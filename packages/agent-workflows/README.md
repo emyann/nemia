@@ -10,6 +10,18 @@ wf up
 wf ls
 ```
 
+To follow it live, use the engine rather than this package — a run's task ids carry the run and the
+step, so the engine's own output already names the work:
+
+```bash
+AE_ROOT="$HOME/.agent-workflows/engine" ae watch
+```
+
+`wf` had a `watch` verb once. It was the better implementation of the two, which was the problem:
+observing the engine is the engine's job, and a workflow layer that owns it is a workflow layer
+that has to be installed before you can see anything. Moving it down made the sentence above —
+*`file`, `tick`, `view`, `logs` and nothing else* — true again.
+
 ## Where this stops
 
 **A workflow orders steps and hands them a workspace. Anything that decides *whether the work is

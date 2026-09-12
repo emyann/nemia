@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, type Engine, type ResumePolicy } from './facade.ts';
+import { createEngine, type Engine, type Event, type ResumePolicy } from './facade.ts';
 
 /** A brief is a markdown file: optional `key: value` frontmatter, body is the prompt. */
 export function parseBrief(text: string, fallbackCwd: string) {
@@ -35,6 +35,22 @@ export function parseBrief(text: string, fallbackCwd: string) {
 const line = (v: { id: string; phase: string; state: { harness?: string; attempts: unknown[]; maxAttempts: number; brief: string }; costUsd?: number; turns?: number }) => {
   const meter = v.costUsd !== undefined ? ` $${v.costUsd.toFixed(3)}/${v.turns ?? 0}t` : '';
   return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${v.state.attempts.length}/${v.state.maxAttempts}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
+};
+
+/**
+ * One journal entry, for a person. Shared by `feed`, `show` and `watch` so the same event does not
+ * read three different ways depending on which verb printed it.
+ */
+const KINDS: Record<string, string> = {
+  filed: 'filed', starting: 'starting', spawned: 'started',
+  ended: 'ended', settled: 'SETTLED', 'stop-requested': 'stop asked',
+};
+
+const entryLine = (taskId: string, event: Event) => {
+  const extra = event.kind === 'settled' ? `  ${event.outcome}`
+    : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'lost' ? ' (lost)' : ''}`
+    : '';
+  return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };
 
 const HELP = `ae — an engine for agent sessions
@@ -89,9 +105,7 @@ export async function main(argv: string[]): Promise<void> {
       const v = await engine.view(arg);
       if (!v.state.brief && !v.state.attempts.length) return console.log(`no such task: ${arg}`);
       const { entries } = await engine.feed(0);
-      for (const e of entries.filter((x) => x.taskId === arg)) {
-        console.log(`${e.event.at.slice(11, 19)}  ${e.event.kind}`);
-      }
+      for (const e of entries.filter((x) => x.taskId === arg)) console.log(entryLine(e.taskId, e.event));
       console.log(`\ncwd: ${v.state.cwd}\nbrief: ${v.state.brief.slice(0, 200)}`);
       return;
     }
@@ -113,19 +127,26 @@ export async function main(argv: string[]): Promise<void> {
 
     case 'feed': {
       const { entries, cursor } = await engine.feed(Number(arg) || 0);
-      for (const e of entries) console.log(`${e.event.at.slice(11, 19)}  ${e.taskId}  ${e.event.kind}`);
+      for (const e of entries) console.log(entryLine(e.taskId, e.event));
       return console.log(`cursor: ${cursor}`);
     }
 
+    // `engine.watch`, not a poll loop of `engine.feed`. The store PUSHES (the file journal watches
+    // the feed), the timer is only the backstop for a store that cannot or an OS event that got
+    // dropped, and a drain guard keeps "at-least-once, in order" true when a push and a tick land
+    // together. All of that already exists behind one method; re-implementing the easy half of it
+    // here is how a CLI ends up being the worst consumer of its own API.
     case 'watch': {
-      let cursor = Number(arg) || 0;
-      console.log(`watching from ${cursor}, ^C to stop`);
-      for (;;) {
-        const got = await engine.feed(cursor);
-        for (const e of got.entries) console.log(`${e.event.at.slice(11, 19)}  ${e.taskId}  ${e.event.kind}`);
-        cursor = got.cursor;
-        await new Promise((r) => setTimeout(r, 1_000));
-      }
+      const from = Number(arg) || 0;
+      console.log(`watching from ${from}, ^C to stop`);
+      await new Promise<void>(() => {
+        engine.watch({
+          from,
+          onEntry: ({ taskId, event }) => console.log(entryLine(taskId, event)),
+          onError: (e) => console.error(String(e)),
+        });
+      });
+      return;
     }
 
     case 'up': {

@@ -372,8 +372,27 @@ t-mtxp3zb3  claude  pending            0/1  Write the number 3 into N3.txt
 t-mtxp3zgs  claude  pending            0/1  Write the number 4 into N4.txt
 ```
 
-`AE_RUNNER=sdk` swaps the compute (see above); note that the SDK runner must stay in one process,
-so use `ae up` rather than repeated `ae tick`.
+### `tick` and `up`, and why both
+
+`up` is `tick` on a timer — `engine.start()`, with a guard so a slow pass never overlaps the next.
+So the question is not why `tick` exists but why `up` does, and the answer is only convenience:
+somewhere has to hold the timer, and a shell loop pays a Node start per pass.
+
+**`tick` is the one that earns its place, because it is the conformance test for level-triggering.**
+A level-triggered engine reads the world, decides, and acts — carrying nothing between passes. If
+repeated one-shot `tick` cannot drive a task to completion but `up` can, some state is hiding in
+the process, and that is a bug however well the suite passes. It is not a hypothetical: the
+quiescence clock was exactly this, and `up` hid it completely.
+
+So: `up` for a daemon, `tick` for cron, CI, a git hook, or one deterministic pass while debugging —
+and `tick` in a loop as the thing that must keep working, or the claim at the top of this file is
+not true. The **one** documented exception is `AE_RUNNER=sdk`, whose sessions live in the process
+that started them; there `up` is required and `tick` genuinely cannot work.
+
+`ae watch` follows the journal. It is `engine.watch` — the store pushes (the file journal watches
+the feed) and the timer is only a backstop — not a poll loop, which is what it used to be while
+the *workflow* layer above it used the good API. A CLI should be the best consumer of its own
+engine, not the worst.
 
 A brief is markdown: `key: value` frontmatter (`cwd`, `model`, `permissionMode`, `maxAttempts`),
 body is the prompt. No YAML dependency, no schema, no template language — yet.

@@ -11,7 +11,7 @@
  */
 import { Context, Effect, Layer, Schema } from 'effect';
 import { execFile } from 'node:child_process';
-import { getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
+import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { Observed, Sighting } from './domain.ts';
 
 export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError', {
@@ -53,13 +53,67 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
   /** Any implementation becomes a Layer. This is the only way a runner reaches the engine. */
   static layer = (ops: RunnerOps) => Layer.succeed(Runner)(Runner.of(ops));
 
-  static claude = () => Runner.layer(claudeOps());
+  static claude = (options?: ClaudeOptions) => Runner.layer(claudeOps(options));
 
   static test = (control?: { sessions: Map<string, Sighting> }) => Runner.layer(testOps(control));
 }
 
-/** Claude Code, through its CLI: the harness owns the session, so nothing here owns a process. */
-export const claudeOps = (): RunnerOps => ({
+/**
+ * How long `working` + not busy must hold before this harness calls a session finished.
+ *
+ * 90 seconds. Long enough that a pause between self-driven steps resumes first — the docs are
+ * explicit that `working` also covers "between steps of work it drives on its own" — and short
+ * enough that a fleet is not waiting on a session that has already written its last word.
+ */
+export const QUIESCENT_AFTER_MS = 90_000;
+
+export type ClaudeOptions = {
+  quiescentAfterMs?: number;
+  now?: () => number;
+  /** When the session's transcript was last written. Injectable so tests need no harness. */
+  transcriptTime?: (sessionId: string) => Promise<number | undefined>;
+};
+
+/**
+ * Claude Code, through its CLI: the harness owns the session, so nothing here owns a process.
+ *
+ * ## What "done" means for this harness, and why it is decided here
+ *
+ * `state: done` is not reliable for the work a fleet actually runs. Measured, three times: a short
+ * single-deliverable task reached `done` in 67 seconds, while every long multi-step task stopped
+ * at `working` and stayed there — 14 minutes in one case, with its transcript frozen and its files
+ * written. Whether anyone was attached made no difference (a controlled pair says so).
+ *
+ * `status` is the signal that does hold. It flipped to `idle` at the exact second the transcript
+ * took its final write, in every probe. Claude Code's own web UI tracks `status` for its liveness
+ * dot rather than `state`, which is the same conclusion arrived at independently.
+ *
+ * So this harness's definition of finished is:
+ *
+ *     done  ⟸  state = done
+ *           ⟸  state = working AND not busy AND transcript quiet, for QUIESCENT_AFTER_MS
+ *
+ * It lives HERE, in the runner, and not in `decide`. `working` and `idle` are this harness's
+ * vocabulary; the engine's is `working | blocked | done | failed | stopped`, and translating one
+ * into the other is the whole job of a runner. A harness that ends by exiting — `codex exec` —
+ * answers the same question by exit code and needs none of this.
+ */
+export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
+  const quiescentAfterMs = options.quiescentAfterMs ?? QUIESCENT_AFTER_MS;
+  const now = options.now ?? (() => Date.now());
+  const transcriptTime = options.transcriptTime ?? (async (sessionId: string) => {
+    try { return (await getSessionInfo(sessionId))?.lastModified; } catch { return undefined; }
+  });
+
+  /**
+   * When each session went quiet, and where its transcript was then.
+   *
+   * Runner-local and re-derivable: losing it after a restart only restarts the clock, which delays
+   * a verdict rather than changing one. Never a source of truth.
+   */
+  const quietSince = new Map<string, { at: number; transcriptAt?: number }>();
+
+  return ({
     spawn: (r) => sh('claude', [
       '--bg',
       '--name', r.name,
@@ -101,6 +155,32 @@ export const claudeOps = (): RunnerOps => ({
         }
         return m;
       }),
+      // Second pass: apply this harness's own definition of finished to whatever is still
+      // `working`. Only quiescent candidates cost a transcript read, so a busy fleet pays nothing.
+      Effect.flatMap((m) => Effect.forEach(
+        [...m],
+        ([name, sighting]) => {
+          if (sighting.state !== 'working' || sighting.busy) {
+            quietSince.delete(name);
+            return Effect.succeed([name, sighting] as const);
+          }
+          return Effect.promise(() => transcriptTime(sighting.sessionId)).pipe(
+            Effect.map((writtenAt) => {
+              const t = now();
+              const mark = quietSince.get(name);
+              // A transcript that moved means it was between steps, not finished. Restart the clock.
+              if (!mark || (writtenAt !== undefined && writtenAt !== mark.transcriptAt)) {
+                quietSince.set(name, { at: t, transcriptAt: writtenAt });
+                return [name, sighting] as const;
+              }
+              return t - mark.at >= quiescentAfterMs
+                ? [name, { ...sighting, state: 'done' as const }] as const
+                : [name, sighting] as const;
+            }),
+          );
+        },
+        { concurrency: 'unbounded' },
+      ).pipe(Effect.map((entries) => new Map(entries)))),
     ),
 
     // `claude stop` takes the short id, which is the uuid's first block.
@@ -114,7 +194,8 @@ export const claudeOps = (): RunnerOps => ({
         try: () => getSessionMessages(sessionId),
         catch: (cause) => new RunnerError({ verb: 'logs', message: String(cause) }),
       }).pipe(Effect.map(renderTranscript)),
-});
+  });
+};
 
 /** A harness that costs nothing: sessions are a map, and a test moves them by hand. */
 export const testOps = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }): RunnerOps => {

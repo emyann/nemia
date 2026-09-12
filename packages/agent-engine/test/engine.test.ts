@@ -400,3 +400,23 @@ test('a probe never invents a session it has not seen', async () => {
   await b.run(step(id, new Map()));          // journals `starting` only
   assert.equal((await b.run(view(id, new Map()))).state.settled, null);
 });
+
+test('a doneFile inherited from before the attempt proves nothing', async () => {
+  // The bug a real run found in six seconds. A workflow hands work along a git branch; the step
+  // before had committed its marker onto that branch; the next step's worktree was cut with the
+  // probe already satisfied. It settled `succeeded` having done nothing, and the board agreed.
+  const b = board();
+  const cwd = scratch();
+  fs.writeFileSync(path.join(cwd, 'FINISHED'), 'left behind by whoever came before');
+
+  const id = await b.run(file({ brief: 'do it', cwd, doneFile: 'FINISHED' }));
+  await b.run(tick());
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'inherited, not earned');
+
+  // The workload's own write, now, does end it.
+  fs.writeFileSync(path.join(cwd, 'FINISHED'), 'this attempt says so');
+  await b.run(tick());
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
+});

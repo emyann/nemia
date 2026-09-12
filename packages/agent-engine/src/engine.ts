@@ -70,13 +70,33 @@ export const requestStop = Effect.fn('requestStop')(function* (taskId: string) {
  * Existence only, and only over a sighting we already have: satisfying a probe says the work is
  * finished, not that a session we have never seen exists.
  */
+const markerFor = (state: State) => path.resolve(state.cwd, state.doneFile!);
+
+/**
+ * Disarm the probe before the attempt runs, so a marker that appears afterwards is THIS attempt's.
+ *
+ * Existence alone was not enough, and a real run proved it in six seconds. A workflow hands work
+ * along a git branch; the step before had committed its marker onto that branch; the next step was
+ * cut a worktree that already contained a satisfied probe, and settled `succeeded` before doing
+ * anything. Twice. The board said the run was fine — a false completion, which is the one failure
+ * this engine is not allowed to have, because a stall is visible and this is not.
+ *
+ * Clearing beats comparing a timestamp: the filesystem's clock and this process's are not the same
+ * clock — measured 1.3ms apart on this machine — so `written after we started` is a race at close
+ * range. Nothing is armed until we disarm it, and then only the workload can arm it again.
+ */
+const disarm = Effect.fn('disarm')(function* (state: State) {
+  if (!state.doneFile) return;
+  yield* Effect.sync(() => { try { fs.rmSync(markerFor(state)); } catch { /* nothing to clear */ } });
+});
+
 const probed = (state: State, observed: ReadonlyMap<string, Sighting>): ReadonlyMap<string, Sighting> => {
   const last = state.attempts.at(-1);
   if (!state.doneFile || !last || last.ended !== null) return observed;
   const name = nameFor(state.taskId, last.n);
   const seen = observed.get(name);
   if (!seen || seen.state !== 'working') return observed;
-  if (!fs.existsSync(path.resolve(state.cwd, state.doneFile))) return observed;
+  if (!fs.existsSync(markerFor(state))) return observed;
   return new Map(observed).set(name, { ...seen, state: 'done' });
 };
 
@@ -106,6 +126,7 @@ export const step = Effect.fn('step')(function* (
       break;
 
     case 'spawn':
+      yield* disarm(state);
       yield* runner.spawn({
         name: action.name, brief: state.brief, cwd: state.cwd,
         model: state.model, permissionMode: state.permissionMode, harness: state.harness,

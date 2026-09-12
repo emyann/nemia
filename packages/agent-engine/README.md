@@ -188,6 +188,31 @@ across five sessions:
 | two eval runs | medium | yes | stuck `working`, 11 min |
 | live run | long, 9m24s, 5 files + tests | no | **`done/idle`**, straight from `working/busy` |
 
+Twelve sessions in, sorted by how long they ran:
+
+| session | harness | resumed | seconds | outcome |
+|---|---|---|---|---|
+| split/respond | claude | **yes** | 6499 | **stalled at `working`** |
+| cancel/implement | claude | no | 563 | `state: done` |
+| cancel/respond | claude | **yes** | 532 | **stalled at `working`** |
+| split/implement | claude | no | 131 | `state: done` |
+| cancel/review | codex | no | 69 | `state: done` |
+| split/review | codex | no | 45 | `state: done` |
+| probe a1 a2 c1 c2 | claude | no | 8–17 | `state: done` |
+| probe b1 b2 | claude | **yes** | 12 | `state: done` |
+
+`probe a/b/c` was built to test one hypothesis — *resumed sessions never reach `done`* — with four
+byte-identical briefs, two carrying `resumeFrom` and two cold. **It is refuted:** both resumed
+sessions reached `done` in twelve seconds.
+
+What the table leaves standing is an *interaction*, not a main effect. Neither factor predicts a
+stall alone — cold-and-long reached `done`, resumed-and-short reached `done` — but **both stalls
+were sessions that were resumed AND ran for minutes.** That cell holds 2 of 2 and is the one the
+probe did not test, because short tasks were chosen to make it fast, which is exactly what made it
+unable to reach the surviving question. The decisive run is a resumed session given ten minutes of
+work. Until someone does it, the trigger is still unknown, and the predicate below is what stands
+in for knowing.
+
 The controlled pair — same task, one attached and one not — rules out the obvious suspect: **being
 watched changes nothing.** The docs agree ("attaching does not change the session's recorded
 state"), and a snapshot taken mid-attach showed `kind`, `state` and `status` all unmoved. Task

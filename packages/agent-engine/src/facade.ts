@@ -221,8 +221,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
       };
 
       const unsubscribe = journalOps?.subscribe?.(() => void drain());
+      // Also not unref'd, for the same reason. The file store's `fs.watch` happens to hold the
+      // loop open, which is exactly why this hid here: a store WITHOUT `subscribe` would have
+      // exited on the spot, and the store is the part a consumer is invited to replace.
       const timer = setInterval(() => void drain(), intervalMs);
-      timer.unref?.();
       void drain();
 
       return {
@@ -243,7 +245,9 @@ export function createEngine(options: EngineOptions = {}): Engine {
         catch (e) { o.onError?.(e); }
         finally { running = false; }
       }, every);
-      timer.unref?.();
+      // NOT unref'd. A control loop that lets its host exit is a control loop that does nothing:
+      // `ae up` printed its banner and returned, because an unref'd interval does not hold the
+      // event loop open. `stop()` is how a consumer gets their process back.
       return { stop: () => { stopped = true; clearInterval(timer); } };
     },
   };

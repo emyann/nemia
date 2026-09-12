@@ -27,6 +27,9 @@ export function parseBrief(text: string, fallbackCwd: string) {
     maxAttempts: meta.maxAttempts ? Number(meta.maxAttempts) : 1,
     deadlineSeconds: meta.deadlineSeconds ? Number(meta.deadlineSeconds) : undefined,
     resume: meta.resume as ResumePolicy | undefined,
+    // Which session to CONTINUE, as opposed to `resume` which is the retry policy between
+    // attempts of this task. Two different questions that the same English word answers.
+    resumeFrom: meta.resumeFrom,
     // `worktree: true` lets the harness name it; any other value names it yourself.
     worktree: meta.worktree === undefined ? undefined : meta.worktree === 'true' ? true : meta.worktree,
   };
@@ -69,7 +72,8 @@ const HELP = `ae — an engine for agent sessions
     cwd, model, maxAttempts, permissionMode
     harness          claude (default) | codex | claude-detached
     deadlineSeconds  wall clock across all attempts
-    resume           interrupted (default) | always | never
+    resume           interrupted (default) | always | never — the RETRY policy
+    resumeFrom       a session id to continue, instead of starting cold
     worktree         true, or a name — the harness cuts it
 
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster

@@ -194,3 +194,41 @@ test('the file store pushes: a watcher hears about a write it did not poll for',
 
   assert.deepEqual(seen, ['filed'], 'delivered without waiting for the interval');
 });
+
+/**
+ * The one property a test running INSIDE the test runner cannot check.
+ *
+ * `start()` and `watch()` both used to `unref()` their interval, so neither held the event loop
+ * open. Every in-process test passed — the runner was keeping the process alive — while `ae up`
+ * printed its banner and exited, doing nothing at all. The only way to see it is from outside,
+ * so this spawns a real child and asks whether it is still there.
+ */
+import { spawn } from 'node:child_process';
+
+const survives = (body: string) => new Promise<boolean>((resolve) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-alive-'));
+  const child = spawn(process.execPath, ['--input-type=module', '-e', `
+    import { createEngine } from '${path.resolve('src/facade.ts')}';
+    const engine = createEngine({ root: ${JSON.stringify(root)} });
+    ${body}
+  `], { stdio: 'ignore' });
+  let exited = false;
+  child.on('exit', () => { exited = true; });
+  setTimeout(() => { const alive = !exited; child.kill(); resolve(alive); }, 1_200);
+});
+
+test('start() keeps its host process alive — a loop that lets you exit is not a loop', async () => {
+  assert.equal(await survives('engine.start({ intervalMs: 200 });'), true);
+});
+
+test('watch() keeps its host process alive, even with a store that cannot push', async () => {
+  // The file store's fs.watch holds the loop open by accident, which is how this hid. A store
+  // with no `subscribe` — the kind a consumer brings — has only the interval.
+  assert.equal(await survives(`
+    const store = {
+      append: async () => {}, read: async () => [], list: async () => [],
+      feed: async () => ({ entries: [], cursor: 0 }),
+    };
+    createEngine({ journal: store }).watch({ onEntry: () => {} });
+  `), true);
+});

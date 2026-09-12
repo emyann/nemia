@@ -214,7 +214,6 @@ export const codex: HarnessSpec = {
     cmd: 'codex',
     args: [
       'exec',
-      ...(r.resumeFrom ? ['resume', r.resumeFrom] : []),
       '--json',
       '--skip-git-repo-check',
       '-C', r.cwd,
@@ -231,6 +230,10 @@ export const codex: HarnessSpec = {
       // message conform; `-o` writes it where the runner chose, outside the workspace, so it
       // cannot travel into the next step's branch. Verified against 0.154.0, strict schema.
       ...(io?.closeoutFile ? ['--output-schema', io.closeoutSchemaFile!, '-o', io.closeoutFile] : []),
+      // `resume` LAST, after every flag: its own usage is `[SESSION_ID] [PROMPT]`, and it rejects
+      // `-C`, `-s` and `--add-dir` after the id ("unexpected argument"). The earlier order put the
+      // flags after it, so resuming a Codex task never parsed — nothing had ever resumed one.
+      ...(r.resumeFrom ? ['resume', r.resumeFrom] : []),
       r.brief,
     ],
   }),

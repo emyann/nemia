@@ -258,3 +258,19 @@ test('outside a repository there is nothing extra to open up', async () => {
   await Effect.runPromise(detachedOps(spy, root()).spawn({ name: 'ae/t12/1', brief: 'x', cwd: plain }));
   assert.equal(given?.writableRoots, undefined);
 });
+
+test('a resumed codex task puts every flag before `resume`, then the id, then the prompt', async () => {
+  // `codex exec resume <id> -C … -s …` fails to parse: the subcommand takes only `[SESSION_ID]
+  // [PROMPT]`. Verified against 0.154.0. The spec emitted exactly that shape until this test.
+  const { codex } = await import('../src/runner-detached.ts');
+  const args = codex.command(
+    { name: 'ae/t/2', brief: 'answer the review', cwd: '/wt', resumeFrom: 'abc-123', worktree: true, closeoutSchema: {} },
+    { writableRoots: ['/repo/.git'], closeoutSchemaFile: '/b/s.json', closeoutFile: '/b/o.json' },
+  ).args;
+  const at = args.indexOf('resume');
+  assert.notEqual(at, -1);
+  assert.deepEqual(args.slice(at), ['resume', 'abc-123', 'answer the review'], 'nothing but the id and the prompt after it');
+  for (const flag of ['-C', '-s', '--add-dir', '--output-schema', '-o', '--worktree']) {
+    assert.ok(args.indexOf(flag) !== -1 && args.indexOf(flag) < at, `${flag} before resume`);
+  }
+});

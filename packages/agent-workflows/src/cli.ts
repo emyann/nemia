@@ -14,6 +14,7 @@ const HELP = `wf — run a workflow of agent steps
   wf ls [runId]                runs and their steps
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
+  wf watch                     follow the engine, live
 
 A workflow is a folder of markdown files. One file is one step:
 
@@ -96,6 +97,28 @@ export async function main(argv: string[]): Promise<void> {
       if (!rest[0]) return console.log(HELP);
       const run = readRun(rest[0]);
       console.log(JSON.stringify({ ...run, brief: `${run.brief.slice(0, 120)}…` }, null, 2));
+      return;
+    }
+
+    case 'watch': {
+      // The engine's own event surface, rendered for a person. Task ids carry the run and the
+      // step, so a line says which piece of work moved without looking anything up.
+      console.log('watching — ^C to stop');
+      const kinds: Record<string, string> = {
+        filed: 'filed', starting: 'starting', spawned: 'started',
+        ended: 'ended', settled: 'SETTLED', 'stop-requested': 'stop asked',
+      };
+      await new Promise<void>(() => {
+        e.watch({
+          onEntry: ({ taskId, event }) => {
+            const extra = event.kind === 'settled' ? `  ${event.outcome}`
+              : event.kind === 'ended' ? `  ${event.observed}`
+              : '';
+            console.log(`${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(kinds[event.kind] ?? event.kind).padEnd(10)}${extra}`);
+          },
+          onError: (err) => console.error(String(err)),
+        });
+      });
       return;
     }
 

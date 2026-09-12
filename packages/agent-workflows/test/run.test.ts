@@ -139,3 +139,15 @@ test('a fan-in step is told it is holding merged work, and that conflicts are it
   assert.match(brief, /work of a and b has been merged/);
   assert.match(brief, /yours to resolve/);
 });
+
+test('a run id is readable, and step ids share its prefix', async () => {
+  // The session a person sees in `claude agents` is named from the task id, so the id is the only
+  // thing standing between them and `ae/t-mtxvs3nw-f4763a59/1`.
+  const { runId } = await import('../src/runner.ts');
+  const id = runId('Add a `split` example workflow to this repository: a step whose job is...');
+  assert.match(id, /^add-a-split-example-workflow-[a-z0-9]{4}$/);
+  assert.equal(`${id}-implement`.startsWith(id), true, 'a step id carries its run');
+
+  assert.match(runId('!!!'), /^run-[a-z0-9]{4}$/, 'a brief with nothing sluggable still gets an id');
+  assert.notEqual(runId('same brief'), runId('same brief'), 'two runs of one request stay apart');
+});

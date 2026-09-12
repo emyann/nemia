@@ -136,6 +136,19 @@ function workspaceFor(
   return { workspace, branch, conflicted };
 }
 
+/**
+ * A run id a person can read.
+ *
+ * The engine lets the caller choose task ids, and a session's name is built from one — so the id
+ * IS what a human sees in `claude agents`. `t-mtxvs3nw-f4763a59` tells them nothing;
+ * `add-split-workflow-8imz` tells them which piece of work they are looking at, and the step
+ * suffix tells them which part of it. The random tail keeps two runs of the same request apart.
+ */
+export const runId = (brief: string): string => {
+  const slug = brief.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28).replace(/-$/, '');
+  return `${slug || 'run'}-${Math.random().toString(36).slice(2, 6)}`;
+};
+
 export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean }): Run {
   const steps = loadWorkflows(opts.workflowDir);   // validated before anything is spent
   if (opts.isolate === false && fansOut(steps)) {
@@ -144,7 +157,7 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
       'Either drop --no-worktree, or make the steps a chain.',
     );
   }
-  const id = `r-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const id = runId(opts.brief);
   const isolate = opts.isolate ?? true;
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
 
@@ -200,6 +213,11 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     const place = workspaceFor(run, steps, step);
 
     const taskId = await e.file({
+      // The task id is chosen, not generated, so the harness session reads `ae/<run>-<step>/1`.
+      // A person scanning their sessions then sees which run and which step, and two steps of one
+      // run share a prefix — which is what makes a resumed step legible as a continuation rather
+      // than a duplicate.
+      id: `${run.id}-${name}`,
       brief: composeBrief(step, run, steps),
       cwd: place.workspace,
       harness: step.harness,

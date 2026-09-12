@@ -10,7 +10,8 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { detachedOps, STALE_MS, type HarnessSpec } from '../src/runner-detached.ts';
+import { detachedOps, STALE_MS, trustedProjects, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
 import { testOps } from '../src/runner.ts';
 import type { Sighting } from '../src/domain.ts';
@@ -242,4 +243,75 @@ test('a resumed codex task puts every flag before `resume`, then the id, then th
   for (const flag of ['-C', '-s', '--output-schema', '-o', '--worktree']) {
     assert.ok(args.indexOf(flag) !== -1 && args.indexOf(flag) < at, `${flag} before resume`);
   }
+});
+
+// ─── trust: extended from your own Codex config, never granted ──────────────
+
+test('trusted projects are read the way Codex writes them, and only those', () => {
+  const toml = [
+    '[projects."/home/u/repo"]', 'trust_level = "trusted"', '',
+    '[projects."/home/u/other"]', 'trust_level = "untrusted"', '',
+    '[model_providers.x]', 'trust_level = "trusted"',
+  ].join('\n');
+  assert.deepEqual([...trustedProjects(toml)], ['/home/u/repo']);
+});
+
+/** A repository with one linked worktree, and a Codex home that does or does not trust it. */
+const repoWithWorktree = (trust: boolean) => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-trust-repo-'));
+  execFileSync('git', ['init', '-q'], { cwd: repo });
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: repo });
+  const wt = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ae-trust-wt-')), 'step');
+  execFileSync('git', ['worktree', 'add', '-q', wt], { cwd: repo, stdio: 'ignore' });
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-codex-home-'));
+  if (trust) fs.writeFileSync(path.join(home, 'config.toml'), `[projects."${repo}"]\ntrust_level = "trusted"\n`);
+  return { repo, wt, home };
+};
+
+const inCodexHome = <T>(home: string, f: () => T): T => {
+  const prev = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = home;
+  try { return f(); } finally { if (prev === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = prev; }
+};
+
+test('a worktree of a repository you trust in Codex is trusted for the run, repository included', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const { repo, wt, home } = repoWithWorktree(true);
+  const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
+  assert.deepEqual(io.trustedDirs, [repo, wt]);
+});
+
+test('a repository you never trusted gets no trust from the engine', async () => {
+  // Trusting it would also load whatever Codex settings it ships. Not the engine's call.
+  const { codex } = await import('../src/runner-detached.ts');
+  const { wt, home } = repoWithWorktree(false);
+  const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
+  assert.equal(io.trustedDirs, undefined);
+});
+
+test('outside a repository there is nothing to extend', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-plain-'));
+  assert.deepEqual(codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: plain }), {});
+});
+
+test('trust reaches codex as config overrides, every one before `resume`', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const args = codex.command({ name: 'ae/t/2', brief: 'the prompt', cwd: '/wt', resumeFrom: 'abc' }, { trustedDirs: ['/repo', '/wt'] }).args;
+  const overrides = args.flatMap((a, i) => (a === '-c' ? [args[i + 1]] : []));
+  assert.deepEqual(overrides, ['projects."/repo".trust_level="trusted"', 'projects."/wt".trust_level="trusted"']);
+  assert.ok(args.lastIndexOf('-c') < args.indexOf('resume'));
+  assert.equal(args.at(-1), 'the prompt');
+});
+
+test("the runner merges what a spec prepares into what its command is given", async () => {
+  let given: HarnessIO | undefined;
+  const spy: HarnessSpec = {
+    name: 'sh',
+    prepare: () => ({ trustedDirs: ['/somewhere'] }),
+    command: (_r, io) => { given = io; return { cmd: 'sh', args: ['-c', 'exit 0'] }; },
+  };
+  await Effect.runPromise(detachedOps(spy, root()).spawn({ name: 'ae/t13/1', brief: 'x', cwd: root(), closeoutSchema: {} }));
+  assert.deepEqual(given?.trustedDirs, ['/somewhere']);
+  assert.ok(given?.closeoutFile, 'alongside what the runner chose itself');
 });

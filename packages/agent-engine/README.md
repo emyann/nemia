@@ -288,33 +288,73 @@ session whose transcript cannot be read gets no verdict at all; the deadline is 
 
 ### The workload's own word
 
-Everything above is us guessing from outside. A task may instead declare `doneFile` — a path under
-its `cwd` — and the moment that file exists the attempt is over. No ninety-second wait, no stall to
-characterise, because the workload said so rather than being read.
+Everything above is us guessing from outside. A task may instead declare `closeoutSchema` — a JSON
+Schema — and the harness asks the workload for a final answer in that shape. **The moment it gives
+one, the attempt is over:** no ninety-second wait, no stall to characterise, because the workload
+said so.
 
-The engine checks **existence and nothing else.** It never opens the file. Two conditions guard it,
-both learned from a real run rather than reasoned out: the marker is **cleared before every
-attempt**, so one inherited from a previous step down a git branch proves nothing; and it is
-ignored while the session is **busy**, because a marker is a claim and a claim is not final. A step
-once wrote `{"outcome":"done"}`, carried on, found it could not commit, and eleven seconds later
-rewrote the same file to `{"outcome":"blocked"}` — by which time the probe had fired and the next
-step was running on the first version. What is written there is
-between the workload and whoever reads it next, and an engine that parsed it would be an engine
-that had learned some workflow's vocabulary — the same line `harness` already holds, where the
-engine dispatches on a string it never interprets.
+How each harness is asked, both verified live:
 
-It layers UNDER the harness's answer instead of replacing it, and that ordering is the point.
-Hermes Kanban solves the same problem with a terminal tool call — `kanban_complete(...)` — and can
-require it because every worker is theirs. You cannot inject a tool into `codex exec`, so for a
-fleet of harnesses nobody here wrote, **declaration is the fast path and observation is the floor.**
-A workload that never writes the file falls back to exactly what happened before; one that does
-skips the guessing entirely.
+| harness | how | where the answer lands |
+|---|---|---|
+| Claude Code | `--json-schema`: the session gets a `StructuredOutput` tool and calls it to finish. Works under `--bg`, though documented only for `-p` (2.1.270). | the session's transcript |
+| Codex | `exec --output-schema`, with `-o` at a file the runner chose outside the workspace (0.154.0, strict schema) | that file |
+
+Runners report the statement **and when it was made**. The engine decides whether it belongs to this
+attempt, records it on the attempt (`state.attempts[n].closeout`), and never reads it. Two rules
+guard that decision, both learned from real runs:
+
+- **Made before the attempt began, it was inherited, not said.** A resumed Claude Code session's
+  transcript holds its parent's entire conversation under the child's own session id — 460 entries,
+  measured — so the parent's `StructuredOutput` call arrives looking exactly like the child's. Only
+  the time tells them apart, and only the journal knows when the attempt started.
+- **From a busy session, it is not final.** A step once declared itself done, carried on, found it
+  could not commit, and revised its verdict eleven seconds later.
+
+It replaced a file the workload wrote into its own directory (`doneFile`), and that file is why the
+design looks like this. A file in the workspace travels down a git branch: the next step was cut a
+worktree that already said it was finished, two steps settled `succeeded` in six seconds each having
+done nothing, and the board called the run healthy. A statement made to the harness lives in the
+session, not in the repository.
+
+It layers UNDER the harness's own answer rather than replacing it. [Hermes
+Kanban](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban) solves the same
+problem with a terminal tool call, `kanban_complete(...)`, which it can require because every worker
+is its own. Here a structured final answer is the fast path and observation is the floor: a workload
+that never gives one ends exactly as it did before.
 
 **It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
 engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
 job of a runner. `decide` did not change. Codex, which ends by exiting, needs none of this and gets
 none of it. And because it is a translation rather than a judgement, it tests with an injected clock
 and an injected transcript — eight tests, no harness, no spend.
+
+## Letting a sandboxed Codex step commit
+
+Codex's `workspace-write` sandbox keeps `.git` read-only on purpose — including the real git
+directory behind a worktree's `.git` pointer — because a writable `.git/hooks` would let an agent
+plant code that runs outside the sandbox the next time anyone runs git. No writable-root flag
+changes that: `--add-dir` was tried against a real run and removed ([openai/codex#27418](https://github.com/openai/codex/issues/27418)).
+
+What does work is a Codex **rule** plus **trust**. A repository that ships
+`.codex/rules/git-commit.rules`
+
+```
+prefix_rule(pattern = ["git", ["add", "commit"]], decision = "allow")
+```
+
+lets exactly `git add` and `git commit` run outside the sandbox. `git push`, `git -c … commit` and
+`rm -rf .git` do not match and stay inside it. Codex loads a project's rules only when the project is
+trusted, and the one configuration measured to let a step commit from a worktree had the repository
+**and** the worktree trusted.
+
+So the Codex spec **extends trust and never grants it.** When a worktree's repository is already
+trusted in your own `~/.codex/config.toml`, the worktree is trusted for that run too
+(`codex.prepare`). A repository you have not trusted gets nothing, because trusting it would also
+load whatever other Codex settings it ships — not a decision an engine gets to make for you.
+
+A step that still cannot commit is not stuck. Committing is the workflow layer's job: it commits
+what a step leaves behind. The rule is what lets Codex do it itself.
 
 ## Which runner: CLI or Agent SDK
 

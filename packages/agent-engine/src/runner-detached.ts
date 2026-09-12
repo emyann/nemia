@@ -18,7 +18,8 @@
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import os from 'node:os';
+import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Observed, Sighting } from './domain.ts';
 import { RunnerError, worktreeName, type RunnerOps, type SpawnRequest } from './runner.ts';
@@ -28,6 +29,12 @@ export type HarnessSpec = {
   name: string;
   /** The command that runs a brief to completion. Exit 0 is success; anything else is failure. */
   command: (r: SpawnRequest, io?: HarnessIO) => { cmd: string; args: string[] };
+  /**
+   * What this harness needs to know about the machine before it runs — read from disk, from git —
+   * kept out of `command` so that stays a pure function of what it is given. Merged into the `io`
+   * the command receives.
+   */
+  prepare?: (r: SpawnRequest) => Partial<HarnessIO>;
   /**
    * A regex with one capture group, matched against the harness's output, that finds ITS session
    * id — needed only to resume later. Optional: the name is the key, this is just a handle.
@@ -47,6 +54,8 @@ export type HarnessIO = {
   closeoutSchemaFile?: string;
   /** Where the harness should write the final answer that satisfies the schema. */
   closeoutFile?: string;
+  /** Directories to treat as trusted for this run. Codex loads a project's rules only when trusted. */
+  trustedDirs?: string[];
 };
 
 /** How long a run file may go unbeaten before `observe` calls it dead. Worker beats every 5s. */
@@ -117,6 +126,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             fs.writeFileSync(schemaFile(r.name), JSON.stringify(r.closeoutSchema));
             io = { closeoutSchemaFile: schemaFile(r.name), closeoutFile: closeoutFile(r.name) };
           }
+          io = { ...io, ...spec.prepare?.(r) };
           const { cmd, args } = spec.command(r, io);
           const plan = {
             name: r.name, cmd, args, cwd: r.cwd, logFile: logFile(r.name),
@@ -180,6 +190,33 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
 // ─── the harnesses ──────────────────────────────────────────────────────────
 
 /**
+ * The project paths a Codex config trusts.
+ *
+ * Reads only `[projects."<path>"]` tables holding `trust_level = "trusted"` — the shape Codex writes
+ * itself — not TOML in general. A config it cannot read trusts nothing.
+ */
+export const trustedProjects = (toml: string): Set<string> => {
+  const trusted = new Set<string>();
+  let current: string | undefined;
+  for (const raw of toml.split('\n')) {
+    const line = raw.trim();
+    const table = /^\[projects\."((?:[^"\\]|\\.)*)"\]$/.exec(line);
+    if (table) { current = table[1]; continue; }
+    if (line.startsWith('[')) { current = undefined; continue; }
+    if (current !== undefined && /^trust_level\s*=\s*"trusted"$/.test(line)) trusted.add(current);
+  }
+  return trusted;
+};
+
+/** The repository a directory's commits land in: the parent of its git common dir. */
+const repositoryOf = (cwd: string): string | undefined => {
+  try {
+    const common = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return path.dirname(path.resolve(cwd, common));
+  } catch { return undefined; }
+};
+
+/**
  * Codex, through `codex exec`. Verified against codex-cli 0.154.0:
  *   --json                  JSONL events on stdout
  *   -C <dir>                working root
@@ -206,6 +243,8 @@ export const codex: HarnessSpec = {
       // message conform; `-o` writes it where the runner chose, outside the workspace, so it
       // cannot travel into the next step's branch. Verified against 0.154.0, strict schema.
       ...(io?.closeoutFile ? ['--output-schema', io.closeoutSchemaFile!, '-o', io.closeoutFile] : []),
+      // Trust, as found by `prepare`: what lets a repository's own `.codex/rules` load in a worktree.
+      ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),
       // `resume` LAST, after every flag: its own usage is `[SESSION_ID] [PROMPT]`, and it rejects
       // `-C`, `-s` and `--add-dir` after the id ("unexpected argument"). The earlier order put the
       // flags after it, so resuming a Codex task never parsed — nothing had ever resumed one.
@@ -215,6 +254,26 @@ export const codex: HarnessSpec = {
   }),
   // Best effort: codex prints a thread/session id in its JSONL. Only needed for resume.
   nativeIdPattern: '"(?:thread_id|session_id|id)"\\s*:\\s*"([0-9a-f-]{16,})"',
+  /**
+   * Trust is extended, never granted.
+   *
+   * Codex keeps `.git` read-only inside its sandbox on purpose, so a step can only commit its own
+   * work when a rule lets `git add`/`git commit` run outside it — and Codex loads a project's rules
+   * only when the project is trusted. The one configuration measured to work had the repository AND
+   * the worktree trusted; a worktree is a new path, so it is never trusted on its own.
+   *
+   * So a worktree whose repository you already trust in your own Codex config is trusted for the
+   * run, and nothing else is. Trusting a repository you never trusted would also load whatever other
+   * Codex settings it ships, and that is not a decision this engine gets to make for you.
+   */
+  prepare: (r) => {
+    const repo = repositoryOf(r.cwd);
+    if (!repo) return {};
+    const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
+    let trusted: Set<string>;
+    try { trusted = trustedProjects(fs.readFileSync(config, 'utf8')); } catch { return {}; }
+    return trusted.has(repo) ? { trustedDirs: [...new Set([repo, r.cwd])] } : {};
+  },
 };
 
 /** Claude Code run the same way — detached by us rather than by the harness. For comparison. */

@@ -96,6 +96,17 @@ const probed = (state: State, observed: ReadonlyMap<string, Sighting>): Readonly
   const name = nameFor(state.taskId, last.n);
   const seen = observed.get(name);
   if (!seen || seen.state !== 'working') return observed;
+  // Still computing? Then it is not finished, whatever it has written down.
+  //
+  // A marker is a CLAIM, and a real run showed the claim is not always final: a step wrote
+  // `{"outcome":"done"}`, kept going, discovered it could not commit, and eleven seconds later
+  // rewrote the same file to `{"outcome":"blocked"}`. The probe had already fired on the first
+  // version and the workflow above had already started the next step on it.
+  //
+  // `busy` is a second, independent fact and it costs one tick to consult. The workload's word
+  // AND its process at rest is a far stronger signal than either alone, and a marker written by
+  // something still working is exactly the case where the word is worth least.
+  if (seen.busy) return observed;
   if (!fs.existsSync(markerFor(state))) return observed;
   return new Map(observed).set(name, { ...seen, state: 'done' });
 };

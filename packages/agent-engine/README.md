@@ -292,7 +292,13 @@ Everything above is us guessing from outside. A task may instead declare `doneFi
 its `cwd` — and the moment that file exists the attempt is over. No ninety-second wait, no stall to
 characterise, because the workload said so rather than being read.
 
-The engine checks **existence and nothing else.** It never opens the file. What is written there is
+The engine checks **existence and nothing else.** It never opens the file. Two conditions guard it,
+both learned from a real run rather than reasoned out: the marker is **cleared before every
+attempt**, so one inherited from a previous step down a git branch proves nothing; and it is
+ignored while the session is **busy**, because a marker is a claim and a claim is not final. A step
+once wrote `{"outcome":"done"}`, carried on, found it could not commit, and eleven seconds later
+rewrote the same file to `{"outcome":"blocked"}` — by which time the probe had fired and the next
+step was running on the first version. What is written there is
 between the workload and whoever reads it next, and an engine that parsed it would be an engine
 that had learned some workflow's vocabulary — the same line `harness` already holds, where the
 engine dispatches on a string it never interprets.

@@ -420,3 +420,25 @@ test('a doneFile inherited from before the attempt proves nothing', async () => 
   await b.run(tick());
   assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
 });
+
+test('a marker written by a session that is still busy is a claim, not a verdict', async () => {
+  // Measured: a step wrote {"outcome":"done"}, carried on, found it could not commit, and eleven
+  // seconds later rewrote the file to {"outcome":"blocked"}. The probe fired on the first version
+  // and the next step was already running on it.
+  const b = board();
+  const cwd = scratch();
+  const id = await b.run(file({ brief: 'do it', cwd, doneFile: 'FINISHED' }));
+  await b.run(tick());
+
+  const name = nameFor(id, 1);
+  b.sessions.set(name, { ...b.sessions.get(name)!, busy: true });
+  fs.writeFileSync(path.join(cwd, 'FINISHED'), 'first thoughts');
+  await b.run(tick());
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'still typing');
+
+  b.sessions.set(name, { ...b.sessions.get(name)!, busy: false });
+  await b.run(tick());
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
+});

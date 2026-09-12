@@ -1,0 +1,169 @@
+/**
+ * A run is one workflow, once, over one workspace.
+ *
+ * Same shape as the engine underneath it: `assess()` is pure and decides everything; the file
+ * store and the engine calls are the I/O around it. A run holds no status of its own — whether it
+ * is finished is a question about its steps' tasks, and the engine can answer that. Copying the
+ * answer here would be a second source of truth that goes stale the moment a task settles.
+ */
+import type { TaskView } from 'agent-engine';
+import type { Workflow } from './workflow.ts';
+
+/** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
+export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';
+
+export type Run = {
+  id: string;
+  /** The repository the work is about. */
+  repo: string;
+  /** Where the run's first step works. Later steps inherit, fork or merge from it. */
+  workspace: string;
+  /** The commit the workspace started from, so a reviewer can diff against it. */
+  baseRef: string;
+  /** The repository's branch when the run started. */
+  branch: string;
+  /** Whether each step gets a worktree of its own. False only for `--no-worktree`. */
+  isolate: boolean;
+  /** What the person actually asked for. This travels to EVERY step; it is the spec. */
+  brief: string;
+  workflowDir: string;
+  /** Per step: the task the engine ran, and the workspace and branch it ran in. */
+  steps: Record<string, { taskId: string | null; workspace?: string; branch?: string }>;
+  createdAt: string;
+};
+
+export type Assessment = {
+  /** Steps whose predecessors have all succeeded and which have not been filed. File these. */
+  ready: string[];
+  /** Steps that can never run, because something they wait on failed. */
+  blocked: string[];
+  status: 'running' | 'succeeded' | 'failed';
+};
+
+/**
+ * What should happen to this run now. Pure — hand it the engine's view of each task and it
+ * decides; it reads no disk and calls no engine.
+ */
+export function assess(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): Assessment {
+  const phase = (name: string): TaskPhase | 'unfiled' => {
+    const id = run.steps[name]?.taskId;
+    return id ? phaseOf(id) : 'unfiled';
+  };
+
+  const ready: string[] = [];
+  const blocked: string[] = [];
+
+  for (const step of steps) {
+    if (phase(step.name) !== 'unfiled') continue;
+    const deps = step.after.map((a) => phase(a));
+    // A predecessor that failed or was stopped is final: nothing downstream can ever run. Said
+    // plainly rather than left to hang, because a run that waits forever looks like a bug.
+    if (deps.some((d) => d === 'failed' || d === 'stopped')) blocked.push(step.name);
+    else if (deps.every((d) => d === 'succeeded')) ready.push(step.name);
+  }
+
+  const all = steps.map((s) => phase(s.name));
+  const status: Assessment['status'] =
+    all.every((p) => p === 'succeeded') ? 'succeeded'
+    : blocked.length || all.some((p) => p === 'failed' || p === 'stopped') ? 'failed'
+    : 'running';
+
+  return { ready, blocked, status };
+}
+
+/**
+ * What a step is told. THE decision about what one step knows of another.
+ *
+ * It gets: its own prose, the original request, and where to look. It does NOT get the previous
+ * step's transcript, reasoning or self-assessment.
+ *
+ * The reason is the one a pull request already demonstrates: a PR description is not the author's
+ * transcript, it is an artifact the author deliberately produced, and the reviewer judges the diff
+ * rather than the author's account of it. Passing the implementer's reasoning to the reviewer
+ * would anchor it on the same context that produced the work — the failure we already avoid when
+ * deciding whether to resume a failed session — and would offer unverifiable claims alongside
+ * verifiable evidence.
+ *
+ * So: intent and artifacts travel, process does not. If a step wants to say something to the next
+ * one, it writes a file, deliberately, like a person would.
+ */
+export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[]): string {
+  // A step that CONTINUES another already has the context — its own. Repeating the spec back and
+  // pointing it at the workspace would be telling someone what they spent an hour doing.
+  if (step.resume) return step.body;
+
+  const earlier = step.after.length
+    ? step.after
+    : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
+
+  const parts = [step.body, '', '## What was asked for', '', run.brief];
+
+  if (step.after.length > 1) {
+    return [
+      step.body, '', '## What was asked for', '', run.brief, '',
+      '## What is in this workspace', '',
+      `The work of ${step.after.join(' and ')} has been merged into this branch.`,
+      'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',
+      'several others is for. `git status` shows them.',
+    ].join('\n');
+  }
+
+  if (earlier.length) {
+    parts.push(
+      '',
+      '## Where to look',
+      '',
+      `This workspace has already been worked in by: ${earlier.join(', ')}.`,
+      `Their work is on disk, and against \`${run.baseRef}\` you can see exactly what changed:`,
+      '',
+      '```',
+      `git diff ${run.baseRef}`,
+      `git status`,
+      '```',
+      '',
+      'Judge what is there. You have not been given their reasoning, on purpose — read the change,',
+      'not an account of it.',
+    );
+  }
+
+  return parts.join('\n');
+}
+
+// ─── where a step works ─────────────────────────────────────────────────────
+
+/**
+ * Which workspace a step needs. Pure — it reads the shape of the workflow, nothing else.
+ *
+ * The rule is git's, not ours:
+ *
+ *   - **inherit** — a step that is the only thing following its only predecessor is the same line
+ *     of work continuing. Same directory, same branch, no git operation. This is the sequential
+ *     case, and it is why `resume:` still makes sense: the author comes back to their own desk.
+ *   - **fork** — a step that runs beside a sibling gets its own worktree, branched from wherever
+ *     it starts. Two agents editing one directory at once is the arrangement we are avoiding, and
+ *     for an agent a worktree costs nothing, so there is no reason to share one.
+ *   - **merge** — a step that waits on SEVERAL steps is a fan-in, so it gets a worktree with all
+ *     of their work combined. `after: a, b` already means "wait for both"; it now also means
+ *     "and give me both". Nobody has to learn a new key for the thing they already asked for.
+ *
+ * Conflicts are not an error here. A merge that conflicts leaves the markers in place and the
+ * step is told about it, because resolving them is exactly the work a fan-in step exists to do.
+ */
+export type WorkspacePlan =
+  | { kind: 'inherit'; from: string }
+  | { kind: 'fork'; from: string | null }
+  | { kind: 'merge'; from: string; also: string[] };
+
+export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
+  if (step.after.length === 0) return { kind: 'fork', from: null };
+  if (step.after.length > 1) {
+    const [first, ...also] = [...step.after].sort();
+    return { kind: 'merge', from: first!, also };
+  }
+
+  const parent = step.after[0]!;
+  const siblings = steps.filter((s) => s.after.includes(parent));
+  return siblings.length === 1
+    ? { kind: 'inherit', from: parent }
+    : { kind: 'fork', from: parent };
+}

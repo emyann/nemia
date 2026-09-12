@@ -11,7 +11,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type Engine, type TaskView } from 'agent-engine';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, composeBrief, inFlight, workspacePlan, type Assessment, type CancelPlan, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, composeBrief, decision, inFlight, workspacePlan, type Assessment, type CancelPlan, type Decision, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -410,6 +410,54 @@ export async function stepViews(e: Engine, run: Run): Promise<Array<{ name: stri
  * result and stays in the repository. Reported as soon as a terminal step has a branch, so it is
  * useful while the run is still going, not only afterwards.
  */
+/**
+ * Has this branch landed on the base branch? Git's answer, not ours.
+ *
+ * `--is-ancestor` rather than a merge-commit search, so a fast-forward, a squash-merge that was
+ * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
+ */
+export function isShipped(run: Run, branch: string): boolean {
+  try {
+    execFileSync('git', ['merge-base', '--is-ancestor', branch, run.branch], { cwd: run.repo, stdio: 'ignore' });
+    return true;
+  } catch { return false; }
+}
+
+/**
+ * The files this run ADDED — what its steps wrote for whoever reads next.
+ *
+ * Read out of git rather than off disk, because the worktree a step ran in is gone by the time
+ * anybody decides anything, while the branch is exactly as it was left.
+ *
+ * "Added" is the whole rule. A step that wants to tell a person something writes a file, the same
+ * way it tells the next step — so the artifacts are the new files, and no frontmatter key has to
+ * be invented to declare them.
+ */
+export function artifacts(run: Run, branch: string): string[] {
+  try {
+    return git(run.repo, 'diff', '--diff-filter=A', '--name-only', `${run.baseRef}...${branch}`)
+      .split('\n').map((l) => l.trim()).filter(Boolean);
+  } catch { return []; }
+}
+
+/** One artifact's text, out of the branch. */
+export function readArtifact(run: Run, branch: string, file: string): string {
+  try { return git(run.repo, 'show', `${branch}:${file}`); } catch { return ''; }
+}
+
+/** How much the run changed, in one line. */
+export function diffStat(run: Run, branch: string): string {
+  try { return git(run.repo, 'diff', '--shortstat', `${run.baseRef}...${branch}`); } catch { return ''; }
+}
+
+/** What is left for a person to do — the pure call, with git asked the one question it owns. */
+export async function decide(e: Engine, id: string): Promise<{ run: Run; decision: Decision }> {
+  const run = readRun(id);
+  const steps = loadWorkflows(run.workflowDir);
+  const { phaseOf } = await taskPhases(e, run);
+  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b)) };
+}
+
 export function resultBranches(run: Run): string[] {
   const steps = loadWorkflows(run.workflowDir);
   return terminalSteps(steps)

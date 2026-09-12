@@ -12,7 +12,7 @@
  * the run, and is the only state this file writes down rather than derives.
  */
 import type { TaskView } from 'agent-engine';
-import type { Workflow } from './workflow.ts';
+import { terminalSteps, type Workflow } from './workflow.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
 export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';
@@ -147,6 +147,60 @@ export function cancelPlan(steps: readonly Workflow[], run: Run, phaseOf: (taskI
   const { ready, status } = assess(steps, run, phaseOf);
   if (!ready.length && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
   return { kind: 'cancel', stop: [] };
+}
+
+// ─── handing it back ────────────────────────────────────────────────────────
+
+/**
+ * What is left for a person to do about this run.
+ *
+ * A review and a reply are two opinions; something has to say what ships, and that something is
+ * not a step. An agent that graded the exchange would be a third opinion with no more standing
+ * than the first two, and the one thing it could not do is the thing the moment is for — commit
+ * the repository to an answer. So the run ends by handing the choice over, deliberately, instead
+ * of settling `succeeded` and going quiet.
+ *
+ * `shipped` is ASKED, not stored. Whether the work landed is a question git can already answer —
+ * is the result branch an ancestor of the base branch — and a `decidedAt` field would be a second
+ * copy of it, wrong the moment somebody merges by hand. A run still holds no status of its own;
+ * cancellation remains the single exception, and it is one because nothing else knows it.
+ */
+export type Decision =
+  | { kind: 'running'; waiting: string[] }
+  | { kind: 'cancelled'; at: string }
+  | { kind: 'shipped'; branches: string[] }
+  | { kind: 'awaiting'; outcome: 'succeeded' | 'failed'; branches: string[]; failed: string[] };
+
+export function decision(
+  steps: readonly Workflow[],
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  shipped: (branch: string) => boolean,
+): Decision {
+  if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
+
+  const { status, ready } = assess(steps, run, phaseOf);
+  if (status === 'running') {
+    // Named so the answer to "why can I not decide yet" is on the screen rather than inferred.
+    const live = Object.entries(run.steps)
+      .filter(([, s]) => s.taskId && ['pending', 'running'].includes(phaseOf(s.taskId)))
+      .map(([name]) => name);
+    return { kind: 'running', waiting: [...live, ...ready].sort() };
+  }
+
+  const branches = terminalSteps(steps)
+    .map((s) => run.steps[s.name]?.branch)
+    .filter((b): b is string => Boolean(b));
+
+  // Every terminal branch, not some: a fan-out that ends in two branches is not shipped because
+  // one of them landed.
+  if (branches.length && branches.every(shipped)) return { kind: 'shipped', branches };
+
+  const failed = Object.entries(run.steps)
+    .filter(([, s]) => s.taskId && ['failed', 'stopped'].includes(phaseOf(s.taskId)))
+    .map(([name]) => name)
+    .sort();
+  return { kind: 'awaiting', outcome: status === 'failed' ? 'failed' : 'succeeded', branches, failed };
 }
 
 /**

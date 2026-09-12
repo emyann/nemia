@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { cancel, engine, listRuns, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
+import { artifacts, cancel, decide, diffStat, engine, listRuns, readArtifact, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
 import { loadWorkflows } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -13,6 +13,7 @@ const HELP = `wf — run a workflow of agent steps
   wf up [ms]                   the same, on a timer
   wf ls [runId]                runs and their steps
   wf cancel <runId>            stop what it has in flight; file nothing more
+  wf decide <runId>            what the run produced, and the choice it leaves you
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
 
@@ -94,7 +95,7 @@ export async function main(argv: string[]): Promise<void> {
         }
         // Where to go and look. A run whose result nobody can find is a run that did not happen.
         const result = resultBranches(run);
-        if (result.length) console.log(`   → result: ${result.join(', ')}  (in ${run.repo})`);
+        if (result.length) console.log(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);
       }
       return;
     }
@@ -111,6 +112,48 @@ export async function main(argv: string[]): Promise<void> {
       console.log(plan.kind === 'already-cancelled' ? `${run.id}  already cancelled at ${plan.at}` : `${run.id}  cancelled`);
       if (plan.stop.length) console.log(`   asked to stop: ${plan.stop.map((s) => s.name).join(', ')}  (the engine stops it on its next tick)`);
       else if (plan.kind === 'cancel') console.log(`   nothing was in flight — no further steps will be filed`);
+      return;
+    }
+
+    // The run does not end by going quiet. A review and a reply are two opinions and something
+    // has to say what ships — which is a person's job, so the run's last act is to put the
+    // material in front of one. Read-only on purpose: it shows the choice and the exact commands,
+    // and does not decide anything itself.
+    case 'decide': {
+      if (!rest[0]) return console.log(HELP);
+      const { run, decision } = await decide(e, rest[0]);
+      const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
+
+      if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
+      if (decision.kind === 'running') return console.log(`${head}\n\n  still running: ${decision.waiting.join(', ')}\n  nothing to decide yet`);
+      if (decision.kind === 'shipped') return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}`);
+
+      console.log(`${head}\n`);
+      console.log(decision.outcome === 'failed'
+        ? `  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)\n`
+        : `  every step succeeded\n`);
+
+      for (const branch of decision.branches) {
+        const stat = diffStat(run, branch);
+        console.log(`  ${branch}${stat ? `  —${stat}` : ''}`);
+
+        // Markdown a step ADDED is a message written for whoever reads next, and today that is
+        // you. Source it added is in the diff, where source belongs.
+        const notes = artifacts(run, branch).filter((f) => f.endsWith('.md') && !f.includes('/'));
+        for (const file of notes) {
+          const text = readArtifact(run, branch, file).trimEnd();
+          const lines = text.split('\n');
+          console.log(`\n  ── ${file} ${'─'.repeat(Math.max(0, 64 - file.length))}`);
+          for (const l of lines.slice(0, 120)) console.log(`  ${l}`);
+          if (lines.length > 120) console.log(`  … ${lines.length - 120} more lines — git show ${branch}:${file}`);
+        }
+      }
+
+      const first = decision.branches[0];
+      if (first) {
+        console.log(`\n  ship it   git -C ${run.repo} merge --no-ff ${first}`);
+        console.log(`  drop it   git -C ${run.repo} branch -D ${decision.branches.join(' ')}`);
+      }
       return;
     }
 

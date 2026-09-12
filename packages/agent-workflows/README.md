@@ -9,6 +9,7 @@ wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf up
 wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
+wf decide r-xyz      # what it produced, and the choice it leaves you
 ```
 
 To follow it live, use the engine rather than this package — a run's task ids carry the run and the
@@ -35,9 +36,8 @@ Definition of done — a closed list, so there is a finish line:
 - [x] fan-out isolates (a worktree per concurrent step), fan-in merges
 - [x] what one step knows of another: intent and artifacts, never process
 - [x] a finished run names the branch its work is on
-- [ ] **the decider** — today nobody settles after `RESPONSE.md`. A review and a reply are two
-      opinions; something has to say what ships. That role is a person's, and the run should end
-      by putting the choice in front of them rather than trailing off.
+- [x] **the decider** — `wf decide` ends the run by handing the choice to a person, because a
+      review and a reply are two opinions and something has to say what ships.
 - [ ] **rounds** — `after` is a DAG and cannot loop, so a second round is a *new run* over the same
       worktree, started by the decider. That keeps rounds countable and deliberate.
 - [x] **the splitter** — `wf-examples/split` proposes parts that touch disjoint files, and is
@@ -165,6 +165,37 @@ cleanly. The integrate step wrote:
 
 That is exactly the failure two engineers would have used a conversation to avoid, caught after the
 fact by a step whose job is to look — with no coordination, no lock, and no declared paths.
+
+## Deciding what ships
+
+A run used to end by going quiet. The last step settled `succeeded`, `wf ls` named a branch, and
+that was it — which is fine until you have six runs and no idea which of them is waiting on you.
+`wf decide <runId>` is the other end of the run: what it produced, and the choice it leaves you.
+
+**The role is a person's, and that is the design, not a shortcut.** An agent grading the exchange
+would be a third opinion with no more standing than the first two, and the one thing it could not
+do is the thing the moment is for — commit the repository to an answer.
+
+It needed no new concept. A step already talks to whoever reads next by writing a file — *intent
+and artifacts travel, process does not* — and a person is just the next reader, so **the artifacts
+are the files the run added**, which git names exactly (`--diff-filter=A`). No frontmatter key to
+declare them, and a workflow that writes different files needs no change here. Markdown added at
+the root is printed in full, because that is a step writing to a human; source it added is in the
+diff, where source belongs. All of it is read out of git rather than off disk, since the worktree
+is gone by the time anyone decides and the branch is exactly as it was left.
+
+**Whether a run shipped is asked, not stored.** Git already knows — is the result branch an
+ancestor of the base branch — so a `decidedAt` field would be a second copy, wrong the moment
+somebody merges by hand. A run still holds no status of its own; cancellation stays the single
+exception, and only because nothing else can know it. A fan-out is shipped when *every* terminal
+branch has landed, not when one has.
+
+A failed run is decided too. The first run this was pointed at had been sitting for hours marked
+`failed`, and its branch held a real fix plus a design question addressed to a person — none of
+which anything in this tool had ever shown anyone.
+
+`wf decide` is read-only. It prints the material and the exact `git merge` / `git branch -D`
+commands, and does not decide anything itself.
 
 ## Calling a run off
 

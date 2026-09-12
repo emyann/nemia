@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, cancelPlan, composeBrief, inFlight, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
+import { assess, cancelPlan, composeBrief, decision, inFlight, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -253,4 +253,67 @@ test('a run id is readable, and step ids share its prefix', async () => {
 
   assert.match(runId('!!!'), /^run-[a-z0-9]{4}$/, 'a brief with nothing sluggable still gets an id');
   assert.notEqual(runId('same brief'), runId('same brief'), 'two runs of one request stay apart');
+});
+
+// ─── the decider ────────────────────────────────────────────────────────────
+
+/** A run whose two steps are done and whose result sits on a branch. */
+const finished = (extra: Partial<Run> = {}) => run({ implement: 't1', review: 't2' }, {
+  steps: {
+    implement: { taskId: 't1', branch: 'wf/r-1/implement' },
+    review: { taskId: 't2', branch: 'wf/r-1/review' },
+  },
+  ...extra,
+});
+const DONE = phases({ t1: 'succeeded', t2: 'succeeded' });
+const nothingShipped = () => false;
+
+test('a run still going has nothing to decide, and says what it is waiting on', () => {
+  const d = decision(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'running' }), nothingShipped);
+  assert.equal(d.kind, 'running');
+  assert.deepEqual(d.kind === 'running' && d.waiting, ['implement']);
+});
+
+test('a cancelled run has nothing to decide either', () => {
+  const d = decision(STEPS, finished({ cancelledAt: '2026-01-01T00:00:00Z' }), DONE, nothingShipped);
+  assert.equal(d.kind, 'cancelled');
+});
+
+test('a finished run is AWAITING a person — succeeding is not deciding', () => {
+  const d = decision(STEPS, finished(), DONE, nothingShipped);
+  assert.equal(d.kind, 'awaiting');
+  assert.deepEqual(d.kind === 'awaiting' && d.branches, ['wf/r-1/review']);
+});
+
+test('shipped is asked of git, not stored on the run', () => {
+  const d = decision(STEPS, finished(), DONE, (b) => b === 'wf/r-1/review');
+  assert.equal(d.kind, 'shipped');
+});
+
+test('a fan-out is not shipped because ONE of its branches landed', () => {
+  const fan = [step('implement'), step('docs', ['implement']), step('tests', ['implement'])];
+  const r = run({ implement: 't1', docs: 't2', tests: 't3' }, {
+    steps: {
+      implement: { taskId: 't1', branch: 'wf/r-1/implement' },
+      docs: { taskId: 't2', branch: 'wf/r-1/docs' },
+      tests: { taskId: 't3', branch: 'wf/r-1/tests' },
+    },
+  });
+  const all = phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' });
+  assert.equal(decision(fan, r, all, (b) => b === 'wf/r-1/docs').kind, 'awaiting');
+  assert.equal(decision(fan, r, all, () => true).kind, 'shipped');
+});
+
+test('a FAILED run is still decided, and names the step that failed', () => {
+  // The case that made this verb worth building: a run marked failed whose branch holds real work
+  // nobody ever read.
+  const d = decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), nothingShipped);
+  assert.equal(d.kind, 'awaiting');
+  assert.equal(d.kind === 'awaiting' && d.outcome, 'failed');
+  assert.deepEqual(d.kind === 'awaiting' && d.failed, ['review']);
+});
+
+test('a run that never filed anything has no branch to ship, and is not "shipped"', () => {
+  const d = decision(STEPS, run({ implement: null, review: null }), phases({}), () => true);
+  assert.equal(d.kind, 'running');
 });

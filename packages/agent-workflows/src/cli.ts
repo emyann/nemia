@@ -145,7 +145,7 @@ export async function main(argv: string[]): Promise<void> {
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
         if (c.needs) console.log(`    needs: ${c.needs}`);
         const missing = missingArtifacts(run, name, c);
-        if (missing.length) console.log(`    !! declared but not committed: ${missing.join(', ')}  — it did not travel`);
+        if (missing.length) console.log(`    !! declared but not on the branch: ${missing.join(', ')}  — it did not travel`);
       }
       console.log();
 

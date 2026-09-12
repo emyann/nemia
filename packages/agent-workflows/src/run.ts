@@ -251,6 +251,10 @@ export function parseCloseout(value: unknown): Closeout | { error: string } {
  * MECHANISM, not prose a workflow author has to remember: one step's body once forgot "commit
  * this" and the reviewer's entire output never reached the next step. The harness enforces the
  * shape of the answer; this says what the fields MEAN, which no schema can.
+ *
+ * Committing is the run's job, not the step's. A sandboxed harness may be unable to touch git's
+ * metadata at all — Codex keeps it read-only — and a review told its artifacts MUST be committed
+ * honestly signed off blocked and stopped two runs, over a file `handOff` then committed anyway.
  */
 export const closeoutContract = (): string => [
   '', '## When you are finished', '',
@@ -261,13 +265,14 @@ export const closeoutContract = (): string => [
   '- `outcome`: `"done"` if you finished the work; `"blocked"` if you cannot honestly finish. A step',
   '  that reports success it did not have is worse than one that stops and says why.',
   '- `summary`: one to three sentences on what you did, for the person who decides what ships.',
-  '- `artifacts`: files you wrote for someone else to read, such as `REVIEW.md`. They must be',
-  '  **committed** — the next step gets your branch merged into its workspace, and an uncommitted',
-  '  file does not travel. A file you list but did not commit is reported as missing.',
+  '- `artifacts`: files you wrote for someone else to read, such as `REVIEW.md`. Leave them in this',
+  '  workspace: when you finish, the run commits whatever you left, so the next step receives it.',
+  '  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is',
+  '  **not** a reason to block. A file you list that does not exist is reported as missing.',
   '- `needs`: when blocked, what a person has to settle; otherwise `null`.',
   '',
-  '**Give it once, and give it last** — after your commits, after everything else. The run reads it',
-  'as your final word and may start the next step on it.',
+  '**Give it once, and give it last**, after everything else. The run reads it as your final word',
+  'and may start the next step on it.',
 ].join('\n');
 
 // ─── handing it back ────────────────────────────────────────────────────────

@@ -377,3 +377,12 @@ test('a blocked run is AWAITING you, and is not called failed', () => {
   assert.deepEqual(d.kind === 'awaiting' && d.failed, [], 'nothing broke');
   assert.deepEqual(d.kind === 'awaiting' && d.stuck, ['implement', 'review']);
 });
+
+test('a step is told the run commits for it — being unable to commit is not being blocked', () => {
+  // Codex's sandbox keeps git's metadata read-only. A review told its artifacts MUST be committed
+  // honestly signed off blocked and stopped two runs, over a file the run had already committed.
+  const brief = composeBrief(step('review', ['implement']), run({ implement: 't1', review: null }), STEPS);
+  assert.match(brief, /the run commits whatever you left/);
+  assert.match(brief, /\*\*not\*\* a reason to block/);
+  assert.doesNotMatch(brief, /must be/);
+});

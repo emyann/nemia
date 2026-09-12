@@ -168,52 +168,60 @@ fact by a step whose job is to look — with no coordination, no lock, and no de
 
 ## The closeout: how a step signs off
 
-Every step ends by writing `.wf/<step>.done.json` and committing it:
+Every step ends by giving a structured final answer, and that answer is how the run knows it is done:
 
 ```json
 { "outcome": "done",
   "summary": "one to three sentences, for the person who decides what ships",
   "artifacts": ["REVIEW.md"],
-  "needs": "only when blocked: what a person has to settle" }
+  "needs": null }
 ```
 
-**The path is per step, and that is not tidiness.** A closeout is committed so it can be read once
-the worktree is swept away — which means it travels down the branch like any other commit. With one
-shared name, the next step is cut a worktree whose probe is *already satisfied*. The first run to
-try this settled `review` and `respond` `succeeded` in six seconds each, having done nothing at all,
-and the board said the run was fine. Distinct names make an inherited marker a different file, and
-make `git show <branch>:<path>` unambiguous on a branch that merged three others. The engine also
-clears the marker before every attempt, so neither layer relies on the other having got it right.
+There is no file to write. The run files each step with `CLOSEOUT_SCHEMA`, and the harness asks for
+the answer in that shape — Claude Code as a `StructuredOutput` tool the agent calls to finish, Codex
+as `--output-schema`. The engine records the answer on the step's task without reading it; this
+package reads it (`closeoutOf`). The schema is strict — every property required, `needs` nullable
+rather than optional — because Codex enforces strict structured outputs, and one schema has to
+satisfy the strictest harness it is handed to.
 
-**Three problems, one file.**
+**It used to be a file, and the file is why it is not one now.** Each step wrote
+`.wf/<step>.done.json` into its worktree and committed it, and three things went wrong in real runs.
+It travelled down the git branch, so the next step was cut a worktree that already said it was
+finished: `review` and `respond` settled `succeeded` in six seconds each having done nothing, and
+`wf ls` called the run healthy. Its path had to be told to the engine in one place and to the agent in
+another. And a step wrote it, kept going, found it could not commit, and rewrote its verdict after the
+next step had already started on the first. A statement made to the harness lives in the session,
+belongs to the attempt that made it, and needs no path.
 
-*It is how the run knows a step is finished.* The engine is told `doneFile: .wf/done.json` and
-settles the attempt the moment it appears — no ninety-second quiescence wait, no stall to
-characterise. This is [Hermes Kanban's](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban)
-`kanban_complete(...)` in the only form that survives a fleet: they can require a terminal *tool
-call* because every worker is theirs, and you cannot inject a tool into `codex exec`. A file, any
-harness can write. Declaration is the fast path; the engine's own observation is still the floor
-under it, for the step that crashes or forgets.
+**Three things, one answer.**
 
-*It stops a step claiming success it did not have.* `"outcome": "blocked"` ends the session
-honestly, and the DAG treats it as final — nothing downstream runs — while `wf decide` says
-**waiting on you** rather than **failed**. A thing that stopped and said why is not a thing that
-broke, and the difference is whether you read a summary or a log.
+*It is how the run knows a step is finished* — the moment the answer is given, not ninety seconds of
+quiet later. This is [Hermes Kanban's](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban)
+`kanban_complete(...)`, in the form every harness here already supports.
 
-*It makes a lost artifact visible.* `artifacts` are cross-checked against the branch, so a file a
-step declared and did not commit is reported: `!! declared but not committed — it did not travel`.
-That is the exact bug the first real run hit, where REVIEW.md was written, never committed, and
-vanished into a clean empty merge with nothing anywhere noticing.
+*It stops a step claiming success it did not have.* `"outcome": "blocked"` ends the session honestly,
+and the DAG treats it as final — nothing downstream runs — while `wf decide` says **waiting on you**
+rather than **failed**. A thing that stopped and said why is not a thing that broke.
 
-**The contract is appended by the runner, not written by workflow authors.** `review.md` was the
-one step whose prose forgot to say "commit this", and the fix at the time was to edit that prose —
-which leaves the next workflow free to make the same mistake. Mechanism, so no workflow can omit
+*It makes a lost artifact visible.* `artifacts` are checked against the branch, and a declared file
+that is not there is reported. The first real run lost a reviewer's entire output to exactly that,
+silently.
+
+**Committing is the run's job.** Every brief tells the step that the run commits whatever it leaves,
+and that being unable to commit is not a reason to block. That is not generosity. Codex's sandbox
+keeps git's metadata read-only, and two runs stopped dead because a review — told its artifacts
+*must* be committed — honestly signed off `blocked`, over a `REVIEW.md` that `handOff` then committed
+anyway. A repository can still let Codex commit its own work by shipping a rule
+([`.codex/rules/git-commit.rules`](.codex/rules/git-commit.rules); the engine's README says how and
+why): the run's commit is the floor, not the ceiling.
+
+**The contract is appended by the runner, not written by workflow authors.** One step's prose once
+forgot to say "commit this", and fixing that prose would have left the next workflow free to repeat
 it.
 
-**`summary` goes to the decider and nowhere else.** The reviewer still gets the diff and the
-artifact list and no account of the work — *read the change, not an account of it* is unchanged.
-Hermes injects the parent's summary into the child's prompt; this is the one place worth diverging,
-and the field earns its keep by travelling to the human at the end instead.
+**`summary` goes to the decider and nowhere else.** The reviewer still gets the diff and no account of
+the work — *read the change, not an account of it* is unchanged. Hermes injects the parent's summary
+into the child's prompt; this is the one place worth diverging.
 
 ## Deciding what ships
 

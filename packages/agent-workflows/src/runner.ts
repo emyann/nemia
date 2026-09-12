@@ -297,7 +297,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // matter — a file written was a file the next step could read — but the moment steps fork, an
   // uncommitted file is invisible downstream and the next step answers a question it never saw.
   // Measured the hard way: a review wrote REVIEW.md, did not commit, and the responder merged a
-  // branch that did not contain it. Asking every step's prose to remember is not a contract.
+  // branch that did not contain it. Asking every step's prose to remember is not a contract — so
+  // this IS the contract: every step is told the run commits what it leaves (`closeoutContract`),
+  // which is also exactly what a sandboxed step that cannot write git's metadata needs.
   for (const [name, st] of Object.entries(run.steps)) {
     if (!st.taskId || !st.workspace || phaseOf(st.taskId) !== 'succeeded') continue;
     handOff(st.workspace, name);
@@ -434,11 +436,13 @@ export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run) =
 };
 
 /**
- * Artifacts a step DECLARED but did not commit.
+ * Artifacts a step DECLARED that are not on its branch.
  *
  * The whole point of declaring them. The first real run lost the reviewer's entire output because
  * REVIEW.md was written and never committed, and nothing anywhere noticed — the merge was clean
- * and empty. A declared file that is not on the branch is now a mismatch somebody can see.
+ * and empty. A declared file that is not on the branch is now a mismatch somebody can see. Since
+ * the run commits whatever a step leaves, a missing one was never written — or was written where
+ * git will not take it, like a gitignored path.
  */
 export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): string[] {
   const branch = run.steps[stepName]?.branch;

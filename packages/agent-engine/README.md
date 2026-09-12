@@ -175,6 +175,50 @@ Exit 0 is success, anything else is failure. That is all a generic harness has t
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,
 which is the test of whether the seam was in the right place.
 
+## What "done" means, and why the harness decides it
+
+**`state: done` is not a reliable completion signal for the work this engine is for.** Measured
+across four sessions:
+
+| session | task | attached? | outcome |
+|---|---|---|---|
+| probe 1 | short, one deliverable | no | **`done/idle` in 67s** |
+| probe 2 | long, four steps | **yes** | stuck `working/idle`, 20 min |
+| control | long, four steps | no | stuck `working/idle`, 7 min |
+| two eval runs | medium | yes | stuck `working`, 11 min |
+
+The controlled pair — same task, one attached and one not — rules out the obvious suspect: **being
+watched changes nothing.** The docs agree ("attaching does not change the session's recorded
+state"), and a snapshot taken mid-attach showed `kind`, `state` and `status` all unmoved. What
+correlates is task shape: short single-deliverable work reaches `done`; long multi-step work stops
+at `working` and stays there with its transcript frozen and its files written. That fits the
+documented meaning — `working` also covers *"between steps of work it drives on its own"*.
+
+**`status` is the signal that holds.** It flipped to `idle` at the exact second the transcript took
+its final write, in every probe. Claude Code's own web UI tracks `status` for its liveness dot
+rather than `state` — the same conclusion, reached independently by the people who wrote it.
+
+Two fields, two questions. Reading them as `state ?? status` discarded the useful one, and also let
+an interactive session's `status: idle` be recorded as a *failure*, since `idle` is not a state at
+all. `busy` is likewise a status, and no longer sits in `Observed` pretending otherwise.
+
+So `claudeOps` answers the question itself:
+
+```
+done  ⟸  state = done
+      ⟸  state = working AND not busy AND transcript quiet, for 90 seconds
+```
+
+A transcript that moves restarts the clock. That is what keeps a pause between self-driven steps
+from being mistaken for an ending — the one direction where this predicate is dangerous, because a
+false completion is invisible and a stall is not.
+
+**It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
+engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
+job of a runner. `decide` did not change. Codex, which ends by exiting, needs none of this and gets
+none of it. And because it is a translation rather than a judgement, it tests with an injected clock
+and an injected transcript — six tests, no harness, no spend.
+
 ## Which runner: CLI or Agent SDK
 
 Both are wired. `AE_RUNNER=sdk` swaps one for the other and **the engine does not change** — only

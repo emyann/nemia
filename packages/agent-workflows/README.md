@@ -167,6 +167,21 @@ the engine has tasks, not runs, and "file nothing further" is not a fact any one
 Stopping the session ends the work burning right now; the mark on the run is what stops the next
 tick cheerfully filing the step after it.
 
+The mark is a file of its own — `runs/<id>.cancelled`, not a field in the run's json — and that
+is not fussiness. The json has a writer that rewrites it constantly: a tick reads the record,
+spends seconds observing sessions and cutting worktrees, then writes back what it filed. `wf
+cancel` is a second writer, and the whole point of it is to be typed while that daemon is running.
+Two writers doing read-modify-write on one file lose updates, and this one did — a cancel landing
+mid-pass was overwritten by the tick's stale copy, and the run went on filing steps as if nobody
+had said anything. Re-reading before writing narrows that window rather than closing it. Two
+writers, two files, composed on read: the tick owns the steps, a person owns the cancellation, and
+neither can erase the other.
+
+For the same reason the mark is enforced by **every** tick, not only by the verb that wrote it.
+`wf cancel` stops what it can see in flight, and a pass already underway may file a step a moment
+later; the next tick finds it and stops it too. The mark is the desired state and each tick
+reconciles toward it — the same level-triggered rule the engine runs on one layer down.
+
 Cancelling a run with nothing in flight, one already finished, or one already cancelled are all
 normal things for a person to do, so none of them is an error and each says which it was. A
 finished run is deliberately **not** relabelled — a run that succeeded succeeded, and stamping it

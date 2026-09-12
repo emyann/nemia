@@ -335,3 +335,68 @@ test('worktree is declared by the task and passed to the harness untouched', asy
   await c.run(tick(9));
   assert.equal(c.spawned.at(-1)!.worktree, 'my-branch');
 });
+
+// ─── the completion probe ───────────────────────────────────────────────────
+
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+/** A cwd a test can drop a file into. */
+const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ae-probe-'));
+
+test('a workload that writes its doneFile is finished, whatever the harness still says', async () => {
+  const b = board();
+  const cwd = scratch();
+  const id = await b.run(file({ brief: 'do it', cwd, doneFile: '.wf/done.json' }));
+  await b.run(tick());
+  await b.run(tick());
+
+  // The harness is still saying `working` — the case that hangs for ever without this.
+  assert.equal([...b.sessions.values()][0]?.state, 'working');
+  assert.equal((await b.run(view(id, new Map()))).state.settled, null);
+
+  fs.mkdirSync(path.join(cwd, '.wf'), { recursive: true });
+  fs.writeFileSync(path.join(cwd, '.wf/done.json'), '{"outcome":"done"}');
+
+  await b.run(tick());
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
+});
+
+test('no doneFile declared means nothing changes — the probe is opt-in', async () => {
+  const b = board();
+  const cwd = scratch();
+  // The file is there, but this task never asked for it to mean anything.
+  fs.mkdirSync(path.join(cwd, '.wf'), { recursive: true });
+  fs.writeFileSync(path.join(cwd, '.wf/done.json'), '{"outcome":"done"}');
+
+  const id = await b.run(file({ brief: 'do it', cwd }));
+  await b.run(tick());
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'still running, as before');
+});
+
+test('the engine never opens the file — existence is the whole contract', async () => {
+  // Unparseable on purpose. A schema here would be the engine learning a workflow's vocabulary.
+  const b = board();
+  const cwd = scratch();
+  const id = await b.run(file({ brief: 'do it', cwd, doneFile: 'FINISHED' }));
+  await b.run(tick());
+  fs.writeFileSync(path.join(cwd, 'FINISHED'), 'not json, not even close');
+  await b.run(tick());
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
+});
+
+test('a probe never invents a session it has not seen', async () => {
+  // Satisfying a probe says the WORK is finished, not that a session exists. Inside the grace
+  // window there is nothing to end, and claiming otherwise would settle a task whose spawn
+  // may still be in flight.
+  const b = board();
+  const cwd = scratch();
+  fs.writeFileSync(path.join(cwd, 'FINISHED'), '');
+  const id = await b.run(file({ brief: 'do it', cwd, doneFile: 'FINISHED' }));
+  await b.run(step(id, new Map()));          // journals `starting` only
+  assert.equal((await b.run(view(id, new Map()))).state.settled, null);
+});

@@ -100,6 +100,18 @@ export type Event =
       resumeFrom?: string;
       /** Isolation: true for a harness-named worktree, a string to name it. */
       worktree?: string | boolean;
+      /**
+       * A path under `cwd` whose EXISTENCE means the workload has finished.
+       *
+       * The workload's own word, which is worth more than anything we can infer from outside: a
+       * probe that is satisfied ends the attempt at once, where reading idleness takes ninety
+       * seconds and reading `state` sometimes never arrives at all. Kubernetes spells this the
+       * same way — the spec declares the check, the kubelet runs it and knows nothing else.
+       *
+       * Existence ONLY. What the file says is between the workload and whoever reads it; the
+       * engine learning to parse it would be the engine learning a workflow's vocabulary.
+       */
+      doneFile?: string;
     }
   /** INTENT: we are about to spawn `nameFor(taskId, attempt)`. */
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string }
@@ -142,6 +154,8 @@ export type State = {
   /** What attempt 1 continues. Set at filing; later attempts follow `resume` policy instead. */
   resumeFrom?: string;
   worktree?: string | boolean;
+  /** A path under `cwd` whose existence means finished. See the `filed` event. */
+  doneFile?: string;
   attempts: Attempt[];
   stopRequested: boolean;
   settled: Outcome | null;
@@ -160,7 +174,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.model = e.model; s.permissionMode = e.permissionMode; s.harness = e.harness;
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
-        s.worktree = e.worktree;
+        s.worktree = e.worktree; s.doneFile = e.doneFile;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom });

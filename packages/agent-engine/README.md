@@ -286,6 +286,24 @@ middle of a long tool call — which writes nothing for minutes at a time (35 se
 session we sampled). It is one gate rather than two, held deliberately, and pinned by a test. A
 session whose transcript cannot be read gets no verdict at all; the deadline is for those.
 
+### The workload's own word
+
+Everything above is us guessing from outside. A task may instead declare `doneFile` — a path under
+its `cwd` — and the moment that file exists the attempt is over. No ninety-second wait, no stall to
+characterise, because the workload said so rather than being read.
+
+The engine checks **existence and nothing else.** It never opens the file. What is written there is
+between the workload and whoever reads it next, and an engine that parsed it would be an engine
+that had learned some workflow's vocabulary — the same line `harness` already holds, where the
+engine dispatches on a string it never interprets.
+
+It layers UNDER the harness's answer instead of replacing it, and that ordering is the point.
+Hermes Kanban solves the same problem with a terminal tool call — `kanban_complete(...)` — and can
+require it because every worker is theirs. You cannot inject a tool into `codex exec`, so for a
+fleet of harnesses nobody here wrote, **declaration is the fast path and observation is the floor.**
+A workload that never writes the file falls back to exactly what happened before; one that does
+skips the guessing entirely.
+
 **It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
 engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
 job of a runner. `decide` did not change. Codex, which ends by exiting, needs none of this and gets

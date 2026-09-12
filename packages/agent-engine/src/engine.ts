@@ -7,6 +7,8 @@
  */
 import { Effect } from 'effect';
 import { randomUUID } from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State } from './domain.ts';
 import { Journal } from './journal.ts';
 import { Runner } from './runner.ts';
@@ -26,7 +28,7 @@ export type TaskView = { id: string; state: State; phase: string; sessionId: str
 export const file = Effect.fn('file')(function* (spec: {
   brief: string; cwd: string; maxAttempts?: number; model?: string; permissionMode?: string;
   harness?: string; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
-  worktree?: string | boolean; id?: string;
+  worktree?: string | boolean; doneFile?: string; id?: string;
 }) {
   const journal = yield* Journal;
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.
@@ -35,7 +37,7 @@ export const file = Effect.fn('file')(function* (spec: {
     kind: 'filed', at: new Date().toISOString(), brief: spec.brief, cwd: spec.cwd,
     maxAttempts: spec.maxAttempts ?? 1, model: spec.model, permissionMode: spec.permissionMode,
     harness: spec.harness, deadlineSeconds: spec.deadlineSeconds, resume: spec.resume,
-    resumeFrom: spec.resumeFrom, worktree: spec.worktree,
+    resumeFrom: spec.resumeFrom, worktree: spec.worktree, doneFile: spec.doneFile,
   });
   return id;
 });
@@ -51,6 +53,33 @@ export const requestStop = Effect.fn('requestStop')(function* (taskId: string) {
  * `observed` is passed in rather than read here: one `claude agents` call serves a whole pass,
  * which is the difference between a board that scales and one that shells out per task.
  */
+/**
+ * The workload's own word on whether it has finished.
+ *
+ * A task may declare `doneFile`, and its existence under `cwd` ends the attempt immediately. This
+ * is the only completion signal that does not have to be INFERRED: `state: done` is unreliable for
+ * long work, quiescence costs ninety seconds and rests on a stall nobody has been able to
+ * characterise, and both are us guessing from outside. A file the workload wrote is it saying so.
+ *
+ * The probe layers UNDER the harness's own answer rather than replacing it. A harness that ends by
+ * exiting needs no probe; a workload that never writes the file falls back to exactly what
+ * happened before. Declaration is the fast path, observation is the floor — which is what a fleet
+ * of harnesses nobody here wrote requires, since a protocol can only be assumed of agents you
+ * control.
+ *
+ * Existence only, and only over a sighting we already have: satisfying a probe says the work is
+ * finished, not that a session we have never seen exists.
+ */
+const probed = (state: State, observed: ReadonlyMap<string, Sighting>): ReadonlyMap<string, Sighting> => {
+  const last = state.attempts.at(-1);
+  if (!state.doneFile || !last || last.ended !== null) return observed;
+  const name = nameFor(state.taskId, last.n);
+  const seen = observed.get(name);
+  if (!seen || seen.state !== 'working') return observed;
+  if (!fs.existsSync(path.resolve(state.cwd, state.doneFile))) return observed;
+  return new Map(observed).set(name, { ...seen, state: 'done' });
+};
+
 export const step = Effect.fn('step')(function* (
   taskId: string,
   observed: ReadonlyMap<string, Sighting>,
@@ -60,7 +89,7 @@ export const step = Effect.fn('step')(function* (
   const runner = yield* Runner;
 
   const state = fold(taskId, yield* journal.read(taskId));
-  const action = decide(state, observed, { at: new Date(), graceMs: GRACE_MS, ...slots });
+  const action = decide(state, probed(state, observed), { at: new Date(), graceMs: GRACE_MS, ...slots });
   const at = () => new Date().toISOString();
 
   switch (action.do) {

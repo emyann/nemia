@@ -253,6 +253,10 @@ export const closeoutContract = (step: string): string => [
   '',
   'Use `"outcome": "blocked"` if you cannot honestly finish. A step that reports success it did not',
   'have is worse than one that stops and says why.',
+  '',
+  '**Write it once, and write it last.** The run reads it as your final word and may start the next',
+  'step on it. If you are not sure yet whether you are blocked, find out BEFORE you write this file,',
+  'not after — a closeout you go back and revise has already been acted on.',
 ].join('\n');
 
 // ─── handing it back ────────────────────────────────────────────────────────

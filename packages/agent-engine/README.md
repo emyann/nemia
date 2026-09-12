@@ -178,7 +178,7 @@ which is the test of whether the seam was in the right place.
 ## What "done" means, and why the harness decides it
 
 **`state: done` is not a reliable completion signal for the work this engine is for.** Measured
-across four sessions:
+across five sessions:
 
 | session | task | attached? | outcome |
 |---|---|---|---|
@@ -186,13 +186,22 @@ across four sessions:
 | probe 2 | long, four steps | **yes** | stuck `working/idle`, 20 min |
 | control | long, four steps | no | stuck `working/idle`, 7 min |
 | two eval runs | medium | yes | stuck `working`, 11 min |
+| live run | long, 9m24s, 5 files + tests | no | **`done/idle`**, straight from `working/busy` |
 
 The controlled pair — same task, one attached and one not — rules out the obvious suspect: **being
 watched changes nothing.** The docs agree ("attaching does not change the session's recorded
-state"), and a snapshot taken mid-attach showed `kind`, `state` and `status` all unmoved. What
-correlates is task shape: short single-deliverable work reaches `done`; long multi-step work stops
-at `working` and stays there with its transcript frozen and its files written. That fits the
-documented meaning — `working` also covers *"between steps of work it drives on its own"*.
+state"), and a snapshot taken mid-attach showed `kind`, `state` and `status` all unmoved. Task
+shape looked like the correlate — short single-deliverable work reaching `done`, long multi-step
+work stalling at `working` with its transcript frozen and its files written. **The fifth session
+refutes that**: nine and a half minutes, five files, tests written and run, and it went
+`working/busy → done/idle` directly, never once passing through `working/idle`. So the stall is
+real but not predicted by task shape, and we still cannot say what triggers it. The predicate below
+is therefore a **safety net, not the normal path** — this run settled on `state: done` and never
+started the clock.
+
+Which is the honest reason to keep it: `working` also covers *"between steps of work it drives on
+its own"*, so a session that stops there is indistinguishable from one that is thinking. Something
+has to break the tie, and only the harness's own vocabulary can.
 
 **`status` is the signal that holds.** It flipped to `idle` at the exact second the transcript took
 its final write, in every probe. Claude Code's own web UI tracks `status` for its liveness dot
@@ -209,15 +218,33 @@ done  ⟸  state = done
       ⟸  state = working AND not busy AND transcript quiet, for 90 seconds
 ```
 
-A transcript that moves restarts the clock. That is what keeps a pause between self-driven steps
-from being mistaken for an ending — the one direction where this predicate is dangerous, because a
-false completion is invisible and a stall is not.
+**The clock is the transcript's, not the observer's.** A session that speaks pushes its own
+deadline out, which is what keeps a pause between self-driven steps from being mistaken for an
+ending — the one direction where this predicate is dangerous, because a false completion is
+invisible and a stall is not. The first version instead remembered when *we* first saw a session
+idle, and that was wrong in a way tests could not see: the verdict depended on the observer living
+long enough to reach it. Measured, with a one-second window and a month-cold transcript —
+
+| driver | verdict |
+|---|---|
+| one long-lived process (`wf up`) | `working` → `done` |
+| three one-shot processes (`wf tick`, cron, a shell loop) | `working`, `working`, `working` — forever |
+
+— so anyone driving the engine a tick at a time got a predicate that could never fire. Reading the
+transcript's own mtime needs no memory, survives a restart by construction, and gives every driver
+the same answer.
+
+What that costs: the rule no longer requires 90 seconds of *observed* idleness, so a single `idle`
+sighting over a cold transcript is enough. Only `busy` stands between that and a session in the
+middle of a long tool call — which writes nothing for minutes at a time (35 seconds, on a live
+session we sampled). It is one gate rather than two, held deliberately, and pinned by a test. A
+session whose transcript cannot be read gets no verdict at all; the deadline is for those.
 
 **It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
 engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
 job of a runner. `decide` did not change. Codex, which ends by exiting, needs none of this and gets
 none of it. And because it is a translation rather than a judgement, it tests with an injected clock
-and an injected transcript — six tests, no harness, no spend.
+and an injected transcript — eight tests, no harness, no spend.
 
 ## Which runner: CLI or Agent SDK
 

@@ -105,14 +105,6 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     try { return (await getSessionInfo(sessionId))?.lastModified; } catch { return undefined; }
   });
 
-  /**
-   * When each session went quiet, and where its transcript was then.
-   *
-   * Runner-local and re-derivable: losing it after a restart only restarts the clock, which delays
-   * a verdict rather than changing one. Never a source of truth.
-   */
-  const quietSince = new Map<string, { at: number; transcriptAt?: number }>();
-
   return ({
     spawn: (r) => sh('claude', [
       '--bg',
@@ -157,28 +149,31 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       }),
       // Second pass: apply this harness's own definition of finished to whatever is still
       // `working`. Only quiescent candidates cost a transcript read, so a busy fleet pays nothing.
+      //
+      // The clock is the TRANSCRIPT'S, not ours. An earlier version remembered when each session
+      // was first seen idle, which made the verdict depend on the observer surviving long enough
+      // to reach it — true of `wf up`, false of anything that ticks once per process and exits.
+      // Measured, with a one-second window and a month-cold transcript: one long-lived process
+      // said `done`; three consecutive one-shot processes each said `working`, forever. The
+      // transcript's mtime already answers "how long has this been quiet", so nothing needs
+      // remembering and every driver gets the same answer.
       Effect.flatMap((m) => Effect.forEach(
         [...m],
-        ([name, sighting]) => {
-          if (sighting.state !== 'working' || sighting.busy) {
-            quietSince.delete(name);
-            return Effect.succeed([name, sighting] as const);
-          }
-          return Effect.promise(() => transcriptTime(sighting.sessionId)).pipe(
-            Effect.map((writtenAt) => {
-              const t = now();
-              const mark = quietSince.get(name);
-              // A transcript that moved means it was between steps, not finished. Restart the clock.
-              if (!mark || (writtenAt !== undefined && writtenAt !== mark.transcriptAt)) {
-                quietSince.set(name, { at: t, transcriptAt: writtenAt });
-                return [name, sighting] as const;
-              }
-              return t - mark.at >= quiescentAfterMs
-                ? [name, { ...sighting, state: 'done' as const }] as const
-                : [name, sighting] as const;
-            }),
-          );
-        },
+        ([name, sighting]) =>
+          // Not `working`, or busy right now: this harness has already answered, and a transcript
+          // read would only cost time. A long tool call writes nothing for minutes — `busy` is
+          // what keeps that from reading as silence.
+          sighting.state !== 'working' || sighting.busy
+            ? Effect.succeed([name, sighting] as const)
+            : Effect.promise(() => transcriptTime(sighting.sessionId)).pipe(
+                Effect.map((writtenAt) =>
+                  // No transcript, no verdict. We would be guessing from a single `idle` sample,
+                  // and the deadline exists for sessions nobody can read.
+                  writtenAt !== undefined && now() - writtenAt >= quiescentAfterMs
+                    ? [name, { ...sighting, state: 'done' as const }] as const
+                    : [name, sighting] as const,
+                ),
+              ),
         { concurrency: 'unbounded' },
       ).pipe(Effect.map((entries) => new Map(entries)))),
     ),

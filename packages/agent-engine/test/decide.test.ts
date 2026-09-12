@@ -37,7 +37,22 @@ test('spawning is idempotent: deciding twice in a row says the same thing', () =
 test('a running session is left alone', () => {
   const s = fold(TASK, [filed(), { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }]);
   assert.equal(decide(s, seen([N1, 'working']), now(5)).do, 'nothing');
-  assert.equal(decide(s, seen([N1, 'busy']), now(5)).do, 'nothing');
+});
+
+test('a QUIESCENT session is still left alone — being between steps is legitimate', () => {
+  // `working` + not busy means the session believes it has work and is computing nothing. That is
+  // what a stall looks like, and also what a legitimate wait between self-driven steps looks like.
+  // `decide` cannot tell them apart, so it reports and waits; only the deadline ends the ambiguity.
+  const s = fold(TASK, [filed(), { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }]);
+  const quiescent = new Map([[N1, { sessionId: 's0', state: 'working' as const, busy: false }]]);
+  assert.equal(decide(s, quiescent, now(5)).do, 'nothing');
+
+  // ...but with a deadline, it ends.
+  const bounded = fold(TASK, [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 1, deadlineSeconds: 10 },
+    { kind: 'starting', at: at(1_000), attempt: 1 }, { kind: 'spawned', at: at(1_100), attempt: 1 },
+  ]);
+  assert.deepEqual(decide(bounded, quiescent, now(30_000)), { do: 'stop', sessionId: 's0', why: 'deadline' });
 });
 
 test('a blocked session is running, and says why', () => {

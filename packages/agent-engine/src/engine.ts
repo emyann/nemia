@@ -193,6 +193,10 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
   const phase = state.settled
     ? state.settled
     : needsHuman(state, observed) ? 'needs-human'
+    // `working` and not busy: it believes it has work and is computing nothing. Said out loud,
+    // because it is indistinguishable from progress in every other view and it is what a stalled
+    // step looks like from outside.
+    : live === 'working' && sighting?.busy === false ? 'working (quiescent)'
     : live ? `running (${live})`
     // Spawned but not yet in the harness's registry: the grace window, not a gap between attempts.
     : last?.ended === null ? 'starting'

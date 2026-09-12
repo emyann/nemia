@@ -88,10 +88,16 @@ export const claudeOps = (): RunnerOps => ({
         const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string }>;
         const m = new Map<string, Sighting>();
         for (const row of rows) {
-          const state = (row.state ?? row.status) as Observed | undefined;
+          // `state` and `status` answer different questions and are NOT a fallback chain. `state`
+          // is the session's lifecycle; `status` is whether its process is busy this instant. A
+          // row with no `state` is an interactive session — never one of ours — and reading its
+          // `status` as a state is how `idle` once became a recorded failure.
+          const state = row.state as Observed | undefined;
           // Only sessions WE named are ours. Everything else on the machine is somebody else's.
           // For this harness the session id IS the native id — `--resume` takes exactly it.
-          if (row.name?.startsWith('ae/') && row.sessionId && state) m.set(row.name, { sessionId: row.sessionId, state, nativeId: row.sessionId });
+          if (row.name?.startsWith('ae/') && row.sessionId && state) {
+            m.set(row.name, { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId });
+          }
         }
         return m;
       }),

@@ -22,10 +22,15 @@
  * which kind of harness produced it.
  */
 
-/** What a harness reports for a session. */
-export type Observed = 'working' | 'busy' | 'blocked' | 'done' | 'failed' | 'stopped';
+/**
+ * What a harness reports for a session. Exactly the documented `state` values, no more.
+ *
+ * `busy` used to be in here and did not belong: it is a value of a DIFFERENT field. See
+ * `Sighting.busy`.
+ */
+export type Observed = 'working' | 'blocked' | 'done' | 'failed' | 'stopped';
 
-const RUNNING: ReadonlySet<Observed> = new Set(['working', 'busy']);
+const RUNNING: ReadonlySet<Observed> = new Set(['working']);
 /** Waiting on a person — running, but nobody is coming unless the operator is told. */
 const NEEDS_HUMAN: ReadonlySet<Observed> = new Set(['blocked']);
 
@@ -41,6 +46,16 @@ export type Outcome = 'succeeded' | 'failed' | 'stopped';
 export type Sighting = {
   sessionId: string;
   state: Observed;
+  /**
+   * Is the session's process doing something *right now*?
+   *
+   * A second, independent fact — not a finer grade of `state`. `working` means "a turn is running
+   * OR the session is between steps of work it drives itself"; `busy` is what tells those apart.
+   * So `working` + not busy is a session that believes it has work and is computing nothing, which
+   * is what a stalled step looks like from outside. Reported, not acted on: being between steps is
+   * legitimate, and only a deadline can honestly end an ambiguous wait.
+   */
+  busy?: boolean;
   nativeId?: string;
   costUsd?: number;
   turns?: number;

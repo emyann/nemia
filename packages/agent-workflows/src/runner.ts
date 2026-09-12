@@ -35,6 +35,10 @@ const runFile = (id: string) => path.join(runsDir(), `${id}.json`);
 const cancelFile = (id: string) => path.join(runsDir(), `${id}.cancelled`);
 
 export const readRun = (id: string): Run => {
+  // A mistyped run id is the commonest way to reach this, and `ENOENT: no such file or directory,
+  // open '/home/.../runs/r-xzy.json'` answers a question nobody asked. Every verb that takes an
+  // id comes through here, so saying it once covers all of them.
+  if (!fs.existsSync(runFile(id))) throw new Error(`no such run: ${id}  (try 'wf ls')`);
   const run = JSON.parse(fs.readFileSync(runFile(id), 'utf8')) as Run;
   const at = fs.existsSync(cancelFile(id)) ? fs.readFileSync(cancelFile(id), 'utf8').trim() : '';
   return at ? { ...run, cancelledAt: at } : run;

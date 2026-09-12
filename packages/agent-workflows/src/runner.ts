@@ -177,6 +177,24 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
   return run;
 }
 
+/**
+ * Commit whatever a step left behind, so the workspace it hands on is the workspace it made.
+ *
+ * Idempotent: a clean tree commits nothing, so this runs on every pass without accumulating
+ * commits. Deliberately not a failure if it cannot — a step's real work is already committed by
+ * the step itself in the normal case, and losing a run over a git edge case would be worse.
+ */
+function handOff(workspace: string, step: string): void {
+  try {
+    if (!execFileSync('git', ['status', '--porcelain'], { cwd: workspace, encoding: 'utf8' }).trim()) return;
+    execFileSync('git', ['add', '-A'], { cwd: workspace });
+    execFileSync('git', [
+      '-c', 'user.email=wf@local', '-c', 'user.name=wf',
+      'commit', '-m', `${step}: hand off what was left uncommitted`,
+    ], { cwd: workspace, encoding: 'utf8' });
+  } catch { /* nothing to hand off, or a tree git will not commit */ }
+}
+
 export type Advanced = { run: Run; filed: string[]; status: 'running' | 'succeeded' | 'failed'; blocked: string[] };
 
 /**
@@ -197,6 +215,18 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     const v = views.get(taskId);
     return v ? phaseOfView(v) : 'unknown';
   };
+
+  // Anything a finished step left uncommitted is committed for it, BEFORE a later step merges.
+  //
+  // A merge carries commits, not working trees. While steps shared one directory that did not
+  // matter — a file written was a file the next step could read — but the moment steps fork, an
+  // uncommitted file is invisible downstream and the next step answers a question it never saw.
+  // Measured the hard way: a review wrote REVIEW.md, did not commit, and the responder merged a
+  // branch that did not contain it. Asking every step's prose to remember is not a contract.
+  for (const [name, st] of Object.entries(run.steps)) {
+    if (!st.taskId || !st.workspace || phaseOf(st.taskId) !== 'succeeded') continue;
+    handOff(st.workspace, name);
+  }
 
   const { ready, blocked, status } = assess(steps, run, phaseOf);
 

@@ -105,8 +105,14 @@ export function assess(steps: readonly Workflow[], run: Run, phaseOf: (taskId: s
  *     being re-stamped. Anything STILL in flight is asked to stop again all the same: cancelling
  *     is level-triggered like everything else here, so running it twice is how a person fixes a
  *     step that slipped through the first time rather than something they have to reason about.
- *   - **finished** — it ended on its own. It is deliberately NOT relabelled: a run that succeeded
- *     succeeded, and overwriting that would make `wf ls` lie about work that actually landed.
+ *   - **finished** — it ended on its own, and there is nothing left for a tick to do either: no
+ *     step in flight AND none ready to file. It is deliberately NOT relabelled — a run that
+ *     succeeded succeeded, and overwriting that would make `wf ls` lie about work that landed.
+ *
+ * "Finished" has to mean both of those, because `failed` does not mean a run has stopped moving:
+ * in a fan-out where `a` failed and `b` succeeded, a step waiting only on `b` is still READY while
+ * the run as a whole reads failed. Treating that as finished wrote no mark, and the next tick
+ * filed the step anyway — the exact thing cancelling is for.
  */
 export type CancelPlan =
   | { kind: 'cancel'; stop: InFlight[] }
@@ -136,8 +142,10 @@ export function cancelPlan(steps: readonly Workflow[], run: Run, phaseOf: (taskI
   if (run.cancelledAt) return { kind: 'already-cancelled', at: run.cancelledAt, stop };
   if (stop.length) return { kind: 'cancel', stop };
 
-  const { status } = assess(steps, run, phaseOf);
-  if (status === 'succeeded' || status === 'failed') return { kind: 'finished', status };
+  // Nothing in flight, so the question is only whether a tick would still file something. `ready`
+  // is the honest test for that; `status` alone is not.
+  const { ready, status } = assess(steps, run, phaseOf);
+  if (!ready.length && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
   return { kind: 'cancel', stop: [] };
 }
 

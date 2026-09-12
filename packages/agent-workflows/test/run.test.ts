@@ -139,6 +139,23 @@ test('cancelling a finished run is not an error, and does not relabel it', () =>
   assert.deepEqual(gone, { kind: 'finished', status: 'failed' });
 });
 
+test('a failed run with a step still READY is cancelled, not called finished', () => {
+  // `failed` does not mean "has stopped moving". `a` failed, but `c` waits only on `b`, which
+  // succeeded — so a tick would still file `c`. Calling this finished wrote no mark and the next
+  // tick filed it anyway, which is the whole thing cancelling is supposed to prevent.
+  const fan = [step('a'), step('b'), step('c', ['b'])];
+  const r = run({ a: 't1', b: 't2', c: null });
+  const p = phases({ t1: 'failed', t2: 'succeeded' });
+
+  const a = assess(fan, r, p);
+  assert.equal(a.status, 'failed');
+  assert.deepEqual(a.ready, ['c'], 'the run is failed AND has work it would file');
+
+  assert.deepEqual(cancelPlan(fan, r, p), { kind: 'cancel', stop: [] });
+  assert.deepEqual(assess(fan, { ...r, cancelledAt: '2026-01-02T00:00:00Z' }, p).ready, [],
+    'and once marked, that step is never filed');
+});
+
 test('cancelling a cancelled run says who got there first, rather than re-stamping it', () => {
   const plan = cancelPlan(STEPS, run({ implement: 't1', review: null }, CANCELLED), phases({ t1: 'stopped' }));
   assert.deepEqual(plan, { kind: 'already-cancelled', at: CANCELLED.cancelledAt, stop: [] });

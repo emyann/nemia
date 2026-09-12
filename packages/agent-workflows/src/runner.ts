@@ -11,7 +11,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type Engine, type TaskView } from 'agent-engine';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, composeBrief, decision, inFlight, workspacePlan, type Assessment, type CancelPlan, type Decision, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, CLOSEOUT, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -274,6 +274,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   const steps = loadWorkflows(run.workflowDir);
 
   const { views, phaseOf } = await taskPhases(e, run);
+  const signedOff = closeoutReader(run);
 
   // A cancelled run is enforced by every pass, not only by the verb that cancelled it.
   //
@@ -302,7 +303,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     handOff(st.workspace, name);
   }
 
-  const { ready, blocked, status } = assess(steps, run, phaseOf);
+  const { ready, blocked, status } = assess(steps, run, phaseOf, signedOff);
 
   /** The harness's own id for a step's session — what `--resume` takes. */
   const sessionOf = (stepName: string): string | undefined => {
@@ -332,6 +333,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
+      // The engine watches for this and never opens it. The shape is ours; see `Closeout`.
+      doneFile: CLOSEOUT,
     });
     run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
@@ -416,6 +419,44 @@ export async function stepViews(e: Engine, run: Run): Promise<Array<{ name: stri
  * `--is-ancestor` rather than a merge-commit search, so a fast-forward, a squash-merge that was
  * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
  */
+/**
+ * How a step signed off, read out of its branch.
+ *
+ * The worktree is usually gone — cleaned up, or never cut for `--no-worktree` — while the branch
+ * is exactly as the step left it, so git is the only place this can be read from reliably. That is
+ * also why the contract insists the file be COMMITTED: an uncommitted closeout is one nobody can
+ * read once the step's directory has been swept away.
+ */
+export function closeoutOf(run: Run, stepName: string): Closeout | { error: string } | undefined {
+  const branch = run.steps[stepName]?.branch;
+  if (!branch) return undefined;
+  let text: string;
+  try { text = git(run.repo, 'show', `${branch}:${CLOSEOUT}`); } catch { return undefined; }
+  return parseCloseout(text);
+}
+
+/** Only the well-formed ones, for the pure functions that just want the outcome. */
+export const closeoutReader = (run: Run) => (stepName: string): Closeout | undefined => {
+  const c = closeoutOf(run, stepName);
+  return c && !('error' in c) ? c : undefined;
+};
+
+/**
+ * Artifacts a step DECLARED but did not commit.
+ *
+ * The whole point of declaring them. The first real run lost the reviewer's entire output because
+ * REVIEW.md was written and never committed, and nothing anywhere noticed — the merge was clean
+ * and empty. A declared file that is not on the branch is now a mismatch somebody can see.
+ */
+export function missingArtifacts(run: Run, stepName: string): string[] {
+  const branch = run.steps[stepName]?.branch;
+  const c = closeoutOf(run, stepName);
+  if (!branch || !c || 'error' in c) return [];
+  return c.artifacts.filter((f) => {
+    try { git(run.repo, 'cat-file', '-e', `${branch}:${f}`); return false; } catch { return true; }
+  });
+}
+
 export function isShipped(run: Run, branch: string): boolean {
   try {
     execFileSync('git', ['merge-base', '--is-ancestor', branch, run.branch], { cwd: run.repo, stdio: 'ignore' });
@@ -455,7 +496,7 @@ export async function decide(e: Engine, id: string): Promise<{ run: Run; decisio
   const run = readRun(id);
   const steps = loadWorkflows(run.workflowDir);
   const { phaseOf } = await taskPhases(e, run);
-  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b)) };
+  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(run)) };
 }
 
 export function resultBranches(run: Run): string[] {

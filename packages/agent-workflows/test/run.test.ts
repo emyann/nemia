@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, cancelPlan, composeBrief, decision, inFlight, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
+import { assess, cancelPlan, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -198,8 +198,12 @@ test('the first step is told nothing about a workspace nobody has touched', () =
 test('a resumed step is told only its own prose — it already has the context', () => {
   const respond: Workflow = { name: 'respond', after: ['implement'], body: 'answer the review', resume: 'implement' };
   const brief = composeBrief(respond, run({ implement: 't1', respond: null }), [step('implement'), respond]);
-  assert.equal(brief, 'answer the review');
+  assert.match(brief, /^answer the review/);
   assert.doesNotMatch(brief, /What was asked for/, 'it was there when the request came in');
+  assert.doesNotMatch(brief, /Where to look/, 'it has been looking at this workspace all along');
+  // The closeout contract is the one thing every brief carries, resumed or not: it is how the run
+  // learns the step is finished, and a step that never heard of it can never say so.
+  assert.match(brief, /When you are finished/);
 });
 
 // ─── where a step works ─────────────────────────────────────────────────────
@@ -316,4 +320,45 @@ test('a FAILED run is still decided, and names the step that failed', () => {
 test('a run that never filed anything has no branch to ship, and is not "shipped"', () => {
   const d = decision(STEPS, run({ implement: null, review: null }), phases({}), () => true);
   assert.equal(d.kind, 'running');
+});
+
+// ─── the closeout ───────────────────────────────────────────────────────────
+
+test('every brief carries the closeout contract — no workflow can forget it', () => {
+  // The bug this exists for: `review.md` was the one step whose prose did not say "commit this",
+  // and the reviewer's entire output silently failed to reach the next step. Prose that every
+  // author must remember is prose some author will not.
+  for (const s of [step('implement'), step('review', ['implement'])]) {
+    assert.match(composeBrief(s, run({ implement: 't1', review: null }), STEPS), /\.wf\/done\.json/);
+  }
+});
+
+test('a closeout is parsed forgivingly — an agent wrote it', () => {
+  assert.deepEqual(parseCloseout('{"outcome":"done","summary":"did it","artifacts":["REVIEW.md"]}'),
+    { outcome: 'done', summary: 'did it', artifacts: ['REVIEW.md'], needs: undefined });
+  assert.ok('error' in parseCloseout('{not json'));
+  assert.ok('error' in parseCloseout('[]'), 'an array is not a closeout');
+  // Missing fields are absences, not failures: a run must not become unreadable over this.
+  assert.deepEqual(parseCloseout('{}'), { outcome: 'done', summary: '', artifacts: [], needs: undefined });
+  assert.deepEqual(parseCloseout('{"artifacts":["a.md",7,null]}').artifacts, ['a.md']);
+});
+
+test('a step that signs off BLOCKED stops the DAG, however its session ended', () => {
+  const blockedAt = (name: string) => (s: string) =>
+    s === name ? { outcome: 'blocked' as const, summary: 'stuck', artifacts: [], needs: 'pick one' } : undefined;
+
+  // The engine settled the session succeeded — it ended cleanly, because the agent stopped on
+  // purpose. Only the closeout knows the work is not done.
+  const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'succeeded' }), blockedAt('implement'));
+  assert.deepEqual(a.ready, [], 'review must not be filed');
+  assert.deepEqual(a.blocked, ['review']);
+});
+
+test('a blocked run is AWAITING you, and is not called failed', () => {
+  const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'pick one' });
+  const d = decision(STEPS, finished(), DONE, nothingShipped, blocked);
+  assert.equal(d.kind, 'awaiting');
+  assert.equal(d.kind === 'awaiting' && d.outcome, 'blocked');
+  assert.deepEqual(d.kind === 'awaiting' && d.failed, [], 'nothing broke');
+  assert.deepEqual(d.kind === 'awaiting' && d.stuck, ['implement', 'review']);
 });

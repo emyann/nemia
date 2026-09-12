@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifacts, cancel, decide, diffStat, engine, listRuns, readArtifact, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
+import { artifacts, cancel, closeoutOf, decide, diffStat, engine, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
 import { loadWorkflows } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -129,9 +129,25 @@ export async function main(argv: string[]): Promise<void> {
       if (decision.kind === 'shipped') return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}`);
 
       console.log(`${head}\n`);
-      console.log(decision.outcome === 'failed'
-        ? `  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)\n`
-        : `  every step succeeded\n`);
+      if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)`);
+      // A step that stopped itself and said why is a different thing from one that broke, and the
+      // difference decides whether you read a summary or a log.
+      if (decision.stuck.length) console.log(`  BLOCKED, waiting on you: ${decision.stuck.join(', ')}`);
+      if (!decision.failed.length && !decision.stuck.length) console.log(`  every step succeeded`);
+
+      // Each step's own closeout: the summary is written FOR this moment. The reviewer never saw
+      // it — that is the point of the field — and you are the audience it was addressed to.
+      for (const name of Object.keys(run.steps)) {
+        const c = closeoutOf(run, name);
+        if (!c) continue;
+        if ('error' in c) { console.log(`\n  ${name}: closeout unreadable — ${c.error}`); continue; }
+        console.log(`\n  ${name}${c.outcome === 'blocked' ? '  BLOCKED' : ''}`);
+        if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
+        if (c.needs) console.log(`    needs: ${c.needs}`);
+        const missing = missingArtifacts(run, name);
+        if (missing.length) console.log(`    !! declared but not committed: ${missing.join(', ')}  — it did not travel`);
+      }
+      console.log();
 
       for (const branch of decision.branches) {
         const stat = diffStat(run, branch);

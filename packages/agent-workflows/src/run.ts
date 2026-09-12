@@ -57,7 +57,19 @@ export type Assessment = {
  * What should happen to this run now. Pure — hand it the engine's view of each task and it
  * decides; it reads no disk and calls no engine.
  */
-export function assess(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): Assessment {
+export function assess(
+  steps: readonly Workflow[],
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  /**
+   * How each step signed off, when it left a closeout.
+   *
+   * A step can end its session cleanly and still not have done the work — `outcome: "blocked"` is
+   * it saying so. The engine cannot know that: it settled a session, and a session that stops
+   * because the agent is stuck stops exactly like one that finished. So the DAG asks here.
+   */
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+): Assessment {
   // A cancelled run outranks anything its tasks say. Nothing more is filed for it however
   // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
   // a tick after a cancel must not helpfully start the next step of a run somebody just stopped.
@@ -65,7 +77,12 @@ export function assess(steps: readonly Workflow[], run: Run, phaseOf: (taskId: s
 
   const phase = (name: string): TaskPhase | 'unfiled' => {
     const id = run.steps[name]?.taskId;
-    return id ? phaseOf(id) : 'unfiled';
+    if (!id) return 'unfiled';
+    // A step that signed off `blocked` did not succeed, whatever became of its session. Read as
+    // `stopped` rather than `failed`: nothing downstream can run, and it is waiting on a person
+    // rather than broken — which is the distinction `wf decide` then makes out loud.
+    if (closeoutOf(name)?.outcome === 'blocked') return 'stopped';
+    return phaseOf(id);
   };
 
   const ready: string[] = [];
@@ -149,6 +166,87 @@ export function cancelPlan(steps: readonly Workflow[], run: Run, phaseOf: (taskI
   return { kind: 'cancel', stop: [] };
 }
 
+// ─── the closeout ───────────────────────────────────────────────────────────
+
+/**
+ * Where a step writes what it finished with. The path is this package's, not the engine's.
+ *
+ * The engine is told only that a file at this path means "finished" and never opens it. Everything
+ * below — the shape, the field names, what they mean — lives here, because it is a workflow's
+ * vocabulary and nothing underneath should have to learn it.
+ */
+export const CLOSEOUT = '.wf/done.json';
+
+/**
+ * What a step says on its way out.
+ *
+ * Two audiences, deliberately separated, which is the whole reason this is a record and not a
+ * string. `summary` is prose for the DECIDER — a person, at the end of the run. `artifacts` is for
+ * the machine and for the next step: the files this step wants read.
+ *
+ * The reviewer never sees `summary`. Passing the implementer's account of the work to the person
+ * judging it would anchor the judgement on the context that produced the work, and offer
+ * unverifiable claims beside verifiable evidence — the rule `composeBrief` already keeps. Hermes
+ * Kanban injects the parent's summary into the child's prompt; this is the one place worth
+ * diverging, and the field earns its place by travelling to the human instead.
+ */
+export type Closeout = {
+  /** `done` finished the work. `blocked` finished the SESSION and needs a person. */
+  outcome: 'done' | 'blocked';
+  summary: string;
+  /** Files this step produced for whoever reads next, by path from the workspace root. */
+  artifacts: string[];
+  /** Set when blocked: what the person has to settle. */
+  needs?: string;
+};
+
+/**
+ * Read a closeout, forgivingly.
+ *
+ * An agent wrote this, so it is parsed the way you would parse anything an agent wrote: a missing
+ * file is normal (the step is still running, or it is an older run, or it crashed), and a malformed
+ * one is reported rather than thrown — a run must not become unreadable because one step wrote
+ * bad JSON on its way out.
+ */
+export function parseCloseout(text: string): Closeout | { error: string } {
+  let raw: unknown;
+  try { raw = JSON.parse(text); } catch (e) { return { error: `unparseable: ${(e as Error).message}` }; }
+  // `typeof [] === 'object'`, so an array would otherwise read as an empty closeout.
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: 'not an object' };
+  const o = raw as Record<string, unknown>;
+  const outcome = o.outcome === 'blocked' ? 'blocked' : 'done';
+  return {
+    outcome,
+    summary: typeof o.summary === 'string' ? o.summary : '',
+    artifacts: Array.isArray(o.artifacts) ? o.artifacts.filter((a): a is string => typeof a === 'string') : [],
+    needs: typeof o.needs === 'string' ? o.needs : undefined,
+  };
+}
+
+/**
+ * What a step is told to write on its way out, appended to every brief.
+ *
+ * MECHANISM, not prose a workflow author has to remember. The first real run lost an entire
+ * reviewer's output because `review.md` was the one step whose body forgot to say "commit this",
+ * and the fix at the time was to edit the prose — which leaves the next workflow to make the same
+ * mistake. Every step is now told the same thing by the runner, so no workflow can omit it.
+ */
+export const closeoutContract = (): string => [
+  '', '## When you are finished', '',
+  `Write \`${CLOSEOUT}\` and commit it. It is how this run knows you are done, and it is the last`,
+  'thing you should do:', '', '```json', '{',
+  '  "outcome": "done",',
+  '  "summary": "one to three sentences: what you did, for the person who decides what ships",',
+  '  "artifacts": ["any file you wrote for someone else to read, e.g. REVIEW.md"],',
+  '  "needs": "only when outcome is \"blocked\": what a person has to settle"',
+  '}', '```', '',
+  '`artifacts` must be **committed**. The next step gets your branch merged into its workspace, and',
+  'an uncommitted file does not travel — a file you list but do not commit is reported as missing.',
+  '',
+  'Use `"outcome": "blocked"` if you cannot honestly finish. A step that reports success it did not',
+  'have is worse than one that stops and says why.',
+].join('\n');
+
 // ─── handing it back ────────────────────────────────────────────────────────
 
 /**
@@ -169,17 +267,18 @@ export type Decision =
   | { kind: 'running'; waiting: string[] }
   | { kind: 'cancelled'; at: string }
   | { kind: 'shipped'; branches: string[] }
-  | { kind: 'awaiting'; outcome: 'succeeded' | 'failed'; branches: string[]; failed: string[] };
+  | { kind: 'awaiting'; outcome: 'succeeded' | 'failed' | 'blocked'; branches: string[]; failed: string[]; stuck: string[] };
 
 export function decision(
   steps: readonly Workflow[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   shipped: (branch: string) => boolean,
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
 ): Decision {
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
-  const { status, ready } = assess(steps, run, phaseOf);
+  const { status, ready } = assess(steps, run, phaseOf, closeoutOf);
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred.
     const live = Object.entries(run.steps)
@@ -196,11 +295,19 @@ export function decision(
   // one of them landed.
   if (branches.length && branches.every(shipped)) return { kind: 'shipped', branches };
 
-  const failed = Object.entries(run.steps)
-    .filter(([, s]) => s.taskId && ['failed', 'stopped'].includes(phaseOf(s.taskId)))
-    .map(([name]) => name)
-    .sort();
-  return { kind: 'awaiting', outcome: status === 'failed' ? 'failed' : 'succeeded', branches, failed };
+  // Told apart on purpose. A step that STOPPED itself and said why is a question for you; one the
+  // engine recorded as failed is a thing that broke. Lumping them loses the only bit that decides
+  // whether you read a summary or a log.
+  const stepsBy = (p: (name: string) => boolean) =>
+    Object.entries(run.steps).filter(([name, s]) => s.taskId && p(name)).map(([name]) => name).sort();
+  const stuck = stepsBy((name) => closeoutOf(name)?.outcome === 'blocked');
+  const failed = stepsBy((name) =>
+    closeoutOf(name)?.outcome !== 'blocked' && ['failed', 'stopped'].includes(phaseOf(run.steps[name]!.taskId!)));
+  return {
+    kind: 'awaiting',
+    outcome: failed.length ? 'failed' : stuck.length ? 'blocked' : 'succeeded',
+    branches, failed, stuck,
+  };
 }
 
 /**
@@ -222,7 +329,7 @@ export function decision(
 export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[]): string {
   // A step that CONTINUES another already has the context — its own. Repeating the spec back and
   // pointing it at the workspace would be telling someone what they spent an hour doing.
-  if (step.resume) return step.body;
+  if (step.resume) return step.body + closeoutContract();
 
   const earlier = step.after.length
     ? step.after
@@ -237,6 +344,7 @@ export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',
       'several others is for. `git status` shows them.',
+      closeoutContract(),
     ].join('\n');
   }
 
@@ -258,6 +366,7 @@ export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[
     );
   }
 
+  parts.push(closeoutContract());
   return parts.join('\n');
 }
 

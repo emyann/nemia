@@ -166,6 +166,47 @@ cleanly. The integrate step wrote:
 That is exactly the failure two engineers would have used a conversation to avoid, caught after the
 fact by a step whose job is to look — with no coordination, no lock, and no declared paths.
 
+## The closeout: how a step signs off
+
+Every step ends by writing `.wf/done.json` and committing it:
+
+```json
+{ "outcome": "done",
+  "summary": "one to three sentences, for the person who decides what ships",
+  "artifacts": ["REVIEW.md"],
+  "needs": "only when blocked: what a person has to settle" }
+```
+
+**Three problems, one file.**
+
+*It is how the run knows a step is finished.* The engine is told `doneFile: .wf/done.json` and
+settles the attempt the moment it appears — no ninety-second quiescence wait, no stall to
+characterise. This is [Hermes Kanban's](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban)
+`kanban_complete(...)` in the only form that survives a fleet: they can require a terminal *tool
+call* because every worker is theirs, and you cannot inject a tool into `codex exec`. A file, any
+harness can write. Declaration is the fast path; the engine's own observation is still the floor
+under it, for the step that crashes or forgets.
+
+*It stops a step claiming success it did not have.* `"outcome": "blocked"` ends the session
+honestly, and the DAG treats it as final — nothing downstream runs — while `wf decide` says
+**waiting on you** rather than **failed**. A thing that stopped and said why is not a thing that
+broke, and the difference is whether you read a summary or a log.
+
+*It makes a lost artifact visible.* `artifacts` are cross-checked against the branch, so a file a
+step declared and did not commit is reported: `!! declared but not committed — it did not travel`.
+That is the exact bug the first real run hit, where REVIEW.md was written, never committed, and
+vanished into a clean empty merge with nothing anywhere noticing.
+
+**The contract is appended by the runner, not written by workflow authors.** `review.md` was the
+one step whose prose forgot to say "commit this", and the fix at the time was to edit that prose —
+which leaves the next workflow free to make the same mistake. Mechanism, so no workflow can omit
+it.
+
+**`summary` goes to the decider and nowhere else.** The reviewer still gets the diff and the
+artifact list and no account of the work — *read the change, not an account of it* is unchanged.
+Hermes injects the parent's summary into the child's prompt; this is the one place worth diverging,
+and the field earns its keep by travelling to the human at the end instead.
+
 ## Deciding what ships
 
 A run used to end by going quiet. The last step settled `succeeded`, `wf ls` named a branch, and

@@ -11,7 +11,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type Engine, type TaskView } from 'agent-engine';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, CLOSEOUT, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, closeoutPath, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -334,7 +334,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       maxAttempts: step.maxAttempts,
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
       // The engine watches for this and never opens it. The shape is ours; see `Closeout`.
-      doneFile: CLOSEOUT,
+      doneFile: closeoutPath(name),
     });
     run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
@@ -431,7 +431,7 @@ export function closeoutOf(run: Run, stepName: string): Closeout | { error: stri
   const branch = run.steps[stepName]?.branch;
   if (!branch) return undefined;
   let text: string;
-  try { text = git(run.repo, 'show', `${branch}:${CLOSEOUT}`); } catch { return undefined; }
+  try { text = git(run.repo, 'show', `${branch}:${closeoutPath(stepName)}`); } catch { return undefined; }
   return parseCloseout(text);
 }
 

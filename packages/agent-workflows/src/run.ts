@@ -174,8 +174,15 @@ export function cancelPlan(steps: readonly Workflow[], run: Run, phaseOf: (taskI
  * The engine is told only that a file at this path means "finished" and never opens it. Everything
  * below — the shape, the field names, what they mean — lives here, because it is a workflow's
  * vocabulary and nothing underneath should have to learn it.
+ *
+ * NAMED PER STEP, and that is not tidiness. A closeout is committed so it can be read after the
+ * worktree is swept away, which means it travels down the branch like any other commit: with one
+ * shared name, the next step inherits a satisfied probe and a closeout that is not its own. The
+ * first real run settled two steps `succeeded` in six seconds each, having done nothing at all.
+ * Distinct names make an inherited marker simply a different file — and make `git show
+ * <branch>:<path>` unambiguous on a branch that merged three others.
  */
-export const CLOSEOUT = '.wf/done.json';
+export const closeoutPath = (step: string) => `.wf/${step}.done.json`;
 
 /**
  * What a step says on its way out.
@@ -231,10 +238,11 @@ export function parseCloseout(text: string): Closeout | { error: string } {
  * and the fix at the time was to edit the prose — which leaves the next workflow to make the same
  * mistake. Every step is now told the same thing by the runner, so no workflow can omit it.
  */
-export const closeoutContract = (): string => [
+export const closeoutContract = (step: string): string => [
   '', '## When you are finished', '',
-  `Write \`${CLOSEOUT}\` and commit it. It is how this run knows you are done, and it is the last`,
-  'thing you should do:', '', '```json', '{',
+  `Write \`${closeoutPath(step)}\` and commit it. It is how this run knows you are done, and it`,
+  'is the last thing you should do:',
+  '', '```json', '{',
   '  "outcome": "done",',
   '  "summary": "one to three sentences: what you did, for the person who decides what ships",',
   '  "artifacts": ["any file you wrote for someone else to read, e.g. REVIEW.md"],',
@@ -329,7 +337,7 @@ export function decision(
 export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[]): string {
   // A step that CONTINUES another already has the context — its own. Repeating the spec back and
   // pointing it at the workspace would be telling someone what they spent an hour doing.
-  if (step.resume) return step.body + closeoutContract();
+  if (step.resume) return step.body + closeoutContract(step.name);
 
   const earlier = step.after.length
     ? step.after
@@ -344,7 +352,7 @@ export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',
       'several others is for. `git status` shows them.',
-      closeoutContract(),
+      closeoutContract(step.name),
     ].join('\n');
   }
 
@@ -366,7 +374,7 @@ export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[
     );
   }
 
-  parts.push(closeoutContract());
+  parts.push(closeoutContract(step.name));
   return parts.join('\n');
 }
 

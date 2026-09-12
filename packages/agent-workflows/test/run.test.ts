@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, cancelPlan, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
+import { assess, cancelPlan, closeoutPath, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -329,8 +329,13 @@ test('every brief carries the closeout contract — no workflow can forget it', 
   // and the reviewer's entire output silently failed to reach the next step. Prose that every
   // author must remember is prose some author will not.
   for (const s of [step('implement'), step('review', ['implement'])]) {
-    assert.match(composeBrief(s, run({ implement: 't1', review: null }), STEPS), /\.wf\/done\.json/);
+    const brief = composeBrief(s, run({ implement: 't1', review: null }), STEPS);
+    // Its OWN path. A shared one travels down the branch and arms the next step's probe before it
+    // has done anything — which is exactly how a real run reported two steps succeeded in six
+    // seconds each.
+    assert.match(brief, new RegExp(`\\.wf/${s.name}\\.done\\.json`));
   }
+  assert.notEqual(closeoutPath('implement'), closeoutPath('review'));
 });
 
 test('a closeout is parsed forgivingly — an agent wrote it', () => {

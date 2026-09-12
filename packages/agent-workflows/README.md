@@ -168,7 +168,7 @@ fact by a step whose job is to look — with no coordination, no lock, and no de
 
 ## The closeout: how a step signs off
 
-Every step ends by writing `.wf/done.json` and committing it:
+Every step ends by writing `.wf/<step>.done.json` and committing it:
 
 ```json
 { "outcome": "done",
@@ -176,6 +176,14 @@ Every step ends by writing `.wf/done.json` and committing it:
   "artifacts": ["REVIEW.md"],
   "needs": "only when blocked: what a person has to settle" }
 ```
+
+**The path is per step, and that is not tidiness.** A closeout is committed so it can be read once
+the worktree is swept away — which means it travels down the branch like any other commit. With one
+shared name, the next step is cut a worktree whose probe is *already satisfied*. The first run to
+try this settled `review` and `respond` `succeeded` in six seconds each, having done nothing at all,
+and the board said the run was fine. Distinct names make an inherited marker a different file, and
+make `git show <branch>:<path>` unambiguous on a branch that merged three others. The engine also
+clears the marker before every attempt, so neither layer relies on the other having got it right.
 
 **Three problems, one file.**
 

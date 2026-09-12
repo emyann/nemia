@@ -2,12 +2,13 @@
 
 A workflow is **a folder of markdown files**. One file is one step. It runs on
 [`agent-engine`](../agent-engine), and it is the proof that the engine's boundary is real: this
-package uses `createEngine`, `file`, `tick`, `view`, `logs` and nothing else.
+package uses `createEngine`, `file`, `tick`, `view`, `stop`, `logs` and nothing else.
 
 ```bash
 wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf up
 wf ls
+wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
 ```
 
 To follow it live, use the engine rather than this package — a run's task ids carry the run and the
@@ -164,6 +165,41 @@ cleanly. The integrate step wrote:
 
 That is exactly the failure two engineers would have used a conversation to avoid, caught after the
 fact by a step whose job is to look — with no coordination, no lock, and no declared paths.
+
+## Calling a run off
+
+A run could be started and watched but never stopped: the only recourse was killing the session by
+hand, which left the run's own record insisting it was still running. `wf cancel <runId>` asks the
+engine to stop the step in flight and writes the cancellation on the **run**.
+
+That last part is the whole decision. Everywhere else a run holds no status of its own — whether it
+is finished is a question about its steps' tasks, and the engine can answer it, so copying the
+answer here would just go stale. Cancellation is the exception because there is nothing to copy:
+the engine has tasks, not runs, and "file nothing further" is not a fact any one task can hold.
+Stopping the session ends the work burning right now; the mark on the run is what stops the next
+tick cheerfully filing the step after it.
+
+The mark is a file of its own — `runs/<id>.cancelled`, not a field in the run's json — and that
+is not fussiness. The json has a writer that rewrites it constantly: a tick reads the record,
+spends seconds observing sessions and cutting worktrees, then writes back what it filed. `wf
+cancel` is a second writer, and the whole point of it is to be typed while that daemon is running.
+Two writers doing read-modify-write on one file lose updates, and this one did — a cancel landing
+mid-pass was overwritten by the tick's stale copy, and the run went on filing steps as if nobody
+had said anything. Re-reading before writing narrows that window rather than closing it. Two
+writers, two files, composed on read: the tick owns the steps, a person owns the cancellation, and
+neither can erase the other.
+
+For the same reason the mark is enforced by **every** tick, not only by the verb that wrote it.
+`wf cancel` stops what it can see in flight, and a pass already underway may file a step a moment
+later; the next tick finds it and stops it too. The mark is the desired state and each tick
+reconciles toward it — the same level-triggered rule the engine runs on one layer down.
+
+Cancelling a run with nothing in flight, one already finished, or one already cancelled are all
+normal things for a person to do, so none of them is an error and each says which it was. A
+finished run is deliberately **not** relabelled — a run that succeeded succeeded, and stamping it
+cancelled would make `wf ls` lie about work that actually landed. Cancelling twice keeps the first
+time and re-asks for whatever is *still* in flight, because the engine carries a stop out on its
+next tick: running it again is how a person deals with one that slipped through, not a no-op.
 
 ## Choosing the model per step
 

@@ -5,6 +5,11 @@
  * store and the engine calls are the I/O around it. A run holds no status of its own — whether it
  * is finished is a question about its steps' tasks, and the engine can answer that. Copying the
  * answer here would be a second source of truth that goes stale the moment a task settles.
+ *
+ * Cancellation is the exception, and it is the one that proves the rule: "somebody called this
+ * off" is not a fact about any step's task, so there is nothing here to copy. The engine can be
+ * asked to stop a task, but it has never heard of the run — which is why `cancelledAt` lives on
+ * the run, and is the only state this file writes down rather than derives.
  */
 import type { TaskView } from 'agent-engine';
 import type { Workflow } from './workflow.ts';
@@ -27,6 +32,14 @@ export type Run = {
   /** What the person actually asked for. This travels to EVERY step; it is the spec. */
   brief: string;
   workflowDir: string;
+  /**
+   * When somebody called the run off, if they did.
+   *
+   * On the run rather than on a step, because that is what it is about: stopping the step in
+   * flight is one consequence of it, and "file nothing further" is the other, and no step's task
+   * can hold the second one.
+   */
+  cancelledAt?: string;
   /** Per step: the task the engine ran, and the workspace and branch it ran in. */
   steps: Record<string, { taskId: string | null; workspace?: string; branch?: string }>;
   createdAt: string;
@@ -37,7 +50,7 @@ export type Assessment = {
   ready: string[];
   /** Steps that can never run, because something they wait on failed. */
   blocked: string[];
-  status: 'running' | 'succeeded' | 'failed';
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled';
 };
 
 /**
@@ -45,6 +58,11 @@ export type Assessment = {
  * decides; it reads no disk and calls no engine.
  */
 export function assess(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): Assessment {
+  // A cancelled run outranks anything its tasks say. Nothing more is filed for it however
+  // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
+  // a tick after a cancel must not helpfully start the next step of a run somebody just stopped.
+  if (run.cancelledAt) return { ready: [], blocked: [], status: 'cancelled' };
+
   const phase = (name: string): TaskPhase | 'unfiled' => {
     const id = run.steps[name]?.taskId;
     return id ? phaseOf(id) : 'unfiled';
@@ -69,6 +87,66 @@ export function assess(steps: readonly Workflow[], run: Run, phaseOf: (taskId: s
     : 'running';
 
   return { ready, blocked, status };
+}
+
+// ─── calling one off ────────────────────────────────────────────────────────
+
+/**
+ * What cancelling this run has to do — and, because they are the same decision, what to tell the
+ * person who asked. Pure, like `assess`, and tested the same way.
+ *
+ * Three answers, because cancelling anything at any time is a normal thing for a person to do and
+ * none of it is an error:
+ *
+ *   - **cancel** — mark the run and ask the engine to stop whatever it has in flight. Possibly
+ *     nothing: a run cancelled before its first tick has filed no task at all, and marking it is
+ *     still the whole point, because that is what stops the next tick filing the first step.
+ *   - **already-cancelled** — someone got there first, and the time they did it stands rather than
+ *     being re-stamped. Anything STILL in flight is asked to stop again all the same: cancelling
+ *     is level-triggered like everything else here, so running it twice is how a person fixes a
+ *     step that slipped through the first time rather than something they have to reason about.
+ *   - **finished** — it ended on its own, and there is nothing left for a tick to do either: no
+ *     step in flight AND none ready to file. It is deliberately NOT relabelled — a run that
+ *     succeeded succeeded, and overwriting that would make `wf ls` lie about work that landed.
+ *
+ * "Finished" has to mean both of those, because `failed` does not mean a run has stopped moving:
+ * in a fan-out where `a` failed and `b` succeeded, a step waiting only on `b` is still READY while
+ * the run as a whole reads failed. Treating that as finished wrote no mark, and the next tick
+ * filed the step anyway — the exact thing cancelling is for.
+ */
+export type CancelPlan =
+  | { kind: 'cancel'; stop: InFlight[] }
+  | { kind: 'already-cancelled'; at: string; stop: InFlight[] }
+  | { kind: 'finished'; status: 'succeeded' | 'failed' };
+
+export type InFlight = { name: string; taskId: string };
+
+/** The steps the engine is still holding: filed, and settled neither way. */
+export function inFlight(run: Run, phaseOf: (taskId: string) => TaskPhase): InFlight[] {
+  const live: InFlight[] = [];
+  for (const [name, step] of Object.entries(run.steps)) {
+    if (!step.taskId) continue;
+    const phase = phaseOf(step.taskId);
+    // `pending` counts: a task that is filed and waiting for a slot has not started, but the next
+    // tick would start it — which is precisely what the person cancelling does not want.
+    if (phase === 'pending' || phase === 'running') live.push({ name, taskId: step.taskId });
+  }
+  return live;
+}
+
+export function cancelPlan(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): CancelPlan {
+  // Whatever is in flight is stopped whatever the rest of the run looks like. A fan-out can have
+  // one sibling still working while another has already failed the run as a whole, and that
+  // session is exactly the one the person cancelling wants to stop.
+  const stop = inFlight(run, phaseOf);
+  if (run.cancelledAt) return { kind: 'already-cancelled', at: run.cancelledAt, stop };
+  if (stop.length) return { kind: 'cancel', stop };
+
+  // Nothing in flight, so the question is only whether a tick would still file something. `ready`
+  // is the honest test for that; `status` alone is not.
+  const { ready, status } = assess(steps, run, phaseOf);
+  if (!ready.length && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
+  return { kind: 'cancel', stop: [] };
 }
 
 /**

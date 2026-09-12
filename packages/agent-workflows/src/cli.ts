@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { engine, listRuns, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
+import { cancel, engine, listRuns, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
 import { loadWorkflows } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -12,6 +12,7 @@ const HELP = `wf — run a workflow of agent steps
   wf tick                      one pass: tick the engine, file what became ready
   wf up [ms]                   the same, on a timer
   wf ls [runId]                runs and their steps
+  wf cancel <runId>            stop what it has in flight; file nothing more
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
 
@@ -86,7 +87,8 @@ export async function main(argv: string[]): Promise<void> {
       const runs = rest[0] ? [readRun(rest[0])] : listRuns();
       if (!runs.length) return console.log('no runs');
       for (const run of runs) {
-        console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`);
+        const calledOff = run.cancelledAt ? '  (cancelled)' : '';
+        console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}`);
         for (const s of await stepViews(e, run)) {
           console.log(`   ${s.name.padEnd(14)} ${s.phase.padEnd(20)} ${s.branch ?? ''}`);
         }
@@ -94,6 +96,21 @@ export async function main(argv: string[]): Promise<void> {
         const result = resultBranches(run);
         if (result.length) console.log(`   → result: ${result.join(', ')}  (in ${run.repo})`);
       }
+      return;
+    }
+
+    case 'cancel': {
+      if (!rest[0]) return console.log(HELP);
+      const { run, plan } = await cancel(e, rest[0]);
+
+      // Say what happened, in every case. A `wf cancel` that prints nothing is indistinguishable
+      // from one that did nothing — and "already finished" and "nothing was in flight" are exactly
+      // the answers a person cannot tell apart from silence.
+      if (plan.kind === 'finished') return console.log(`${run.id}  already ${plan.status} — nothing to stop`);
+
+      console.log(plan.kind === 'already-cancelled' ? `${run.id}  already cancelled at ${plan.at}` : `${run.id}  cancelled`);
+      if (plan.stop.length) console.log(`   asked to stop: ${plan.stop.map((s) => s.name).join(', ')}  (the engine stops it on its next tick)`);
+      else if (plan.kind === 'cancel') console.log(`   nothing was in flight — no further steps will be filed`);
       return;
     }
 

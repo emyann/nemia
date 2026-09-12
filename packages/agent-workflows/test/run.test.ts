@@ -362,3 +362,13 @@ test('a blocked run is AWAITING you, and is not called failed', () => {
   assert.deepEqual(d.kind === 'awaiting' && d.failed, [], 'nothing broke');
   assert.deepEqual(d.kind === 'awaiting' && d.stuck, ['implement', 'review']);
 });
+
+test('the JSON the contract shows an agent actually parses', () => {
+  // It did not. `"only when outcome is "blocked": ..."` — nested quotes, invalid JSON, handed to
+  // every step as the example to copy. Caught by a real run, not by a unit test, because nothing
+  // had ever tried to parse the thing we were telling agents to imitate.
+  const brief = composeBrief(step('implement'), run({ implement: null }), STEPS);
+  const json = brief.split('```json')[1]!.split('```')[0]!;
+  assert.doesNotThrow(() => JSON.parse(json), 'the example must be valid JSON');
+  assert.ok(!('error' in parseCloseout(json)), 'and must parse as a closeout');
+});

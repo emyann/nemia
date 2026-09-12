@@ -238,7 +238,7 @@ export const closeoutContract = (): string => [
   '  "outcome": "done",',
   '  "summary": "one to three sentences: what you did, for the person who decides what ships",',
   '  "artifacts": ["any file you wrote for someone else to read, e.g. REVIEW.md"],',
-  '  "needs": "only when outcome is \"blocked\": what a person has to settle"',
+  '  "needs": "only when blocked: what a person has to settle"',
   '}', '```', '',
   '`artifacts` must be **committed**. The next step gets your branch merged into its workspace, and',
   'an uncommitted file does not travel — a file you list but do not commit is reported as missing.',

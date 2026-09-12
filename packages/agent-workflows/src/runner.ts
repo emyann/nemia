@@ -38,6 +38,31 @@ export const engine = (): Engine => createEngine({
 const phaseOfView = (v: TaskView): TaskPhase =>
   v.state.settled ?? (v.state.attempts.length ? 'running' : 'pending');
 
+/**
+ * Gitignored directories a fresh worktree needs in order to be usable.
+ *
+ * A worktree contains tracked files only, so `node_modules` is absent and a step that runs the
+ * tests fails on its first command — through no fault of its own. Symlinked rather than copied:
+ * installing per worktree would cost minutes per step, and a local `file:` dependency would not
+ * even resolve from a worktree that lives outside the repository's parent directory.
+ *
+ * `node_modules` is the pragmatic 95% case rather than a principle. A workflow for another
+ * ecosystem wants `.venv`, `target`, `vendor`; when that day comes this becomes a run option
+ * instead of a constant.
+ */
+const LINK_DIRS = ['node_modules'];
+
+/** Make a worktree usable: link in what git deliberately did not copy. */
+function linkDependencies(repo: string, workspace: string): void {
+  for (const dir of LINK_DIRS) {
+    const from = path.join(repo, dir);
+    const to = path.join(workspace, dir);
+    if (fs.existsSync(from) && !fs.existsSync(to)) {
+      try { fs.symlinkSync(from, to, 'dir'); } catch { /* best effort: the step will say so */ }
+    }
+  }
+}
+
 const git = (repo: string, ...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
 
 /**
@@ -93,6 +118,7 @@ function workspaceFor(
   const from = plan.kind === 'merge' ? of(plan.from).branch : plan.from ? of(plan.from).branch : run.baseRef;
   fs.mkdirSync(path.dirname(workspace), { recursive: true });
   git(run.repo, 'worktree', 'add', '-b', branch, workspace, from);
+  linkDependencies(run.repo, workspace);
 
   let conflicted = false;
   if (plan.kind === 'merge') {

@@ -54,6 +54,13 @@ export type JournalOps = {
    * replays rather than being told to start over. Pass 0 to read the whole history.
    */
   readonly feed: (after: Cursor) => Effect.Effect<{ entries: FeedEntry[]; cursor: Cursor }, JournalError>;
+  /**
+   * Optional: call `onChange` when something has been appended, so a watcher can read instead of
+   * poll. A store that cannot signal simply omits this and watchers fall back to a timer — the
+   * same shape as everything else here, where a change is a HINT and re-reading is the mechanism.
+   * Missing a signal costs latency and nothing else.
+   */
+  readonly subscribe?: (onChange: () => void) => () => void;
 };
 
 export class Journal extends Context.Service<Journal, JournalOps>()('engine/Journal') {
@@ -61,14 +68,17 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
   static layer = (ops: JournalOps) => Layer.succeed(Journal)(Journal.of(ops));
 
   /** Files under `root` (default `~/.agent-engine`). The default, and the standalone one. */
-  static files = (root = path.join(os.homedir(), '.agent-engine')) => {
+  static files = (root?: string) => Journal.layer(Journal.filesOps(root));
+
+  /** The same implementation as a plain value, for a caller that needs its optional `subscribe`. */
+  static filesOps = (root = path.join(os.homedir(), '.agent-engine')): JournalOps => {
     const dir = path.join(root, 'tasks');
     const file = (id: string) => path.join(dir, `${id}.jsonl`);
     const feedFile = path.join(root, 'feed.jsonl');
     const fail = (taskId: string) => (cause: unknown) =>
       new JournalError({ taskId, message: cause instanceof Error ? cause.message : String(cause) });
 
-    return Journal.layer({
+    return {
       append: (taskId, event) =>
         Effect.try({
           try: () => {
@@ -115,7 +125,19 @@ export class Journal extends Context.Service<Journal, JournalOps>()('engine/Jour
           },
           catch: fail('*'),
         }),
-    });
+
+      // `fs.watch` on the directory holding the feed: a write to the file is a change the OS will
+      // tell us about. Not the mechanism — `feed()` is — just the thing that skips the wait.
+      subscribe: (onChange) => {
+        try {
+          fs.mkdirSync(root, { recursive: true });
+          const watcher = fs.watch(root, (_e, name) => { if (!name || name === 'feed.jsonl') onChange(); });
+          return () => watcher.close();
+        } catch {
+          return () => {};
+        }
+      },
+    };
   };
 
   /** In memory, for tests. */

@@ -27,7 +27,24 @@ export type PromiseJournal = {
   append(taskId: string, event: Event): Promise<void>;
   read(taskId: string): Promise<Event[]>;
   list(): Promise<string[]>;
-  feed(after: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
+  feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
+  /**
+   * Watch everything that happens, as it happens.
+   *
+   * The engine's event-driven surface: a consumer reacts to work finishing without polling a task
+   * or knowing what a tick is. Pushed by the store when it can signal (the file store watches the
+   * feed), and backed by a timer so that a store which cannot — or an OS that drops the event —
+   * costs latency rather than correctness.
+   *
+   * Delivery is at-least-once in order, and the cursor never expires, so a consumer that starts
+   * at 0 replays the whole history first.
+   */
+  watch(options: {
+    onEntry: (entry: FeedEntry) => void | Promise<void>;
+    from?: Cursor;
+    intervalMs?: number;
+    onError?: (e: unknown) => void;
+  }): { stop(): void };
 };
 
 /** A harness, in Promises. Only needed for one that `HarnessSpec` cannot describe. */
@@ -86,6 +103,21 @@ export type Engine = {
   logs(taskId: string): Promise<string>;
   /** Everything that has happened since `after`, and where to resume. */
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
+  /**
+   * Watch everything that happens, as it happens — the engine's event-driven surface.
+   *
+   * A consumer reacts to work finishing without polling a task or knowing what a tick is. Pushed
+   * by the store when it can signal (the file store watches the feed), and backed by a timer so
+   * that a store which cannot signal — or an OS that drops the event — costs latency rather than
+   * correctness. Delivery is in order and at-least-once; the cursor never expires, so starting at
+   * 0 replays the whole history first.
+   */
+  watch(options: {
+    onEntry: (entry: FeedEntry) => void | Promise<void>;
+    from?: Cursor;
+    intervalMs?: number;
+    onError?: (e: unknown) => void;
+  }): { stop(): void };
   /** Tick on a timer until stopped. Ticks never overlap. */
   start(options?: { intervalMs?: number; onTick?: (r: TickReport) => void; onError?: (e: unknown) => void }): { stop(): void };
 };
@@ -133,8 +165,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const fallback = options.defaultHarness ?? Object.keys(harnesses)[0] ?? 'claude';
   const max = options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
 
+  // Kept beside the Layer so `watch` can use an optional `subscribe` when the store has one.
+  const journalOps = options.journal ? undefined : Journal.filesOps(root);
   const layer = Layer.mergeAll(
-    options.journal ? journalOf(options.journal) : Journal.files(root),
+    options.journal ? journalOf(options.journal) : Journal.layer(journalOps!),
     runnerOf(harnesses, fallback, root),
   );
   // Every method is the same shape: an Effect, provided and run. The layer is built once, so
@@ -161,6 +195,40 @@ export function createEngine(options: EngineOptions = {}): Engine {
       return v.sessionId ? yield* runner.logs(v.sessionId) : '(no session yet)';
     })),
     feed: (after = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after))),
+
+    watch: ({ onEntry, from = 0, intervalMs = 1_000, onError }) => {
+      let cursor = from;
+      let stopped = false;
+      let draining = false;
+
+      // One drain at a time: a push and a tick can arrive together, and delivering an entry twice
+      // because two reads overlapped would make "at-least-once in order" a lie.
+      const drain = async () => {
+        if (stopped || draining) return;
+        draining = true;
+        try {
+          for (;;) {
+            const got = await engine.feed(cursor);
+            if (!got.entries.length) break;
+            cursor = got.cursor;
+            for (const entry of got.entries) {
+              if (stopped) return;
+              await onEntry(entry);
+            }
+          }
+        } catch (e) { onError?.(e); }
+        finally { draining = false; }
+      };
+
+      const unsubscribe = journalOps?.subscribe?.(() => void drain());
+      const timer = setInterval(() => void drain(), intervalMs);
+      timer.unref?.();
+      void drain();
+
+      return {
+        stop: () => { stopped = true; clearInterval(timer); unsubscribe?.(); },
+      };
+    },
 
     start: (o = {}) => {
       const every = o.intervalMs ?? 3_000;

@@ -139,3 +139,58 @@ test('tasks that name the harness and tasks that do not share ONE pool', async (
   assert.equal(sessions.size, 2, 'two, not four');
   assert.deepEqual(report.running, { fake: 2 });
 });
+
+// ─── watching ───────────────────────────────────────────────────────────────
+
+test('watch delivers every event, in order, once', async () => {
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
+
+  const seen: string[] = [];
+  const w = engine.watch({ onEntry: (e) => { seen.push(e.event.kind); }, intervalMs: 20 });
+
+  const id = await engine.file({ brief: 'b', cwd: '/r' });
+  await engine.tick();
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'done' });
+  await engine.tick();
+  await new Promise((r) => setTimeout(r, 200));
+  w.stop();
+
+  assert.deepEqual(seen, ['filed', 'starting', 'spawned', 'ended', 'settled'], 'in order, no repeats');
+  void id;
+});
+
+test('a watcher starting at 0 replays history, and stop() stops', async () => {
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
+  await engine.file({ brief: 'b', cwd: '/r' });
+  await engine.tick();
+
+  const seen: string[] = [];
+  const w = engine.watch({ onEntry: (e) => { seen.push(e.event.kind); }, intervalMs: 20 });
+  await new Promise((r) => setTimeout(r, 120));
+  assert.deepEqual(seen, ['filed', 'starting', 'spawned'], 'the cursor never expires — it replays');
+
+  w.stop();
+  const before = seen.length;
+  await engine.file({ brief: 'another', cwd: '/r' });
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(seen.length, before, 'nothing arrives after stop()');
+});
+
+test('the file store pushes: a watcher hears about a write it did not poll for', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-watch-'));
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
+
+  const seen: string[] = [];
+  // A deliberately useless timer: anything that arrives quickly came from the push, not the poll.
+  const w = engine.watch({ onEntry: (e) => { seen.push(e.event.kind); }, intervalMs: 60_000 });
+  await new Promise((r) => setTimeout(r, 50));
+
+  await engine.file({ brief: 'b', cwd: '/r' });
+  await new Promise((r) => setTimeout(r, 400));
+  w.stop();
+
+  assert.deepEqual(seen, ['filed'], 'delivered without waiting for the interval');
+});

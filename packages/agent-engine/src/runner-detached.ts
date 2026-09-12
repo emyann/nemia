@@ -18,7 +18,7 @@
 import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Observed, Sighting } from './domain.ts';
 import { RunnerError, worktreeName, type RunnerOps, type SpawnRequest } from './runner.ts';
@@ -47,6 +47,16 @@ export type HarnessIO = {
   closeoutSchemaFile?: string;
   /** Where the harness should write the final answer that satisfies the schema. */
   closeoutFile?: string;
+  /**
+   * Directories outside the workspace the harness must be able to write — the git metadata the
+   * working directory's commits land in.
+   *
+   * A worktree's `.git` is a pointer: its index and HEAD live in `<repo>/.git/worktrees/<name>` and
+   * its objects in `<repo>/.git`, both outside the worktree. Codex's `workspace-write` sandbox made
+   * them read-only, so every review step could write REVIEW.md and never commit it — two real runs,
+   * both signing off blocked for that reason alone.
+   */
+  writableRoots?: string[];
 };
 
 /** How long a run file may go unbeaten before `observe` calls it dead. Worker beats every 5s. */
@@ -54,6 +64,14 @@ export const STALE_MS = 30_000;
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-worker.ts');
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
+
+/** The git directory a commit made in `cwd` writes to, absolute. Undefined outside a repository. */
+const gitCommonDir = (cwd: string): string | undefined => {
+  try {
+    const out = execFileSync('git', ['rev-parse', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return path.resolve(cwd, out.trim());
+  } catch { return undefined; }
+};
 
 type RunFile = {
   name?: string; state: Observed; pid: number; heartbeatAt: string;
@@ -117,6 +135,9 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             fs.writeFileSync(schemaFile(r.name), JSON.stringify(r.closeoutSchema));
             io = { closeoutSchemaFile: schemaFile(r.name), closeoutFile: closeoutFile(r.name) };
           }
+          // Found here rather than in the spec, so a spec stays a pure function of what it is given.
+          const gitDir = gitCommonDir(r.cwd);
+          if (gitDir) io = { ...io, writableRoots: [gitDir] };
           const { cmd, args } = spec.command(r, io);
           const plan = {
             name: r.name, cmd, args, cwd: r.cwd, logFile: logFile(r.name),
@@ -203,6 +224,9 @@ export const codex: HarnessSpec = {
       // unlike Claude's. The spec is where that difference lives, so the engine never learns
       // that harnesses disagree about anything.
       ...(r.worktree ? ['--worktree'] : []),
+      // Where a commit writes. Without it the sandbox lets a step edit files it can never commit —
+      // measured twice, on the two review steps that ran in worktrees.
+      ...(io?.writableRoots ?? []).flatMap((dir) => ['--add-dir', dir]),
       // The closing statement, when the task asked for one. `--output-schema` makes the final
       // message conform; `-o` writes it where the runner chose, outside the workspace, so it
       // cannot travel into the next step's branch. Verified against 0.154.0, strict schema.

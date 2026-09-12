@@ -10,7 +10,8 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { detachedOps, STALE_MS, type HarnessSpec } from '../src/runner-detached.ts';
+import { detachedOps, STALE_MS, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
 import { testOps } from '../src/runner.ts';
 import type { Sighting } from '../src/domain.ts';
@@ -225,4 +226,35 @@ test('a re-spawn of the same attempt does not find the last answer waiting for i
 
   await Effect.runPromise(ops.spawn({ name: 'ae/t10/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
   assert.equal((await Effect.runPromise(ops.observe)).get('ae/t10/1')?.closeout, undefined);
+});
+
+// ─── where a commit writes ──────────────────────────────────────────────────
+
+test('codex may write the git metadata it commits into — or a step can edit and never commit', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const args = codex.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/wt' }, { writableRoots: ['/repo/.git'] }).args;
+  assert.equal(args[args.indexOf('--add-dir') + 1], '/repo/.git');
+  assert.equal(args.at(-1), 'the prompt');
+});
+
+test("a run in a git worktree is given its repository's git dir, which the worktree does not contain", async () => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-repo-'));
+  execFileSync('git', ['init', '-q'], { cwd: repo });
+  execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'root'], { cwd: repo });
+  const wt = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ae-wt-')), 'step');
+  execFileSync('git', ['worktree', 'add', '-q', wt], { cwd: repo, stdio: 'ignore' });
+
+  let given: HarnessIO | undefined;
+  const spy: HarnessSpec = { name: 'sh', command: (_r, io) => { given = io; return { cmd: 'sh', args: ['-c', 'exit 0'] }; } };
+  await Effect.runPromise(detachedOps(spy, root()).spawn({ name: 'ae/t11/1', brief: 'x', cwd: wt }));
+
+  assert.deepEqual(given?.writableRoots?.map((d) => fs.realpathSync(d)), [fs.realpathSync(path.join(repo, '.git'))]);
+});
+
+test('outside a repository there is nothing extra to open up', async () => {
+  let given: HarnessIO | undefined;
+  const spy: HarnessSpec = { name: 'sh', command: (_r, io) => { given = io; return { cmd: 'sh', args: ['-c', 'exit 0'] }; } };
+  const plain = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-plain-'));
+  await Effect.runPromise(detachedOps(spy, root()).spawn({ name: 'ae/t12/1', brief: 'x', cwd: plain }));
+  assert.equal(given?.writableRoots, undefined);
 });

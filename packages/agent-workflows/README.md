@@ -127,6 +127,18 @@ instead of the reasoning behind it.
 A conflicting merge is left conflicted on purpose, and the step is told so in its brief. Resolving
 it is the work that a fan-in step exists to do.
 
+### A merge carries commits, not working trees
+
+The first bug this design produced, and it was silent. A `review` step wrote `REVIEW.md` and never
+committed it. While every step shared one directory that was harmless — a file written was a file
+the next step could read. The moment steps fork it is not: `respond` merged review's *branch*,
+which did not contain the file, and answered a review it had never seen.
+
+Asking each step's prose to remember to commit is not a contract. The run now commits whatever a
+finished step left behind, before anything merges it, so **the workspace a step hands on is the
+workspace it made** — true by construction rather than by instruction. It is idempotent: a clean
+tree commits nothing.
+
 ### It caught a conflict that talking is supposed to prevent
 
 A run with two concurrent steps — one adding a JSDoc comment to `src/slug.js`, one adding a test to

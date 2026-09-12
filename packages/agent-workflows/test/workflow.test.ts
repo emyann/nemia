@@ -112,3 +112,19 @@ test('the terminal steps are where the work ends up', () => {
   // A workflow may deliberately end wide; then there is more than one place to look.
   assert.deepEqual(terminalSteps([{ name: 'a', after: [], body: 'x' }, { name: 'b', after: [], body: 'x' }]).map((s) => s.name), ['a', 'b']);
 });
+
+test('the shipped examples are valid workflows too', () => {
+  const examples = path.join(import.meta.dirname, '..', 'wf-examples');
+  for (const d of fs.readdirSync(examples, { withFileTypes: true }).filter((e) => e.isDirectory())) {
+    assert.ok(loadWorkflows(path.join(examples, d.name)).length, `${d.name} has steps`);
+  }
+
+  assert.equal(fansOut(loadWorkflows(path.join(examples, 'fanout'))), true, 'two roots meeting at integrate');
+
+  // The splitter proposes parts; it does not file them. So it is one step that runs on its own,
+  // and the concurrency it argues about happens in the runs a person starts after reading PLAN.md.
+  const split = loadWorkflows(path.join(examples, 'split'));
+  assert.deepEqual(split.map((s) => s.name), ['split']);
+  assert.deepEqual(split[0]!.after, [], 'nothing precedes it — splitting is the first thing');
+  assert.equal(fansOut(split), false);
+});

@@ -27,8 +27,13 @@ Definition of done — a closed list, so there is a finish line:
       by putting the choice in front of them rather than trailing off.
 - [ ] **rounds** — `after` is a DAG and cannot loop, so a second round is a *new run* over the same
       worktree, started by the decider. That keeps rounds countable and deliberate.
-- [ ] **the splitter** — the step whose job is producing tasks that touch disjoint files, and which
-      is allowed to answer "these cannot be split, run them in sequence".
+- [x] **the splitter** — `wf-examples/split` proposes parts that touch disjoint files, and is
+      allowed to answer "these cannot be split, run them in sequence".
+
+**The splitter proposes; it does not file.** It writes `PLAN.md` and stops. A run's steps come from
+a folder that is fixed when the run starts, so turning a plan into concurrent steps would mean
+letting a run grow steps while it is running — a decision about the run model, not something to
+slip in with an example. For now a person reads `PLAN.md` and starts a run per part.
 
 ## The format
 

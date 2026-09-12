@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifacts, cancel, closeoutOf, decide, diffStat, engine, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
+import { artifacts, cancel, decide, diffStat, engine, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
 import { loadWorkflows } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -121,7 +121,7 @@ export async function main(argv: string[]): Promise<void> {
     // and does not decide anything itself.
     case 'decide': {
       if (!rest[0]) return console.log(HELP);
-      const { run, decision } = await decide(e, rest[0]);
+      const { run, decision, closeouts } = await decide(e, rest[0]);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
 
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
@@ -138,13 +138,13 @@ export async function main(argv: string[]): Promise<void> {
       // Each step's own closeout: the summary is written FOR this moment. The reviewer never saw
       // it — that is the point of the field — and you are the audience it was addressed to.
       for (const name of Object.keys(run.steps)) {
-        const c = closeoutOf(run, name);
+        const c = closeouts[name];
         if (!c) continue;
         if ('error' in c) { console.log(`\n  ${name}: closeout unreadable — ${c.error}`); continue; }
         console.log(`\n  ${name}${c.outcome === 'blocked' ? '  BLOCKED' : ''}`);
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
         if (c.needs) console.log(`    needs: ${c.needs}`);
-        const missing = missingArtifacts(run, name);
+        const missing = missingArtifacts(run, name, c);
         if (missing.length) console.log(`    !! declared but not committed: ${missing.join(', ')}  — it did not travel`);
       }
       console.log();

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, cancelPlan, closeoutPath, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
+import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -324,28 +324,38 @@ test('a run that never filed anything has no branch to ship, and is not "shipped
 
 // ─── the closeout ───────────────────────────────────────────────────────────
 
-test('every brief carries the closeout contract — no workflow can forget it', () => {
-  // The bug this exists for: `review.md` was the one step whose prose did not say "commit this",
-  // and the reviewer's entire output silently failed to reach the next step. Prose that every
-  // author must remember is prose some author will not.
+test('every brief says what finishing means — and names no file to write', () => {
+  // Mechanism, not prose each workflow must remember. And no path: a closeout written into the
+  // worktree travelled down the git branch and pre-finished the next step, twice, in six seconds.
   for (const s of [step('implement'), step('review', ['implement'])]) {
     const brief = composeBrief(s, run({ implement: 't1', review: null }), STEPS);
-    // Its OWN path. A shared one travels down the branch and arms the next step's probe before it
-    // has done anything — which is exactly how a real run reported two steps succeeded in six
-    // seconds each.
-    assert.match(brief, new RegExp(`\\.wf/${s.name}\\.done\\.json`));
+    assert.match(brief, /When you are finished/);
+    for (const field of ['outcome', 'summary', 'artifacts', 'needs']) assert.match(brief, new RegExp(`\`${field}\``));
+    assert.doesNotMatch(brief, /\.wf\//, 'nothing to write into the workspace');
   }
-  assert.notEqual(closeoutPath('implement'), closeoutPath('review'));
+  const resumed: Workflow = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement' };
+  assert.match(composeBrief(resumed, run({ implement: 't1', respond: null }), [step('implement'), resumed]), /When you are finished/);
 });
 
-test('a closeout is parsed forgivingly — an agent wrote it', () => {
-  assert.deepEqual(parseCloseout('{"outcome":"done","summary":"did it","artifacts":["REVIEW.md"]}'),
-    { outcome: 'done', summary: 'did it', artifacts: ['REVIEW.md'], needs: undefined });
+test('the schema is strict enough for the strictest harness it is handed to', () => {
+  // Codex enforces strict structured outputs: every property required, nothing extra allowed.
+  // Optional becomes nullable instead, which is why `needs` is `string | null`. Verified live.
+  assert.equal(CLOSEOUT_SCHEMA.additionalProperties, false);
+  assert.deepEqual([...CLOSEOUT_SCHEMA.required].sort(), Object.keys(CLOSEOUT_SCHEMA.properties).sort());
+  assert.deepEqual(CLOSEOUT_SCHEMA.properties.needs.type, ['string', 'null']);
+});
+
+test('a closeout is read forgivingly — the harness enforced the shape, but an agent filled it in', () => {
+  // What Codex actually wrote, verified: an object, with needs null when unused.
+  assert.deepEqual(parseCloseout({ outcome: 'done', summary: 'probe ok', artifacts: [], needs: null }),
+    { outcome: 'done', summary: 'probe ok', artifacts: [], needs: undefined });
+  assert.deepEqual(parseCloseout('{"outcome":"blocked","summary":"s","artifacts":[],"needs":"pick one"}'),
+    { outcome: 'blocked', summary: 's', artifacts: [], needs: 'pick one' }, 'text is accepted too');
   assert.ok('error' in parseCloseout('{not json'));
-  assert.ok('error' in parseCloseout('[]'), 'an array is not a closeout');
-  // Missing fields are absences, not failures: a run must not become unreadable over this.
-  assert.deepEqual(parseCloseout('{}'), { outcome: 'done', summary: '', artifacts: [], needs: undefined });
-  assert.deepEqual(parseCloseout('{"artifacts":["a.md",7,null]}').artifacts, ['a.md']);
+  assert.ok('error' in parseCloseout([]), 'an array is not a closeout');
+  assert.ok('error' in parseCloseout(null));
+  assert.deepEqual(parseCloseout({}), { outcome: 'done', summary: '', artifacts: [], needs: undefined });
+  assert.deepEqual((parseCloseout({ artifacts: ['a.md', 7, null] }) as { artifacts: string[] }).artifacts, ['a.md']);
 });
 
 test('a step that signs off BLOCKED stops the DAG, however its session ended', () => {
@@ -366,14 +376,4 @@ test('a blocked run is AWAITING you, and is not called failed', () => {
   assert.equal(d.kind === 'awaiting' && d.outcome, 'blocked');
   assert.deepEqual(d.kind === 'awaiting' && d.failed, [], 'nothing broke');
   assert.deepEqual(d.kind === 'awaiting' && d.stuck, ['implement', 'review']);
-});
-
-test('the JSON the contract shows an agent actually parses', () => {
-  // It did not. `"only when outcome is "blocked": ..."` — nested quotes, invalid JSON, handed to
-  // every step as the example to copy. Caught by a real run, not by a unit test, because nothing
-  // had ever tried to parse the thing we were telling agents to imitate.
-  const brief = composeBrief(step('implement'), run({ implement: null }), STEPS);
-  const json = brief.split('```json')[1]!.split('```')[0]!;
-  assert.doesNotThrow(() => JSON.parse(json), 'the example must be valid JSON');
-  assert.ok(!('error' in parseCloseout(json)), 'and must parse as a closeout');
 });

@@ -11,7 +11,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type Engine, type TaskView } from 'agent-engine';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, closeoutPath, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -274,7 +274,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   const steps = loadWorkflows(run.workflowDir);
 
   const { views, phaseOf } = await taskPhases(e, run);
-  const signedOff = closeoutReader(run);
+  const signedOff = closeoutReader(views, run);
 
   // A cancelled run is enforced by every pass, not only by the verb that cancelled it.
   //
@@ -333,8 +333,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
-      // The engine watches for this and never opens it. The shape is ours; see `Closeout`.
-      doneFile: closeoutPath(name),
+      // The shape of the step's closing statement. The engine hands it to the harness and records
+      // the answer without reading it; what the fields mean is ours — see `Closeout`.
+      closeoutSchema: CLOSEOUT_SCHEMA,
     });
     run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
@@ -414,30 +415,21 @@ export async function stepViews(e: Engine, run: Run): Promise<Array<{ name: stri
  * useful while the run is still going, not only afterwards.
  */
 /**
- * Has this branch landed on the base branch? Git's answer, not ours.
+ * How a step signed off: its closing statement, as the engine recorded it on the attempt.
  *
- * `--is-ancestor` rather than a merge-commit search, so a fast-forward, a squash-merge that was
- * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
+ * The engine carries the payload and never reads it; this reads it. No git and no path — the step
+ * made the statement to its harness, and it lives on the engine's record of the attempt that made
+ * it, which is also what keeps a resumed step from being credited with its parent's.
  */
-/**
- * How a step signed off, read out of its branch.
- *
- * The worktree is usually gone — cleaned up, or never cut for `--no-worktree` — while the branch
- * is exactly as the step left it, so git is the only place this can be read from reliably. That is
- * also why the contract insists the file be COMMITTED: an uncommitted closeout is one nobody can
- * read once the step's directory has been swept away.
- */
-export function closeoutOf(run: Run, stepName: string): Closeout | { error: string } | undefined {
-  const branch = run.steps[stepName]?.branch;
-  if (!branch) return undefined;
-  let text: string;
-  try { text = git(run.repo, 'show', `${branch}:${closeoutPath(stepName)}`); } catch { return undefined; }
-  return parseCloseout(text);
+export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepName: string): Closeout | { error: string } | undefined {
+  const taskId = run.steps[stepName]?.taskId;
+  const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
+  return said === undefined ? undefined : parseCloseout(said);
 }
 
 /** Only the well-formed ones, for the pure functions that just want the outcome. */
-export const closeoutReader = (run: Run) => (stepName: string): Closeout | undefined => {
-  const c = closeoutOf(run, stepName);
+export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run) => (stepName: string): Closeout | undefined => {
+  const c = closeoutOf(views, run, stepName);
   return c && !('error' in c) ? c : undefined;
 };
 
@@ -448,15 +440,20 @@ export const closeoutReader = (run: Run) => (stepName: string): Closeout | undef
  * REVIEW.md was written and never committed, and nothing anywhere noticed — the merge was clean
  * and empty. A declared file that is not on the branch is now a mismatch somebody can see.
  */
-export function missingArtifacts(run: Run, stepName: string): string[] {
+export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): string[] {
   const branch = run.steps[stepName]?.branch;
-  const c = closeoutOf(run, stepName);
-  if (!branch || !c || 'error' in c) return [];
-  return c.artifacts.filter((f) => {
+  if (!branch || !closeout || 'error' in closeout) return [];
+  return closeout.artifacts.filter((f) => {
     try { git(run.repo, 'cat-file', '-e', `${branch}:${f}`); return false; } catch { return true; }
   });
 }
 
+/**
+ * Has this branch landed on the base branch? Git's answer, not ours.
+ *
+ * `--is-ancestor` rather than a merge-commit search, so a fast-forward, a squash-merge that was
+ * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
+ */
 export function isShipped(run: Run, branch: string): boolean {
   try {
     execFileSync('git', ['merge-base', '--is-ancestor', branch, run.branch], { cwd: run.repo, stdio: 'ignore' });
@@ -492,11 +489,16 @@ export function diffStat(run: Run, branch: string): string {
 }
 
 /** What is left for a person to do — the pure call, with git asked the one question it owns. */
-export async function decide(e: Engine, id: string): Promise<{ run: Run; decision: Decision }> {
+export async function decide(e: Engine, id: string): Promise<{
+  run: Run;
+  decision: Decision;
+  closeouts: Record<string, Closeout | { error: string } | undefined>;
+}> {
   const run = readRun(id);
   const steps = loadWorkflows(run.workflowDir);
-  const { phaseOf } = await taskPhases(e, run);
-  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(run)) };
+  const { views, phaseOf } = await taskPhases(e, run);
+  const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
+  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run)), closeouts };
 }
 
 export function resultBranches(run: Run): string[] {

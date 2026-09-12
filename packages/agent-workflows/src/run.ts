@@ -169,20 +169,34 @@ export function cancelPlan(steps: readonly Workflow[], run: Run, phaseOf: (taskI
 // ─── the closeout ───────────────────────────────────────────────────────────
 
 /**
- * Where a step writes what it finished with. The path is this package's, not the engine's.
+ * The shape of a step's closing statement, handed to the engine as a JSON Schema.
  *
- * The engine is told only that a file at this path means "finished" and never opens it. Everything
- * below — the shape, the field names, what they mean — lives here, because it is a workflow's
- * vocabulary and nothing underneath should have to learn it.
+ * The engine passes it to the harness verbatim — Claude Code turns it into a StructuredOutput tool
+ * the agent calls to finish, Codex into `--output-schema` — and records what comes back without
+ * reading it. The shape and what it means live here, because they are this package's vocabulary
+ * and nothing underneath should have to learn it.
  *
- * NAMED PER STEP, and that is not tidiness. A closeout is committed so it can be read after the
- * worktree is swept away, which means it travels down the branch like any other commit: with one
- * shared name, the next step inherits a satisfied probe and a closeout that is not its own. The
- * first real run settled two steps `succeeded` in six seconds each, having done nothing at all.
- * Distinct names make an inherited marker simply a different file — and make `git show
- * <branch>:<path>` unambiguous on a branch that merged three others.
+ * Strict on purpose: every property required and `needs` nullable rather than optional. Codex
+ * enforces strict structured outputs, and a schema has to satisfy the strictest harness it will be
+ * handed to. Verified against codex 0.154.0.
+ *
+ * It replaced a file each step wrote into its own worktree, and the file's failures are the reason.
+ * The file travelled down the git branch, so the next step started out finished. Its path had to be
+ * told to the engine in one place and to the agent in another. And a step could write it, carry on,
+ * and rewrite it. A statement made to the harness lives in the session, belongs to the attempt that
+ * made it, and needs no path.
  */
-export const closeoutPath = (step: string) => `.wf/${step}.done.json`;
+export const CLOSEOUT_SCHEMA = {
+  type: 'object',
+  properties: {
+    outcome: { type: 'string', enum: ['done', 'blocked'] },
+    summary: { type: 'string' },
+    artifacts: { type: 'array', items: { type: 'string' } },
+    needs: { type: ['string', 'null'] },
+  },
+  required: ['outcome', 'summary', 'artifacts', 'needs'],
+  additionalProperties: false,
+};
 
 /**
  * What a step says on its way out.
@@ -210,53 +224,50 @@ export type Closeout = {
 /**
  * Read a closeout, forgivingly.
  *
- * An agent wrote this, so it is parsed the way you would parse anything an agent wrote: a missing
- * file is normal (the step is still running, or it is an older run, or it crashed), and a malformed
- * one is reported rather than thrown — a run must not become unreadable because one step wrote
- * bad JSON on its way out.
+ * The harness enforced the shape, but an agent filled it in, and a run must not become unreadable
+ * because one step's answer came back odd. It arrives as the object the engine recorded; text is
+ * accepted too, since that is what a harness that could not parse its own answer hands back.
  */
-export function parseCloseout(text: string): Closeout | { error: string } {
-  let raw: unknown;
-  try { raw = JSON.parse(text); } catch (e) { return { error: `unparseable: ${(e as Error).message}` }; }
+export function parseCloseout(value: unknown): Closeout | { error: string } {
+  let raw = value;
+  if (typeof raw === 'string') {
+    try { raw = JSON.parse(raw); } catch (e) { return { error: `unparseable: ${(e as Error).message}` }; }
+  }
   // `typeof [] === 'object'`, so an array would otherwise read as an empty closeout.
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { error: 'not an object' };
   const o = raw as Record<string, unknown>;
-  const outcome = o.outcome === 'blocked' ? 'blocked' : 'done';
   return {
-    outcome,
+    outcome: o.outcome === 'blocked' ? 'blocked' : 'done',
     summary: typeof o.summary === 'string' ? o.summary : '',
     artifacts: Array.isArray(o.artifacts) ? o.artifacts.filter((a): a is string => typeof a === 'string') : [],
-    needs: typeof o.needs === 'string' ? o.needs : undefined,
+    // Nullable in the schema because strict harnesses require every property; absent here.
+    needs: typeof o.needs === 'string' && o.needs ? o.needs : undefined,
   };
 }
 
 /**
- * What a step is told to write on its way out, appended to every brief.
+ * What every step is told about finishing, appended to every brief.
  *
- * MECHANISM, not prose a workflow author has to remember. The first real run lost an entire
- * reviewer's output because `review.md` was the one step whose body forgot to say "commit this",
- * and the fix at the time was to edit the prose — which leaves the next workflow to make the same
- * mistake. Every step is now told the same thing by the runner, so no workflow can omit it.
+ * MECHANISM, not prose a workflow author has to remember: one step's body once forgot "commit
+ * this" and the reviewer's entire output never reached the next step. The harness enforces the
+ * shape of the answer; this says what the fields MEAN, which no schema can.
  */
-export const closeoutContract = (step: string): string => [
+export const closeoutContract = (): string => [
   '', '## When you are finished', '',
-  `Write \`${closeoutPath(step)}\` and commit it. It is how this run knows you are done, and it`,
-  'is the last thing you should do:',
-  '', '```json', '{',
-  '  "outcome": "done",',
-  '  "summary": "one to three sentences: what you did, for the person who decides what ships",',
-  '  "artifacts": ["any file you wrote for someone else to read, e.g. REVIEW.md"],',
-  '  "needs": "only when blocked: what a person has to settle"',
-  '}', '```', '',
-  '`artifacts` must be **committed**. The next step gets your branch merged into its workspace, and',
-  'an uncommitted file does not travel — a file you list but do not commit is reported as missing.',
+  'Your final answer is a structured closeout, and it is how this run knows you are done. The session',
+  'asks you for it in the required shape when you finish — in Claude Code, by calling the',
+  '`StructuredOutput` tool. There is no file to write.',
   '',
-  'Use `"outcome": "blocked"` if you cannot honestly finish. A step that reports success it did not',
-  'have is worse than one that stops and says why.',
+  '- `outcome`: `"done"` if you finished the work; `"blocked"` if you cannot honestly finish. A step',
+  '  that reports success it did not have is worse than one that stops and says why.',
+  '- `summary`: one to three sentences on what you did, for the person who decides what ships.',
+  '- `artifacts`: files you wrote for someone else to read, such as `REVIEW.md`. They must be',
+  '  **committed** — the next step gets your branch merged into its workspace, and an uncommitted',
+  '  file does not travel. A file you list but did not commit is reported as missing.',
+  '- `needs`: when blocked, what a person has to settle; otherwise `null`.',
   '',
-  '**Write it once, and write it last.** The run reads it as your final word and may start the next',
-  'step on it. If you are not sure yet whether you are blocked, find out BEFORE you write this file,',
-  'not after — a closeout you go back and revise has already been acted on.',
+  '**Give it once, and give it last** — after your commits, after everything else. The run reads it',
+  'as your final word and may start the next step on it.',
 ].join('\n');
 
 // ─── handing it back ────────────────────────────────────────────────────────
@@ -341,7 +352,7 @@ export function decision(
 export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[]): string {
   // A step that CONTINUES another already has the context — its own. Repeating the spec back and
   // pointing it at the workspace would be telling someone what they spent an hour doing.
-  if (step.resume) return step.body + closeoutContract(step.name);
+  if (step.resume) return step.body + closeoutContract();
 
   const earlier = step.after.length
     ? step.after
@@ -356,7 +367,7 @@ export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',
       'several others is for. `git status` shows them.',
-      closeoutContract(step.name),
+      closeoutContract(),
     ].join('\n');
   }
 
@@ -378,7 +389,7 @@ export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[
     );
   }
 
-  parts.push(closeoutContract(step.name));
+  parts.push(closeoutContract());
   return parts.join('\n');
 }
 

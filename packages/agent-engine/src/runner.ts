@@ -11,6 +11,9 @@
  */
 import { Context, Effect, Layer, Schema } from 'effect';
 import { execFile } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
 import type { Observed, Sighting } from './domain.ts';
 
@@ -32,6 +35,8 @@ export type SpawnRequest = {
   resumeFrom?: string;
   /** Isolation: true for a harness-named git worktree, a string to name it. */
   worktree?: string | boolean;
+  /** A JSON Schema the workload's final answer must satisfy. Passed through; never interpreted. */
+  closeoutSchema?: object;
 };
 
 /**
@@ -67,11 +72,54 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
  */
 export const QUIESCENT_AFTER_MS = 90_000;
 
+/** Where a Claude Code session's transcript is, found once and remembered. */
+const PROJECTS = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
+const transcripts = new Map<string, string>();
+const transcriptFile = (sessionId: string): string | undefined => {
+  const known = transcripts.get(sessionId);
+  if (known && fs.existsSync(known)) return known;
+  let dirs: string[];
+  try { dirs = fs.readdirSync(PROJECTS); } catch { return undefined; }
+  for (const d of dirs) {
+    const f = path.join(PROJECTS, d, `${sessionId}.jsonl`);
+    if (fs.existsSync(f)) { transcripts.set(sessionId, f); return f; }
+  }
+  return undefined;
+};
+
+/**
+ * The LAST StructuredOutput call in a transcript, and when it was made.
+ *
+ * Read from the raw JSONL rather than through `getSessionMessages`, because the SDK's messages
+ * carry no timestamp, and the timestamp is the only thing that tells this session's statement from
+ * one it inherited: a resumed transcript holds its parent's whole conversation, parent's calls
+ * included, under the child's own session id.
+ */
+export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: number } | undefined => {
+  let found: { payload: unknown; at: number } | undefined;
+  for (const line of jsonl.split('\n')) {
+    // Most lines are not it, and the tool's own definition mentions the name too.
+    if (!line.includes('StructuredOutput')) continue;
+    let entry: { type?: string; timestamp?: string; message?: { content?: unknown } };
+    try { entry = JSON.parse(line); } catch { continue; }
+    const content = entry.message?.content;
+    if (entry.type !== 'assistant' || !Array.isArray(content)) continue;
+    for (const block of content as Array<{ type?: string; name?: string; input?: unknown }>) {
+      if (block?.type !== 'tool_use' || block.name !== 'StructuredOutput') continue;
+      const at = Date.parse(entry.timestamp ?? '');
+      if (Number.isFinite(at)) found = { payload: block.input, at };
+    }
+  }
+  return found;
+};
+
 export type ClaudeOptions = {
   quiescentAfterMs?: number;
   now?: () => number;
   /** When the session's transcript was last written. Injectable so tests need no harness. */
   transcriptTime?: (sessionId: string) => Promise<number | undefined>;
+  /** The session's closing statement and when it was made. Injectable for the same reason. */
+  closeoutFrom?: (sessionId: string) => Promise<{ payload: unknown; at: number } | undefined>;
 };
 
 /**
@@ -104,6 +152,23 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const transcriptTime = options.transcriptTime ?? (async (sessionId: string) => {
     try { return (await getSessionInfo(sessionId))?.lastModified; } catch { return undefined; }
   });
+  const closeoutFrom = options.closeoutFrom ?? (async (sessionId: string) => {
+    const file = transcriptFile(sessionId);
+    if (!file) return undefined;
+    try { return lastStructuredOutput(await fs.promises.readFile(file, 'utf8')); } catch { return undefined; }
+  });
+
+  /**
+   * A finished session's statement cannot change, so it is read once. A working one is read each
+   * time it is idle, because that is when it may just have made one. Losing this only re-reads.
+   */
+  const finalStatements = new Map<string, { payload: unknown; at: number } | undefined>();
+  const statementOf = async (s: Sighting) => {
+    if (finalStatements.has(s.sessionId)) return finalStatements.get(s.sessionId);
+    const said = await closeoutFrom(s.sessionId);
+    if (s.state === 'done' || s.state === 'failed' || s.state === 'stopped') finalStatements.set(s.sessionId, said);
+    return said;
+  };
 
   return ({
     spawn: (r) => sh('claude', [
@@ -126,6 +191,10 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // OPTIONAL value, so a bare `--worktree` immediately before the prompt eats the prompt as
       // the worktree's name and the session runs with nothing to do. Measured, not theorised.
       ...(r.worktree ? ['--worktree', worktreeName(r)] : []),
+      // The closing statement's shape. Claude Code gives the session a StructuredOutput tool for
+      // it, which works under `--bg` as well as `-p` — verified on 2.1.270, though documented only
+      // for `-p`. Takes a required value, so unlike `--worktree` it cannot swallow the prompt.
+      ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
       r.brief,
     ], { cwd: r.cwd, verb: 'spawn' }).pipe(Effect.asVoid),
 
@@ -160,20 +229,26 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       Effect.flatMap((m) => Effect.forEach(
         [...m],
         ([name, sighting]) =>
-          // Not `working`, or busy right now: this harness has already answered, and a transcript
-          // read would only cost time. A long tool call writes nothing for minutes — `busy` is
-          // what keeps that from reading as silence.
-          sighting.state !== 'working' || sighting.busy
+          // Busy right now: nothing it has said is final and nothing about it is quiet. A long tool
+          // call writes nothing for minutes, and `busy` is what keeps that from reading as silence.
+          sighting.busy
             ? Effect.succeed([name, sighting] as const)
-            : Effect.promise(() => transcriptTime(sighting.sessionId)).pipe(
-                Effect.map((writtenAt) =>
-                  // No transcript, no verdict. We would be guessing from a single `idle` sample,
-                  // and the deadline exists for sessions nobody can read.
-                  writtenAt !== undefined && now() - writtenAt >= quiescentAfterMs
-                    ? [name, { ...sighting, state: 'done' as const }] as const
-                    : [name, sighting] as const,
-                ),
-              ),
+            : Effect.promise(async () => {
+                // What the workload SAID, if it said anything — reported with when it was said.
+                // Whether it belongs to this attempt is the engine's call, not ours: a resumed
+                // session carries its parent's statements too, and only the journal knows when
+                // the attempt began.
+                const said = await statementOf(sighting);
+                const reported: Sighting = said ? { ...sighting, closeout: said } : sighting;
+                if (reported.state !== 'working') return [name, reported] as const;
+                // The floor underneath, statement or not. Kept even when there IS one, because an
+                // inherited statement is discarded upstream and must not leave a session with no
+                // way to end. No transcript, no verdict: the deadline is for sessions nobody reads.
+                const writtenAt = await transcriptTime(sighting.sessionId);
+                return writtenAt !== undefined && now() - writtenAt >= quiescentAfterMs
+                  ? [name, { ...reported, state: 'done' as const }] as const
+                  : [name, reported] as const;
+              }),
         { concurrency: 'unbounded' },
       ).pipe(Effect.map((entries) => new Map(entries)))),
     ),

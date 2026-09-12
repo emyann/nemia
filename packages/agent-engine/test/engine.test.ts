@@ -336,109 +336,90 @@ test('worktree is declared by the task and passed to the harness untouched', asy
   assert.equal(c.spawned.at(-1)!.worktree, 'my-branch');
 });
 
-// ─── the completion probe ───────────────────────────────────────────────────
+// ─── the closing statement ──────────────────────────────────────────────────
 
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+const SCHEMA = { type: 'object', properties: { outcome: { type: 'string' } }, required: ['outcome'] };
 
-/** A cwd a test can drop a file into. */
-const scratch = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ae-probe-'));
+/** File a task and get its first attempt as far as the harness. */
+const running = async (b: ReturnType<typeof board>, s: Parameters<typeof file>[0]) => {
+  const id = await b.run(file(s));
+  await b.run(tick());
+  const startedAt = Date.parse((await b.run(view(id, new Map()))).state.attempts[0]!.startedAt);
+  return { id, name: nameFor(id, 1), startedAt };
+};
 
-test('a workload that writes its doneFile is finished, whatever the harness still says', async () => {
+test('the schema reaches the harness verbatim — the engine never learns its shape', async () => {
   const b = board();
-  const cwd = scratch();
-  const id = await b.run(file({ brief: 'do it', cwd, doneFile: '.wf/done.json' }));
-  await b.run(tick());
-  await b.run(tick());
-
-  // The harness is still saying `working` — the case that hangs for ever without this.
-  assert.equal([...b.sessions.values()][0]?.state, 'working');
-  assert.equal((await b.run(view(id, new Map()))).state.settled, null);
-
-  fs.mkdirSync(path.join(cwd, '.wf'), { recursive: true });
-  fs.writeFileSync(path.join(cwd, '.wf/done.json'), '{"outcome":"done"}');
-
-  await b.run(tick());
-  await b.run(tick());
-  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
+  await running(b, { ...spec, closeoutSchema: SCHEMA });
+  assert.deepEqual(b.spawned[0]?.closeoutSchema, SCHEMA);
 });
 
-test('no doneFile declared means nothing changes — the probe is opt-in', async () => {
+test('a statement made during the attempt ends it, whatever the harness still says', async () => {
+  // `working` is where a Claude Code session stays after calling StructuredOutput — measured.
   const b = board();
-  const cwd = scratch();
-  // The file is there, but this task never asked for it to mean anything.
-  fs.mkdirSync(path.join(cwd, '.wf'), { recursive: true });
-  fs.writeFileSync(path.join(cwd, '.wf/done.json'), '{"outcome":"done"}');
+  const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, busy: false, closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 } });
+  await b.run(tick());
 
-  const id = await b.run(file({ brief: 'do it', cwd }));
-  await b.run(tick());
-  await b.run(tick());
-  assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'still running, as before');
+  const v = await b.run(view(id, new Map()));
+  assert.equal(v.state.settled, 'succeeded');
+  assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' }, 'and what it said is on the record');
 });
 
-test('the engine never opens the file — existence is the whole contract', async () => {
-  // Unparseable on purpose. A schema here would be the engine learning a workflow's vocabulary.
+test('a statement made BEFORE the attempt began was inherited, not said', async () => {
+  // Measured: a resumed Claude Code session's transcript holds its parent's whole conversation
+  // under the child's own session id — 460 entries — so a parent's StructuredOutput call arrives
+  // looking exactly like the child's. Only when it was made tells them apart.
   const b = board();
-  const cwd = scratch();
-  const id = await b.run(file({ brief: 'do it', cwd, doneFile: 'FINISHED' }));
+  const { id, name } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, busy: false, closeout: { payload: { outcome: 'done', by: 'parent' }, at: 0 } });
   await b.run(tick());
-  fs.writeFileSync(path.join(cwd, 'FINISHED'), 'not json, not even close');
+  assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'the parent finishing is not the child finishing');
+
+  // When the harness does end it, the inherited statement is not written down as this attempt's.
+  b.sessions.set(name, { ...b.sessions.get(name)!, state: 'done' });
   await b.run(tick());
-  await b.run(tick());
-  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
+  const v = await b.run(view(id, new Map()));
+  assert.equal(v.state.settled, 'succeeded');
+  assert.equal(v.state.attempts[0]?.closeout, undefined);
 });
 
-test('a probe never invents a session it has not seen', async () => {
-  // Satisfying a probe says the WORK is finished, not that a session exists. Inside the grace
-  // window there is nothing to end, and claiming otherwise would settle a task whose spawn
-  // may still be in flight.
+test('a statement from a session that is still busy is not final', async () => {
+  // Measured once, with the file this replaced: a step declared itself done, kept going, found it
+  // could not commit, and rewrote its verdict to blocked eleven seconds later.
   const b = board();
-  const cwd = scratch();
-  fs.writeFileSync(path.join(cwd, 'FINISHED'), '');
-  const id = await b.run(file({ brief: 'do it', cwd, doneFile: 'FINISHED' }));
-  await b.run(step(id, new Map()));          // journals `starting` only
-  assert.equal((await b.run(view(id, new Map()))).state.settled, null);
-});
-
-test('a doneFile inherited from before the attempt proves nothing', async () => {
-  // The bug a real run found in six seconds. A workflow hands work along a git branch; the step
-  // before had committed its marker onto that branch; the next step's worktree was cut with the
-  // probe already satisfied. It settled `succeeded` having done nothing, and the board agreed.
-  const b = board();
-  const cwd = scratch();
-  fs.writeFileSync(path.join(cwd, 'FINISHED'), 'left behind by whoever came before');
-
-  const id = await b.run(file({ brief: 'do it', cwd, doneFile: 'FINISHED' }));
-  await b.run(tick());
-  await b.run(tick());
-  assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'inherited, not earned');
-
-  // The workload's own write, now, does end it.
-  fs.writeFileSync(path.join(cwd, 'FINISHED'), 'this attempt says so');
-  await b.run(tick());
-  await b.run(tick());
-  assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
-});
-
-test('a marker written by a session that is still busy is a claim, not a verdict', async () => {
-  // Measured: a step wrote {"outcome":"done"}, carried on, found it could not commit, and eleven
-  // seconds later rewrote the file to {"outcome":"blocked"}. The probe fired on the first version
-  // and the next step was already running on it.
-  const b = board();
-  const cwd = scratch();
-  const id = await b.run(file({ brief: 'do it', cwd, doneFile: 'FINISHED' }));
-  await b.run(tick());
-
-  const name = nameFor(id, 1);
-  b.sessions.set(name, { ...b.sessions.get(name)!, busy: true });
-  fs.writeFileSync(path.join(cwd, 'FINISHED'), 'first thoughts');
-  await b.run(tick());
+  const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, busy: true, closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 } });
   await b.run(tick());
   assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'still typing');
 
   b.sessions.set(name, { ...b.sessions.get(name)!, busy: false });
   await b.run(tick());
-  await b.run(tick());
   assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
+});
+
+test('a session the harness already ended keeps its statement on the record — unread', async () => {
+  const b = board();
+  const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, state: 'done', closeout: { payload: { outcome: 'blocked' }, at: startedAt + 1000 } });
+  await b.run(tick());
+
+  const v = await b.run(view(id, new Map()));
+  // `blocked` means something to whoever filed the task. To the engine it is a payload.
+  assert.equal(v.state.settled, 'succeeded');
+  assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'blocked' });
+});
+
+test('no schema, no statement: a task ends exactly as it did before', async () => {
+  const b = board();
+  const { id, name } = await running(b, spec);
+  b.sessions.set(name, { ...b.sessions.get(name)!, busy: false });
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.settled, null);
+
+  b.sessions.set(name, { ...b.sessions.get(name)!, state: 'done' });
+  await b.run(tick());
+  const v = await b.run(view(id, new Map()));
+  assert.equal(v.state.settled, 'succeeded');
+  assert.equal(v.state.attempts[0]?.closeout, undefined);
 });

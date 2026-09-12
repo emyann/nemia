@@ -184,3 +184,45 @@ test('the default permission mode is `auto` — a fleet cannot wait for a person
   const chosen = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', permissionMode: 'dontAsk' }).args;
   assert.equal(chosen[chosen.indexOf('--permission-mode') + 1], 'dontAsk', 'and a task may still choose');
 });
+
+// ─── the closing statement ──────────────────────────────────────────────────
+
+test('codex is given the schema and an output file, and the prompt still comes last', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const args = codex.command(
+    { name: 'ae/t/1', brief: 'the prompt', cwd: '/r', closeoutSchema: {} },
+    { closeoutSchemaFile: '/board/s.schema.json', closeoutFile: '/board/s.closeout.json' },
+  ).args;
+  assert.equal(args[args.indexOf('--output-schema') + 1], '/board/s.schema.json');
+  assert.equal(args[args.indexOf('-o') + 1], '/board/s.closeout.json');
+  assert.equal(args.at(-1), 'the prompt');
+  assert.ok(!codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args.includes('--output-schema'), 'no schema, no flag');
+});
+
+test("a detached harness's final answer is its closing statement — and nothing lands in the workspace", async () => {
+  const dir = root();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-ws-'));
+  const answers: HarnessSpec = {
+    name: 'sh',
+    command: (_r, io) => ({ cmd: 'sh', args: ['-c', `printf '%s' '{"outcome":"done"}' > '${io?.closeoutFile}'`] }),
+  };
+  const ops = detachedOps(answers, dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/t9/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
+
+  const seen = await settle(ops, 'ae/t9/1', 'done');
+  assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
+  assert.equal(typeof seen.closeout?.at, 'number');
+  assert.deepEqual(fs.readdirSync(workspace), [], 'the workspace is the one place it must not be');
+});
+
+test('a re-spawn of the same attempt does not find the last answer waiting for it', async () => {
+  const dir = root();
+  const quiet: HarnessSpec = { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) };
+  const ops = detachedOps(quiet, dir);
+  const leftover = path.join(dir, 'runs', 'sh', 'ae_t10_1.closeout.json');
+  fs.mkdirSync(path.dirname(leftover), { recursive: true });
+  fs.writeFileSync(leftover, '{"outcome":"done"}');
+
+  await Effect.runPromise(ops.spawn({ name: 'ae/t10/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
+  assert.equal((await Effect.runPromise(ops.observe)).get('ae/t10/1')?.closeout, undefined);
+});

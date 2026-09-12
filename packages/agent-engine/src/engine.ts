@@ -7,8 +7,6 @@
  */
 import { Effect } from 'effect';
 import { randomUUID } from 'node:crypto';
-import fs from 'node:fs';
-import path from 'node:path';
 import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State } from './domain.ts';
 import { Journal } from './journal.ts';
 import { Runner } from './runner.ts';
@@ -28,7 +26,7 @@ export type TaskView = { id: string; state: State; phase: string; sessionId: str
 export const file = Effect.fn('file')(function* (spec: {
   brief: string; cwd: string; maxAttempts?: number; model?: string; permissionMode?: string;
   harness?: string; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
-  worktree?: string | boolean; doneFile?: string; id?: string;
+  worktree?: string | boolean; closeoutSchema?: object; id?: string;
 }) {
   const journal = yield* Journal;
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.
@@ -37,7 +35,7 @@ export const file = Effect.fn('file')(function* (spec: {
     kind: 'filed', at: new Date().toISOString(), brief: spec.brief, cwd: spec.cwd,
     maxAttempts: spec.maxAttempts ?? 1, model: spec.model, permissionMode: spec.permissionMode,
     harness: spec.harness, deadlineSeconds: spec.deadlineSeconds, resume: spec.resume,
-    resumeFrom: spec.resumeFrom, worktree: spec.worktree, doneFile: spec.doneFile,
+    resumeFrom: spec.resumeFrom, worktree: spec.worktree, closeoutSchema: spec.closeoutSchema,
   });
   return id;
 });
@@ -54,60 +52,43 @@ export const requestStop = Effect.fn('requestStop')(function* (taskId: string) {
  * which is the difference between a board that scales and one that shells out per task.
  */
 /**
- * The workload's own word on whether it has finished.
+ * The workload's closing statement, taken as the end of the attempt — when it belongs to this one.
  *
- * A task may declare `doneFile`, and its existence under `cwd` ends the attempt immediately. This
- * is the only completion signal that does not have to be INFERRED: `state: done` is unreliable for
- * long work, quiescence costs ninety seconds and rests on a stall nobody has been able to
- * characterise, and both are us guessing from outside. A file the workload wrote is it saying so.
+ * Everything else the engine knows about completion is inferred from outside: `state`, unreliable
+ * for long work, and quiescence, which costs ninety seconds and rests on a stall twenty sessions
+ * failed to characterise. A harness that takes a structured final answer — Claude Code's
+ * StructuredOutput tool, `codex exec --output-schema` — gives the workload a way to SAY it is
+ * finished, and the runner reports that statement here as a fact with a timestamp.
  *
- * The probe layers UNDER the harness's own answer rather than replacing it. A harness that ends by
- * exiting needs no probe; a workload that never writes the file falls back to exactly what
- * happened before. Declaration is the fast path, observation is the floor — which is what a fleet
- * of harnesses nobody here wrote requires, since a protocol can only be assumed of agents you
- * control.
+ * It replaces a file the workload wrote into its own directory, and that file's two bugs are the
+ * two rules below. The file lived in the workspace, so it travelled down a git branch and the next
+ * step started out satisfied. A statement lives in the session instead — but a RESUMED Claude
+ * session's transcript holds its parent's whole conversation under the child's own id (measured:
+ * 460 entries), so the parent's statement arrives looking exactly like the child's. The session id
+ * cannot tell them apart; the moment it was made can, and only the journal knows when this attempt
+ * began, which is why the check is here and not in a runner.
  *
- * Existence only, and only over a sighting we already have: satisfying a probe says the work is
- * finished, not that a session we have never seen exists.
+ * The payload is carried, never read. The engine records it on the attempt and does nothing else.
  */
-const markerFor = (state: State) => path.resolve(state.cwd, state.doneFile!);
-
-/**
- * Disarm the probe before the attempt runs, so a marker that appears afterwards is THIS attempt's.
- *
- * Existence alone was not enough, and a real run proved it in six seconds. A workflow hands work
- * along a git branch; the step before had committed its marker onto that branch; the next step was
- * cut a worktree that already contained a satisfied probe, and settled `succeeded` before doing
- * anything. Twice. The board said the run was fine — a false completion, which is the one failure
- * this engine is not allowed to have, because a stall is visible and this is not.
- *
- * Clearing beats comparing a timestamp: the filesystem's clock and this process's are not the same
- * clock — measured 1.3ms apart on this machine — so `written after we started` is a race at close
- * range. Nothing is armed until we disarm it, and then only the workload can arm it again.
- */
-const disarm = Effect.fn('disarm')(function* (state: State) {
-  if (!state.doneFile) return;
-  yield* Effect.sync(() => { try { fs.rmSync(markerFor(state)); } catch { /* nothing to clear */ } });
-});
-
-const probed = (state: State, observed: ReadonlyMap<string, Sighting>): ReadonlyMap<string, Sighting> => {
+const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): ReadonlyMap<string, Sighting> => {
   const last = state.attempts.at(-1);
-  if (!state.doneFile || !last || last.ended !== null) return observed;
+  if (!last || last.ended !== null) return observed;
   const name = nameFor(state.taskId, last.n);
   const seen = observed.get(name);
-  if (!seen || seen.state !== 'working') return observed;
-  // Still computing? Then it is not finished, whatever it has written down.
-  //
-  // A marker is a CLAIM, and a real run showed the claim is not always final: a step wrote
-  // `{"outcome":"done"}`, kept going, discovered it could not commit, and eleven seconds later
-  // rewrote the same file to `{"outcome":"blocked"}`. The probe had already fired on the first
-  // version and the workflow above had already started the next step on it.
-  //
-  // `busy` is a second, independent fact and it costs one tick to consult. The workload's word
-  // AND its process at rest is a far stronger signal than either alone, and a marker written by
-  // something still working is exactly the case where the word is worth least.
+  if (!seen?.closeout) return observed;
+
+  // Made before this attempt began: carried over, not said. Dropped, so it is never recorded as
+  // this attempt's either.
+  if (!(seen.closeout.at > Date.parse(last.startedAt))) {
+    const said: Sighting = { ...seen };
+    delete said.closeout;
+    return new Map(observed).set(name, said);
+  }
+  // The harness has already answered; the statement rides along to the record and nothing more.
+  if (seen.state !== 'working') return observed;
+  // Still computing: a statement it may yet revise. Measured once, with the file — a step declared
+  // itself done, kept going, found it could not commit, and rewrote the verdict to blocked.
   if (seen.busy) return observed;
-  if (!fs.existsSync(markerFor(state))) return observed;
   return new Map(observed).set(name, { ...seen, state: 'done' });
 };
 
@@ -120,7 +101,7 @@ export const step = Effect.fn('step')(function* (
   const runner = yield* Runner;
 
   const state = fold(taskId, yield* journal.read(taskId));
-  const action = decide(state, probed(state, observed), { at: new Date(), graceMs: GRACE_MS, ...slots });
+  const action = decide(state, closedOut(state, observed), { at: new Date(), graceMs: GRACE_MS, ...slots });
   const at = () => new Date().toISOString();
 
   switch (action.do) {
@@ -137,11 +118,10 @@ export const step = Effect.fn('step')(function* (
       break;
 
     case 'spawn':
-      yield* disarm(state);
       yield* runner.spawn({
         name: action.name, brief: state.brief, cwd: state.cwd,
         model: state.model, permissionMode: state.permissionMode, harness: state.harness,
-        worktree: state.worktree,
+        worktree: state.worktree, closeoutSchema: state.closeoutSchema,
         // Taken from the journal rather than recomputed: the decision was made when the attempt
         // was started, possibly by an engine that has since died.
         resumeFrom: state.attempts.find((a) => a.n === action.attempt)?.resumeFrom,
@@ -153,6 +133,7 @@ export const step = Effect.fn('step')(function* (
       yield* journal.append(taskId, {
         kind: 'ended', at: at(), attempt: action.attempt, sessionId: action.sessionId,
         observed: action.observed, reason: action.reason, nativeId: action.nativeId,
+        closeout: action.closeout,
       });
       break;
 

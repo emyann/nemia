@@ -8,7 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import { claudeOps, QUIESCENT_AFTER_MS } from '../src/runner.ts';
+import { claudeOps, lastStructuredOutput, QUIESCENT_AFTER_MS } from '../src/runner.ts';
 
 /**
  * `observe` shells out, so these tests drive the predicate through a stub of that call. A tiny
@@ -127,4 +127,73 @@ test('blocked is never quiescent — a session waiting on a person is not finish
     t += 10 * QUIESCENT_AFTER_MS;
     assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'blocked');
   } finally { restore(); }
+});
+
+// ─── the closing statement ──────────────────────────────────────────────────
+
+const entry = (o: object) => JSON.stringify(o);
+const structured = (timestamp: string, input: object) => entry({
+  type: 'assistant', timestamp,
+  message: { content: [{ type: 'tool_use', name: 'StructuredOutput', input }] },
+});
+
+test('the LAST StructuredOutput call is the statement, stamped with when it was made', () => {
+  // A resumed transcript holds the parent's calls too, so the time matters as much as the payload.
+  const jsonl = [
+    entry({ type: 'system', tools: [{ name: 'StructuredOutput' }] }), // the definition names it too
+    structured('2026-09-12T08:00:00.000Z', { outcome: 'done', by: 'parent' }),
+    entry({ type: 'user', timestamp: '2026-09-12T09:00:00.000Z', message: { content: 'carry on' } }),
+    structured('2026-09-12T09:30:00.000Z', { outcome: 'blocked' }),
+    '{half a line mentioning StructuredOutput',
+  ].join('\n');
+  assert.deepEqual(lastStructuredOutput(jsonl), { payload: { outcome: 'blocked' }, at: Date.parse('2026-09-12T09:30:00.000Z') });
+  assert.equal(lastStructuredOutput(entry({ type: 'user', message: { content: 'say StructuredOutput' } })), undefined);
+});
+
+test('an idle session reports what it said; a busy one is not even asked', async () => {
+  const said = { payload: { outcome: 'done' }, at: 5 };
+  let asked = 0;
+  const closeoutFrom = async () => { asked++; return said; };
+
+  let restore = withFakeClaude(row('working', 'busy'));
+  try {
+    const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom }).observe);
+    assert.equal(seen.get('ae/t-1/1')?.closeout, undefined);
+    assert.equal(asked, 0, 'mid-turn, nothing it has said is final');
+  } finally { restore(); }
+
+  restore = withFakeClaude(row('working', 'idle'));
+  try {
+    const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom }).observe);
+    assert.deepEqual(seen.get('ae/t-1/1')?.closeout, said);
+    assert.equal(seen.get('ae/t-1/1')?.state, 'working', 'reported, not acted on — whose it is, the engine decides');
+  } finally { restore(); }
+});
+
+test('a finished session is read once, because its statement cannot change', async () => {
+  let asked = 0;
+  const restore = withFakeClaude(row('done', 'idle'));
+  try {
+    const ops = claudeOps({ transcriptTime: async () => 0, closeoutFrom: async () => { asked++; return { payload: 1, at: 1 }; } });
+    await Effect.runPromise(ops.observe);
+    await Effect.runPromise(ops.observe);
+    assert.equal(asked, 1);
+  } finally { restore(); }
+});
+
+test('Claude Code is handed the schema as --json-schema, and the prompt still comes last', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  const argsFile = path.join(dir, 'args');
+  fs.writeFileSync(path.join(dir, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
+    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: dir, closeoutSchema: schema }));
+    const args = fs.readFileSync(argsFile, 'utf8').trim().split('\n');
+    const i = args.indexOf('--json-schema');
+    assert.notEqual(i, -1);
+    assert.deepEqual(JSON.parse(args[i + 1]!), schema);
+    assert.equal(args.at(-1), 'the prompt');
+  } finally { process.env.PATH = prev; }
 });

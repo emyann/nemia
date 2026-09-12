@@ -30,7 +30,8 @@ export function parseBrief(text: string, fallbackCwd: string) {
     // Which session to CONTINUE, as opposed to `resume` which is the retry policy between
     // attempts of this task. Two different questions that the same English word answers.
     resumeFrom: meta.resumeFrom,
-    doneFile: meta.doneFile,
+    // A path to a JSON Schema file: frontmatter is one line per key, and a schema is not.
+    closeoutSchema: meta.closeoutSchema ? JSON.parse(fs.readFileSync(path.resolve(meta.closeoutSchema), 'utf8')) as object : undefined,
     // `worktree: true` lets the harness name it; any other value names it yourself.
     worktree: meta.worktree === undefined ? undefined : meta.worktree === 'true' ? true : meta.worktree,
   };
@@ -76,7 +77,7 @@ const HELP = `ae — an engine for agent sessions
     resume           interrupted (default) | always | never — the RETRY policy
     resumeFrom       a session id to continue, instead of starting cold
     worktree         true, or a name — the harness cuts it
-    doneFile         a path under cwd whose existence means the workload finished
+    closeoutSchema   a JSON Schema file — the workload ends by answering in that shape
 
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster
   AE_MAX_CONCURRENT  sessions per harness at once (default 3)`;

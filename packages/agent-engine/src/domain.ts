@@ -59,6 +59,14 @@ export type Sighting = {
   nativeId?: string;
   costUsd?: number;
   turns?: number;
+  /**
+   * What the workload said when it finished, and WHEN it said it — present only for a harness that
+   * can take a structured final answer, and only once one was given.
+   *
+   * The time is not decoration. A resumed session can carry a statement its parent made, and the
+   * engine keeps one only if it was made after this attempt began.
+   */
+  closeout?: { payload: unknown; at: number };
 };
 
 /** The join key. Deterministic, so it survives anything that kills this process. */
@@ -101,24 +109,20 @@ export type Event =
       /** Isolation: true for a harness-named worktree, a string to name it. */
       worktree?: string | boolean;
       /**
-       * A path under `cwd` whose EXISTENCE means the workload has finished.
+       * A JSON Schema for the workload's closing statement, handed to the harness verbatim.
        *
-       * The workload's own word, which is worth more than anything we can infer from outside: a
-       * probe that is satisfied ends the attempt at once, where reading idleness takes ninety
-       * seconds and reading `state` sometimes never arrives at all. Kubernetes spells this the
-       * same way — the spec declares the check, the kubelet runs it and knows nothing else.
-       *
-       * Existence ONLY. What the file says is between the workload and whoever reads it; the
-       * engine learning to parse it would be the engine learning a workflow's vocabulary.
+       * The workload's own word on whether it has finished, which is worth more than anything we
+       * can infer from outside. The engine passes the schema through and records what comes back;
+       * it never learns the shape, because the shape is somebody else's vocabulary.
        */
-      doneFile?: string;
+      closeoutSchema?: object;
     }
   /** INTENT: we are about to spawn `nameFor(taskId, attempt)`. */
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string }
   /** RESULT: the spawn call returned. The session is the harness's problem now. */
   | { kind: 'spawned'; at: string; attempt: number }
   /** An attempt reached a terminal state, as observed — never as assumed. */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string }
+  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown }
   /** The operator asked for it to stop. */
   | { kind: 'stop-requested'; at: string }
   /** Terminal. Nothing moves after this. */
@@ -137,6 +141,8 @@ export type Attempt = {
   nativeId: string | null;
   /** What this attempt was told to continue, decided when it started and never re-derived. */
   resumeFrom?: string;
+  /** What the workload said when this attempt ended, if it said anything. Carried, never read. */
+  closeout?: unknown;
 };
 
 export type State = {
@@ -154,8 +160,8 @@ export type State = {
   /** What attempt 1 continues. Set at filing; later attempts follow `resume` policy instead. */
   resumeFrom?: string;
   worktree?: string | boolean;
-  /** A path under `cwd` whose existence means finished. See the `filed` event. */
-  doneFile?: string;
+  /** The shape of the workload's closing statement. See the `filed` event. */
+  closeoutSchema?: object;
   attempts: Attempt[];
   stopRequested: boolean;
   settled: Outcome | null;
@@ -174,7 +180,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.model = e.model; s.permissionMode = e.permissionMode; s.harness = e.harness;
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
-        s.worktree = e.worktree; s.doneFile = e.doneFile;
+        s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom });
@@ -186,7 +192,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; }
+        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; }
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;
@@ -206,7 +212,7 @@ export type Action =
   /** An intent with no spawn behind it. Named in advance, so this cannot double-start. */
   | { do: 'spawn'; attempt: number; name: string }
   /** The harness says this attempt is over. Write it down. */
-  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string }
+  | { do: 'record-end'; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown }
   | { do: 'stop'; sessionId: string; why: string }
   | { do: 'settle'; outcome: Outcome; note?: string };
 
@@ -282,7 +288,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     if (isLive(sighting.state)) {
       return { do: 'nothing', why: NEEDS_HUMAN.has(sighting.state) ? 'blocked — needs a person' : `running (${sighting.state})` };
     }
-    return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: sighting.state, reason: 'harness', nativeId: sighting.nativeId };
+    return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: sighting.state, reason: 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
   }
 
   if (!last.spawnedAt) return { do: 'spawn', attempt: last.n, name: nameFor(state.taskId, last.n) };

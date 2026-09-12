@@ -86,12 +86,14 @@ export type TaskSpec = {
   resumeFrom?: string;
   worktree?: string | boolean;
   /**
-   * A path under `cwd` whose existence means this workload has finished.
+   * A JSON Schema for the workload's closing statement, handed to the harness verbatim.
    *
-   * The workload's own word, taken over anything the engine could infer. Existence only — the
-   * engine never opens it, so whatever you write there is yours and stays yours.
+   * A harness that can take a structured final answer uses it — Claude Code as its StructuredOutput
+   * tool, Codex as `--output-schema` — and the moment the workload gives one, the attempt is over.
+   * The statement is recorded on the attempt (`state.attempts[n].closeout`) and never read by the
+   * engine: its shape is yours.
    */
-  doneFile?: string;
+  closeoutSchema?: object;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };

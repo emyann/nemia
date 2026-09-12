@@ -11,7 +11,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type Engine, type TaskView } from 'agent-engine';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, composeBrief, workspacePlan, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, composeBrief, workspacePlan, type Assessment, type CancelPlan, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -37,6 +37,30 @@ export const engine = (): Engine => createEngine({
 /** The engine's task phases, narrowed to what a run cares about. */
 const phaseOfView = (v: TaskView): TaskPhase =>
   v.state.settled ?? (v.state.attempts.length ? 'running' : 'pending');
+
+/**
+ * The engine's word on every task this run has filed, read once.
+ *
+ * One read per task per pass, shared by everything that then wants an answer: `advance` needs the
+ * views themselves (for the session id a `resume:` step continues), and the pure functions need
+ * only the phase.
+ */
+async function taskPhases(e: Engine, run: Run): Promise<{
+  views: Map<string, TaskView>;
+  phaseOf: (taskId: string) => TaskPhase;
+}> {
+  const views = new Map<string, TaskView>();
+  for (const { taskId } of Object.values(run.steps)) {
+    if (taskId) views.set(taskId, await e.view(taskId));
+  }
+  return {
+    views,
+    phaseOf: (taskId) => {
+      const v = views.get(taskId);
+      return v ? phaseOfView(v) : 'unknown';
+    },
+  };
+}
 
 /**
  * Gitignored directories a fresh worktree needs in order to be usable.
@@ -195,7 +219,7 @@ function handOff(workspace: string, step: string): void {
   } catch { /* nothing to hand off, or a tree git will not commit */ }
 }
 
-export type Advanced = { run: Run; filed: string[]; status: 'running' | 'succeeded' | 'failed'; blocked: string[] };
+export type Advanced = { run: Run; filed: string[]; status: Assessment['status']; blocked: string[] };
 
 /**
  * One pass over one run: tick the engine, then file whatever became ready.
@@ -207,14 +231,7 @@ export type Advanced = { run: Run; filed: string[]; status: 'running' | 'succeed
 export async function advance(e: Engine, run: Run): Promise<Advanced> {
   const steps = loadWorkflows(run.workflowDir);
 
-  const views = new Map<string, TaskView>();
-  for (const { taskId } of Object.values(run.steps)) {
-    if (taskId) views.set(taskId, await e.view(taskId));
-  }
-  const phaseOf = (taskId: string): TaskPhase => {
-    const v = views.get(taskId);
-    return v ? phaseOfView(v) : 'unknown';
-  };
+  const { views, phaseOf } = await taskPhases(e, run);
 
   // Anything a finished step left uncommitted is committed for it, BEFORE a later step merges.
   //
@@ -265,6 +282,43 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   if (filed.length) writeRun(run);
 
   return { run, filed, status, blocked };
+}
+
+export type Cancelled = { run: Run; plan: CancelPlan };
+
+/**
+ * Call a run off: stop what it has in flight, and write down that it is cancelled.
+ *
+ * Both halves matter and neither replaces the other. Stopping the session ends the work that is
+ * burning right now; the mark on the run is what stops the NEXT step being filed, which the engine
+ * could never know to do — it has tasks, not runs.
+ *
+ * The stop is asked for BEFORE the run is marked, on purpose. If the engine refuses, the run is
+ * left uncancelled and asking again does both; the other order would leave a run that reads as
+ * cancelled while its session ran on.
+ *
+ * `e.stop` only records the operator's intent — the engine carries it out on its next tick and
+ * confirms on the one after. That is the engine's contract, not a shortcut here, and it is why the
+ * verb reports what it ASKED to stop.
+ */
+export async function cancel(e: Engine, id: string): Promise<Cancelled> {
+  const run = readRun(id);
+  const steps = loadWorkflows(run.workflowDir);
+  const { phaseOf } = await taskPhases(e, run);
+
+  const plan = cancelPlan(steps, run, phaseOf);
+  if (plan.kind === 'finished') return { run, plan };
+
+  for (const { taskId } of plan.stop) await e.stop(taskId);
+  if (plan.kind === 'already-cancelled') return { run, plan };
+
+  // Re-read before writing. A `wf up` in another terminal may have filed a step in the meantime,
+  // and cancelling must ADD a fact to the run, not roll its record back to what we read — a task
+  // whose id we dropped is a session nobody can find again.
+  const latest = readRun(id);
+  latest.cancelledAt = new Date().toISOString();
+  writeRun(latest);
+  return { run: latest, plan };
 }
 
 /** Every run, advanced once, after one engine tick. This is the whole daemon. */

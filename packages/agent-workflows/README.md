@@ -2,12 +2,13 @@
 
 A workflow is **a folder of markdown files**. One file is one step. It runs on
 [`agent-engine`](../agent-engine), and it is the proof that the engine's boundary is real: this
-package uses `createEngine`, `file`, `tick`, `view`, `logs` and nothing else.
+package uses `createEngine`, `file`, `tick`, `view`, `stop`, `logs` and nothing else.
 
 ```bash
 wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf up
 wf ls
+wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
 ```
 
 ## Where this stops
@@ -152,6 +153,26 @@ cleanly. The integrate step wrote:
 
 That is exactly the failure two engineers would have used a conversation to avoid, caught after the
 fact by a step whose job is to look — with no coordination, no lock, and no declared paths.
+
+## Calling a run off
+
+A run could be started and watched but never stopped: the only recourse was killing the session by
+hand, which left the run's own record insisting it was still running. `wf cancel <runId>` asks the
+engine to stop the step in flight and writes the cancellation on the **run**.
+
+That last part is the whole decision. Everywhere else a run holds no status of its own — whether it
+is finished is a question about its steps' tasks, and the engine can answer it, so copying the
+answer here would just go stale. Cancellation is the exception because there is nothing to copy:
+the engine has tasks, not runs, and "file nothing further" is not a fact any one task can hold.
+Stopping the session ends the work burning right now; the mark on the run is what stops the next
+tick cheerfully filing the step after it.
+
+Cancelling a run with nothing in flight, one already finished, or one already cancelled are all
+normal things for a person to do, so none of them is an error and each says which it was. A
+finished run is deliberately **not** relabelled — a run that succeeded succeeded, and stamping it
+cancelled would make `wf ls` lie about work that actually landed. Cancelling twice keeps the first
+time and re-asks for whatever is *still* in flight, because the engine carries a stop out on its
+next tick: running it again is how a person deals with one that slipped through, not a no-op.
 
 ## Choosing the model per step
 

@@ -85,6 +85,13 @@ export type TaskSpec = {
   /** Continue an existing session of this harness instead of starting cold. */
   resumeFrom?: string;
   worktree?: string | boolean;
+  /**
+   * A path under `cwd` whose existence means this workload has finished.
+   *
+   * The workload's own word, taken over anything the engine could infer. Existence only — the
+   * engine never opens it, so whatever you write there is yours and stays yours.
+   */
+  doneFile?: string;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };

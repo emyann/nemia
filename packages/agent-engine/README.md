@@ -205,13 +205,34 @@ Twelve sessions in, sorted by how long they ran:
 byte-identical briefs, two carrying `resumeFrom` and two cold. **It is refuted:** both resumed
 sessions reached `done` in twelve seconds.
 
-What the table leaves standing is an *interaction*, not a main effect. Neither factor predicts a
-stall alone — cold-and-long reached `done`, resumed-and-short reached `done` — but **both stalls
-were sessions that were resumed AND ran for minutes.** That cell holds 2 of 2 and is the one the
-probe did not test, because short tasks were chosen to make it fast, which is exactly what made it
-unable to reach the surviving question. The decisive run is a resumed session given ten minutes of
-work. Until someone does it, the trigger is still unknown, and the predicate below is what stands
-in for knowing.
+That left an *interaction* standing — both stalls were resumed AND ran for minutes — so a second
+probe went after that cell directly: a stack VM with an assembler, a disassembler, twenty tests and
+three example programs, four ways, two of them resuming a session that had just built something
+else. It is refuted as well:
+
+| session | resumed | seconds | outcome |
+|---|---|---|---|
+| split/respond | yes | 6499 | **stalled** |
+| VM e2 | no | 943 | `state: done` |
+| VM e1 | no | 722 | `state: done` |
+| **VM d1** | **yes** | **569** | **`state: done`** |
+| cancel/implement | no | 563 | `state: done` |
+| cancel/respond | yes | 532 | **stalled** |
+| VM d2 | yes | 473 | `state: done` |
+
+`VM d1` was resumed and ran 569 seconds — longer than the stalled `cancel/respond`, longer than the
+succeeding `cancel/implement` — and reached `done` cleanly. Over 300 seconds the score is: resumed
+n=4, stalled 2; cold n=3, stalled 0.
+
+**Twenty sessions in, nothing we have tested predicts it.** Not resume, not duration, not the two
+together. Two resumed long sessions stalled and two did not, under briefs that differed in nothing
+but their working directory. That intermittency is the finding, and it reads more like a race in
+how the harness records a terminal state than like a rule about the work.
+
+Which is the case for the predicate, made better than an argument could make it: **a trigger you
+cannot characterise is a trigger you cannot design around.** The only untested cell left is
+resumed × git worktree — both stalls were workflow steps in one, and no probe has been — but that
+is fitting a shape to two points, and a timeout already covers it either way.
 
 The controlled pair — same task, one attached and one not — rules out the obvious suspect: **being
 watched changes nothing.** The docs agree ("attaching does not change the session's recorded

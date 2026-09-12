@@ -203,6 +203,21 @@ quiet later. This is [Hermes Kanban's](https://hermes-agent.nousresearch.com/doc
 and the DAG treats it as final — nothing downstream runs — while `wf decide` says **waiting on you**
 rather than **failed**. A thing that stopped and said why is not a thing that broke.
 
+`wf ls` says so as well, one line per step. A step that signed off blocked ended its session as
+cleanly as one that finished, so the engine's phase alone read `succeeded` for both, and the step
+waiting on you looked like one you could ignore. The outcome now sits beside the phase:
+
+```
+fix-the-parser-k2q9  Fix the parser so a trailing comma is not an error
+   implement      succeeded · done     wf/fix-the-parser-k2q9/implement
+   respond        waiting
+   review         succeeded · BLOCKED  wf/fix-the-parser-k2q9/review
+   → waiting on you: review  —  wf decide fix-the-parser-k2q9
+```
+
+A step with no closeout — still running, never filed, or from a run older than closeouts — reads as
+it always did. The summary is left off that screen on purpose: it was written for `wf decide`.
+
 *It makes a lost artifact visible.* `artifacts` are checked against the branch, and a declared file
 that is not there is reported. The first real run lost a reviewer's entire output to exactly that,
 silently.

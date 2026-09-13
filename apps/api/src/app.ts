@@ -3,6 +3,7 @@ import { Hono } from 'hono';
 import { checkStderr, closeoutOf, closeoutReader, engine, listRuns, verdictWord } from 'agent-workflows';
 import { assess, composeBrief, inFlight, listing, type Assessment, type Run, type TaskPhase } from 'agent-workflows/run';
 import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
+import { capabilitiesOf, repoOf } from './capabilities.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];
@@ -470,6 +471,10 @@ const noSuchRun = (id: string) =>
 
 export const app = new Hono()
   .get('/api/health', (c) => c.json({ ok: true }))
+  // What the repository offers a step, read from the checkout on each request (capabilities.ts). Each MCP server
+  // the settings enable is started and asked for its tools once while the api runs; one that fails is an `error`
+  // on its entry, never a failed request.
+  .get('/api/capabilities', async (c) => c.json(await capabilitiesOf(repoOf())))
   .get('/api/runs', async (c) => {
     // What one request costs, however many runs there are: one harness observation (one
     // `claude agents --json`, one scan of the detached runs' files), a read of every task journal in

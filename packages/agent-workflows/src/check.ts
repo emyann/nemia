@@ -77,15 +77,29 @@ const TRAILER = '[wf check] exit';
  * - **A subshell**, so a command that says `exit 3` ends the subshell and not the script, and the
  *   number is still printed.
  * - **On lines of its own**, so a command ending in a `# comment` cannot comment out the parenthesis.
- * - **stderr to its own file.** The engine keeps one log for a detached session, and hkb measured a
- *   loud stderr evicting a test runner's stdout verdict from a shared window. Two streams, both kept.
+ * - **stderr to its own file**, when the brief names one. The engine keeps one log for a detached
+ *   session, and hkb measured a loud stderr evicting a test runner's stdout verdict from a shared
+ *   window. Two streams, both kept.
+ * - **No redirection at all when it names none** — a task filed on this harness by hand. Not
+ *   `2>/dev/stderr`: the engine's worker hands the process sockets rather than pipes, `/dev/stderr`
+ *   cannot be reopened on a socket, and the redirection failed before the command ran. Measured, by
+ *   the end-to-end run of this package; stderr simply stays in the log instead.
+ * - **Inside a function**, so a redirection that fails (a directory that is gone) fails the command
+ *   with a status the script can still print, rather than ending the shell before its last line.
  * - **The exit code printed last**, on stdout, so it is the final line of the log whatever the command
  *   printed. It is for the person reading: the engine's own `succeeded`/`failed` — the worker's reading
  *   of the process's exit — is what the run gates on, so a command that prints a trailer of its own
  *   changes a number on a screen and nothing else.
  */
-export const checkScript = (command: string): string =>
-  `(\n${command}\n) 2>"\${WF_STDERR:-/dev/stderr}"; c=$?; printf '\\n${TRAILER} %d\\n' "$c"; exit "$c"`;
+export const checkScript = (command: string): string => [
+  'wf_check() {',
+  '(',
+  command,
+  ')',
+  '}',
+  'if [ -n "${WF_STDERR:-}" ]; then wf_check 2>"$WF_STDERR"; else wf_check; fi',
+  `c=$?; printf '\\n${TRAILER} %d\\n' "$c"; exit "$c"`,
+].join('\n');
 
 /**
  * The harness. A `HarnessSpec` in shape, typed here by its shape rather than imported: `runner.ts` is

@@ -122,6 +122,30 @@ test('LIVE: the engine settles a check on its exit code, in the workspace, with 
   assert.equal(readVerdict(await e.logs(passed)), 0);
 });
 
+test('LIVE: a brief filed by hand, with no WF_STDERR, still runs its command — and keeps stderr in the log', async () => {
+  // The fallback once redirected to `/dev/stderr`, which cannot be reopened on the socket the worker
+  // hands the process: the redirection failed and the command never ran. Found end to end.
+  const { workspace, e } = scratch();
+  const id = await e.file({ id: 'by-hand', harness: 'check', cwd: workspace, brief: 'echo work > work.txt; echo said >&2; exit 4' });
+  const v = await settled(e, id);
+  assert.equal(v.state.settled, 'failed');
+  const log = await e.logs(id);
+  assert.equal(readVerdict(log), 4, 'the command ran and its own exit code came back');
+  assert.ok(fs.existsSync(path.join(workspace, 'work.txt')), 'in the workspace');
+  assert.match(log, /said/, 'stderr stays in the log when there is no file for it');
+});
+
+test('LIVE: a stderr file that cannot be opened fails the check with a number, not a silent shell', async () => {
+  const { root, e } = scratch();
+  const id = await e.file({
+    id: 'nowhere', harness: 'check', cwd: root,
+    brief: checkBrief('echo fine', { ...ENV, WF_WORKSPACE: root, WF_STDERR: path.join(root, 'gone', 'x.stderr') }),
+  });
+  const v = await settled(e, id);
+  assert.equal(v.state.settled, 'failed', 'a check whose evidence has nowhere to go does not pass');
+  assert.notEqual(readVerdict(await e.logs(id)), 'unfinished', 'and the script still reached its last line');
+});
+
 test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfinished', async () => {
   const { e, file } = scratch();
   const hung = await file('hung', 'sleep 60', 1);
@@ -129,3 +153,4 @@ test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfi
   assert.equal(v.state.settled, 'failed', 'a hung suite does not hold the run for ever');
   assert.equal(readVerdict(await e.logs(hung)), 'unfinished');
 });
+

@@ -21,8 +21,8 @@ import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import type { Page } from 'playwright';
-import { expectCount, expectInside, expectVisible, settled } from './checks.ts';
+import type { Locator, Page } from 'playwright';
+import { expectCount, expectInside, expectVisible, settled, watch } from './checks.ts';
 import { FAKE, seed } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
@@ -41,6 +41,18 @@ async function sidebar(page: Page): Promise<void> {
   await expectVisible(menu.getByRole('link', { name: 'Runs' }), 'the sidebar has Runs');
 }
 
+/** The fake run on the Factory: its card, its step nodes, and both together. */
+function onTheFloor(page: Page): { card: Locator; steps: Locator; run: Locator; step: (name: string) => Locator } {
+  const card = `.react-flow__node[data-id="${FAKE.id}"]`;
+  const steps = `.react-flow__node[data-id^="${FAKE.id}/"]`;
+  return {
+    card: page.locator(card),
+    steps: page.locator(steps),
+    run: page.locator(`${card}, ${steps}`),
+    step: (name) => page.locator(`.react-flow__node[data-id="${FAKE.id}/${name}"]`),
+  };
+}
+
 /** The pages, and what each must have. A new page gets a line here, or the check never looks at it. */
 const PAGES: PageSpec[] = [
   {
@@ -48,12 +60,54 @@ const PAGES: PageSpec[] = [
     route: '/',
     expect: async (page) => {
       await sidebar(page);
-      await expectVisible(page.locator('.react-flow'), 'the Factory canvas');
-      const card = page.locator(`.react-flow__node[data-id="${FAKE.id}"]`);
+      const floor = page.locator('.react-flow');
+      await expectVisible(floor, 'the Factory canvas');
+      const { card, steps, run, step } = onTheFloor(page);
       await expectVisible(card, `the fake run's card on the Factory (${FAKE.id})`);
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
+      await expectVisible(card.locator(`a[href="/runs/${FAKE.id}"]`), "the card's title links to the run's page");
       await settled(page);
-      await expectInside(card, page.locator('.react-flow'), 'the card is on the floor');
+      await expectInside(card, floor, 'the card is on the floor');
+      await expectCount(steps, 0, 'a closed card draws no step');
+
+      // A click on the card, away from its title's link, unfolds the run's graph beside it.
+      await card.locator('time').click();
+      await expectCount(steps, FAKE.steps.length, `the card opens into a node per step (${FAKE.steps.join(', ')})`);
+      for (const name of FAKE.steps) await expectVisible(step(name), `the open run draws ${name}`);
+      await expectVisible(step(FAKE.blocked).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate on the Factory`);
+      await expectCount(page.locator(`.react-flow__edge[data-id="${FAKE.id}/->${FAKE.first}"]`), 1, `one dashed edge from the card into ${FAKE.first}`);
+      await expectCount(page.locator('.react-flow__edge'), FAKE.edges + 1, "the run's edges, and the card's into its first step");
+      await expectVisible(card.getByRole('button', { name: 'Hide steps' }), "the open card's chevron hides the steps");
+      await settled(page);
+      await expectInside(run, floor, 'the open run, card and steps, is brought onto the screen');
+
+      // Remembered in this browser: another visit finds the run open. A page of its own, so this one's
+      // requests are not cut off by a reload, and watched the same way.
+      const again = await page.context().newPage();
+      try {
+        const { problems } = watch(again);
+        await again.goto(new URL('/', page.url()).href, { waitUntil: 'networkidle' });
+        await expectCount(onTheFloor(again).steps, FAKE.steps.length, 'the run is still open on the next visit');
+        await again.waitForLoadState('networkidle');
+        if (problems().length) throw new Error(`the next visit had problems:\n    ${problems().join('\n    ')}`);
+      } finally {
+        await again.close();
+      }
+
+      // Collapse all folds it away, and the chevron opens it again.
+      await page.getByRole('button', { name: 'Collapse all' }).click();
+      await expectCount(steps, 0, 'Collapse all folds the graph away');
+      await card.getByRole('button', { name: 'Show steps' }).click();
+      await expectCount(steps, FAKE.steps.length, "the card's chevron unfolds it again");
+
+      // A click on a step opens its inspector beside the floor, the run's title above the step's name.
+      await step('review').click();
+      const inspector = page.locator('aside[aria-label="Step review"]');
+      await expectVisible(inspector, 'the step inspector opens on a click on review');
+      await expectVisible(inspector.getByText(FAKE.title), 'the inspector names the run the step is in');
+      // The floor narrows for the inspector and brings the run back into view; judged once it has.
+      await settled(page);
+      await expectInside(run, floor, 'the run is on the floor beside the open inspector');
     },
   },
   {

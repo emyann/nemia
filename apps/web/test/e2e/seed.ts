@@ -17,6 +17,10 @@ export const FAKE = {
   title: 'Give the board a look',
   steps: ['implement', 'review', 'respond'],
   blocked: 'implement',
+  /** The step that waits on no other, which the run's card leads into on the Factory. */
+  first: 'implement',
+  /** One per `after` between its steps: implement → review, review → respond, implement → respond. */
+  edges: 3,
 } as const;
 
 const STEPS = [

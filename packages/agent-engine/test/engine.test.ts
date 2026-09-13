@@ -398,6 +398,64 @@ test('a statement from a session that is still busy is not final', async () => {
   assert.equal((await b.run(view(id, new Map()))).state.settled, 'succeeded');
 });
 
+test('a statement ends the attempt when the harness has marked the session blocked, as when working', async () => {
+  // Measured: a `claude --bg` step called StructuredOutput and ended its turn, and the next
+  // observation found it `blocked`, idle. Taken as an answer the harness had already given, the
+  // statement was ignored, `decide` said "needs a person" for ever, and the slot was never freed.
+  const b = board();
+  const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, state: 'blocked', busy: false, closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 } });
+
+  const action = await b.run(step(id, new Map(b.sessions)));
+  assert.ok(action.do === 'record-end', `the attempt ends, not "${action.do === 'nothing' ? action.why : action.do}"`);
+  assert.equal(action.observed, 'done');
+  assert.deepEqual(action.closeout, { outcome: 'done' }, 'with what it said on the end');
+
+  await b.run(tick());
+  const v = await b.run(view(id, new Map(b.sessions)));
+  assert.equal(v.state.settled, 'succeeded');
+  assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
+});
+
+test('blocked with no statement still needs a person', async () => {
+  const b = board();
+  const { id, name } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, state: 'blocked', busy: false });
+
+  assert.deepEqual(await b.run(step(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
+  await b.run(tick());
+  assert.equal(await b.run(phaseOf(id, b)), 'needs-human');
+});
+
+test('blocked with an inherited statement still needs a person, and the statement is not recorded', async () => {
+  const b = board();
+  const { id, name } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, state: 'blocked', busy: false, closeout: { payload: { outcome: 'done', by: 'parent' }, at: 0 } });
+
+  assert.deepEqual(await b.run(step(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
+  await b.run(tick());
+  assert.equal(await b.run(phaseOf(id, b)), 'needs-human');
+
+  // When the harness does end it, the parent's statement is not written down as this attempt's.
+  b.sessions.set(name, { ...b.sessions.get(name)!, state: 'done' });
+  const action = await b.run(step(id, new Map(b.sessions)));
+  assert.ok(action.do === 'record-end');
+  assert.equal(action.closeout, undefined);
+  await b.run(tick());
+  const v = await b.run(view(id, new Map()));
+  assert.equal(v.state.settled, 'succeeded');
+  assert.equal(v.state.attempts[0]?.closeout, undefined);
+});
+
+test('blocked and busy: a statement it may yet revise still waits', async () => {
+  const b = board();
+  const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });
+  b.sessions.set(name, { ...b.sessions.get(name)!, state: 'blocked', busy: true, closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 } });
+
+  assert.deepEqual(await b.run(step(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
+  assert.equal((await b.run(view(id, new Map()))).state.settled, null);
+});
+
 test('a session the harness already ended keeps its statement on the record — unread', async () => {
   const b = board();
   const { id, name, startedAt } = await running(b, { ...spec, closeoutSchema: SCHEMA });

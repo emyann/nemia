@@ -61,6 +61,9 @@ behind; each one had to be cleared by hand with `claude stop` and `claude rm`. S
 possibly removing) a session once its task settles belongs in the engine. `test/live.test.ts` clears
 its own two sessions for this reason.
 
+A session seen `blocked` after giving its closeout now ends its attempt and settles, and stays in the
+registry afterwards like every other.
+
 ### 4. `claude-detached` ignores `closeoutSchema`, and measures no usage
 
 `agent-engine/src/runner-detached.ts`: the spec's `command` does not take the harness `io`, so a
@@ -182,3 +185,4 @@ list, and what fences that reviewer on Codex is `permissionMode: read-only`.
 | a detached harness launched into a missing cwd killed the process that launched it: the child's `error` event went unheard | the cwd is checked first and refused; the child's `error` is heard | engine `0d5c720` |
 | the tests were never typechecked, and a required `PromiseJournal.watch` that nothing called hid there | `test/` in the typecheck; the dead method gone | engine `9aaa38b` |
 | the README claimed `AE_RUNNER=sdk`, "refuse a tool call: no", 25 tests, a file table 2–3× off, and "three next things" already done (bug 5) | made true; `test/readme.test.ts` refuses each of those classes | engine `f947da4` |
+| a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |

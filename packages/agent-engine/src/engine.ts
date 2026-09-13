@@ -90,7 +90,10 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
     return new Map(observed).set(name, said);
   }
   // The harness has already answered; the statement rides along to the record and nothing more.
-  if (seen.state !== 'working') return observed;
+  // `blocked` is no answer: to `decide` it is live for ever. Measured — a step called
+  // StructuredOutput, ended its turn, and was next seen `blocked`, idle — so a statement ends a
+  // blocked attempt exactly as it ends a working one, or that attempt holds its slot until a deadline.
+  if (!LIVE.has(seen.state)) return observed;
   // Still computing: a statement it may yet revise. Measured once, with the file — a step declared
   // itself done, kept going, found it could not commit, and rewrote the verdict to blocked.
   if (seen.busy) return observed;

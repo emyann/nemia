@@ -22,7 +22,7 @@ import os from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Observed, Sighting } from './domain.ts';
-import { RunnerError, worktreeName, type RunnerOps, type SpawnRequest } from './runner.ts';
+import { claudeRefuses, RunnerError, worktreeName, type RunnerOps, type SpawnRequest } from './runner.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {
@@ -40,6 +40,13 @@ export type HarnessSpec = {
    * id — needed only to resume later. Optional: the name is the key, this is just a handle.
    */
   nativeIdPattern?: string;
+  /**
+   * What this harness cannot be asked for, as a sentence that names what to write instead — or
+   * `undefined` when it can do what the task says. Permission modes are the harness's own words,
+   * so the check lives on the spec, and `file()` asks it before anything is journalled. A spec
+   * without one is asked nothing.
+   */
+  refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
 };
 
 /**
@@ -217,6 +224,21 @@ const repositoryOf = (cwd: string): string | undefined => {
 };
 
 /**
+ * Codex's sandboxes, which a task names as its `permissionMode`. `bypassPermissions`, Claude's
+ * word, is also taken, as the widest, because the spec has always emitted it that way.
+ */
+export const CODEX_SANDBOXES: readonly string[] = ['read-only', 'workspace-write', 'danger-full-access'];
+
+/**
+ * The sandbox a task runs in: the one it named, `workspace-write` when it named none. A word that
+ * is not a sandbox never arrives through `file()`, which refuses it; a direct caller gets the default.
+ */
+const sandboxOf = (r: SpawnRequest): string => {
+  const asked = r.permissionMode === 'bypassPermissions' ? 'danger-full-access' : r.permissionMode;
+  return asked !== undefined && CODEX_SANDBOXES.includes(asked) ? asked : 'workspace-write';
+};
+
+/**
  * Codex, through `codex exec`. Verified against codex-cli 0.154.0:
  *   --json                  JSONL events on stdout
  *   -C <dir>                working root
@@ -233,11 +255,9 @@ export const codex: HarnessSpec = {
       '--json',
       '--skip-git-repo-check',
       '-C', r.cwd,
-      // `read-only` is emitted as itself. It used to fall through to `workspace-write`, so a task
-      // that asked for a reviewer that cannot write got one that could.
-      '-s', r.permissionMode === 'bypassPermissions' ? 'danger-full-access'
-        : r.permissionMode === 'read-only' ? 'read-only'
-        : 'workspace-write',
+      // The sandbox the task named, as itself. `read-only` used to fall through to `workspace-write`,
+      // so a task that asked for a reviewer that cannot write got one that could.
+      '-s', sandboxOf(r),
       ...(r.model ? ['-m', r.model] : []),
       // Codex's worktree flag takes NO value, so it is safe immediately before the prompt —
       // unlike Claude's. The spec is where that difference lives, so the engine never learns
@@ -256,6 +276,10 @@ export const codex: HarnessSpec = {
       r.brief,
     ],
   }),
+  refuses: (task) =>
+    task.permissionMode !== undefined && task.permissionMode !== 'bypassPermissions' && !CODEX_SANDBOXES.includes(task.permissionMode)
+      ? `\`permissionMode: ${task.permissionMode}\` is not a sandbox Codex has. Its modes are: ${CODEX_SANDBOXES.join(', ')} (and bypassPermissions, meaning danger-full-access).`
+      : undefined,
   // Best effort: codex prints a thread/session id in its JSONL. Only needed for resume.
   nativeIdPattern: '"(?:thread_id|session_id|id)"\\s*:\\s*"([0-9a-f-]{16,})"',
   /**
@@ -294,4 +318,5 @@ export const claudeDetached: HarnessSpec = {
     ],
   }),
   nativeIdPattern: '"session_id"\\s*:\\s*"([0-9a-f-]{16,})"',
+  refuses: claudeRefuses,
 };

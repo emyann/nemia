@@ -15,7 +15,7 @@ import path from 'node:path';
 import os from 'node:os';
 import type { Event, ResumePolicy, Sighting } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
-import { claudeOps, Runner, RunnerError, type SpawnRequest } from './runner.ts';
+import { claudeOps, claudeRefuses, Runner, RunnerError, type SpawnRequest } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { composite } from './runner-composite.ts';
 import { DEFAULT_MAX_CONCURRENT, file, requestStop, tick, view, type TaskView } from './engine.ts';
@@ -101,7 +101,15 @@ export type TaskSpec = {
 export type TickReport = { tasks: number; actions: number; running: Record<string, number> };
 
 export type Engine = {
-  /** File work. Returns the task id. Nothing runs until a tick. */
+  /**
+   * File work. Returns the task id. Nothing runs until a tick.
+   *
+   * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
+   * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
+   * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model or
+   * resumeFrom; or a word its harness does not take (Claude Code's permission modes, a
+   * `HarnessSpec`'s own `refuses`). A harness brought as a `PromiseRunner` is asked nothing.
+   */
   file(spec: TaskSpec): Promise<string>;
   /** One pass: start what may start, notice what ended, settle what is over. */
   tick(): Promise<TickReport>;
@@ -162,6 +170,41 @@ const runnerOf = (harnesses: Record<string, HarnessConfig>, fallback: string, ro
 const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
   Effect.tryPromise({ try: f, catch: (cause) => onError(cause instanceof Error ? cause.message : String(cause)) });
 
+// ─── what the door refuses ──────────────────────────────────────────────────
+
+/** Exhaustive by type: a policy added to `ResumePolicy` and not here does not compile. */
+const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
+
+/**
+ * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`.
+ *
+ * Checked at the API, so the CLI is not the only door that checks. A journalled task is a promise
+ * the loop keeps trying to honour, so a value it cannot use is cheapest refused before it is
+ * written: `deadlineSeconds: NaN` was journalled as `null` and stopped its task on the first pass,
+ * and a permission mode the harness rejects failed the spawn, which failed the whole tick. Which
+ * words a harness takes is asked of the harness; the engine never learns them.
+ */
+const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+  if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
+  if (typeof spec.cwd !== 'string' || !spec.cwd) return '`cwd` is empty. Give the directory the session should work in.';
+  if (!Object.hasOwn(harnesses, spec.harness)) {
+    return `\`harness: ${spec.harness}\` is not a harness this engine has. Its harnesses are: ${Object.keys(harnesses).join(', ')}.`;
+  }
+  if (spec.maxAttempts !== undefined && !(Number.isInteger(spec.maxAttempts) && spec.maxAttempts >= 1)) {
+    return `\`maxAttempts: ${spec.maxAttempts}\` is not a number of attempts. Give a whole number from 1.`;
+  }
+  if (spec.deadlineSeconds !== undefined && !(Number.isFinite(spec.deadlineSeconds) && spec.deadlineSeconds > 0)) {
+    return `\`deadlineSeconds: ${spec.deadlineSeconds}\` is not a number of seconds. Give seconds above 0, or leave it out for no deadline.`;
+  }
+  if (spec.resume !== undefined && !Object.hasOwn(RESUME_POLICIES, spec.resume)) {
+    return `\`resume: ${spec.resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}.`;
+  }
+  if (spec.model === '') return "`model` is empty. Leave it out for the harness's default.";
+  if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
+  const h = harnesses[spec.harness]!;
+  return (h === 'claude-bg' ? claudeRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
+};
+
 // ─── the engine ─────────────────────────────────────────────────────────────
 
 export function createEngine(options: EngineOptions = {}): Engine {
@@ -189,7 +232,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
     // The harness is RESOLVED here, never left implicit. A task filed without one would otherwise
     // be counted in a pool called 'default' while an identical task that named its harness went
     // in another — two ceilings for one subscription, each the full size.
-    file: (spec) => go(file({ ...spec, harness: spec.harness ?? fallback })),
+    file: async (spec) => {
+      const task = { ...spec, harness: spec.harness ?? fallback };
+      const refused = refusalOf(task, harnesses);
+      if (refused) throw Object.assign(new Error(`file: ${refused}`), { exitCode: 2 });
+      return go(file(task));
+    },
     tick: () => go(tick(max)),
     view: (taskId) => go(Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => view(taskId, o)))),
     list: () => go(Effect.gen(function* () {

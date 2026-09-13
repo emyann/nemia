@@ -195,6 +195,18 @@ test('codex runs read-only when the task says read-only — never widened to wor
   assert.equal(sandbox('read-only'), 'read-only');
   assert.equal(sandbox(), 'workspace-write', 'the shipped default is unchanged');
   assert.equal(sandbox('bypassPermissions'), 'danger-full-access');
+  // Codex's own words are its own sandboxes. `danger-full-access` used to become workspace-write.
+  assert.equal(sandbox('danger-full-access'), 'danger-full-access');
+  assert.equal(sandbox('workspace-write'), 'workspace-write');
+});
+
+test("codex refuses a permission mode that is not one of its sandboxes; Claude's harnesses refuse Codex's", async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const task = (permissionMode: string) => ({ brief: 'b', cwd: '/r', permissionMode });
+  assert.match(codex.refuses!(task('acceptEdits')) ?? '', /not a sandbox Codex has.*read-only, workspace-write, danger-full-access/);
+  assert.match(claudeDetached.refuses!(task('read-only')) ?? '', /not a mode Claude Code has/);
+  assert.equal(codex.refuses!(task('read-only')), undefined);
+  assert.equal(claudeDetached.refuses!(task('auto')), undefined);
 });
 
 // ─── the closing statement ──────────────────────────────────────────────────

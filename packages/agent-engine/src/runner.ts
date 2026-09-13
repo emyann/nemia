@@ -113,6 +113,24 @@ export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: num
   return found;
 };
 
+/**
+ * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that
+ * speaks it and never in `domain.ts`.
+ *
+ * As the CLI checks them on 2.1.270: `--permission-mode` refuses any other word while it parses its
+ * arguments, and still takes `default`, which its help no longer lists. `file()` asks before a task
+ * is journalled. Refused at spawn instead, a bad mode failed the whole tick, on every pass.
+ */
+export const CLAUDE_PERMISSION_MODES: readonly string[] = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'manual', 'plan'];
+
+/** What Claude Code cannot be asked for, as a sentence that says what to write instead. */
+export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
+  if (task.permissionMode !== undefined && !CLAUDE_PERMISSION_MODES.includes(task.permissionMode)) {
+    return `\`permissionMode: ${task.permissionMode}\` is not a mode Claude Code has. Its modes are: ${CLAUDE_PERMISSION_MODES.join(', ')}.`;
+  }
+  return undefined;
+};
+
 export type ClaudeOptions = {
   quiescentAfterMs?: number;
   now?: () => number;

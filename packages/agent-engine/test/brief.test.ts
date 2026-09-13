@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -30,7 +30,7 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
   const dir = tmp();
   const schema = path.join(dir, 'closeout.json');
   fs.writeFileSync(schema, '{"type":"object"}');
-  // A Record, so a key added to BRIEF_KEYS without a sample here does not compile.
+  // Keyed by BriefKey: a key added to BRIEF_KEYS without a sample here fails this test.
   const samples: Record<BriefKey, [string, unknown]> = {
     cwd: [dir, dir],
     harness: ['codex', 'codex'],
@@ -113,18 +113,27 @@ test('no frontmatter is all prompt, at the defaults', () => {
   assert.equal(spec.maxAttempts, 1);
 });
 
-test('`ae start` exits 2 with the sentence, not a stack trace', () => {
+const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
+
+/** `ae start` on a brief, against a board of its own. */
+const aeStart = (front: string) => {
   const dir = tmp();
   const file = path.join(dir, 'brief.md');
-  fs.writeFileSync(file, brief('afer: implement'));
-  const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
-  try {
-    execFileSync(process.execPath, [ae, 'start', file], { env: { ...process.env, AE_ROOT: dir }, stdio: 'pipe' });
-    assert.fail('ae start accepted a brief with an unknown key');
-  } catch (e) {
-    const err = e as { status?: number; stderr?: Buffer };
-    assert.equal(err.status, 2);
-    assert.match(String(err.stderr), /^brief: `afer` is not a key a brief has/);
-    assert.equal(fs.existsSync(path.join(dir, 'tasks')), false, 'and nothing was filed');
-  }
+  fs.writeFileSync(file, brief(front));
+  const r = spawnSync(process.execPath, [ae, 'start', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
+  return { status: r.status, stderr: r.stderr, filed: fs.existsSync(path.join(dir, 'tasks')) };
+};
+
+test('`ae start` exits 2 with the sentence, not a stack trace, and files nothing', () => {
+  const r = aeStart('afer: implement');
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /^brief: `afer` is not a key a brief has/);
+  assert.equal(r.filed, false);
+});
+
+test('`ae start` refuses what file() refuses, too — a harness this engine does not have', () => {
+  const r = aeStart('harness: banana');
+  assert.equal(r.status, 2);
+  assert.match(r.stderr, /^file: `harness: banana` is not a harness this engine has/);
+  assert.equal(r.filed, false);
 });

@@ -3,16 +3,24 @@ import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
 import {
   byAge,
+  CARD_WIDTH,
   CELL_HEIGHT,
   CELL_WIDTH,
+  GRAPH_TOP,
+  graphAt,
   GRID_COLUMNS,
   inFlight,
   keepLayout,
+  ONE_CELL,
   placeRuns,
   repoName,
+  spanOf,
   stepInFlight,
   titleOf,
+  toggleOpen,
+  type Span,
 } from '../src/lib/factory.ts';
+import { COLUMN_WIDTH, extentOf, layout, NODE_WIDTH, ROW_HEIGHT, type Point } from '../src/lib/layout.ts';
 
 /** A run with one step per status, filed unless it is still waiting. */
 const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunSummary => ({
@@ -168,4 +176,130 @@ test('what is saved is every card as last left, and nothing for a run the store 
     new: { x: 4, y: 4 },
   });
   assert.deepEqual(Object.fromEntries(keepLayout(null, now, new Set(['new']))), { new: { x: 4, y: 4 } });
+});
+
+// ─── open runs ───────────────────────────────────────────────────────────────
+
+/** A chain of `n` steps, each after the one before, laid out. */
+const chain = (n: number) => layout(Array.from({ length: n }, (_, i) => ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [] })));
+const fanOut = layout([{ name: 'plan', after: [] }, { name: 'api', after: ['plan'] }, { name: 'web', after: ['plan'] }]);
+const diamond = layout([
+  { name: 'plan', after: [] },
+  { name: 'api', after: ['plan'] },
+  { name: 'web', after: ['plan'] },
+  { name: 'docs', after: ['plan'] },
+  { name: 'merge', after: ['api', 'web', 'docs'] },
+  { name: 'ship', after: ['merge'] },
+]);
+
+test('an open run spans its card\'s cell and as many to the right as its graph is wide', () => {
+  assert.deepEqual(spanOf(extentOf(new Map())), ONE_CELL, 'no steps: the card alone');
+  assert.deepEqual(spanOf(extentOf(chain(1))), { columns: 2, rows: 1 });
+  // The e2e's fake run is a chain of three: a whole row of the grid.
+  assert.deepEqual(spanOf(extentOf(chain(3))), { columns: 4, rows: 1 });
+  assert.deepEqual(spanOf(extentOf(chain(5))), { columns: 6, rows: 1 }, 'wider than the grid');
+  // Taller than a cell, so it takes the row below as well.
+  assert.deepEqual(spanOf(extentOf(fanOut)), { columns: 3, rows: 2 });
+  assert.deepEqual(spanOf(extentOf(diamond)), { columns: 5, rows: 3 });
+  // At a cell's edge, and a pixel past it.
+  assert.deepEqual(spanOf({ width: CELL_WIDTH, height: ROW_HEIGHT }), { columns: 2, rows: 1 });
+  assert.deepEqual(spanOf({ width: CELL_WIDTH + 1, height: ROW_HEIGHT }), { columns: 3, rows: 1 });
+  assert.deepEqual(spanOf({ width: 0, height: CELL_HEIGHT - GRAPH_TOP + 1 }), { columns: 1, rows: 2 });
+});
+
+test('every step of an open run lies right of its card and inside its span, a gap short of the next cell', () => {
+  for (const [shape, at] of Object.entries({ one: chain(1), three: chain(3), five: chain(5), fanOut, diamond })) {
+    const span = spanOf(extentOf(at));
+    const placed = graphAt(at);
+    const xs = [...placed.values()].map((p) => p.x);
+    // The first column a column's arrow right of the card, as each column is from the one before.
+    assert.equal(Math.min(...xs), CARD_WIDTH + COLUMN_WIDTH - NODE_WIDTH, shape);
+    for (const [name, p] of placed) {
+      const where = `${shape}: ${name} at ${JSON.stringify(p)} in ${JSON.stringify(span)}`;
+      assert.ok(p.y >= 0, `below the card's top — ${where}`);
+      assert.ok(p.x + NODE_WIDTH + (CELL_WIDTH - CARD_WIDTH) <= span.columns * CELL_WIDTH, `a gap short of the next cell across — ${where}`);
+      assert.ok(p.y + ROW_HEIGHT <= span.rows * CELL_HEIGHT, `a gap short of the next row — ${where}`);
+    }
+  }
+  // A chain is level, beside the card.
+  assert.deepEqual([...graphAt(chain(3)).values()].map((p) => p.y), [GRAPH_TOP, GRAPH_TOP, GRAPH_TOP]);
+});
+
+test('a click opens a run, last in the order runs claim cells; another click closes it', () => {
+  assert.deepEqual(toggleOpen([], 'a'), ['a']);
+  assert.deepEqual(toggleOpen(['a'], 'b'), ['a', 'b']);
+  assert.deepEqual(toggleOpen(['a', 'b'], 'a'), ['b']);
+  assert.deepEqual(toggleOpen(toggleOpen(['b'], 'a'), 'a'), ['b']);
+});
+
+/**
+ * Pairs of runs whose boxes on the floor overlap: a card's cell, or an open run's cells across and down.
+ * Measured in the floor's coordinates, not in cells, so it does not share `placeRuns`' arithmetic.
+ */
+function overlapping(at: ReadonlyMap<string, Point>, spans: ReadonlyMap<string, Span> = new Map()): string[] {
+  const boxes = [...at].map(([id, { x, y }]) => {
+    const { columns, rows } = spans.get(id) ?? ONE_CELL;
+    return { id, x, y, right: x + columns * CELL_WIDTH, bottom: y + rows * CELL_HEIGHT };
+  });
+  return boxes.flatMap((a, i) =>
+    boxes.slice(i + 1).filter((b) => a.x < b.right && b.x < a.right && a.y < b.bottom && b.y < a.bottom).map((b) => `${a.id}/${b.id}`),
+  );
+}
+
+test('a run opening moves the cards its graph now covers, never itself, and no card beside it', () => {
+  const ids = ['a', 'b', 'c', 'd', 'e'];
+  const fresh = placeRuns(ids, new Map(), null);
+  const spans = new Map([['b', { columns: 3, rows: 1 }]]);
+  const opened = placeRuns(ids, fresh, null, spans);
+  assert.deepEqual(Object.fromEntries(opened), {
+    a: { x: 0, y: 0 },
+    b: { x: CELL_WIDTH, y: 0 },
+    // c and d were in b's graph: the first free cells, in age order.
+    c: { x: CELL_WIDTH, y: CELL_HEIGHT },
+    d: { x: 2 * CELL_WIDTH, y: CELL_HEIGHT },
+    e: { x: 0, y: CELL_HEIGHT },
+  });
+  assert.deepEqual(overlapping(opened, spans), []);
+  // The same pass again moves nothing: a level-triggered layout, not one that moves on every read.
+  assert.deepEqual(placeRuns(ids, opened, null, spans), opened);
+
+  // A run that starts while b is open does not land in its graph.
+  const started = placeRuns([...ids, 'f'], opened, null, spans);
+  assert.deepEqual(started.get('f'), { x: 3 * CELL_WIDTH, y: CELL_HEIGHT });
+  assert.deepEqual(overlapping(started, spans), []);
+
+  // Closed again: b takes its one cell, nobody moves back, and the next run takes the first free cell.
+  const closed = placeRuns([...ids, 'f'], opened, null);
+  assert.deepEqual(Object.fromEntries([...closed].filter(([id]) => id !== 'f')), Object.fromEntries(opened));
+  assert.deepEqual(closed.get('f'), { x: 2 * CELL_WIDTH, y: 0 });
+  assert.deepEqual(overlapping(closed), []);
+});
+
+test('two open runs whose graphs meet: the one opened last stays, and the other moves to a row with room', () => {
+  const onFloor = new Map([['a', { x: 0, y: 0 }], ['b', { x: CELL_WIDTH, y: 0 }]]);
+  const aLast = new Map([['a', { columns: 4, rows: 1 }], ['b', { columns: 3, rows: 1 }]]);
+  const bLast = new Map([['b', { columns: 3, rows: 1 }], ['a', { columns: 4, rows: 1 }]]);
+  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b'], onFloor, null, aLast)), { a: { x: 0, y: 0 }, b: { x: 0, y: CELL_HEIGHT } });
+  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b'], onFloor, null, bLast)), { a: { x: 0, y: CELL_HEIGHT }, b: { x: CELL_WIDTH, y: 0 } });
+  assert.deepEqual(overlapping(placeRuns(['a', 'b'], onFloor, null, aLast), aLast), []);
+  assert.deepEqual(overlapping(placeRuns(['a', 'b'], onFloor, null, bLast), bLast), []);
+});
+
+test('a graph wider than the grid starts a row, and a tall one keeps the rows it covers', () => {
+  const spans = new Map([['b', { columns: 6, rows: 1 }], ['c', { columns: 2, rows: 2 }]]);
+  const at = placeRuns(['a', 'b', 'c', 'd'], new Map(), null, spans);
+  assert.deepEqual(Object.fromEntries(at), {
+    a: { x: 2 * CELL_WIDTH, y: CELL_HEIGHT },
+    b: { x: 0, y: 0 },
+    c: { x: 0, y: CELL_HEIGHT },
+    d: { x: 3 * CELL_WIDTH, y: CELL_HEIGHT },
+  });
+  assert.deepEqual(overlapping(at, spans), []);
+});
+
+test('a card coming back onto the floor does not land in an open run\'s graph', () => {
+  const spans = new Map([['b', { columns: 3, rows: 1 }]]);
+  const at = placeRuns(['a', 'b'], new Map([['b', { x: 0, y: 0 }]]), new Map([['a', { x: CELL_WIDTH, y: 0 }]]), spans);
+  assert.deepEqual(Object.fromEntries(at), { a: { x: 3 * CELL_WIDTH, y: 0 }, b: { x: 0, y: 0 } });
+  assert.deepEqual(overlapping(at, spans), []);
 });

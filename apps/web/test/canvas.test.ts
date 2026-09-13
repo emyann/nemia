@@ -5,12 +5,16 @@ import {
   duration,
   edgesOf,
   forgetFactoryLayout,
+  forgetFactoryOpen,
   forgetLayout,
   parseLayout,
+  parseOpen,
   place,
   readFactoryLayout,
+  readFactoryOpen,
   readLayout,
   saveFactoryLayout,
+  saveFactoryOpen,
   saveLayout,
 } from '../src/lib/canvas.ts';
 
@@ -137,3 +141,39 @@ function memory(kept: Map<string, string>) {
     removeItem: (key: string) => void kept.delete(key),
   };
 }
+
+test("the Factory's open runs are kept in the order opened, apart from its arrangement, until forgotten", (t) => {
+  stubStorage(t, memory(new Map()));
+  assert.deepEqual(readFactoryOpen(), []);
+  saveFactoryOpen(['r-2', 'r-1']);
+  assert.deepEqual(readFactoryOpen(), ['r-2', 'r-1']);
+  saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
+  forgetFactoryLayout();
+  assert.deepEqual(readFactoryOpen(), ['r-2', 'r-1'], 'forgetting the arrangement is not closing the runs');
+  saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
+  forgetFactoryOpen();
+  assert.deepEqual(readFactoryOpen(), []);
+  assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } });
+});
+
+test('a saved open set is refused unless it is a list of run ids', () => {
+  const refused = [null, '', 'not json', 'null', '{}', '"r-1"', '3', '[1]', '["r-1",null]', '["r-1",["r-2"]]', '[""]'];
+  for (const raw of refused) assert.deepEqual(parseOpen(raw), [], String(raw));
+  assert.deepEqual(parseOpen('["r-2","r-1","r-2"]'), ['r-2', 'r-1']);
+  assert.deepEqual(parseOpen('[]'), []);
+});
+
+test('a browser that refuses storage keeps no run open, and throws nothing — nor one where storage is not there at all', (t) => {
+  const refuse = () => {
+    throw new Error('SecurityError: storage is disabled');
+  };
+  stubStorage(t, { getItem: refuse, setItem: refuse, removeItem: refuse });
+  assert.deepEqual(readFactoryOpen(), []);
+  assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
+  assert.doesNotThrow(() => forgetFactoryOpen());
+  // A sandboxed frame throws on reading `localStorage` itself, before any call.
+  Object.defineProperty(globalThis, 'localStorage', { get: refuse, configurable: true });
+  assert.deepEqual(readFactoryOpen(), []);
+  assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
+  assert.doesNotThrow(() => forgetFactoryOpen());
+});

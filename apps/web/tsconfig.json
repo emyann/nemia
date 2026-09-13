@@ -9,6 +9,8 @@
     "skipLibCheck": true,
     "noEmit": true,
     "verbatimModuleSyntax": true,
+    // Node runs the tests on these files as they are, and resolves a value import only by its full name.
+    "allowImportingTsExtensions": true,
     "types": ["vite/client"],
     "paths": {
       "@/*": ["./src/*"]

@@ -13,6 +13,7 @@ export type StepState =
   | 'verified'
   | 'unverified'
   | 'blocked'
+  | 'exhausted'
   | 'unsigned'
   | 'failed'
   | 'failed-check'
@@ -26,6 +27,8 @@ export function stepState(status: string, runCancelled: boolean): StepState {
   if (said === 'BLOCKED') return 'blocked';
   // The run's own verdict on a signed step: its check exited 0, is running, or did not exit 0.
   if (word === 'verified ✓') return 'verified';
+  // A loop out of rounds: its looping step asked for another round on the last one `rounds:` allows. Final, and a person decides.
+  if (word === 'rounds exhausted') return 'exhausted';
   if (word === 'checking') return 'checking';
   if (word.startsWith('failed ✗ check')) return 'failed-check';
   // Signed off, with no `check:` to run: nothing but its own word says it worked.
@@ -39,7 +42,8 @@ export function stepState(status: string, runCancelled: boolean): StepState {
   if (word === 'succeeded') return 'unverified';
   if (word === 'unknown') return 'unknown';
   if (word === 'waiting' || word === 'pending') return runCancelled ? 'cancelled' : 'waiting';
-  // `running (working)`, `working (quiescent)`, `starting`, `between attempts`.
+  // `running (working)`, `working (quiescent)`, `starting`, `between attempts` — and, on purpose, a word `wf ls` has
+  // gained since this was written: a step the board cannot name is shown as still going, never as done or as needing you.
   return 'working';
 }
 
@@ -54,6 +58,7 @@ export const stateMeaning: Record<StepState, string> = {
   verified: 'verified: its check exited 0',
   unverified: 'unverified: it signed off and has no check, so only its own word says it worked',
   blocked: 'blocked: it signed off without finishing, and needs a person',
+  exhausted: 'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round',
   unsigned: 'unsigned: it ended without the closeout it was asked for',
   failed: 'failed: its session failed',
   'failed-check': 'failed its check: the command the run judges it by did not exit 0',
@@ -70,6 +75,8 @@ export const stateClass: Record<StepState, string> = {
   // Neutral, not green: nothing checked it. `StatusChip` marks it too, so it does not pass for a step still to do.
   unverified: 'bg-neutral-100 text-neutral-700 ring-1 ring-neutral-300 ring-inset dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-600',
   blocked: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
+  // Waiting on a person, as `blocked` is: nothing broke, and the loop goes no further until somebody decides.
+  exhausted: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   unsigned: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
   failed: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
   'failed-check': 'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',

@@ -11,6 +11,7 @@ export const stepMinimapFill: Record<StepState, string> = {
   verified: 'var(--color-emerald-500)',
   unverified: 'var(--color-neutral-500)',
   blocked: 'var(--color-amber-500)',
+  exhausted: 'var(--color-amber-500)',
   unsigned: 'var(--color-amber-400)',
   failed: 'var(--color-red-500)',
   'failed-check': 'var(--color-red-500)',

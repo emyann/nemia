@@ -42,8 +42,8 @@ function Run({ run }: { run: RunDetail }) {
 
       {run.waitingOnYou.length > 0 && (
         <p className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, or refused by its
-          check —{' '}<code>wf decide {run.id}</code>
+          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, refused by its
+          check, or out of rounds —{' '}<code>wf decide {run.id}</code>
         </p>
       )}
 

@@ -14,7 +14,7 @@ export type RunSummary = {
   /** Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file. */
   moving: boolean;
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string }>;
-  /** Steps a person has to act on — blocked, unsigned, or refused by their check. Empty on a cancelled run. */
+  /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds. Empty on a cancelled run. */
   waitingOnYou: string[];
 };
 

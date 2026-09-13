@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
-import { closeoutOf, engine, list, listRuns } from 'agent-workflows';
+import { closeoutOf, engine, listRuns } from 'agent-workflows';
 import { composeBrief, type Run } from 'agent-workflows/run';
 import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
 
@@ -11,7 +11,7 @@ export type RunSummary = {
   brief: string;
   createdAt: string;
   cancelledAt: string | null;
-  /** `status` is what `wf ls` prints for the step, word for word. */
+  /** `status` is what `wf ls` prints for the step — see `statusOf` for the one word it corrects. */
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string }>;
   /** Steps that signed off blocked, on a run nobody has called off. */
   waitingOnYou: string[];
@@ -48,14 +48,14 @@ export type RunDetail = {
   createdAt: string;
   cancelledAt: string | null;
   waitingOnYou: string[];
-  /** Why `spec`, `body` and `told` are null: the workflow folder could not be read. */
+  /** Set when the workflow folder cannot be read, or no longer has the steps the run started with. */
   warning: string | null;
-  /** In workflow order. */
+  /** The recorded steps in the order the run started with them, then any the folder has gained. */
   steps: Array<{
     name: string;
     spec: StepSpec | null;
     body: string | null;
-    /** What the step was actually given, as `composeBrief` writes it. */
+    /** For a filed step, the brief the engine was filed with; for one not yet filed, what it would be given now. */
     told: string | null;
     taskId: string | null;
     workspace: string | null;
@@ -72,13 +72,13 @@ export type RunDetail = {
 const e = engine();
 
 type TaskView = Awaited<ReturnType<typeof e.view>>;
-type Listing = Awaited<ReturnType<typeof list>>;
+type Views = ReadonlyMap<string, TaskView>;
 
 /**
  * The engine's view of every task a run has filed. Each `view` observes every harness — a
  * `claude agents` call, a scan of detached runs — so a request reads each task once.
  */
-async function viewsOf(run: Run): Promise<Map<string, TaskView>> {
+async function viewsOf(run: Run): Promise<Views> {
   const views = new Map<string, TaskView>();
   for (const { taskId } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
@@ -102,46 +102,99 @@ function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { steps: 
       : `The workflow folder ${run.workflowDir} is gone.`;
     return {
       steps: null,
-      warning: `${why} The steps are listed from the run record, without their spec, their prose, or what they were told.`,
+      warning: `${why} The steps are listed from the run record, without their spec or prose.`,
     };
   }
 }
 
 /**
- * `wf ls`'s words for a run whose workflow folder cannot be read.
+ * Which steps a run has, in the order to show them.
  *
- * `list` is where those words come from, but it loads the folder before it says anything and throws
- * when the folder is gone — while the record still says which steps ran and the engine still knows
- * how they went. Nothing agent-workflows exports applies the rule without the folder, so this repeats
- * `listing` (agent-workflows/src/run.ts) over the record's steps. The api test holds the two in step.
+ * Every step on the record, in the record's order — the workflow's order when the run started —
+ * because the record is the truth about what ran, whatever the folder says now; `wf decide` reads
+ * the record too. Then any step the folder has and the record does not: `wf start` records every
+ * step it finds, so those were added since, and the tick will file them, because it reads the folder.
  */
-function recordListing(run: Run, views: ReadonlyMap<string, TaskView>): Listing {
-  const waitingOnYou: string[] = [];
-  const steps = Object.entries(run.steps).map(([name, { taskId, branch = null }]) => {
-    if (!taskId) return { name, status: 'waiting', branch };
-    const phase = views.get(taskId)?.phase ?? 'unknown';
-    const c = closeoutOf(views, run, name);
-    if (!c) return { name, status: phase, branch };
-    if ('error' in c) return { name, status: `${phase} · closeout unreadable`, branch };
-    if (c.outcome === 'blocked') waitingOnYou.push(name);
-    return { name, status: `${phase} · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`, branch };
-  });
-  return { steps, waitingOnYou: run.cancelledAt ? [] : waitingOnYou };
+function stepNames(run: Run, workflows: readonly Workflow[] | null): string[] {
+  const added = (workflows ?? []).map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
+  return [...Object.keys(run.steps), ...added];
 }
 
-const listingOf = async (run: Run, steps: Workflow[] | null, views?: ReadonlyMap<string, TaskView>): Promise<Listing> =>
-  steps ? list(e, run) : recordListing(run, views ?? (await viewsOf(run)));
+/** How the folder has moved away from the steps the run started with, or null if it has not. */
+function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
+  const inFolder = new Set(workflows.map((s) => s.name));
+  const removed = Object.keys(run.steps).filter((name) => !inFolder.has(name));
+  const added = workflows.map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
+  const said = [
+    ...(removed.length ? [`it no longer has ${removed.join(', ')}, shown from the run record without spec or prose`] : []),
+    ...(added.length ? [`it has ${added.join(', ')}, which the run did not start with`] : []),
+  ];
+  return said.length ? `The workflow folder ${run.workflowDir} has changed since this run started: ${said.join('; ')}.` : null;
+}
+
+/**
+ * What `wf ls` says about a step, over one read of its task.
+ *
+ * `listing`'s rule (agent-workflows/src/run.ts), with one correction: a task the engine has no
+ * record of is `unknown`, the line `phaseOfView` in runner.ts draws. `list` passes the engine's own
+ * `pending` through for it, so a task lost from the engine's store would read as queued behind a
+ * slot. Worded here rather than by calling `list`, which words only the steps now in the folder and
+ * would read every task a second time. The api test holds these words to `list`'s wherever `list`
+ * is right.
+ */
+function statusOf(run: Run, name: string, views: Views): string {
+  const taskId = run.steps[name]?.taskId;
+  if (!taskId) return 'waiting';
+  const view = views.get(taskId);
+  // Every filed task has the brief it was filed with; only a task the engine never heard of has none.
+  if (!view?.state.brief) return 'unknown';
+  const c = closeoutOf(views, run, name);
+  if (!c) return view.phase;
+  if ('error' in c) return `${view.phase} · closeout unreadable`;
+  return `${view.phase} · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
+}
+
+/** Steps that signed off blocked, on a run nobody has called off. */
+const waitingOn = (run: Run, names: readonly string[], views: Views): string[] =>
+  run.cancelledAt
+    ? []
+    : names.filter((name) => {
+        const c = closeoutOf(views, run, name);
+        return c !== undefined && !('error' in c) && c.outcome === 'blocked';
+      });
+
+/**
+ * What a step was told.
+ *
+ * For a filed step, the brief the engine holds: it is what the step was given. Recomposing it now
+ * would not be — `composeBrief` points a step with no `after` at every step filed so far, so a
+ * finished first step would read as told to look at work done after it, and an edited folder would
+ * rewrite it. For a step not yet filed, what `composeBrief` would give it now. For a filed task the
+ * engine has no record of, nobody can say.
+ */
+function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, views: Views): string | null {
+  const taskId = run.steps[name]?.taskId;
+  if (taskId) return views.get(taskId)?.state.brief || null;
+  const step = workflows?.find((s) => s.name === name);
+  return step && workflows ? composeBrief(step, run, workflows) : null;
+}
 
 async function summarize(run: Run): Promise<RunSummary> {
-  const { steps, waitingOnYou } = await listingOf(run, workflowsOf(run).steps);
+  const names = stepNames(run, workflowsOf(run).steps);
+  const views = await viewsOf(run);
   return {
     id: run.id,
     repo: run.repo,
     brief: run.brief,
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
-    steps: steps.map(({ name, status, branch }) => ({ name, taskId: run.steps[name]?.taskId ?? null, branch, status })),
-    waitingOnYou,
+    steps: names.map((name) => ({
+      name,
+      taskId: run.steps[name]?.taskId ?? null,
+      branch: run.steps[name]?.branch ?? null,
+      status: statusOf(run, name, views),
+    })),
+    waitingOnYou: waitingOn(run, names, views),
   };
 }
 
@@ -156,9 +209,10 @@ const specOf = (step: Workflow): StepSpec => ({
 });
 
 async function detail(run: Run): Promise<RunDetail> {
-  const { steps: workflows, warning } = workflowsOf(run);
+  const folder = workflowsOf(run);
+  const workflows = folder.steps;
+  const names = stepNames(run, workflows);
   const views = await viewsOf(run);
-  const { steps, waitingOnYou } = await listingOf(run, workflows, views);
   return {
     id: run.id,
     brief: run.brief,
@@ -169,20 +223,20 @@ async function detail(run: Run): Promise<RunDetail> {
     isolate: run.isolate,
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
-    waitingOnYou,
-    warning,
-    steps: steps.map(({ name, status, branch }) => {
+    waitingOnYou: waitingOn(run, names, views),
+    warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
+    steps: names.map((name) => {
       const step = workflows?.find((s) => s.name === name);
       const c = closeoutOf(views, run, name);
       return {
         name,
         spec: step ? specOf(step) : null,
         body: step?.body ?? null,
-        told: step && workflows ? composeBrief(step, run, workflows) : null,
+        told: toldOf(run, name, workflows, views),
         taskId: run.steps[name]?.taskId ?? null,
         workspace: run.steps[name]?.workspace ?? null,
-        branch,
-        status,
+        branch: run.steps[name]?.branch ?? null,
+        status: statusOf(run, name, views),
         // An unreadable closeout is already in `status`; there is nothing here to show of it.
         closeout: c && !('error' in c)
           ? { outcome: c.outcome, summary: c.summary, needs: c.needs ?? null, artifacts: c.artifacts }

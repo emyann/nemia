@@ -14,7 +14,8 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "test": "turbo run test",
-    "typecheck": "turbo run typecheck"
+    "typecheck": "turbo run typecheck",
+    "e2e": "npm run e2e --workspace web"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",

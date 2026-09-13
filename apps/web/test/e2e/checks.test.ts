@@ -1,0 +1,93 @@
+/**
+ * The e2e's refusals, made to refuse. `npm run e2e` runs this before it looks at the real pages, so a
+ * check that cannot fail never gets to pass them. It needs Chromium (`npx playwright install chromium`),
+ * which is why it is not part of `npm test`.
+ */
+import { after, before, test } from 'node:test';
+import assert from 'node:assert/strict';
+import { chromium, type Browser, type Page } from 'playwright';
+import { expectCount, expectInside, expectTheme, expectVisible, Refused, watch } from './checks.ts';
+
+let browser: Browser;
+before(async () => {
+  browser = await chromium.launch();
+});
+after(async () => {
+  await browser?.close();
+});
+
+/** `html` at a made-up origin, with `/api/runs` answering `api` — no server, no port. */
+async function pageWith(html: string, { theme = 'light', api = 200 }: { theme?: 'light' | 'dark'; api?: number } = {}) {
+  const context = await browser.newContext({ colorScheme: theme });
+  const page: Page = await context.newPage();
+  const { problems } = watch(page);
+  await page.route('http://e2e.test/**', (route) => {
+    const { pathname } = new URL(route.request().url());
+    if (pathname === '/') return route.fulfill({ contentType: 'text/html', body: html });
+    if (pathname === '/api/runs') return route.fulfill({ status: api, contentType: 'application/json', body: '[]' });
+    return route.abort('connectionrefused');
+  });
+  await page.goto('http://e2e.test/');
+  return { page, problems };
+}
+
+async function eventually(done: () => boolean, ms = 3_000): Promise<void> {
+  const until = Date.now() + ms;
+  while (!done() && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 50));
+}
+
+test('a console error, an uncaught exception, a failed request and a 500 are each a problem', async () => {
+  const { problems } = await pageWith(`<p>ok</p><script>
+    console.error('the graph did not draw');
+    setTimeout(() => { throw new Error('boom'); });
+    fetch('/api/runs');
+    fetch('/api/gone').catch(() => {});
+  </script>`, { api: 500 });
+  const want = [/^console error: the graph did not draw$/, /^uncaught: boom$/, /^request failed: GET http:\/\/e2e\.test\/api\/gone/, /^request answered 500: GET http:\/\/e2e\.test\/api\/runs$/];
+  await eventually(() => want.every((pattern) => problems().some((p) => pattern.test(p))));
+  for (const pattern of want) assert.ok(problems().some((p) => pattern.test(p)), `${pattern} in:\n${problems().join('\n')}`);
+});
+
+test('a page that does none of those has no problems — or every page would fail, and the watch prove nothing', async () => {
+  const { page, problems } = await pageWith('<p>ok</p><script>fetch("/api/runs")</script>');
+  await page.waitForLoadState('networkidle');
+  assert.deepEqual(problems(), []);
+});
+
+test('an element that is not on the page, or is there and hidden, is refused, naming the assertion', async () => {
+  const { page } = await pageWith('<nav><a href="/">Factory</a></nav><p class="card" hidden>a card</p>');
+  await expectVisible(page.getByRole('link', { name: 'Factory' }), 'the sidebar has Factory');
+  await assert.rejects(expectVisible(page.getByRole('link', { name: 'Runs' }), 'the sidebar has Runs', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the sidebar has Runs — not visible after 300 ms');
+  await assert.rejects(expectVisible(page.locator('.card'), 'the card', 300), Refused);
+});
+
+test('a count that is not the count is refused, naming both', async () => {
+  const { page } = await pageWith('<div class="node"></div><div class="node"></div>');
+  await expectCount(page.locator('.node'), 2, 'a node per step');
+  await assert.rejects(expectCount(page.locator('.node'), 3, 'a node per step', 300),
+    (err: Error) => err instanceof Refused && err.message === 'a node per step — expected 3, found 2');
+});
+
+test('a node hanging off the edge of its canvas is refused, naming it — as the run page was, photographed mid-fit', async () => {
+  const { page } = await pageWith(`<div id="canvas" style="position:relative;width:200px;height:100px;overflow:hidden">
+    <div class="node" data-id="implement" style="position:absolute;left:10px;top:10px;width:50px;height:20px"></div>
+    <div class="node" data-id="respond" style="position:absolute;left:180px;top:10px;width:50px;height:20px"></div>
+  </div>`);
+  await expectInside(page.locator('.node[data-id="implement"]'), page.locator('#canvas'), 'every step is on the canvas');
+  await assert.rejects(expectInside(page.locator('.node'), page.locator('#canvas'), 'every step is on the canvas'),
+    (err: Error) => err instanceof Refused && err.message === 'every step is on the canvas — respond is outside it');
+});
+
+test('a page that stays light in the dark is refused, and so is one nobody painted', async () => {
+  const themed = '<style>body{background:white}@media (prefers-color-scheme: dark){body{background:oklch(0.145 0 0)}}</style><p>ok</p>';
+  await expectTheme((await pageWith(themed, { theme: 'dark' })).page, 'dark');
+  await expectTheme((await pageWith(themed)).page, 'light');
+
+  await assert.rejects(expectTheme((await pageWith('<style>body{background:white}</style><p>ok</p>', { theme: 'dark' })).page, 'dark'),
+    (err: Error) => err instanceof Refused && /^the page is dark — its background is rgb\(255, 255, 255\), which is not$/.test(err.message));
+  await assert.rejects(expectTheme((await pageWith('<p>unpainted</p>', { theme: 'dark' })).page, 'dark'), Refused);
+  // And the emulation itself: a light browser asked to be judged dark.
+  await assert.rejects(expectTheme((await pageWith(themed)).page, 'dark'),
+    (err: Error) => err instanceof Refused && err.message === 'the browser prefers dark — it prefers light');
+});

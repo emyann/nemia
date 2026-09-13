@@ -43,6 +43,19 @@ test('an attempt that runs counts its time; one that is over says when it starte
   assert.equal(attemptLine({ count: 0, latest: null }, false, now), null);
 });
 
+test('an attempt that is over says how long it took, once the record keeps when it ended', () => {
+  const now = Date.parse('2026-09-13T01:00:00.000Z');
+  const startedAt = '2026-09-13T00:30:00.000Z';
+  const endedAt = '2026-09-13T00:59:04.000Z';
+  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt, reason: 'harness' } }, false, now), '#1 · 29m 04s');
+  // Ended, and the step still live behind it — between attempts: the attempt shown took what it took.
+  assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: 'failed', endedAt, reason: 'exit' } }, true, now), '#2 · 29m 04s');
+  // Still running: the time counts, whatever the record says of an end it has not got.
+  assert.equal(attemptLine({ count: 3, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now), '#3 · 30m 00s');
+  // An old record, over and with no end: no clock to stop, so it says when it started.
+  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now), '#1 · started 30m 00s ago');
+});
+
 test('an edge is complete only when both of its ends are done', () => {
   const edges = edgesOf([
     { name: 'implement', after: [], state: 'done' },

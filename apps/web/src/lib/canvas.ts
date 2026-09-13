@@ -25,16 +25,19 @@ export function duration(ms: number): string {
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
- * `#<attempts> · <elapsed>` for a step's latest attempt, or null before its first.
+ * `#<attempts> · <time>` for a step's latest attempt, or null before its first.
  *
- * Elapsed counts only while the attempt runs. Once it is over the api has no end time to stop the
- * clock at — the engine's view does not keep one — so it says how long ago the attempt started.
+ * While the attempt runs, the time counts. Once it is over, the time is how long it took, from its
+ * start to its end. A record from before the engine kept the end has no clock to stop, so it says how
+ * long ago the attempt started instead.
  */
 export function attemptLine(attempts: StepAttempts, live: boolean, now: number): string | null {
   const { count, latest } = attempts;
   if (!latest) return null;
-  const since = duration(now - Date.parse(latest.startedAt));
-  return latest.ended === null && live ? `#${count} · ${since}` : `#${count} · started ${since} ago`;
+  const started = Date.parse(latest.startedAt);
+  if (latest.ended === null && live) return `#${count} · ${duration(now - started)}`;
+  if (latest.endedAt) return `#${count} · ${duration(Date.parse(latest.endedAt) - started)}`;
+  return `#${count} · started ${duration(now - started)} ago`;
 }
 
 export type CanvasEdge = { id: string; source: string; target: string; complete: boolean };

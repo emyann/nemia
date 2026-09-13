@@ -247,7 +247,8 @@ export const mcpRefuses = (mcp: unknown): string | undefined => {
  * named, it stops the CLI before a session exists ("MCP config is not a valid JSON", 2.1.270).
  */
 export const checkoutMcpConfig = (cwd: string): string | undefined => {
-  const file = path.join(cwd, '.mcp.json');
+  // Absolute: Claude Code resolves the flag's path from inside the cwd, so `repo` would name repo/repo.
+  const file = path.resolve(cwd, '.mcp.json');
   let text: string;
   try {
     if (!fs.statSync(file).isFile()) return undefined;
@@ -268,7 +269,8 @@ export const writeMcpConfig = (file: string, mcp: SpawnRequest['mcp']): string |
   if (!mcp || !Object.keys(mcp).length) { fs.rmSync(file, { force: true }); return undefined; }
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ mcpServers: mcp }), { mode: 0o600 });
-  return file;
+  // Absolute for the same reason as the checkout's: a root given relative is relative to the engine.
+  return path.resolve(file);
 };
 
 /**

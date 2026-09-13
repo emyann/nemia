@@ -192,3 +192,21 @@ test('codex quotes every name and value as TOML, and the override comes before `
   assert.ok(at < args.indexOf('resume'), 'before resume, which rejects flags after its id');
   assert.equal(args.at(-1), 'the prompt');
 });
+
+test('a relative cwd or root still names each config by an absolute path — Claude resolves the flag inside the cwd', async () => {
+  const was = process.cwd();
+  const bin = fakeBin();
+  process.chdir(tmp('parent'));
+  try {
+    const here = process.cwd();
+    fs.mkdirSync('repo');
+    fs.writeFileSync(path.join('repo', '.mcp.json'), '{"mcpServers":{}}');
+    await onPath(bin, () => Effect.runPromise(
+      claudeOps({ root: 'board' }).spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: 'repo', mcp: { a: { command: 'x' } } }),
+    ));
+    const { configs } = mcpConfigsOf(argvIn(path.join(bin, 'claude.argv')));
+    assert.deepEqual(configs, [path.join(here, 'repo', '.mcp.json'), path.join(here, 'board', 'mcp', 'ae_t_1.json')]);
+    // What Claude Code does with each: resolve it from inside the session's cwd.
+    for (const c of configs) assert.ok(fs.existsSync(path.resolve(here, 'repo', c)), `${c} is found from inside repo`);
+  } finally { process.chdir(was); }
+});

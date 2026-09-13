@@ -5,10 +5,9 @@ today, what the feature has to settle, and what earlier work already taught abou
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
 State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
-outputs (package J), a step's files directory with `workflows/ui/` (U1), and a browser for every
-Claude step (the repository's `.mcp.json`) have shipped.
-outputs (package J), a step's files directory with `workflows/ui/` (U1), and a worktree's own
-`node_modules` with `.worktreeinclude` have shipped.
+outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
+step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`, and
+trying a step again with `retries:` and `wf retry` (§4 F) have shipped.
 
 ## Shipped: the check
 
@@ -22,11 +21,7 @@ closeout it was asked for is `unsigned` and files nothing; failed and stopped st
 
 What it leaves for wave 2 of the plan, in its order:
 
-- **Retries** (§4 F). `retries:` is parsed, and nothing acts on it: a refused check goes to the person at
-  `wf decide`. Next, `retries: n` re-files the step with the verdict as data — the command, the exit
-  code, both tails, "do not weaken it" — and `wf retry <run> <step>` does the same on a person's word,
-  through an ask file. `steps[name].check` becomes `steps[name].tries[]`, and the derived ids
-  (`<run>-<step>-try2`, `…-try2-check`) keep a crashed pass adoptable.
+- **Retries** (§4 F). Shipped: *Shipped: trying again*, below.
 - **The decider screen** (§4 G): what a branch touched, grouped; the full diff of check-affecting files
   such as `package.json`; whether a lesson was written where the next agent reads.
 - **Rounds** (§4 H) — section 1 below.
@@ -113,6 +108,7 @@ What it leaves:
 - **Two browser builds.** No `@playwright/mcp` release pins the e2e's playwright 1.62.1 (Chromium 1234),
   so 0.0.80 brings its own 1.63.0 alpha (Chromium 1243). Each is installed once per machine; CLAUDE.md
   gives both commands.
+
 ## Shipped: a worktree's own `node_modules`, and `.worktreeinclude`
 
 A worktree the run cuts no longer links the main checkout's whole `node_modules`. Through that link a
@@ -160,6 +156,49 @@ What it leaves:
   root of the repository. Patterns would need `git ls-files --others --ignored` and a matcher.
 - **Worktrees cut before this keep their link.** `provisionDeps` leaves a `node_modules` that is a link
   alone (`shared`), and nothing re-provisions a worktree after its cut.
+
+## Shipped: trying again — `retries:` and `wf retry`
+
+A step whose check did not pass can now be tried again without hand surgery. Before, the only remedy for
+a check that refused for a reason that was not the code was editing the engine's journal and the run's
+record with the daemon stopped. That happened four times on 2026-09-13 (plan §4b: a parallel-turbo flake, a
+leaked `WF_STDERR`, a missing package, and three checks the harness killed for "low memory" with 16 GB free).
+
+- `retries: n` re-files a step its check **refused** (settled `failed`, with an exit code), up to `n` times.
+  The step's own last session is continued, and its brief carries the verdict as data: the command, the exit,
+  both tails, and "do not weaken it".
+- A check that **did not finish** (`stopped`, or `failed` without an exit code) spends no try. It waits on
+  the person, and `wf decide` offers `wf retry <run> <step> --recheck`.
+- `wf retry <run> <step> [--nudge | --fresh | --model <m> | --recheck]` writes `runs/<id>.asks/retry-<step>-<n>`
+  exclusively. The next tick honours it once and moves it into `done/`.
+- `steps[name].taskId` and `.check` stay the current try's, and the tries before go under `steps[name].tries`.
+  The derived ids (`<run>-<step>-try<n>`, `…-try<n>-check`) let the next pass adopt a try a crashed pass filed.
+
+`wf ls` puts the try beside a step's line (`note`) and never in its word, so the board's vocabulary is
+unchanged. The README section *Trying again* is the account.
+
+What it leaves:
+
+- **The board does not see asks or tries.** `apps/api` calls `assess` and `listing` without the ask files or
+  a verdict per step. Its `moving` ignores a try that is due, its `waitingOnYou` still names a step whose retry
+  was asked for, and `note` is not in its payload. That is one argument each in `judge`, plus a verb on the
+  board if a person should be able to ask from there.
+- **An ask carries no message.** A nudge tells the step what happened, not what the person wants done
+  differently. That is plan §4b's *steering by message*: the same file shape, with text the tick composes into
+  the brief.
+- **The refused check's litter is in the workspace when the next try starts.** The new try's hand-off commits
+  whatever the suite left that git does not ignore, under the step's name. A clean-up would be destructive,
+  so nothing does one.
+- **A try shares its step's files directory.** The last try's screenshots stay beside the new try's until they
+  are overwritten, and `wf decide` lists them all.
+- **Two readings of one verdict.** The tick tells a refusal by the exit code the engine recorded, so no log is
+  read per pass. `wf ls` and `wf decide` read the log's `[wf check] exit N`. They agree while the check prints
+  the code it exits with. A record from before the engine kept exit codes reads as "did not finish" to the
+  tick, so it offers `--recheck` rather than spending a retry.
+- **The engine's deadline is `failed`, not `stopped`.** A check stopped at its deadline settles `failed` with
+  no exit code, so the missing exit code, not the phase, is what says it did not finish.
+- **`bin/wf.ts` exits 1 on every error**, including the verbs' refusals, which set `exitCode` 2.
+- **No `retries:` on this repository's workflows.** A flaky suite would spend a whole session on a nudge.
 
 ## 1. Rounds
 

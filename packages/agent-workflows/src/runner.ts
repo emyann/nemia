@@ -11,14 +11,15 @@ import os from 'node:os';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 'agent-engine';
-import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type Verdict } from './check.ts';
+import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check.ts';
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 
 export { verdictWord } from './check.ts';
-export { artifactLines, outputLines } from './run.ts';
+export { artifactLines, dueNote, outputLines, tryNote } from './run.ts';
+export type { Retry, RetryAsk, RetryMode } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
 import { artifactPlace, type ArtifactFile } from './run.ts';
-import { assess, cancelPlan, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, stepStatus, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, parseCloseout, retriesDue, retryLines, retryRefusal, spentAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryMode, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -75,6 +76,81 @@ export const markCancelled = (id: string): string => {
     return fs.readFileSync(cancelFile(id), 'utf8').trim() || at;
   }
 };
+
+/**
+ * A person's `wf retry`, in files of its own: `runs/<id>.asks/retry-<step>-<n>`, one per try asked for.
+ *
+ * For the reason a cancellation has its own file: the run's json has one writer, the tick, and a verb typed
+ * while `wf up` runs must not be a second. The verb creates the ask, whole and exclusively, and never touches
+ * it again. Every pass reads the directory, and once the run's record holds the try an ask names, the tick
+ * moves the file into `done/` — consumed, never edited. Naming the try is what makes an ask honoured once: a
+ * pass that dies after filing the try and before consuming the ask files nothing more, because the next pass
+ * finds the try on the board (`adoptTries`) or on the record (`spentAsks`).
+ */
+const asksDir = (id: string) => path.join(runsDir(), `${id}.asks`);
+export const askFile = (id: string, step: string, n: number): string => path.join(asksDir(id), `retry-${step}-${n}`);
+
+/** The asks waiting in a run's directory, and a line for each file there that names a retry and cannot be read as one. */
+export function readAsks(id: string): { asks: RetryAsk[]; notes: string[] } {
+  const asks: RetryAsk[] = [];
+  const notes: string[] = [];
+  let names: string[];
+  try {
+    names = fs.readdirSync(asksDir(id), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
+  } catch { return { asks, notes }; }
+  for (const name of names) {
+    // Anything else is not an ask: the file the verb writes before linking it into place starts with a dot.
+    const named = /^retry-(.+)-(\d+)$/.exec(name);
+    if (!named) continue;
+    const ask = askIn(path.join(asksDir(id), name), named[1]!, Number(named[2]));
+    if (typeof ask === 'string') notes.push(`${path.join(asksDir(id), name)}: ${ask}, so it is not honoured — remove it, and ask with wf retry`);
+    else asks.push(ask);
+  }
+  return { asks, notes };
+}
+
+/** One ask file, read: the step and the try from its name, how and when from what it holds — or why it cannot be read. */
+function askIn(file: string, step: string, n: number): RetryAsk | string {
+  let held: unknown;
+  try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  const { mode, model, at } = (held && typeof held === 'object' ? held : {}) as Record<string, unknown>;
+  if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') return `it asks for no mode wf retry knows (${JSON.stringify(mode)})`;
+  if (model !== undefined && (typeof model !== 'string' || !model)) return 'its model is not a name';
+  return { step, try: n, mode, ...(model ? { model: model as string } : {}), at: typeof at === 'string' ? at : '' };
+}
+
+/**
+ * Write a person's ask, whole and exclusively: into a file of its own, then linked to its name. `link` refuses a
+ * name that exists, as `wx` does, and unlike `wx` leaves no moment in which the tick can read an ask that has
+ * been created and not yet written. False when an ask for that try was already there.
+ */
+function writeAsk(id: string, ask: RetryAsk): boolean {
+  const file = askFile(id, ask.step, ask.try);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const whole = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${Date.now()}`);
+  fs.writeFileSync(whole, `${JSON.stringify(ask, null, 2)}\n`, { flag: 'wx' });
+  try {
+    fs.linkSync(whole, file);
+    return true;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    throw err;
+  } finally {
+    fs.rmSync(whole, { force: true });
+  }
+}
+
+/** Move each ask the run's record already answers into `done/`. The tick's one touch on a person's file, and never an edit. */
+function consumeAsks(run: Run, asks: readonly RetryAsk[]): void {
+  for (const ask of spentAsks(run, asks)) {
+    const file = askFile(run.id, ask.step, ask.try);
+    const done = path.join(asksDir(run.id), 'done', path.basename(file));
+    try {
+      fs.mkdirSync(path.dirname(done), { recursive: true });
+      fs.renameSync(file, done);
+    } catch { /* already moved, by a pass beside this one */ }
+  }
+}
 
 export const listRuns = (): Run[] =>
   fs.existsSync(runsDir())
@@ -181,9 +257,58 @@ async function adoptChecks(
   return adopted;
 }
 
+/**
+ * Tries a pass filed and never wrote down, put back on the record — in memory, as `adoptChecks` does, and
+ * before anything asks what is in flight, for the same reason: a run cancelled in that window files no more
+ * tries, so a try filed in it would otherwise never be adopted, nor stopped.
+ *
+ * Looked for only where a try is due (`retriesDue`, cancelled or not): an ask for the step's next try, or a
+ * refused check `retries:` covers. A run waiting on a person with nothing asked costs no look.
+ */
+async function adoptTries(
+  e: Engine,
+  run: Run,
+  steps: readonly Workflow[],
+  views: Map<string, TaskView>,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+  asked: (taskId: string) => boolean,
+  verdictOf: (step: string) => Verdict | undefined,
+  asks: readonly RetryAsk[],
+): Promise<string[]> {
+  const adopted: string[] = [];
+  for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks)) {
+    const taskId = r.mode === 'recheck' ? checkTaskId(run, r.step, r.try) : stepTaskId(run, r.step, r.try);
+    const view = await e.view(taskId);
+    if (!view.state.brief) continue;   // not filed: due, and this pass's to file
+    views.set(taskId, view);
+    const record = run.steps[r.step]!;
+    run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : nextTry(record, r, taskId);
+    adopted.push(r.step);
+  }
+  return adopted;
+}
+
 /** Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing. */
 const closeoutAsked =(views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
   Boolean(views.get(taskId)?.state.closeoutSchema);
+
+/**
+ * What each step's current check exited with, off the engine's record: the code its process gave, or
+ * `unfinished` when it gave none — killed by a signal, stopped, or never started. What the tick tells a refusal
+ * from a check that did not finish by (`refusedCheck`), without reading a log: a run waiting on a person costs
+ * no more each pass. The check prints the code it exits with, so this and the log's `[wf check] exit N` agree.
+ */
+const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string): Verdict | undefined => {
+  const taskId = run.steps[step]?.check?.taskId;
+  const last = taskId ? views.get(taskId)?.state.attempts.at(-1) : undefined;
+  if (!last) return undefined;
+  return typeof last.exitCode === 'number' ? last.exitCode : 'unfinished';
+};
+
+/** The harness's own id for a task's last session — what `--resume` takes. */
+const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string): string | undefined =>
+  views.get(taskId)?.state.attempts.at(-1)?.nativeId ?? undefined;
 
 /**
  * Where a check's stderr goes: beside the run records, outside every workspace — a file inside one
@@ -468,6 +593,14 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
       `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
     ), { exitCode: 2 });
   }
+  // Nor for another step's try: any step may be tried again, as `<step>-try<n>`, its check as `<step>-try<n>-check`.
+  const tryClash = steps.map((s) => ({ s, of: /^(.+)-try\d+(?:-check)?$/.exec(s.name)?.[1] })).find(({ of }) => of && steps.some((other) => other.name === of));
+  if (tryClash) {
+    const { s, of } = tryClash;
+    throw Object.assign(new Error(
+      `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
+    ), { exitCode: 2 });
+  }
   const isolate = opts.isolate ?? true;
   // Refused here, where a person is looking, rather than line by line in a daemon's log. Only a run that
   // cuts worktrees reads the file.
@@ -516,11 +649,12 @@ function handOff(workspace: string, step: string): void {
 }
 
 /**
- * One pass's work: the steps it filed, the steps whose checks it filed, and where the run stands — and
- * `notes`, what cutting a worktree had to say, each line starting with its step: a path `.worktreeinclude`
- * lists that the main checkout does not have, a line it refused, an `npm ci` that ran or failed.
+ * One pass's work: the steps it filed, the steps whose checks it filed, the steps it tried again, and where the
+ * run stands — and `notes`, each line starting with its step: what cutting a worktree had to say (a path
+ * `.worktreeinclude` lists that the main checkout does not have, a line it refused, an `npm ci` that ran or
+ * failed), each try filed and on whose word, and an ask file that cannot be read.
  */
-export type Advanced = { run: Run; filed: string[]; checked: string[]; status: Assessment['status']; blocked: string[]; notes: string[] };
+export type Advanced = { run: Run; filed: string[]; checked: string[]; tried: string[]; status: Assessment['status']; blocked: string[]; notes: string[] };
 
 /**
  * One pass over one run: tick the engine, then file whatever became ready.
@@ -535,6 +669,10 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   const { views, phaseOf } = await taskPhases(e, run);
   const signedOff = closeoutReader(views, run);
   const asked = closeoutAsked(views);
+  const verdictOf = exitVerdicts(views, run);
+  // A person's word, read on every pass: an ask made while this pass was elsewhere is read by the next.
+  const { asks, notes: askNotes } = readAsks(run.id);
+  const adoptedTries = await adoptTries(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks);
   const adopted = await adoptChecks(e, run, steps, views, phaseOf, signedOff, asked);
 
   // A cancelled run is enforced by every pass, not only by the verb that cancelled it.
@@ -567,14 +705,62 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // work in progress — is committed under this step's name (`handOffDue`).
   for (const name of handOffDue(steps, run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
 
-  const { ready, check, blocked, status } = assess(steps, run, phaseOf, signedOff, asked);
+  const { ready, check, retry, blocked, status } = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks);
+
+  // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
+  // workspace and on the branch it had, under its next try's derived id, and the try it replaces moves behind
+  // it on the record. Nothing about the engine changes: to it, this is one more task.
+  const tried: string[] = [];
+  const rechecked: string[] = [];
+  const notes: string[] = [...askNotes];
+  for (const r of retry) {
+    const step = steps.find((s) => s.name === r.step)!;
+    const record = run.steps[r.step]!;
+    tried.push(r.step);
+    notes.push(`${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : `wf retry ${modeWord(r)}`}`);
+    // A recheck files no session. Its check is filed below with the others, under the new try's id.
+    if (r.mode === 'recheck') {
+      run.steps[r.step] = nextTry(record, r);
+      rechecked.push(r.step);
+      continue;
+    }
+
+    const taskId = stepTaskId(run, r.step, r.try);
+    // A try an earlier pass filed and never wrote down was adopted above. Looked up once more all the same,
+    // as a check is: filing an id the engine already holds would journal it twice.
+    if (!(await e.view(taskId)).state.brief) {
+      const files = artifactsDir(run, r.step);
+      fs.mkdirSync(files, { recursive: true });
+      // A nudge continues the last try's session. With none to continue — a session the harness never
+      // reported — the try starts a new one, and its brief says so.
+      const resumeFrom = r.mode === 'nudge' ? sessionIn(views, record.taskId!) : undefined;
+      // What the check said, as data in the brief: the frozen command, its exit, and both tails.
+      const refusal = record.check && step.check ? await refusalOf(e, step.check, record.check.taskId) : undefined;
+      await e.file({
+        id: taskId,
+        brief: composeBrief(step, run, steps, signedOff, files, undefined, {
+          try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), resumed: Boolean(resumeFrom),
+          status: stepStatus(step, run, phaseOf, signedOff, asked), ...(refusal ? { refusal } : {}),
+        }),
+        cwd: record.workspace ?? run.workspace,
+        harness: step.harness,
+        model: r.model ?? step.model,
+        permissionMode: step.permissionMode,
+        deadlineSeconds: step.deadlineSeconds,
+        maxAttempts: step.maxAttempts,
+        resumeFrom,
+        closeoutSchema: closeoutSchemaOf(step),
+      });
+    }
+    run.steps[r.step] = nextTry(record, r, taskId);
+  }
 
   // The fact the run establishes for itself: each signed step's `check:`, executed where the work is.
   // An engine task on the `check` harness, so it outlives this pass, has a deadline, and is stopped
   // by a cancel like anything else. Nothing is ready on it in this pass — a follower waits for the
   // check to SETTLE, on a later one.
   const checked: string[] = [];
-  for (const name of check) {
+  for (const name of [...check, ...rechecked]) {
     const step = steps.find((s) => s.name === name)!;
     const workspace = run.steps[name]!.workspace ?? run.workspace;
     const taskId = checkTaskId(run, name);
@@ -613,7 +799,6 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   };
 
   const filed: string[] = [];
-  const notes: string[] = [];
   for (const name of ready) {
     const step = steps.find((s) => s.name === name)!;
     const place = await workspaceFor(run, steps, step);
@@ -627,7 +812,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       // A person scanning their sessions then sees which run and which step, and two steps of one
       // run share a prefix — which is what makes a resumed step legible as a continuation rather
       // than a duplicate.
-      id: `${run.id}-${name}`,
+      id: stepTaskId(run, name),
       // What the steps it reads declared, if it names any in `input:` — read off the same closeouts the
       // assessment that made it ready just read, so it is handed what it was filed on.
       // And, when the run installed its `node_modules` or could not, why its start was slow or what to run.
@@ -649,9 +834,12 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
-  if (filed.length || checked.length || adopted.length) writeRun(run);
+  if (filed.length || checked.length || tried.length || adopted.length || adoptedTries.length) writeRun(run);
+  // After the record is written, never before: an ask is consumed once the record holds its try — this pass's,
+  // or one a pass that died before consuming it wrote down.
+  consumeAsks(run, asks);
 
-  return { run, filed, checked, status, blocked, notes };
+  return { run, filed, checked, tried, status, blocked, notes };
 }
 
 export type Cancelled = { run: Run; plan: CancelPlan };
@@ -680,11 +868,14 @@ export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
-  // A check filed by a pass that died before writing the run down is in flight too. Found here so the
-  // verb stops it at once; on the record only in memory, because this verb never writes the run.
+  // A check or a try filed by a pass that died before writing the run down is in flight too. Found here so
+  // the verb stops it at once; on the record only in memory, because this verb never writes the run.
+  const { asks } = readAsks(id);
+  const verdictOf = exitVerdicts(views, run);
+  await adoptTries(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks);
   await adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views));
 
-  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views));
+  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks);
   if (plan.kind === 'finished') return { run, plan };
 
   for (const { taskId } of plan.stop) await e.stop(taskId);
@@ -716,7 +907,32 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
   // Only a refused check's log is read here: its exit code is the one number on its line.
   const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
   return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name),
-    closeoutAsked(views), (name) => refused.get(name)?.verdict);
+    closeoutAsked(views), (name) => refused.get(name)?.verdict, readAsks(run.id).asks);
+}
+
+export type Asked = { run: Run; ask: RetryAsk; file: string };
+
+/**
+ * Ask for another try of a step — `wf retry` — by writing the ask, and nothing else. The next tick honours it once.
+ *
+ * Refused before anything is written, with what to do instead (`retryRefusal`): a step that is not waiting on a
+ * person, a cancelled run, an ask for that try already there. Like a cancellation, the ask is the person's own
+ * file, and the verb never writes the run's json, which the tick owns.
+ */
+export async function retry(e: Engine, id: string, stepName: string, how: { mode: RetryMode; model?: string }): Promise<Asked> {
+  const run = readRun(id);
+  const steps = stepsOf(run);
+  const { views, phaseOf } = await taskPhases(e, run);
+  const refusal = (asks: readonly RetryAsk[]) =>
+    retryRefusal(steps, run, stepName, how, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks);
+  const refuse = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
+
+  const refused = refusal(readAsks(id).asks);
+  if (refused) refuse(refused);
+  const ask: RetryAsk = { step: stepName, try: tryOf(run, stepName) + 1, mode: how.mode, ...(how.model ? { model: how.model } : {}), at: new Date().toISOString() };
+  // Someone asked in the moment since the look above: said as the look would have said it.
+  if (!writeAsk(id, ask)) refuse(refusal(readAsks(id).asks) ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
+  return { run, ask, file: askFile(id, stepName, ask.try) };
 }
 
 /**
@@ -740,16 +956,15 @@ async function checkReports(
   for (const step of steps) {
     const taskId = run.steps[step.name]?.check?.taskId;
     if (!taskId || !step.check || !want(phaseOf(taskId))) continue;
-    const log = await e.logs(taskId);
-    reports.set(step.name, {
-      command: step.check,
-      passed: phaseOf(taskId) === 'succeeded',
-      verdict: readVerdict(log),
-      stdout: stdoutTail(log),
-      stderr: lastLines(tailOf(checkStderr(taskId))),
-    });
+    reports.set(step.name, { passed: phaseOf(taskId) === 'succeeded', ...(await refusalOf(e, step.check, taskId)) });
   }
   return reports;
+}
+
+/** What a check said, off its log and its stderr file: the verdict, and the last lines of each stream. */
+async function refusalOf(e: Engine, command: string, taskId: string): Promise<CheckRefusal> {
+  const log = await e.logs(taskId);
+  return { command, verdict: readVerdict(log), stdout: stdoutTail(log), stderr: lastLines(tailOf(checkStderr(taskId))) };
 }
 
 /** The end of a file that may be large, or absent — a check stopped before it started wrote none. */
@@ -893,13 +1108,27 @@ export async function decide(e: Engine, id: string): Promise<{
   closeouts: Record<string, Closeout | { error: string } | undefined>;
   /** Every settled check, by step: what the run's own fact about the step says. */
   checks: Record<string, CheckReport>;
+  /** The tries the next tick files: asked for, or covered by `retries:`. */
+  retrying: Retry[];
+  /** For each step a person may try again, the `wf retry` that does it (`retryLines`). */
+  offers: string[];
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   const checks = Object.fromEntries(await checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped'));
-  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run), closeoutAsked(views)), closeouts, checks };
+  const { asks } = readAsks(id);
+  const reader = closeoutReader(views, run);
+  const asked = closeoutAsked(views);
+  // The verdict the screen prints, off the log: a refusal and a check that did not finish, told apart by it.
+  const verdictOf = (name: string) => checks[name]?.verdict;
+  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks);
+  return {
+    run, decision: d, closeouts, checks,
+    retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks),
+    offers: retryLines(steps, run, d, phaseOf, reader, asked),
+  };
 }
 
 export function resultBranches(run: Run): string[] {

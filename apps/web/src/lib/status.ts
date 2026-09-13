@@ -1,32 +1,78 @@
 /**
  * What a step's status means for the person looking at it.
  *
- * The words are `wf ls`'s and the board shows them as they are; this only chooses the colour.
- * `cancelled` is a fact about the run rather than the step: a step that has not started on a run
- * somebody called off never will, and a step the cancellation stopped reads `stopped`.
+ * The words are `wf ls`'s — what the run established, not only what the engine settled — and the board
+ * shows them as they are; this only chooses the colour. `cancelled` is a fact about the run rather than
+ * the step: a step that has not started on a run somebody called off never will, and a step the
+ * cancellation stopped reads `stopped`.
  */
-export type StepState = 'working' | 'needs-human' | 'done' | 'blocked' | 'failed' | 'waiting' | 'cancelled' | 'unknown';
+export type StepState =
+  | 'working'
+  | 'needs-human'
+  | 'checking'
+  | 'verified'
+  | 'unverified'
+  | 'blocked'
+  | 'unsigned'
+  | 'failed'
+  | 'failed-check'
+  | 'waiting'
+  | 'cancelled'
+  | 'unknown';
 
 export function stepState(status: string, runCancelled: boolean): StepState {
   // `succeeded · BLOCKED`: the session ended cleanly, and the step is waiting on a person.
-  const [phase = '', said] = status.split(' · ');
+  const [word = '', said] = status.split(' · ');
   if (said === 'BLOCKED') return 'blocked';
-  if (phase === 'needs-human') return 'needs-human';
-  if (phase === 'failed') return 'failed';
-  if (phase === 'stopped') return 'cancelled';
-  if (phase === 'succeeded') return 'done';
-  if (phase === 'unknown') return 'unknown';
-  if (phase === 'waiting' || phase === 'pending') return runCancelled ? 'cancelled' : 'waiting';
+  // The run's own verdict on a signed step: its check exited 0, is running, or did not exit 0.
+  if (word === 'verified ✓') return 'verified';
+  if (word === 'checking') return 'checking';
+  if (word.startsWith('failed ✗ check')) return 'failed-check';
+  // Signed off, with no `check:` to run: nothing but its own word says it worked.
+  if (word === 'unverified') return 'unverified';
+  // Ended without the closeout it was asked for.
+  if (word === 'unsigned') return 'unsigned';
+  if (word === 'needs-human') return 'needs-human';
+  if (word === 'failed') return 'failed';
+  if (word === 'stopped') return 'cancelled';
+  // The engine's word for a session that ended, which is not work that was done: at most its own word.
+  if (word === 'succeeded') return 'unverified';
+  if (word === 'unknown') return 'unknown';
+  if (word === 'waiting' || word === 'pending') return runCancelled ? 'cancelled' : 'waiting';
   // `running (working)`, `working (quiescent)`, `starting`, `between attempts`.
   return 'working';
 }
 
+/** Final, and a follower may be filed on it — `satisfiesAfter` in agent-workflows: verified, or done on its own word. */
+export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified';
+
+/** What each state means, for a person who hovers over a chip. */
+export const stateMeaning: Record<StepState, string> = {
+  working: 'working: its session is running',
+  'needs-human': 'needs a person: its session is asking',
+  checking: 'checking: it signed off, and the run is running its check',
+  verified: 'verified: its check exited 0',
+  unverified: 'unverified: it signed off and has no check, so only its own word says it worked',
+  blocked: 'blocked: it signed off without finishing, and needs a person',
+  unsigned: 'unsigned: it ended without the closeout it was asked for',
+  failed: 'failed: its session failed',
+  'failed-check': 'failed its check: the command the run judges it by did not exit 0',
+  waiting: 'waiting: not filed yet',
+  cancelled: 'cancelled: the run was called off',
+  unknown: 'unknown: the engine has no record of its task',
+};
+
 export const stateClass: Record<StepState, string> = {
   working: 'bg-sky-100 text-sky-800 dark:bg-sky-950 dark:text-sky-300',
   'needs-human': 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300',
-  done: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+  checking: 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300',
+  verified: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300',
+  // Neutral, not green: nothing checked it. `StatusChip` marks it too, so it does not pass for a step still to do.
+  unverified: 'bg-neutral-100 text-neutral-700 ring-1 ring-neutral-300 ring-inset dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-600',
   blocked: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
+  unsigned: 'bg-amber-50 text-amber-800 ring-1 ring-amber-400 ring-inset dark:bg-amber-950/50 dark:text-amber-300 dark:ring-amber-700',
   failed: 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300',
+  'failed-check': 'bg-red-100 font-semibold text-red-800 ring-1 ring-red-300 ring-inset dark:bg-red-950 dark:text-red-300 dark:ring-red-800',
   waiting: 'bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300',
   cancelled: 'bg-neutral-100 text-neutral-500 line-through dark:bg-neutral-900 dark:text-neutral-500',
   unknown: 'border border-dashed border-neutral-300 text-neutral-500 dark:border-neutral-700',

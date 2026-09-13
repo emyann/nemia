@@ -4,7 +4,7 @@ import { stepLogQuery, type RunDetail } from '../lib/api';
 import { duration, isLive } from '../lib/canvas';
 import { stepState, type StepState } from '../lib/status';
 import { cn } from '../lib/utils';
-import { code, Facts, specRows, Told, when } from './Facts';
+import { Check, code, Facts, specRows, Told, when } from './Facts';
 import { StatusChip } from './StatusChip';
 
 type Step = RunDetail['steps'][number];
@@ -113,6 +113,7 @@ function Details({ step, state, runCancelled }: { step: Step; state: StepState; 
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
         ]}
       />
+      {step.check && <Check check={step.check} />}
       {spec ? (
         <section className="space-y-1">
           <h3 className="text-xs font-medium text-neutral-500">Spec</h3>

@@ -41,6 +41,13 @@ async function sidebar(page: Page): Promise<void> {
   await expectVisible(menu.getByRole('link', { name: 'Runs' }), 'the sidebar has Runs');
 }
 
+/** Finished runs on the Factory's floor too. Off by default, on every visit. */
+async function showFinished(page: Page): Promise<void> {
+  const toggle = page.getByRole('switch', { name: 'Show finished' });
+  await expectVisible(toggle, 'the Factory has a Show finished switch');
+  await toggle.click();
+}
+
 /** The fake run on the Factory: its card, its step nodes, and both together. */
 function onTheFloor(page: Page): { card: Locator; steps: Locator; run: Locator; step: (name: string) => Locator } {
   const card = `.react-flow__node[data-id="${FAKE.id}"]`;
@@ -83,10 +90,24 @@ const PAGES: PageSpec[] = [
       await expectVisible(floor, 'the Factory canvas');
       const { card, steps, run, step } = onTheFloor(page);
       const beside = page.locator(`.react-flow__node[data-id="${NEIGHBOUR.id}"]`);
-      await expectVisible(card, `the fake run's card on the Factory (${FAKE.id})`);
+      // The review's case: a run `assess` calls failed, with a session of it still running, is in flight.
+      await expectVisible(beside, `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`);
+      await expectVisible(beside.getByText(/since it started$/), 'its card counts the time since it started, as a card in flight does');
+      await settled(page);
+
+      // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight.
+      // Its followers read `waiting`, and will for ever; they do not keep it on the floor.
+      await expectCount(card, 0, `a run whose check refused is finished, not in flight: no card on the floor by default (${FAKE.id})`);
+      await expectVisible(page.getByText('1 in flight · 1 finished · 1 waiting on you'), 'the Factory counts it finished, and waiting on you');
+      await showFinished(page);
+      await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
+      await expectVisible(card.getByText(/^started .+ ago$/), 'the card reads finished: when it started, not a clock still counting');
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
       await expectVisible(card.locator(`a[href="/runs/${FAKE.id}"]`), "the card's title links to the run's page");
-      await expectVisible(beside, `the run started after it has the card beside it (${NEIGHBOUR.id})`);
+      await expectVisible(card.locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }), `the card shows ${FAKE.refused}'s refused check as a red chip`);
+
+      // Laid out again, oldest first: the fake run's card in the first cell, and the other run's in the cell beside it.
+      await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);
       await expectInside(card, floor, 'the card is on the floor');
       await expectCount(steps, 0, 'a closed card draws no step');
@@ -97,15 +118,29 @@ const PAGES: PageSpec[] = [
       await expectCount(steps, FAKE.steps.length, `the card opens into a node per step (${FAKE.steps.join(', ')})`);
       for (const name of FAKE.steps) await expectVisible(step(name), `the open run draws ${name}`);
       await expectVisible(step(FAKE.blocked).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate on the Factory`);
-      await expectCount(page.locator(`.react-flow__edge[data-id="${FAKE.id}/->${FAKE.first}"]`), 1, `one dashed edge from the card into ${FAKE.first}`);
-      await expectCount(page.locator('.react-flow__edge'), FAKE.edges + 1, "the run's edges, and the card's into its first step");
+      await expectVisible(
+        step(FAKE.refused).locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }),
+        `${FAKE.refused}, whose check refused, has a red chip`,
+      );
+      await expectVisible(
+        step(FAKE.unverified).locator('[data-state="unverified"]', { hasText: 'unverified · done' }),
+        `${FAKE.unverified}, signed off with no check, is marked unverified, not done`,
+      );
+      for (const first of FAKE.first) {
+        await expectCount(page.locator(`.react-flow__edge[data-id="${FAKE.id}/->${first}"]`), 1, `one dashed edge from the card into ${first}`);
+      }
+      await expectCount(page.locator('.react-flow__edge'), FAKE.edges + FAKE.first.length, "the run's edges, and the card's into each first step");
       await expectVisible(card.getByRole('button', { name: 'Hide steps' }), "the open card's chevron hides the steps");
       await expectApart(beside, run, 'the card beside it moves out from under the unfolded graph');
       await settled(page);
       await expectInside(run, floor, 'the open run, card and steps, is brought onto the screen');
 
       // Remembered in this browser: the next visit finds the run open.
-      await nextVisit(page, (again) => expectCount(onTheFloor(again).steps, FAKE.steps.length, 'the run is still open on the next visit'));
+      await nextVisit(page, async (again) => {
+        // Finished runs are shown by asking, on every visit; which runs are open is what this browser kept.
+        await showFinished(again);
+        await expectCount(onTheFloor(again).steps, FAKE.steps.length, 'the run is still open on the next visit');
+      });
 
       // Collapse all folds it away, and the chevron opens it again.
       await page.getByRole('button', { name: 'Collapse all' }).click();
@@ -134,6 +169,7 @@ const PAGES: PageSpec[] = [
       await expectVisible(card.getByRole('button', { name: 'Show steps' }), "after a reset the card's chevron shows the steps");
       await nextVisit(page, async (again) => {
         const next = onTheFloor(again);
+        await showFinished(again);
         // The chevron reads the open runs this browser kept as the page mounts, before any step is read.
         await expectVisible(next.card.getByRole('button', { name: 'Show steps' }), 'the next visit after a reset finds the run closed');
         await expectCount(next.steps, 0, 'the next visit after a reset draws no step');
@@ -150,6 +186,15 @@ const PAGES: PageSpec[] = [
       // The floor narrows for the inspector and brings the run back into view; judged once it has.
       await settled(page);
       await expectInside(run, floor, 'the run is on the floor beside the open inspector');
+
+      // The step whose check refused: its Details say what the check ran, what it exited with, and how its output ended.
+      await step(FAKE.refused).click();
+      const check = page.locator(`aside[aria-label="Step ${FAKE.refused}"] section[aria-label="Check"]`);
+      await expectVisible(check.getByText(FAKE.check, { exact: true }), `the inspector of ${FAKE.refused} shows its check's command (${FAKE.check})`);
+      await expectVisible(check.getByText('exit 1', { exact: true }), `the inspector of ${FAKE.refused} shows what its check exited with`);
+      await expectVisible(check.getByText(FAKE.said), `the inspector of ${FAKE.refused} shows the last lines of its check's output`);
+      await settled(page);
+      await expectInside(run, floor, `the run is on the floor beside ${FAKE.refused}'s inspector`);
     },
   },
   {
@@ -159,7 +204,8 @@ const PAGES: PageSpec[] = [
       await sidebar(page);
       const row = page.locator(`li a[href="/runs/${FAKE.id}"]`);
       await expectVisible(row, `the runs list has a row for ${FAKE.id}`);
-      await expectVisible(row.getByText(`waiting on you: ${FAKE.blocked}`), `the row says ${FAKE.blocked} is waiting on you`);
+      await expectVisible(row.getByText(`waiting on you: ${FAKE.waitingOnYou.join(', ')}`), `the row says ${FAKE.waitingOnYou.join(' and ')} are waiting on you`);
+      await expectVisible(row.locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }), `the row shows ${FAKE.refused}'s refused check as a red chip`);
     },
   },
   {
@@ -171,6 +217,8 @@ const PAGES: PageSpec[] = [
       await expectCount(graph.locator('.react-flow__node'), FAKE.steps.length, `the run's graph has a node per step (${FAKE.steps.join(', ')})`);
       for (const step of FAKE.steps) await expectVisible(graph.locator(`.react-flow__node[data-id="${step}"]`), `the graph has ${step}`);
       await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"]`).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate`);
+      await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.refused}"] [data-state="failed-check"]`), `${FAKE.refused}'s refused check is a red chip on the run's graph`);
+      await expectVisible(page.locator('section[aria-label="Check"]').getByText(FAKE.said), `the run's page shows how ${FAKE.refused}'s check's output ended`);
       await graph.locator('.react-flow__node[data-id="review"]').click();
       await expectVisible(page.locator('aside[aria-label="Step review"]'), 'the step inspector opens on a click on review');
       // The canvas narrows for the inspector and fits itself again; judged once it has.

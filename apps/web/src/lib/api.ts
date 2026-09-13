@@ -1,5 +1,8 @@
 import { queryOptions } from '@tanstack/react-query';
 
+/** Mirrors `RunStatus` in apps/api/src/app.ts: where `assess` puts the run. */
+export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
+
 /** Mirrors `RunSummary` in apps/api/src/app.ts. */
 export type RunSummary = {
   id: string;
@@ -7,7 +10,11 @@ export type RunSummary = {
   brief: string;
   createdAt: string;
   cancelledAt: string | null;
+  status: RunStatus;
+  /** Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file. */
+  moving: boolean;
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string }>;
+  /** Steps a person has to act on — blocked, unsigned, or refused by their check. Empty on a cancelled run. */
   waitingOnYou: string[];
 };
 
@@ -30,6 +37,15 @@ export type StepCloseout = {
   artifacts: string[];
 };
 
+/**
+ * Mirrors `StepCheck` in apps/api/src/app.ts: the command a step is judged by, from the workflow the run
+ * froze, and once its check refused, the exit in `wf ls`'s words and the end of each stream.
+ */
+export type StepCheck = {
+  command: string;
+  refused: { exit: string; stdout: StepLog; stderr: StepLog; unreadable: string | null } | null;
+};
+
 /** Mirrors `RunDetail` in apps/api/src/app.ts. */
 export type RunDetail = {
   id: string;
@@ -41,6 +57,8 @@ export type RunDetail = {
   isolate: boolean;
   createdAt: string;
   cancelledAt: string | null;
+  status: RunStatus;
+  moving: boolean;
   waitingOnYou: string[];
   warning: string | null;
   steps: Array<{
@@ -53,6 +71,8 @@ export type RunDetail = {
     branch: string | null;
     status: string;
     closeout: StepCloseout | null;
+    /** Null for a step with no `check:`. */
+    check: StepCheck | null;
     attempts: StepAttempts;
   }>;
 };

@@ -3,13 +3,18 @@
 A scheduler for agent sessions on your own machine. It does **one thing**: take a brief, run one
 agent session to completion, and let you follow it — surviving its own death while it happens.
 
-1,285 lines. The part you must read to understand it is `src/domain.ts`, and it is 180 of them.
+The part you must read to understand it is `src/domain.ts`, and `decide` in it is a screen long.
 
 ```bash
-npm test        # 25 tests, no money spent
+npm test                 # no money spent
+AE_LIVE=1 npm test       # adds the one test that runs a real Claude Code session, and spends some
 npm run typecheck
-node bin/ae.ts  # the verbs
+node bin/ae.ts           # the verbs
 ```
+
+`test/readme.test.ts` holds this file to the code: it fails when this README names an environment
+variable nothing reads, a file that does not exist, an `ae` verb the CLI lacks, or a count of tests
+or lines — and when a source file or a brief key goes unmentioned here.
 
 ## Where this stops
 
@@ -32,7 +37,8 @@ Definition of done — a closed list, and it is closed:
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
 change seems to belong in here, check it against the boundary above first: it almost certainly
-knows about a second workload.
+knows about a second workload. A knob on the workload — `model`, `tools`, `effort` — is a field
+carried on the task and read by a runner, never a callback into `decide`.
 
 ### The one real decision in here: resume policy
 
@@ -76,8 +82,8 @@ process here — the engine can be killed, upgraded or restarted at any point in
 
 Because we do not own the thing being leased. "Is it still running" is a question we *ask*
 (`observe`) rather than a claim we *hold*. That deletes the lease table, the renewal timer, the
-liveness probe, the expiry reclaim and the abort plumbing — about 800 lines in the version of this
-that tried to own the process.
+liveness probe, the expiry reclaim and the abort plumbing — most of the version of this that tried
+to own the process.
 
 ## Using it without Effect
 
@@ -115,9 +121,9 @@ Bring your own harness — three ways, in order of how much you have to write:
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
 | a `PromiseRunner` | four async methods, for anything else at all |
 
-**`src/cli.ts` imports `createEngine` and nothing else from the engine.** That is deliberate and
-it is the test: if the Promise API were not enough to write the CLI with, it would not be enough
-for anyone. `grep "from 'effect'" src/cli.ts` returns nothing.
+**`src/cli.ts` imports `createEngine`, and types, and nothing else from the engine.** That is
+deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
+not be enough for anyone. `grep "from 'effect'" src/cli.ts` returns nothing, and a test says so.
 
 The Effect API is still there under `agent-engine/effect` — `Layer` composition, typed error
 channels, the lot. Keep your `effect` version aligned with this package's if you use it: Context
@@ -158,15 +164,17 @@ That costs exactly one thing: **a heartbeat**. A worker that gets killed leaves 
 `working` forever, and nothing on disk tells that apart from a session thinking hard. So the worker
 beats every 5s and `observe` calls a stale beat dead — which is a lease, in the only form a lease
 has ever taken. It is the price of not having somebody else's registry to read, and therefore the
-price of running more than one harness. It is ~15 lines, because the engine already had a journal
-and a seam.
+price of running more than one harness. It is a handful of lines, because the engine already had a
+journal and a seam.
 
-**Adding a harness is a value, not code** — `HarnessSpec` is a command and an optional regex:
+**Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
+optionally the words it refuses:
 
 ```ts
 export const codex: HarnessSpec = {
   name: 'codex',
   command: (r) => ({ cmd: 'codex', args: ['exec', '--json', '-C', r.cwd, ..., r.brief] }),
+  refuses: (task) => /* a sentence when the task asks for a sandbox or effort Codex lacks */,
   nativeIdPattern: '"(?:thread_id|session_id)"\\s*:\\s*"([0-9a-f-]{16,})"',
 }
 ```
@@ -174,6 +182,80 @@ export const codex: HarnessSpec = {
 Exit 0 is success, anything else is failure. That is all a generic harness has to say, and it is
 enough. `decide` never learns that harnesses exist — adding all of this changed it by zero lines,
 which is the test of whether the seam was in the right place.
+
+## What a task may say, and what is refused
+
+A brief is markdown: `key: value` frontmatter, one line per key, and the body is the prompt. `#`
+after a space starts a comment. The keys are a closed list:
+
+| key | what |
+|---|---|
+| `cwd` | the directory the session works in; default, where you run `ae` |
+| `harness` | `claude` (default), `codex`, `claude-detached` |
+| `model` | the harness's model name |
+| `permissionMode` | the harness's own words — see below; default `auto` for Claude Code, `workspace-write` for Codex |
+| `maxAttempts` | a whole number from 1; default 1 |
+| `deadlineSeconds` | wall clock across all attempts, above 0; absent, no deadline |
+| `resume` | `interrupted` (default), `always`, `never` — the retry policy |
+| `resumeFrom` | a session id to continue, instead of starting cold |
+| `worktree` | `true`, `false`, or a name — the harness cuts it |
+| `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
+| `tools` | `Read, Grep, Glob` — the only tools the session has; see below |
+| `effort` | how hard the harness thinks, in its own words — see below |
+
+**Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
+refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
+the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
+of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
+and stop its task on the first pass), a `resume` that is not a policy, a `cwd` or schema file that
+is not there, and a brief with no prompt.
+
+**`file()` refuses the same values at the API**, so the CLI is not the only door that checks:
+a harness the engine does not have (it used to run on the fallback, silently), counts and seconds
+it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `tools` that
+is not a list of names, and a word the task's harness does not have. Those words belong to the
+harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
+and `domain.ts` never learns them:
+
+| harness | `permissionMode` | `effort` |
+|---|---|---|
+| `claude`, `claude-detached` | `acceptEdits`, `auto`, `bypassPermissions`, `default`, `dontAsk`, `manual`, `plan` | `low`, `medium`, `high`, `xhigh`, `max` |
+| `codex` | `read-only`, `workspace-write`, `danger-full-access` (and `bypassPermissions`, meaning the last) | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` |
+
+Claude Code's permission modes are what 2.1.270 accepts when it parses its arguments (`default` is
+taken though its help no longer lists it). Its efforts are refused here because the CLI does not
+refuse one: an unknown `--effort` gets a warning and the default. Codex's efforts are the ones its
+API named when refusing a bad one, for the default model; Codex itself checks none, and a bad one
+fails the session. A harness brought as a `PromiseRunner` is asked nothing.
+
+**A harness that refuses to start a session anyway** ends that attempt `failed`, reason
+`unstartable`, with its words on the attempt — `decide` then settles or retries it like any
+failure. It used to reject the whole tick, and every task behind it stalled on every pass.
+
+## Narrowing a session: `tools` and `effort`
+
+Both are fields on the task, carried on the `filed` event and `State` and read only by a runner.
+`decide` never reads either, and a test reads `decide` to keep it so.
+
+| harness | `tools: Read, Grep, Glob` | `effort: high` |
+|---|---|---|
+| `claude` | `--tools Read,Grep,Glob` | `--effort high` |
+| `claude-detached` | the same | the same |
+| `codex` | `-s read-only` when the list has none of Bash, Write or Edit; otherwise not narrowed | `-c model_reasoning_effort="high"` |
+
+**`--tools`, not `--allowedTools`.** A tool that is not in the session's set does not exist for it;
+an unapproved one is still there to try. The flag is variadic, so it is emitted just before
+`--permission-mode`, which always follows and ends the list — directly before the prompt it would
+take the prompt as a tool name, the same trap as a bare `--worktree`. An empty list is no tools.
+
+**Verified live, not only by `--help`:** `test/live.test.ts` (`AE_LIVE=1`) files two real `--bg`
+sessions told to write a file, one with `tools: Read, Grep, Glob` and one without. On Claude Code
+2.1.270 the fenced one wrote nothing and still gave its closeout — `--tools` does not take away
+the tool a closing statement is made with — and the control wrote the file.
+
+**Codex has no tool list**, only one shell and three sandboxes, so the list can only take writing
+away: a list with none of Bash, Write or Edit runs `read-only` whatever sandbox the task named,
+and a list with any of them leaves the sandbox as the task named it.
 
 ## What "done" means, and why the harness decides it
 
@@ -286,6 +368,9 @@ middle of a long tool call — which writes nothing for minutes at a time (35 se
 session we sampled). It is one gate rather than two, held deliberately, and pinned by a test. A
 session whose transcript cannot be read gets no verdict at all; the deadline is for those.
 
+The quiet rule still ends a task that asked for a closeout and never gave one as `succeeded` —
+open issue 1 in `docs/open-issues.md`, deferred, with the reason there.
+
 ### The workload's own word
 
 Everything above is us guessing from outside. A task may instead declare `closeoutSchema` — a JSON
@@ -327,7 +412,30 @@ that never gives one ends exactly as it did before.
 engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
 job of a runner. `decide` did not change. Codex, which ends by exiting, needs none of this and gets
 none of it. And because it is a translation rather than a judgement, it tests with an injected clock
-and an injected transcript — eight tests, no harness, no spend.
+and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
+
+## What an attempt consumed
+
+Every attempt records `usage` — `{ turns, toolCalls, inputTokens?, outputTokens?, costUsd? }` — and
+`exitCode`, copied from the sighting that ended it. **Each is `null` when nothing measured it,
+never `0`**: a zero that means "nobody counted" reads as "cost nothing". `decide` reads neither.
+
+| runner | `usage` | `exitCode` |
+|---|---|---|
+| `claude` | from the transcript it already reads: responses, tool calls and tokens since the session's own start; no cost | `null` — the process is the harness's |
+| `codex`, `claude-detached` | `null` — not measured | the worker's record of the process |
+| `sdkRunner()` | from the SDK's result message, cost included when the SDK gives one | `null` |
+
+Two measured traps shape the transcript count. A response is written as one line per content block,
+each repeating its message id and usage, so responses are counted once, by id. And a resumed
+transcript holds its parent's conversation with the parent's timestamps, so only what came after
+the session's `startedAt` in `claude agents --json` is counted; a row with no start reports no
+usage rather than a wrong one. `ae show` prints one line per attempt, naming what was not measured:
+
+```
+attempt 1  done  <turns> turns · <calls> tool calls · <in> in · <out> out · cost not measured
+attempt 2  failed  exit 1  usage not measured
+```
 
 ## Letting a sandboxed Codex step commit
 
@@ -358,17 +466,30 @@ what a step leaves behind. The rule is what lets Codex do it itself.
 
 ## Which runner: CLI or Agent SDK
 
-Both are wired. `AE_RUNNER=sdk` swaps one for the other and **the engine does not change** — only
-what is true after a crash does. That is the whole reason `Runner` is a seam and not an import.
+**`createEngine` and `ae` always use the CLI runners.** No environment variable selects another.
+`sdkRunner()` exists, but only as a `Layer` for the Effect API: you compose it yourself, and tick
+in the same long-lived process that spawned the sessions, because they die with it.
 
-| | `Runner.claude()` (default) | `Runner.sdk()` |
+```ts
+import { Effect, Layer } from 'effect'
+import { Journal, sdkRunner, file, tick } from 'agent-engine/effect'
+
+const board = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), sdkRunner())
+await Effect.runPromise(file({ brief, cwd }).pipe(Effect.provide(board)))
+// then, in this same process: tick() on a timer, provided the same `board`
+```
+
+The engine does not change between them — only what is true after a crash does. That is the whole
+reason `Runner` is a seam and not an import.
+
+| | `Runner.claude()` (what `createEngine` uses) | `sdkRunner()` |
 |---|---|---|
 | how | `claude --bg --name …` | Agent SDK `query()` |
 | owns the session | the **harness** | **this process** |
 | engine dies mid-session | session runs on, next tick adopts it | session dies with it |
 | run state | `claude agents --json` | an in-memory map |
-| cost / turns / tool calls | not visible | **live** (`$0.1054  4 turns`) |
-| refuse a tool call | no | `canUseTool`, hooks, MCP |
+| usage | turns, tool calls and tokens from the transcript, once the session is idle; no cost | from the SDK's result, cost included |
+| narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session | not wired: it passes only `model` and `permissionMode` |
 | good for | the fleet, long work, unattended | one task in the foreground, with a human watching |
 
 The Agent SDK is a typed wrapper around the same CLI, but the wrapping is over **stdio
@@ -409,19 +530,32 @@ selector, and it is why no attempt can ever run twice.
 
 ## Files
 
-| file | lines | what |
-|---|---|---|
-| `src/domain.ts` | 180 | events, `fold`, **`decide`** — pure, no I/O, the whole judgement |
-| `src/engine.ts` | 133 | applies one decision, then the pass over every task |
-| `src/cli.ts` | 101 | the verbs: parse, call, print |
-| `src/runner.ts` | 103 | the compute seam — `spawn`/`observe`/`stop`/`logs`, and nothing else |
-| `src/runner-sdk.ts` | 97 | the same four verbs on the Agent SDK, with the tradeoff written down |
-| `src/runner-detached.ts` | 172 | a runner for any harness that runs a prompt and exits; the Codex spec |
-| `src/runner-composite.ts` | 53 | dispatch by harness, merge what they all see |
-| `bin/ae-worker.ts` | 78 | the detached worker: babysits one harness process, keeps the run file |
-| `src/journal.ts` | 118 | append-only JSONL per task, plus the board-wide feed |
-| `test/decide.test.ts` | 16 tests | every branch of the decision, no harness needed |
-| `test/engine.test.ts` | 9 tests | the crash cases, against a fake harness |
+| file | what |
+|---|---|
+| `src/domain.ts` | events, `fold`, **`decide`** — pure, no I/O, the whole judgement |
+| `src/engine.ts` | applies one decision, then the pass over every task |
+| `src/facade.ts` | `createEngine`: the engine in Promises, and what `file()` refuses |
+| `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
+| `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |
+| `src/journal.ts` | append-only JSONL per task, plus the board-wide feed |
+| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs` — and Claude Code's runner, words and usage |
+| `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits; the Codex and `claude -p` specs |
+| `src/runner-composite.ts` | dispatch by harness, merge what they all see |
+| `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
+| `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
+| `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
+| `test/decide.test.ts` | every branch of the decision, no harness needed |
+| `test/engine.test.ts` | the crash cases, the ceiling, the fields carried, against a fake harness |
+| `test/completion.test.ts` | Claude Code's "done", its argv and its usage, with a fake `claude` on `PATH` |
+| `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
+| `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
+| `test/journal.test.ts` | the store and the feed's cursor |
+| `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
+| `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
+| `test/readme.test.ts` | this file, held to the code |
+| `test/live.test.ts` | the `--tools` fence against real Claude Code — `AE_LIVE=1` only |
+| `docs/open-issues.md` | what is still wrong or half-verified |
+| `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 
 If a change wants an `if` in `engine.ts`, it probably belongs in `decide`. That line is what keeps
 this small, and it is the one rule worth defending.
@@ -435,12 +569,13 @@ cwd: /path/to/repo
 permissionMode: acceptEdits
 maxAttempts: 2
 ---
-Fix the failing test in src/foo.test.ts. Do not change the test.
+Fix the failing parser test. Do not change the test.
 MD
 
 node bin/ae.ts start brief.md    # file it
 node bin/ae.ts up                # reconcile on a timer — this is the daemon
 node bin/ae.ts ls                # every task, desired vs observed
+node bin/ae.ts show <id>         # the journal, then one line per attempt
 node bin/ae.ts logs <id>         # the session's own output
 node bin/ae.ts stop <id>
 ```
@@ -455,12 +590,13 @@ watches for its `settled` event, and files the next one — it never reads a tas
 learns what `decide` is:
 
 ```ts
-import { file, Journal } from 'agent-engine'
+import { createEngine } from 'agent-engine'
 
-const { entries, cursor } = yield* journal.feed(lastCursor)
+const engine = createEngine()
+const { entries, cursor } = await engine.feed(lastCursor)
 for (const { taskId, event } of entries) {
   if (event.kind === 'settled' && event.outcome === 'succeeded') {
-    yield* file({ brief: `Review what ${taskId} did`, cwd, harness: 'codex' })
+    await engine.file({ brief: `Review what ${taskId} did`, cwd, harness: 'codex' })
   }
 }
 ```
@@ -496,31 +632,27 @@ quiescence clock was exactly this, and `up` hid it completely.
 
 So: `up` for a daemon, `tick` for cron, CI, a git hook, or one deterministic pass while debugging —
 and `tick` in a loop as the thing that must keep working, or the claim at the top of this file is
-not true. The **one** documented exception is `AE_RUNNER=sdk`, whose sessions live in the process
-that started them; there `up` is required and `tick` genuinely cannot work.
+not true. The **one** exception is `sdkRunner()`, whose sessions live in the process that started
+them; there a long-lived ticking process is required and one-shot `tick` genuinely cannot work.
 
 `ae watch` follows the journal. It is `engine.watch` — the store pushes (the file journal watches
 the feed) and the timer is only a backstop — not a poll loop, which is what it used to be while
 the *workflow* layer above it used the good API. A CLI should be the best consumer of its own
 engine, not the worst.
 
-A brief is markdown: `key: value` frontmatter (`cwd`, `model`, `permissionMode`, `maxAttempts`),
-body is the prompt. No YAML dependency, no schema, no template language — yet.
-
 ## Deliberately missing
 
-Not "todo" — *excluded*, so the core stays legible: no board, no DAG or dependencies, no git
-worktrees, no pull requests, no budget ceilings, no approvals, no multi-machine anything. Each is
-a kind built **on** this one, the way `tekton.dev` is built on `batch/v1`. None of them requires
-changing `decide`, which is the test of whether this core is the right size.
+Not "todo" — *excluded*, so the core stays legible: no board, no DAG or dependencies, no worktree
+management (the harness cuts worktrees; the engine only asks for one), no pull requests, no budget
+ceilings, no approvals, no multi-machine anything. Each is a kind built **on** this one, the way
+`tekton.dev` is built on `batch/v1`. None of them requires changing `decide`, which is the test of
+whether this core is the right size.
 
-## The three next things, in order
+## What is left
 
-1. **Watch instead of poll.** `ae up` ticks on a timer. The harness's registry changing is the
-   hint that skips the wait; the tick stays as the fallback that makes missing one free.
-2. **Worktrees.** `claude --worktree <name>` already isolates a session. One field on the brief,
-   one flag in `Runner.claude` — the engine does not learn a new concept.
-3. **Sequencing.** A `Run` of steps that files the next task when the previous one settles. A
-   second kind with its own `decide`, reading this one's journal and writing its own.
+**Watch instead of poll.** `ae up` ticks on a timer. The harness's registry changing is the hint
+that skips the wait; the tick stays as the fallback that makes missing one free. Worktrees and
+sequencing, once listed here, are done — sequencing as `agent-workflows`, a consumer of this engine.
+Everything else that is still wrong or only half-verified is in `docs/open-issues.md`.
 
 Anything that makes `decide` longer than a screen is a second kind wearing a disguise.

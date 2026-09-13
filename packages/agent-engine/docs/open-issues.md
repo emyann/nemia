@@ -89,8 +89,8 @@ otherwise — it cannot happen.
 configured harnesses, and so their words, are known.
 
 **Effect.** A consumer of `agent-engine/effect` can still journal `deadlineSeconds: NaN`, which stops
-the task on its first pass, or a permission mode its harness rejects, which now ends the attempt
-`unstartable` rather than stalling the tick.
+the task on its first pass, or a permission mode its harness rejects, which now waits out the grace
+window and ends the attempt `lost` rather than stalling the tick.
 
 **Fix.** The harness-agnostic half of `refusalOf` can move under the Effect `file` as it is. The
 vocabulary half needs the runner to answer, and `RunnerOps` has no verb for that — the four verbs are
@@ -174,10 +174,11 @@ list, and what fences that reviewer on Codex is `permissionMode: read-only`.
 | a task the engine forgot read as queued, so a run looked in flight for ever | `unknown`, not `pending` | workflows `0e7b02a` |
 | cancel raced a tick; a failed run with work left could still file it | cancellation in its own file, enforced every tick | workflows `f59d95c`, `3eeaf2f` (merged in `e1c9170`) |
 | a Codex task that asked for `read-only` ran `workspace-write`; `danger-full-access` did too | each sandbox name emitted as itself | engine `9d5257d`, `310efd3` |
-| a brief's typo was a default, and `deadlineSeconds: 5m` stopped its task on the first pass | a closed `BRIEF_KEYS`; every bad key and value refused, exit 2 | engine `60c1d01` |
+| a brief's typo was a default, and `deadlineSeconds: 5m` stopped its task on the first pass | a closed `BRIEF_KEYS`; every bad key and value refused, exit 2 (a count that overflows to `Infinity` too, found in review) | engine `60c1d01`, `3ca8ac4` |
 | an unknown harness ran on the fallback; a bad permission mode failed every tick | `file()` refuses, asking each harness for its own words | engine `310efd3` |
 | no way to narrow a session's tools or set its effort, and Claude Code ignores an unknown `--effort` | `tools` and `effort` carried and emitted; a bad effort refused; `--tools` verified live | engine `060a41d` |
 | cost and turns had a field no wired runner filled and no record kept | `usage` and `exitCode` on the attempt, `null` when unmeasured | engine `4db1213` |
-| a spawn the harness refused rejected the whole tick, stalling every task behind it | the attempt ends `failed`, `unstartable`, in the harness's words | engine `8a52173` |
+| a spawn the harness refused rejected the whole tick, stalling every task behind it | a refusal the harness vouches for ends the attempt `unstartable`; any other spawn error is journalled as spawned and left to the grace window, so a session it did start is still adopted (the first version ended every spawn error; found in review) | engine `8a52173`, `0d5c720` |
+| a detached harness launched into a missing cwd killed the process that launched it: the child's `error` event went unheard | the cwd is checked first and refused; the child's `error` is heard | engine `0d5c720` |
 | the tests were never typechecked, and a required `PromiseJournal.watch` that nothing called hid there | `test/` in the typecheck; the dead method gone | engine `9aaa38b` |
 | the README claimed `AE_RUNNER=sdk`, "refuse a tool call: no", 25 tests, a file table 2–3× off, and "three next things" already done (bug 5) | made true; `test/readme.test.ts` refuses each of those classes | engine `f947da4` |

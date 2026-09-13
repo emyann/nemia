@@ -228,9 +228,14 @@ refuse one: an unknown `--effort` gets a warning and the default. Codex's effort
 API named when refusing a bad one, for the default model; Codex itself checks none, and a bad one
 fails the session. A harness brought as a `PromiseRunner` is asked nothing.
 
-**A harness that refuses to start a session anyway** ends that attempt `failed`, reason
-`unstartable`, with its words on the attempt — `decide` then settles or retries it like any
-failure. It used to reject the whole tick, and every task behind it stalled on every pass.
+**A spawn that fails** is answered by what the harness can vouch for. When nothing can have
+started — the OS would not create the process, a detached worker was never launched, or a
+`PromiseRunner` rejects with `refused: true` — the attempt ends `failed`, reason `unstartable`, in
+the harness's words, and `decide` settles or retries it like any failure. Any other failure may
+have left a session behind (a launcher can create one and lose its acknowledgement), so the call is
+recorded as spawned, with its error, and the grace window decides: the session is adopted if it
+appears, the attempt `lost` if it never does. Either way the tick goes on; it used to reject, and
+every task behind the failed one stalled on every pass.
 
 ## Narrowing a session: `tools` and `effort`
 

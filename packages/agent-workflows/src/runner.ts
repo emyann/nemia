@@ -76,9 +76,23 @@ export const engine = (): Engine => createEngine({
   maxConcurrent: Number(process.env.WF_MAX_CONCURRENT) || 2,
 });
 
-/** The engine's task phases, narrowed to what a run cares about. */
-const phaseOfView = (v: TaskView): TaskPhase =>
-  v.state.settled ?? (v.state.attempts.length ? 'running' : 'pending');
+/**
+ * The engine's task phases, narrowed to what a run cares about.
+ *
+ * A task the engine has never heard of is `unknown`, NOT `pending`. It folds to the same empty
+ * state as one that is filed and waiting for a slot — `settled: null`, zero attempts — and the one
+ * thing that tells them apart is that a filed task has the brief it was filed with.
+ *
+ * Worth the line, because `pending` counts as in flight. A run whose engine board has since been
+ * cleared read as running for ever: `wf cancel` claimed to stop steps nobody can find, and
+ * `wf decide` said "still running". `unknown` was in the type for this and was simply unreachable.
+ * Found by the `wf rm` run (34774e0), whose verb was not kept; this was.
+ */
+const phaseOfView = (v: TaskView): TaskPhase => {
+  if (v.state.settled) return v.state.settled;
+  if (v.state.attempts.length) return 'running';
+  return v.state.brief ? 'pending' : 'unknown';
+};
 
 /**
  * The engine's word on every task this run has filed, read once.

@@ -45,6 +45,8 @@ const engineWith = (phase: Record<string, TaskPhase>, hold?: Promise<void>, clos
     view: async (id: string) => ({
       id, phase: phase[id] ?? 'unknown', sessionId: 's',
       state: {
+        // A filed task has the brief it was filed with; only one the engine never heard of has none.
+        brief: 'filed',
         settled: settled.has(phase[id] ?? '') ? phase[id] : null,
         attempts: phase[id] === 'pending' ? [] : [{ n: 1, ended: null, nativeId: 's', closeout: closeouts[id] }],
         stopRequested: false,
@@ -140,4 +142,25 @@ test('`wf ls` takes how each step signed off from the engine — and a task from
   const l = await list(e, run);
   assert.deepEqual(l.steps.map((s) => s.status), ['succeeded', 'succeeded · BLOCKED']);
   assert.deepEqual(l.waitingOnYou, ['review']);
+});
+
+test('a step whose task the engine no longer has is unknown, not queued — cancelling stops nobody', async () => {
+  // A task the engine has never heard of folds to the same empty state as one waiting for a slot,
+  // and `pending` counts as in flight. Read that way, a run whose board was cleared since would
+  // claim to stop sessions nobody can find. The brief is what tells them apart; see `phaseOfView`.
+  // Found by the `wf rm` run (34774e0); the verb was not kept, this was.
+  const run = aRun('r-amnesia', { implement: { taskId: 't-forgotten' }, review: { taskId: null } });
+  writeRun(run);
+  const stopped: string[] = [];
+  const forgetful = {
+    view: async (id: string) => ({
+      id, phase: 'pending', sessionId: null,
+      state: { settled: null, attempts: [], brief: '', stopRequested: false },
+    }),
+    stop: async (id: string) => { stopped.push(id); },
+  } as unknown as Engine;
+
+  const { plan } = await cancel(forgetful, run.id);
+  assert.deepEqual(stopped, [], 'nobody to stop');
+  assert.ok(plan.kind === 'finished' || plan.stop.length === 0, 'and nothing reported as stopped');
 });

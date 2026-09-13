@@ -563,6 +563,25 @@ owner is not mid-run.
   a step overstepping. A mid-flight instruction to a step should be written on the run — an
   `asks/` file the tick composes into the record and `wf decide` prints — the same one-writer
   shape as `.cancelled`. → with F's ask files.
+- **a branch's new dependency is invisible to its own check (M1, refused three times):** worktrees
+  share the main checkout's `node_modules`; a package pinned on a branch is not installed there, and
+  every `npm install` at a merge prunes whatever a step unpacked into the shared tree. M1's check
+  and tests failed on `ENOENT …/@playwright/mcp/cli.js`. CLAUDE.md's "unpack it into node_modules"
+  is fragile for the same reason. The run should give each worktree its own `node_modules` when
+  the branch's lockfile differs from main's (`npm ci` in the worktree, ~1 min) — or link
+  per-package rather than the whole tree. → with F; until then `npm install --no-save <pkg>` at the
+  root before a check that needs it. The same link cuts the other way (M1, a fourth refusal): a
+  worktree's `apps/*` tests run against `main`'s packages, so once `main` moves under a branch
+  (E5's `logs`), the branch's own check fails on tests it never touched. A step's check should run
+  against the branch's packages — its own `node_modules` — or the run should say plainly that the
+  check is stale against `main` and re-run it after a rebase.
+- **Playwright MCP, from M1's review (Opus, raw):** `browser_run_code_unsafe` is a core tool no
+  flag removes — denied by name in `.claude/settings.json` at the merge; the server inherits the
+  session's environment (`.mcp.json` sets no `env`, and Playwright reads config from env too);
+  `test/mcp-config.test.ts` checks five flags and would pass an added `--cdp-endpoint` or
+  `--extension`; `--output-dir /tmp/playwright-mcp` is one directory for every concurrent step
+  (a per-step dir needs an `env` on the task, or per-step `mcp:` — I); the live test takes the
+  model's own list of its servers as the evidence. → I, and the next M run.
 - **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
   a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
   for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running

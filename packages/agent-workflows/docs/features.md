@@ -5,7 +5,8 @@ today, what the feature has to settle, and what earlier work already taught abou
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
 State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
-outputs (package J), and a step's files directory with `workflows/ui/` (U1) have shipped.
+outputs (package J), a step's files directory with `workflows/ui/` (U1), and a browser for every
+Claude step (the repository's `.mcp.json`) have shipped.
 
 ## Shipped: the check
 
@@ -20,9 +21,6 @@ closeout it was asked for is `unsigned` and files nothing; failed and stopped st
 What it leaves for wave 2 of the plan, in its order:
 
 - **Retries** (§4 F). `retries:` is parsed, and nothing acts on it: a refused check goes to the person at
-- The browser the plan gives the ui `implement` step (a Playwright MCP server via `.mcp.json`,
-  or `mcp:` on the step once the run passes it through — engine E4 carries it): not shipped here.
-  The step sees the PNGs its check wrote; it cannot drive the page yet.
   `wf decide`. Next, `retries: n` re-files the step with the verdict as data — the command, the exit
   code, both tails, "do not weaken it" — and `wf retry <run> <step>` does the same on a person's word,
   through an ask file. `steps[name].check` becomes `steps[name].tries[]`, and the derived ids
@@ -85,6 +83,35 @@ What it leaves:
   `toldOf`, once this has landed.
 - **No clean-up and no size cap.** Screenshots accumulate per run under `WF_ROOT`, as check stderr files
   do. `wf rm`, when it comes, removes `runs/<id>/` whole.
+
+## Shipped: a browser for every Claude step
+
+The browser the plan gives the ui `implement` step, through the content route: the repository's
+`.mcp.json` names one server, `playwright`, run as `node node_modules/@playwright/mcp/cli.js --headless
+--browser chromium --isolated --output-dir /tmp/playwright-mcp`, with `@playwright/mcp` pinned exactly in
+the root devDependencies. The engine names that file on every Claude spawn, beside `--strict-mcp-config`
+and `--no-chrome` (E4), so a step in any worktree of the repository has the `browser_*` tools and none of
+the operator's servers. `.claude/settings.json` enables it for an interactive session in the checkout.
+`node`, not `npx`, so nothing is downloaded at a spawn, and the relative path resolves through each
+worktree's `node_modules` link. `--isolated` keeps each session's profile in memory, so no two steps share
+cookies or storage. `--output-dir` keeps the snapshots and screenshots the tools write out of the
+workspace, where the run would otherwise commit `.playwright-mcp/`. `workflows/ui/implement.md` tells the
+step it can drive the page it builds. `test/mcp-config.test.ts` holds the file to that shape, makes each
+way out of it refuse, and starts the server as configured to list its tools. A live test (`AE_LIVE=1`)
+files a `--bg` task in the checkout and reads back its MCP servers and tools. Run on 2026-09-13 in a
+worktree (Claude Code 2.1.270, on a machine whose operator has a user-scope server), it passed:
+`playwright` was the only server, and `mcp__playwright__browser_navigate` was among the tools.
+
+What it leaves:
+
+- **Every Claude step has it, the readers too.** `look` and `review` do not need a browser. Per-step
+  choice is `mcp:` on the step once the run passes it through (engine E4 carries it on the task); then the
+  server moves from `.mcp.json` onto `implement` and `respond`.
+- **Codex steps do not have it.** Codex reads no `.mcp.json`. The engine hands a task's `mcp` to Codex as
+  one `-c mcp_servers=…` override, so a Codex browser waits on the same `mcp:` key.
+- **Two browser builds.** No `@playwright/mcp` release pins the e2e's playwright 1.62.1 (Chromium 1234),
+  so 0.0.80 brings its own 1.63.0 alpha (Chromium 1243). Each is installed once per machine; CLAUDE.md
+  gives both commands.
 
 ## 1. Rounds
 

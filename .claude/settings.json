@@ -1,10 +1,14 @@
 {
+  "enabledMcpjsonServers": [
+    "playwright"
+  ],
   "permissions": {
     "deny": [
       "Bash(git push)",
       "Bash(git push:*)",
       "Bash(git branch -D:*)",
-      "Bash(git branch --delete --force:*)"
+      "Bash(git branch --delete --force:*)",
+      "mcp__playwright__browser_run_code_unsafe"
     ]
   }
 }

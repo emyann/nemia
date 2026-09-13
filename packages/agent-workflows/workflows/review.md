@@ -1,16 +1,18 @@
 ---
 harness: codex
 after: implement
-# A review should read and not edit, and the engine now honours `permissionMode: read-only` for
-# codex — but a read-only reviewer cannot write REVIEW.md, which respond reads. Until the review
-# travels as a closeout the run hands to the next step (docs/plan-hold-the-bar.md §4 J), the
-# reviewer keeps write access, and test/check.test.ts refuses the read-only pair.
+# The review travels as this step's closeout — `findings`, in the shape review.schema.json declares —
+# and respond is handed it with `input: review`. Nothing is written to the workspace, so the reviewer
+# reads and does not edit.
+permissionMode: read-only
+output: review.schema.json
 ---
 Review the change in this workspace as a second engineer would.
 
 Read the diff. Look for: correctness bugs, cases the tests do not cover, and anything that does
 not do what was asked. Style is not interesting unless it hides a bug.
 
-Write your review to REVIEW.md as a short list of findings, each one naming the file and line and
-saying concretely what would go wrong. If you find nothing worth changing, say that in one line —
-a review that invents work to look thorough is worse than a short one.
+You work read-only: write nothing into the workspace. Your review is the `findings` in your
+closeout, each one naming the file and line and saying concretely what would go wrong. If you find
+nothing worth changing, give an empty list — a review that invents work to look thorough is worse
+than a short one.

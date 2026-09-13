@@ -2,9 +2,12 @@
 harness: claude
 after: review
 resume: implement
+input: review
 check: npm test && npm run typecheck
 ---
-A second engineer has reviewed your change. Their findings are in REVIEW.md in this workspace.
+A second engineer has reviewed your change. Their findings are below, under *From review*: each
+names a file and line and says what would go wrong. An empty list means they found nothing worth
+changing.
 
 Go through them one at a time. For each finding you have three honest answers, and they are all
 acceptable:
@@ -21,4 +24,5 @@ changing something you believe is correct, to look agreeable, makes the code wor
 disagreement from the person who has to decide.
 
 Write your replies to RESPONSE.md, one entry per finding, each labelled with one of the three
-answers above. Commit any fixes you made.
+answers above — it is for the person who decides what ships, who reads the findings beside it. If
+there were no findings, say so in one line. Commit any fixes you made.

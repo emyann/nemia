@@ -9,6 +9,21 @@
       "Bash(git branch -D:*)",
       "Bash(git branch --delete --force:*)",
       "mcp__playwright__browser_run_code_unsafe"
+    ],
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run build)",
+      "Bash(npm run e2e)",
+      "Bash(npx turbo run test:*)",
+      "Bash(node --test:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git status)",
+      "Bash(git status:*)",
+      "Bash(git branch)",
+      "Bash(git branch --list:*)"
     ]
   }
 }

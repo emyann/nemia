@@ -626,6 +626,12 @@ owner is not mid-run.
   "waiting on you" and the page's banner does not. Pass `run.waitingOnYou.includes(step.name)` on
   `StepNodeData` and require it in the gate; a component test with a pending ask. Judged not worth a
   round by the reviewer; a small apps run, with the api's swap to I's exports. → apps.
+- **the reviewer can run the suite, and nothing else (2026-09-13, after I):** the operator folders' review
+  step is `tools: Read, Grep, Glob, Bash` with `permissionMode: dontAsk`, and `.claude/settings.json` allows the
+  exact read-only commands (`npm test`, `npm run typecheck|build|e2e`, `npx turbo run test:*`, `node --test:*`,
+  `git diff|log|show|status|branch`). In `dontAsk` any other Bash command is denied without a prompt, and there is
+  no Edit or Write on the list — so the reviewer is read-only by machinery, not by prose (plan §4 I's aim). The
+  shipped `review.md` stays on codex, whose fence is the sandbox. First run to test it: E6's review.
 
 ## 5. What the plan does not do
 

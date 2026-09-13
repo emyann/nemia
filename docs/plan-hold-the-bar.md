@@ -603,6 +603,14 @@ owner is not mid-run.
   attempt rather than the log `wf ls` reads — two sources that agree today and a test holds the words
   to `list`'s. Export a log-free verdict and the two predicates; the copies go. → I, with the
   mode-list copies.
+- **the board and the api after R (2026-09-13):** `listing` now says `rounds exhausted` for a loop at its cap,
+  and `apps/web/src/lib/status.ts` maps a word it does not know to `working`, so such a run reads as working
+  on the board; `apps/api`'s `judge` passes `assess` no round asks and `moving` does not count a round due.
+  Small apps run: map the word (amber, waiting on you), pass `readAsks(run.id).rounds`, count `round`. → apps.
+- **the reviewer cannot run the suite (B1's review, 2026-09-13):** on the operator folders the review step runs
+  read-only by prose, and the permission classifier refused `node --test`, so it reviewed by reading. The check
+  had run the suite, so nothing was lost; but a reviewer that can run tests finds more. → I: `tools:` on the
+  review step naming Bash for `npm test`, and read-only for the rest.
 
 ## 5. What the plan does not do
 

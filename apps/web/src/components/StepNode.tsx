@@ -1,7 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
 import { attemptLine, isLive } from '../lib/canvas';
-import { stepState } from '../lib/status';
+import { isGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
 
@@ -25,8 +25,8 @@ export function StepNode({
   // Every second while the attempt's time is counting; otherwise only "started … ago" moves.
   const now = useNow(live ? 1_000 : 30_000);
   const running = state === 'working';
-  // The human gate. On a run somebody called off, nobody is waiting for the answer any more.
-  const gate = state === 'blocked' && !runCancelled;
+  // The human gate: a step that signed off blocked, or a loop out of rounds.
+  const gate = isGate(state, runCancelled);
   const { spec } = step;
 
   return (

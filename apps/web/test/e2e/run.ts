@@ -255,6 +255,10 @@ const PAGES: PageSpec[] = [
         node(LOOPING.exhausted).locator(`[data-state="exhausted"][title^="rounds exhausted: "][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
         `${LOOPING.exhausted}, out of rounds, is an amber chip on the graph, its note after what that means on hover`,
       );
+      // Waiting on a person, as a step signed off blocked is: drawn as a human gate. implement, done, is not one.
+      await expectVisible(node(LOOPING.exhausted).getByText('human gate'), `${LOOPING.exhausted}, out of rounds, is drawn as a human gate`);
+      await expectVisible(node(LOOPING.exhausted).getByText('waiting on you'), `${LOOPING.exhausted}, out of rounds, says it is waiting on you on the graph`);
+      await expectCount(node('implement').getByText('waiting on you'), 0, 'implement, done on its own word, is not a human gate');
       await expectVisible(
         node('implement').locator(`[data-state="unverified"][title$="${LOOPING.notes.implement}"]`),
         `implement's chip on the graph ends its title with the round it is on (${LOOPING.notes.implement})`,

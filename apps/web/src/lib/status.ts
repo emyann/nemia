@@ -50,6 +50,14 @@ export function stepState(status: string, runCancelled: boolean): StepState {
 /** Final, and a follower may be filed on it — `satisfiesAfter` in agent-workflows: verified, or done on its own word. */
 export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified';
 
+/**
+ * A human gate: final, nothing broke, and the run goes no further until a person decides — a step that signed off
+ * blocked, or a loop out of rounds (`wf round`). The two `wf decide` calls a blocked outcome. Not a refused check nor an
+ * unsigned step, which wait on you too but are work to try again (`wf retry`). On a run somebody called off, nobody is
+ * waiting for the answer any more.
+ */
+export const isGate = (state: StepState, runCancelled: boolean): boolean => (state === 'blocked' || state === 'exhausted') && !runCancelled;
+
 /** What each state means, for a person who hovers over a chip. */
 export const stateMeaning: Record<StepState, string> = {
   working: 'working: its session is running',

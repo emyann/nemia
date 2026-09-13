@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { satisfiesAfter, stateClass, stateMeaning, stepState, type StepState } from '../src/lib/status.ts';
+import { isGate, satisfiesAfter, stateClass, stateMeaning, stepState, type StepState } from '../src/lib/status.ts';
 
 test('each word wf ls prints reads as the state a person acts on', () => {
   // Every word `listing` in agent-workflows can say: `waiting`, `rounds exhausted`, the run's verdicts, and the engine's
@@ -81,4 +81,15 @@ test('a word the board does not know reads as working, on purpose: never as done
     assert.equal(stepState(status, false), 'working', status);
     assert.equal(satisfiesAfter(stepState(status, false)), false, status);
   }
+});
+
+test('a human gate is a step a person decides: signed off blocked, or a loop out of rounds — and on a cancelled run, neither', () => {
+  for (const status of ['succeeded · BLOCKED', 'rounds exhausted']) {
+    assert.equal(isGate(stepState(status, false), false), true, status);
+    // Nobody waits for the answer on a run somebody called off.
+    assert.equal(isGate(stepState(status, true), true), false, `${status}, on a cancelled run`);
+  }
+  // Waiting on you too, but work to try again, not a decision; and every state that waits on nobody.
+  const notGates = ['failed ✗ check (exit 1)', 'failed ✗ check (unfinished)', 'unsigned', 'verified ✓', 'unverified · done', 'checking', 'running (working)', 'needs-human', 'failed', 'stopped', 'waiting', 'unknown'];
+  for (const status of notGates) assert.equal(isGate(stepState(status, false), false), false, status);
 });

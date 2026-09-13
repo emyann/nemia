@@ -106,7 +106,7 @@ function Details({ step, state, runCancelled }: { step: Step; state: StepState; 
         rows={[
           ['attempts', attempts.count],
           ['latest began', latest && when(latest.startedAt)],
-          ['latest ended', latest && (latest.ended ? <Ended at={latest.endedAt ?? null} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
+          ['latest ended', latest && (latest.ended ? <Ended at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
           // Only with an end on the record: one from before the engine kept it says how, and not when.
           ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
           ['branch', code(step.branch)],

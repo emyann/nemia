@@ -35,11 +35,11 @@ test('a duration reads in its two largest units', () => {
 test('an attempt that runs counts its time; one that is over says when it started', () => {
   const now = Date.parse('2026-09-13T01:00:00.000Z');
   const startedAt = '2026-09-13T00:47:56.000Z';
-  assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: null, reason: null } }, true, now), '#2 · 12m 04s');
-  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', reason: 'harness' } }, false, now), '#1 · started 12m 04s ago');
+  assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now), '#2 · 12m 04s');
+  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now), '#1 · started 12m 04s ago');
   // No end on the record, but no session going either (stopped before the engine saw it end):
   // counting on would claim it is still at work.
-  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: null, reason: null } }, false, now), '#1 · started 12m 04s ago');
+  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: null, endedAt: null, reason: null } }, false, now), '#1 · started 12m 04s ago');
   assert.equal(attemptLine({ count: 0, latest: null }, false, now), null);
 });
 

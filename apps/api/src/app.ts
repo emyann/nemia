@@ -66,20 +66,15 @@ export type RunDetail = {
   }>;
 };
 
-/**
- * A step's attempts as the engine's view has them: how many, and when and how the latest went.
- *
- * No end time. The engine journals one on its `ended` event, but the view folds it away
- * (`state.attempts[n]` keeps how and why an attempt ended, not when), and the one export that still
- * has it is `feed`, which reads the whole store's history. So `ended` says whether the latest
- * attempt is over, and how long it took is not known here once it is.
- */
+/** A step's attempts as the engine's view has them: how many, and when and how the latest went. */
 export type StepAttempts = {
   count: number;
   latest: {
     startedAt: string;
     /** The harness's last word on the attempt — `done`, `failed`, `stopped`; null while it runs. */
     ended: string | null;
+    /** When it ended: the `at` of the engine's `ended` event, kept as `Attempt.endedAt`; null while it runs. */
+    endedAt: string | null;
     /** `harness` when the harness said it ended, `lost` when the engine stopped seeing it; null while it runs. */
     reason: string | null;
   } | null;
@@ -297,7 +292,7 @@ function attemptsOf(run: Run, name: string, views: Views): StepAttempts {
   const latest = attempts.at(-1);
   return {
     count: attempts.length,
-    latest: latest ? { startedAt: latest.startedAt, ended: latest.ended, reason: latest.reason } : null,
+    latest: latest ? { startedAt: latest.startedAt, ended: latest.ended, endedAt: latest.endedAt ?? null, reason: latest.reason } : null,
   };
 }
 

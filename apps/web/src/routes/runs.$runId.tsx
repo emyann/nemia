@@ -127,7 +127,7 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
 
 function BackToRuns() {
   return (
-    <Link to="/" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
+    <Link to="/runs" className="text-sm text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
       ← Runs
     </Link>
   );

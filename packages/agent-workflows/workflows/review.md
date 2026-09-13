@@ -5,6 +5,9 @@ after: implement
 # `again: true` sends the change round again (`loop: implement`): implement's own session is continued and handed
 # the findings as data, then this step reviews again, a new session — at most `rounds: 3`, then a person decides.
 # Nothing is written to the workspace, so the reviewer reads and does not edit.
+# No `tools:` — codex has no tool list, and the line is refused on it. The fence is the sandbox: `read-only`
+# reads and runs commands, `git diff` among them, and writes nothing. The same reviewer on claude is fenced
+# by its tools instead: `tools: Read, Grep, Glob, Bash` — Bash for `git diff` and `npm test`, nothing that edits.
 permissionMode: read-only
 output: review.schema.json
 loop: implement

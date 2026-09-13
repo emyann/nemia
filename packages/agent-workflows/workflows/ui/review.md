@@ -4,6 +4,9 @@ after: implement
 # The review travels as this step's closeout — `findings`, in the shape review.schema.json declares —
 # and respond is handed it with `input: review`. Nothing is written to the workspace, so the reviewer
 # reads and does not edit.
+# No `tools:` — codex has no tool list, and the line is refused on it. The fence is the sandbox: `read-only`
+# reads and runs commands, `git diff` among them, and writes nothing. The same reviewer on claude is fenced
+# by its tools instead: `tools: Read, Grep, Glob, Bash` — Bash for `git diff` and `npm test`, nothing that edits.
 permissionMode: read-only
 output: review.schema.json
 ---

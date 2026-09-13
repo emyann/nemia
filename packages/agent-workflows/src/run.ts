@@ -11,7 +11,6 @@
  * asked to stop a task, but it has never heard of the run — which is why `cancelledAt` lives on
  * the run, and is the only state this file writes down rather than derives.
  */
-import type { TaskView } from 'agent-engine';
 import { checkContract, verdictWord, type Verdict } from './check.ts';
 import { terminalSteps, type Workflow } from './workflow.ts';
 

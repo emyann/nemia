@@ -481,5 +481,6 @@ holding a concurrency slot forever.
 | `src/runner.ts` | the I/O: run store, git worktree, and the engine |
 | `src/cli.ts` | the verbs |
 
-`assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it.
-Same split as the engine, one layer up.
+`assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,
+and `test/boundary.test.ts` fails the suite the day another file does — a type import included. Same
+split as the engine, one layer up.

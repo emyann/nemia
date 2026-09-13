@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
-import { file, GRACE_MS, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
-import { decide, fold, nameFor, type Sighting } from '../src/domain.ts';
+import { file, GRACE_MS, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
+import { decide, fold, nameFor, type Observed, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 
 /** One board: a journal and a fake harness whose session states a test moves by hand. */
@@ -505,11 +505,11 @@ test('tools and effort are declared by the task and reach every attempt untouche
   assert.equal(plain.spawned[0]!.effort, undefined);
 });
 
-test('decide never reads tools, effort, usage or an exit code — carried on the record, never judged', () => {
+test('decide never reads tools, effort, usage, an exit code or an end time — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.effort|\.usage|\.exitCode/);
+  assert.doesNotMatch(body, /\.tools|\.effort|\.usage|\.exitCode|\.endedAt/);
 });
 
 // ─── usage: carried from the sighting, null when nobody measured ────────────
@@ -535,6 +535,41 @@ test('an attempt nobody measured records null — not zeros that would read as f
   const [a] = (await b.run(view(id, new Map()))).state.attempts;
   assert.equal(a!.usage, null);
   assert.equal(a!.exitCode, null);
+});
+
+// ─── when an attempt ended: the time the engine wrote it down ───────────────
+
+test('the settled view carries when its attempt ended, as journalled — and null while it ran', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.attempts[0]!.endedAt, null, 'in flight, it has not ended');
+
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done' });
+  await b.run(tick());
+  const v = await b.run(view(id, new Map()));
+  const ended = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'ended');
+  assert.equal(v.state.settled, 'succeeded');
+  assert.ok(ended, 'the end was journalled');
+  assert.equal(v.state.attempts[0]!.endedAt, ended.at);
+  assert.ok(Date.parse(v.state.attempts[0]!.startedAt) <= Date.parse(ended.at), 'and it ended after it started');
+});
+
+// ─── what counts as live ────────────────────────────────────────────────────
+
+test('LIVE is exactly the states decide waits on — `busy` is not a state, so it is not one of them', () => {
+  // Exhaustive by type: a state added to `Observed` and not here does not compile.
+  const STATES: Record<Observed, true> = { working: true, blocked: true, done: true, failed: true, stopped: true };
+  const t0 = new Date(0).toISOString();
+  const inFlight = fold('t', [
+    { kind: 'filed', at: t0, brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'starting', at: t0, attempt: 1 },
+    { kind: 'spawned', at: t0, attempt: 1 },
+  ]);
+  const waitsOn = (Object.keys(STATES) as Observed[]).filter((state) =>
+    decide(inFlight, new Map([[nameFor('t', 1), { sessionId: 's', state }]]), { at: new Date(0), graceMs: GRACE_MS, used: 0, max: 1 }).do === 'nothing');
+  assert.deepEqual([...LIVE].sort(), waitsOn.sort());
+  assert.equal((LIVE as ReadonlySet<string>).has('busy'), false);
 });
 
 // ─── a harness that refuses to start ────────────────────────────────────────

@@ -230,3 +230,16 @@ test("...and `resume: never` does not override that — they are different state
   const action = decide(s, seen(), now());
   assert.equal(action.do === 'start' ? action.resumeFrom : null, 'sess-1');
 });
+
+// ─── when an attempt ended ──────────────────────────────────────────────────
+
+test('an ended attempt keeps the time it ended: the `at` of its `ended` entry', () => {
+  const [a] = fold(TASK, ran('failed')).attempts;
+  assert.equal(a!.startedAt, at(1));
+  assert.equal(a!.endedAt, at(3));
+});
+
+test('an attempt in flight has no end time, and does not borrow the one before it', () => {
+  const s = fold(TASK, [...ran('failed', 2), { kind: 'starting', at: at(4), attempt: 2 }, { kind: 'spawned', at: at(5), attempt: 2 }]);
+  assert.deepEqual(s.attempts.map((a) => [a.ended, a.endedAt]), [['failed', at(3)], [null, null]]);
+});

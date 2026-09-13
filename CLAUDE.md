@@ -9,8 +9,10 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 ## Check your work
 
 - `npm test` — from the root, turbo runs `node --test test/*.test.ts` in every package
-  (109 engine · 72 workflows · 3 api at 2026-09-12). Runs from a package directory too. Not
-  bare `node --test` from the root: `agent-engine/test/facade.test.ts` is cwd-relative.
+  (181 engine · 135 workflows · 16 api · 17 web at 2026-09-13). Runs from a package directory
+  too. Not bare `node --test` from the root: `agent-engine/test/facade.test.ts` is cwd-relative.
+  To verify a merge, run it serially — `npx turbo run test --concurrency=1` — until the api
+  tests stop depending on the machine's live `claude agents` registry (plan §4b).
 - `npm run typecheck` — `tsc --noEmit` per package. **This is the lint.** There is no eslint or
   biome, on purpose, until one replaces more code than it adds.
 - Run both before you commit. Green is the floor, not the bar: a change that makes the suite

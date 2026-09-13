@@ -426,6 +426,8 @@ and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 Every attempt records `usage` — `{ turns, toolCalls, inputTokens?, outputTokens?, costUsd? }` — and
 `exitCode`, copied from the sighting that ended it. **Each is `null` when nothing measured it,
 never `0`**: a zero that means "nobody counted" reads as "cost nothing". `decide` reads neither.
+An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of its `starting` and
+`ended` entries, `endedAt` being `null` while it runs — so how long it took is on the record.
 
 | runner | `usage` | `exitCode` |
 |---|---|---|
@@ -437,11 +439,12 @@ Two measured traps shape the transcript count. A response is written as one line
 each repeating its message id and usage, so responses are counted once, by id. And a resumed
 transcript holds its parent's conversation with the parent's timestamps, so only what came after
 the session's `startedAt` in `claude agents --json` is counted; a row with no start reports no
-usage rather than a wrong one. `ae show` prints one line per attempt, naming what was not measured:
+usage rather than a wrong one. `ae show` prints one line per attempt — when it ran, then what it
+consumed, naming what was not measured — and an attempt still running as `running since <start>`:
 
 ```
-attempt 1  done  <turns> turns · <calls> tool calls · <in> in · <out> out · cost not measured
-attempt 2  failed  exit 1  usage not measured
+attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · cost not measured
+attempt 2  failed  09:05:02 → 09:05:40 (38s)  exit 1  usage not measured
 ```
 
 ## Letting a sandboxed Codex step commit

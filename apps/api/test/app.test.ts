@@ -50,18 +50,19 @@ const retryingTask = (taskId: string) => journal(taskId, [
 ]);
 
 /**
- * A session of the `codex` harness as its worker leaves it on disk: a run file, and the output.
- * `unreadable` puts a directory where the output should be, so reading it fails.
+ * A session of a detached harness — `codex`, or the run's `check` — as its worker leaves it on disk: a
+ * run file, and the output. `unreadable` puts a directory where the output should be, so reading it fails.
  */
-const codexSession = (taskId: string, attempt: number, output: string | { unreadable: true }) => {
+const detachedSession = (harness: string, taskId: string, attempt: number, output: string | { unreadable: true }, exitCode = 0) => {
   const name = `ae/${taskId}/${attempt}`;
-  const dir = path.join(root, 'engine', 'runs', 'codex');
+  const dir = path.join(root, 'engine', 'runs', harness);
   const base = path.join(dir, name.replace(/[^a-zA-Z0-9]+/g, '_'));
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(`${base}.json`, JSON.stringify({ name, state: 'done', pid: 0, heartbeatAt: at, logFile: `${base}.log`, exitCode: 0 }));
+  fs.writeFileSync(`${base}.json`, JSON.stringify({ name, state: 'done', pid: 0, heartbeatAt: at, logFile: `${base}.log`, exitCode }));
   if (typeof output === 'string') fs.writeFileSync(`${base}.log`, output);
   else fs.mkdirSync(`${base}.log`);
 };
+const codexSession = (taskId: string, attempt: number, output: string | { unreadable: true }) => detachedSession('codex', taskId, attempt, output);
 
 const workflowFolder = (files: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-workflow-'));
@@ -104,6 +105,7 @@ test('runs are read from the workflow store and summarized, with what each step 
   assert.deepEqual(await res.json(), [{
     id: 'r-1', repo: '/code/app', brief: 'Do the thing', createdAt: '2026-09-12T00:00:00.000Z',
     cancelledAt: '2026-09-12T01:00:00.000Z',
+    status: 'cancelled',
     steps: [
       // t-1 is on the record and not in this engine's store: a fresh WF_ROOT has no tasks at all.
       { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown' },
@@ -133,7 +135,8 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   assert.deepEqual({ ...run, steps: undefined }, {
     id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', workflowDir, baseRef: 'def456',
     branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', cancelledAt: null,
-    waitingOnYou: ['implement'], warning: null, steps: undefined,
+    // implement signed off blocked, so review can never be filed: the run is over, and failed.
+    status: 'failed', waitingOnYou: ['implement'], warning: null, steps: undefined,
   });
 
   assert.deepEqual(implement, {
@@ -145,6 +148,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
     status: 'succeeded · BLOCKED',
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
+    check: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   });
 
@@ -156,6 +160,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     taskId: null, workspace: null, branch: null,
     status: 'waiting',
     closeout: null,
+    check: null,
     attempts: { count: 0, latest: null },
   });
   // Not filed, so what it would be given now: implement has run in this workspace, so look there.
@@ -214,11 +219,12 @@ test('a run whose workflow folder is gone still answers, from its record', async
       taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
       status: 'succeeded · BLOCKED',
       closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
+      check: null,
       attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
     },
     {
       name: 'review', spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', closeout: null,
-      attempts: { count: 0, latest: null },
+      check: null, attempts: { count: 0, latest: null },
     },
   ]);
 
@@ -262,6 +268,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     taskId: 't-6', workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
     status: 'succeeded · BLOCKED',
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
+    check: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   });
   assert.deepEqual([review.body, review.spec.after, review.status], ['Review it.', ['replacement'], 'waiting']);
@@ -388,6 +395,192 @@ test('output the engine cannot read is a 502 that says how to read it from the c
   assert.match(body.error, /`wf logs r-10 implement`/);
 });
 
+// ─── what the run established ────────────────────────────────────────────────
+
+const done = { outcome: 'done', summary: 'It is done.', needs: null, artifacts: [] };
+
+/** A task on the run's `check` harness, as the engine journals one: running, or settled with the exit code its process gave, if it gave one. */
+const checkTask = (taskId: string, how: { running: true } | { settled: 'succeeded' | 'failed' | 'stopped'; exitCode?: number }) => journal(taskId, [
+  { ...filed(taskId), harness: 'check' },
+  { kind: 'starting', at, attempt: 1 },
+  { kind: 'spawned', at, attempt: 1 },
+  ...('settled' in how
+    ? [
+        {
+          kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: how.settled === 'succeeded' ? 'done' : how.settled, reason: 'harness',
+          ...(how.exitCode === undefined ? {} : { exitCode: how.exitCode }),
+        },
+        { kind: 'settled', at, outcome: how.settled },
+      ]
+    : []),
+]);
+
+/** A task asked for a closeout, whose session ended without giving one. */
+const silentTask = (taskId: string) => journal(taskId, [
+  { ...filed(taskId), closeoutSchema: { type: 'object' } },
+  { kind: 'starting', at, attempt: 1 },
+  { kind: 'spawned', at, attempt: 1 },
+  { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness' },
+  { kind: 'settled', at, outcome: 'succeeded' },
+]);
+
+/** A test runner's stdout as the check's log keeps it: the command's output, then the exit code the run printed. */
+const refusedOutput = 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1\n\n[wf check] exit 1\n';
+
+/**
+ * A run that froze its workflow, with a step for each thing `wf ls` says the run established: verified;
+ * refused by its check, with an exit code and without one; still checking; done on its own word; ended
+ * without the closeout it was asked for; still running; and waiting behind a refusal.
+ */
+const r20Steps = [
+  { name: 'build', after: [], body: 'Build it.', check: 'npm run build' },
+  { name: 'test', after: [], body: 'Test it.', check: 'npm test' },
+  { name: 'e2e', after: [], body: 'Try it in a browser.', check: 'npm run e2e' },
+  { name: 'lint', after: [], body: 'Lint it.', check: 'npm run lint' },
+  { name: 'docs', after: [], body: 'Write it down.' },
+  { name: 'notes', after: [], body: 'Say what changed.' },
+  { name: 'plan', after: [], body: 'Plan the next one.' },
+  { name: 'ship', after: ['test'], body: 'Ship it.' },
+];
+
+function seedChecks() {
+  for (const step of ['build', 'test', 'e2e', 'lint', 'docs']) settledTask(`t-20-${step}`, done);
+  checkTask('r-20-build-check', { settled: 'succeeded', exitCode: 0 });
+  checkTask('r-20-test-check', { settled: 'failed', exitCode: 1 });
+  detachedSession('check', 'r-20-test-check', 1, refusedOutput, 1);
+  fs.mkdirSync(path.join(root, 'checks'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'checks', 'r-20-test-check.stderr'), 'npm error Test failed.\n');
+  // Stopped at its deadline before it printed anything: no exit code, and no session output.
+  checkTask('r-20-e2e-check', { settled: 'stopped' });
+  checkTask('r-20-lint-check', { running: true });
+  silentTask('t-20-notes');
+  retryingTask('t-20-plan');
+  writeRun({
+    ...r2, id: 'r-20', workflow: r20Steps,
+    // The folder as somebody left it after `wf start`: the same steps, and every `check:` taken out. The
+    // run is judged by the workflow it froze, so these change nothing.
+    workflowDir: workflowFolder(Object.fromEntries(r20Steps.map((s) => [`${s.name}.md`, `${s.after.length ? `---\nafter: ${s.after.join(', ')}\n---\n` : ''}${s.body}\n`]))),
+    steps: {
+      build: { taskId: 't-20-build', check: { taskId: 'r-20-build-check' } },
+      test: { taskId: 't-20-test', check: { taskId: 'r-20-test-check' } },
+      e2e: { taskId: 't-20-e2e', check: { taskId: 'r-20-e2e-check' } },
+      lint: { taskId: 't-20-lint', check: { taskId: 'r-20-lint-check' } },
+      docs: { taskId: 't-20-docs' },
+      notes: { taskId: 't-20-notes' },
+      plan: { taskId: 't-20-plan' },
+      ship: { taskId: null },
+    },
+  });
+
+  // Verified, then done on its own word: every step final, and every one lets a follower be filed.
+  settledTask('t-21-build', done);
+  checkTask('r-21-build-check', { settled: 'succeeded', exitCode: 0 });
+  settledTask('t-21-docs', done);
+  writeRun({
+    ...r2, id: 'r-21', workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'),
+    workflow: [{ name: 'build', after: [], body: 'Build it.', check: 'npm run build' }, { name: 'docs', after: ['build'], body: 'Write it down.' }],
+    steps: { build: { taskId: 't-21-build', check: { taskId: 'r-21-build-check' } }, docs: { taskId: 't-21-docs' } },
+  });
+}
+
+type Said = { name: string; status: string; branch: string | null };
+
+test("each step says what the run established, in `wf ls`'s words, on both endpoints", async () => {
+  seedChecks();
+  const words = [
+    ['build', 'verified ✓'],
+    ['test', 'failed ✗ check (exit 1)'],
+    ['e2e', 'failed ✗ check (unfinished)'],
+    ['lint', 'checking'],
+    ['docs', 'unverified · done'],
+    ['notes', 'unsigned'],
+    ['plan', 'starting'],
+    ['ship', 'waiting'],
+  ];
+  const detail = await (await app.request('/api/runs/r-20')).json();
+  const summary = await listed('r-20');
+  assert.deepEqual(detail.steps.map((s: Said) => [s.name, s.status]), words);
+  assert.deepEqual(summary.steps.map((s: Said) => [s.name, s.status]), words);
+  // The refusals and the step that never signed; not a check still running, nor a step done on its own word.
+  assert.deepEqual(detail.waitingOnYou, ['test', 'e2e', 'notes']);
+  assert.deepEqual(summary.waitingOnYou, ['test', 'e2e', 'notes']);
+  assert.equal(detail.warning, null);
+});
+
+test("the api's words, and who it says is waited on, are `list`'s — a refused check's exit code among them", async () => {
+  const e = engine();
+  for (const id of ['r-20', 'r-21']) {
+    const words = await list(e, readRun(id));
+    const detail = await (await app.request(`/api/runs/${id}`)).json();
+    for (const [where, run] of [['list', await listed(id)], ['detail', detail]]) {
+      assert.deepEqual(run.steps.map(({ name, status, branch }: Said) => ({ name, status, branch })), words.steps, `${id}, ${where}`);
+      assert.deepEqual(run.waitingOnYou, words.waitingOnYou, `${id}, ${where}`);
+    }
+  }
+});
+
+test("a run's status is where `assess` puts it — running, succeeded, failed or cancelled — on both endpoints", async () => {
+  const cases: Array<[id: string, status: string, why: string]> = [
+    ['r-5', 'running', 'a step filed and queued for a slot, its follower still to be filed'],
+    ['r-7', 'running', 'a step on its second attempt'],
+    ['r-21', 'succeeded', 'verified, then done on its own word'],
+    // From before runs froze their workflow, so judged by its folder, as the tick judges it — which has a step still to file.
+    ['r-6', 'running', 'its step signed off blocked, and the folder since gained a step the tick would file'],
+    ['r-20', 'failed', 'a check refused, so what waits on that step waits for ever'],
+    ['r-8', 'failed', 'a step signed off blocked, so its follower will never be filed'],
+    ['r-2', 'cancelled', 'called off, whatever its steps say'],
+    ['r-3', 'cancelled', 'called off, and judged from its record, its folder gone'],
+  ];
+  for (const [id, status, why] of cases) {
+    assert.equal((await listed(id)).status, status, `${id} listed: ${why}`);
+    assert.equal((await (await app.request(`/api/runs/${id}`)).json()).status, status, `${id} in full: ${why}`);
+  }
+});
+
+test("a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines", async () => {
+  const run = await (await app.request('/api/runs/r-20')).json();
+  const checkOf = (name: string) => run.steps.find((s: Said) => s.name === name).check;
+  assert.deepEqual(checkOf('build'), { command: 'npm run build', refused: null });
+  assert.deepEqual(checkOf('lint'), { command: 'npm run lint', refused: null });
+  assert.deepEqual(checkOf('test'), {
+    command: 'npm test',
+    refused: {
+      exit: 'exit 1',
+      stdout: { lines: ['ok 1 - builds', 'not ok 2 - parses a trailing comma', '# fail 1', '', '[wf check] exit 1'], truncated: false },
+      stderr: { lines: ['npm error Test failed.'], truncated: false },
+      unreadable: null,
+    },
+  });
+  // Stopped before it printed: no number, no stderr file, and the engine's word that there is no session to read.
+  assert.deepEqual(checkOf('e2e'), {
+    command: 'npm run e2e',
+    refused: { exit: 'unfinished', stdout: { lines: ['(no session yet)'], truncated: false }, stderr: { lines: [], truncated: false }, unreadable: null },
+  });
+  // No `check:` in the workflow the run froze.
+  for (const name of ['docs', 'notes', 'plan', 'ship']) assert.equal(checkOf(name), null, name);
+});
+
+test("a refused check whose output cannot be read still answers, and says how to read it from the command line", async () => {
+  settledTask('t-22-test', done);
+  checkTask('r-22-test-check', { settled: 'failed', exitCode: 2 });
+  detachedSession('check', 'r-22-test-check', 1, { unreadable: true }, 2);
+  writeRun({
+    ...r2, id: 'r-22', workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'),
+    workflow: [{ name: 'test', after: [], body: 'Test it.', check: 'npm test' }],
+    steps: { test: { taskId: 't-22-test', check: { taskId: 'r-22-test-check' } } },
+  });
+
+  const res = await app.request('/api/runs/r-22');
+  assert.equal(res.status, 200);
+  const [test] = (await res.json()).steps;
+  assert.equal(test.status, 'failed ✗ check (exit 2)');
+  assert.deepEqual({ ...test.check.refused, unreadable: undefined }, {
+    exit: 'exit 2', stdout: { lines: [], truncated: false }, stderr: { lines: [], truncated: false }, unreadable: undefined,
+  });
+  assert.match(test.check.refused.unreadable, /Could not read the output of its check \(task r-22-test-check\)/);
+  assert.match(test.check.refused.unreadable, /`wf decide r-22`/);
+});
+
 test('the list of runs observes the engine once, however many runs and steps are filed', async (t) => {
   // A `claude` ahead of the real one on PATH, which notes each call and sees no sessions of ours.
   const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-bin-'));
@@ -407,8 +600,9 @@ test('the list of runs observes the engine once, however many runs and steps are
   }
   const res = await app.request('/api/runs');
   assert.equal(res.status, 200);
-  const runs: Array<{ steps: Array<{ taskId: string | null }> }> = await res.json();
-  // A view per filed step would have observed once for each of these.
+  const runs: Array<{ steps: Array<{ taskId: string | null; status: string }> }> = await res.json();
+  // A view per filed step would have observed once for each of these, and reading a refused check's log once more for each of those.
   assert.ok(runs.flatMap((r) => r.steps).filter((s) => s.taskId).length >= 3);
+  assert.ok(runs.flatMap((r) => r.steps).some((s) => s.status === 'failed ✗ check (exit 1)'), 'a refused check, worded with its exit code, is on the list');
   assert.equal(observations(), 1);
 });

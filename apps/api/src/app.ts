@@ -1,8 +1,11 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
-import { closeoutOf, engine, listRuns } from 'agent-workflows';
-import { composeBrief, type Run } from 'agent-workflows/run';
+import { checkStderr, closeoutOf, closeoutReader, engine, listRuns, verdictWord } from 'agent-workflows';
+import { assess, composeBrief, listing, type Assessment, type Run, type TaskPhase } from 'agent-workflows/run';
 import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
+
+/** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
+export type RunStatus = Assessment['status'];
 
 /** A run as the web app lists it: what was asked, where, and what each step is doing. */
 export type RunSummary = {
@@ -11,9 +14,10 @@ export type RunSummary = {
   brief: string;
   createdAt: string;
   cancelledAt: string | null;
-  /** `status` is what `wf ls` prints for the step — see `statusOf` for the one word it corrects. */
+  status: RunStatus;
+  /** `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. */
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string }>;
-  /** Steps that signed off blocked, on a run nobody has called off. */
+  /** Steps a person has to act on — blocked, unsigned, or refused by their check — on a run nobody has called off. */
   waitingOnYou: string[];
 };
 
@@ -36,6 +40,24 @@ export type StepCloseout = {
   artifacts: string[];
 };
 
+/**
+ * The command a step is judged by, and what it said once it refused.
+ *
+ * `command` is from the workflow the run froze at `wf start`: the one the run executes. `refused` is set
+ * once the check settled failed or stopped: `exit` in `wf ls`'s words (`exit 1`, `unfinished`), then the
+ * end of each of its streams, as `wf decide` shows them.
+ */
+export type StepCheck = {
+  command: string;
+  refused: {
+    exit: string;
+    stdout: StepLog;
+    stderr: StepLog;
+    /** Why its output could not be read, when it could not. */
+    unreadable: string | null;
+  } | null;
+};
+
 /** One run in full, for a person reading it: the spec, and per step what it was told and how it went. */
 export type RunDetail = {
   id: string;
@@ -47,6 +69,7 @@ export type RunDetail = {
   isolate: boolean;
   createdAt: string;
   cancelledAt: string | null;
+  status: RunStatus;
   waitingOnYou: string[];
   /** Set when the workflow folder cannot be read, or no longer has the steps the run started with. */
   warning: string | null;
@@ -62,6 +85,8 @@ export type RunDetail = {
     branch: string | null;
     status: string;
     closeout: StepCloseout | null;
+    /** Null for a step with no `check:` in the workflow the run froze. */
+    check: StepCheck | null;
     attempts: StepAttempts;
   }>;
 };
@@ -102,14 +127,16 @@ type TaskView = Awaited<ReturnType<typeof e.view>>;
 type Views = ReadonlyMap<string, TaskView>;
 
 /**
- * The engine's view of every task a run has filed, for one run's page. Each `view` observes every
- * harness — a `claude agents` call, a scan of detached runs — so this is an observation per filed
- * step, and a request reads each task once. The list of every run reads them with `everyView`.
+ * The engine's view of every task a run has filed — each step's, and each check's — for one run's page.
+ * Each `view` observes every harness — a `claude agents` call, a scan of detached runs — so this is an
+ * observation per filed task, and a request reads each task once. The list of every run reads them with
+ * `everyView`.
  */
 async function viewsOf(run: Run): Promise<Views> {
   const views = new Map<string, TaskView>();
-  for (const { taskId } of Object.values(run.steps)) {
+  for (const { taskId, check } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
+    if (check) views.set(check.taskId, await e.view(check.taskId));
   }
   return views;
 }
@@ -152,7 +179,8 @@ function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { steps: 
  * Every step on the record, in the record's order — the workflow's order when the run started —
  * because the record is the truth about what ran, whatever the folder says now; `wf decide` reads
  * the record too. Then any step the folder has and the record does not: `wf start` records every
- * step it finds, so those were added since, and the tick will file them, because it reads the folder.
+ * step it finds, so those were added since. The tick files them only on a record from before runs
+ * froze their workflow, which it reads from the folder; on a run that froze one they stay `waiting`.
  */
 function stepNames(run: Run, workflows: readonly Workflow[] | null): string[] {
   const added = (workflows ?? []).map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
@@ -172,35 +200,74 @@ function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
 }
 
 /**
- * What `wf ls` says about a step, over one read of its task.
- *
- * `listing`'s rule (agent-workflows/src/run.ts), with one correction: a task the engine has no
- * record of is `unknown`, the line `phaseOfView` in runner.ts draws. `list` passes the engine's own
- * `pending` through for it, so a task lost from the engine's store would read as queued behind a
- * slot. Worded here rather than by calling `list`, which words only the steps now in the folder and
- * would read every task a second time. The api test holds these words to `list`'s wherever `list`
- * is right.
+ * The steps a run is judged by: the workflow it froze at `wf start`, which the tick reads (`stepsOf` in
+ * runner.ts), and for a record from before runs froze one, the folder. A record whose folder no longer
+ * reads is judged from the record alone, a `bare` step each.
  */
-function statusOf(run: Run, name: string, views: Views): string {
-  const taskId = run.steps[name]?.taskId;
-  if (!taskId) return 'waiting';
+const judgedSteps = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] =>
+  run.workflow ?? folder ?? Object.keys(run.steps).map(bare);
+
+/** A step nothing defines any more. All the record says of it is its name: no `after`, `check:` or `output:`. */
+const bare = (name: string): Workflow => ({ name, after: [], body: '' });
+
+/**
+ * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `wf ls` shows it.
+ *
+ * With one correction: a task the engine has no record of is `unknown`, the line `phaseOfView` in
+ * runner.ts draws. `list` passes the engine's own `pending` through for it, so a task lost from the
+ * engine's store would read as queued behind a slot.
+ */
+const wordOf = (views: Views) => (taskId: string): string => {
   const view = views.get(taskId);
   // Every filed task has the brief it was filed with; only a task the engine never heard of has none.
-  if (!view?.state.brief) return 'unknown';
-  const c = closeoutOf(views, run, name);
-  if (!c) return view.phase;
-  if ('error' in c) return `${view.phase} · closeout unreadable`;
-  return `${view.phase} · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
-}
+  return view?.state.brief ? view.phase : 'unknown';
+};
 
-/** Steps that signed off blocked, on a run nobody has called off. */
-const waitingOn = (run: Run, names: readonly string[], views: Views): string[] =>
-  run.cancelledAt
-    ? []
-    : names.filter((name) => {
-        const c = closeoutOf(views, run, name);
-        return c !== undefined && !('error' in c) && c.outcome === 'blocked';
-      });
+/** Settled one way or another, or not yet: all `assess` asks of a task's phase. */
+const phaseOf = (views: Views) => (taskId: string): TaskPhase => views.get(taskId)?.state.settled ?? 'running';
+
+/** Whether a task was asked for a closeout: the schema on the engine's record of its filing. `closeoutAsked` in runner.ts, not exported. */
+const askedOf = (views: Views) => (taskId: string): boolean => Boolean(views.get(taskId)?.state.closeoutSchema);
+
+/**
+ * What a step's check exited with: the exit code the engine recorded off the check's process, or
+ * `unfinished` when it recorded none — killed at its deadline, stopped, or never started.
+ *
+ * `wf ls` reads the number off the `[wf check] exit N` line the check prints last (`readVerdict`), and
+ * the check's shell exits with the code it prints, so the two agree. Reading the log here would cost a
+ * `logs` call per refused check, and each call observes every harness again: the list of every run would
+ * observe once more for each refused check on the board, every poll.
+ */
+const verdictOf = (run: Run, views: Views) => (name: string): number | 'unfinished' => {
+  const taskId = run.steps[name]?.check?.taskId;
+  const exitCode = taskId ? views.get(taskId)?.state.attempts.at(-1)?.exitCode : null;
+  return typeof exitCode === 'number' ? exitCode : 'unfinished';
+};
+
+/** What the run established, over one read of its tasks: each step's word, who is waited on, and where the run stands. */
+type Judged = { words: ReadonlyMap<string, string>; waitingOnYou: string[]; status: RunStatus };
+
+/**
+ * What `wf ls` says about each step, and what `assess` says about the run.
+ *
+ * The words are `listing`'s — `verified ✓`, `checking`, `unverified · done`, `failed ✗ check (exit 1)`,
+ * `unsigned`, `succeeded · BLOCKED`, and the engine's own word while a step runs — with `wordOf`'s one
+ * correction. A step the page shows and the tick does not judge — one the folder gained after the run froze
+ * its workflow, or one a pre-freeze record has and its folder lost — is worded as a `bare` step, and has no
+ * say in the run's status. Everything is read off the views the request already has: calling `list` would
+ * read every task again, and word only the steps the tick judges. The api test holds these words to `list`'s.
+ */
+function judge(run: Run, names: readonly string[], folder: readonly Workflow[] | null, views: Views): Judged {
+  const steps = judgedSteps(run, folder);
+  const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
+  const asked = askedOf(views);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdictOf(run, views));
+  return {
+    words: new Map(said.steps.map((s) => [s.name, s.status])),
+    waitingOnYou: names.filter((name) => said.waitingOnYou.includes(name)),
+    status: assess(steps, run, phaseOf(views), closeoutReader(views, run), asked).status,
+  };
+}
 
 /**
  * What a step was told.
@@ -219,20 +286,23 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
 }
 
 function summarize(run: Run, views: Views): RunSummary {
-  const names = stepNames(run, workflowsOf(run).steps);
+  const folder = workflowsOf(run).steps;
+  const names = stepNames(run, folder);
+  const judged = judge(run, names, folder, views);
   return {
     id: run.id,
     repo: run.repo,
     brief: run.brief,
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
+    status: judged.status,
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
       branch: run.steps[name]?.branch ?? null,
-      status: statusOf(run, name, views),
+      status: judged.words.get(name)!,
     })),
-    waitingOnYou: waitingOn(run, names, views),
+    waitingOnYou: judged.waitingOnYou,
   };
 }
 
@@ -251,6 +321,8 @@ async function detail(run: Run): Promise<RunDetail> {
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
   const views = await viewsOf(run);
+  const judged = judge(run, names, workflows, views);
+  const checks = await checksOf(run, judgedSteps(run, workflows), views);
   return {
     id: run.id,
     brief: run.brief,
@@ -261,7 +333,8 @@ async function detail(run: Run): Promise<RunDetail> {
     isolate: run.isolate,
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
-    waitingOnYou: waitingOn(run, names, views),
+    status: judged.status,
+    waitingOnYou: judged.waitingOnYou,
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
     steps: names.map((name) => {
       const step = workflows?.find((s) => s.name === name);
@@ -274,11 +347,12 @@ async function detail(run: Run): Promise<RunDetail> {
         taskId: run.steps[name]?.taskId ?? null,
         workspace: run.steps[name]?.workspace ?? null,
         branch: run.steps[name]?.branch ?? null,
-        status: statusOf(run, name, views),
+        status: judged.words.get(name)!,
         // An unreadable closeout is already in `status`; there is nothing here to show of it.
         closeout: c && !('error' in c)
           ? { outcome: c.outcome, summary: c.summary, needs: c.needs ?? null, artifacts: c.artifacts }
           : null,
+        check: checks.get(name) ?? null,
         attempts: attemptsOf(run, name, views),
       };
     }),
@@ -305,6 +379,57 @@ function tailOf(output: string, max: number): StepLog {
   // Output that ends in a newline has not begun another line.
   if (lines.at(-1) === '') lines.pop();
   return lines.length > max ? { lines: lines.slice(-max), truncated: true } : { lines, truncated: false };
+}
+
+/** How many lines of each stream a refused check shows: as many as `wf decide` does (`CHECK_TAIL_LINES`). */
+const CHECK_LINES = 20;
+
+/**
+ * Each judged step's check: its command, and for a check that refused, what it said — what `checkReports`
+ * in runner.ts reads for `wf ls` and `wf decide`, which the package does not export. A `logs` call per
+ * refused check, which observes every harness again: on one run's page, and never on the list.
+ */
+async function checksOf(run: Run, steps: readonly Workflow[], views: Views): Promise<Map<string, StepCheck>> {
+  const checks = new Map<string, StepCheck>();
+  for (const step of steps) {
+    if (!step.check) continue;
+    const taskId = run.steps[step.name]?.check?.taskId;
+    const settled = taskId ? views.get(taskId)?.state.settled : null;
+    if (!taskId || (settled !== 'failed' && settled !== 'stopped')) {
+      checks.set(step.name, { command: step.check, refused: null });
+      continue;
+    }
+    let stdout: StepLog = { lines: [], truncated: false };
+    let unreadable: string | null = null;
+    try {
+      stdout = tailOf(await e.logs(taskId), CHECK_LINES);
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      unreadable = `Could not read the output of its check (task ${taskId}): ${why}. \`wf decide ${run.id}\` reads it the same way from the command line.`;
+    }
+    checks.set(step.name, {
+      command: step.check,
+      refused: { exit: verdictWord(verdictOf(run, views)(step.name)), stdout, stderr: tailOf(endOf(checkStderr(taskId)), CHECK_LINES), unreadable },
+    });
+  }
+  return checks;
+}
+
+/** The end of a file that may be large, or absent: a check stopped before it started wrote no stderr. */
+function endOf(file: string, bytes = 64_000): string {
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const size = fs.fstatSync(fd).size;
+      const buf = Buffer.alloc(Math.min(size, bytes));
+      fs.readSync(fd, buf, 0, buf.length, size - buf.length);
+      return buf.toString('utf8');
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    return '';
+  }
 }
 
 /** Found among the runs the store has, not read by path, so no id can name a file outside it. */

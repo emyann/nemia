@@ -5,7 +5,7 @@ it can be picked up later without reconstructing it from commit history. The las
 record of what was fixed, with commits, so the open items have their context.
 
 State as of 2026-09-13: agent-engine after the hold-the-bar engine work (repository
-`docs/plan-hold-the-bar.md` §4 B), agent-workflows `0e7b02a`.
+`docs/plan-hold-the-bar.md` §4 B and E4), agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -117,15 +117,57 @@ anyway. Refusing such a list on Codex is the stricter choice, and it was not mad
 workflow layer plans for its reviewer (`Read, Grep, Glob, Bash`, plan package I) is exactly such a
 list, and what fences that reviewer on Codex is `permissionMode: read-only`.
 
+### 9. A Codex task still has the operator's MCP servers
+
+**The finding** (2026-09-13, plan §4 E4). A `claude --bg` step was spawned with no MCP flags, so it
+loaded every server the operator has. Measured on Claude Code 2.1.270, from the `init` event of
+`claude -p` in an empty directory holding a `.mcp.json`: `claude-design` from `~/.claude.json`; the
+claude.ai connectors Gmail, Google Drive, Google Calendar and a LoL server; and the `.mcp.json`
+server, which no setting had approved. With `--strict-mcp-config`, none of them — the `.mcp.json`
+server included. With that file also named by `--mcp-config`, that server only. And a live `--bg`
+session spawned strict still had Claude in Chrome connecting: a user setting switches it on, and no
+config names it. hkb closed the same hole with `strictMcpConfig` (its ADR-013).
+
+**Fixed for Claude Code** (engine `5340772`, `945bf46`): every `claude` and `claude-detached` spawn is
+`--strict-mcp-config --no-chrome`, and names the checkout's `.mcp.json` and the task's `mcp`.
+
+**Open for Codex.** `codex exec` is given a task's `mcp` as one `-c mcp_servers={…}` override, and the
+override is merged into the table `~/.codex/config.toml` has, not put in its place: with
+`-c mcp_servers={}`, a configured server stayed listed and enabled (`codex mcp list`, codex-cli
+0.154.0). Codex has no strict flag. A task's server that shares an operator server's name is merged
+into it, and fails to load if the transports differ (`url is not supported for stdio`).
+
+**Proposed fix.** `-c mcp_servers.<name>.enabled=false` disables a server (measured with `codex mcp
+list`), so a `prepare` could disable every server the operator's Codex has that the task does not
+name. Not done: the names would have to come from `config.toml`, a profile, and whatever else 0.154.0
+layers in, and a list that misses one is a fence that looks closed. The machine this was measured on
+has no Codex servers configured.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
   2026-09-13: a session with `tools: Read, Grep, Glob`, told to write a file, wrote none and still gave
   its closeout; the same brief without the list wrote the file. Both ran at `effort: low`, so
   `--effort` is accepted under `--bg`; that it changes anything was not measured.
+- **The MCP fence under `--bg`** (engine `945bf46`). `test/live.test.ts` on Claude Code 2.1.270,
+  2026-09-13: a session with no `mcp`, in an empty directory, reported no MCP server and no MCP tool,
+  and its transcript shows none pending or failed; the control, given one stdio server through
+  `mcp`, reported `aeprobe` and `mcp__aeprobe__ping` and nothing else. So `--mcp-config`,
+  `--strict-mcp-config` and `--no-chrome` are all taken under `--bg`. Servers connect after a `--bg`
+  session starts, so the brief has the session sleep while one is still connecting; the first run did
+  not, answered too early in both sessions, and so showed Chrome still connecting under strict.
 
 ## Verified by tests, not by a live run
 
+- **`claude-detached` under the MCP fence** (engine `5340772`, `945bf46`). Argv tests only; the live
+  run was `--bg`. That `-p` takes `--strict-mcp-config --no-chrome`, and loads a `.mcp.json` named by
+  `--mcp-config` under strict, was seen in `claude -p`'s `init` event, with a model name that cannot
+  answer — so nothing was spent, and nothing was asked.
+- **Codex `mcp_servers`** (engine `5340772`). The override was read back by `codex mcp get --json` as
+  exactly the task's arguments — quotes, a backslash, a newline, a non-ASCII character — with
+  `headers` as `http_headers`. No `codex exec` has run with one.
+- **A task's `url` server under Claude Code.** Only the refusal of one with no `type` rests on a
+  measurement (`claude -p` loaded nothing from it); no session has used an http server from `mcp`.
 - **Resuming a Codex task** (`f63dc55`). The argument order is checked against Codex's own parser; no
   workflow has resumed a Codex step, so whether exec-level `-C` and `-s` apply to the resumed session
   is unknown.
@@ -154,7 +196,10 @@ list, and what fences that reviewer on Codex is `permissionMode: read-only`.
    line for a run with a blocked step; `closeout unreadable` for an answer that cannot be parsed; no
    such line for a cancelled run. The reasons are in `RESPONSE.md` on
    `wf/make-wf-ls-say-how-each-fini-zpp7/respond`.
-5. **hkb migration**: two decisions to make before starting — see
+5. **Should a task be able to ask for Claude in Chrome?** Every Claude Code spawn is `--no-chrome`
+   (bug 9): a step cannot drive the operator's signed-in browser. Allowing it would be a field that
+   says so, not a default; nothing has asked for one.
+6. **hkb migration**: two decisions to make before starting — see
    [hkb-migration.md](hkb-migration.md), "Two consequences to decide on *before* starting".
 
 ## Fixed
@@ -183,6 +228,7 @@ list, and what fences that reviewer on Codex is `permissionMode: read-only`.
 | cost and turns had a field no wired runner filled and no record kept | `usage` and `exitCode` on the attempt, `null` when unmeasured | engine `4db1213` |
 | a spawn the harness refused rejected the whole tick, stalling every task behind it | a refusal the harness vouches for ends the attempt `unstartable`; any other spawn error is journalled as spawned and left to the grace window, so a session it did start is still adopted (the first version ended every spawn error; found in review) | engine `8a52173`, `0d5c720` |
 | a detached harness launched into a missing cwd killed the process that launched it: the child's `error` event went unheard | the cwd is checked first and refused; the child's `error` is heard | engine `0d5c720` |
+| a `claude --bg` step loaded the operator's MCP servers — `~/.claude.json`, the claude.ai connectors (mail, calendar, drive) — and Claude in Chrome, beside the checkout's `.mcp.json` | `mcp` carried on the task and refused unless it is `.mcp.json` servers; every Claude Code spawn `--strict-mcp-config --no-chrome`, naming the checkout's `.mcp.json` and the task's map (the Codex half is bug 9) | engine `5340772`, `945bf46` |
 | the tests were never typechecked, and a required `PromiseJournal.watch` that nothing called hid there | `test/` in the typecheck; the dead method gone | engine `9aaa38b` |
 | the README claimed `AE_RUNNER=sdk`, "refuse a tool call: no", 25 tests, a file table 2–3× off, and "three next things" already done (bug 5) | made true; `test/readme.test.ts` refuses each of those classes | engine `f947da4` |
 | a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |

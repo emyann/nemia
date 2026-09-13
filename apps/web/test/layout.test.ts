@@ -5,7 +5,7 @@ import { COLUMN_WIDTH, layers, layout, ROW_HEIGHT } from '../src/lib/layout.ts';
 // A layering that loops would hang the suite rather than fail it; these fail it.
 const bounded = { timeout: 2_000 };
 
-test('a chain is one column, a row per step, in the order it runs', bounded, () => {
+test('a chain is one row, a column per step, in the order it runs', bounded, () => {
   const steps = [
     { name: 'respond', after: ['review'] },
     { name: 'implement', after: [] },
@@ -14,24 +14,43 @@ test('a chain is one column, a row per step, in the order it runs', bounded, () 
   assert.deepEqual(layers(steps), [['implement'], ['review'], ['respond']]);
   assert.deepEqual(Object.fromEntries(layout(steps)), {
     implement: { x: 0, y: 0 },
-    review: { x: 0, y: ROW_HEIGHT },
-    respond: { x: 0, y: 2 * ROW_HEIGHT },
+    review: { x: COLUMN_WIDTH, y: 0 },
+    respond: { x: 2 * COLUMN_WIDTH, y: 0 },
   });
 });
 
-test('a fan-in is placed below both of its parents, between them', bounded, () => {
+test('a fan-in is placed to the right of both of its parents, between them vertically', bounded, () => {
   const at = layout([
     { name: 'api', after: [] },
     { name: 'web', after: [] },
     { name: 'merge', after: ['api', 'web'] },
   ]);
   const [api, web, merge] = [at.get('api')!, at.get('web')!, at.get('merge')!];
-  assert.ok(merge.y > api.y && merge.y > web.y, JSON.stringify({ api, web, merge }));
-  assert.ok(api.x < merge.x && merge.x < web.x, JSON.stringify({ api, web, merge }));
-  assert.equal(web.x - api.x, COLUMN_WIDTH);
+  assert.ok(merge.x > api.x && merge.x > web.x, JSON.stringify({ api, web, merge }));
+  assert.ok(api.y < merge.y && merge.y < web.y, JSON.stringify({ api, web, merge }));
+  // The parents stand in one column, a row apart.
+  assert.equal(api.x, web.x);
+  assert.equal(web.y - api.y, ROW_HEIGHT);
 });
 
-test('a step goes below the deepest step it waits on, not the nearest', bounded, () => {
+test('every edge points right, however the steps fan out and in', bounded, () => {
+  const steps = [
+    { name: 'plan', after: [] },
+    { name: 'api', after: ['plan'] },
+    { name: 'web', after: ['plan'] },
+    { name: 'docs', after: [] },
+    { name: 'merge', after: ['api', 'web', 'docs'] },
+    { name: 'ship', after: ['merge', 'plan'] },
+  ];
+  const at = layout(steps);
+  for (const step of steps) {
+    for (const parent of step.after) {
+      assert.ok(at.get(step.name)!.x > at.get(parent)!.x, `${parent} -> ${step.name}: ${JSON.stringify(Object.fromEntries(at))}`);
+    }
+  }
+});
+
+test('a step goes right of the deepest step it waits on, not the nearest', bounded, () => {
   assert.deepEqual(layers([
     { name: 'plan', after: [] },
     { name: 'build', after: ['plan'] },
@@ -39,13 +58,16 @@ test('a step goes below the deepest step it waits on, not the nearest', bounded,
   ]), [['plan'], ['build'], ['ship']]);
 });
 
-test('within a row, steps follow their parents, so a fan-out does not cross', bounded, () => {
-  assert.deepEqual(layers([
-    { name: 'left', after: [] },
-    { name: 'right', after: [] },
-    { name: 'under-right', after: ['right'] },
-    { name: 'under-left', after: ['left'] },
-  ]), [['left', 'right'], ['under-left', 'under-right']]);
+test('within a column, steps follow their parents, so a fan-out does not cross', bounded, () => {
+  const steps = [
+    { name: 'top', after: [] },
+    { name: 'bottom', after: [] },
+    { name: 'after-bottom', after: ['bottom'] },
+    { name: 'after-top', after: ['top'] },
+  ];
+  assert.deepEqual(layers(steps), [['top', 'bottom'], ['after-top', 'after-bottom']]);
+  const at = layout(steps);
+  assert.ok(at.get('after-top')!.y < at.get('after-bottom')!.y, JSON.stringify(Object.fromEntries(at)));
 });
 
 test('a cycle is refused, naming the steps in it, and the layering does not loop', bounded, () => {

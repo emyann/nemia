@@ -12,9 +12,14 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
 /**
  * One step on the canvas: which step, what it runs on, and what it is doing now.
  *
- * `w-56` is narrower than the layering's column, which leaves the gap between nodes in a row.
+ * `w-56` is narrower than the layering's column, which leaves room for the arrow between columns.
  */
-export function StepNode({ data: { step, index, runCancelled }, selected }: NodeProps<StepFlowNode>) {
+export function StepNode({
+  data: { step, index, runCancelled },
+  selected,
+  sourcePosition = Position.Right,
+  targetPosition = Position.Left,
+}: NodeProps<StepFlowNode>) {
   const state = stepState(step.status, runCancelled);
   const live = isLive(state);
   // Every second while the attempt's time is counting; otherwise only "started … ago" moves.
@@ -36,7 +41,7 @@ export function StepNode({ data: { step, index, runCancelled }, selected }: Node
         selected ? 'outline-2 outline-offset-2 outline-neutral-900 dark:outline-neutral-100' : '',
       ].join(' ')}
     >
-      <Handle type="target" position={Position.Top} isConnectable={false} className="opacity-0" />
+      <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
 
       <div className="px-3 pt-2 pb-2">
         <div className="flex items-center justify-between gap-2">
@@ -74,7 +79,7 @@ export function StepNode({ data: { step, index, runCancelled }, selected }: Node
         </p>
       )}
 
-      <Handle type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
+      <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
     </div>
   );
 }

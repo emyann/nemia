@@ -7,6 +7,7 @@ import {
   MarkerType,
   MiniMap,
   Panel,
+  Position,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
@@ -77,6 +78,9 @@ const nodeAt = (run: RunDetail, index: number, position: Point): StepFlowNode =>
   id: run.steps[index]!.name,
   type: 'step',
   position,
+  // The graph reads left to right: an edge leaves a step on its right and arrives on the left.
+  sourcePosition: Position.Right,
+  targetPosition: Position.Left,
   data: { step: run.steps[index]!, index, runCancelled: run.cancelledAt !== null },
 });
 

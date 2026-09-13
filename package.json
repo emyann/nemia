@@ -18,6 +18,7 @@
     "e2e": "npm run e2e --workspace web"
   },
   "devDependencies": {
+    "@playwright/mcp": "0.0.80",
     "@types/node": "^22.20.2",
     "turbo": "^2.10.12",
     "typescript": "^5.9.3"

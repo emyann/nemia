@@ -7,9 +7,27 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
-import { STEP_KEYS, type StepKey } from '../src/workflow.ts';
+import { CLOSEOUT_FIELDS, outputFields, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
+
+/** A strict output schema: `findings`, each a file, a line and what would go wrong. */
+const FINDINGS = {
+  type: 'object',
+  properties: {
+    findings: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { file: { type: 'string' }, line: { type: ['integer', 'null'] }, what: { type: 'string' } },
+        required: ['file', 'line', 'what'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['findings'],
+  additionalProperties: false,
+};
 
 test('a step is frontmatter and prose, and the prose is the point', () => {
   const w = parseWorkflow('review', '---\nharness: codex\nafter: implement\n---\nRead the diff.\n');
@@ -144,17 +162,20 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 
 test('every key a step has is read — none is accepted and then dropped', () => {
   const values: Record<StepKey, string> = {
-    after: 'implement', resume: 'implement', harness: 'codex', model: 'gpt-5.1', permissionMode: 'read-only',
-    deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1',
+    after: 'implement', resume: 'implement', input: 'implement', harness: 'codex', model: 'gpt-5.1', permissionMode: 'read-only',
+    deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
   };
-  const w = fm('review', Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n'));
+  const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
+  const w = parseWorkflow('review', text, (file) => (file === 'review.schema.json' ? JSON.stringify(FINDINGS) : undefined));
   for (const key of STEP_KEYS) assert.notEqual(w[key], undefined, `${key} is on the list and never read`);
   assert.equal(w.deadlineSeconds, 900);
   assert.equal(w.retries, 1);
+  assert.deepEqual(w.input, ['implement']);
+  assert.deepEqual(w.output, { file: 'review.schema.json', schema: FINDINGS });
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, harness, model, permissionMode, deadlineSeconds, maxAttempts, check, retries.";
+  const list = "A step's keys are: after, resume, input, harness, model, permissionMode, deadlineSeconds, maxAttempts, check, retries, output.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -249,4 +270,156 @@ test('frontmatter that never closes is refused; a file saved on Windows keeps it
   assert.equal(crlf.harness, 'codex');
   assert.deepEqual(crlf.after, ['implement']);
   assert.equal(parseWorkflow('x', '---\n---\nbody').body, 'body', 'an empty frontmatter is still frontmatter');
+});
+
+// ─── what a step declares, and what it reads ────────────────────────────────
+
+/**
+ * A workflow folder: `implement`, then `review` declaring `output: review.schema.json`, then whatever
+ * `files` add or replace — by file name, text or a schema object; `null` leaves the file out.
+ */
+const outputFolder = (files: Record<string, string | object | null> = {}) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-output-'));
+  const all: Record<string, string | object | null> = {
+    'implement.md': 'implement it\n',
+    'review.md': '---\nafter: implement\noutput: review.schema.json\n---\nreview it\n',
+    'review.schema.json': FINDINGS,
+    ...files,
+  };
+  for (const [name, content] of Object.entries(all)) {
+    if (content === null) continue;
+    fs.writeFileSync(path.join(dir, name), typeof content === 'string' ? content : JSON.stringify(content, null, 2));
+  }
+  return dir;
+};
+
+/** Load `outputFolder(files)` and hand back the refusal's message, failing if there was none. */
+const refusal = (files: Record<string, string | object | null>): string => {
+  try {
+    loadWorkflows(outputFolder(files));
+  } catch (e) {
+    assert.ok(e instanceof WorkflowError, String(e));
+    assert.equal(e.exitCode, 2, 'the author has something to fix');
+    return e.message;
+  }
+  return assert.fail('loaded, and should have been refused');
+};
+
+test('`output:` is read at load — the file as the step names it, and the schema it held — and is not a step', () => {
+  const dir = outputFolder();
+  const steps = loadWorkflows(dir);
+  assert.deepEqual(steps.map((s) => s.name), ['implement', 'review'], 'a .json beside the steps is not one');
+  const review = steps.find((s) => s.name === 'review')!;
+  assert.deepEqual(review.output, { file: 'review.schema.json', schema: FINDINGS });
+  assert.deepEqual(outputFields(review), ['findings']);
+  assert.equal(steps.find((s) => s.name === 'implement')!.output, undefined, 'absent means the step declares nothing');
+
+  // Relative to the workflow folder, not to wherever `wf start` was typed.
+  fs.mkdirSync(path.join(dir, 'schemas'));
+  fs.renameSync(path.join(dir, 'review.schema.json'), path.join(dir, 'schemas', 'review.json'));
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: schemas/review.json\n---\nreview it\n');
+  assert.deepEqual(loadWorkflows(dir).find((s) => s.name === 'review')!.output?.schema, FINDINGS);
+});
+
+test('an `output:` file that is not there is refused at load, with the fix', () => {
+  assert.match(refusal({ 'review.schema.json': null }),
+    /^review: `output: review\.schema\.json` is not there\. It is a JSON Schema file, relative to the workflow folder — write it beside review\.md/);
+  assert.match(refusal({ 'review.schema.json': null, 'review.schema.json.md': 'not the schema\n' }), /is not there/);
+  // A step read without its folder has nowhere to read the file from, and does not pretend it has none.
+  assert.throws(() => parseWorkflow('review', '---\noutput: review.schema.json\n---\nreview it\n'), /review: `output: review\.schema\.json` names a file beside the step, and this step was read without its folder/);
+});
+
+test('an output schema that is not strict is refused, and says where', () => {
+  const items = FINDINGS.properties.findings.items;
+  const withItems = (changed: object) => ({ ...FINDINGS, properties: { findings: { type: 'array', items: { ...items, ...changed } } } });
+  const { additionalProperties: _, ...open } = FINDINGS;
+
+  assert.match(refusal({ 'review.schema.json': { ...FINDINGS, required: [] } }),
+    /review: `output: review\.schema\.json` is not strict at the top: `findings` is not in `required`\. Codex refuses/);
+  assert.match(refusal({ 'review.schema.json': open }), /not strict at the top: `additionalProperties` is not `false`/);
+  assert.match(refusal({ 'review.schema.json': { ...FINDINGS, required: ['findings', 'ghost'] } }), /not strict at the top: `required` names `ghost`, which is not a property/);
+  assert.match(refusal({ 'review.schema.json': withItems({ required: ['file', 'what'] }) }),
+    /not strict at findings\[\]: `line` is not in `required`\. .*required and nullable instead/);
+  assert.match(refusal({ 'review.schema.json': withItems({ additionalProperties: true }) }), /not strict at findings\[\]: `additionalProperties` is not `false`/);
+  const deep = withItems({ properties: { ...items.properties, fix: { anyOf: [{ type: 'null' }, { type: 'object', properties: { patch: { type: 'string' } } }] } }, required: [...items.required, 'fix'] });
+  assert.match(refusal({ 'review.schema.json': deep }), /not strict at findings\[\]\.fix\.anyOf\[1\]: `patch` is not in `required`/);
+
+  // Not a schema of fields at all.
+  assert.match(refusal({ 'review.schema.json': '{ "findings": ' }), /`output: review\.schema\.json` is not JSON \(/);
+  for (const shape of [[], { type: 'array', items: {} }, { type: 'object', properties: {}, required: [], additionalProperties: false }]) {
+    assert.match(refusal({ 'review.schema.json': shape }), /is not a schema of fields\. Give it `"type": "object"` and at least one field/, JSON.stringify(shape));
+  }
+  // Only `properties` is merged into the closeout: a definition beside them would not reach the harness.
+  assert.match(refusal({ 'review.schema.json': { ...FINDINGS, $defs: { finding: items } } }), /sets `\$defs` beside its fields, and only its `properties` are merged/);
+});
+
+test('an output schema that names a field every closeout already has is refused', () => {
+  for (const field of CLOSEOUT_FIELDS) {
+    const schema = { type: 'object', properties: { ...FINDINGS.properties, [field]: { type: 'string' } }, required: ['findings', field], additionalProperties: false };
+    assert.match(refusal({ 'review.schema.json': schema }),
+      new RegExp(`review: \`output: review\\.schema\\.json\` declares \`${field}\`, which every closeout already has\\. .*\`summary\` goes to the person who decides, never to a step`), field);
+  }
+});
+
+test('`input:` names steps this one waits on — directly, or through `resume` — and is refused on any other', () => {
+  const respond = (keys: string) => ({ 'respond.md': `---\n${keys}\n---\nanswer it\n` });
+
+  assert.deepEqual(loadWorkflows(outputFolder(respond('after: review\ninput: review'))).find((s) => s.name === 'respond')!.input, ['review']);
+  assert.deepEqual(loadWorkflows(outputFolder(respond('resume: review\ninput: review'))).find((s) => s.name === 'respond')!.input, ['review'], 'resume implies after');
+  assert.deepEqual(fm('integrate', 'after: a, b\ninput: a, b').input, ['a', 'b'], 'a list, like `after`');
+  assert.equal(fm('x', 'after: a').input, undefined, 'absent means the step reads nothing');
+  // A step handed a resume without the `after` the parser adds is still reading finished work.
+  validate([step('implement'), { ...step('review', ['implement']), output: { file: 'r.json', schema: FINDINGS as never } }, { name: 'respond', after: [], resume: 'review', input: ['review'], body: 'x' }]);
+
+  const notAfter = /respond: `input: review`, but respond does not wait on review — a step cannot read the product of work that has not finished\. Add review to `after:`, or delete the line\./;
+  assert.match(refusal(respond('after: implement\ninput: review')), notAfter);
+  assert.match(refusal(respond('input: review')), notAfter, 'a root reads nothing');
+  // Directly: a step two back has finished too, but the key names what this step waits on.
+  const implementDeclares = { 'implement.md': '---\noutput: review.schema.json\n---\nimplement it\n' };
+  assert.match(refusal({ ...implementDeclares, ...respond('after: review\ninput: implement') }), /respond: `input: implement`, but respond does not wait on implement/);
+});
+
+test('`input:` naming no step, or a step that declares no output, is refused — nothing of its closeout would travel', () => {
+  const respond = (keys: string) => ({ 'respond.md': `---\n${keys}\n---\nanswer it\n` });
+  assert.match(refusal(respond('after: review\ninput: reveiw')), /respond: `input: reveiw` names a step that is not here\. Correct the name, or delete the line\./);
+  assert.match(refusal(respond('after: implement\ninput: implement')),
+    /respond: `input: implement`, but implement declares no `output:`, so nothing of its closeout travels — its summary goes to the person who decides, never to a step\. Give implement\.md an `output:` schema/);
+});
+
+test('an output schema is read strict wherever an object can sit — and one that points elsewhere with `$ref` is refused', () => {
+  const loose = { type: 'object', properties: { optional: { type: 'string' } } };
+  const around = (product: object) => ({ 'review.schema.json': { type: 'object', properties: { product }, required: ['product'], additionalProperties: false } });
+
+  // The review's case: a definition nested under the field, and a reference to it. The walk read neither,
+  // and the schema loaded with a loose object in it.
+  assert.match(refusal(around({ $defs: { value: loose }, $ref: '#/properties/product/$defs/value' })),
+    /^review: `output: review\.schema\.json` uses `\$ref` at product\. The run checks a schema is strict by reading it, and does not follow references .* Inline what it points at, and delete `\$ref`\./);
+  // However strict the target: what is checked must be what the harness is handed, not what a pointer says it is.
+  const strict = { ...loose, required: ['optional'], additionalProperties: false };
+  for (const ref of ['$ref', '$dynamicRef', '$recursiveRef']) {
+    assert.match(refusal(around({ $defs: { value: strict }, [ref]: '#/properties/product/$defs/value' })), new RegExp(`uses \`\\${ref}\` at product\\.`), ref);
+  }
+
+  // Every keyword that holds a schema is read.
+  const under: Array<[object, string]> = [
+    [{ type: 'string', $defs: { value: loose } }, 'product.$defs.value'],
+    [{ type: 'string', definitions: { value: loose } }, 'product.definitions.value'],
+    [{ type: 'string', not: loose }, 'product.not'],
+    [{ if: loose, then: { type: 'string' }, else: { type: 'string' } }, 'product.if'],
+    [{ if: { type: 'string' }, then: loose, else: { type: 'string' } }, 'product.then'],
+    [{ if: { type: 'string' }, then: { type: 'string' }, else: loose }, 'product.else'],
+    [{ type: 'array', items: [loose] }, 'product[]'],
+    [{ type: 'array', contains: loose }, 'product.contains'],
+    [{ type: 'array', additionalItems: loose }, 'product.additionalItems'],
+    [{ type: 'array', unevaluatedItems: loose }, 'product.unevaluatedItems'],
+    [{ type: 'string', additionalProperties: loose }, 'product.additionalProperties'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, patternProperties: { '^x-': loose } }, 'product.patternProperties.^x-'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, dependentSchemas: { a: loose } }, 'product.dependentSchemas.a'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, dependencies: { a: loose } }, 'product.dependencies.a'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, unevaluatedProperties: loose }, 'product.unevaluatedProperties'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, propertyNames: loose }, 'product.propertyNames'],
+  ];
+  for (const [product, at] of under) {
+    assert.match(refusal(around(product)), new RegExp(`is not strict at ${at.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: \`optional\` is not in \`required\``), at);
+  }
 });

@@ -15,8 +15,9 @@
  * interesting decisions in this kind of work — is this good enough, did it actually do what was
  * asked — are not predicates a workflow language could evaluate. They are judgements, and a
  * judgement belongs to a step with an agent in it, not to a keyword. The workflow is a team, not a
- * program: `after` orders, `resume` continues, `check` measures, `retries` counts, and the rest
- * say who does the work and for how long.
+ * program: `after` orders, `resume` continues, `check` measures, `retries` counts, `output` declares
+ * what a step's closeout says for the steps after it and `input` reads it, and the rest say who does
+ * the work and for how long.
  *
  * **The keys are a closed list.** A key the parser does not know is refused by name, and a value
  * it cannot use is refused with the fix, before anything is spent. Accepting and ignoring is what
@@ -56,13 +57,52 @@ export type Workflow = {
   check?: string;
   /** How many times the run re-files the step after its check refuses it. Absent means none. */
   retries?: number;
+  /**
+   * The steps whose declared output this step is handed, in its brief under `## From <step>`, as data.
+   *
+   * Only what the producer's `output:` declares travels — never its summary, needs or artifacts — and
+   * only to a step that names it here. Each must be a step this one waits on: you cannot read the
+   * product of work that has not finished. Like `after` it is a relationship, not control flow.
+   */
+  input?: string[];
+  /**
+   * What this step's closeout says beyond the four fields every closeout has, for a step that reads it.
+   *
+   * A JSON Schema file beside the step, read by `wf start` and frozen on the run with the rest of the
+   * step — a schema is part of what the step is judged by, so it lives inside the fence a `check:`
+   * does. Its properties are merged into the closeout schema the step is filed with; a closeout that
+   * lacks one of them is `unsigned`.
+   */
+  output?: StepOutput;
+};
+
+/** A step's declared output: the file as the step names it, and the schema that file held at `wf start`. */
+export type StepOutput = { file: string; schema: OutputSchema };
+
+/** An output schema, checked strict: an object whose every property is required and nothing else allowed. */
+export type OutputSchema = {
+  type: 'object';
+  properties: Record<string, Record<string, unknown>>;
+  required: string[];
+  additionalProperties: false;
+  [key: string]: unknown;
 };
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'harness', 'model', 'permissionMode', 'deadlineSeconds', 'maxAttempts', 'check', 'retries',
+  'after', 'resume', 'input', 'harness', 'model', 'permissionMode', 'deadlineSeconds', 'maxAttempts', 'check', 'retries', 'output',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
+
+/**
+ * The four fields every closeout has. They are the run's: `summary` goes to the person who decides and
+ * nowhere else, so an `output:` may not declare one of them and have it travel to a step. The schema
+ * itself is `CLOSEOUT_SCHEMA` in run.ts, and a test holds the two to each other.
+ */
+export const CLOSEOUT_FIELDS = ['outcome', 'summary', 'artifacts', 'needs'] as const;
+
+/** The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none. */
+export const outputFields = (step: Workflow): string[] => Object.keys(step.output?.schema.properties ?? {});
 
 /**
  * Keys refused with a reason of their own, because each is one somebody will write expecting it to
@@ -125,7 +165,13 @@ const isStepKey = (key: string): key is StepKey => (STEP_KEYS as readonly string
 
 const FRONTMATTER = /^---[ \t]*\n([\s\S]*?\n)?---[ \t]*(?:\n|$)/;
 
-export function parseWorkflow(name: string, text: string): Workflow {
+/**
+ * One step, from its file's text.
+ *
+ * `read` answers for a file beside the step — the folder's, relative to it — or `undefined` when there
+ * is none. Only `output:` names one, and a step parsed without a folder cannot have it read.
+ */
+export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined): Workflow {
   // A file saved with a byte-order mark or `\r\n` is the same file. Left in, either one hides the
   // frontmatter in the body, and every key in it is dropped without a word.
   text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
@@ -154,6 +200,8 @@ export function parseWorkflow(name: string, text: string): Workflow {
     maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),
+    input: meta.input?.split(',').map((s) => s.trim()).filter(Boolean),
+    output: outputOf(name, meta.output, read),
   };
 }
 
@@ -233,20 +281,119 @@ function checkOf(step: string, check: string | undefined): string | undefined {
   return check;
 }
 
+/**
+ * The schema an `output:` names, read and refused unless the run can use it.
+ *
+ * Strict, because the schema is merged into the closeout the step is filed with and Codex refuses a
+ * structured output that is not: every object in it lists every property in `required` and sets
+ * `additionalProperties: false`. Refused here rather than by the harness at spawn, which is after a
+ * run has started and a step has been filed on it.
+ */
+function outputOf(step: string, file: string | undefined, read: ((file: string) => string | undefined) | undefined): StepOutput | undefined {
+  if (file === undefined) return undefined;
+  const named = `${step}: \`output: ${file}\``;
+  if (!read) refuse(`${named} names a file beside the step, and this step was read without its folder. Load it with \`loadWorkflows(<folder>)\`, which reads the file.`);
+  const text = read(file);
+  if (text === undefined) {
+    refuse(`${named} is not there. It is a JSON Schema file, relative to the workflow folder — write it beside ${step}.md, correct the path, or delete the line and the step declares no output.`);
+  }
+  let schema: unknown;
+  try { schema = JSON.parse(text); } catch (e) {
+    refuse(`${named} is not JSON (${(e as Error).message}). It is a JSON Schema: an object with \`"type": "object"\` and the fields the step declares under \`properties\`.`);
+  }
+  if (!isObject(schema) || schema.type !== 'object' || !isObject(schema.properties) || !Object.keys(schema.properties).length) {
+    refuse(`${named} is not a schema of fields. Give it \`"type": "object"\` and at least one field under \`properties\` — or delete the line, and the step declares no output.`);
+  }
+  const extra = Object.keys(schema).filter((k) => !['type', 'properties', 'required', 'additionalProperties', 'title', 'description', '$schema'].includes(k));
+  if (extra.length) {
+    refuse(`${named} sets ${extra.map((k) => `\`${k}\``).join(', ')} beside its fields, and only its \`properties\` are merged into the closeout — the rest would be dropped on the way to the harness. Inline what the fields refer to, and delete the key.`);
+  }
+  const taken = Object.keys(schema.properties).filter((k) => (CLOSEOUT_FIELDS as readonly string[]).includes(k));
+  if (taken.length) {
+    refuse(`${named} declares ${taken.map((k) => `\`${k}\``).join(', ')}, which every closeout already has. ${CLOSEOUT_FIELDS.map((k) => `\`${k}\``).join(', ')} are the run's, and \`summary\` goes to the person who decides, never to a step. Rename the field.`);
+  }
+  const loose = looseAt(schema, '');
+  if (loose && 'ref' in loose) {
+    refuse(`${named} uses \`${loose.ref}\` at ${loose.at || 'the top'}. The run checks a schema is strict by reading it, and does not follow references — an object it did not read would reach the harness unchecked. Inline what it points at, and delete \`${loose.ref}\`.`);
+  }
+  if (loose) {
+    refuse(`${named} is not strict at ${loose.at || 'the top'}: ${loose.why}. Codex refuses a structured output whose objects do not list every property in \`required\` and set \`"additionalProperties": false\`. A field that may be absent is required and nullable instead — \`"type": ["string", "null"]\`.`);
+  }
+  return { file, schema: schema as OutputSchema };
+}
+
+const isObject = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+
+/** Keywords whose value is a schema. `items` may also be an array of them, as older drafts wrote it. */
+const ONE_SCHEMA = ['items', 'additionalItems', 'additionalProperties', 'unevaluatedItems', 'unevaluatedProperties', 'contains', 'propertyNames', 'not', 'if', 'then', 'else'];
+/** Keywords whose value is an array of schemas. */
+const SCHEMA_LISTS = ['allOf', 'anyOf', 'oneOf', 'prefixItems'];
+/** Keywords whose value maps a name to a schema. */
+const SCHEMA_MAPS = ['properties', 'patternProperties', 'dependentSchemas', 'dependencies', '$defs', 'definitions'];
+/** Keywords that stand for a schema written somewhere else. */
+const REFERENCES = ['$ref', '$dynamicRef', '$recursiveRef'];
+
+/**
+ * The first object in a schema that is not strict, and why; or the first reference; or `undefined`.
+ *
+ * Every keyword that holds a schema is read, because an object the walk skips is an object nobody
+ * checked. A reference is refused rather than followed: resolving one is a second reading of the
+ * schema that can disagree with the harness's, and a `$ref` under a field once carried a loose object
+ * past this check to the harness.
+ */
+function looseAt(node: unknown, at: string): { at: string; why: string } | { at: string; ref: string } | undefined {
+  if (!isObject(node)) return undefined;
+  const ref = REFERENCES.find((k) => Object.hasOwn(node, k));
+  if (ref) return { at, ref };
+  const types = Array.isArray(node.type) ? node.type : [node.type];
+  if (types.includes('object') || 'properties' in node) {
+    const properties = isObject(node.properties) ? Object.keys(node.properties) : [];
+    const required = Array.isArray(node.required) ? node.required : [];
+    const missing = properties.filter((p) => !required.includes(p));
+    const stray = required.filter((r) => !properties.includes(r as string));
+    if (missing.length) return { at, why: `${missing.map((p) => `\`${p}\``).join(', ')} ${missing.length > 1 ? 'are' : 'is'} not in \`required\`` };
+    if (stray.length) return { at, why: `\`required\` names ${stray.map((p) => `\`${String(p)}\``).join(', ')}, which is not a property` };
+    if (node.additionalProperties !== false) return { at, why: '`additionalProperties` is not `false`' };
+  }
+  const below = (k: string) => (at ? `${at}.${k}` : k);
+  const children: Array<[string, unknown]> = [];
+  for (const k of SCHEMA_MAPS) {
+    const map = node[k];
+    if (isObject(map)) for (const [name, v] of Object.entries(map)) children.push([k === 'properties' ? below(name) : below(`${k}.${name}`), v]);
+  }
+  for (const k of ONE_SCHEMA) {
+    const values = k === 'items' && Array.isArray(node.items) ? node.items : [node[k]];
+    for (const v of values) children.push([k === 'items' ? `${at}[]` : below(k), v]);
+  }
+  for (const k of SCHEMA_LISTS) {
+    const list = node[k];
+    if (Array.isArray(list)) list.forEach((v, i) => children.push([k === 'prefixItems' ? `${at}[]` : `${at}.${k}[${i}]`, v]));
+  }
+  for (const [where, child] of children) {
+    const found = looseAt(child, where);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 /** Read a folder of steps and check that they form a workflow rather than a wish. */
 export function loadWorkflows(dir: string): Workflow[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
   if (!files.length) throw new WorkflowError(`${dir} has no .md steps in it`);
 
-  const steps = files.map((f) => parseWorkflow(path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')));
+  const read = (file: string): string | undefined => {
+    try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
+  };
+  const steps = files.map((f) => parseWorkflow(path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8'), read));
   validate(steps);
   return steps;
 }
 
 /**
- * Two ways a folder of markdown is not a workflow: a step waits on one that does not exist, or the
- * steps wait on each other. Both are caught here, before anything is spent.
+ * The ways a folder of markdown is not a workflow: a step waits on one that does not exist, the steps
+ * wait on each other, or a step reads the output of one that has not finished or declares none. All
+ * are caught here, before anything is spent.
  */
 export function validate(steps: readonly Workflow[]): void {
   const names = new Set(steps.map((s) => s.name));
@@ -254,6 +401,17 @@ export function validate(steps: readonly Workflow[]): void {
     for (const a of s.after) {
       if (!names.has(a)) throw new WorkflowError(`${s.name}: waits on "${a}", which is not a step here`);
       if (a === s.name) throw new WorkflowError(`${s.name}: waits on itself`);
+    }
+    for (const from of s.input ?? []) {
+      const producer = steps.find((x) => x.name === from);
+      if (!producer) throw new WorkflowError(`${s.name}: \`input: ${from}\` names a step that is not here. Correct the name, or delete the line.`);
+      // Directly, or through `resume` — which the parser has already added to `after`.
+      if (!s.after.includes(from) && s.resume !== from) {
+        throw new WorkflowError(`${s.name}: \`input: ${from}\`, but ${s.name} does not wait on ${from} — a step cannot read the product of work that has not finished. Add ${from} to \`after:\`, or delete the line.`);
+      }
+      if (!producer.output) {
+        throw new WorkflowError(`${s.name}: \`input: ${from}\`, but ${from} declares no \`output:\`, so nothing of its closeout travels — its summary goes to the person who decides, never to a step. Give ${from}.md an \`output:\` schema, or delete the line.`);
+      }
     }
     if (s.resume) {
       const target = steps.find((x) => x.name === s.resume);

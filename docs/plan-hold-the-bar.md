@@ -365,6 +365,70 @@ step's closeout reaches a follower that did not ask.
 Until J lands, `review.md` keeps write access (the line was dropped at C's merge) and C's test
 refuses the read-only pair.
 
+### U1 — The e2e check: a UI step is verified in a browser · after F1
+
+**Why.** W's closeout: "the pages were not viewed in a browser". K's: "a headless-browser check of
+the page passed in both themes" — a script it wrote for itself. Whether a UI change is looked at
+depends on the agent thinking of it; that is prose-level reliability. The Chrome extension is the
+right tool for an interactive session and the wrong one for unattended steps: it drives the
+operator's own browser, one window, their logged-in state.
+
+**Shape.** `npm run e2e` at the root: builds; starts the api and the web preview on port 0 and
+reads the ports it got (concurrent worktrees must not collide — hkb's `self:slot`, solved locally);
+seeds a fake run under a temporary `WF_ROOT`; visits `/`, `/runs`, `/runs/:id` in headless
+Chromium (Playwright, pinned; the browser lives in `~/.cache/ms-playwright`, installed once —
+worktrees symlink `node_modules`); asserts no console errors and the elements each page must have;
+screenshots both themes into **a directory outside the workspace** (a PNG written into a worktree
+rides the branch; a gitignored one does not reach the next step's worktree at all) — the run
+names that directory: `runs/<id>/artifacts/<step>/`, created by the run, told to the step in the
+brief the way the closeout contract is, and to the check as `WF_ARTIFACTS`; exits non-zero on any
+of it. A `ui/` workflow folder whose steps carry `check: npm test && npm run typecheck && npm run
+build && npm run e2e`. CLAUDE.md: "for `apps/web` changes, run `npm run e2e` and read the PNGs
+before you sign off" — the same script, early, as the agent's own eyes; the check is the
+enforcement, the line is the convenience. Owns: `apps/web/test/e2e/` (or `scripts/`), the root
+`package.json` script, `packages/agent-workflows` for the artifacts dir (small), `workflows/ui/`.
+Lightpanda (CDP-compatible, built for agents) is a possible browser behind Playwright's
+`connectOverCDP` later; start on Chromium, keep the seam.
+
+### E4 — `mcp:` on the task, and `--strict-mcp-config` by default · engine · after E3
+
+**What it means here.** An MCP server is a process the harness starts beside the session and
+whose tools the model can call. Claude Code loads them from three places: user scope
+(`~/.claude.json` — every project), project scope (`.mcp.json` at the repo root, a tracked file,
+enabled per repo by `.claude/settings.json` → `enabledMcpjsonServers`), and per invocation
+(`--mcp-config <file>`, with `--strict-mcp-config` to load *only* that). A `--bg` step in a
+worktree sees the tracked `.mcp.json`, so **configuring a browser server in the repository is
+enough for every step to have it, with no engine change** — that is the content route, and it is
+the first thing to do. Two things it does not give: per-step choice (a reviewer that must not
+have a browser; an implementer that must), and — the finding — **today a `--bg` step inherits
+the operator's user-scope servers**: nothing passes `--strict-mcp-config`, so an unattended step
+can reach whatever connectors the operator has at user scope (mail, calendar, drive). hkb
+measured the same and closed it with `strictMcpConfig` (ADR-013). That is a G2-class gap.
+
+**Shape.** `mcp?: Record<string, McpServer>` on `TaskSpec`/`SpawnRequest`/`filed`/`State` —
+carried, never read by `decide` (the `tools`/`effort` pattern; a Pod's sidecar). claude-bg and
+claude-detached write the map to a file the runner owns and emit `--mcp-config <file>
+--strict-mcp-config`; with no `mcp:` they emit `--strict-mcp-config` alone, so a step gets the
+repository's `.mcp.json` and nothing of the operator's. codex maps it to `-c
+mcp_servers.<name>.command=…` overrides (the spec already passes `-c` for trust and effort). A
+`mcp:` key on a step in agent-workflows once the engine carries it (with I). Tests: argv at
+shipped defaults; a live gated one that a step without `mcp:` lists no user-scope server.
+
+### The `ui/` workflow · after U1, J and I
+
+```
+implement ──► review (codex, read-only: the code)  ──┐
+          └─► look   (claude, tools: Read Grep Glob; input: implement.screenshots) ──┴─► respond
+```
+`implement.md`: `check: … && npm run e2e`, `output: implement.schema.json` (`screenshots`, the
+pages visited); told where its artifacts dir is; the browser via `.mcp.json` (or `mcp:` after E4)
+so it can drive the page, not only screenshot it. `review.md`: unchanged from J. `look.md`: a
+second reviewer, on Claude because it reads images, `input: implement` for the screenshots only,
+`output: look.schema.json` (findings against the brief's intent: layout, both themes, what a
+person would notice). `respond.md`: `after: review, look`, `input: review, look`, `resume:
+implement` — a fan-in the run already knows how to cut; the checks run again on its result.
+The board's inspector shows a step's artifacts (a small api endpoint for `runs/<id>/artifacts/`).
+
 ### I — `tools:` and `effort:` pass-through · wave 2 · after A, B, C
 
 `workflow.ts` accepts both (A refused them by name); `runner.ts` passes them to `e.file`;

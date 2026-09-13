@@ -99,15 +99,6 @@ window and ends the attempt `lost` rather than stalling the tick.
 vocabulary half needs the runner to answer, and `RunnerOps` has no verb for that — the four verbs are
 the line that type holds — so it would be a value passed to `file`, not a fifth verb.
 
-### 7. Codex usage is not measured
-
-**Where.** `agent-engine/src/runner-detached.ts`. Every Codex attempt records `usage: null`.
-
-`codex exec --json` does report it: its `turn.completed` event carries `input_tokens`,
-`cached_input_tokens`, `output_tokens` and `reasoning_output_tokens` (seen in a 0.154.0 run log). The
-fix is an optional `HarnessSpec` reader of the worker's log, once it is decided what `turns` means for
-Codex, whose turns are prompts rather than model responses.
-
 ### 8. A Codex `tools` list that names Bash, Write or Edit narrows nothing
 
 Codex has one shell and three sandboxes, not a tool list, so a list can only take writing away: none
@@ -161,6 +152,16 @@ has no Codex servers configured.
   not, answered too early in both sessions, and so showed Chrome still connecting under strict.
 
 ## Verified by tests, not by a live run
+
+- **Codex usage** (engine `TBD-7`). Measured on the `exec --json` streams of seventeen codex-cli
+  0.154.0 runs the worker had captured (`~/.agent-workflows/engine/runs/codex`): the sixteen whose
+  turn completed each ended in one `turn.completed` carrying `input_tokens`, `cached_input_tokens`,
+  `cache_write_input_tokens` (0 in all), `output_tokens` and `reasoning_output_tokens`, with cached
+  below input and reasoning below output in every one; every item was a `command_execution`, a
+  `file_change` or an `agent_message`. Read back by the reader, all sixteen give their tokens and
+  tool calls, and the one cut short gives its tool calls and no tokens. End to end with a fake `codex`
+  only: no live attempt has recorded it, and no stream with an MCP call, a resume or a second turn has
+  been read.
 
 - **`claude-detached`'s closeout** (engine `TBD-4`). A fake `claude` on `PATH`, at shipped defaults.
   That `-p --output-format json --json-schema` prints one `result` line whose `structured_output` is
@@ -242,3 +243,4 @@ has no Codex servers configured.
 | a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |
 | a relative `cwd` filed through the API failed a detached harness: its worker was launched in `repo`, then launched the harness in `repo` again, from inside it (`spawn sh ENOENT`) | `file()` refuses a `cwd` that is not absolute, naming it resolved; the detached runner resolves the one it is handed, as `claude --bg` always has | engine `TBD-10` |
 | a `claude-detached` task never gave a closeout: its spec dropped `closeoutSchema` | `--json-schema` and `--output-format json`, and the answer read from the result's `structured_output` in the worker's capture, stamped with when that was written. The worker writes a run's end only once the harness's output is in the log: `exit` can come before the pipes drain, and the pass that records the end missed the answer (found writing the test) | engine `TBD-4` |
+| every Codex attempt recorded `usage: null`, though its `exec --json` stream reports tokens | read from the worker's capture of that stream: tool calls by item, tokens from `turn.completed`, each absent when the stream cannot say. `turns` and `toolCalls` may now be absent from any `Usage` — a Codex turn is a prompt, not a model response — and `ae show` names what was not measured | engine `TBD-7` |

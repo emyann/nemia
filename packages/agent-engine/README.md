@@ -487,16 +487,18 @@ and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 
 ## What an attempt consumed
 
-Every attempt records `usage` — `{ turns, toolCalls, inputTokens?, outputTokens?, costUsd? }` — and
+Every attempt records `usage` — `{ turns?, toolCalls?, inputTokens?, outputTokens?, costUsd? }` — and
 `exitCode`, copied from the sighting that ended it. **Each is `null` when nothing measured it,
-never `0`**: a zero that means "nobody counted" reads as "cost nothing". `decide` reads neither.
+never `0`**: a zero that means "nobody counted" reads as "cost nothing". A count its runner could not
+see is absent from `usage` in the same way, and `ae show` names it not measured. `decide` reads neither.
 An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of its `starting` and
 `ended` entries, `endedAt` being `null` while it runs — so how long it took is on the record.
 
 | runner | `usage` | `exitCode` |
 |---|---|---|
 | `claude` | from the transcript it already reads: responses, tool calls and tokens since the session's own start; no cost | `null` — the process is the harness's |
-| `codex`, `claude-detached` | `null` — not measured | the worker's record of the process |
+| `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens from `turn.completed`; no turns — a Codex turn is a prompt, not a model response — and no cost | the worker's record of the process |
+| `claude-detached` | `null` — not measured ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
 | `sdkRunner()` | from the SDK's result message, cost included when the SDK gives one | `null` |
 
 Two measured traps shape the transcript count. A response is written as one line per content block,
@@ -509,6 +511,18 @@ consumed, naming what was not measured — and an attempt still running as `runn
 ```
 attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · cost not measured
 attempt 2  failed  09:05:02 → 09:05:40 (38s)  exit 1  usage not measured
+```
+
+Codex's stream is read by the same rule. Tokens are given only when every turn that started completed
+with them, and tool calls only while every item in the stream is of a type seen before —
+`command_execution` and `file_change` are calls, `agent_message` is not. Nothing is added to
+`input_tokens` or `output_tokens`: in every run measured (codex-cli 0.154.0), cached tokens were a part
+of the first and reasoning tokens a part of the second. `cache_write_input_tokens` was 0 in all of
+them, so whether `input_tokens` counts it is unknown, and a stream where it is not 0 gives no input
+count:
+
+```
+attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  turns not measured · <calls> tool calls · <in> in · <out> out · cost not measured
 ```
 
 ## Letting a sandboxed Codex step commit

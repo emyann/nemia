@@ -82,10 +82,13 @@ export type Sighting = {
  * "nobody counted" reads as "cost nothing", which is the one reading a record must never allow.
  */
 export type Usage = {
-  /** Model responses, each counted once however many lines it was written as. */
-  turns: number;
-  /** Tool calls the model made. */
-  toolCalls: number;
+  /**
+   * Model responses, each counted once however many lines it was written as. Absent from a runner
+   * that cannot see them: Codex's stream reports turns of a prompt, not the responses inside one.
+   */
+  turns?: number;
+  /** Tool calls the model made. Absent when its runner could not count them. */
+  toolCalls?: number;
   /** Every input token the model read, cached ones included. */
   inputTokens?: number;
   outputTokens?: number;

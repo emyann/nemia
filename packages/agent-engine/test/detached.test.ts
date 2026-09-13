@@ -584,3 +584,43 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
     assert.deepEqual(fs.readdirSync(cwd), [], 'nothing in the workspace');
   } finally { process.env.PATH = prev; }
 });
+
+// ─── codex: what it consumed, from its stream ───────────────────────────────
+
+test('codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it', async () => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-fake-codex-'));
+  const stream = [
+    { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' },
+    { type: 'turn.started' },
+    { type: 'item.started', item: { id: 'item_1', type: 'command_execution', command: 'ls', status: 'in_progress' } },
+    { type: 'item.completed', item: { id: 'item_1', type: 'command_execution', exit_code: 0, status: 'completed' } },
+    { type: 'turn.completed', usage: { input_tokens: 1200, cached_input_tokens: 1000, cache_write_input_tokens: 0, output_tokens: 80, reasoning_output_tokens: 8 } },
+  ];
+  fs.writeFileSync(path.join(bin, 'codex'), [
+    '#!/bin/sh',
+    'echo "Reading additional input from stdin..." >&2',
+    ...stream.map((e) => `printf '%s\\n' '${JSON.stringify(e)}'`),
+  ].join('\n'), { mode: 0o755 });
+  // The `claude` harness is observed on every tick too, and must not read this machine's registry.
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then echo '[]'; fi\n`, { mode: 0o755 });
+  const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
+  process.env.PATH = `${bin}:${prev.PATH}`;
+  process.env.CODEX_HOME = root();
+  try {
+    const engine = createEngine({ root: root() });
+    const id = await engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' });
+    const until = Date.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+      await engine.tick();
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const { state } = await engine.view(id);
+    assert.equal(state.settled, 'succeeded');
+    assert.deepEqual(state.attempts[0]?.usage, { toolCalls: 1, inputTokens: 1200, outputTokens: 80 }, 'measured, and nothing it did not measure');
+    assert.equal(state.attempts[0]?.exitCode, 0);
+    assert.equal(state.attempts[0]?.nativeId, '01a09996-d343-7932-8971-b2f209ba315b');
+  } finally {
+    process.env.PATH = prev.PATH;
+    if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = prev.CODEX_HOME;
+  }
+});

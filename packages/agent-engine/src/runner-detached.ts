@@ -21,7 +21,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import type { Observed, Sighting } from './domain.ts';
+import type { Observed, Sighting, Usage } from './domain.ts';
 import { checkoutMcpConfig, claudeMcpArgs, claudeRefuses, RunnerError, worktreeName, writeMcpConfig, type McpServer, type RunnerOps, type SpawnRequest } from './runner.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
@@ -81,6 +81,8 @@ export type HarnessIO = {
 export type HarnessOutput = {
   /** The final answer, wrapped so that an answer is told apart from none by presence, not by value. */
   closeout?: { payload: unknown };
+  /** What the session consumed, as far as the output says: every field a measurement, absent when not. */
+  usage?: Usage;
 };
 
 /** How long a run file may go unbeaten before `observe` calls it dead. Worker beats every 5s. */
@@ -228,6 +230,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           // The process's own exit code, once it has one. The worker writes -1 when there is none —
           // killed by a signal, or never started — and that is reported as no code, not as a code.
           ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
+          ...(output?.read.usage ? { usage: output.read.usage } : {}),
         });
       }
       return m;
@@ -353,6 +356,58 @@ export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
     : tomlTable([['url', tomlString(s.url)], ['http_headers', tomlStrings(s.headers)]])] as const));
 
 /**
+ * The item types a Codex `exec --json` stream was seen to carry (0.154.0, seventeen runs): two that
+ * are tool calls and one that is said. Any other type cannot be counted either way, so a stream that
+ * has one reports no count of tool calls rather than a guessed one.
+ */
+const CODEX_CALL_ITEMS: readonly string[] = ['command_execution', 'file_change'];
+const CODEX_SAID_ITEMS: readonly string[] = ['agent_message'];
+
+/**
+ * What a Codex session consumed, read from its `exec --json` stream — measured or absent, never zeros.
+ *
+ * Tokens come from `turn.completed`, one per prompt run to completion, and only when every turn that
+ * started completed with them: a session killed mid-turn has not reported its last one. Nothing is
+ * added to `input_tokens` or `output_tokens`: in every run seen, `cached_input_tokens` was below the
+ * first and `reasoning_output_tokens` below the second, so each is a part of its total, not beside it.
+ * `cache_write_input_tokens` was 0 in every one, so whether `input_tokens` counts it is unknown, and a
+ * stream where it is not 0 gives no input count. Tool calls are the call items, counted once by id.
+ * No `turns` — it counts model responses, which the stream does not report — and no cost.
+ */
+export const codexOutput = (output: string): HarnessOutput => {
+  let started = 0;
+  const completed: Array<{ input?: number; output: number } | null> = [];
+  const calls = new Set<string>();
+  let uncounted = false;
+  for (const line of output.split('\n')) {
+    if (!line.includes('"type"')) continue;
+    let event: { type?: unknown; usage?: Record<string, unknown>; item?: { id?: unknown; type?: unknown } };
+    try { event = JSON.parse(line); } catch { continue; }
+    if (event.type === 'turn.started') started++;
+    else if (event.type === 'turn.completed') {
+      const count = (key: string) => (typeof event.usage?.[key] === 'number' ? (event.usage[key] as number) : undefined);
+      const input = count('input_tokens');
+      const out = count('output_tokens');
+      completed.push(input === undefined || out === undefined ? null : { input: count('cache_write_input_tokens') ? undefined : input, output: out });
+    } else if (event.type === 'item.started' || event.type === 'item.completed') {
+      const { id, type } = event.item ?? {};
+      if (typeof id !== 'string' || typeof type !== 'string') continue;
+      if (CODEX_CALL_ITEMS.includes(type)) calls.add(id);
+      else if (!CODEX_SAID_ITEMS.includes(type)) uncounted = true;
+    }
+  }
+  if (started === 0 && completed.length === 0) return {};
+  const turns = completed.length === started && completed.every((c) => c !== null)
+    ? (completed as Array<{ input?: number; output: number }>) : undefined;
+  const usage: Usage = {
+    ...(uncounted ? {} : { toolCalls: calls.size }),
+    ...(turns?.every((t) => t.input !== undefined) ? { inputTokens: turns.reduce((n, t) => n + t.input!, 0) } : {}),
+    ...(turns ? { outputTokens: turns.reduce((n, t) => n + t.output, 0) } : {}),
+  };
+  return Object.keys(usage).length ? { usage } : {};
+};
+
+/**
  * Codex, through `codex exec`. Verified against codex-cli 0.154.0:
  *   --json                  JSONL events on stdout
  *   -C <dir>                working root
@@ -410,6 +465,8 @@ export const codex: HarnessSpec = {
     }
     return undefined;
   },
+  // What it consumed, from the same JSONL: tokens from `turn.completed`, tool calls by item.
+  readOutput: codexOutput,
   // Best effort: codex prints a thread/session id in its JSONL. Only needed for resume.
   nativeIdPattern: '"(?:thread_id|session_id|id)"\\s*:\\s*"([0-9a-f-]{16,})"',
   /**

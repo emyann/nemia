@@ -1,0 +1,130 @@
+/**
+ * The brief parser, made to refuse.
+ *
+ * A parser that accepts any key turns a typo into a default, and nothing about that is visible
+ * until a task has run the wrong way. So most of this file is refusals, each at shipped defaults,
+ * and the one allowing test is the one that proves no key is accepted and then dropped.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { BRIEF_KEYS, parseBrief, type BriefKey } from '../src/cli.ts';
+
+const brief = (front: string, body = 'do the thing') => `---\n${front}\n---\n${body}`;
+const parse = (text: string) => parseBrief(text, '/fallback');
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'ae-brief-'));
+
+/** Refused with exit code 2 and a message that matches — never a raw exception, never a default. */
+const refuses = (text: string, says: RegExp) =>
+  assert.throws(() => parse(text), (e: Error & { exitCode?: number }) => {
+    assert.equal(e.exitCode, 2, `exit code 2 for: ${e.message}`);
+    assert.match(e.message, says);
+    return true;
+  });
+
+test('every key a brief has reaches the spec — none is accepted and then dropped', () => {
+  const dir = tmp();
+  const schema = path.join(dir, 'closeout.json');
+  fs.writeFileSync(schema, '{"type":"object"}');
+  // A Record, so a key added to BRIEF_KEYS without a sample here does not compile.
+  const samples: Record<BriefKey, [string, unknown]> = {
+    cwd: [dir, dir],
+    harness: ['codex', 'codex'],
+    model: ['opus', 'opus'],
+    permissionMode: ['acceptEdits', 'acceptEdits'],
+    maxAttempts: ['3', 3],
+    deadlineSeconds: ['900', 900],
+    resume: ['always', 'always'],
+    resumeFrom: ['abc-123', 'abc-123'],
+    worktree: ['my-branch', 'my-branch'],
+    closeoutSchema: [schema, { type: 'object' }],
+  };
+  for (const key of BRIEF_KEYS) {
+    const [written, read] = samples[key];
+    assert.deepEqual(parse(brief(`${key}: ${written}`))[key], read, key);
+  }
+});
+
+test('an unknown key is refused by name, with the list of keys a brief has', () => {
+  refuses(brief('afer: implement'), /`afer` is not a key a brief has/);
+  assert.throws(() => parse(brief('maxAtempts: 3')), (e: Error) => BRIEF_KEYS.every((k) => e.message.includes(k)));
+});
+
+test('`deadlineSeconds: 5m` is refused — it became NaN, and stopped the task on its first pass', () => {
+  for (const bad of ['5m', '0', '-30', 'Infinity', 'soon']) {
+    refuses(brief(`deadlineSeconds: ${bad}`), /is not a number of seconds.*deadlineSeconds: 900/);
+  }
+});
+
+test('a maxAttempts that is not a whole number from 1 is refused', () => {
+  for (const bad of ['0', '2.5', 'two', '-1', '1e2']) {
+    refuses(brief(`maxAttempts: ${bad}`), /is not a number of attempts/);
+  }
+});
+
+test('a resume that is not a retry policy is refused, and points at resumeFrom', () => {
+  refuses(brief('resume: sometimes'), /not a retry policy.*interrupted, always, never.*resumeFrom/);
+  // `in` would have said yes: every object has a `toString`.
+  refuses(brief('resume: toString'), /not a retry policy/);
+});
+
+test('a key given twice, a line that is not key: value, and an empty value are refused', () => {
+  refuses(brief('harness: claude\nharness: codex'), /`harness` is given twice/);
+  refuses(brief('harness codex'), /`harness codex` is not a `key: value` line/);
+  refuses(brief('model:'), /`model:` has no value/);
+});
+
+test('frontmatter that is never closed is refused, not read as the prompt', () => {
+  refuses('---\nharness: codex\nreview the diff', /never closed/);
+});
+
+test('a brief with no prompt is refused', () => {
+  refuses(brief('harness: codex', ''), /there is no prompt/);
+});
+
+test('a cwd that is not a directory is refused', () => {
+  refuses(brief(`cwd: ${path.join(tmp(), 'nope')}`), /is not a directory/);
+});
+
+test('a closeoutSchema that cannot be read, is not JSON, or is not an object is refused', () => {
+  const dir = tmp();
+  refuses(brief(`closeoutSchema: ${path.join(dir, 'missing.json')}`), /cannot be read/);
+  fs.writeFileSync(path.join(dir, 'bad.json'), '{ not json');
+  refuses(brief(`closeoutSchema: ${path.join(dir, 'bad.json')}`), /is not JSON/);
+  fs.writeFileSync(path.join(dir, 'list.json'), '[]');
+  refuses(brief(`closeoutSchema: ${path.join(dir, 'list.json')}`), /a schema is a JSON object/);
+});
+
+test('comments, CRLF and `worktree: false` mean what a person writing them means', () => {
+  const spec = parse(brief('# a note on its own line\nharness: codex   # the reviewer\nworktree: false').replace(/\n/g, '\r\n'));
+  assert.equal(spec.harness, 'codex');
+  assert.equal(spec.worktree, undefined, '`false` is no worktree, not one named "false"');
+  assert.equal(spec.brief, 'do the thing');
+});
+
+test('no frontmatter is all prompt, at the defaults', () => {
+  const spec = parse('just do it');
+  assert.equal(spec.brief, 'just do it');
+  assert.equal(spec.cwd, '/fallback');
+  assert.equal(spec.maxAttempts, 1);
+});
+
+test('`ae start` exits 2 with the sentence, not a stack trace', () => {
+  const dir = tmp();
+  const file = path.join(dir, 'brief.md');
+  fs.writeFileSync(file, brief('afer: implement'));
+  const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
+  try {
+    execFileSync(process.execPath, [ae, 'start', file], { env: { ...process.env, AE_ROOT: dir }, stdio: 'pipe' });
+    assert.fail('ae start accepted a brief with an unknown key');
+  } catch (e) {
+    const err = e as { status?: number; stderr?: Buffer };
+    assert.equal(err.status, 2);
+    assert.match(String(err.stderr), /^brief: `afer` is not a key a brief has/);
+    assert.equal(fs.existsSync(path.join(dir, 'tasks')), false, 'and nothing was filed');
+  }
+});

@@ -8,32 +8,115 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, type Engine, type Event, type ResumePolicy } from './facade.ts';
+import { createEngine, type Engine, type Event, type ResumePolicy, type TaskSpec } from './facade.ts';
 
-/** A brief is a markdown file: optional `key: value` frontmatter, body is the prompt. */
-export function parseBrief(text: string, fallbackCwd: string) {
-  const m = /^---\n([\s\S]*?)\n---\n?/.exec(text);
-  const meta: Record<string, string> = {};
-  if (m) for (const line of m[1]!.split('\n')) {
+/**
+ * Every key a brief may have — a closed list, on purpose.
+ *
+ * The parser used to collect any `key: value` line and read the ones it knew, so a typo was a
+ * default and a bad value was a surprise: `maxAtempts: 3` ran once, and `deadlineSeconds: 5m`
+ * became NaN, was journalled as `null`, and stopped the task on its first pass. A key this list
+ * does not name is refused by name, with the list. A test feeds every key through the parser, so
+ * none can be accepted here and then dropped.
+ */
+export const BRIEF_KEYS = [
+  'cwd', 'harness', 'model', 'permissionMode', 'maxAttempts', 'deadlineSeconds',
+  'resume', 'resumeFrom', 'worktree', 'closeoutSchema',
+] as const satisfies readonly (keyof TaskSpec)[];
+export type BriefKey = (typeof BRIEF_KEYS)[number];
+
+const isBriefKey = (key: string): key is BriefKey => (BRIEF_KEYS as readonly string[]).includes(key);
+
+/** Exhaustive by type: a policy added to `ResumePolicy` and not here does not compile. */
+const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
+
+/** A refusal: exit code 2, and a sentence that says what to write instead. */
+const refuse = (message: string) => Object.assign(new Error(`brief: ${message}`), { exitCode: 2 });
+
+const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+
+/**
+ * A brief is a markdown file: optional `key: value` frontmatter, body is the prompt.
+ *
+ * It refuses rather than guesses: a key not in `BRIEF_KEYS`, a key given twice, a line that is not
+ * `key: value`, an empty value, a count or a number of seconds that is not one, a `resume` that is
+ * not a policy, a `cwd` or schema file that is not there, and a brief with nothing to do. What a
+ * value means to a harness — a permission mode, a harness name — is the engine's to check, and
+ * `file()` checks it, so this is not the only door that does.
+ */
+export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
+  const source = text.replace(/\r\n/g, '\n');
+  const m = /^---\n(?:([\s\S]*?)\n)?---[ \t]*(?:\n|$)/.exec(source);
+  if (!m && source.startsWith('---\n')) throw refuse('the frontmatter opened with `---` is never closed. End it with a `---` line of its own.');
+
+  const meta = new Map<BriefKey, string>();
+  for (const raw of m?.[1]?.split('\n') ?? []) {
+    // `#` after a space starts a comment, as it would in YAML — so `harness: codex  # the reviewer`
+    // means codex, and not a harness called "codex  # the reviewer".
+    const line = raw.replace(/(^|\s)#.*$/, '').trim();
+    if (!line) continue;
     const i = line.indexOf(':');
-    if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+    if (i <= 0) throw refuse(`\`${line}\` is not a \`key: value\` line. Write it as \`key: value\`, or delete it.`);
+    const key = line.slice(0, i).trim();
+    const value = line.slice(i + 1).trim();
+    if (!isBriefKey(key)) throw refuse(`\`${key}\` is not a key a brief has. A brief's keys are: ${BRIEF_KEYS.join(', ')}.`);
+    if (meta.has(key)) throw refuse(`\`${key}\` is given twice. Keep one.`);
+    if (!value) throw refuse(`\`${key}:\` has no value. Give it one, or delete the line.`);
+    meta.set(key, value);
   }
+
+  const brief = (m ? source.slice(m[0].length) : source).trim();
+  if (!brief) throw refuse('there is no prompt. Write what the session should do below the frontmatter.');
+
+  const maxAttempts = meta.get('maxAttempts');
+  if (maxAttempts !== undefined && !/^[1-9]\d*$/.test(maxAttempts)) {
+    throw refuse(`\`maxAttempts: ${maxAttempts}\` is not a number of attempts. Write a whole number from 1, like \`maxAttempts: 2\`.`);
+  }
+  const deadlineSeconds = meta.get('deadlineSeconds');
+  if (deadlineSeconds !== undefined && !(Number.isFinite(Number(deadlineSeconds)) && Number(deadlineSeconds) > 0)) {
+    throw refuse(`\`deadlineSeconds: ${deadlineSeconds}\` is not a number of seconds. Write seconds above 0, like \`deadlineSeconds: 900\` for fifteen minutes.`);
+  }
+  const resume = meta.get('resume');
+  if (resume !== undefined && !Object.hasOwn(RESUME_POLICIES, resume)) {
+    throw refuse(`\`resume: ${resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}. To continue a particular session, that is \`resumeFrom: <session id>\`.`);
+  }
+  const cwd = meta.get('cwd');
+  if (cwd !== undefined && !isDirectory(path.resolve(cwd))) {
+    throw refuse(`\`cwd: ${cwd}\` is not a directory (${path.resolve(cwd)}). Give the directory the session should work in.`);
+  }
+
+  // A path to a JSON Schema file: frontmatter is one line per key, and a schema is not.
+  let closeoutSchema: object | undefined;
+  const schemaPath = meta.get('closeoutSchema');
+  if (schemaPath !== undefined) {
+    let schemaText: string;
+    try { schemaText = fs.readFileSync(path.resolve(schemaPath), 'utf8'); }
+    catch (e) { throw refuse(`\`closeoutSchema: ${schemaPath}\` cannot be read (${(e as Error).message}). It is a path to a JSON Schema file, relative to where you run \`ae\`.`); }
+    let parsed: unknown;
+    try { parsed = JSON.parse(schemaText); }
+    catch (e) { throw refuse(`\`closeoutSchema: ${schemaPath}\` is not JSON (${(e as Error).message}).`); }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw refuse(`\`closeoutSchema: ${schemaPath}\` is not a JSON Schema: a schema is a JSON object.`);
+    }
+    closeoutSchema = parsed;
+  }
+
+  const worktree = meta.get('worktree');
   return {
-    brief: (m ? text.slice(m[0].length) : text).trim(),
-    cwd: meta.cwd ? path.resolve(meta.cwd) : fallbackCwd,
-    model: meta.model,
-    permissionMode: meta.permissionMode,
-    harness: meta.harness,
-    maxAttempts: meta.maxAttempts ? Number(meta.maxAttempts) : 1,
-    deadlineSeconds: meta.deadlineSeconds ? Number(meta.deadlineSeconds) : undefined,
-    resume: meta.resume as ResumePolicy | undefined,
+    brief,
+    cwd: cwd !== undefined ? path.resolve(cwd) : fallbackCwd,
+    model: meta.get('model'),
+    permissionMode: meta.get('permissionMode'),
+    harness: meta.get('harness'),
+    maxAttempts: maxAttempts !== undefined ? Number(maxAttempts) : 1,
+    deadlineSeconds: deadlineSeconds !== undefined ? Number(deadlineSeconds) : undefined,
+    resume: resume as ResumePolicy | undefined,
     // Which session to CONTINUE, as opposed to `resume` which is the retry policy between
     // attempts of this task. Two different questions that the same English word answers.
-    resumeFrom: meta.resumeFrom,
-    // A path to a JSON Schema file: frontmatter is one line per key, and a schema is not.
-    closeoutSchema: meta.closeoutSchema ? JSON.parse(fs.readFileSync(path.resolve(meta.closeoutSchema), 'utf8')) as object : undefined,
-    // `worktree: true` lets the harness name it; any other value names it yourself.
-    worktree: meta.worktree === undefined ? undefined : meta.worktree === 'true' ? true : meta.worktree,
+    resumeFrom: meta.get('resumeFrom'),
+    closeoutSchema,
+    // `worktree: true` lets the harness name it, `false` is no worktree, any other value names it.
+    worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
   };
 }
 

@@ -28,23 +28,8 @@ export type PromiseJournal = {
   read(taskId: string): Promise<Event[]>;
   list(): Promise<string[]>;
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
-  /**
-   * Watch everything that happens, as it happens.
-   *
-   * The engine's event-driven surface: a consumer reacts to work finishing without polling a task
-   * or knowing what a tick is. Pushed by the store when it can signal (the file store watches the
-   * feed), and backed by a timer so that a store which cannot — or an OS that drops the event —
-   * costs latency rather than correctness.
-   *
-   * Delivery is at-least-once in order, and the cursor never expires, so a consumer that starts
-   * at 0 replays the whole history first.
-   */
-  watch(options: {
-    onEntry: (entry: FeedEntry) => void | Promise<void>;
-    from?: Cursor;
-    intervalMs?: number;
-    onError?: (e: unknown) => void;
-  }): { stop(): void };
+  // No `watch` here: a store only has to answer `feed`. `Engine.watch` is built on it, and a
+  // required `watch` on the store was a method nothing ever called.
 };
 
 /** A harness, in Promises. Only needed for one that `HarnessSpec` cannot describe. */

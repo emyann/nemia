@@ -92,14 +92,15 @@ release the harness refuses is asked again.
 
 **Measured before relying on it** (`test/live.test.ts`, Claude Code 2.1.270): a session told a word
 settled and was released in the same pass; it was gone from `claude agents`, `ae logs` still read its
-transcript, and a second task filed with `resumeFrom` its id said the word back. `ae logs` finds a
-released session by the id its end was recorded with, and asks the task's own harness for it.
+transcript, and a second task filed with `resumeFrom` its id said the word back. `ae logs` finds a released session by the id recorded when its attempt ended, or when its task
+settled with the attempt still open, and asks the task's own harness for it.
 
-Two kinds of session are left listed. A task that asked for a `worktree` has its session stopped and
-not removed: `claude rm` deletes the worktree with the session, and the task's work is in it. And a
-task settled with no end on the record — stopped by a person, or past its deadline — never journalled
-its session's id, so removing that session would leave `ae logs` nothing to read; it is not running by
-then. `release` is optional on `Runner`: the detached runner has none, because its run files are the
+A task settled with no end on the record — stopped by a person, or past its deadline — has its
+session's id written on its `settled` entry instead, so that session is released like any other and
+`ae logs` still reads it. One kind is left listed: a task that asked for a `worktree` has its session
+stopped and not removed, because `claude rm` deletes the worktree with the session and the task's work
+is in it. (So is a session whose task settled before its id was recorded: removed, it could not be
+read.) `release` is optional on `Runner`: the detached runner has none, because its run files are the
 record `logs` reads.
 
 ### Why there are no leases

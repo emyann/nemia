@@ -55,14 +55,14 @@ follows; this only keeps its work on its branch.
 
 **Status.** Deferred on purpose (2026-09-12): fix it when it bites.
 
-### 3. Some settled Claude sessions still stay in the registry
+### 3. A worktree task's Claude session stays in the registry
 
-A `--bg` session is released once its attempt's end is on the record (engine `7200295`): stopped if it
-still runs, and removed from `claude agents`. Two kinds are left there, stopped. A task that asked for
-a `worktree`, because `claude rm` deletes the worktree the harness cut and the task's work is in it.
-And a task settled with no `ended` — stopped by a person, or past its deadline — because its session's
-id was never journalled, and once the session was removed `ae logs` would have nothing to read.
-Recording that id would take an event `decide` does not ask for today.
+A `--bg` session is released once its attempt's end, or its task's settling, is on the record (engine
+`7200295`, and two fixes from review in the table below): stopped if `claude agents` still has it
+running, then removed. One kind is left there, stopped: a task that asked for a `worktree`, because
+`claude rm` deletes the worktree the harness cut and the task's work is in it. Removing it safely would
+need that work somewhere else first. A session whose task a person or a deadline settled before the
+`settled` entry carried its id stays listed too, since `ae logs` could not read it once removed.
 
 ### 4. `claude-detached` measures no usage
 
@@ -158,6 +158,10 @@ has no Codex servers configured.
 
 ## Verified by tests, not by a live run
 
+- **Releasing a quiet session, or one a person or a deadline stopped** (engine `TBD-R1`, `TBD-R2`). A
+  fake `claude` that keeps a registry, at shipped defaults. The live run released a session that had
+  given its closeout; none that ended by quiet, and none settled without an end.
+
 - **Codex usage** (engine `bb3de3c`). Measured on the `exec --json` streams of seventeen codex-cli
   0.154.0 runs the worker had captured (`~/.agent-workflows/engine/runs/codex`): the sixteen whose
   turn completed each ended in one `turn.completed` carrying `input_tokens`, `cached_input_tokens`,
@@ -250,3 +254,4 @@ has no Codex servers configured.
 | every Codex attempt recorded `usage: null`, though its `exec --json` stream reports tokens | read from the worker's capture of that stream: tool calls by item, tokens from `turn.completed`, each absent when the stream cannot say. `turns` and `toolCalls` may now be absent from any `Usage` — a Codex turn is a prompt, not a model response — and `ae show` names what was not measured | engine `bb3de3c` |
 | every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `7200295` |
 | a released session that had ended by quiet was removed without a `claude stop` — and a worktree task's was never touched, left `working` for good — because `release` read the runner's translated `done` | `release` stops on the state `claude agents` itself listed (found in review) | engine `TBD-R1` |
+| a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `TBD-R2` |

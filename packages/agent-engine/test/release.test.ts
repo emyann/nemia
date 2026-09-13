@@ -12,6 +12,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import type { Event, PromiseJournal } from '../src/facade.ts';
 
 const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-release-${label}-`));
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -160,12 +162,17 @@ test('a session ended by quiet is stopped before it goes — the runner reports 
   }
 });
 
-test('no session is released while its attempt runs, nor when a person stopped its task and no end was written', async () => {
+test('no session is released while its attempt runs; one a person stopped is released once its task settles, its id recorded for logs', async () => {
+  // A task a person stops settles with no `ended`, so its session's id goes on its `settled` entry: once
+  // left listed for want of that id (found in review), the session is now released and still read.
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
     const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
-    for (let i = 0; i < 3; i++) await engine.tick();
+    await engine.tick();
+    const [row] = claude.rows();
+    wrote(row!, 0);
+    for (let i = 0; i < 2; i++) await engine.tick();
     assert.equal((await engine.view(id)).phase, 'working (quiescent)');
     assert.deepEqual(claude.releases(), [], 'running: nothing stopped, nothing removed');
 
@@ -173,9 +180,63 @@ test('no session is released while its attempt runs, nor when a person stopped i
     for (let i = 0; i < 3; i++) await engine.tick();
     const v = await engine.view(id);
     assert.equal(v.state.settled, 'stopped');
-    assert.equal(v.state.attempts[0]?.ended, null, 'settled with no end on the record');
-    assert.deepEqual(claude.releases().map((c) => c[0]), ['stop'], "the person's stop, and no rm: its id was never journalled, and logs would lose it");
-    assert.equal(claude.rows().length, 1);
+    assert.equal(v.state.attempts[0]?.ended, null, 'settled with no end written');
+    assert.equal(v.state.attempts[0]?.nativeId, row!.sessionId, 'its session id, recorded as it settled');
+    assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], "the person's stop, then — stopped by then — only rm");
+    assert.deepEqual(claude.rows(), []);
+    assert.equal(v.sessionId, row!.sessionId);
+    assert.match(await engine.logs(id), /the prompt/, 'and ae logs still reads it');
+  });
+});
+
+test('a session stopped at its deadline is released once its task settles, as one a person stopped is', async () => {
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const engine = createEngine({ root: tmp('root') });
+    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), deadlineSeconds: 0.2 });
+    await engine.tick();
+    const [row] = claude.rows();
+    await sleep(300);
+    for (let i = 0; i < 3; i++) await engine.tick();
+    const v = await engine.view(id);
+    assert.equal(v.state.settled, 'failed');
+    assert.equal(v.state.attempts[0]?.ended, null, 'settled with no end written');
+    assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], 'stopped by the deadline, then removed');
+  });
+});
+
+test("a task settled before its session's id was recorded keeps that session listed — removed, ae logs could not read it", async () => {
+  const claude = fakeClaude();
+  const unrecorded = randomUUID();
+  const recorded = randomUUID();
+  claude.setRows([
+    { name: 'ae/before/1', sessionId: unrecorded, state: 'stopped', status: 'idle', startedAt: Date.now() },
+    { name: 'ae/after/1', sessionId: recorded, state: 'stopped', status: 'idle', startedAt: Date.now() },
+  ]);
+  // Two journals a person stopped, as an engine without the id wrote one and as this one writes the other.
+  const at = new Date().toISOString();
+  const stopped = (settled: Event): Event[] => [
+    { kind: 'filed', at, brief: 'the prompt', cwd: '/r', maxAttempts: 1, harness: 'claude' },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'stop-requested', at },
+    settled,
+  ];
+  const tasks: Record<string, Event[]> = {
+    before: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator' }),
+    after: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator', nativeId: recorded }),
+  };
+  const journal: PromiseJournal = {
+    async append(id, e) { (tasks[id] ??= []).push(e); },
+    async read(id) { return [...(tasks[id] ?? [])]; },
+    async list() { return Object.keys(tasks); },
+    async feed() { return { entries: [], cursor: 0 }; },
+  };
+  await onPath(claude.bin, async () => {
+    const engine = createEngine({ root: tmp('root'), journal });
+    for (let i = 0; i < 2; i++) await engine.tick();
+    assert.deepEqual(claude.releases(), [['rm', recorded.split('-')[0]!]], 'the session whose id is on the record, and only it');
+    assert.deepEqual(claude.rows().map((r) => r.name), ['ae/before/1']);
   });
 });
 

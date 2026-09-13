@@ -174,9 +174,15 @@ export const step = Effect.fn('step')(function* (
       yield* runner.stop(action.sessionId);
       break;
 
-    case 'settle':
-      yield* journal.append(taskId, { kind: 'settled', at: at(), outcome: action.outcome, note: action.note });
+    case 'settle': {
+      // An attempt left open — stopped by a person, or past its deadline — has no `ended` to carry its
+      // session's id, so it is written here, read off the sighting as an ending's facts are: what `logs`
+      // reads once the harness has let the session go. A fact for the record; `decide` never reads it.
+      const last = state.attempts.at(-1);
+      const open = last && last.ended === null ? observed.get(nameFor(taskId, last.n))?.nativeId : undefined;
+      yield* journal.append(taskId, { kind: 'settled', at: at(), outcome: action.outcome, note: action.note, ...(open ? { nativeId: open } : {}) });
       break;
+    }
   }
 
   return action;
@@ -212,9 +218,9 @@ export const settleTask = Effect.fn('settleTask')(function* (
  * record and whose session the harness still lists. I/O applied to what the journal already says,
  * not a judgement — `decide` is not asked, and learns nothing.
  *
- * Only an attempt with a written end. A task settled without one — stopped by a person, or past its
- * deadline — never journalled its session's id, so a session released then would leave `logs` with
- * nothing to read; by then it is not live, and it stays listed.
+ * An attempt with a written end — or, in a task settled while it was open (stopped by a person, or
+ * past its deadline), one whose session's id the `settled` entry recorded. A task settled before that id
+ * was recorded keeps its session listed: released, `logs` would have nothing to read.
  *
  * Level-triggered like the rest: asked on every pass that still observes such a session, so a crash
  * between writing an end and releasing is repaired by the next pass. A release the harness refuses is
@@ -224,7 +230,8 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, ob
   const runner = yield* Runner;
   if (!runner.release) return;
   for (const attempt of state.attempts) {
-    const session = attempt.ended === null ? undefined : observed.get(nameFor(state.taskId, attempt.n));
+    const finished = attempt.ended !== null || (state.settled !== null && attempt.nativeId !== null);
+    const session = finished ? observed.get(nameFor(state.taskId, attempt.n)) : undefined;
     if (!session) continue;
     yield* runner.release(session, { worktree: state.worktree }).pipe(
       Effect.catchTag('RunnerError', () => Effect.succeed(undefined)),

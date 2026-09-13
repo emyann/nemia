@@ -10,7 +10,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 'agent-engine';
-import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief } from './check.ts';
+import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type Verdict } from './check.ts';
+
+export { verdictWord } from './check.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
 import { assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
 
@@ -493,8 +495,57 @@ export async function tick(e: Engine): Promise<Advanced[]> {
  */
 export async function list(e: Engine, run: Run): Promise<Listing> {
   const steps = stepsOf(run);
-  const { views } = await taskPhases(e, run);
-  return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name));
+  const { views, phaseOf } = await taskPhases(e, run);
+  // Only a refused check's log is read here: its exit code is the one number on its line.
+  const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
+  return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name),
+    closeoutAsked(views), (name) => refused.get(name)?.verdict);
+}
+
+/**
+ * What a settled check said, for a person to read.
+ *
+ * `passed` is the engine's settled phase — the worker's reading of the exit code, and the only thing
+ * the run gates on. The rest is evidence: the number from the log's last line, and the last lines of
+ * each stream, kept apart because a loud stderr must not push a test runner's stdout verdict off the
+ * screen.
+ */
+export type CheckReport = { command: string; passed: boolean; verdict: Verdict; stdout: string; stderr: string };
+
+async function checkReports(
+  e: Engine,
+  run: Run,
+  steps: readonly Workflow[],
+  phaseOf: (taskId: string) => TaskPhase,
+  want: (phase: TaskPhase) => boolean,
+): Promise<Map<string, CheckReport>> {
+  const reports = new Map<string, CheckReport>();
+  for (const step of steps) {
+    const taskId = run.steps[step.name]?.check?.taskId;
+    if (!taskId || !step.check || !want(phaseOf(taskId))) continue;
+    const log = await e.logs(taskId);
+    reports.set(step.name, {
+      command: step.check,
+      passed: phaseOf(taskId) === 'succeeded',
+      verdict: readVerdict(log),
+      stdout: stdoutTail(log),
+      stderr: lastLines(tailOf(checkStderr(taskId))),
+    });
+  }
+  return reports;
+}
+
+/** The end of a file that may be large, or absent — a check stopped before it started wrote none. */
+function tailOf(file: string, bytes = 64_000): string {
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const size = fs.fstatSync(fd).size;
+      const buf = Buffer.alloc(Math.min(size, bytes));
+      fs.readSync(fd, buf, 0, buf.length, size - buf.length);
+      return buf.toString('utf8');
+    } finally { fs.closeSync(fd); }
+  } catch { return ''; }
 }
 
 /**
@@ -585,12 +636,15 @@ export async function decide(e: Engine, id: string): Promise<{
   run: Run;
   decision: Decision;
   closeouts: Record<string, Closeout | { error: string } | undefined>;
+  /** Every settled check, by step: what the run's own fact about the step says. */
+  checks: Record<string, CheckReport>;
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
-  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run), closeoutAsked(views)), closeouts };
+  const checks = Object.fromEntries(await checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped'));
+  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run), closeoutAsked(views)), closeouts, checks };
 }
 
 export function resultBranches(run: Run): string[] {

@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, cancel, list, markCancelled, readRun, start } = await import('../src/runner.ts');
+const { advance, cancel, decide, list, markCancelled, readRun, start } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -142,7 +142,7 @@ test('`wf ls` takes how each step signed off from the engine — and a task from
   const { e } = engineWith({ t1: 'succeeded', t2: 'succeeded' }, undefined, { t2: blocked });
 
   const l = await list(e, run);
-  assert.deepEqual(l.steps.map((s) => s.status), ['succeeded', 'succeeded · BLOCKED']);
+  assert.deepEqual(l.steps.map((s) => s.status), ['unverified', 'succeeded · BLOCKED']);
   assert.deepEqual(l.waitingOnYou, ['review']);
 });
 
@@ -220,6 +220,7 @@ const board = () => {
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown }>();
   const filings: string[] = [];
   const stopped: string[] = [];
+  const logs = new Map<string, string>();
   const e = {
     view: async (id: string) => {
       const t = tasks.get(id);
@@ -234,9 +235,10 @@ const board = () => {
     },
     file: async (spec: Filed) => { filings.push(spec.id); tasks.set(spec.id, { spec, phase: 'pending' }); return spec.id; },
     stop: async (id: string) => { stopped.push(id); },
+    logs: async (id: string) => logs.get(id) ?? '(no output yet)',
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
-  return { e, tasks, filings, stopped, settle };
+  return { e, tasks, filings, stopped, settle, logs };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -401,4 +403,27 @@ test("a step named for another step's check is refused at `wf start`, before any
   // With worktrees: a second root would otherwise be refused first, for running beside `implement`.
   assert.throws(() => start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }), (err: Error & { exitCode?: number }) =>
     err.exitCode === 2 && /implement-check/.test(err.message) && /Rename implement-check\.md/.test(err.message));
+});
+
+test('`wf ls` and `wf decide` read a refused check from its log and its stderr file', async () => {
+  const run = started(folder('check: npm test'));
+  const { e, settle, logs } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  const id = `${run.id}-implement-check`;
+  settle(id, 'failed');
+  logs.set(id, 'not ok 3 - parses a trailing comma\n# fail 1\n\n[wf check] exit 1\n');
+  fs.writeFileSync(path.join(ROOT, 'checks', `${id}.stderr`), 'npm error Test failed.\n');
+
+  const l = await list(e, readRun(run.id));
+  assert.deepEqual(l.steps.map((s) => s.status), ['failed ✗ check (exit 1)', 'waiting']);
+  assert.deepEqual(l.waitingOnYou, ['implement']);
+
+  const { decision: d, checks } = await decide(e, run.id);
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failedCheck], ['failed', ['implement']]);
+  assert.deepEqual(checks.implement, {
+    command: 'npm test', passed: false, verdict: 1,
+    stdout: 'not ok 3 - parses a trailing comma\n# fail 1', stderr: 'npm error Test failed.',
+  });
 });

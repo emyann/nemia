@@ -12,7 +12,7 @@
  * the run, and is the only state this file writes down rather than derives.
  */
 import type { TaskView } from 'agent-engine';
-import { checkContract } from './check.ts';
+import { checkContract, verdictWord, type Verdict } from './check.ts';
 import { terminalSteps, type Workflow } from './workflow.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
@@ -485,24 +485,26 @@ export function decision(
 export type Listing = {
   /** One line per step: its name, what to say about it, and the branch it is on. */
   steps: Array<{ name: string; status: string; branch: string | null }>;
-  /** Steps that signed off blocked, on a run nobody has called off. */
+  /** Steps a person has to act on — blocked, unsigned, or refused by their check — on a run nobody has called off. */
   waitingOnYou: string[];
 };
 
 /**
  * What `wf ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
  *
- * The engine's phase alone cannot tell apart the two cases that matter most. A step that stopped
- * itself `blocked` ended its session as cleanly as one that finished the work, so both read
- * `succeeded` — and the step a person has to act on looked exactly like one they can ignore. So a
- * step's outcome goes beside its phase, and `BLOCKED` is shouted, in the word `wf decide` uses.
+ * The words are `stepStatus`'s, so the list says what the run established and not only what the
+ * engine settled: `verified ✓`, `checking`, `failed ✗ check (exit 1)`, `unsigned` — and `unverified`
+ * for a step whose only evidence is its own word, on every line where that is true, because a step
+ * nobody checked must not pass for one somebody did.
  *
- * A step with no closeout reads exactly as it did before there were closeouts: still running, never
- * filed, or from a run that predates them. Nothing is inferred for it — a missing closeout is not a
- * claim that the work was done, and an old run must still list.
+ * Where the run has no verdict of its own, the step's closeout goes beside the word, as before. A step
+ * that stopped itself `blocked` ended its session as cleanly as one that finished the work, so the
+ * engine's phase reads `succeeded` for both; `BLOCKED` is shouted beside it, in the word `wf decide`
+ * uses. A step still running shows the engine's own word for it. Nothing is inferred for a step with
+ * no closeout — a missing closeout is not a claim that the work was done, and an old run must still list.
  *
- * One line per step, deliberately. The summary and `needs` were written for `wf decide`, where there
- * is room to read them; here they would turn a list into a report.
+ * One line per step, deliberately. The summary, `needs` and a check's output were written for
+ * `wf decide`, where there is room to read them; here they would turn a list into a report.
  */
 export function listing(
   steps: readonly Workflow[],
@@ -510,21 +512,40 @@ export function listing(
   /** The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is. */
   phaseOf: (taskId: string) => string,
   closeoutOf: (step: string) => Closeout | { error: string } | undefined,
+  askedCloseout: (taskId: string) => boolean = () => false,
+  /** What a refused check exited with, as its log tells it. */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): Listing {
+  // The engine's word for a settled task IS its outcome; any other word is a task still going.
+  const settledOf = (taskId: string): TaskPhase => {
+    const word = phaseOf(taskId);
+    return word === 'succeeded' || word === 'failed' || word === 'stopped' ? word : 'running';
+  };
+  const readable = (name: string): Closeout | undefined => {
+    const c = closeoutOf(name);
+    return c && !('error' in c) ? c : undefined;
+  };
+
   const waitingOnYou: string[] = [];
-  const rows = steps.map(({ name }) => {
+  const rows = steps.map((step) => {
+    const { name } = step;
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
     if (!taskId) return { name, status: 'waiting', branch };
 
-    const phase = phaseOf(taskId);
+    const status = stepStatus(step, run, settledOf, readable, askedCloseout);
+    if (status === 'blocked' || status === 'unsigned' || status === 'failed (check)') waitingOnYou.push(name);
+    // The run's own verdict, where it has one, and nothing beside it.
+    if (status === 'verified') return { name, status: 'verified ✓', branch };
+    if (status === 'checking') return { name, status: 'checking', branch };
+    if (status === 'failed (check)') return { name, status: `failed ✗ check (${verdictWord(verdictOf(name) ?? 'unfinished')})`, branch };
+
     const c = closeoutOf(name);
-    if (!c) return { name, status: phase, branch };
     // Still worth a word: a statement nobody can read is not the same as no statement, and
     // `wf decide` prints the reason.
-    if ('error' in c) return { name, status: `${phase} · closeout unreadable`, branch };
-    if (c.outcome === 'blocked') waitingOnYou.push(name);
-    return { name, status: `${phase} · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`, branch };
+    const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
+    const word = status === 'unsigned' || status === 'unverified' ? status : phaseOf(taskId);
+    return { name, status: `${word}${said}`, branch };
   });
 
   // A run somebody called off is waiting on nobody — `wf decide` says there is nothing to decide —

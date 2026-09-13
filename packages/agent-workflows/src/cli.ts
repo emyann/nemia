@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifacts, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, stepsOf, tick } from './runner.ts';
+import { artifacts, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, stepsOf, tick, verdictWord } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -19,12 +19,18 @@ const HELP = `wf — run a workflow of agent steps
 A workflow is a folder of markdown files. One file is one step:
 
     ---
-    harness: codex        # claude (default) | codex
-    after: implement      # what must succeed first
+    harness: claude       # claude (default) | codex | claude-detached
+    after: review         # what must finish first: verified, or unverified if it has no check
+    check: npm test       # the run executes it in the step's workspace; exit 0 files what follows
     ---
-    Review the changes on this branch. Be specific about correctness, not style.
+    Answer the review in REVIEW.md, one finding at a time.
 
-The only non-prose key is \`after\`. Everything else the agent is told is prose.
+No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, and the rest
+(model, permissionMode, deadlineSeconds, maxAttempts) say who does the work and for how long.
+Everything else the agent is told is prose.
+
+  wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
+  · unverified (no check: declared) · unsigned (ended without its closeout) · BLOCKED.
 
   WF_ROOT            where runs and the engine's board live
   WF_MAX_CONCURRENT  sessions per harness at once (default 2)
@@ -128,7 +134,7 @@ export async function main(argv: string[]): Promise<void> {
     // and does not decide anything itself.
     case 'decide': {
       if (!rest[0]) return console.log(HELP);
-      const { run, decision, closeouts } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks } = await decide(e, rest[0]);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
 
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
@@ -136,19 +142,35 @@ export async function main(argv: string[]): Promise<void> {
       if (decision.kind === 'shipped') return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}`);
 
       console.log(`${head}\n`);
+      // The run's own verdicts first: they decide how much of the rest is worth reading.
+      if (decision.failedCheck.length) console.log(`  FAILED CHECK: ${decision.failedCheck.join(', ')}  — the run executed its check and it did not exit 0; nothing after it ran`);
+      if (decision.unsigned.length) console.log(`  UNSIGNED: ${decision.unsigned.join(', ')}  — ended without the closeout it was asked for; nothing after it ran`);
+      if (decision.unverified.length) console.log(`  UNVERIFIED: ${decision.unverified.join(', ')}  — no check: declared; only its own word says it worked`);
       if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)`);
       // A step that stopped itself and said why is a different thing from one that broke, and the
       // difference decides whether you read a summary or a log.
       if (decision.stuck.length) console.log(`  BLOCKED, waiting on you: ${decision.stuck.join(', ')}`);
-      if (!decision.failed.length && !decision.stuck.length) console.log(`  every step succeeded`);
+      if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
 
       // Each step's own closeout: the summary is written FOR this moment. The reviewer never saw
-      // it — that is the point of the field — and you are the audience it was addressed to.
+      // it — that is the point of the field — and you are the audience it was addressed to. Above it,
+      // what the run's check of the step said: the machine's word before the agent's.
       for (const name of Object.keys(run.steps)) {
         const c = closeouts[name];
+        const check = checks[name];
+        if (!c && !check) continue;
+        const blocked = c && !('error' in c) && c.outcome === 'blocked';
+        console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}`);
+        if (check) {
+          console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
+          // For a check that refused, the last of each stream, labelled: which pipe a line came from
+          // is the difference between a runner's progress noise and its summary.
+          for (const [stream, text] of [['stdout', check.stdout], ['stderr', check.stderr]] as const) {
+            if (!check.passed && text) console.log(`      ${stream}:\n        ${text.split('\n').join('\n        ')}`);
+          }
+        }
         if (!c) continue;
-        if ('error' in c) { console.log(`\n  ${name}: closeout unreadable — ${c.error}`); continue; }
-        console.log(`\n  ${name}${c.outcome === 'blocked' ? '  BLOCKED' : ''}`);
+        if ('error' in c) { console.log(`    closeout unreadable — ${c.error}`); continue; }
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
         if (c.needs) console.log(`    needs: ${c.needs}`);
         const missing = missingArtifacts(run, name, c);

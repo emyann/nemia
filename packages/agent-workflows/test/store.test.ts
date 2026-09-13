@@ -12,9 +12,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-engine';
+import type { Engine, TaskView } from 'agent-engine';
 import type { Run, TaskPhase } from '../src/run.ts';
-import { readCheckBrief } from '../src/check.ts';
+import { readCheckBrief, verdictWord } from '../src/check.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-store-'));
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, decide, list, markCancelled, missingArtifacts, readRun, retry, round, start } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, phaseOfView, readRun, retry, round, start } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -1286,4 +1286,64 @@ test("a round files its target with the target's tools and effort, and the loopi
   await toReview(b, run.id, 2, false);
   const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
   assert.deepEqual([review2.tools, review2.effort, review2.resumeFrom], [REVIEWS, 'max', undefined], "round 2's review");
+});
+
+// ─── what a consumer reads without a log: `phaseOfView`, `closeoutAsked`, `exitVerdicts` ───
+
+/** Every task a run's record names, viewed once, as the tick views them: all the exports are given — no engine, and so no log. */
+const viewsOf = async (e: Engine, run: Run): Promise<Map<string, TaskView>> => {
+  const views = new Map<string, TaskView>();
+  for (const { taskId, check } of Object.values(run.steps)) {
+    if (taskId) views.set(taskId, await e.view(taskId));
+    if (check) views.set(check.taskId, await e.view(check.taskId));
+  }
+  return views;
+};
+
+test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose attempt has no exit code — the word `wf ls` reads off the log — and no retry is spent on it', async () => {
+  const refused = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
+  refused.logs.set(`${refused.run.id}-implement-check`, 'not ok 1 - parses a trailing comma\n\n[wf check] exit 1\n');
+  // Killed at its deadline: the engine settles it `failed`, with no exit code on its attempt and no trailer on its log.
+  const killed = await throughCheck('check: npm test\nretries: 1', 'failed');
+  killed.logs.set(`${killed.run.id}-implement-check`, 'ok 1 - builds\n');
+
+  for (const [b, verdict] of [[refused, 1], [killed, 'unfinished']] as const) {
+    const run = readRun(b.run.id);
+    const verdictOf = exitVerdicts(await viewsOf(b.e, run), run);
+    assert.equal(verdictOf('implement'), verdict);
+    assert.equal(verdictOf('review'), undefined, 'a step with no check filed has no verdict at all');
+    assert.equal((await list(b.e, run)).steps[0]!.status, `failed ✗ check (${verdictWord(verdict)})`, "`wf ls`'s word, which it read off the log");
+  }
+  assert.deepEqual((await advance(killed.e, readRun(killed.run.id))).tried, [], 'a check that did not finish spends no retry');
+  assert.deepEqual((await advance(refused.e, readRun(refused.run.id))).tried, ['implement'], 'a refusal does');
+});
+
+test("`phaseOfView` and `closeoutAsked` say what `wf ls` says: `unknown` for a task the engine has no record of, not `pending`; `unsigned` only for a step that was asked for its closeout", async () => {
+  const b = board();
+  const run = started(folder());
+  await advance(b.e, readRun(run.id));
+  const implement = `${run.id}-implement`;
+  // Filed, and waiting for a slot.
+  let views = await viewsOf(b.e, readRun(run.id));
+  assert.deepEqual([phaseOfView(views.get(implement)), (await list(b.e, readRun(run.id))).steps[0]!.status], ['pending', 'pending']);
+
+  // A record naming a task the engine has no record of. The engine folds it to a filed task's state, and says `pending`;
+  // `wf ls` said so too, which is in flight, for a task nobody will ever move.
+  const lost = aRun('r-lost', { implement: { taskId: 'r-lost-implement' }, review: { taskId: null } });
+  writeRun(lost);
+  const lostView = await b.e.view('r-lost-implement');
+  assert.equal(lostView.phase, 'pending', "the engine's own word");
+  assert.deepEqual([phaseOfView(lostView), phaseOfView(undefined), (await list(b.e, lost)).steps[0]!.status], ['unknown', 'unknown', 'unknown']);
+
+  // Settled without the closeout the run asked for.
+  b.settle(implement, 'succeeded');
+  views = await viewsOf(b.e, readRun(run.id));
+  assert.deepEqual([phaseOfView(views.get(implement)), closeoutAsked(views)(implement)], ['succeeded', true]);
+  assert.equal((await list(b.e, readRun(run.id))).steps[0]!.status, 'unsigned');
+
+  // A task from before closeouts was never asked for one, so it is not unsigned: it lists `unverified`.
+  const before = aRun('r-before', { implement: { taskId: 't-before' }, review: { taskId: null } });
+  const { e: old } = engineWith({ 't-before': 'succeeded' });
+  const oldViews = await viewsOf(old, before);
+  assert.deepEqual([phaseOfView(oldViews.get('t-before')), closeoutAsked(oldViews)('t-before'), (await list(old, before)).steps[0]!.status], ['succeeded', false, 'unverified']);
 });

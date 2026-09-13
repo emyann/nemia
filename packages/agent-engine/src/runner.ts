@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { Observed, Sighting } from './domain.ts';
+import type { Observed, Sighting, Usage } from './domain.ts';
 
 export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError', {
   verb: Schema.String,
@@ -118,6 +118,47 @@ export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: num
 };
 
 /**
+ * What a session consumed, read from its transcript: the responses made at or after `since`.
+ *
+ * `since` is the session's own start, from the harness's registry. A resumed transcript holds its
+ * parent's whole conversation under the child's id, with the parent's timestamps, so counted whole
+ * a continuation would report its parent's work as its own. A response is written as one line per
+ * content block, each repeating its `message.id` and `usage` (measured: 160 lines, 85 responses),
+ * so responses are counted once, by id. Tokens are given only when every counted response carried
+ * them. A transcript holds no cost, so `costUsd` is absent — never 0.
+ */
+export const transcriptUsage = (jsonl: string, since: number): Usage => {
+  const responses = new Map<string, { input: number; output: number } | null>();
+  const toolCalls = new Set<string>();
+  for (const line of jsonl.split('\n')) {
+    if (!line.includes('"assistant"')) continue;
+    let entry: { type?: string; timestamp?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } };
+    try { entry = JSON.parse(line); } catch { continue; }
+    const message = entry.message;
+    if (entry.type !== 'assistant' || !message?.id || !(Date.parse(entry.timestamp ?? '') >= since)) continue;
+    const u = message.usage;
+    const n = (key: string) => (typeof u?.[key] === 'number' ? (u[key] as number) : 0);
+    responses.set(message.id, typeof u?.input_tokens === 'number' && typeof u?.output_tokens === 'number'
+      ? { input: n('input_tokens') + n('cache_creation_input_tokens') + n('cache_read_input_tokens'), output: n('output_tokens') }
+      : null);
+    if (Array.isArray(message.content)) {
+      for (const block of message.content as Array<{ type?: string; id?: string }>) {
+        if (block?.type === 'tool_use' && block.id) toolCalls.add(block.id);
+      }
+    }
+  }
+  const counted = [...responses.values()];
+  const measured = counted.filter((c) => c !== null);
+  return {
+    turns: responses.size,
+    toolCalls: toolCalls.size,
+    ...(measured.length === counted.length
+      ? { inputTokens: measured.reduce((t, c) => t + c.input, 0), outputTokens: measured.reduce((t, c) => t + c.output, 0) }
+      : {}),
+  };
+};
+
+/**
  * The permission modes Claude Code takes. Harness vocabulary, so it lives beside the runner that
  * speaks it and never in `domain.ts`.
  *
@@ -152,6 +193,8 @@ export type ClaudeOptions = {
   transcriptTime?: (sessionId: string) => Promise<number | undefined>;
   /** The session's closing statement and when it was made. Injectable for the same reason. */
   closeoutFrom?: (sessionId: string) => Promise<{ payload: unknown; at: number } | undefined>;
+  /** What the session consumed since `since`, its own start. Injectable for the same reason. */
+  usageFrom?: (sessionId: string, since: number) => Promise<Usage | undefined>;
 };
 
 /**
@@ -189,6 +232,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     if (!file) return undefined;
     try { return lastStructuredOutput(await fs.promises.readFile(file, 'utf8')); } catch { return undefined; }
   });
+  const usageFrom = options.usageFrom ?? (async (sessionId: string, since: number) => {
+    const file = transcriptFile(sessionId);
+    if (!file) return undefined;
+    try { return transcriptUsage(await fs.promises.readFile(file, 'utf8'), since); } catch { return undefined; }
+  });
 
   /**
    * A finished session's statement cannot change, so it is read once. A working one is read each
@@ -200,6 +248,20 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     const said = await closeoutFrom(s.sessionId);
     if (s.state === 'done' || s.state === 'failed' || s.state === 'stopped') finalStatements.set(s.sessionId, said);
     return said;
+  };
+
+  /**
+   * What it consumed, by the same rule: read once when finished, each idle pass while not. No start
+   * in the registry, no usage — without one, a resumed session's inherited conversation cannot be
+   * told from its own, and a wrong count is worse than none.
+   */
+  const finalUsage = new Map<string, Usage | undefined>();
+  const usageOf = async (s: Sighting, since: number | undefined) => {
+    if (since === undefined) return undefined;
+    if (finalUsage.has(s.sessionId)) return finalUsage.get(s.sessionId);
+    const used = await usageFrom(s.sessionId, since);
+    if (s.state === 'done' || s.state === 'failed' || s.state === 'stopped') finalUsage.set(s.sessionId, used);
+    return used;
   };
 
   return ({
@@ -238,8 +300,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
 
     observe: sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
       Effect.map((out) => {
-        const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string }>;
-        const m = new Map<string, Sighting>();
+        const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string; startedAt?: unknown }>;
+        const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
         for (const row of rows) {
           // `state` and `status` answer different questions and are NOT a fallback chain. `state`
           // is the session's lifecycle; `status` is whether its process is busy this instant. A
@@ -249,7 +311,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           // Only sessions WE named are ours. Everything else on the machine is somebody else's.
           // For this harness the session id IS the native id — `--resume` takes exactly it.
           if (row.name?.startsWith('ae/') && row.sessionId && state) {
-            m.set(row.name, { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId });
+            m.set(row.name, {
+              sighting: { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId },
+              // When THIS session started, as the harness recorded it: what usage is counted from.
+              startedAt: typeof row.startedAt === 'number' ? row.startedAt : undefined,
+            });
           }
         }
         return m;
@@ -266,7 +332,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // remembering and every driver gets the same answer.
       Effect.flatMap((m) => Effect.forEach(
         [...m],
-        ([name, sighting]) =>
+        ([name, { sighting, startedAt }]) =>
           // Busy right now: nothing it has said is final and nothing about it is quiet. A long tool
           // call writes nothing for minutes, and `busy` is what keeps that from reading as silence.
           sighting.busy
@@ -277,7 +343,9 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
                 // session carries its parent's statements too, and only the journal knows when
                 // the attempt began.
                 const said = await statementOf(sighting);
-                const reported: Sighting = said ? { ...sighting, closeout: said } : sighting;
+                // And what it has consumed since its own start — reported as measured, or not at all.
+                const used = await usageOf(sighting, startedAt);
+                const reported: Sighting = { ...sighting, ...(said ? { closeout: said } : {}), ...(used ? { usage: used } : {}) };
                 if (reported.state !== 'working') return [name, reported] as const;
                 // The floor underneath, statement or not. Kept even when there IS one, because an
                 // inherited statement is discarded upstream and must not leave a session with no

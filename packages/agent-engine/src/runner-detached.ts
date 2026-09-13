@@ -161,7 +161,12 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       // output by the worker — present only once the harness has printed it, which is why resume
       // is best-effort for this kind of harness and exact for one with a registry.
       for (const { name, run } of readAll()) {
-        m.set(name, { sessionId: name, state: observedState(run, now), nativeId: run.nativeId, closeout: statementOf(name) });
+        m.set(name, {
+          sessionId: name, state: observedState(run, now), nativeId: run.nativeId, closeout: statementOf(name),
+          // The process's own exit code, once it has one. The worker writes -1 when there is none —
+          // killed by a signal, or never started — and that is reported as no code, not as a code.
+          ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
+        });
       }
       return m;
     }),

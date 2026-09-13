@@ -334,7 +334,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
 export { codex, claudeDetached } from './runner-detached.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { nameFor } from './domain.ts';
-export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt } from './domain.ts';
+export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage } from './domain.ts';
 export type { SpawnRequest } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { TaskView } from './engine.ts';

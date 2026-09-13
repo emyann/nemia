@@ -7,7 +7,7 @@
  */
 import { Effect } from 'effect';
 import { randomUUID } from 'node:crypto';
-import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State } from './domain.ts';
+import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { Runner } from './runner.ts';
 
@@ -20,7 +20,11 @@ export const DEFAULT_MAX_CONCURRENT = 3;
 /** A live session is one the engine is still waiting on. `done`/`failed`/`stopped` are not. */
 const LIVE = new Set(['working', 'busy', 'blocked']);
 
-export type TaskView = { id: string; state: State; phase: string; sessionId: string | null; costUsd?: number; turns?: number };
+export type TaskView = {
+  id: string; state: State; phase: string; sessionId: string | null;
+  /** What the attempt in flight has consumed so far, when its runner can see inside it. Settled attempts carry theirs on `state.attempts`. */
+  usage?: Usage;
+};
 
 /** File a task. The only write a person makes; everything after is the loop's. */
 export const file = Effect.fn('file')(function* (spec: {
@@ -131,13 +135,17 @@ export const step = Effect.fn('step')(function* (
       yield* journal.append(taskId, { kind: 'spawned', at: at(), attempt: action.attempt });
       break;
 
-    case 'record-end':
+    case 'record-end': {
+      // What the attempt consumed and how its process exited are read off the same sighting the
+      // ending came from, and written beside it. Facts for the record; `decide` sees neither.
+      const seen = observed.get(nameFor(taskId, action.attempt));
       yield* journal.append(taskId, {
         kind: 'ended', at: at(), attempt: action.attempt, sessionId: action.sessionId,
         observed: action.observed, reason: action.reason, nativeId: action.nativeId,
-        closeout: action.closeout,
+        closeout: action.closeout, usage: seen?.usage, exitCode: seen?.exitCode,
       });
       break;
+    }
 
     case 'stop':
       yield* runner.stop(action.sessionId);
@@ -246,5 +254,5 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
     : last?.ended === null ? 'starting'
     : last ? 'between attempts'
     : 'pending';
-  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? null, costUsd: sighting?.costUsd, turns: sighting?.turns };
+  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? null, usage: sighting?.usage };
 });

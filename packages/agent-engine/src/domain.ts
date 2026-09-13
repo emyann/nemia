@@ -41,7 +41,8 @@ export type Outcome = 'succeeded' | 'failed' | 'stopped';
  *
  * `nativeId` is the harness's own identifier — the thing `--resume` takes. It is not the key and
  * is often not known until the session has started, which is exactly why it is not the key.
- * `costUsd`/`turns` are present only when the runner can see inside a session.
+ * `usage` is present only when the runner can see inside a session, `exitCode` only for a harness
+ * that ends by exiting.
  */
 export type Sighting = {
   sessionId: string;
@@ -57,8 +58,10 @@ export type Sighting = {
    */
   busy?: boolean;
   nativeId?: string;
-  costUsd?: number;
-  turns?: number;
+  /** What the session has consumed, as far as its runner could measure. Absent when it could not. */
+  usage?: Usage;
+  /** How the harness's process exited. A fact about the process, not a verdict on the work. */
+  exitCode?: number;
   /**
    * What the workload said when it finished, and WHEN it said it — present only for a harness that
    * can take a structured final answer, and only once one was given.
@@ -67,6 +70,25 @@ export type Sighting = {
    * engine keeps one only if it was made after this attempt began.
    */
   closeout?: { payload: unknown; at: number };
+};
+
+/**
+ * What a session consumed, as its runner measured it.
+ *
+ * Every field is a measurement. A count the runner could not see is absent, never 0, and a runner
+ * that measured nothing reports no usage at all, so its attempt records `null`. A zero that means
+ * "nobody counted" reads as "cost nothing", which is the one reading a record must never allow.
+ */
+export type Usage = {
+  /** Model responses, each counted once however many lines it was written as. */
+  turns: number;
+  /** Tool calls the model made. */
+  toolCalls: number;
+  /** Every input token the model read, cached ones included. */
+  inputTokens?: number;
+  outputTokens?: number;
+  /** Only a runner that is told the cost has one. A transcript does not say. */
+  costUsd?: number;
 };
 
 /** The join key. Deterministic, so it survives anything that kills this process. */
@@ -129,8 +151,11 @@ export type Event =
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string }
   /** RESULT: the spawn call returned. The session is the harness's problem now. */
   | { kind: 'spawned'; at: string; attempt: number }
-  /** An attempt reached a terminal state, as observed — never as assumed. */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown }
+  /**
+   * An attempt reached a terminal state, as observed — never as assumed. `usage` and `exitCode`
+   * come from the same sighting, when its runner measured them; `decide` reads neither.
+   */
+  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number }
   /** The operator asked for it to stop. */
   | { kind: 'stop-requested'; at: string }
   /** Terminal. Nothing moves after this. */
@@ -151,6 +176,10 @@ export type Attempt = {
   resumeFrom?: string;
   /** What the workload said when this attempt ended, if it said anything. Carried, never read. */
   closeout?: unknown;
+  /** What this attempt consumed; `null` when its runner measured nothing, never zeros. Carried, never read. */
+  usage: Usage | null;
+  /** How its process exited; `null` for a harness whose process is not ours, or one that never exited. */
+  exitCode: number | null;
 };
 
 export type State = {
@@ -195,7 +224,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.tools = e.tools; s.effort = e.effort;
         break;
       case 'starting':
-        s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom });
+        s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, usage: null, exitCode: null });
         break;
       case 'spawned': {
         const a = s.attempts.find((x) => x.n === e.attempt);
@@ -204,7 +233,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; }
+        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; }
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;

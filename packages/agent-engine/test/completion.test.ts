@@ -242,3 +242,46 @@ test('effort reaches Claude Code as --effort', async () => {
   assert.equal(args[args.indexOf('--effort') + 1], 'high');
   assert.equal(args.at(-1), 'the prompt');
 });
+
+// ─── what a session consumed ────────────────────────────────────────────────
+
+const rowStarted = (state: string, status: string, startedAt?: number) => JSON.stringify([{
+  name: 'ae/t-1/1', sessionId: 's-1', state, status, kind: 'background', ...(startedAt !== undefined ? { startedAt } : {}),
+}]);
+
+test("usage is measured from the session's own start, as the registry records it", async () => {
+  const restore = withFakeClaude(rowStarted('done', 'idle', 1_789_000_000_000));
+  try {
+    let since: number | undefined;
+    const ops = claudeOps({
+      transcriptTime: async () => 0, closeoutFrom: async () => undefined,
+      usageFrom: async (_id, from) => { since = from; return { turns: 2, toolCalls: 1 }; },
+    });
+    const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
+    assert.equal(since, 1_789_000_000_000);
+    assert.deepEqual(seen?.usage, { turns: 2, toolCalls: 1 });
+  } finally { restore(); }
+});
+
+test('no start in the registry, no usage — an inherited conversation could not be told apart', async () => {
+  const restore = withFakeClaude(rowStarted('done', 'idle'));
+  try {
+    let asked = 0;
+    const ops = claudeOps({
+      transcriptTime: async () => 0, closeoutFrom: async () => undefined,
+      usageFrom: async () => { asked++; return { turns: 9, toolCalls: 9 }; },
+    });
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.usage, undefined);
+    assert.equal(asked, 0, 'not even asked');
+  } finally { restore(); }
+});
+
+test('a busy session is not read for usage — nothing it has consumed is final', async () => {
+  const restore = withFakeClaude(rowStarted('working', 'busy', 1));
+  try {
+    let asked = 0;
+    const ops = claudeOps({ transcriptTime: async () => 0, usageFrom: async () => { asked++; return { turns: 1, toolCalls: 0 }; } });
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.usage, undefined);
+    assert.equal(asked, 0);
+  } finally { restore(); }
+});

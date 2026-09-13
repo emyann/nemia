@@ -447,9 +447,34 @@ test('tools and effort are declared by the task and reach every attempt untouche
   assert.equal(plain.spawned[0]!.effort, undefined);
 });
 
-test('decide never reads tools or effort — a knob on the workload is a field, not a judgement', () => {
+test('decide never reads tools, effort, usage or an exit code — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.effort/);
+  assert.doesNotMatch(body, /\.tools|\.effort|\.usage|\.exitCode/);
+});
+
+// ─── usage: carried from the sighting, null when nobody measured ────────────
+
+test('what a session consumed and how it exited go on the attempt, from the sighting that ended it', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(tick());
+  const usage = { turns: 3, toolCalls: 5, inputTokens: 1200, outputTokens: 80 };
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done', usage, exitCode: 0 });
+  await b.run(tick());
+  const [a] = (await b.run(view(id, new Map()))).state.attempts;
+  assert.deepEqual(a!.usage, usage);
+  assert.equal(a!.exitCode, 0);
+});
+
+test('an attempt nobody measured records null — not zeros that would read as free', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(tick());
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done' }); // the fake harness measures nothing
+  await b.run(tick());
+  const [a] = (await b.run(view(id, new Map()))).state.attempts;
+  assert.equal(a!.usage, null);
+  assert.equal(a!.exitCode, null);
 });

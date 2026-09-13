@@ -387,3 +387,29 @@ test('an effort a harness does not have is refused by that harness, in its own w
   assert.equal(codex.refuses!(task('minimal')), undefined);
   assert.equal(claudeDetached.refuses!(task('xhigh')), undefined);
 });
+
+// ─── the exit code: a fact about the process ────────────────────────────────
+
+test("a detached session's exit code is on its sighting, and no usage is invented beside it", async () => {
+  const dir = root();
+  const ops = detachedOps(sh('exit 3'), dir);
+  await Effect.runPromise(ops.spawn(req('ae/t14/1', dir)));
+  const seen = await settle(ops, 'ae/t14/1', 'failed');
+  assert.equal(seen?.exitCode, 3);
+  assert.equal(seen?.usage, undefined, 'a generic harness measures no usage, and reports none rather than 0');
+});
+
+test("no exit code yet, or the worker's -1 for none, is reported as no code at all", async () => {
+  const dir = root();
+  const ops = detachedOps(sh('true'), dir);
+  const runs = path.join(dir, 'runs', 'sh');
+  fs.mkdirSync(runs, { recursive: true });
+  const write = (name: string, patch: object) => fs.writeFileSync(path.join(runs, `${name.replace(/\//g, '_')}.json`), JSON.stringify({
+    name, pid: 999999, logFile: '/dev/null', heartbeatAt: new Date().toISOString(), ...patch,
+  }));
+  write('ae/t15/1', { state: 'working' });
+  write('ae/t16/1', { state: 'stopped', exitCode: -1 });
+  const seen = await Effect.runPromise(ops.observe);
+  assert.equal('exitCode' in seen.get('ae/t15/1')!, false, 'still running: no code');
+  assert.equal('exitCode' in seen.get('ae/t16/1')!, false, 'killed by a signal: no code, not -1');
+});

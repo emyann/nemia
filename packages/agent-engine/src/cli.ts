@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, type Engine, type Event, type ResumePolicy, type TaskSpec } from './facade.ts';
+import { createEngine, type Attempt, type Engine, type Event, type ResumePolicy, type TaskSpec, type TaskView, type Usage } from './facade.ts';
 
 /**
  * Every key a brief may have — a closed list, on purpose.
@@ -128,8 +128,32 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   };
 }
 
-const line = (v: { id: string; phase: string; state: { harness?: string; attempts: unknown[]; maxAttempts: number; brief: string }; costUsd?: number; turns?: number }) => {
-  const meter = v.costUsd !== undefined ? ` $${v.costUsd.toFixed(3)}/${v.turns ?? 0}t` : '';
+/** A count for a person: 20400 → 20.4k, 1234567 → 1.2M. */
+const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
+
+/**
+ * What an attempt consumed, for a person — and when its runner measured nothing, saying so. A zero
+ * would read as "cost nothing"; the truth is "nobody counted".
+ */
+export const usageLine = (u: Usage | null): string => {
+  if (!u) return 'usage not measured';
+  const tokens = u.inputTokens !== undefined && u.outputTokens !== undefined
+    ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out` : ' · tokens not measured';
+  const cost = u.costUsd !== undefined ? ` · $${u.costUsd.toFixed(3)}` : ' · cost not measured';
+  return `${u.turns} turns · ${u.toolCalls} tool calls${tokens}${cost}`;
+};
+
+/** One attempt, for `ae show`: how it ended, how its process exited if it has one, what it consumed. */
+export const attemptLine = (a: Attempt): string => {
+  if (a.ended === null) return `attempt ${a.n}  running`;
+  const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : ''}`;
+  const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
+  return `attempt ${a.n}  ${how}${exit}  ${usageLine(a.usage)}`;
+};
+
+const line = (v: TaskView) => {
+  const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
+  const meter = u ? `  ${u.costUsd !== undefined ? `$${u.costUsd.toFixed(3)}/` : ''}${u.turns}t` : '';
   return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${v.state.attempts.length}/${v.state.maxAttempts}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 
@@ -210,6 +234,7 @@ export async function main(argv: string[]): Promise<void> {
       const { entries } = await engine.feed(0);
       for (const e of entries.filter((x) => x.taskId === arg)) console.log(entryLine(e.taskId, e.event));
       console.log(`\ncwd: ${v.state.cwd}\nbrief: ${v.state.brief.slice(0, 200)}`);
+      for (const a of v.state.attempts) console.log(attemptLine(a));
       return;
     }
 

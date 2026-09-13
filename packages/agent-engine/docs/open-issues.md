@@ -270,3 +270,10 @@ mid-refresh") and was bridged by Remote Control when a cross-session message rea
 registry showed it final for one observation in that window, the pin explains it. Not reproduced.
 Fix if so: pin only a statement that was found, or re-read once when the pinned value is `undefined`
 and the transcript's mtime is newer than the pin. Remedy in the run: `wf retry <run> <step>` (nudge).
+
+**Confirmed for the resume path, one hour later.** The nudge (`wf retry`, `--resume`) kept the session id;
+its new StructuredOutput at 22:58:32Z (inside try 2's attempt) was not read either, and try 2's `ended`
+carried usage byte-identical to attempt 1's — `finalStatements` and `finalUsage` are keyed by session id,
+set on the first final sighting and never cleared, so every resumed attempt reads the first one's pins.
+Restarting the daemon (the pins live in its memory) and nudging again is the remedy until the fix lands.
+Attempt 1's own `undefined` pin is still unexplained. Filed as a run (E6) on 2026-09-13.

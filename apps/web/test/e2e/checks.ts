@@ -105,3 +105,54 @@ export async function expectTheme(page: Page, theme: 'light' | 'dark'): Promise<
     throw new Refused(`the page is ${theme} — its background is ${seen.color}, which is not`);
   }
 }
+
+type Boxed = { name: string; box: { x: number; y: number; width: number; height: number } | null };
+
+/** Each element matched, by its `data-id` (else its place), and where it is on the page. */
+const boxesOf = async (elements: Locator): Promise<Boxed[]> =>
+  Promise.all((await elements.all()).map(async (element, i) => ({ name: (await element.getAttribute('data-id')) ?? `#${i + 1}`, box: await element.boundingBox() })));
+
+/**
+ * No element of `these` overlaps one of `those`, within `timeout`: a card moved out from under a graph, not
+ * left beneath it. Polled, because the floor is laid out again a render after whatever moved it. Nothing
+ * matched on either side is refused too: an overlap between nothing and something proves nothing.
+ */
+export async function expectApart(these: Locator, those: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+  const problem = async (): Promise<string | null> => {
+    const [a, b] = await Promise.all([boxesOf(these), boxesOf(those)]);
+    if (!a.length || !b.length) return `nothing to compare: ${a.length} and ${b.length} found`;
+    const over = a.flatMap((one) =>
+      b.filter((other) => one.box && other.box && one.box.x < other.box.x + other.box.width && other.box.x < one.box.x + one.box.width
+        && one.box.y < other.box.y + other.box.height && other.box.y < one.box.y + one.box.height).map((other) => `${one.name} and ${other.name}`));
+    return over.length ? `${over.join(', ')} overlap` : null;
+  };
+  const until = Date.now() + timeout;
+  let found = await problem();
+  while (found && Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    found = await problem();
+  }
+  if (found) throw new Refused(`${assertion} — ${found}`);
+}
+
+/**
+ * While `move` runs, `leader` moves, and every element of `followers` moves by as much: an open run's steps
+ * dragged with its card. A pixel of slack for positions that round differently.
+ */
+export async function expectMovedWith(followers: Locator, leader: Locator, move: () => Promise<void>, assertion: string): Promise<void> {
+  const [lead] = await boxesOf(leader);
+  const before = await boxesOf(followers);
+  await move();
+  const [led] = await boxesOf(leader);
+  const after = new Map((await boxesOf(followers)).map(({ name, box }) => [name, box]));
+  if (!lead?.box || !led?.box) throw new Refused(`${assertion} — the element to follow is not on the page`);
+  if (!before.length) throw new Refused(`${assertion} — nothing follows ${lead.name}`);
+  const dx = led.box.x - lead.box.x;
+  const dy = led.box.y - lead.box.y;
+  if (Math.abs(dx) < 1 && Math.abs(dy) < 1) throw new Refused(`${assertion} — ${lead.name} did not move`);
+  const behind = before.filter(({ name, box }) => {
+    const now = after.get(name);
+    return !box || !now || Math.abs(now.x - box.x - dx) > 1 || Math.abs(now.y - box.y - dy) > 1;
+  });
+  if (behind.length) throw new Refused(`${assertion} — ${behind.map((f) => f.name).join(', ')} did not move with ${lead.name}`);
+}

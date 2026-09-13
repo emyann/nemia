@@ -6,7 +6,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
-import { expectCount, expectInside, expectTheme, expectVisible, Refused, watch } from './checks.ts';
+import { expectApart, expectCount, expectInside, expectMovedWith, expectTheme, expectVisible, Refused, watch } from './checks.ts';
 
 let browser: Browser;
 before(async () => {
@@ -90,4 +90,32 @@ test('a page that stays light in the dark is refused, and so is one nobody paint
   // And the emulation itself: a light browser asked to be judged dark.
   await assert.rejects(expectTheme((await pageWith(themed)).page, 'dark'),
     (err: Error) => err instanceof Refused && err.message === 'the browser prefers dark — it prefers light');
+});
+
+test("a card under a graph is refused, naming both — and so is a comparison with nothing on one side", async () => {
+  const { page } = await pageWith(`<div style="position:relative">
+    <div class="card" data-id="beside" style="position:absolute;left:0;top:0;width:100px;height:50px"></div>
+    <div class="step" data-id="run/implement" style="position:absolute;left:90px;top:10px;width:100px;height:50px"></div>
+    <div class="step" data-id="run/review" style="position:absolute;left:300px;top:10px;width:100px;height:50px"></div>
+  </div>`);
+  await expectApart(page.locator('.card'), page.locator('[data-id="run/review"]'), 'the card is clear of the graph');
+  await assert.rejects(expectApart(page.locator('.card'), page.locator('.step'), 'the card is clear of the graph', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the card is clear of the graph — beside and run/implement overlap');
+  await assert.rejects(expectApart(page.locator('.gone'), page.locator('.step'), 'the card is clear of the graph', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the card is clear of the graph — nothing to compare: 0 and 2 found');
+});
+
+test('a step left behind when its card moves is refused, naming it — and so is a card that never moved', async () => {
+  const { page } = await pageWith(`<div id="card" data-id="run" style="position:absolute;left:0;top:0;width:100px;height:50px"></div>
+    <div class="step" data-id="run/implement" style="position:absolute;left:150px;top:0;width:100px;height:50px"></div>
+    <div class="step" data-id="run/review" style="position:absolute;left:300px;top:0;width:100px;height:50px"></div>`);
+  const down = (selector: string) => () =>
+    page.evaluate((s) => {
+      document.querySelectorAll<HTMLElement>(s).forEach((el) => (el.style.top = `${parseFloat(el.style.top) + 40}px`));
+    }, selector);
+  await expectMovedWith(page.locator('.step'), page.locator('#card'), down('#card, .step'), 'the steps move with the card');
+  await assert.rejects(expectMovedWith(page.locator('.step'), page.locator('#card'), down('#card, [data-id="run/implement"]'), 'the steps move with the card'),
+    (err: Error) => err instanceof Refused && err.message === 'the steps move with the card — run/review did not move with run');
+  await assert.rejects(expectMovedWith(page.locator('.step'), page.locator('#card'), async () => {}, 'the steps move with the card'),
+    (err: Error) => err instanceof Refused && err.message === 'the steps move with the card — run did not move');
 });

@@ -1,5 +1,5 @@
 /**
- * The store `npm run e2e` serves: one fake run, written the way `wf` and the engine write theirs.
+ * The store `npm run e2e` serves: two fake runs, written the way `wf` and the engine write theirs.
  *
  * Three steps, frozen on the record as `wf start` freezes them, with the folder beside it: `implement`
  * signed off blocked, `review` was filed and the engine has no record of its task (`unknown`), and
@@ -21,6 +21,15 @@ export const FAKE = {
   first: 'implement',
   /** One per `after` between its steps: implement → review, review → respond, implement → respond. */
   edges: 3,
+} as const;
+
+/**
+ * A second run, started after FAKE and with nothing filed: in flight, so its card takes the cell beside
+ * FAKE's — the cell FAKE's graph unfolds over, which the Factory must move this card out of.
+ */
+export const NEIGHBOUR = {
+  id: 'a-run-beside-it-e2e1',
+  title: 'A run beside it',
 } as const;
 
 const STEPS = [
@@ -87,4 +96,15 @@ export function seed(root: string, now = Date.now()): void {
     },
     { kind: 'settled', at: ago(12), outcome: 'succeeded' },
   ].map((event) => `${JSON.stringify(event)}\n`).join(''));
+
+  const besideDir = path.join(root, 'workflow-beside');
+  write(path.join(besideDir, 'plan.md'), '---\nharness: claude\n---\nPlan it.\n');
+  write(path.join(root, 'runs', `${NEIGHBOUR.id}.json`), JSON.stringify({
+    id: NEIGHBOUR.id, repo: '/code/hkb-v2', workspace: '/code/hkb-v2', baseRef: '19c9365', branch: 'main', isolate: true,
+    brief: `${NEIGHBOUR.title}\n\nA second run seeded by npm run e2e, nothing filed yet: the card beside the first.`,
+    workflowDir: besideDir,
+    workflow: [{ name: 'plan', after: [], body: 'Plan it.', harness: 'claude' }],
+    createdAt: ago(5),
+    steps: { plan: { taskId: null } },
+  }, null, 2));
 }

@@ -2,7 +2,7 @@
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
  *  1. Builds the web app.
- *  2. Seeds a store in a temporary WF_ROOT with one fake run (seed.ts).
+ *  2. Seeds a store in a temporary WF_ROOT with two fake runs (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
  *     as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers and beside
@@ -22,8 +22,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectCount, expectInside, expectVisible, settled, watch } from './checks.ts';
-import { FAKE, seed } from './seed.ts';
+import { expectApart, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, watch } from './checks.ts';
+import { FAKE, NEIGHBOUR, seed } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -53,6 +53,25 @@ function onTheFloor(page: Page): { card: Locator; steps: Locator; run: Locator; 
   };
 }
 
+/**
+ * Another visit to `page`'s address in the same browser, so what this browser kept, checked by `check` and
+ * watched as the page itself is. A page of its own rather than a reload: a reload cuts off an in-flight
+ * refetch, which the watch would rightly count as a failed request.
+ */
+async function nextVisit(page: Page, check: (again: Page) => Promise<void>): Promise<void> {
+  const again = await page.context().newPage();
+  try {
+    const { problems } = watch(again);
+    await again.goto(page.url(), { waitUntil: 'networkidle' });
+    await check(again);
+    await again.waitForLoadState('networkidle');
+    const seen = problems();
+    if (seen.length) throw new Refused(`no console error and no failed request on the next visit — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+  } finally {
+    await again.close();
+  }
+}
+
 /** The pages, and what each must have. A new page gets a line here, or the check never looks at it. */
 const PAGES: PageSpec[] = [
   {
@@ -63,14 +82,17 @@ const PAGES: PageSpec[] = [
       const floor = page.locator('.react-flow');
       await expectVisible(floor, 'the Factory canvas');
       const { card, steps, run, step } = onTheFloor(page);
+      const beside = page.locator(`.react-flow__node[data-id="${NEIGHBOUR.id}"]`);
       await expectVisible(card, `the fake run's card on the Factory (${FAKE.id})`);
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
       await expectVisible(card.locator(`a[href="/runs/${FAKE.id}"]`), "the card's title links to the run's page");
+      await expectVisible(beside, `the run started after it has the card beside it (${NEIGHBOUR.id})`);
       await settled(page);
       await expectInside(card, floor, 'the card is on the floor');
       await expectCount(steps, 0, 'a closed card draws no step');
 
-      // A click on the card, away from its title's link, unfolds the run's graph beside it.
+      // A click on the card, away from its title's link, unfolds the run's graph beside it — over the cell
+      // the other run's card is in, which moves aside.
       await card.locator('time').click();
       await expectCount(steps, FAKE.steps.length, `the card opens into a node per step (${FAKE.steps.join(', ')})`);
       for (const name of FAKE.steps) await expectVisible(step(name), `the open run draws ${name}`);
@@ -78,21 +100,12 @@ const PAGES: PageSpec[] = [
       await expectCount(page.locator(`.react-flow__edge[data-id="${FAKE.id}/->${FAKE.first}"]`), 1, `one dashed edge from the card into ${FAKE.first}`);
       await expectCount(page.locator('.react-flow__edge'), FAKE.edges + 1, "the run's edges, and the card's into its first step");
       await expectVisible(card.getByRole('button', { name: 'Hide steps' }), "the open card's chevron hides the steps");
+      await expectApart(beside, run, 'the card beside it moves out from under the unfolded graph');
       await settled(page);
       await expectInside(run, floor, 'the open run, card and steps, is brought onto the screen');
 
-      // Remembered in this browser: another visit finds the run open. A page of its own, so this one's
-      // requests are not cut off by a reload, and watched the same way.
-      const again = await page.context().newPage();
-      try {
-        const { problems } = watch(again);
-        await again.goto(new URL('/', page.url()).href, { waitUntil: 'networkidle' });
-        await expectCount(onTheFloor(again).steps, FAKE.steps.length, 'the run is still open on the next visit');
-        await again.waitForLoadState('networkidle');
-        if (problems().length) throw new Error(`the next visit had problems:\n    ${problems().join('\n    ')}`);
-      } finally {
-        await again.close();
-      }
+      // Remembered in this browser: the next visit finds the run open.
+      await nextVisit(page, (again) => expectCount(onTheFloor(again).steps, FAKE.steps.length, 'the run is still open on the next visit'));
 
       // Collapse all folds it away, and the chevron opens it again.
       await page.getByRole('button', { name: 'Collapse all' }).click();
@@ -100,7 +113,36 @@ const PAGES: PageSpec[] = [
       await card.getByRole('button', { name: 'Show steps' }).click();
       await expectCount(steps, FAKE.steps.length, "the card's chevron unfolds it again");
 
-      // A click on a step opens its inspector beside the floor, the run's title above the step's name.
+      // Dragged, the card takes its steps with it. Dropped on the other run's card, it stays where it landed,
+      // and the card under it moves aside on the drop — not on whatever changes the floor next.
+      await settled(page);
+      const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('time').boundingBox()];
+      if (!from || !onto || !grip) throw new Refused("the cards to drag and drop onto — one of them is not on the page");
+      await expectMovedWith(steps, card, async () => {
+        const [x, y] = [grip.x + grip.width / 2, grip.y + grip.height / 2];
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + onto.x - from.x, y + onto.y - from.y, { steps: 12 });
+        await page.mouse.up();
+      }, "the open run's steps move with its card when it is dragged");
+      await expectCount(steps, FAKE.steps.length, 'a drop is not a click: the run is still open');
+      await expectApart(beside, run, 'the card the open run was dropped on moves out from under it');
+
+      // Reset layout closes every run as it lays the floor out again, here and on the next visit.
+      await page.getByRole('button', { name: 'Reset layout' }).click();
+      await expectCount(steps, 0, 'Reset layout folds the graph away');
+      await expectVisible(card.getByRole('button', { name: 'Show steps' }), "after a reset the card's chevron shows the steps");
+      await nextVisit(page, async (again) => {
+        const next = onTheFloor(again);
+        // The chevron reads the open runs this browser kept as the page mounts, before any step is read.
+        await expectVisible(next.card.getByRole('button', { name: 'Show steps' }), 'the next visit after a reset finds the run closed');
+        await expectCount(next.steps, 0, 'the next visit after a reset draws no step');
+      });
+
+      // Open again; a click on a step opens its inspector beside the floor, the run's title above the step's name.
+      await card.getByRole('button', { name: 'Show steps' }).click();
+      await expectCount(steps, FAKE.steps.length, 'the chevron unfolds the run again after a reset');
+      await expectApart(beside, run, 'the card beside it moves aside again');
       await step('review').click();
       const inspector = page.locator('aside[aria-label="Step review"]');
       await expectVisible(inspector, 'the step inspector opens on a click on review');

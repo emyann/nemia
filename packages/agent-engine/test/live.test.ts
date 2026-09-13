@@ -12,11 +12,16 @@
  * Servers connect after a `--bg` session starts, so the brief waits for them. The first run did not:
  * both sessions answered while their servers were still connecting — Chrome among them, under strict.
  *
+ * And the engine's release of a settled session is measured before it is trusted: `claude rm` could
+ * have taken the transcript with it. So a session is told a word, settles and is released; then
+ * `ae logs` must still read it, and a second task resuming it must still say the word.
+ *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -39,7 +44,7 @@ const settleThenCheck = async (engine: Engine, ids: Record<string, string>, chec
     }
     check(views);
   } finally {
-    // Settled sessions stay in the harness's registry (open issue 3); leave nothing running behind.
+    // The engine releases a session once its end is on the record; this is for one that never got that far.
     for (const v of Object.values(views)) {
       if (!v.sessionId) continue;
       const short = v.sessionId.split('-')[0]!;
@@ -142,4 +147,56 @@ test("a --bg session filed with no mcp, in an empty directory, has no MCP tools 
     assert.equal(views.bare?.state.settled, 'succeeded', `bare settled: ${views.bare?.phase}`);
     assert.deepEqual(said('bare'), { mcpServers: [], mcpTools: [] }, "no mcp and no .mcp.json: none of the operator's servers, connectors or Chrome");
   });
+});
+
+const WORD_CLOSEOUT = {
+  type: 'object',
+  properties: { word: { type: 'string' } },
+  required: ['word'],
+  additionalProperties: false,
+};
+
+test('a settled --bg session is stopped and removed from claude agents — and ae logs still reads it, and --resume still continues it', {
+  skip,
+  timeout: 25 * 60_000,
+}, async () => {
+  const engine = createEngine({ root: tmp('release-board') });
+  const cwd = tmp('release');
+  const word = `ae${randomUUID().slice(0, 8)}`;
+  const agents = () => JSON.parse(execFileSync('claude', ['agents', '--all', '--json'], { encoding: 'utf8', timeout: 60_000 })) as Array<{ sessionId?: string }>;
+  const settled = async (id: string) => {
+    const until = Date.now() + 10 * 60_000;
+    while (Date.now() < until) {
+      await engine.tick();
+      const v = await engine.view(id);
+      if (v.state.settled) return v;
+      await new Promise((r) => setTimeout(r, 5_000));
+    }
+    return engine.view(id);
+  };
+  const sessions = new Set<string>();
+  const common = { cwd, deadlineSeconds: 480, model: 'haiku', closeoutSchema: WORD_CLOSEOUT };
+  try {
+    const firstId = await engine.file({ ...common, brief: `The code word is ${word}. Remember it, and do nothing else. Then give your closing statement, with word set to ok.` });
+    const first = await settled(firstId);
+    if (first.sessionId) sessions.add(first.sessionId);
+    const id = first.state.attempts.at(-1)?.nativeId ?? undefined;
+    assert.equal(first.state.settled, 'succeeded', `first settled: ${first.phase}`);
+    assert.ok(id, 'its session id is on the record');
+    assert.equal(agents().some((r) => r.sessionId === id), false, 'released in the pass that settled it: not in claude agents');
+    assert.match(await engine.logs(firstId), new RegExp(word), 'ae logs still reads the removed session');
+
+    const secondId = await engine.file({ ...common, resumeFrom: id, brief: 'What was the code word you were given? Give it as word in your closing statement.' });
+    const second = await settled(secondId);
+    if (second.sessionId) sessions.add(second.sessionId);
+    assert.equal(second.state.settled, 'succeeded', `resumed settled: ${second.phase}`);
+    assert.deepEqual(second.state.attempts.at(-1)?.closeout, { word }, 'the removed session was resumed, and remembered its word');
+    assert.equal(agents().some((r) => r.sessionId === second.sessionId), false, 'and the resumed one was released too');
+  } finally {
+    for (const s of sessions) {
+      for (const verb of ['stop', 'rm']) {
+        try { execFileSync('claude', [verb, s.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 }); } catch { /* released already */ }
+      }
+    }
+  }
 });

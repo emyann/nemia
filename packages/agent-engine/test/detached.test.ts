@@ -152,6 +152,22 @@ test('one harness failing to answer does not blind the engine to the others', as
   assert.deepEqual([...merged.keys()], ['ae/x/1']);
 });
 
+test('the composite sends a release only to the harness that reported the session — never to the fallback', async () => {
+  const released: string[] = [];
+  const a = new Map<string, Sighting>([['ae/x/1', { sessionId: 's-a', state: 'done' }]]);
+  const b = new Map<string, Sighting>([['ae/y/1', { sessionId: 's-b', state: 'done' }]]);
+  const alpha = { ...testOps({ sessions: a }), release: (s: Sighting) => Effect.sync(() => { released.push(s.sessionId); }) };
+  const ops = composite({ alpha, beta: testOps({ sessions: b }) }, 'alpha');
+
+  await Effect.runPromise(ops.release!({ sessionId: 's-b', state: 'done' }, {}));
+  assert.deepEqual(released, [], 'no pass has said whose it is: nobody is asked, the fallback least of all');
+  await Effect.runPromise(ops.observe);
+  await Effect.runPromise(ops.release!({ sessionId: 's-b', state: 'done' }, {}));
+  assert.deepEqual(released, [], 'beta has no release, so there is nothing to do');
+  await Effect.runPromise(ops.release!({ sessionId: 's-a', state: 'done' }, {}));
+  assert.deepEqual(released, ['s-a']);
+});
+
 // ─── isolation: the flag shapes differ per harness, which is what a spec is for ──
 
 test('a worktree is always NAMED for Claude — a bare --worktree would eat the prompt', async () => {

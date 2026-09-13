@@ -71,12 +71,34 @@ JOIN KEY  a name we choose        →  claude --name ae/<task>/<attempt>
 ```
 
 That's the whole engine. `decide()` is pure, total, and returns exactly one step; everything
-effectful is the four verbs of `Runner`. Kubernetes' control plane for the loop, durable
+effectful is the four verbs of `Runner`, and a fifth, optional one that lets a finished session go. Kubernetes' control plane for the loop, durable
 execution's journal for the memory, and the local harness as the kubelet.
 
 **The engine never holds a session.** `claude --bg` hands it to the harness, which already owns
 resume, stop, logs and a registry that outlives us. So a three-hour session is not a three-hour
 process here — the engine can be killed, upgraded or restarted at any point in it.
+
+### Letting a finished session go
+
+Claude Code keeps every `--bg` session in `claude agents` until something removes it, and one that
+has given its closeout stays there `working/idle` for good — every run used to leave its sessions
+behind, to be cleared by hand. So once an attempt's end is on the record, the engine **releases** its
+session: `claude stop` if it still runs, then `claude rm`. It is I/O applied to the record, not a
+decision — `decide` is not asked — and it is level-triggered: asked on every pass that still sees such
+a session, so a crash between writing the end and releasing is repaired by the next pass, and a
+release the harness refuses is asked again.
+
+**Measured before relying on it** (`test/live.test.ts`, Claude Code 2.1.270): a session told a word
+settled and was released in the same pass; it was gone from `claude agents`, `ae logs` still read its
+transcript, and a second task filed with `resumeFrom` its id said the word back. `ae logs` finds a
+released session by the id its end was recorded with, and asks the task's own harness for it.
+
+Two kinds of session are left listed. A task that asked for a `worktree` has its session stopped and
+not removed: `claude rm` deletes the worktree with the session, and the task's work is in it. And a
+task settled with no end on the record — stopped by a person, or past its deadline — never journalled
+its session's id, so removing that session would leave `ae logs` nothing to read; it is not running by
+then. `release` is optional on `Runner`: the detached runner has none, because its run files are the
+record `logs` reads.
 
 ### Why there are no leases
 
@@ -119,7 +141,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 |---|---|
 | `'claude-bg'` | Claude Code's background sessions; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, for anything else at all |
+| a `PromiseRunner` | four async methods, and an optional fifth, `release`, for anything else at all |
 
 **`src/cli.ts` imports `createEngine`, and types, and nothing else from the engine.** That is
 deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
@@ -639,11 +661,12 @@ selector, and it is why no attempt can ever run twice.
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
+| `test/release.test.ts` | letting a finished Claude Code session go, at shipped defaults — a fake `claude` that keeps a registry |
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence and `--strict-mcp-config` against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, `--strict-mcp-config`, and what a released session still has, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 

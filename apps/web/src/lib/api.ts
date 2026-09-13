@@ -53,8 +53,34 @@ export type RunDetail = {
     branch: string | null;
     status: string;
     closeout: StepCloseout | null;
+    attempts: StepAttempts;
   }>;
 };
+
+/**
+ * Mirrors `StepAttempts` in apps/api/src/app.ts. There is no end time: the engine's view does not
+ * keep one, so an attempt that is over says how it ended and not when.
+ */
+export type StepAttempts = {
+  count: number;
+  latest: { startedAt: string; ended: string | null; reason: string | null } | null;
+};
+
+/** Mirrors `StepLog` in apps/api/src/app.ts. */
+export type StepLog = { lines: string[]; truncated: boolean };
+
+/**
+ * A step's output, read on the page's beat while the step runs and left alone once it is not.
+ *
+ * Whether it runs is in the key, so the output is read once more when a step stops: the last beat
+ * before it stopped can miss how it ended.
+ */
+export const stepLogQuery = (runId: string, step: string, running: boolean) =>
+  queryOptions({
+    queryKey: ['runs', runId, 'steps', step, 'log', running ? 'running' : 'not running'],
+    queryFn: () => get<StepLog>(`/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/log`),
+    refetchInterval: running ? 5_000 : false,
+  });
 
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(path);

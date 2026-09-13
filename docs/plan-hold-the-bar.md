@@ -620,6 +620,12 @@ owner is not mid-run.
   step is not final. A tick that recognises this one message on a `blocked` session and resumes it is the
   fix in the run; the harness's is a shared refresh lock across processes. → agent-workflows, small; and
   a Claude Code report.
+- **the canvas gate reads the step, the banner reads the api (B3's round-2 review, 2026-09-13):** `isGate`
+  in `apps/web/src/lib/status.ts` is decided from the step's state alone, while the api's `waitingOnYou`
+  now leaves out a step with a `wf round`/`wf retry` ask pending — so for up to one tick the canvas says
+  "waiting on you" and the page's banner does not. Pass `run.waitingOnYou.includes(step.name)` on
+  `StepNodeData` and require it in the gate; a component test with a pending ask. Judged not worth a
+  round by the reviewer; a small apps run, with the api's swap to I's exports. → apps.
 
 ## 5. What the plan does not do
 

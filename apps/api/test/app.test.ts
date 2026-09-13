@@ -373,3 +373,28 @@ test('output the engine cannot read is a 502 that says how to read it from the c
   assert.match(body.error, /Could not read the output of step 'implement' \(task t-10\)/);
   assert.match(body.error, /`wf logs r-10 implement`/);
 });
+
+test('the list of runs observes the engine once, however many runs and steps are filed', async (t) => {
+  // A `claude` ahead of the real one on PATH, which notes each call and sees no sessions of ours.
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-bin-'));
+  const calls = path.join(bin, 'calls');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
+  const before = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${before}`;
+  t.after(() => {
+    process.env.PATH = before;
+  });
+  const observations = () =>
+    (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '').split('\n').filter((line) => line.startsWith('agents')).length;
+
+  for (const n of [11, 12, 13]) {
+    queuedTask(`t-${n}`);
+    writeRun({ ...r2, id: `r-${n}`, steps: { implement: { taskId: `t-${n}`, branch: `wf/r-${n}/implement` }, review: { taskId: null } } });
+  }
+  const res = await app.request('/api/runs');
+  assert.equal(res.status, 200);
+  const runs: Array<{ steps: Array<{ taskId: string | null }> }> = await res.json();
+  // A view per filed step would have observed once for each of these.
+  assert.ok(runs.flatMap((r) => r.steps).filter((s) => s.taskId).length >= 3);
+  assert.equal(observations(), 1);
+});

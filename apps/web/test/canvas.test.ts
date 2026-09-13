@@ -1,6 +1,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { attemptLine, duration, edgesOf, forgetLayout, parseLayout, place, readLayout, saveLayout } from '../src/lib/canvas.ts';
+import {
+  attemptLine,
+  duration,
+  edgesOf,
+  forgetFactoryLayout,
+  forgetLayout,
+  parseLayout,
+  place,
+  readFactoryLayout,
+  readLayout,
+  saveFactoryLayout,
+  saveLayout,
+} from '../src/lib/canvas.ts';
 
 test('a duration reads in its two largest units', () => {
   const s = 1000;
@@ -72,6 +84,9 @@ test('storage that refuses every call is survived: nothing read, nothing thrown'
   assert.equal(readLayout('r-1'), null);
   assert.doesNotThrow(() => saveLayout('r-1', new Map([['a', { x: 1, y: 2 }]])));
   assert.doesNotThrow(() => forgetLayout('r-1'));
+  assert.equal(readFactoryLayout(), null);
+  assert.doesNotThrow(() => saveFactoryLayout(new Map([['r-1', { x: 1, y: 2 }]])));
+  assert.doesNotThrow(() => forgetFactoryLayout());
 });
 
 test('a layout is kept per run until it is forgotten', (t) => {
@@ -95,4 +110,30 @@ function stubStorage(t: { after: (fn: () => void) => void }, storage: object) {
     if (before) Object.defineProperty(globalThis, 'localStorage', before);
     else Reflect.deleteProperty(globalThis, 'localStorage');
   });
+}
+
+test('a layout saved before the graph read left to right is not read', (t) => {
+  const kept = new Map([['hkb:canvas-layout:r-1', JSON.stringify({ implement: { x: 0, y: 300 } })]]);
+  stubStorage(t, memory(kept));
+  assert.equal(readLayout('r-1'), null);
+  // What is arranged now is read back, and the old arrangement is not laid over it.
+  saveLayout('r-1', new Map([['implement', { x: 300, y: 0 }]]));
+  assert.deepEqual(Object.fromEntries(readLayout('r-1')!), { implement: { x: 300, y: 0 } });
+});
+
+test("the Factory's arrangement is kept apart from every run's, until it is forgotten", (t) => {
+  stubStorage(t, memory(new Map()));
+  saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
+  assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } });
+  assert.equal(readLayout('r-1'), null);
+  forgetFactoryLayout();
+  assert.equal(readFactoryLayout(), null);
+});
+
+function memory(kept: Map<string, string>) {
+  return {
+    getItem: (key: string) => kept.get(key) ?? null,
+    setItem: (key: string, value: string) => void kept.set(key, value),
+    removeItem: (key: string) => void kept.delete(key),
+  };
 }

@@ -1,10 +1,11 @@
 /**
- * Where each step of a run goes on the canvas: longest-path layering from `after`.
+ * Where each step of a run goes on the canvas: longest-path layering from `after`, read left to right.
  *
- * A step sits one row below the deepest step it waits on, so every edge points down and a fan-in
- * lands below all of its parents. Within a row, steps are ordered by where their parents are — the
- * mean of their columns — then by the run's own order, which keeps a chain in one column and a
- * fan-out uncrossed. A run is a handful of steps; nothing here is cleverer than that.
+ * A step sits one column right of the deepest step it waits on, so every edge points right and a
+ * fan-in lands to the right of all of its parents. Within a column, steps are ordered top to bottom
+ * by where their parents are — the mean of their places in their own columns — then by the run's
+ * own order, which keeps a chain in one row and a fan-out uncrossed. A run is a handful of steps;
+ * nothing here is cleverer than that.
  *
  * Pure, and it ends on any input. A cycle is refused rather than followed: `loadWorkflows` refuses
  * one before a run can start, so only a folder or record edited by hand could bring one here.
@@ -13,11 +14,12 @@
 export type StepEdges = { name: string; after: readonly string[] };
 export type Point = { x: number; y: number };
 
-/** Room for one node and the gap beside it. The nodes are drawn a fixed width to fit. */
-export const COLUMN_WIDTH = 260;
+/** Room for one node and the arrow to the next column. The nodes are drawn a fixed width to fit. */
+export const COLUMN_WIDTH = 300;
+/** Room for one node and the gap below it, within a column. */
 export const ROW_HEIGHT = 150;
 
-/** The rows, top first, each left to right. Throws, naming the steps it could not place, on a cycle. */
+/** The columns, left first, each top to bottom. Throws, naming the steps it could not place, on a cycle. */
 export function layers(steps: readonly StepEdges[]): string[][] {
   const order = new Map<string, number>();
   const afterOf = new Map<string, readonly string[]>();
@@ -35,14 +37,14 @@ export function layers(steps: readonly StepEdges[]): string[][] {
 
   // Kahn's algorithm. A step is taken once, when the last step it waits on has been, so the loop
   // visits each edge once and ends whatever `after` says; what is never taken is in or behind a cycle.
-  const rowOf = new Map<string, number>();
+  const depthOf = new Map<string, number>();
   const waiting = new Map(names.map((name) => [name, parents.get(name)!.length]));
   const taken = names.filter((name) => waiting.get(name) === 0);
-  for (const name of taken) rowOf.set(name, 0);
+  for (const name of taken) depthOf.set(name, 0);
   for (let i = 0; i < taken.length; i++) {
     const name = taken[i]!;
     for (const child of children.get(name)!) {
-      rowOf.set(child, Math.max(rowOf.get(child) ?? 0, rowOf.get(name)! + 1));
+      depthOf.set(child, Math.max(depthOf.get(child) ?? 0, depthOf.get(name)! + 1));
       waiting.set(child, waiting.get(child)! - 1);
       if (waiting.get(child) === 0) taken.push(child);
     }
@@ -55,25 +57,25 @@ export function layers(steps: readonly StepEdges[]): string[][] {
     );
   }
 
-  const rows: string[][] = [];
-  for (const name of names) (rows[rowOf.get(name)!] ??= []).push(name);
-  const column = new Map<string, number>();
-  rows.forEach((row, r) => {
-    if (r > 0) {
-      // Every step below the first row has a parent, and every parent is in a row already placed.
-      const pull = (name: string) => mean(parents.get(name)!.map((p) => column.get(p)!));
-      row.sort((a, b) => pull(a) - pull(b) || order.get(a)! - order.get(b)!);
+  const columns: string[][] = [];
+  for (const name of names) (columns[depthOf.get(name)!] ??= []).push(name);
+  const place = new Map<string, number>();
+  columns.forEach((column, c) => {
+    if (c > 0) {
+      // Every step right of the first column has a parent, and every parent is in a column already placed.
+      const pull = (name: string) => mean(parents.get(name)!.map((p) => place.get(p)!));
+      column.sort((a, b) => pull(a) - pull(b) || order.get(a)! - order.get(b)!);
     }
-    row.forEach((name, i) => column.set(name, i - (row.length - 1) / 2));
+    column.forEach((name, i) => place.set(name, i - (column.length - 1) / 2));
   });
-  return rows;
+  return columns;
 }
 
-/** Each step's top-left corner, rows centred on x = 0. */
+/** Each step's top-left corner: the first column at x = 0, every column centred on y = 0. */
 export function layout(steps: readonly StepEdges[]): Map<string, Point> {
   const at = new Map<string, Point>();
-  layers(steps).forEach((row, r) =>
-    row.forEach((name, i) => at.set(name, { x: (i - (row.length - 1) / 2) * COLUMN_WIDTH, y: r * ROW_HEIGHT })),
+  layers(steps).forEach((column, c) =>
+    column.forEach((name, i) => at.set(name, { x: c * COLUMN_WIDTH, y: (i - (column.length - 1) / 2) * ROW_HEIGHT })),
   );
   return at;
 }

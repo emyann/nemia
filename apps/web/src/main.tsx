@@ -19,6 +19,10 @@ declare module '@tanstack/react-router' {
   interface Register {
     router: typeof router;
   }
+  interface StaticDataRouteOption {
+    /** The page takes the whole space beside the menu, rather than the reading column. */
+    fullBleed?: boolean;
+  }
 }
 
 createRoot(document.getElementById('root')!).render(

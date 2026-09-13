@@ -1,7 +1,7 @@
 /**
- * What the canvas works out about a run, without React Flow: the words on a node, which edges are
- * complete, and where a person left the nodes. Pure, apart from the three storage calls at the end,
- * each of which survives a browser that refuses storage.
+ * What the canvases work out, without React Flow: the words on a step's node, which edges are
+ * complete, and where a person left the nodes — a run's steps, or the Factory's runs. Pure, apart
+ * from the storage calls at the end, each of which survives a browser that refuses storage.
  */
 import type { StepAttempts } from './api';
 import type { Point } from './layout';
@@ -82,28 +82,44 @@ export function parseLayout(raw: string | null): Map<string, Point> | null {
   return at;
 }
 
-/** Per run, in this browser only: a layout is a person's arrangement, not a fact about the run. */
-const layoutKey = (runId: string) => `hkb:canvas-layout:${runId}`;
+/**
+ * Per run, in this browser only: a layout is a person's arrangement, not a fact about the run.
+ *
+ * `v2` since the graph reads left to right. An arrangement dragged on the top-to-bottom canvas is
+ * left unread under the old key, rather than laid over the new layering with its steps stacked.
+ */
+const layoutKey = (runId: string) => `hkb:canvas-layout:v2:${runId}`;
 
-export function readLayout(runId: string): Map<string, Point> | null {
+/** The Factory's arrangement, one per browser: where each run's card was left, by run id. */
+const FACTORY_KEY = 'hkb:factory-layout';
+
+export const readLayout = (runId: string): Map<string, Point> | null => readAt(layoutKey(runId));
+export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void => saveAt(layoutKey(runId), at);
+export const forgetLayout = (runId: string): void => forgetAt(layoutKey(runId));
+
+export const readFactoryLayout = (): Map<string, Point> | null => readAt(FACTORY_KEY);
+export const saveFactoryLayout = (at: ReadonlyMap<string, Point>): void => saveAt(FACTORY_KEY, at);
+export const forgetFactoryLayout = (): void => forgetAt(FACTORY_KEY);
+
+function readAt(key: string): Map<string, Point> | null {
   try {
-    return parseLayout(localStorage.getItem(layoutKey(runId)));
+    return parseLayout(localStorage.getItem(key));
   } catch {
     return null;
   }
 }
 
-export function saveLayout(runId: string, at: ReadonlyMap<string, Point>): void {
+function saveAt(key: string, at: ReadonlyMap<string, Point>): void {
   try {
-    localStorage.setItem(layoutKey(runId), JSON.stringify(Object.fromEntries(at)));
+    localStorage.setItem(key, JSON.stringify(Object.fromEntries(at)));
   } catch {
     // Refused or full: the arrangement lasts as long as the page does.
   }
 }
 
-export function forgetLayout(runId: string): void {
+function forgetAt(key: string): void {
   try {
-    localStorage.removeItem(layoutKey(runId));
+    localStorage.removeItem(key);
   } catch {
     // Nothing could have been kept, so there is nothing to forget.
   }

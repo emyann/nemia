@@ -4,8 +4,8 @@ The features agent-workflows is still missing, in the order I would take them. E
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
-State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2) and declared
-outputs (package J) have shipped.
+State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
+outputs (package J), and a step's files directory with `workflows/ui/` (U1) have shipped.
 
 ## Shipped: the check
 
@@ -54,6 +54,34 @@ What it leaves:
   engine's record, the same way `wf decide` does.
 - **Files as inputs** (plan §4b). `wf start --input <file>` would copy into `runs/<id>/inputs/`, and
   every brief would name the directory. A closeout carries text, not a screenshot.
+
+## Shipped: a step's files directory, and `workflows/ui/`
+
+The run makes `runs/<id>/artifacts/<step>/` under `WF_ROOT` before it files a step, tells the step where
+it is on its brief, beside the closeout contract, and gives the step's check the same directory as
+`WF_ARTIFACTS`. A declared artifact by absolute path counts when it is a file in that directory; any other
+absolute path is refused without being looked at. `wf decide` lists the directory's files with their
+sizes. With it comes `workflows/ui/`: implement, then review and look side by side, then respond, checked
+by `npm run e2e`, which screenshots every page of the web app in both themes into the step's directory
+for `look` to read. The README section *A step's files* is the account.
+
+What it leaves:
+
+- **`look` writes nothing on its word alone.** `tools:` (§4 I) is what makes it a reader. Until then, a
+  file it wrote would be committed and merged into respond.
+- **Reading outside the worktree, unattended, has not been run.** The screenshots live under `WF_ROOT`,
+  outside `look`'s worktree. Nobody has yet run a `claude` step in `auto` mode to see whether it reads
+  them without asking. If it stalls `needs-human`, the fix is a directory the step may read, carried on
+  the task the way `mcp:` will be (§4 E4).
+- **The board does not show a step's files.** That needs a small api endpoint over
+  `runs/<id>/artifacts/` and a list in the step inspector (plan, *The `ui/` workflow*).
+- **The api does not tell an unfiled step its directory.** `composeBrief` takes the directory as a fifth
+  argument, and the api's "what it would be told now" does not pass it yet. In a worktree, `apps/api`
+  resolves `agent-workflows` through the main checkout's `node_modules`, so an app change that needs a
+  package change from the same branch fails `typecheck` until the package is merged. It is one line in
+  `toldOf`, once this has landed.
+- **No clean-up and no size cap.** Screenshots accumulate per run under `WF_ROOT`, as check stderr files
+  do. `wf rm`, when it comes, removes `runs/<id>/` whole.
 
 ## 1. Rounds
 

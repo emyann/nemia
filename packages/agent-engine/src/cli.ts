@@ -144,14 +144,32 @@ export const usageLine = (u: Usage | null): string => {
   return `${u.turns} turns · ${u.toolCalls} tool calls${tokens}${cost}`;
 };
 
-/** One attempt, for `ae show`: how it ended, how its process exited if it has one, what it consumed. */
+/** A length of time for a person: 42s, 4m 59s, 1h 02m. */
+const duration = (ms: number): string => {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+  return `${Math.floor(s / 3600)}h ${String(Math.floor(s / 60) % 60).padStart(2, '0')}m`;
+};
+
+/**
+ * When an attempt ran, read off the record: start → end (how long), in UTC as the journal lines
+ * above it are. One still running has no end to print, and a length up to now would need a clock
+ * this line is not handed.
+ */
+const ranLine = (a: Attempt): string => a.endedAt === null
+  ? `since ${a.startedAt.slice(11, 19)}`
+  : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
+
+/** One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. */
 export const attemptLine = (a: Attempt): string => {
-  if (a.ended === null) return `attempt ${a.n}  running`;
-  if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
+  const when = ranLine(a);
+  if (a.ended === null) return `attempt ${a.n}  running ${when}`;
+  if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
   const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : ''}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
-  return `attempt ${a.n}  ${how}${exit}  ${usageLine(a.usage)}${failedCall}`;
+  return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${failedCall}`;
 };
 
 const line = (v: TaskView) => {

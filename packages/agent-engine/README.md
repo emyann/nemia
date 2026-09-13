@@ -439,11 +439,12 @@ Two measured traps shape the transcript count. A response is written as one line
 each repeating its message id and usage, so responses are counted once, by id. And a resumed
 transcript holds its parent's conversation with the parent's timestamps, so only what came after
 the session's `startedAt` in `claude agents --json` is counted; a row with no start reports no
-usage rather than a wrong one. `ae show` prints one line per attempt, naming what was not measured:
+usage rather than a wrong one. `ae show` prints one line per attempt — when it ran, then what it
+consumed, naming what was not measured — and an attempt still running as `running since <start>`:
 
 ```
-attempt 1  done  <turns> turns · <calls> tool calls · <in> in · <out> out · cost not measured
-attempt 2  failed  exit 1  usage not measured
+attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · cost not measured
+attempt 2  failed  09:05:02 → 09:05:40 (38s)  exit 1  usage not measured
 ```
 
 ## Letting a sandboxed Codex step commit

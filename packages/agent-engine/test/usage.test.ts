@@ -66,7 +66,7 @@ test('an attempt its runner measured nothing about records null, and a person re
   const [a] = fold('t', events).attempts;
   assert.equal(a!.usage, null);
   assert.equal(a!.exitCode, null);
-  assert.equal(attemptLine(a!), 'attempt 1  done  usage not measured');
+  assert.equal(attemptLine(a!), 'attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  usage not measured');
 });
 
 test('a measured attempt prints what was measured, and names what was not', () => {
@@ -80,5 +80,29 @@ test('a measured attempt prints what was measured, and names what was not', () =
     { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
     { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'harness', exitCode: 3, usage: { turns: 1, toolCalls: 0 } },
   ]).attempts;
-  assert.equal(attemptLine(a!), 'attempt 1  failed  exit 3  1 turns · 0 tool calls · tokens not measured · cost not measured');
+  assert.equal(attemptLine(a!), 'attempt 1  failed  09:00:01 → 09:05:00 (4m 59s)  exit 3  1 turns · 0 tool calls · tokens not measured · cost not measured');
+});
+
+// ─── when it ran, for a person ──────────────────────────────────────────────
+
+/** Attempt 1 as fold reads it: started at `startedAt`, and ended `done` at `endedAt` when there is one. */
+const ranAt = (startedAt: string, endedAt?: string) => {
+  const ended: Event[] = endedAt ? [{ kind: 'ended', at: endedAt, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' }] : [];
+  return fold('t', [
+    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'starting', at: startedAt, attempt: 1 },
+    ...ended,
+  ]).attempts[0]!;
+};
+
+test('ae show says when each attempt ran: its start, its end, and how long that took', () => {
+  const shown = (startedAt: string, endedAt: string) => attemptLine(ranAt(startedAt, endedAt));
+  assert.equal(shown('2026-09-12T09:00:01Z', '2026-09-12T09:00:43Z'), 'attempt 1  done  09:00:01 → 09:00:43 (42s)  usage not measured');
+  assert.equal(shown('2026-09-12T09:00:01.250Z', '2026-09-12T10:02:30.000Z'), 'attempt 1  done  09:00:01 → 10:02:30 (1h 02m)  usage not measured');
+  // The length is taken from the timestamps, not from the clock text: past midnight it is still 45 seconds.
+  assert.equal(shown('2026-09-12T23:59:30Z', '2026-09-13T00:00:15Z'), 'attempt 1  done  23:59:30 → 00:00:15 (45s)  usage not measured');
+});
+
+test('an attempt still running has no end to print, so ae show says since when', () => {
+  assert.equal(attemptLine(ranAt('2026-09-12T09:00:01Z')), 'attempt 1  running since 09:00:01');
 });

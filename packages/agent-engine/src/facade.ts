@@ -15,7 +15,7 @@ import path from 'node:path';
 import os from 'node:os';
 import type { Event, ResumePolicy, Sighting } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
-import { claudeOps, claudeRefuses, Runner, RunnerError, type SpawnRequest } from './runner.ts';
+import { claudeOps, claudeRefuses, mcpRefuses, Runner, RunnerError, type McpServer, type SpawnRequest } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { composite } from './runner-composite.ts';
 import { DEFAULT_MAX_CONCURRENT, file, requestStop, tick, view, type TaskView } from './engine.ts';
@@ -97,6 +97,14 @@ export type TaskSpec = {
    * `model_reasoning_effort` for Codex. Carried on the task; `decide` never reads it.
    */
   effort?: string;
+  /**
+   * MCP servers the session may have, by name, as a `.mcp.json` gives them —
+   * `{ browser: { command: 'npx', args: ['@playwright/mcp'] } }`. Claude Code gets these and its
+   * checkout's `.mcp.json`, and never the operator's own servers: every spawn is
+   * `--strict-mcp-config`. Codex gets these as config overrides, on top of its own config's. Carried
+   * on the task; `decide` never reads it.
+   */
+  mcp?: Record<string, McpServer>;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };
@@ -110,7 +118,8 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
    * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model,
-   * resumeFrom or effort; a `tools` that is not a list of names; or a word its harness does not take
+   * resumeFrom or effort; a `tools` that is not a list of names; an `mcp` whose entries are not
+   * MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
    * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists).
    * A harness brought as a `PromiseRunner` is asked nothing.
    */
@@ -158,7 +167,7 @@ const runnerOf = (harnesses: Record<string, HarnessConfig>, fallback: string, ro
   Runner.layer(composite(
     Object.fromEntries(Object.entries(harnesses).map(([name, h]) => [
       name,
-      h === 'claude-bg' ? claudeOps()
+      h === 'claude-bg' ? claudeOps({ root })
         : isSpec(h) ? detachedOps(h, root)
         : {
             spawn: (r: SpawnRequest) => Effect.tryPromise({
@@ -217,6 +226,8 @@ const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
   if (spec.tools !== undefined && !(Array.isArray(spec.tools) && spec.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))) {
     return `\`tools: ${JSON.stringify(spec.tools)}\` is not a list of tool names. Give one name per entry, like ["Read", "Grep", "Glob"].`;
   }
+  const mcp = spec.mcp === undefined ? undefined : mcpRefuses(spec.mcp);
+  if (mcp) return mcp;
   const h = harnesses[spec.harness]!;
   return (h === 'claude-bg' ? claudeRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
 };
@@ -333,6 +344,6 @@ export { codex, claudeDetached } from './runner-detached.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { nameFor } from './domain.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage } from './domain.ts';
-export type { SpawnRequest } from './runner.ts';
+export type { McpServer, SpawnRequest } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { TaskView } from './engine.ts';

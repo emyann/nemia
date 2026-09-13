@@ -325,6 +325,41 @@ test('file() refuses a tool list that is not a list of names, and journals one t
   assert.deepEqual((filed as { tools?: string[] }).tools, ['Read', 'Grep', 'Glob'], 'on the record, for the runner');
 });
 
+test('file() refuses an mcp map whose entries are not .mcp.json servers, and journals one that is', async () => {
+  const { journal, engine } = shipped();
+  const bad: Array<[unknown, RegExp]> = [
+    [[], /`mcp: \[\]` is not a map of MCP servers by name/],
+    [null, /`mcp: null` is not a map of MCP servers by name/],
+    ['npx @playwright/mcp', /is not a map of MCP servers by name/],
+    [{ 'my server': { command: 'x' } }, /`mcp: "my server"` is not a server name/],
+    [{ web: 'npx server' }, /`mcp.web` is not a server\. An entry is/],
+    [{ web: {} }, /`mcp.web` has neither `command` nor `url`/],
+    [{ web: { command: 'x', url: 'https://h/mcp' } }, /`mcp.web` has both `command` and `url`/],
+    [{ web: { command: '' } }, /`mcp.web.command` is not a program to run/],
+    [{ web: { command: 'x', args: '-y server' } }, /`mcp.web.args` is not a list of strings/],
+    [{ web: { command: 'x', env: { PORT: 3000 } } }, /`mcp.web.env` is not a map of strings/],
+    [{ web: { command: 'x', cwd: '/r' } }, /`mcp.web` has `cwd`, which a server with a `command` does not take/],
+    [{ web: { command: 'x', type: 'http' } }, /`mcp.web` has a `command` and `type: "http"`/],
+    // Claude Code would load nothing from this, and say nothing.
+    [{ web: { url: 'https://h/mcp' } }, /`mcp.web` has a `url` and no `type`.*Claude Code loads no server/],
+    [{ web: { type: 'ws', url: 'https://h/mcp' } }, /`mcp.web` has a `url` and `type: "ws"`/],
+    [{ web: { type: 'http', url: 7 } }, /`mcp.web.url` is not an address/],
+    [{ web: { type: 'http', url: 'https://h/mcp', env: {} } }, /`mcp.web` has `env`, which a server with a `url` does not take/],
+    [{ web: { type: 'http', url: 'https://h/mcp', headers: { Authorization: 1 } } }, /`mcp.web.headers` is not a map of strings/],
+  ];
+  for (const [mcp, says] of bad) await refused(engine, { brief: 'b', cwd: '/r', mcp: mcp as TaskSpec['mcp'] }, says);
+  // Codex's own words: it connects to no SSE server. Claude Code does.
+  const sse = { docs: { type: 'sse' as const, url: 'https://h/sse' } };
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', mcp: sse }, /`mcp.docs` is an SSE server, and Codex connects only to stdio and streamable HTTP/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  await engine.file({ brief: 'b', cwd: '/r', harness: 'claude-detached', mcp: sse });
+  const mcp = { browser: { command: 'npx', args: ['-y', '@playwright/mcp'], env: { HEADLESS: '1' } }, docs: { type: 'http' as const, url: 'https://h/mcp' } };
+  const id = await engine.file({ brief: 'b', cwd: '/r', mcp });
+  const [filed] = await journal.read(id);
+  assert.deepEqual((filed as { mcp?: unknown }).mcp, mcp, 'on the record, for the runner');
+});
+
 test('a PromiseRunner whose spawn rejects is not taken to have started nothing — unless it says so', async () => {
   const sessions = new Map<string, Sighting>();
   const launcher: PromiseRunner = {

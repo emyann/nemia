@@ -22,6 +22,8 @@
  * which kind of harness produced it.
  */
 
+import type { McpServer } from './runner.ts';
+
 /**
  * What a harness reports for a session. Exactly the documented `state` values, no more.
  *
@@ -147,6 +149,11 @@ export type Event =
       tools?: string[];
       /** How hard the harness should think, in its own words. Carried, never read here. */
       effort?: string;
+      /**
+       * The MCP servers the session may have, by name, beside its checkout's own. Carried, never
+       * read here: a runner hands them to its harness, and `decide` never learns what a server is.
+       */
+      mcp?: Record<string, McpServer>;
     }
   /** INTENT: we are about to spawn `nameFor(taskId, attempt)`. */
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string }
@@ -208,9 +215,10 @@ export type State = {
   worktree?: string | boolean;
   /** The shape of the workload's closing statement. See the `filed` event. */
   closeoutSchema?: object;
-  /** The session's tools and effort. See the `filed` event. `decide` never reads either. */
+  /** The session's tools, effort and MCP servers. See the `filed` event. `decide` never reads any of them. */
   tools?: string[];
   effort?: string;
+  mcp?: Record<string, McpServer>;
   attempts: Attempt[];
   stopRequested: boolean;
   settled: Outcome | null;
@@ -230,7 +238,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
         s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
-        s.tools = e.tools; s.effort = e.effort;
+        s.tools = e.tools; s.effort = e.effort; s.mcp = e.mcp;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, usage: null, exitCode: null });

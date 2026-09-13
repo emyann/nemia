@@ -47,7 +47,19 @@ export type SpawnRequest = {
   tools?: string[];
   /** How hard the harness should think, in its own words. */
   effort?: string;
+  /** MCP servers the session may have, by name, beside its checkout's `.mcp.json`. Absent: only those. */
+  mcp?: Record<string, McpServer>;
 };
+
+/**
+ * One MCP server — a process the harness starts beside the session, or an address it connects to —
+ * in the shape a `.mcp.json` entry gives it: Claude Code's own, so a task's servers are written for
+ * it as they are. Harness vocabulary: carried on the task, read by a runner, never by `decide`. A
+ * `url` needs its `type`, because Claude Code loads nothing from one without it.
+ */
+export type McpServer =
+  | { type?: 'stdio'; command: string; args?: string[]; env?: Record<string, string> }
+  | { type: 'http' | 'sse'; url: string; headers?: Record<string, string> };
 
 /**
  * The seam itself, as a plain value.
@@ -192,6 +204,82 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
   return undefined;
 };
 
+const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');
+
+/**
+ * Why a task's `mcp` is not a map of MCP servers, as a sentence that says what to write — or
+ * `undefined`. Closed, like a brief's keys, because Claude Code does not refuse an entry it cannot
+ * use: on 2.1.270 a `url` with no `type` loads no server and says nothing.
+ */
+export const mcpRefuses = (mcp: unknown): string | undefined => {
+  const shape = 'An entry is { "command": "npx", "args": [...], "env": {...} }, or { "type": "http", "url": "https://...", "headers": {...} }, as in a `.mcp.json`.';
+  if (!isMap(mcp)) return `\`mcp: ${JSON.stringify(mcp)}\` is not a map of MCP servers by name. ${shape}`;
+  for (const [name, server] of Object.entries(mcp)) {
+    const at = `\`mcp.${name}\``;
+    if (!/^[\w-]+$/.test(name)) return `\`mcp: ${JSON.stringify(name)}\` is not a server name. Use letters, digits, - and _.`;
+    if (!isMap(server)) return `${at} is not a server. ${shape}`;
+    const local = 'command' in server;
+    if (local === ('url' in server)) return `${at} has ${local ? 'both `command` and `url`' : 'neither `command` nor `url`'}. ${shape}`;
+    const stray = Object.keys(server).find((k) => !(local ? ['type', 'command', 'args', 'env'] : ['type', 'url', 'headers']).includes(k));
+    if (stray) return `${at} has \`${stray}\`, which a server with a \`${local ? 'command' : 'url'}\` does not take. ${shape}`;
+    if (local) {
+      if (typeof server.command !== 'string' || !server.command) return `\`mcp.${name}.command\` is not a program to run. Give it as a string, like "npx".`;
+      if (server.type !== undefined && server.type !== 'stdio') return `${at} has a \`command\` and \`type: ${JSON.stringify(server.type)}\`. Leave \`type\` out, or give "stdio".`;
+      if (server.args !== undefined && !(Array.isArray(server.args) && server.args.every((a) => typeof a === 'string'))) {
+        return `\`mcp.${name}.args\` is not a list of strings. Give one argument per entry, like ["-y", "@playwright/mcp"].`;
+      }
+      if (server.env !== undefined && !isStringMap(server.env)) return `\`mcp.${name}.env\` is not a map of strings. Quote every value, like { "PORT": "3000" }.`;
+    } else {
+      if (typeof server.url !== 'string' || !server.url) return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
+      if (server.type !== 'http' && server.type !== 'sse') {
+        return `${at} has a \`url\` and ${server.type === undefined ? 'no `type`' : `\`type: ${JSON.stringify(server.type)}\``}. Give "type": "http", or "sse": Claude Code loads no server from a url without one.`;
+      }
+      if (server.headers !== undefined && !isStringMap(server.headers)) return `\`mcp.${name}.headers\` is not a map of strings. Quote every value, like { "Authorization": "Bearer ..." }.`;
+    }
+  }
+  return undefined;
+};
+
+/**
+ * The checkout's own `.mcp.json`, when it has one: the repository's servers, named so that
+ * `--strict-mcp-config` keeps them. One that is not JSON is refused here, before anything runs —
+ * named, it stops the CLI before a session exists ("MCP config is not a valid JSON", 2.1.270).
+ */
+export const checkoutMcpConfig = (cwd: string): string | undefined => {
+  const file = path.join(cwd, '.mcp.json');
+  let text: string;
+  try {
+    if (!fs.statSync(file).isFile()) return undefined;
+    text = fs.readFileSync(file, 'utf8');
+  } catch { return undefined; }
+  try { JSON.parse(text); } catch (e) {
+    throw new Error(`${file} is not valid JSON (${(e as Error).message}), and Claude Code starts no session with it named. Fix the file, or remove it from the checkout.`);
+  }
+  return file;
+};
+
+/**
+ * A task's `mcp`, written to `file` as an MCP config (`{"mcpServers": …}`) — or `file` cleared when
+ * the task names none, so a re-spawn never finds servers it was not given. Owner-only: an `env` or
+ * `headers` value may be a secret.
+ */
+export const writeMcpConfig = (file: string, mcp: SpawnRequest['mcp']): string | undefined => {
+  if (!mcp || !Object.keys(mcp).length) { fs.rmSync(file, { force: true }); return undefined; }
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ mcpServers: mcp }), { mode: 0o600 });
+  return file;
+};
+
+/**
+ * Claude Code's MCP flags: the configs given, and `--strict-mcp-config` always, so the session loads
+ * those and nothing else. The strict flag goes last because `--mcp-config` is variadic.
+ */
+export const claudeMcpArgs = (configs: ReadonlyArray<string | undefined>): string[] => {
+  const named = configs.filter((c): c is string => c !== undefined);
+  return [...(named.length ? ['--mcp-config', ...named] : []), '--strict-mcp-config'];
+};
+
 export type ClaudeOptions = {
   quiescentAfterMs?: number;
   now?: () => number;
@@ -201,6 +289,8 @@ export type ClaudeOptions = {
   closeoutFrom?: (sessionId: string) => Promise<{ payload: unknown; at: number } | undefined>;
   /** What the session consumed since `since`, its own start. Injectable for the same reason. */
   usageFrom?: (sessionId: string, since: number) => Promise<Usage | undefined>;
+  /** Where the runner writes what it hands the CLI by path — a task's MCP config. Default `~/.agent-engine`. */
+  root?: string;
 };
 
 /**
@@ -230,6 +320,9 @@ export type ClaudeOptions = {
 export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const quiescentAfterMs = options.quiescentAfterMs ?? QUIESCENT_AFTER_MS;
   const now = options.now ?? (() => Date.now());
+  const root = options.root ?? path.join(os.homedir(), '.agent-engine');
+  /** A task's MCP config, kept outside the workspace: a file in a step's worktree travels down its branch. */
+  const mcpFile = (name: string) => path.join(root, 'mcp', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);
   const transcriptTime = options.transcriptTime ?? (async (sessionId: string) => {
     try { return (await getSessionInfo(sessionId))?.lastModified; } catch { return undefined; }
   });
@@ -271,7 +364,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   };
 
   return ({
-    spawn: (r) => sh('claude', [
+    spawn: (r) => Effect.try({
+      // Found and written before the CLI runs, so whatever throws here started nothing.
+      try: () => claudeMcpArgs([checkoutMcpConfig(r.cwd), writeMcpConfig(mcpFile(r.name), r.mcp)]),
+      catch: (cause) => new RunnerError({ verb: 'spawn', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}`, refused: true }),
+    }).pipe(Effect.flatMap((mcpArgs) => sh('claude', [
       '--bg',
       '--name', r.name,
       // The fence. `--tools`, not `--allowedTools`: a tool the session does not have beats one it
@@ -285,6 +382,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // `auto` approves everything with background safety checks, which the docs recommend for
       // exactly this: long tasks, no prompt fatigue. Overridable per task; never silently.
       '--permission-mode', r.permissionMode ?? 'auto',
+      // MCP servers: the ones named here and no others. Without `--strict-mcp-config` a session loads
+      // every server the operator has — user scope, and their claude.ai connectors (mail, calendar,
+      // drive), measured on 2.1.270 — so it is on every spawn. Strict alone drops the checkout's
+      // `.mcp.json` as well, so that file is named when there is one, beside the task's own `mcp`.
+      ...mcpArgs,
       ...(r.model ? ['--model', r.model] : []),
       ...(r.effort ? ['--effort', r.effort] : []),
       // `--resume` continues that conversation in the background. The NAME is still ours and
@@ -302,7 +404,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // for `-p`. Takes a required value, so unlike `--worktree` it cannot swallow the prompt.
       ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
       r.brief,
-    ], { cwd: r.cwd, verb: 'spawn' }).pipe(Effect.asVoid),
+    ], { cwd: r.cwd, verb: 'spawn' }))).pipe(Effect.asVoid),
 
     observe: sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
       Effect.map((out) => {

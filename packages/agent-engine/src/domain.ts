@@ -95,16 +95,17 @@ export type Usage = {
 export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${attempt}`;
 
 /**
- * Why an attempt ended, in the only two categories the engine can tell apart.
+ * Why an attempt ended, in the only three categories the engine can tell apart.
  *
- *   `harness`  the harness reported a terminal state. It ran, and this is what it concluded.
- *   `lost`     we never heard: the session vanished, or a detached worker stopped beating.
- *              The work in the transcript is real; nobody said it was finished.
+ *   `harness`      the harness reported a terminal state. It ran, and this is what it concluded.
+ *   `lost`         we never heard: the session vanished, or a detached worker stopped beating.
+ *                  The work in the transcript is real; nobody said it was finished.
+ *   `unstartable`  the harness refused to start it: the spawn call itself failed. Nothing ran.
  *
  * Everything about resume policy hangs on this distinction, which is why it is recorded rather
  * than inferred later.
  */
-export type EndReason = 'harness' | 'lost';
+export type EndReason = 'harness' | 'lost' | 'unstartable';
 
 /** What a new attempt does with the one before it. A workload property, not a callback. */
 export type ResumePolicy =
@@ -155,7 +156,7 @@ export type Event =
    * An attempt reached a terminal state, as observed — never as assumed. `usage` and `exitCode`
    * come from the same sighting, when its runner measured them; `decide` reads neither.
    */
-  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number }
+  | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number; error?: string }
   /** The operator asked for it to stop. */
   | { kind: 'stop-requested'; at: string }
   /** Terminal. Nothing moves after this. */
@@ -180,6 +181,8 @@ export type Attempt = {
   usage: Usage | null;
   /** How its process exited; `null` for a harness whose process is not ours, or one that never exited. */
   exitCode: number | null;
+  /** What the harness said when it refused to start this attempt (`reason: 'unstartable'`). */
+  error?: string;
 };
 
 export type State = {
@@ -233,7 +236,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; }
+        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; a.error = e.error; }
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;

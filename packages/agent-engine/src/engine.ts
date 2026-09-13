@@ -122,8 +122,12 @@ export const step = Effect.fn('step')(function* (
       yield* journal.append(taskId, { kind: 'starting', at: at(), attempt: action.attempt, resumeFrom: action.resumeFrom });
       break;
 
-    case 'spawn':
-      yield* runner.spawn({
+    case 'spawn': {
+      // A harness that refuses to start the session has answered, and the answer is recorded like
+      // any other ending — `failed`, `unstartable`, in the harness's own words — so `decide` settles
+      // or retries it as it would any failure. Let out as an error instead, it rejected the whole
+      // tick: every task behind this one stalled, on every pass, for as long as this one existed.
+      const refused = yield* runner.spawn({
         name: action.name, brief: state.brief, cwd: state.cwd,
         model: state.model, permissionMode: state.permissionMode, harness: state.harness,
         worktree: state.worktree, closeoutSchema: state.closeoutSchema,
@@ -131,9 +135,15 @@ export const step = Effect.fn('step')(function* (
         // Taken from the journal rather than recomputed: the decision was made when the attempt
         // was started, possibly by an engine that has since died.
         resumeFrom: state.attempts.find((a) => a.n === action.attempt)?.resumeFrom,
-      });
-      yield* journal.append(taskId, { kind: 'spawned', at: at(), attempt: action.attempt });
+      }).pipe(
+        Effect.as(undefined),
+        Effect.catchTag('RunnerError', (e) => Effect.succeed(e.message)),
+      );
+      yield* journal.append(taskId, refused === undefined
+        ? { kind: 'spawned', at: at(), attempt: action.attempt }
+        : { kind: 'ended', at: at(), attempt: action.attempt, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: refused });
       break;
+    }
 
     case 'record-end': {
       // What the attempt consumed and how its process exited are read off the same sighting the

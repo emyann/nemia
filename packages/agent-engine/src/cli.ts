@@ -146,6 +146,7 @@ export const usageLine = (u: Usage | null): string => {
 /** One attempt, for `ae show`: how it ended, how its process exited if it has one, what it consumed. */
 export const attemptLine = (a: Attempt): string => {
   if (a.ended === null) return `attempt ${a.n}  running`;
+  if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
   const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : ''}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   return `attempt ${a.n}  ${how}${exit}  ${usageLine(a.usage)}`;
@@ -168,7 +169,7 @@ const KINDS: Record<string, string> = {
 
 const entryLine = (taskId: string, event: Event) => {
   const extra = event.kind === 'settled' ? `  ${event.outcome}`
-    : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'lost' ? ' (lost)' : ''}`
+    : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? '' : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
     : '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };

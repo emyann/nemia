@@ -478,3 +478,45 @@ test('an attempt nobody measured records null — not zeros that would read as f
   assert.equal(a!.usage, null);
   assert.equal(a!.exitCode, null);
 });
+
+// ─── a harness that refuses to start ────────────────────────────────────────
+
+import { RunnerError, testOps } from '../src/runner.ts';
+
+/** A board whose harness refuses any task whose brief is `refuse`, in the words a CLI would use. */
+const refusingBoard = () => {
+  const sessions = new Map<string, Sighting>();
+  const ops = testOps({ sessions });
+  const layer = Layer.mergeAll(Journal.test(), Runner.layer({
+    ...ops,
+    spawn: (r) => r.brief === 'refuse'
+      ? Effect.fail(new RunnerError({ verb: 'spawn', message: "claude --bg: error: option '--permission-mode <mode>' argument 'yolo' is invalid." }))
+      : ops.spawn(r),
+  }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  return { sessions, run };
+};
+
+test('a spawn the harness refuses ends the attempt, unstartable, in its words — and the tick goes on', async () => {
+  const b = refusingBoard();
+  const bad = await b.run(file({ ...spec, brief: 'refuse', id: 'a-bad' }));
+  const good = await b.run(file({ ...spec, id: 'b-good' }));
+
+  // Before, this pass rejected: every task behind the bad one stalled, on every pass.
+  await b.run(tick());
+
+  const v = await b.run(view(bad, new Map()));
+  assert.equal(v.state.settled, 'failed');
+  assert.equal(v.state.attempts[0]?.reason, 'unstartable');
+  assert.match(v.state.attempts[0]?.error ?? '', /argument 'yolo' is invalid/);
+  assert.ok(b.sessions.has(nameFor(good, 1)), 'the task behind it started in the same pass');
+});
+
+test('an unstartable attempt spends an attempt like any other failure, and settles when they run out', async () => {
+  const b = refusingBoard();
+  const id = await b.run(file({ ...spec, brief: 'refuse', maxAttempts: 2 }));
+  await b.run(tick());
+  const v = await b.run(view(id, new Map()));
+  assert.deepEqual(v.state.attempts.map((a) => a.reason), ['unstartable', 'unstartable']);
+  assert.equal(v.state.settled, 'failed');
+});

@@ -3,7 +3,9 @@
  *
  * Spawned with no MCP flags, a Claude Code session loads every server the operator has: user scope
  * (`~/.claude.json`) and their claude.ai connectors — mail, calendar, drive — beside the checkout's
- * `.mcp.json` (the `init` event of `claude -p` on 2.1.270). Every case below goes through
+ * `.mcp.json` (the `init` event of `claude -p` on 2.1.270). Strict is not the whole fence: Claude in
+ * Chrome, which a user setting switches on, was still connecting in a `--bg` session spawned strict.
+ * Every case below goes through
  * `createEngine()`'s own harnesses with a fake `claude` and `codex` on PATH, each writing down the
  * argv it was given, so what is checked is what the engine really runs.
  */
@@ -84,6 +86,7 @@ test("no mcp and no .mcp.json: Claude Code is spawned strict, with no config —
     const { args, root } = await spawnAtDefaults({ cwd: tmp('bare'), harness });
     assert.ok(args, `${harness} was spawned`);
     assert.ok(args.includes('--strict-mcp-config'), `${harness}: strict, so user scope and claude.ai connectors stay unloaded`);
+    assert.ok(args.includes('--no-chrome'), `${harness}: nor the operator's Chrome, which no config names and strict leaves on`);
     assert.equal(args.includes('--mcp-config'), false, `${harness}: and no server is named in their place`);
     assert.deepEqual(configsUnder(root), [], `${harness}: nothing written for a task that named no servers`);
     assert.ok(args.includes('the prompt'), `${harness}: the prompt survives`);
@@ -99,6 +102,7 @@ test(".mcp.json in the checkout: named, so strict keeps the repository's servers
     const { configs, next } = mcpConfigsOf(args);
     assert.deepEqual(configs, [path.join(cwd, '.mcp.json')], `${harness}: the checkout's file, and nothing else`);
     assert.equal(next, '--strict-mcp-config', `${harness}: still strict, and the variadic list is ended by it, not by the prompt`);
+    assert.ok(args.includes('--no-chrome'), `${harness}: and still no Chrome`);
   }
   assert.equal((await spawnAtDefaults({ cwd, harness: 'claude' })).args?.at(-1), 'the prompt');
 });
@@ -129,6 +133,7 @@ test("a task's mcp is written outside the workspace and named after the checkout
     assert.ok(path.relative(cwd, configs[1]!).startsWith('..'), `${harness}: written outside the workspace`);
     assert.equal(fs.statSync(configs[1]!).mode & 0o077, 0, `${harness}: readable by its owner only — an env or a header may be a secret`);
     assert.equal(next, '--strict-mcp-config', harness);
+    assert.ok(args.includes('--no-chrome'), `${harness}: a task's servers do not bring the operator's Chrome back`);
   }
   assert.deepEqual(fs.readdirSync(cwd), ['.mcp.json'], 'nothing landed in the checkout');
 });

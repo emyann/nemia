@@ -272,12 +272,18 @@ export const writeMcpConfig = (file: string, mcp: SpawnRequest['mcp']): string |
 };
 
 /**
- * Claude Code's MCP flags: the configs given, and `--strict-mcp-config` always, so the session loads
- * those and nothing else. The strict flag goes last because `--mcp-config` is variadic.
+ * Claude Code's MCP flags: the configs given, then `--strict-mcp-config` and `--no-chrome`, always.
+ *
+ * Strict loads those configs and nothing else — but not every server comes from a config. Claude in
+ * Chrome, which drives the operator's own browser and whatever they are signed in to there, is
+ * switched on by a user setting (`claudeInChromeDefaultEnabled`), and it was still connecting in a
+ * `--bg` session spawned strict (2.1.270). So it is switched off by its own flag; a step that needs a
+ * browser names one in `mcp` or its checkout's `.mcp.json`. Strict comes straight after the configs
+ * because `--mcp-config` is variadic.
  */
 export const claudeMcpArgs = (configs: ReadonlyArray<string | undefined>): string[] => {
   const named = configs.filter((c): c is string => c !== undefined);
-  return [...(named.length ? ['--mcp-config', ...named] : []), '--strict-mcp-config'];
+  return [...(named.length ? ['--mcp-config', ...named] : []), '--strict-mcp-config', '--no-chrome'];
 };
 
 export type ClaudeOptions = {
@@ -386,6 +392,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // every server the operator has — user scope, and their claude.ai connectors (mail, calendar,
       // drive), measured on 2.1.270 — so it is on every spawn. Strict alone drops the checkout's
       // `.mcp.json` as well, so that file is named when there is one, beside the task's own `mcp`.
+      // Claude in Chrome is not in any config and survives strict, so `--no-chrome` goes with it.
       ...mcpArgs,
       ...(r.model ? ['--model', r.model] : []),
       ...(r.effort ? ['--effort', r.effort] : []),

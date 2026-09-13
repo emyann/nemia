@@ -22,6 +22,7 @@ export type McpServer = {
   source: string;
   /** `.mcp.json`'s `type`: `stdio` for a server with a command and none given. */
   type: string;
+  /** `command`, `args` and `url` as `.mcp.json` writes them: the api expands `${VAR}` only to start the server, so no secret reaches the page. */
   command: string | null;
   args: string[];
   url: string | null;
@@ -63,7 +64,10 @@ const SETTINGS = '.claude/settings.json';
 const MCP_JSON = '.mcp.json';
 
 /** Everything the repository at `repo` offers. Never throws for what is on disk: an absent file is an empty list, a broken one a warning. */
-export async function capabilitiesOf(repo: string, { deadlineMs = ASK_MS }: { deadlineMs?: number } = {}): Promise<Capabilities> {
+export async function capabilitiesOf(
+  repo: string,
+  { deadlineMs = ASK_MS, env = process.env }: { deadlineMs?: number; env?: NodeJS.ProcessEnv } = {},
+): Promise<Capabilities> {
   const warnings: string[] = [];
   const settings = jsonAt(repo, SETTINGS, warnings, 'nothing is read as denied or enabled from it');
   const deny = stringsAt(settings, ['permissions', 'deny'], warnings);
@@ -80,7 +84,17 @@ export async function capabilitiesOf(repo: string, { deadlineMs = ASK_MS }: { de
     if (!entry.enabled) {
       return { ...entry, notAsked: `Not enabled by ${SETTINGS}, so the api does not start it. Add "${server.name}" to enabledMcpjsonServers there to list its tools.` };
     }
-    const answer = await answerOf(repo, { ...server, command: server.command }, deadlineMs);
+    const stdio = { ...server, command: server.command };
+    const launch = launchOf(repo, stdio, env);
+    if ('missing' in launch) {
+      const [them, each] = launch.missing.length > 1 ? ['them', 'each'] : ['it', 'it'];
+      const named = launch.missing.map((name) => `\`\${${name}}\``).join(' and ');
+      return {
+        ...entry,
+        error: `${MCP_JSON} gives ${server.name} ${named} with no default, and the api's environment does not set ${them}, so it is not started. Set ${them} where the api runs, or give ${each} a default: \`\${NAME:-value}\`.`,
+      };
+    }
+    const answer = await answerOf(repo, stdio, launch, deadlineMs);
     return {
       ...entry,
       tools: answer.tools?.map((tool) => ({ ...tool, denied: denyingRule(deny, server.name, tool.name) })) ?? null,
@@ -277,18 +291,46 @@ function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
 
 // ─── asking a server for its tools ──────────────────────────────────────────
 
+/** What starts a stdio server: the command, its args, and the whole environment it is given. */
+type Launch = { command: string; args: string[]; env: Record<string, string> };
+
+/** The api's own settings, which a server is not given: they mean nothing to it, and an inherited `PORT` could have it bind the api's port. */
+const API_ONLY = new Set(['PORT', 'HKB_REPO']);
+
+/**
+ * The server started as a session starts it: `${VAR}` and `${VAR:-default}` expanded in its `command`, `args` and
+ * `env` from `env` — the default when `VAR` is unset — and `env` itself inherited, less the api's own settings and
+ * with `CLAUDE_PROJECT_DIR` the repository, under the entry's `env`. `missing` names each variable that is unset and
+ * has no default: a session refuses such an entry too.
+ */
+function launchOf(repo: string, server: Declared & { command: string }, env: NodeJS.ProcessEnv): Launch | { missing: string[] } {
+  const missing = new Set<string>();
+  const expand = (text: string): string =>
+    text.replace(/\$\{([^}:]+)(?::-([^}]*))?\}/g, (written, name: string, fallback: string | undefined) => {
+      const value = env[name] ?? fallback;
+      if (value === undefined) missing.add(name);
+      return value ?? written;
+    });
+  const command = expand(server.command);
+  const args = server.args.map(expand);
+  const own = Object.fromEntries(Object.entries(server.env).map(([key, value]) => [key, expand(value)]));
+  if (missing.size) return { missing: [...missing] };
+  const inherited = Object.entries(env).filter((pair): pair is [string, string] => pair[1] !== undefined && !API_ONLY.has(pair[0]));
+  return { command, args, env: { ...Object.fromEntries(inherited), CLAUDE_PROJECT_DIR: repo, ...own } };
+}
+
 type Answer = { tools: Array<{ name: string; description: string | null }> | null; error: string | null; checkedAt: string };
 
 /**
- * Every answer the api has had, for the life of the process. Keyed by the repository and all `.mcp.json` says
- * to start the server, so an edit to its entry asks again; the promise is kept, so requests that overlap ask once.
+ * Every answer the api has had, for the life of the process. Keyed by the repository, the server and all it is
+ * started with, so an edit to its entry asks again; the promise is kept, so requests that overlap ask once.
  */
 const answers = new Map<string, Promise<Answer>>();
 
-function answerOf(repo: string, server: Declared & { command: string }, deadlineMs: number): Promise<Answer> {
-  const key = JSON.stringify([repo, server.name, server.command, server.args, server.env]);
+function answerOf(repo: string, server: Declared & { command: string }, launch: Launch, deadlineMs: number): Promise<Answer> {
+  const key = JSON.stringify([repo, server.name, launch]);
   let answer = answers.get(key);
-  if (!answer) answers.set(key, (answer = ask(repo, server, deadlineMs)));
+  if (!answer) answers.set(key, (answer = ask(repo, server, launch, deadlineMs)));
   return answer;
 }
 
@@ -296,13 +338,11 @@ function answerOf(repo: string, server: Declared & { command: string }, deadline
 const SAID_LINES = 20;
 
 /**
- * Start the server as `.mcp.json` says, in the repository, ask it `tools/list` over stdio, and stop it.
- *
- * Its environment is the MCP SDK's default — `HOME`, `PATH`, `USER` and the like, not the api's own — with the
- * entry's `env` over it. Resolves with the tools, or with why not and what it printed; never rejects.
+ * Start the server as `launch` says, in the repository, ask it `tools/list` over stdio, and stop it. Resolves with the
+ * tools, or with why not and what it printed, quoting the entry as `.mcp.json` writes it; never rejects.
  */
-async function ask(repo: string, server: Declared & { command: string }, deadlineMs: number): Promise<Answer> {
-  const transport = new StdioClientTransport({ command: server.command, args: server.args, env: server.env, cwd: repo, stderr: 'pipe' });
+async function ask(repo: string, server: Declared & { command: string }, launch: Launch, deadlineMs: number): Promise<Answer> {
+  const transport = new StdioClientTransport({ command: launch.command, args: launch.args, env: launch.env, cwd: repo, stderr: 'pipe' });
   let said = '';
   transport.stderr?.on('data', (chunk: Buffer) => (said = (said + chunk.toString()).slice(-16_000)));
   const client = new Client({ name: 'hkb-api', version: '0.0.0' });

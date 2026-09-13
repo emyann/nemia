@@ -197,6 +197,69 @@ test('each server is asked once while the api runs: requests after the first, an
   assert.deepEqual(edited.mcp[0]!.args, [FIXTURE_SERVER, '--edited']);
 });
 
+test("an entry is started as a session starts it — ${VAR} and ${VAR:-default} expanded from the api's environment, which the server inherits — and shown as written", async () => {
+  const set: Record<string, string> = {
+    HKB_TEST_FIXTURE_DIR: path.dirname(FIXTURE_SERVER), HKB_TEST_SECRET: 's3cret', HKB_TEST_INHERITED: 'from the api', PORT: '8787',
+  };
+  const before = Object.fromEntries(Object.keys(set).map((key) => [key, process.env[key]]));
+  Object.assign(process.env, set);
+  try {
+    const args = ['${HKB_TEST_FIXTURE_DIR}/mcp-server.ts', '--token=${HKB_TEST_SECRET}'];
+    const repo = repoWith({
+      '.mcp.json': {
+        mcpServers: {
+          expands: {
+            command: process.execPath,
+            args,
+            env: { HKB_TEST_MODE: 'env', HKB_TEST_NAMED: '${HKB_TEST_SECRET}', HKB_TEST_DEFAULTED: '${HKB_TEST_NEVER_SET_DEFAULTED:-the default}' },
+          },
+        },
+      },
+      '.claude/settings.json': { enabledMcpjsonServers: ['expands'] },
+    });
+    const { status, body } = await served(repo);
+    assert.equal(status, 200);
+    const [server] = body.mcp;
+    assert.equal(server.error, null);
+    assert.deepEqual(server.args, args, 'shown as written: expanded, a token would be on the page');
+    assert.deepEqual(JSON.parse(server.tools[0].description), {
+      argv: ['--token=s3cret'],
+      HKB_TEST_NAMED: 's3cret',
+      HKB_TEST_DEFAULTED: 'the default',
+      HKB_TEST_INHERITED: 'from the api',
+      CLAUDE_PROJECT_DIR: repo,
+    }, "what the server was started with — and no PORT, which is the api's");
+  } finally {
+    for (const [key, value] of Object.entries(before)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
+test("an entry naming a variable the api's environment does not set, with no default, is an error on its entry, and not started", async () => {
+  const starts = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-starts-')), 'starts');
+  const repo = repoWith({
+    '.mcp.json': {
+      mcpServers: {
+        needs: {
+          ...fixture({ HKB_TEST_STARTS: starts, GITHUB_PERSONAL_ACCESS_TOKEN: '${HKB_TEST_NEVER_SET_TOKEN}' }),
+          args: [FIXTURE_SERVER, '--from=${HKB_TEST_NEVER_SET_ARG}'],
+        },
+      },
+    },
+    '.claude/settings.json': { enabledMcpjsonServers: ['needs'] },
+  });
+  const { status, body } = await served(repo);
+  assert.equal(status, 200);
+  assert.deepEqual([body.mcp[0].tools, body.mcp[0].checkedAt], [null, null]);
+  assert.equal(
+    body.mcp[0].error,
+    ".mcp.json gives needs `${HKB_TEST_NEVER_SET_ARG}` and `${HKB_TEST_NEVER_SET_TOKEN}` with no default, and the api's environment does not set them, so it is not started. Set them where the api runs, or give each a default: `${NAME:-value}`.",
+  );
+  assert.deepEqual(startsIn(starts), [], 'never started');
+});
+
 test('a server .claude/settings.json does not enable is listed, and not started', async () => {
   const starts = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-starts-')), 'starts');
   const off = fixture({ HKB_TEST_STARTS: starts });

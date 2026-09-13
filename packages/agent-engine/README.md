@@ -496,7 +496,7 @@ Claude Code's runner reads the statement from the transcript on every idle pass 
 works. What it read from a finished one it keeps for that attempt only — the row's name, its session,
 and the start `claude agents` gave it — and only while the transcript has not been written since.
 Kept by session id, for good, a read went wrong twice on one step. A `view` saw the session listed
-final thirty seconds before its `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
+final at least ten seconds before its — inferred from the pinned usage, not observed — `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
 which `--resume` runs under the same id, was handed that nothing and its first try's usage, to the
 byte. A resume changes both facts, so neither may live in a daemon's memory (`test/resume.test.ts`).
 

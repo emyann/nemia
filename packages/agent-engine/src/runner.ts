@@ -376,7 +376,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * Both conditions are what reading again would find, so no driver answers differently for having
    * seen the session before. Kept by session id, for good, it failed twice on one step
    * (`let-a-step-say-which-tools-i-v27t-implement`, 2026-09-13). The registry listed the session
-   * final to a `view` — which observes without stepping — some thirty seconds before it gave its
+   * final to a `view` — which observes without stepping — at least ten seconds before it gave its (the reading the evidence allows, not a measurement)
    * StructuredOutput, so "nothing said" was kept, and the end the tick later wrote had no closeout and
    * that earlier moment's usage. Then the nudged retry `--resume`d the same id and was handed both, to
    * the byte. An attempt is the row's name, its session, and the start `claude agents` gave it.

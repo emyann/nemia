@@ -13,6 +13,7 @@
  */
 import path from 'node:path';
 import { checkContract, verdictWord, type Verdict } from './check.ts';
+import { depsLines, type Provisioned } from './deps.ts';
 import { CLOSEOUT_FIELDS, outputFields, terminalSteps, type Workflow } from './workflow.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
@@ -765,6 +766,8 @@ export function composeBrief(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   /** The directory the run made for this step's files (`artifactsDir` in runner.ts). */
   artifactsDir?: string,
+  /** What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in runner.ts). */
+  deps?: Provisioned,
 ): string {
   // What finishing means, on every brief: the command this step will be judged by, when it has one,
   // where its files for the steps after it go, and then the closeout — last, because it says to give it
@@ -776,11 +779,13 @@ export function composeBrief(
   ].join('\n');
   // What this step reads of the steps it waits on — their declared output, and only if it asked.
   const given = (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n');
+  // Said only when the run did more than link its dependencies: a minute of `npm ci`, or a failure.
+  const tree = depsLines(deps);
 
   // A step that CONTINUES another already has the context — its own. Repeating the spec back and
   // pointing it at the workspace would be telling someone what they spent an hour doing. What it reads
-  // is new to it all the same.
-  if (step.resume) return step.body + given + contracts;
+  // is new to it all the same, and so is a tree the run installed.
+  if (step.resume) return step.body + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts;
 
   const earlier = step.after.length
     ? step.after
@@ -795,16 +800,15 @@ export function composeBrief(
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',
       'several others is for. `git status` shows them.',
+      ...(tree.length ? ['', ...tree] : []),
       ...(given ? [given] : []),
       contracts,
     ].join('\n');
   }
 
+  if (earlier.length || tree.length) parts.push('', '## Where to look', '');
   if (earlier.length) {
     parts.push(
-      '',
-      '## Where to look',
-      '',
       `This workspace has already been worked in by: ${earlier.join(', ')}.`,
       `Their work is on disk, and against \`${run.baseRef}\` you can see exactly what changed:`,
       '',
@@ -817,6 +821,7 @@ export function composeBrief(
       'not an account of it.',
     );
   }
+  if (tree.length) parts.push(...(earlier.length ? [''] : []), ...tree);
 
   if (given) parts.push(given);
   parts.push(contracts);

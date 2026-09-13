@@ -22,8 +22,14 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).
 - For `apps/web` changes, run `npm run e2e` and read the PNGs it writes before you sign off (`.e2e/`,
-  or `$WF_ARTIFACTS` in a run); `npx playwright install chromium` once per machine. A new page gets
-  a line in `PAGES` (`apps/web/test/e2e/run.ts`), or the check never looks at it.
+  or `$WF_ARTIFACTS` in a run). A new page gets a line in `PAGES` (`apps/web/test/e2e/run.ts`), or
+  the check never looks at it. Once per machine, install a browser for each playwright: `npx playwright
+  install chromium` for the e2e's, and `node node_modules/@playwright/mcp/cli.js install-browser
+  chromium` for the one behind the steps' `browser_*` tools (`.mcp.json`). One build per playwright
+  version lives in `~/.cache/ms-playwright`, and these two differ (1.62.1 and a 1.63 alpha). An install
+  deletes every build whose playwright is not listed alive in `~/.cache/ms-playwright/.links`, so
+  install through the checkout's own `node_modules`, never from an `npx` download. (Learned by the run
+  that added the browser, whose install deleted the e2e's builds.)
 - **A guard is not proven by a test that asks whether it allows.** Every new refusal — a parser
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's

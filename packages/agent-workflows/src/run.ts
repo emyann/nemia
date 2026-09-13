@@ -338,6 +338,58 @@ export function decision(
   };
 }
 
+// ─── what `wf ls` says ──────────────────────────────────────────────────────
+
+export type Listing = {
+  /** One line per step: its name, what to say about it, and the branch it is on. */
+  steps: Array<{ name: string; status: string; branch: string | null }>;
+  /** Steps that signed off blocked, on a run nobody has called off. */
+  waitingOnYou: string[];
+};
+
+/**
+ * What `wf ls` shows for each step of a run. Pure, like `decision`, and tested the same way.
+ *
+ * The engine's phase alone cannot tell apart the two cases that matter most. A step that stopped
+ * itself `blocked` ended its session as cleanly as one that finished the work, so both read
+ * `succeeded` — and the step a person has to act on looked exactly like one they can ignore. So a
+ * step's outcome goes beside its phase, and `BLOCKED` is shouted, in the word `wf decide` uses.
+ *
+ * A step with no closeout reads exactly as it did before there were closeouts: still running, never
+ * filed, or from a run that predates them. Nothing is inferred for it — a missing closeout is not a
+ * claim that the work was done, and an old run must still list.
+ *
+ * One line per step, deliberately. The summary and `needs` were written for `wf decide`, where there
+ * is room to read them; here they would turn a list into a report.
+ */
+export function listing(
+  steps: readonly Workflow[],
+  run: Run,
+  /** The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is. */
+  phaseOf: (taskId: string) => string,
+  closeoutOf: (step: string) => Closeout | { error: string } | undefined,
+): Listing {
+  const waitingOnYou: string[] = [];
+  const rows = steps.map(({ name }) => {
+    const taskId = run.steps[name]?.taskId;
+    const branch = run.steps[name]?.branch ?? null;
+    if (!taskId) return { name, status: 'waiting', branch };
+
+    const phase = phaseOf(taskId);
+    const c = closeoutOf(name);
+    if (!c) return { name, status: phase, branch };
+    // Still worth a word: a statement nobody can read is not the same as no statement, and
+    // `wf decide` prints the reason.
+    if ('error' in c) return { name, status: `${phase} · closeout unreadable`, branch };
+    if (c.outcome === 'blocked') waitingOnYou.push(name);
+    return { name, status: `${phase} · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`, branch };
+  });
+
+  // A run somebody called off is waiting on nobody — `wf decide` says there is nothing to decide —
+  // though each step still signed off the way it did, and its line still says so.
+  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou };
+}
+
 /**
  * What a step is told. THE decision about what one step knows of another.
  *

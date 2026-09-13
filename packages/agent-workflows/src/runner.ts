@@ -11,7 +11,7 @@ import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createEngine, type Engine, type TaskView } from 'agent-engine';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, listing, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -394,19 +394,16 @@ export async function tick(e: Engine): Promise<Advanced[]> {
   return out;
 }
 
-export async function stepViews(e: Engine, run: Run): Promise<Array<{ name: string; phase: string; taskId: string | null; branch: string | null }>> {
+/**
+ * What `wf ls` shows for one run — the pure call, over one read of each task.
+ *
+ * The phase beside a step is the engine's own word (`running (working)`, `needs-human`), not the
+ * narrowed `TaskPhase` the DAG decides on: a person reading the list wants the detail.
+ */
+export async function list(e: Engine, run: Run): Promise<Listing> {
   const steps = loadWorkflows(run.workflowDir);
-  const rows = [];
-  for (const s of steps) {
-    const taskId = run.steps[s.name]?.taskId ?? null;
-    rows.push({
-      name: s.name,
-      taskId,
-      branch: run.steps[s.name]?.branch ?? null,
-      phase: taskId ? (await e.view(taskId)).phase : 'waiting',
-    });
-  }
-  return rows;
+  const { views } = await taskPhases(e, run);
+  return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name));
 }
 
 /**

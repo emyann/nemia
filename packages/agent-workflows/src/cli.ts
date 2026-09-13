@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifacts, cancel, decide, diffStat, engine, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, stepViews, tick } from './runner.ts';
+import { artifacts, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, tick } from './runner.ts';
 import { loadWorkflows } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -90,9 +90,15 @@ export async function main(argv: string[]): Promise<void> {
       for (const run of runs) {
         const calledOff = run.cancelledAt ? '  (cancelled)' : '';
         console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}`);
-        for (const s of await stepViews(e, run)) {
-          console.log(`   ${s.name.padEnd(14)} ${s.phase.padEnd(20)} ${s.branch ?? ''}`);
+        const { steps, waitingOnYou } = await list(e, run);
+        // As wide as this run's longest status, so its branches still line up beside it.
+        const width = Math.max(20, ...steps.map((s) => s.status.length));
+        for (const s of steps) {
+          console.log(`   ${s.name.padEnd(14)} ${s.status.padEnd(width)} ${s.branch ?? ''}`);
         }
+        // The step a person has to act on, and where to act. Said here and not left to the result
+        // line, because a run blocked on its first step has no result branch yet.
+        if (waitingOnYou.length) console.log(`   → waiting on you: ${waitingOnYou.join(', ')}  —  wf decide ${run.id}`);
         // Where to go and look. A run whose result nobody can find is a run that did not happen.
         const result = resultBranches(run);
         if (result.length) console.log(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);

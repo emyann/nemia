@@ -23,7 +23,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, cancel, markCancelled, readRun } = await import('../src/runner.ts');
+const { advance, cancel, list, markCancelled, readRun } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -34,8 +34,11 @@ const aRun = (id: string, steps: Run['steps']): Run => ({
 /** What the daemon does to the run's json, and the only thing it does to it. */
 const writeRun = (run: Run) => fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(run, null, 2));
 
-/** Just enough engine: what each task is doing, and a `file` the test can hold open mid-call. */
-const engineWith = (phase: Record<string, TaskPhase>, hold?: Promise<void>) => {
+/**
+ * Just enough engine: what each task is doing, how it signed off if it did, and a `file` the test
+ * can hold open mid-call.
+ */
+const engineWith = (phase: Record<string, TaskPhase>, hold?: Promise<void>, closeouts: Record<string, unknown> = {}) => {
   const stopped: string[] = [];
   const settled = new Set(['succeeded', 'failed', 'stopped']);
   const e = {
@@ -43,7 +46,7 @@ const engineWith = (phase: Record<string, TaskPhase>, hold?: Promise<void>) => {
       id, phase: phase[id] ?? 'unknown', sessionId: 's',
       state: {
         settled: settled.has(phase[id] ?? '') ? phase[id] : null,
-        attempts: phase[id] === 'pending' ? [] : [{ n: 1, ended: null, nativeId: 's' }],
+        attempts: phase[id] === 'pending' ? [] : [{ n: 1, ended: null, nativeId: 's', closeout: closeouts[id] }],
         stopRequested: false,
       },
     }),
@@ -121,4 +124,20 @@ test('a run the engine has already been asked to stop is not asked again every f
 
   await advance(e, readRun(run.id));
   assert.deepEqual(stopped, []);
+});
+
+// ─── what `wf ls` reads ─────────────────────────────────────────────────────
+
+// Not cancelling, but the same kind of test: what `wf ls` shows is decided purely in run.test.ts,
+// and this is the read that feeds it — each step's closeout, off the engine's record of its task.
+test('`wf ls` takes how each step signed off from the engine — and a task from before closeouts still lists', async () => {
+  // `implement` is from before closeouts: its attempt carries none. `review` signed off blocked, in a
+  // session the engine settled exactly as cleanly as the other.
+  const run = aRun('r-ls', { implement: { taskId: 't1' }, review: { taskId: 't2' } });
+  const blocked = { outcome: 'blocked', summary: 'two readings of the brief', artifacts: [], needs: 'pick one' };
+  const { e } = engineWith({ t1: 'succeeded', t2: 'succeeded' }, undefined, { t2: blocked });
+
+  const l = await list(e, run);
+  assert.deepEqual(l.steps.map((s) => s.status), ['succeeded', 'succeeded · BLOCKED']);
+  assert.deepEqual(l.waitingOnYou, ['review']);
 });

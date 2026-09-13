@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, parseCloseout, workspacePlan, type Run, type TaskPhase } from '../src/run.ts';
+import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, listing, parseCloseout, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -385,4 +385,70 @@ test('a step is told the run commits for it — being unable to commit is not be
   assert.match(brief, /the run commits whatever you left/);
   assert.match(brief, /\*\*not\*\* a reason to block/);
   assert.doesNotMatch(brief, /must be/);
+});
+
+// ─── what `wf ls` says ──────────────────────────────────────────────────────
+
+/** The engine's own phase words, which are free text — `running (working)`, `needs-human`. */
+const shown = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
+/** How each step signed off, by name. A step not named left no closeout. */
+const signedOff = (m: Record<string, Closeout | { error: string }>) => (name: string) => m[name];
+const said = (outcome: Closeout['outcome']): Closeout => ({
+  outcome,
+  summary: 'rewrote the parser\nand the three tests that pinned it',
+  artifacts: [],
+  needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
+});
+const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.status);
+const SETTLED = shown({ t1: 'succeeded', t2: 'succeeded' });
+
+test('a step that signed off says how, next to the phase', () => {
+  const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: said('done'), review: said('done') }));
+  assert.deepEqual(statuses(l), ['succeeded · done', 'succeeded · done']);
+  assert.deepEqual(l.waitingOnYou, []);
+});
+
+test('BLOCKED stands out — its session succeeded, and it is the step waiting on you', () => {
+  // The case this exists for: the engine settled both sessions `succeeded`, and without the
+  // closeout these two lines were identical.
+  const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: said('done'), review: said('blocked') }));
+  assert.deepEqual(statuses(l), ['succeeded · done', 'succeeded · BLOCKED']);
+  assert.deepEqual(l.waitingOnYou, ['review']);
+});
+
+test('a step with no closeout reads exactly as it did before there were closeouts', () => {
+  // Still running, and never filed.
+  const live = listing(STEPS, run({ implement: 't1', review: null }), shown({ t1: 'running (working)' }), signedOff({}));
+  assert.deepEqual(live.steps, [
+    { name: 'implement', status: 'running (working)', branch: null },
+    { name: 'review', status: 'waiting', branch: null },
+  ]);
+
+  // A run from before closeouts: settled, and silent about how. Nothing is inferred for it.
+  const old = listing(STEPS, finished(), shown({ t1: 'succeeded', t2: 'failed' }), signedOff({}));
+  assert.deepEqual(old.steps, [
+    { name: 'implement', status: 'succeeded', branch: 'wf/r-1/implement' },
+    { name: 'review', status: 'failed', branch: 'wf/r-1/review' },
+  ]);
+  assert.deepEqual(old.waitingOnYou, []);
+});
+
+test('one line per step — the summary and what it needs are for `wf decide`', () => {
+  const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: said('done'), review: said('blocked') }));
+  for (const status of statuses(l)) {
+    assert.doesNotMatch(status, /\n/);
+    assert.doesNotMatch(status, /parser|flag name/);
+  }
+});
+
+test('a closeout nobody can read is said so, and is not taken for either answer', () => {
+  const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: { error: 'not an object' } }));
+  assert.deepEqual(statuses(l), ['succeeded · closeout unreadable', 'succeeded']);
+  assert.deepEqual(l.waitingOnYou, []);
+});
+
+test('a cancelled run is waiting on nobody, though its step still says it signed off blocked', () => {
+  const l = listing(STEPS, finished(CANCELLED), shown({ t1: 'succeeded', t2: 'stopped' }), signedOff({ implement: said('blocked') }));
+  assert.deepEqual(statuses(l), ['succeeded · BLOCKED', 'stopped']);
+  assert.deepEqual(l.waitingOnYou, [], '`wf decide` has nothing to decide for it');
 });

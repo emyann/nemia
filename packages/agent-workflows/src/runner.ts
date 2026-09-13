@@ -8,9 +8,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 'agent-engine';
 import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type Verdict } from './check.ts';
+import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 
 export { verdictWord } from './check.ts';
 export { artifactLines, outputLines } from './run.ts';
@@ -200,29 +202,161 @@ export const checkStderr = (taskId: string): string => path.join(HOME, 'checks',
  */
 export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'artifacts', step);
 
-/**
- * Gitignored directories a fresh worktree needs in order to be usable.
- *
- * A worktree contains tracked files only, so `node_modules` is absent and a step that runs the
- * tests fails on its first command — through no fault of its own. Symlinked rather than copied:
- * installing per worktree would cost minutes per step, and a local `file:` dependency would not
- * even resolve from a worktree that lives outside the repository's parent directory.
- *
- * `node_modules` is the pragmatic 95% case rather than a principle. A workflow for another
- * ecosystem wants `.venv`, `target`, `vendor`; when that day comes this becomes a run option
- * instead of a constant.
- */
-const LINK_DIRS = ['node_modules'];
+/** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
+const NPM_CI_TIMEOUT_MS = 10 * 60_000;
 
-/** Make a worktree usable: link in what git deliberately did not copy. */
-function linkDependencies(repo: string, workspace: string): void {
-  for (const dir of LINK_DIRS) {
-    const from = path.join(repo, dir);
-    const to = path.join(workspace, dir);
-    if (fs.existsSync(from) && !fs.existsSync(to)) {
-      try { fs.symlinkSync(from, to, 'dir'); } catch { /* best effort: the step will say so */ }
+const execFileAsync = promisify(execFile);
+const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false });
+
+/**
+ * Where the worktree's `package-lock.json` asks for a tree the main checkout does not have on disk, or
+ * null when links will do: `lockfileParting`, over a look at each package path the lockfile names.
+ *
+ * A main checkout with no `node_modules` has no tree to part from and none to link, so its lockfile is
+ * compared byte for byte instead, as before: a different one is installed in the worktree, and the same
+ * one leaves nothing to provision. A worktree without a lockfile parts only from a main checkout that
+ * has one — a repository without one is not npm's, and links are all there is.
+ */
+export function lockfileParts(mainRoot: string, worktree: string): string | null {
+  const read = (file: string): string | null => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
+  const wanted = read(path.join(worktree, 'package-lock.json'));
+  const mains = read(path.join(mainRoot, 'package-lock.json'));
+  if (wanted === null) return mains === null ? null : 'package-lock.json';
+  if (!fs.statSync(path.join(mainRoot, 'node_modules'), { throwIfNoEntry: false })?.isDirectory()) {
+    return wanted === mains ? null : 'package-lock.json';
+  }
+
+  let lock: unknown = null;
+  try { lock = JSON.parse(wanted); } catch { /* parts at package-lock.json */ }
+  const installed: Record<string, Installed | null> = {};
+  for (const key of Object.keys(lockfilePackages(lock) ?? {}).filter(isModuleKey)) {
+    const at = path.join(mainRoot, key);
+    const st = lstatOf(at);
+    if (!st) installed[key] = null;
+    else if (st.isSymbolicLink()) {
+      installed[key] = { link: true, resolved: path.relative(mainRoot, path.resolve(path.dirname(at), fs.readlinkSync(at))).split(path.sep).join('/') };
+    } else {
+      let version: string | undefined;
+      try { version = JSON.parse(fs.readFileSync(path.join(at, 'package.json'), 'utf8')).version; } catch { /* a package without a manifest has no version */ }
+      installed[key] = { link: false, version };
     }
   }
+  return lockfileParting(lock, installed);
+}
+
+/** Whether git ignores a path in a checkout. `git check-ignore` says no for a tracked path, and for one git has not been told to ignore. */
+function ignored(repo: string, rel: string): boolean {
+  try {
+    execFileSync('git', ['check-ignore', '-q', '--', rel], { cwd: repo, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Main's `node_modules`, listed for `depsPlan`: names and link targets, nothing below a package. */
+function listDeps(modules: string): DepsListing | null {
+  if (!fs.statSync(modules, { throwIfNoEntry: false })?.isDirectory()) return null;
+  const entriesOf = (dir: string): DepEntry[] => {
+    try {
+      return fs.readdirSync(dir, { withFileTypes: true }).map((d) =>
+        d.isSymbolicLink() ? { name: d.name, link: fs.readlinkSync(path.join(dir, d.name)) } : { name: d.name });
+    } catch { return []; }
+  };
+  const entries = entriesOf(modules);
+  const scopes = Object.fromEntries(entries
+    .filter((e) => e.name.startsWith('@') && e.link === undefined)
+    .map((e) => [e.name, entriesOf(path.join(modules, e.name))]));
+  return { entries, scopes, bins: entriesOf(path.join(modules, '.bin')) };
+}
+
+/**
+ * Give a worktree a `node_modules` of its own: `depsPlan`'s links, or `npm ci` when its lockfile differs.
+ *
+ * A worktree holds tracked files only, so without this a step that runs the tests fails on its first
+ * command through no fault of its own. It used to be one link to the main checkout's whole tree, which
+ * tested a branch against main's workspace packages and hid a dependency the branch added. Links cost no
+ * install; when the worktree's `package-lock.json` asks for packages main has not installed they would be
+ * the wrong tree, so `npm ci` installs one here — about a minute, which the step is told (`depsLines`).
+ *
+ * Idempotent, so a pass that died halfway can run it again and a second call changes nothing: a tree npm
+ * installed (it has `.package-lock.json`, which the plan never makes) is left alone, and so is a
+ * `node_modules` that is one link, cut before this; a tree the plan made gains only what it lacks, and
+ * nothing already there is replaced. It writes nothing under the main checkout. It does not throw: a
+ * tick that threw here would throw on every pass after, and a step can run `npm ci` itself.
+ */
+export async function provisionDeps(mainRoot: string, worktree: string): Promise<Provisioned> {
+  const modules = path.join(worktree, 'node_modules');
+  if (lstatOf(modules)?.isSymbolicLink()) return { tree: 'shared' };
+  if (lstatOf(path.join(modules, '.package-lock.json'))) return { tree: 'own', installed: false };
+
+  if (lockfileParts(mainRoot, worktree)) {
+    try {
+      await execFileAsync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, timeout: NPM_CI_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
+      return { tree: 'own', installed: true };
+    } catch (err) {
+      const { stderr, message } = err as { stderr?: string; message?: string };
+      return { tree: 'failed', error: lastLines(stderr?.trim() ? stderr : message ?? String(err), 10) };
+    }
+  }
+
+  const listing = listDeps(path.join(mainRoot, 'node_modules'));
+  if (!listing) return { tree: 'absent' };
+  let made = 0;
+  try {
+    for (const action of depsPlan(mainRoot, worktree, listing)) {
+      if (lstatOf(action.path)) continue;
+      if (action.kind === 'dir') fs.mkdirSync(action.path);
+      else fs.symlinkSync(action.target, action.path);
+      made++;
+    }
+  } catch (err) {
+    return { tree: 'failed', error: (err as Error).message };
+  }
+  return { tree: 'linked', made };
+}
+
+/** `.worktreeinclude` at the root of the main checkout, parsed — or null, when the repository has none. */
+function readInclude(repo: string): WorktreeInclude | null {
+  const file = path.join(repo, '.worktreeinclude');
+  return fs.existsSync(file) ? worktreeInclude(fs.readFileSync(file, 'utf8')) : null;
+}
+
+/**
+ * Copy what `.worktreeinclude` lists from the main checkout into a worktree the run just cut — the
+ * gitignored files a repository says a worktree needs, as Claude Code's `--worktree` does. Never
+ * `node_modules`: `provisionDeps` makes that, and a copy would cost minutes per step.
+ *
+ * Read from the main checkout, never from the worktree a step can edit. Only a path git ignores there is
+ * copied, as Claude Code's file copies only ignored files: anything else lands in the worktree as an
+ * untracked file, and the hand-off's `git add -A` commits it onto the run's branch — a token in a notes
+ * file included. Nothing already in the worktree is overwritten, so a second pass copies nothing. What a
+ * person should hear comes back as lines for the run's log, never as an error: a path the main checkout
+ * does not have is skipped, and one that leads outside the repository — as written, or through a link —
+ * or that git does not ignore is refused.
+ */
+function includeFiles(repo: string, worktree: string): string[] {
+  const include = readInclude(repo);
+  if (!include) return [];
+  const notes = refusalLines(include.refused).map((line) => `.worktreeinclude: refused ${line}`);
+  const root = fs.realpathSync(repo);
+  const absent: string[] = [];
+  for (const rel of include.copy) {
+    const from = path.join(repo, rel);
+    let real: string;
+    try { real = fs.realpathSync(from); } catch { absent.push(rel); continue; }
+    if (!inside(root, real)) { notes.push(`.worktreeinclude: refused "${rel}" leads outside the repository`); continue; }
+    if (!ignored(repo, rel)) { notes.push(`.worktreeinclude: refused "${rel}" is not gitignored — the hand-off would commit it`); continue; }
+    const to = path.join(worktree, rel);
+    try {
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.cpSync(from, to, { recursive: true, force: false, errorOnExist: false, verbatimSymlinks: true });
+    } catch (err) {
+      notes.push(`.worktreeinclude: could not copy ${rel} — ${(err as Error).message}`);
+    }
+  }
+  if (absent.length) notes.unshift(`.worktreeinclude: skipped ${absent.join(', ')} — not in the main checkout`);
+  return notes;
 }
 
 const git = (repo: string, ...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
@@ -253,11 +387,11 @@ function makeWorkspace(repo: string, isolate: boolean): { workspace: string; bas
  * merge that conflicts is left conflicted on purpose: the step is told, and resolving it is the
  * job. Failing here instead would throw away work that a person would simply sort out.
  */
-function workspaceFor(
+async function workspaceFor(
   run: Run,
   steps: readonly Workflow[],
   step: Workflow,
-): { workspace: string; branch: string; conflicted: boolean } {
+): Promise<{ workspace: string; branch: string; conflicted: boolean; deps?: Provisioned; notes: string[] }> {
   const plan = workspacePlan(steps, step);
   const of = (name: string) => {
     const s = run.steps[name];
@@ -267,11 +401,11 @@ function workspaceFor(
 
   // Without isolation every step works in the repository itself, which is only safe because
   // `validate` refuses a workflow that could run two steps at once in that mode.
-  if (!run.isolate) return { workspace: run.repo, branch: run.branch, conflicted: false };
+  if (!run.isolate) return { workspace: run.repo, branch: run.branch, conflicted: false, notes: [] };
 
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
-    return { workspace: parent.workspace, branch: parent.branch, conflicted: false };
+    return { workspace: parent.workspace, branch: parent.branch, conflicted: false, notes: [] };
   }
 
   // A worktree of its own, so nothing it does can collide with a sibling's.
@@ -279,8 +413,9 @@ function workspaceFor(
   const workspace = path.join(HOME, 'worktrees', run.id, step.name);
   const from = plan.kind === 'merge' ? of(plan.from).branch : plan.from ? of(plan.from).branch : run.baseRef;
   fs.mkdirSync(path.dirname(workspace), { recursive: true });
-  git(run.repo, 'worktree', 'add', '-b', branch, workspace, from);
-  linkDependencies(run.repo, workspace);
+  // Taken up where it stands when a pass cut it and died before filing the step — in the minute `npm ci`
+  // can take, say. `worktree add -b` would refuse the branch that pass made, on every pass after.
+  if (!fs.existsSync(path.join(workspace, '.git'))) git(run.repo, 'worktree', 'add', '-b', branch, workspace, from);
 
   let conflicted = false;
   if (plan.kind === 'merge') {
@@ -295,7 +430,13 @@ function workspaceFor(
       }
     }
   }
-  return { workspace, branch, conflicted };
+
+  // After the merges, because the step works on the merged tree — its lockfile included.
+  const notes = includeFiles(run.repo, workspace);
+  const deps = await provisionDeps(run.repo, workspace);
+  if (deps.tree === 'own' && deps.installed) notes.push('node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed');
+  if (deps.tree === 'failed') notes.push(`node_modules: not provisioned — ${deps.error.split('\n').at(-1)}`);
+  return { workspace, branch, conflicted, deps, notes };
 }
 
 /**
@@ -327,8 +468,16 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
       `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
     ), { exitCode: 2 });
   }
-  const id = runId(opts.brief);
   const isolate = opts.isolate ?? true;
+  // Refused here, where a person is looking, rather than line by line in a daemon's log. Only a run that
+  // cuts worktrees reads the file.
+  const refused = isolate ? readInclude(opts.repo)?.refused ?? [] : [];
+  if (refused.length) {
+    throw Object.assign(new Error(
+      `${path.join(opts.repo, '.worktreeinclude')}: ${refusalLines(refused).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${refused.length === 1 ? 'that line' : 'those lines'}.`,
+    ), { exitCode: 2 });
+  }
+  const id = runId(opts.brief);
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
 
   const run: Run = {
@@ -366,8 +515,12 @@ function handOff(workspace: string, step: string): void {
   } catch { /* nothing to hand off, or a tree git will not commit */ }
 }
 
-/** One pass's work: the steps it filed, the steps whose checks it filed, and where the run stands. */
-export type Advanced = { run: Run; filed: string[]; checked: string[]; status: Assessment['status']; blocked: string[] };
+/**
+ * One pass's work: the steps it filed, the steps whose checks it filed, and where the run stands — and
+ * `notes`, what cutting a worktree had to say, each line starting with its step: a path `.worktreeinclude`
+ * lists that the main checkout does not have, a line it refused, an `npm ci` that ran or failed.
+ */
+export type Advanced = { run: Run; filed: string[]; checked: string[]; status: Assessment['status']; blocked: string[]; notes: string[] };
 
 /**
  * One pass over one run: tick the engine, then file whatever became ready.
@@ -460,9 +613,11 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   };
 
   const filed: string[] = [];
+  const notes: string[] = [];
   for (const name of ready) {
     const step = steps.find((s) => s.name === name)!;
-    const place = workspaceFor(run, steps, step);
+    const place = await workspaceFor(run, steps, step);
+    notes.push(...place.notes.map((note) => `${name}: ${note}`));
     // Made before the step is told of it, so the directory its brief names is there when it starts.
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
@@ -475,7 +630,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       id: `${run.id}-${name}`,
       // What the steps it reads declared, if it names any in `input:` — read off the same closeouts the
       // assessment that made it ready just read, so it is handed what it was filed on.
-      brief: composeBrief(step, run, steps, signedOff, files),
+      // And, when the run installed its `node_modules` or could not, why its start was slow or what to run.
+      brief: composeBrief(step, run, steps, signedOff, files, place.deps),
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,
@@ -495,7 +651,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   }
   if (filed.length || checked.length || adopted.length) writeRun(run);
 
-  return { run, filed, checked, status, blocked };
+  return { run, filed, checked, status, blocked, notes };
 }
 
 export type Cancelled = { run: Run; plan: CancelPlan };

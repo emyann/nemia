@@ -674,3 +674,142 @@ test("an absolute path outside the step's files directory is refused, and never 
   assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])), [path.join(files, 'link.txt')]);
   assert.deepEqual(artifactFiles(run, 'implement'), []);
 });
+
+// ─── a step's worktree, as shipped: its own node_modules, and .worktreeinclude ─
+
+/**
+ * A main checkout with npm workspaces: `packages/x`, a lockfile npm wrote, committed; then, as a person's
+ * checkout has them, gitignored things — a `node_modules` written by hand (`x` linked, `third` main's
+ * own, npm's `.package-lock.json`), so no registry is asked.
+ */
+const aNodeRepo = (include?: string): string => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'node-repo-'));
+  const put = (rel: string, text: string) => {
+    fs.mkdirSync(path.dirname(path.join(repo, rel)), { recursive: true });
+    fs.writeFileSync(path.join(repo, rel), text);
+  };
+  put('package.json', JSON.stringify({ name: 'fixture', private: true, workspaces: ['packages/*'] }));
+  put('packages/x/package.json', JSON.stringify({ name: 'x', version: '1.0.0' }));
+  put('packages/x/index.js', "module.exports = 'x';\n");
+  put('.gitignore', 'node_modules\n.env.local\nconfig/local/\nescape\n');
+  if (include !== undefined) put('.worktreeinclude', include);
+  execFileSync('npm', ['install', '--package-lock-only', '--offline', '--no-audit', '--no-fund'], { cwd: repo, stdio: 'ignore' });
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+  git('init', '-q');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  put('node_modules/third/index.js', "module.exports = 'third';\n");
+  // npm's record of what it installed, as npm would leave it: what the lockfile named. The run reads the disk instead.
+  fs.copyFileSync(path.join(repo, 'package-lock.json'), path.join(repo, 'node_modules', '.package-lock.json'));
+  fs.symlinkSync('../packages/x', path.join(repo, 'node_modules', 'x'));
+  return repo;
+};
+
+/** `wf start` as a person types it: worktrees, the default. */
+const isolated = (repo: string) => start({ brief: 'add a flag', repo, workflowDir: folder() });
+
+test('a step\'s worktree gets what .worktreeinclude lists from the main checkout — a file, a directory — and a node_modules of its own, never a copy', async () => {
+  // `/.env.local` is written the way Claude Code's gitignore syntax anchors a path at the root.
+  const repo = aNodeRepo(['# what a worktree needs', '/.env.local', 'config/local/', 'node_modules', 'missing.txt', 'escape', 'notes.txt', ''].join('\n'));
+  fs.writeFileSync(path.join(repo, '.env.local'), 'TOKEN=main\n');
+  // Untracked, and not ignored: copied, the hand-off's `git add -A` would commit it onto the run's branch.
+  fs.writeFileSync(path.join(repo, 'notes.txt'), 'TOKEN=main\n');
+  fs.mkdirSync(path.join(repo, 'config/local/deeper'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'config/local/deeper/a.json'), '{"from":"main"}\n');
+  const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
+  fs.writeFileSync(path.join(outside, 'secret'), 'not the step\'s\n');
+  fs.symlinkSync(outside, path.join(repo, 'escape'));
+
+  const run = isolated(repo);
+  // Edited after `wf start`, which would have refused it: the cut refuses it too.
+  fs.appendFileSync(path.join(repo, '.worktreeinclude'), `../${path.basename(outside)}/secret\n`);
+  const { e, tasks } = board();
+  const pass = await advance(e, readRun(run.id));
+  const wt = readRun(run.id).steps.implement!.workspace!;
+  assert.equal(wt, path.join(ROOT, 'worktrees', run.id, 'implement'), 'a worktree, as shipped');
+
+  assert.equal(fs.readFileSync(path.join(wt, '.env.local'), 'utf8'), 'TOKEN=main\n', 'a listed file arrives');
+  assert.equal(fs.readFileSync(path.join(wt, 'config/local/deeper/a.json'), 'utf8'), '{"from":"main"}\n', 'a listed directory arrives, whole');
+  assert.ok(!fs.existsSync(path.join(wt, 'escape')), 'a listed path that leads out of the repository through a link is not copied');
+  assert.ok(!fs.existsSync(path.join(wt, '..', path.basename(outside))), 'nor one that climbs out');
+  assert.ok(!fs.existsSync(path.join(wt, 'notes.txt')), 'nor one git does not ignore');
+  assert.equal(gitOut(wt, 'status', '--porcelain'), '', 'so the cut leaves nothing for the hand-off to commit');
+
+  // `node_modules` was listed, and is not a copy: a directory of the worktree's own, linking main's
+  // packages, without the file npm keeps for main's tree.
+  assert.ok(fs.lstatSync(path.join(wt, 'node_modules')).isDirectory());
+  assert.ok(fs.lstatSync(path.join(wt, 'node_modules/third')).isSymbolicLink());
+  assert.equal(fs.realpathSync(path.join(wt, 'node_modules/x')), fs.realpathSync(path.join(wt, 'packages/x')), 'its workspace package is its own');
+  assert.ok(!fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')));
+
+  assert.deepEqual(pass.notes, [
+    'implement: .worktreeinclude: skipped missing.txt — not in the main checkout',
+    `implement: .worktreeinclude: refused "../${path.basename(outside)}/secret" is outside the repository`,
+    'implement: .worktreeinclude: refused "escape" leads outside the repository',
+    'implement: .worktreeinclude: refused "notes.txt" is not gitignored — the hand-off would commit it',
+  ]);
+  assert.doesNotMatch(tasks.get(`${run.id}-implement`)!.spec.brief, /npm ci/, 'links cost nothing, and the brief says nothing of them');
+});
+
+test('wf start refuses a .worktreeinclude line outside the repository, by name, before a run is written', () => {
+  const repo = aNodeRepo('/.env.local\n../x\nC:\\x\n');
+  const runs = fs.readdirSync(path.join(ROOT, 'runs')).length;
+  assert.throws(() => isolated(repo), (err: Error & { exitCode?: number }) => {
+    assert.match(err.message, /"\.\.\/x" is outside the repository/);
+    assert.match(err.message, /"C:\\x" is absolute/);
+    assert.match(err.message, /fix or remove those lines/);
+    assert.doesNotMatch(err.message, /\.env\.local/, 'a leading / is the root of the repository, and nothing to refuse');
+    assert.equal(err.exitCode, 2);
+    return true;
+  });
+  assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).length, runs);
+  // --no-worktree cuts nothing and copies nothing, so it has nothing to refuse.
+  assert.ok(start({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false }));
+  // A file written for Claude Code, anchored lines and all, starts a run.
+  assert.ok(isolated(aNodeRepo('# for claude --worktree\n/.env.local\n/config/local/\n')));
+});
+
+test('a worktree whose lockfile asks for what the main checkout has not installed gets its own tree from npm ci before the step is filed, and the step is told why', async () => {
+  const repo = aNodeRepo();
+  // A package lands in main's lockfile and is committed, and nobody has run `npm install` in main since:
+  // the lockfile is ahead of the tree links would point at, and the worktree's lockfile is main's, byte for byte.
+  fs.mkdirSync(path.join(repo, 'packages/y'), { recursive: true });
+  fs.writeFileSync(path.join(repo, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
+  fs.writeFileSync(path.join(repo, 'packages/y/index.js'), "module.exports = 'y';\n");
+  execFileSync('npm', ['install', '--package-lock-only', '--offline', '--no-audit', '--no-fund'], { cwd: repo, stdio: 'ignore' });
+  for (const args of [['add', '-A'], ['commit', '-q', '-m', 'add y']]) {
+    execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+  }
+  assert.ok(!fs.existsSync(path.join(repo, 'node_modules/y')), 'main has not installed y');
+  assert.match(fs.readFileSync(path.join(repo, 'node_modules/.package-lock.json'), 'utf8'), /node_modules\/y/,
+    'though npm\'s record of main\'s tree says it has, after --package-lock-only');
+
+  const run = isolated(repo);
+  const { e, tasks } = board();
+  const pass = await advance(e, readRun(run.id));
+  const wt = readRun(run.id).steps.implement!.workspace!;
+  assert.equal(fs.readFileSync(path.join(wt, 'package-lock.json'), 'utf8'), fs.readFileSync(path.join(repo, 'package-lock.json'), 'utf8'), 'the lockfiles agree');
+  assert.deepEqual(pass.filed, ['implement']);
+  assert.ok(fs.existsSync(path.join(wt, 'node_modules/.package-lock.json')), 'npm installed a tree here');
+  assert.equal(fs.realpathSync(path.join(wt, 'node_modules/y')), fs.realpathSync(path.join(wt, 'packages/y')), 'with the package the lockfile names');
+  assert.ok(!fs.existsSync(path.join(wt, 'node_modules/third')), 'and nothing of main\'s in it');
+  assert.deepEqual(pass.notes, ['implement: node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed']);
+
+  const brief = tasks.get(`${run.id}-implement`)!.spec.brief;
+  const at = brief.indexOf('## Where to look');
+  assert.ok(at >= 0 && brief.indexOf('`npm ci`', at) > at, 'told under Where to look');
+  assert.ok(brief.indexOf('`npm ci`', at) < brief.indexOf('## When you are finished'), 'before the closeout, which stays last');
+});
+
+test('a pass that dies after cutting a worktree does not wedge every pass after it', async () => {
+  const run = isolated(aNodeRepo());
+  const { e, filings } = board();
+  const dying = { ...(e as object), file: async () => { throw new Error('the tick died here'); } } as unknown as Engine;
+  await assert.rejects(advance(dying, readRun(run.id)), /the tick died here/);
+  const wt = path.join(ROOT, 'worktrees', run.id, 'implement');
+  assert.ok(fs.existsSync(path.join(wt, '.git')), 'the worktree and its branch were made');
+
+  const pass = await advance(e, readRun(run.id));
+  assert.deepEqual([pass.filed, filings], [['implement'], [`${run.id}-implement`]]);
+  assert.equal(readRun(run.id).steps.implement?.workspace, wt, 'in the worktree that pass cut');
+});

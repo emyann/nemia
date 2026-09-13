@@ -78,6 +78,7 @@ export async function main(argv: string[]): Promise<void> {
         const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
         const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
         console.log(`${r.run.id}  ${r.status}${filed}${checked}${blocked}`);
+        for (const note of r.notes) console.log(`   ${note}`);
       }
       return;
     }
@@ -87,6 +88,7 @@ export async function main(argv: string[]): Promise<void> {
       console.log(`up — every ${every}ms, ^C to stop`);
       for (;;) {
         for (const r of await tick(e)) {
+          for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
           if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
           if (r.checked.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  checking ${r.checked.join(', ')}`);
         }

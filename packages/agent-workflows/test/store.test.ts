@@ -1195,3 +1195,21 @@ test('the shipped workflow goes round as its folder says: review filed read-only
   assert.deepEqual((implement.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
   assert.match(implement.brief, /^## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*[\s\S]*## Before you sign off\n[\s\S]*`npm test && npm run typecheck`/);
 });
+
+test('a round ask file the run cannot read is not honoured, and not touched: the pass says so, and files nothing', async () => {
+  const run = started(looped('rounds: 1\n'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, [], 'out of rounds, on the first');
+  fs.mkdirSync(asksDir(run.id), { recursive: true });
+  fs.writeFileSync(path.join(asksDir(run.id), 'round-review-2'), 'once more, please');
+  fs.writeFileSync(path.join(asksDir(run.id), 'round-review-3'), '[]');
+  const filed = b.filings.length;
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual(pass.looped, []);
+  assert.ok(pass.notes.some((n) => /round-review-2: unreadable .* so it is not honoured — remove it, and ask with wf round/.test(n)), pass.notes.join('\n'));
+  assert.ok(pass.notes.some((n) => /round-review-3: it is not an ask wf round wrote, so it is not honoured/.test(n)), pass.notes.join('\n'));
+  assert.deepEqual(roundAsksOf(run.id), ['round-review-2', 'round-review-3']);
+  assert.equal(b.filings.length, filed);
+});

@@ -1284,3 +1284,9 @@ test('`wf round` is refused, saying what to do instead — a round still running
   assert.match(refused(ask(inRound(3), saidIn(3, true), ALL_SUCCEEDED, 'deploy')), /^r-1 has no step "deploy"/);
   assert.match(refused(roundAsk(STEPS, run({ implement: 't1', review: 't2' }), undefined, ALL_SUCCEEDED)), /^no step of r-1 has `loop:`, so there is no round to run/);
 });
+
+test('`wf round` with no step takes the loop only when there is one — with several, it names them for the person to choose', () => {
+  const two: Workflow[] = [...LOOP.slice(0, 2), step('docs', ['review']), { ...step('proof', ['docs']), output: { file: 'proof.json', schema: LOOPING }, loop: 'docs', rounds: 2 }];
+  assert.deepEqual(roundAsk(two, run({ implement: 'i1', review: 'r1', docs: null, proof: null }), undefined, ALL_SUCCEEDED),
+    { refusal: 'r-1 has 2 loops, closing at review, proof: name the one to go round again — wf round r-1 <step>.' });
+});

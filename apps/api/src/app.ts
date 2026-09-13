@@ -97,8 +97,8 @@ export type StepLog = {
 };
 
 /**
- * One engine for the process, and the api only reads through it — `view` and `logs`, never `tick`
- * or `file`.
+ * One engine for the process, and the api only reads through it — `list`, `view` and `logs`, never
+ * `tick` or `file`.
  * Filing and advancing work is `wf`'s job, so a board left open in a tab cannot start anything.
  */
 const e = engine();
@@ -107,8 +107,9 @@ type TaskView = Awaited<ReturnType<typeof e.view>>;
 type Views = ReadonlyMap<string, TaskView>;
 
 /**
- * The engine's view of every task a run has filed. Each `view` observes every harness — a
- * `claude agents` call, a scan of detached runs — so a request reads each task once.
+ * The engine's view of every task a run has filed, for one run's page. Each `view` observes every
+ * harness — a `claude agents` call, a scan of detached runs — so this is an observation per filed
+ * step, and a request reads each task once. The list of every run reads them with `everyView`.
  */
 async function viewsOf(run: Run): Promise<Views> {
   const views = new Map<string, TaskView>();
@@ -116,6 +117,17 @@ async function viewsOf(run: Run): Promise<Views> {
     if (taskId) views.set(taskId, await e.view(taskId));
   }
   return views;
+}
+
+/**
+ * The engine's view of every task in its store, over one observation, by task id.
+ *
+ * `list` observes the harnesses once and folds every task's journal against that; `view` observes
+ * afresh on each call. A task the engine has no record of is simply absent, which reads exactly as
+ * `view`'s empty state does: no brief, so `unknown`.
+ */
+async function everyView(): Promise<Views> {
+  return new Map((await e.list()).map((view) => [view.id, view]));
 }
 
 /**
@@ -211,9 +223,8 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
   return step && workflows ? composeBrief(step, run, workflows) : null;
 }
 
-async function summarize(run: Run): Promise<RunSummary> {
+function summarize(run: Run, views: Views): RunSummary {
   const names = stepNames(run, workflowsOf(run).steps);
-  const views = await viewsOf(run);
   return {
     id: run.id,
     repo: run.repo,
@@ -310,10 +321,17 @@ const noSuchRun = (id: string) =>
 export const app = new Hono()
   .get('/api/health', (c) => c.json({ ok: true }))
   .get('/api/runs', async (c) => {
-    // One run at a time, as `wf ls` does: every task read starts a harness observation.
-    const runs: RunSummary[] = [];
-    for (const run of listRuns()) runs.push(await summarize(run));
-    return c.json(runs);
+    // What one request costs, however many runs there are: one harness observation (one
+    // `claude agents --json`, one scan of the detached runs' files), a read of every task journal in
+    // the engine's store, and each run's record and workflow folder. It was a `view` — so an
+    // observation — per filed step of every run: dozens of `claude agents` calls a poll.
+    //
+    // The records before the engine: `wf` files a step's task before it writes the id on the run, so
+    // every id read here is in the listing that follows. The other way round, a task filed between
+    // the two reads would show as `unknown` until the next poll.
+    const runs = listRuns();
+    const views = await everyView();
+    return c.json(runs.map((run) => summarize(run, views)));
   })
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');

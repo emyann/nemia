@@ -14,8 +14,12 @@
         "required": ["file", "line", "what"],
         "additionalProperties": false
       }
+    },
+    "again": {
+      "type": "boolean",
+      "description": "true when a finding is worth another round: implement is handed your findings, and the change comes back to a new review. false when the change is done as far as this review goes — a person still reads your findings."
     }
   },
-  "required": ["findings"],
+  "required": ["findings", "again"],
   "additionalProperties": false
 }

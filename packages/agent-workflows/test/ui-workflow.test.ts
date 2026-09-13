@@ -50,10 +50,15 @@ test('look reads implement on Claude, which reads images, and hands on findings 
   assert.deepEqual(findings.items.properties.theme.enum, ['light', 'dark', 'both']);
 });
 
-test('review is the review workflows/ ships — codex, read-only, the same prose and the same findings', () => {
-  const shipped = loadWorkflows(WORKFLOWS).find((s) => s.name === 'review');
-  assert.deepEqual(steps.review, shipped);
+test('review is the review workflows/ ships — codex, read-only, the same prose and the same findings — less its loop', () => {
+  // workflows/ loops its review back to implement. ui/ does not: its respond is a fan-in of two reviewers, and a
+  // loop whose steps fork is refused at load. Everything else is the same review, and held to it here.
+  const shipped = loadWorkflows(WORKFLOWS).find((s) => s.name === 'review')!;
+  const { again: _, ...findings } = shipped.output!.schema.properties;
+  const schema = { ...shipped.output!.schema, properties: findings, required: shipped.output!.schema.required.filter((f) => f !== 'again') };
+  assert.deepEqual(steps.review, { ...shipped, loop: undefined, rounds: undefined, output: { ...shipped.output!, schema } });
   assert.equal(steps.review?.permissionMode, 'read-only');
+  assert.deepEqual([shipped.loop, steps.review?.loop], ['implement', undefined], 'the one difference');
 });
 
 test('respond is the fan-in: after review and look, reading both, continuing implement, in a workspace that merges all three', () => {

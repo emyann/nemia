@@ -110,12 +110,50 @@ test('resuming a step that does not exist is refused', () => {
   assert.throws(() => validate([{ name: 'a', after: [], body: 'x', resume: 'ghost' }]), /resumes "ghost"/);
 });
 
-test('the three shipped steps are a valid workflow', () => {
+test('the shipped workflow is implement ⇄ review: two steps, and the review loops back to implement, at most three rounds', () => {
   const steps = loadWorkflows(path.join(import.meta.dirname, '..', 'workflows'));
-  assert.deepEqual(steps.map((s) => s.name).sort(), ['implement', 'respond', 'review']);
-  const respond = steps.find((s) => s.name === 'respond')!;
-  assert.equal(respond.resume, 'implement', 'it is the author coming back, not a third party');
-  assert.deepEqual(respond.after.sort(), ['implement', 'review'], 'and it waits for the review to exist');
+  assert.deepEqual(steps.map((s) => s.name), ['implement', 'review'], 'respond is gone: implement answers the review in its own session, through the loop');
+  const review = steps.find((s) => s.name === 'review')!;
+  assert.deepEqual([review.loop, review.rounds], ['implement', 3]);
+  assert.equal((review.output?.schema.properties.again as { type: string }).type, 'boolean');
+  assert.deepEqual(review.output?.schema.required, ['findings', 'again']);
+  assert.deepEqual(loopSpan(steps, review), ['implement', 'review']);
+});
+
+test('REFUSED at shipped defaults: the shipped review with its loop pointed at a step it does not wait on, with `again` gone from its schema, or beside another step', () => {
+  const shipped = path.join(import.meta.dirname, '..', 'workflows');
+  const copy = () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-shipped-'));
+    for (const f of fs.readdirSync(shipped).filter((f) => /\.(md|json)$/.test(f))) fs.copyFileSync(path.join(shipped, f), path.join(dir, f));
+    return dir;
+  };
+  const refused = (dir: string): string => {
+    try { loadWorkflows(dir); } catch (e) {
+      assert.ok(e instanceof WorkflowError, String(e));
+      assert.equal(e.exitCode, 2);
+      return e.message;
+    }
+    return assert.fail('loaded, and should have been refused');
+  };
+  assert.deepEqual(loadWorkflows(copy()).map((s) => s.name), ['implement', 'review'], 'the copy, untouched, loads');
+  const docs = '---\nafter: implement\n---\ndocument it\n';
+
+  const elsewhere = copy();
+  fs.writeFileSync(path.join(elsewhere, 'docs.md'), docs);
+  fs.writeFileSync(path.join(elsewhere, 'review.md'), fs.readFileSync(path.join(elsewhere, 'review.md'), 'utf8').replace(/^loop: implement$/m, 'loop: docs'));
+  assert.match(fs.readFileSync(path.join(elsewhere, 'review.md'), 'utf8'), /^loop: docs$/m, 'the change is really in the file');
+  assert.match(refused(elsewhere), /^review: `loop: docs`, but review does not wait on docs, directly or through the steps between/);
+
+  const lacks = copy();
+  const schema = JSON.parse(fs.readFileSync(path.join(lacks, 'review.schema.json'), 'utf8'));
+  delete schema.properties.again;
+  schema.required = schema.required.filter((f: string) => f !== 'again');
+  fs.writeFileSync(path.join(lacks, 'review.schema.json'), JSON.stringify(schema));
+  assert.match(refused(lacks), /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and `output: review\.schema\.json` does not declare `again`/);
+
+  const beside = copy();
+  fs.writeFileSync(path.join(beside, 'docs.md'), docs);
+  assert.match(refused(beside), /^review: `loop: implement` files review again after implement each round, .*docs waits on implement too, so review forks a worktree of its own/);
 });
 
 test('a chain does not fan out; a diamond does', () => {

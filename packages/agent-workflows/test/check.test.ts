@@ -177,12 +177,12 @@ test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfi
 
 // ─── what this repository ships ─────────────────────────────────────────────
 
-test("this repository's own workflow checks the suite and the types after every step that edits; its reviewer reads on codex, read-only, and hands its findings on as its closeout", () => {
+test("this repository's own workflow checks the suite and the types after every step that edits — implement, every round — and its reviewer reads on codex, read-only, and hands its findings back as its closeout", () => {
   // The check a person runs by hand at every trial merge, run by the run instead. A step that breaks
   // either half now blocks what follows it rather than handing it on.
   const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
+  assert.deepEqual(Object.keys(steps), ['implement', 'review']);
   assert.equal(steps.implement?.check, 'npm test && npm run typecheck');
-  assert.equal(steps.respond?.check, 'npm test && npm run typecheck');
   assert.equal(steps.review?.harness, 'codex');
   // Read-only again. It lost the line at C's merge because a read-only reviewer could not write the
   // REVIEW.md that respond read; the review now travels as its closeout (plan §4 J), so it writes nothing.
@@ -191,16 +191,17 @@ test("this repository's own workflow checks the suite and the types after every 
   const findings = steps.review?.output?.schema.properties.findings as { type: string; items: { required: string[] } } | undefined;
   assert.equal(findings?.type, 'array');
   assert.deepEqual(findings?.items.required, ['file', 'line', 'what']);
-  assert.deepEqual(steps.respond?.input, ['review'], 'respond is handed the findings; nothing else reads them');
-  assert.deepEqual(Object.values(steps).filter((s) => s.input).map((s) => s.name), ['respond']);
+  // respond is gone (plan §4 R): the findings go back to implement's own session through the loop, and nothing reads them by `input:`.
+  assert.deepEqual([steps.review?.loop, steps.review?.rounds], ['implement', 3]);
+  assert.deepEqual(Object.values(steps).filter((s) => s.input).map((s) => s.name), []);
 });
 
-test('the shipped review is read-only on an engine that honours it, and that is fine: REVIEW.md is not how the review reaches respond', () => {
+test('the shipped review is read-only on an engine that honours it, and that is fine: REVIEW.md is not how the review reaches implement', () => {
   // review.md sets `permissionMode: read-only`, and the engine runs a read-only codex step `-s read-only`,
   // so the reviewer cannot write a file. That pair was refused here while respond.md answered a REVIEW.md
   // the reviewer wrote. It is fine now because the file is not the transport: the findings are review's
-  // closeout, declared with `output:`, and respond is handed them with `input: review`. This still
-  // refuses the day either file goes back to handing the review on as REVIEW.md.
+  // closeout, declared with `output:`, and its `loop: implement` hands them back to implement as data. This
+  // still refuses the day either file goes back to handing the review on as REVIEW.md.
   //
   // It asks the engine in this tree, not the one `agent-engine` resolves to: in a run's worktree,
   // node_modules is a link into the main checkout, whose engine can be anything — a trial merge half
@@ -210,11 +211,11 @@ test('the shipped review is read-only on an engine that honours it, and that is 
   const sandbox = args[args.indexOf('-s') + 1];
   const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.permissionMode === 'read-only';
   assert.ok(reviewCannotWrite, 'the shipped reviewer runs read-only on the engine in this tree');
-  const handedOnAsAFile = /REVIEW\.md/.test(steps.review?.body ?? '') || /REVIEW\.md/.test(steps.respond?.body ?? '');
+  const handedOnAsAFile = /REVIEW\.md/.test(steps.review?.body ?? '') || /REVIEW\.md/.test(steps.implement?.body ?? '');
   assert.ok(!(reviewCannotWrite && handedOnAsAFile),
-    'workflows/review.md is read-only, and review.md or respond.md hands the review on as a REVIEW.md the reviewer cannot write. '
-    + 'The review travels as the closeout: `output:` on review.md, `input: review` on respond.md.');
-  assert.ok(steps.review?.output && steps.respond?.input?.includes('review'), 'it reaches respond as a declared closeout');
+    'workflows/review.md is read-only, and review.md or implement.md hands the review on as a REVIEW.md the reviewer cannot write. '
+    + 'The review travels as the closeout: `output:` and `loop: implement` on review.md.');
+  assert.ok(steps.review?.output && steps.review?.loop === 'implement', 'it reaches implement as a declared closeout, through the loop');
 });
 
 test('the command a check runs does not inherit WF_STDERR, so a check inside a check keeps its own stderr', () => {

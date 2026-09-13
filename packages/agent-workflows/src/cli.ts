@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifacts, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, stepsOf, tick, verdictWord } from './runner.ts';
+import { artifacts, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, outputLines, readArtifact, readRun, resultBranches, start, stepsOf, tick, verdictWord } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -21,16 +21,19 @@ A workflow is a folder of markdown files. One file is one step:
     ---
     harness: claude       # claude (default) | codex | claude-detached
     after: review         # what must finish first: verified, or unverified if it has no check
+    input: review         # handed what review's closeout declares with output:, as data
     check: npm test       # the run executes it in the step's workspace; exit 0 files what follows
     ---
-    Answer the review in REVIEW.md, one finding at a time.
+    Answer each finding the review hands you, in RESPONSE.md.
 
-No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, and the rest
-(model, permissionMode, deadlineSeconds, maxAttempts) say who does the work and for how long.
-Everything else the agent is told is prose.
+No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, \`output\` declares
+what a closeout says for a later step (a JSON Schema beside the step) and \`input\` reads it, and the
+rest (model, permissionMode, deadlineSeconds, maxAttempts, retries) say who does the work and for how
+long. Everything else the agent is told is prose.
 
   wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
-  · unverified (no check: declared) · unsigned (ended without its closeout) · BLOCKED.
+  · unverified (no check: declared) · unsigned (ended without its closeout, or without a field its
+  output: declares) · BLOCKED.
 
   WF_ROOT            where runs and the engine's board live
   WF_MAX_CONCURRENT  sessions per harness at once (default 2)
@@ -144,7 +147,7 @@ export async function main(argv: string[]): Promise<void> {
       console.log(`${head}\n`);
       // The run's own verdicts first: they decide how much of the rest is worth reading.
       if (decision.failedCheck.length) console.log(`  FAILED CHECK: ${decision.failedCheck.join(', ')}  — the run executed its check and it did not exit 0; nothing after it ran`);
-      if (decision.unsigned.length) console.log(`  UNSIGNED: ${decision.unsigned.join(', ')}  — ended without the closeout it was asked for; nothing after it ran`);
+      if (decision.unsigned.length) console.log(`  UNSIGNED: ${decision.unsigned.join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran`);
       if (decision.unverified.length) console.log(`  UNVERIFIED: ${decision.unverified.join(', ')}  — no check: declared; only its own word says it worked`);
       if (decision.failed.length) console.log(`  FAILED: ${decision.failed.join(', ')}  (wf logs ${run.id} <step>)`);
       // A step that stopped itself and said why is a different thing from one that broke, and the
@@ -154,7 +157,10 @@ export async function main(argv: string[]): Promise<void> {
 
       // Each step's own closeout: the summary is written FOR this moment. The reviewer never saw
       // it — that is the point of the field — and you are the audience it was addressed to. Above it,
-      // what the run's check of the step said: the machine's word before the agent's.
+      // what the run's check of the step said: the machine's word before the agent's. Below it, what the
+      // step declared for the steps after it — read off the engine's record, not a branch, so dropping
+      // the branch does not drop the review.
+      const steps = stepsOf(run);
       for (const name of Object.keys(run.steps)) {
         const c = closeouts[name];
         const check = checks[name];
@@ -172,6 +178,8 @@ export async function main(argv: string[]): Promise<void> {
         if (!c) continue;
         if ('error' in c) { console.log(`    closeout unreadable — ${c.error}`); continue; }
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
+        const step = steps.find((s) => s.name === name);
+        for (const line of step ? outputLines(step, c) : []) console.log(`    ${line}`);
         if (c.needs) console.log(`    needs: ${c.needs}`);
         const missing = missingArtifacts(run, name, c);
         if (missing.length) console.log(`    !! declared but not on the branch: ${missing.join(', ')}  — it did not travel`);

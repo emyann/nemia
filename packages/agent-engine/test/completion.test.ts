@@ -182,14 +182,27 @@ test('a blocked, idle session reports what it said too — and stays blocked, fo
   } finally { restore(); }
 });
 
-test('a finished session is read once, because its statement cannot change', async () => {
+test('a finished session is read once while its transcript is unchanged — again once it is written, and again for another attempt', async () => {
   let asked = 0;
-  const restore = withFakeClaude(row('done', 'idle'));
+  let written = 0;
+  const ops = claudeOps({ transcriptTime: async () => written, closeoutFrom: async () => { asked++; return { payload: 1, at: 1 }; } });
+  let restore = withFakeClaude(row('done', 'idle'));
   try {
-    const ops = claudeOps({ transcriptTime: async () => 0, closeoutFrom: async () => { asked++; return { payload: 1, at: 1 }; } });
     await Effect.runPromise(ops.observe);
     await Effect.runPromise(ops.observe);
-    assert.equal(asked, 1);
+    assert.equal(asked, 1, 'its transcript is older than the read');
+    written = Date.now();
+    await Effect.runPromise(ops.observe);
+    assert.equal(asked, 2, 'written since the read: read again');
+  } finally { restore(); }
+
+  // `--resume` keeps the id: the same session under a new attempt's name is not the attempt that was read,
+  // however old its transcript.
+  written = 0;
+  restore = withFakeClaude(JSON.stringify([{ name: 'ae/t-2/1', sessionId: 's-1', state: 'done', status: 'idle', kind: 'background' }]));
+  try {
+    await Effect.runPromise(ops.observe);
+    assert.equal(asked, 3);
   } finally { restore(); }
 });
 

@@ -492,6 +492,14 @@ guard that decision, both learned from real runs:
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
 
+Claude Code's runner reads the statement from the transcript on every idle pass while a session
+works. What it read from a finished one it keeps for that attempt only — the row's name, its session,
+and the start `claude agents` gave it — and only while the transcript has not been written since.
+Kept by session id, for good, a read went wrong twice on one step. A `view` saw the session listed
+final thirty seconds before its `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
+which `--resume` runs under the same id, was handed that nothing and its first try's usage, to the
+byte. A resume changes both facts, so neither may live in a daemon's memory (`test/resume.test.ts`).
+
 It replaced a file the workload wrote into its own directory (`doneFile`), and that file is why the
 design looks like this. A file in the workspace travels down a git branch: the next step was cut a
 worktree that already said it was finished, two steps settled `succeeded` in six seconds each having
@@ -530,7 +538,8 @@ Two measured traps shape the transcript count. A response is written as one line
 each repeating its message id and usage, so responses are counted once, by id. And a resumed
 transcript holds its parent's conversation with the parent's timestamps, so only what came after
 the session's `startedAt` in `claude agents --json` is counted; a row with no start reports no
-usage rather than a wrong one. `ae show` prints one line per attempt — when it ran, then what it
+usage rather than a wrong one. A count read from a finished session is kept as its statement is: for
+that start, while the transcript is unchanged. `ae show` prints one line per attempt — when it ran, then what it
 consumed, naming what was not measured — and an attempt still running as `running since <start>`:
 
 ```
@@ -661,6 +670,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
 | `test/engine.test.ts` | the crash cases, the ceiling, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done", its argv and its usage, with a fake `claude` on `PATH` |
+| `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |

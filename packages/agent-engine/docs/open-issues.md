@@ -192,6 +192,9 @@ has no Codex servers configured.
 - **Discarding a statement inherited on resume** (`closedOut` in `agent-engine/src/engine.ts`). In the
   one live resumed step, the session was busy for as long as only its parent's `StructuredOutput` call
   existed, so the busy rule alone explains why it did not settle early.
+- **A resumed attempt's own closeout and usage** (engine `00e301b`). A fake `claude` that keeps a
+  registry, and a transcript file, at shipped defaults. No live session has been resumed under the fix,
+  and the registry listing a session final between two turns was read off the pinned usage, not seen.
 - **Codex trust** (`d8cae64`). Only one configuration was shown to let a sandboxed step commit from a
   worktree: repository *and* worktree trusted, with the rule committed in the repository. Whether one
   trust entry is enough was not established.
@@ -255,25 +258,42 @@ has no Codex servers configured.
 | every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `7200295` |
 | a released session that had ended by quiet was removed without a `claude stop` — and a worktree task's was never touched, left `working` for good — because `release` read the runner's translated `done` | `release` stops on the state `claude agents` itself listed (found in review) | engine `c2ebd62` |
 | a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `9c4221e` |
+| a nudged retry that `--resume`d its session was recorded with no closeout and its first try's usage, to the byte; and a statement given after a `view` had seen the session listed final was never read, until the daemon restarted | the Claude runner keeps a read of a finished session for one attempt — the row's name, its session, the registry's start — and only while the transcript has not been written since | engine `00e301b` |
 
-## A closeout given ten seconds before the session ended was not read (2026-09-13, half-verified)
+## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 
-Task `let-a-step-say-which-tools-i-v27t-implement`, session `b948c622…`: the transcript holds one
-`StructuredOutput` tool_use at 22:54:01.237Z (`outcome`, `summary`, `artifacts`, `needs`; the tool
-answered "provided successfully"); the engine observed the session `done` at 22:54:11.057Z and journaled
-`ended` with `usage` read from that transcript and no `closeout`, so the step read `unsigned`.
-`lastStructuredOutput` on the file finds the statement today, and there is one transcript for the id.
-The only cache on that path is `finalStatements` in `runner.ts` (`statementOf`): a session once seen in
-`done`/`failed`/`stopped` has its statement pinned, `undefined` included. The session had earlier been
-`blocked` on a login-refresh race ("another Claude Code process is refreshing it, or exited
-mid-refresh") and was bridged by Remote Control when a cross-session message reached it — if the
-registry showed it final for one observation in that window, the pin explains it. Not reproduced.
-Fix if so: pin only a statement that was found, or re-read once when the pinned value is `undefined`
-and the transcript's mtime is newer than the pin. Remedy in the run: `wf retry <run> <step>` (nudge).
+Task `let-a-step-say-which-tools-i-v27t-implement`, session `b948c622…`: one `StructuredOutput` at
+22:54:01.237Z; the engine journaled `ended` at 22:54:11.057Z, `done`, with usage and no closeout, so the
+step read `unsigned`. The nudged retry (`…-try2`) `--resume`d the same id, gave a second
+`StructuredOutput` at 22:58:32Z, and its `ended` carried no closeout and usage identical to the first's
+(turns 29, tool calls 93, the same tokens). Only a daemon restart and a third try made it read.
 
-**Confirmed for the resume path, one hour later.** The nudge (`wf retry`, `--resume`) kept the session id;
-its new StructuredOutput at 22:58:32Z (inside try 2's attempt) was not read either, and try 2's `ended`
-carried usage byte-identical to attempt 1's — `finalStatements` and `finalUsage` are keyed by session id,
-set on the first final sighting and never cleared, so every resumed attempt reads the first one's pins.
-Restarting the daemon (the pins live in its memory) and nudging again is the remedy until the fix lands.
-Attempt 1's own `undefined` pin is still unexplained. Filed as a run (E6) on 2026-09-13.
+**What the code allowed.** `finalStatements` and `finalUsage` in `runner.ts` were keyed by session id,
+set on the first sighting the registry listed `done`, `failed` or `stopped` (and not busy), and never
+cleared. A resume keeps the id, so try 2 was handed try 1's pins: a statement of `undefined`, and try
+1's usage.
+
+**Why try 1's pin was `undefined`.** The pinned usage dates the read. Counted from the attempt's start,
+the transcript reaches 29 responses and 93 tool calls at 22:53:25.947Z, and the 30th response lands at
+22:53:50.451Z. The pin was taken in that window, at least ten seconds before the statement. At
+22:53:20Z a background task's notification was queued; at 22:53:25.98Z a turn's last tool result was
+written and the queue drained into a silent turn. A registry that listed the session final between
+those two turns explains the pin. No `ended` was written then, so no tick saw that state. But `wf up`
+calls `engine.view` several times a pass (`agent-workflows/src/runner.ts`), and each `view` observes,
+and so pinned, without stepping. The login-refresh block and the Remote Control bridge ended at
+22:47:40Z, when the cross-session message arrived, and nothing after that needs them. What
+`claude agents` listed at 22:53:2x was not recorded: this is the reading the evidence allows, not a
+measurement.
+
+**Fix** (engine `00e301b`). A read of a finished session is kept for one attempt — the row's name, its
+session, and the registry's `startedAt` — and only while the transcript's mtime is older than the read
+by more than a second, so it is taken again once the transcript grows. That holds for a statement that
+was found as well as one that was not. Reads for rows no longer listed are dropped. At shipped defaults,
+with a fake `claude` and a transcript file, `test/resume.test.ts` refuses both failures; run against the
+runner before the fix, its tests fail.
+
+**Checked and left.** The `transcripts` path cache is keyed by session id too. Of the 24 journalled
+resumes, 21 ran in a different working directory from the session they continued. The one of those
+that kept its id (`9ea123ff…`, implement → respond) went on writing the original project's transcript,
+and no id has two transcripts among the 432 project directories. So a resume does not move the file
+the cache names.

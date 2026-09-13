@@ -107,6 +107,16 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
  */
 export const QUIESCENT_AFTER_MS = 90_000;
 
+/**
+ * How far a transcript's mtime may trail `Date.now()` for the same instant. The kernel may stamp a
+ * file from a coarser clock, so a line written just after a read can carry a time just before it. A
+ * read of a finished session is kept only while its transcript is older than the read by more than
+ * this: one more read at the end of a session, and never a line missed.
+ */
+const MTIME_SLOP_MS = 1_000;
+
+const FINAL: ReadonlySet<Observed> = new Set(['done', 'failed', 'stopped']);
+
 /** Where a Claude Code session's transcript is, found once and remembered. */
 const PROJECTS = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'projects');
 const transcripts = new Map<string, string>();
@@ -359,23 +369,45 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   });
 
   /**
-   * A finished session's statement cannot change, so it is read once. A working one is read each
-   * time it is idle, because that is when it may just have made one. Losing this only re-reads.
+   * What a finished attempt said and consumed, as read from its transcript — kept for THAT attempt,
+   * and only while the transcript has not been written since. A working session is read on every
+   * idle pass instead, because that is when it may just have spoken. Losing this only re-reads.
+   *
+   * Both conditions are what reading again would find, so no driver answers differently for having
+   * seen the session before. Kept by session id, for good, it failed twice on one step
+   * (`let-a-step-say-which-tools-i-v27t-implement`, 2026-09-13). The registry listed the session
+   * final to a `view` — which observes without stepping — some thirty seconds before it gave its
+   * StructuredOutput, so "nothing said" was kept, and the end the tick later wrote had no closeout and
+   * that earlier moment's usage. Then the nudged retry `--resume`d the same id and was handed both, to
+   * the byte. An attempt is the row's name, its session, and the start `claude agents` gave it.
    */
-  const finalStatements = new Map<string, { payload: unknown; at: number } | undefined>();
-  const statementOf = async (s: Sighting) => {
-    if (finalStatements.has(s.sessionId)) return finalStatements.get(s.sessionId);
-    const said = await closeoutFrom(s.sessionId);
-    if (s.state === 'done' || s.state === 'failed' || s.state === 'stopped') finalStatements.set(s.sessionId, said);
-    return said;
+  type Kept<T> = { value: T; readAt: number };
+  const keptStatements = new Map<string, Kept<{ payload: unknown; at: number } | undefined>>();
+  const keptUsage = new Map<string, Kept<Usage | undefined>>();
+  const attemptOf = (name: string, s: Sighting, startedAt: number | undefined) => JSON.stringify([name, s.sessionId, startedAt ?? null]);
+  const keptRead = async <T>(
+    kept: Map<string, Kept<T>>, attempt: string, s: Sighting,
+    writtenAt: () => Promise<number | undefined>, read: () => Promise<T>,
+  ): Promise<T> => {
+    if (!FINAL.has(s.state)) return read();
+    const pin = kept.get(attempt);
+    if (pin) {
+      const written = await writtenAt();
+      if (written !== undefined && written < pin.readAt - MTIME_SLOP_MS) return pin.value;
+    }
+    const readAt = now();
+    const value = await read();
+    kept.set(attempt, { value, readAt });
+    return value;
   };
-
+  const statementOf = (attempt: string, s: Sighting, writtenAt: () => Promise<number | undefined>) =>
+    keptRead(keptStatements, attempt, s, writtenAt, () => closeoutFrom(s.sessionId));
   /**
-   * What it consumed, by the same rule: read once when finished, each idle pass while not. No start
-   * in the registry, no usage — without one, a resumed session's inherited conversation cannot be
-   * told from its own, and a wrong count is worse than none.
+   * No start in the registry, no usage — without one, a resumed session's inherited conversation
+   * cannot be told from its own, and a wrong count is worse than none.
    */
-  const finalUsage = new Map<string, Usage | undefined>();
+  const usageOf = async (attempt: string, s: Sighting, since: number | undefined, writtenAt: () => Promise<number | undefined>) =>
+    since === undefined ? undefined : keptRead(keptUsage, attempt, s, writtenAt, () => usageFrom(s.sessionId, since));
 
   /**
    * Each of our sessions' state as `claude agents` itself last listed it, before this runner's own
@@ -384,13 +416,6 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * pass always makes before it releases anything.
    */
   const listed = new Map<string, Observed>();
-  const usageOf = async (s: Sighting, since: number | undefined) => {
-    if (since === undefined) return undefined;
-    if (finalUsage.has(s.sessionId)) return finalUsage.get(s.sessionId);
-    const used = await usageFrom(s.sessionId, since);
-    if (s.state === 'done' || s.state === 'failed' || s.state === 'stopped') finalUsage.set(s.sessionId, used);
-    return used;
-  };
 
   return ({
     spawn: (r) => Effect.try({
@@ -470,33 +495,42 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // said `done`; three consecutive one-shot processes each said `working`, forever. The
       // transcript's mtime already answers "how long has this been quiet", so nothing needs
       // remembering and every driver gets the same answer.
-      Effect.flatMap((m) => Effect.forEach(
-        [...m],
-        ([name, { sighting, startedAt }]) =>
-          // Busy right now: nothing it has said is final and nothing about it is quiet. A long tool
-          // call writes nothing for minutes, and `busy` is what keeps that from reading as silence.
-          sighting.busy
-            ? Effect.succeed([name, sighting] as const)
-            : Effect.promise(async () => {
-                // What the workload SAID, if it said anything — reported with when it was said.
-                // Whether it belongs to this attempt is the engine's call, not ours: a resumed
-                // session carries its parent's statements too, and only the journal knows when
-                // the attempt began.
-                const said = await statementOf(sighting);
-                // And what it has consumed since its own start — reported as measured, or not at all.
-                const used = await usageOf(sighting, startedAt);
-                const reported: Sighting = { ...sighting, ...(said ? { closeout: said } : {}), ...(used ? { usage: used } : {}) };
-                if (reported.state !== 'working') return [name, reported] as const;
-                // The floor underneath, statement or not. Kept even when there IS one, because an
-                // inherited statement is discarded upstream and must not leave a session with no
-                // way to end. No transcript, no verdict: the deadline is for sessions nobody reads.
-                const writtenAt = await transcriptTime(sighting.sessionId);
-                return writtenAt !== undefined && now() - writtenAt >= quiescentAfterMs
-                  ? [name, { ...reported, state: 'done' as const }] as const
-                  : [name, reported] as const;
-              }),
-        { concurrency: 'unbounded' },
-      ).pipe(Effect.map((entries) => new Map(entries)))),
+      Effect.flatMap((m) => {
+        // What was kept for an attempt no longer listed goes with it: a released session is not read again.
+        const attempts = new Set([...m].map(([name, { sighting, startedAt }]) => attemptOf(name, sighting, startedAt)));
+        for (const kept of [keptStatements, keptUsage]) for (const key of kept.keys()) if (!attempts.has(key)) kept.delete(key);
+        return Effect.forEach(
+          [...m],
+          ([name, { sighting, startedAt }]) =>
+            // Busy right now: nothing it has said is final and nothing about it is quiet. A long tool
+            // call writes nothing for minutes, and `busy` is what keeps that from reading as silence.
+            sighting.busy
+              ? Effect.succeed([name, sighting] as const)
+              : Effect.promise(async () => {
+                  const attempt = attemptOf(name, sighting, startedAt);
+                  // When the transcript was last written: asked once a pass at most, and only if needed.
+                  let written: Promise<number | undefined> | undefined;
+                  const writtenAt = () => (written ??= transcriptTime(sighting.sessionId));
+                  // What the workload SAID, if it said anything — reported with when it was said.
+                  // Whether it belongs to this attempt is the engine's call, not ours: a resumed
+                  // session carries its parent's statements too, and only the journal knows when
+                  // the attempt began.
+                  const said = await statementOf(attempt, sighting, writtenAt);
+                  // And what it has consumed since its own start — reported as measured, or not at all.
+                  const used = await usageOf(attempt, sighting, startedAt, writtenAt);
+                  const reported: Sighting = { ...sighting, ...(said ? { closeout: said } : {}), ...(used ? { usage: used } : {}) };
+                  if (reported.state !== 'working') return [name, reported] as const;
+                  // The floor underneath, statement or not. Kept even when there IS one, because an
+                  // inherited statement is discarded upstream and must not leave a session with no
+                  // way to end. No transcript, no verdict: the deadline is for sessions nobody reads.
+                  const quietSince = await writtenAt();
+                  return quietSince !== undefined && now() - quietSince >= quiescentAfterMs
+                    ? [name, { ...reported, state: 'done' as const }] as const
+                    : [name, reported] as const;
+                }),
+          { concurrency: 'unbounded' },
+        ).pipe(Effect.map((entries) => new Map(entries)));
+      }),
     ),
 
     // `claude stop` takes the short id, which is the uuid's first block.

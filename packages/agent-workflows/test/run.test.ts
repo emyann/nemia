@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, cancelPlan, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, outputLines, parseCloseout, stepStatus, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
+import { assess, cancelPlan, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, outputLines, parseCloseout, stepStatus, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -804,4 +804,25 @@ test('`wf decide` prints a declared output readably: a list as a list, anything 
   ]);
   assert.deepEqual(outputLines(more, reviewSaid()).at(-1), '!! declared and not given: verdict, score');
   assert.deepEqual(outputLines(step('implement'), reviewSaid()), [], 'a step that declares nothing prints nothing of what else it said');
+});
+
+test('a declared field named `__proto__` travels like any other — into the brief, into `wf decide`, and into the unsigned rule', () => {
+  // JSON may name a key `__proto__`. Assigned into a plain object it sets the prototype instead of a
+  // field, and the declared product vanished on its way to the step that reads it.
+  const schema = JSON.parse('{"type":"object","properties":{"__proto__":{"type":"string"}},"required":["__proto__"],"additionalProperties":false}') as OutputSchema;
+  const producer: Workflow = { ...step('review', ['implement']), output: { file: 'review.schema.json', schema } };
+  const reader: Workflow = { ...step('respond', ['review']), input: ['review'] };
+  const said = parseCloseout('{"outcome":"done","summary":"s","artifacts":[],"needs":null,"__proto__":"product"}') as Closeout;
+  const silent = parseCloseout('{"outcome":"done","summary":"s","artifacts":[],"needs":null}') as Closeout;
+
+  assert.equal(JSON.stringify(declaredOutput(producer, said)), '{"given":{"__proto__":"product"},"missing":[]}');
+  assert.deepEqual(declaredOutput(producer, silent).missing, ['__proto__']);
+  const r = run({ review: 't2', respond: null });
+  const p = phases({ t2: 'succeeded' });
+  assert.equal(stepStatus(producer, r, p, () => silent, asked), 'unsigned');
+  assert.equal(stepStatus(producer, r, p, () => said, asked), 'unverified');
+  const brief = composeBrief(reader, r, [producer, reader], (name) => (name === 'review' ? said : undefined));
+  assert.equal(JSON.stringify(jsonIn(brief)), '{"__proto__":"product"}');
+  assert.deepEqual(outputLines(producer, said), ['__proto__: product']);
+  assert.equal(JSON.stringify(closeoutSchemaOf(producer).required), '["outcome","summary","artifacts","needs","__proto__"]');
 });

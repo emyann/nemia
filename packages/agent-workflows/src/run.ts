@@ -422,13 +422,15 @@ export function parseCloseout(value: unknown): Closeout | { error: string } {
  * closeout's content passes through on its way to another step.
  */
 export function declaredOutput(step: Workflow, said: Closeout | undefined): { given: Record<string, unknown>; missing: string[] } {
-  const given: Record<string, unknown> = {};
+  const given: Array<[string, unknown]> = [];
   const missing: string[] = [];
   for (const field of outputFields(step)) {
-    if (said?.output && Object.hasOwn(said.output, field)) given[field] = said.output[field];
+    if (said?.output && Object.hasOwn(said.output, field)) given.push([field, said.output[field]]);
     else missing.push(field);
   }
-  return { given, missing };
+  // `Object.fromEntries` defines each field as a property of its own. Assignment does not for
+  // `__proto__`, a key JSON may name: it set the prototype, and the field never reached the step reading it.
+  return { given: Object.fromEntries(given), missing };
 }
 
 /**

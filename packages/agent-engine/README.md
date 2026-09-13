@@ -83,7 +83,9 @@ process here — the engine can be killed, upgraded or restarted at any point in
 Claude Code keeps every `--bg` session in `claude agents` until something removes it, and one that
 has given its closeout stays there `working/idle` for good — every run used to leave its sessions
 behind, to be cleared by hand. So once an attempt's end is on the record, the engine **releases** its
-session: `claude stop` if it still runs, then `claude rm`. It is I/O applied to the record, not a
+session: `claude stop` if it still runs, then `claude rm`. Whether it still runs is the registry's
+word, not the runner's: a session quiet for ninety seconds is reported `done`, and `claude agents`
+still has it working. It is I/O applied to the record, not a
 decision — `decide` is not asked — and it is level-triggered: asked on every pass that still sees such
 a session, so a crash between writing the end and releasing is repaired by the next pass, and a
 release the harness refuses is asked again.

@@ -85,6 +85,17 @@ const said = (row: Row, payload: object) => {
 
 const short = (row: Row) => row.sessionId.split('-')[0]!;
 
+/** A transcript with no statement in it, last written `ago` milliseconds ago. */
+const wrote = (row: Row, ago: number) => {
+  const dir = path.join(config, 'projects', 'fake-project');
+  fs.mkdirSync(dir, { recursive: true });
+  const file = path.join(dir, `${row.sessionId}.jsonl`);
+  const entry = { type: 'user', uuid: 'u-1', parentUuid: null, sessionId: row.sessionId, timestamp: new Date().toISOString(), message: { role: 'user', content: 'the prompt' } };
+  fs.writeFileSync(file, `${JSON.stringify(entry)}\n`);
+  const at = new Date(Date.now() - ago);
+  fs.utimesSync(file, at, at);
+};
+
 test('a task that gave its closeout settles, and its session is stopped and removed in that pass — the next tick does not see it', async () => {
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
@@ -126,6 +137,27 @@ test('a task that asked for a worktree has its session stopped and never removed
     assert.deepEqual(claude.releases(), [['stop', short(row!)]], 'stopped once, and no rm on any pass');
     assert.deepEqual(claude.rows().map((r) => r.state), ['stopped'], 'still listed');
   });
+});
+
+test('a session ended by quiet is stopped before it goes — the runner reports it done, and claude agents still has it working', async () => {
+  // Found in review: `release` read the sighting's state, which quiescence had rewritten to `done`. A
+  // worktree task's session was then never touched, left working, and any other was removed unstopped.
+  for (const worktree of [false, true]) {
+    const claude = fakeClaude();
+    await onPath(claude.bin, async () => {
+      const engine = createEngine({ root: tmp('root') });
+      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), ...(worktree ? { worktree: true } : {}) });
+      await engine.tick();
+      const [row] = claude.rows();
+      wrote(row!, 10 * 60_000);
+
+      for (let i = 0; i < 3; i++) await engine.tick();
+      const at = `worktree: ${worktree}`;
+      assert.equal((await engine.view(id)).state.attempts[0]?.ended, 'done', `${at}: ended by quiet, with no statement`);
+      assert.deepEqual(claude.releases(), worktree ? [['stop', short(row!)]] : [['stop', short(row!)], ['rm', short(row!)]], `${at}: stopped first`);
+      assert.deepEqual(claude.rows().map((r) => r.state), worktree ? ['stopped'] : [], at);
+    });
+  }
 });
 
 test('no session is released while its attempt runs, nor when a person stopped its task and no end was written', async () => {

@@ -376,6 +376,14 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * told from its own, and a wrong count is worse than none.
    */
   const finalUsage = new Map<string, Usage | undefined>();
+
+  /**
+   * Each of our sessions' state as `claude agents` itself last listed it, before this runner's own
+   * definition of finished is applied: a session quiet for the window is reported `done` while Claude
+   * Code still has it running, and `release` must stop that one. Rebuilt by every `observe`, which a
+   * pass always makes before it releases anything.
+   */
+  const listed = new Map<string, Observed>();
   const usageOf = async (s: Sighting, since: number | undefined) => {
     if (since === undefined) return undefined;
     if (finalUsage.has(s.sessionId)) return finalUsage.get(s.sessionId);
@@ -432,6 +440,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       Effect.map((out) => {
         const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string; startedAt?: unknown }>;
         const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
+        listed.clear();
         for (const row of rows) {
           // `state` and `status` answer different questions and are NOT a fallback chain. `state`
           // is the session's lifecycle; `status` is whether its process is busy this instant. A
@@ -441,6 +450,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           // Only sessions WE named are ours. Everything else on the machine is somebody else's.
           // For this harness the session id IS the native id — `--resume` takes exactly it.
           if (row.name?.startsWith('ae/') && row.sessionId && state) {
+            listed.set(row.sessionId, state);
             m.set(row.name, {
               sighting: { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId },
               // When THIS session started, as the harness recorded it: what usage is counted from.
@@ -503,7 +513,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * worktree", and the task's work is in that worktree.
      */
     release: (session, task) => Effect.gen(function* () {
-      if (session.state === 'working' || session.state === 'blocked') {
+      // The registry's word, not the sighting's: quiescence reports a quiet `working/idle` session
+      // `done`, and it is still running (found in review). A session this runner has not listed — no
+      // `observe` made here — has only its sighting to go by.
+      const running = listed.get(session.sessionId) ?? session.state;
+      if (running === 'working' || running === 'blocked') {
         // Failing only if it exited since it was observed — which leaves `rm` exactly as able to go on.
         yield* sh('claude', ['stop', short(session.sessionId)], { verb: 'release' }).pipe(
           Effect.catchTag('RunnerError', () => Effect.succeed('')),

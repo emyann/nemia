@@ -170,6 +170,18 @@ test('an idle session reports what it said; a busy one is not even asked', async
   } finally { restore(); }
 });
 
+test('a blocked, idle session reports what it said too — and stays blocked, for the engine to judge', async () => {
+  // A session that gave its closeout and ended its turn has been seen `blocked`/idle. The engine
+  // ends that attempt only if the runner still hands it the statement.
+  const said = { payload: { outcome: 'done' }, at: 5 };
+  const restore = withFakeClaude(row('blocked', 'idle'));
+  try {
+    const seen = await Effect.runPromise(claudeOps({ now: () => 0, transcriptTime: async () => 0, closeoutFrom: async () => said }).observe);
+    assert.deepEqual(seen.get('ae/t-1/1')?.closeout, said);
+    assert.equal(seen.get('ae/t-1/1')?.state, 'blocked');
+  } finally { restore(); }
+});
+
 test('a finished session is read once, because its statement cannot change', async () => {
   let asked = 0;
   const restore = withFakeClaude(row('done', 'idle'));

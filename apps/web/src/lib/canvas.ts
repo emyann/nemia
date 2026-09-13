@@ -1,6 +1,6 @@
 /**
  * What the canvases work out, without React Flow: the words on a step's node, which edges are
- * complete, and where a person left the nodes — a run's steps, or the Factory's runs. Pure, apart
+ * complete, and where a person left the nodes — a run's steps, or the Factory's runs and which are open. Pure, apart
  * from the storage calls at the end, each of which survives a browser that refuses storage.
  */
 import type { StepAttempts } from './api';
@@ -25,16 +25,19 @@ export function duration(ms: number): string {
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
- * `#<attempts> · <elapsed>` for a step's latest attempt, or null before its first.
+ * `#<attempts> · <time>` for a step's latest attempt, or null before its first.
  *
- * Elapsed counts only while the attempt runs. Once it is over the api has no end time to stop the
- * clock at — the engine's view does not keep one — so it says how long ago the attempt started.
+ * While the attempt runs, the time counts. Once it is over, the time is how long it took, from its
+ * start to its end. A record from before the engine kept the end has no clock to stop, so it says how
+ * long ago the attempt started instead.
  */
 export function attemptLine(attempts: StepAttempts, live: boolean, now: number): string | null {
   const { count, latest } = attempts;
   if (!latest) return null;
-  const since = duration(now - Date.parse(latest.startedAt));
-  return latest.ended === null && live ? `#${count} · ${since}` : `#${count} · started ${since} ago`;
+  const started = Date.parse(latest.startedAt);
+  if (latest.ended === null && live) return `#${count} · ${duration(now - started)}`;
+  if (latest.endedAt) return `#${count} · ${duration(Date.parse(latest.endedAt) - started)}`;
+  return `#${count} · started ${duration(now - started)} ago`;
 }
 
 export type CanvasEdge = { id: string; source: string; target: string; complete: boolean };
@@ -93,25 +96,44 @@ const layoutKey = (runId: string) => `hkb:canvas-layout:v2:${runId}`;
 /** The Factory's arrangement, one per browser: where each run's card was left, by run id. */
 const FACTORY_KEY = 'hkb:factory-layout';
 
-export const readLayout = (runId: string): Map<string, Point> | null => readAt(layoutKey(runId));
-export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void => saveAt(layoutKey(runId), at);
+/** The Factory's open runs, one list per browser, beside its arrangement: whose graphs are unfolded, in the order opened. */
+const FACTORY_OPEN_KEY = 'hkb:factory-open';
+
+export const readLayout = (runId: string): Map<string, Point> | null => readAt(layoutKey(runId), parseLayout, null);
+export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void => saveAt(layoutKey(runId), Object.fromEntries(at));
 export const forgetLayout = (runId: string): void => forgetAt(layoutKey(runId));
 
-export const readFactoryLayout = (): Map<string, Point> | null => readAt(FACTORY_KEY);
-export const saveFactoryLayout = (at: ReadonlyMap<string, Point>): void => saveAt(FACTORY_KEY, at);
+export const readFactoryLayout = (): Map<string, Point> | null => readAt(FACTORY_KEY, parseLayout, null);
+export const saveFactoryLayout = (at: ReadonlyMap<string, Point>): void => saveAt(FACTORY_KEY, Object.fromEntries(at));
 export const forgetFactoryLayout = (): void => forgetAt(FACTORY_KEY);
 
-function readAt(key: string): Map<string, Point> | null {
+export const readFactoryOpen = (): string[] => readAt(FACTORY_OPEN_KEY, parseOpen, []);
+export const saveFactoryOpen = (ids: readonly string[]): void => saveAt(FACTORY_OPEN_KEY, ids);
+export const forgetFactoryOpen = (): void => forgetAt(FACTORY_OPEN_KEY);
+
+/** The open runs as they were saved: run ids, each once, in order; none for anything that is not a list of ids. */
+export function parseOpen(raw: string | null): string[] {
+  if (raw === null) return [];
+  let value: unknown;
   try {
-    return parseLayout(localStorage.getItem(key));
+    value = JSON.parse(raw);
   } catch {
-    return null;
+    return [];
+  }
+  return Array.isArray(value) && value.every((id) => typeof id === 'string' && id !== '') ? [...new Set<string>(value)] : [];
+}
+
+function readAt<T>(key: string, parse: (raw: string | null) => T, none: T): T {
+  try {
+    return parse(localStorage.getItem(key));
+  } catch {
+    return none;
   }
 }
 
-function saveAt(key: string, at: ReadonlyMap<string, Point>): void {
+function saveAt(key: string, value: unknown): void {
   try {
-    localStorage.setItem(key, JSON.stringify(Object.fromEntries(at)));
+    localStorage.setItem(key, JSON.stringify(value));
   } catch {
     // Refused or full: the arrangement lasts as long as the page does.
   }

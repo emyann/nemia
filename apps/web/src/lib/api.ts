@@ -58,12 +58,12 @@ export type RunDetail = {
 };
 
 /**
- * Mirrors `StepAttempts` in apps/api/src/app.ts. There is no end time: the engine's view does not
- * keep one, so an attempt that is over says how it ended and not when.
+ * Mirrors `StepAttempts` in apps/api/src/app.ts. `endedAt` is when the latest attempt ended — the
+ * engine's `Attempt.endedAt` — and null while it runs or on a record from before the engine kept it.
  */
 export type StepAttempts = {
   count: number;
-  latest: { startedAt: string; ended: string | null; reason: string | null } | null;
+  latest: { startedAt: string; ended: string | null; endedAt: string | null; reason: string | null } | null;
 };
 
 /** Mirrors `StepLog` in apps/api/src/app.ts. */

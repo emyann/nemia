@@ -4,20 +4,19 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  MarkerType,
   MiniMap,
   Panel,
   Position,
   ReactFlow,
   ReactFlowProvider,
   useReactFlow,
-  type Edge,
   type NodeChange,
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
-import { edgesOf, forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
+import { forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
 import { layout, type Point } from '../lib/layout';
-import { stepState, type StepState } from '../lib/status';
+import { stepState } from '../lib/status';
+import { stepEdges, stepMinimapFill } from './stepGraph';
 import { StepNode, type StepFlowNode } from './StepNode';
 
 type Props = { run: RunDetail; selected: string | null; onSelect: (step: string | null) => void };
@@ -26,18 +25,6 @@ type Props = { run: RunDetail; selected: string | null; onSelect: (step: string 
 const nodeTypes = { step: StepNode };
 
 const FIT = { padding: 0.2, maxZoom: 1.25 };
-
-/** The minimap in the chips' colours, so a glance at it says what the nodes say. */
-const minimapFill: Record<StepState, string> = {
-  working: 'var(--color-sky-500)',
-  'needs-human': 'var(--color-orange-500)',
-  done: 'var(--color-emerald-500)',
-  blocked: 'var(--color-amber-500)',
-  failed: 'var(--color-red-500)',
-  waiting: 'var(--color-neutral-400)',
-  cancelled: 'var(--color-neutral-400)',
-  unknown: 'var(--color-neutral-400)',
-};
 
 const button =
   'rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-700 shadow-sm hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
@@ -120,20 +107,7 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
     });
   }, [placed, run, runCancelled, selected]);
 
-  const edges = useMemo<Edge[]>(
-    () =>
-      edgesOf(run.steps.map((s) => ({ name: s.name, after: s.spec?.after ?? [], state: states.get(s.name)! }))).map((e) => ({
-        id: e.id,
-        source: e.source,
-        target: e.target,
-        markerEnd: { type: MarkerType.ArrowClosed },
-        // Solid once both ends are done; dashed while what it stands for is still to happen.
-        style: e.complete ? undefined : { strokeDasharray: '6 4' },
-        selectable: false,
-        focusable: false,
-      })),
-    [run, states],
-  );
+  const edges = useMemo(() => stepEdges(run), [run]);
 
   // Set when a person has moved a node — a drag, or the arrow keys — and cleared once it is saved.
   const moved = useRef(false);
@@ -234,7 +208,7 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
           pannable
           zoomable
           style={{ width: 128, height: 88 }}
-          nodeColor={(node) => minimapFill[stepState(node.data.step.status, runCancelled)]}
+          nodeColor={(node) => stepMinimapFill[stepState(node.data.step.status, runCancelled)]}
         />
       </ReactFlow>
     </div>

@@ -5,12 +5,16 @@ import {
   duration,
   edgesOf,
   forgetFactoryLayout,
+  forgetFactoryOpen,
   forgetLayout,
   parseLayout,
+  parseOpen,
   place,
   readFactoryLayout,
+  readFactoryOpen,
   readLayout,
   saveFactoryLayout,
+  saveFactoryOpen,
   saveLayout,
 } from '../src/lib/canvas.ts';
 
@@ -31,12 +35,25 @@ test('a duration reads in its two largest units', () => {
 test('an attempt that runs counts its time; one that is over says when it started', () => {
   const now = Date.parse('2026-09-13T01:00:00.000Z');
   const startedAt = '2026-09-13T00:47:56.000Z';
-  assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: null, reason: null } }, true, now), '#2 · 12m 04s');
-  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', reason: 'harness' } }, false, now), '#1 · started 12m 04s ago');
+  assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now), '#2 · 12m 04s');
+  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now), '#1 · started 12m 04s ago');
   // No end on the record, but no session going either (stopped before the engine saw it end):
   // counting on would claim it is still at work.
-  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: null, reason: null } }, false, now), '#1 · started 12m 04s ago');
+  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: null, endedAt: null, reason: null } }, false, now), '#1 · started 12m 04s ago');
   assert.equal(attemptLine({ count: 0, latest: null }, false, now), null);
+});
+
+test('an attempt that is over says how long it took, once the record keeps when it ended', () => {
+  const now = Date.parse('2026-09-13T01:00:00.000Z');
+  const startedAt = '2026-09-13T00:30:00.000Z';
+  const endedAt = '2026-09-13T00:59:04.000Z';
+  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt, reason: 'harness' } }, false, now), '#1 · 29m 04s');
+  // Ended, and the step still live behind it — between attempts: the attempt shown took what it took.
+  assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: 'failed', endedAt, reason: 'exit' } }, true, now), '#2 · 29m 04s');
+  // Still running: the time counts, whatever the record says of an end it has not got.
+  assert.equal(attemptLine({ count: 3, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now), '#3 · 30m 00s');
+  // An old record, over and with no end: no clock to stop, so it says when it started.
+  assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now), '#1 · started 30m 00s ago');
 });
 
 test('an edge is complete only when both of its ends are done', () => {
@@ -137,3 +154,39 @@ function memory(kept: Map<string, string>) {
     removeItem: (key: string) => void kept.delete(key),
   };
 }
+
+test("the Factory's open runs are kept in the order opened, apart from its arrangement, until forgotten", (t) => {
+  stubStorage(t, memory(new Map()));
+  assert.deepEqual(readFactoryOpen(), []);
+  saveFactoryOpen(['r-2', 'r-1']);
+  assert.deepEqual(readFactoryOpen(), ['r-2', 'r-1']);
+  saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
+  forgetFactoryLayout();
+  assert.deepEqual(readFactoryOpen(), ['r-2', 'r-1'], 'forgetting the arrangement is not closing the runs');
+  saveFactoryLayout(new Map([['r-1', { x: 320, y: 0 }]]));
+  forgetFactoryOpen();
+  assert.deepEqual(readFactoryOpen(), []);
+  assert.deepEqual(Object.fromEntries(readFactoryLayout()!), { 'r-1': { x: 320, y: 0 } });
+});
+
+test('a saved open set is refused unless it is a list of run ids', () => {
+  const refused = [null, '', 'not json', 'null', '{}', '"r-1"', '3', '[1]', '["r-1",null]', '["r-1",["r-2"]]', '[""]'];
+  for (const raw of refused) assert.deepEqual(parseOpen(raw), [], String(raw));
+  assert.deepEqual(parseOpen('["r-2","r-1","r-2"]'), ['r-2', 'r-1']);
+  assert.deepEqual(parseOpen('[]'), []);
+});
+
+test('a browser that refuses storage keeps no run open, and throws nothing — nor one where storage is not there at all', (t) => {
+  const refuse = () => {
+    throw new Error('SecurityError: storage is disabled');
+  };
+  stubStorage(t, { getItem: refuse, setItem: refuse, removeItem: refuse });
+  assert.deepEqual(readFactoryOpen(), []);
+  assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
+  assert.doesNotThrow(() => forgetFactoryOpen());
+  // A sandboxed frame throws on reading `localStorage` itself, before any call.
+  Object.defineProperty(globalThis, 'localStorage', { get: refuse, configurable: true });
+  assert.deepEqual(readFactoryOpen(), []);
+  assert.doesNotThrow(() => saveFactoryOpen(['r-1']));
+  assert.doesNotThrow(() => forgetFactoryOpen());
+});

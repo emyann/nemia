@@ -18,6 +18,8 @@ export type Point = { x: number; y: number };
 export const COLUMN_WIDTH = 300;
 /** Room for one node and the gap below it, within a column. */
 export const ROW_HEIGHT = 150;
+/** How wide a step's node is drawn (`w-56`): the rest of its column is the arrow to the next. */
+export const NODE_WIDTH = 224;
 
 /** The columns, left first, each top to bottom. Throws, naming the steps it could not place, on a cycle. */
 export function layers(steps: readonly StepEdges[]): string[][] {
@@ -78,6 +80,14 @@ export function layout(steps: readonly StepEdges[]): Map<string, Point> {
     column.forEach((name, i) => at.set(name, { x: c * COLUMN_WIDTH, y: (i - (column.length - 1) / 2) * ROW_HEIGHT })),
   );
   return at;
+}
+
+/** The room a layout takes: a column's width per column, and a row's height per row of its tallest column. */
+export function extentOf(at: ReadonlyMap<string, Point>): { width: number; height: number } {
+  if (!at.size) return { width: 0, height: 0 };
+  const xs = [...at.values()].map((p) => p.x);
+  const ys = [...at.values()].map((p) => p.y);
+  return { width: Math.max(...xs) - Math.min(...xs) + COLUMN_WIDTH, height: Math.max(...ys) - Math.min(...ys) + ROW_HEIGHT };
 }
 
 const mean = (xs: readonly number[]) => xs.reduce((sum, x) => sum + x, 0) / xs.length;

@@ -145,7 +145,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
     status: 'succeeded · BLOCKED',
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
-    attempts: { count: 1, latest: { startedAt: at, ended: 'done', reason: 'harness' } },
+    attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   });
 
   assert.deepEqual({ ...review, told: undefined }, {
@@ -214,7 +214,7 @@ test('a run whose workflow folder is gone still answers, from its record', async
       taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
       status: 'succeeded · BLOCKED',
       closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
-      attempts: { count: 1, latest: { startedAt: at, ended: 'done', reason: 'harness' } },
+      attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
     },
     {
       name: 'review', spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', closeout: null,
@@ -262,7 +262,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     taskId: 't-6', workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
     status: 'succeeded · BLOCKED',
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
-    attempts: { count: 1, latest: { startedAt: at, ended: 'done', reason: 'harness' } },
+    attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   });
   assert.deepEqual([review.body, review.spec.after, review.status], ['Review it.', ['replacement'], 'waiting']);
   assert.deepEqual([replacement.body, replacement.taskId, replacement.status, replacement.closeout], ['Do the original thing.', null, 'waiting', null]);
@@ -291,16 +291,30 @@ test('a run id cannot name a file outside the run store', async () => {
   assert.equal(res.status, 404);
 });
 
-test('each step says how many attempts it has had, when the latest began, and how it ended', async () => {
+test('each step says how many attempts it has had, when the latest began, and how and when it ended', async () => {
   retryingTask('t-7');
   writeRun({ ...r2, id: 'r-7', steps: { implement: { taskId: 't-7', branch: 'wf/r-7/implement' }, review: { taskId: null } } });
 
   const run = await (await app.request('/api/runs/r-7')).json();
   assert.deepEqual(run.steps.map((s: { attempts: unknown }) => s.attempts), [
     // The second attempt is still going, so it has not ended; the one the engine lost is counted.
-    { count: 2, latest: { startedAt: later, ended: null, reason: null } },
+    { count: 2, latest: { startedAt: later, ended: null, endedAt: null, reason: null } },
     { count: 0, latest: null },
   ]);
+
+  // An attempt that ran half an hour: its end is its `ended` event's, not its start's, so the board can say how long it took.
+  journal('t-8', [
+    filed('t-8'),
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at: later, attempt: 1, sessionId: 'ae/t-8/1', observed: 'done', reason: 'harness' },
+    { kind: 'settled', at: later, outcome: 'succeeded' },
+  ]);
+  writeRun({ ...r2, id: 'r-8', steps: { implement: { taskId: 't-8', branch: 'wf/r-8/implement' }, review: { taskId: null } } });
+  assert.deepEqual((await (await app.request('/api/runs/r-8')).json()).steps[0].attempts, {
+    count: 1,
+    latest: { startedAt: at, ended: 'done', endedAt: later, reason: 'harness' },
+  });
 
   // A task the engine has no record of has had no attempts it can speak for.
   assert.deepEqual((await (await app.request('/api/runs/r-4')).json()).steps[0].attempts, { count: 0, latest: null });

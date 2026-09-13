@@ -2,7 +2,7 @@
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
  *  1. Builds the web app.
- *  2. Seeds a store in a temporary WF_ROOT with one fake run (seed.ts).
+ *  2. Seeds a store in a temporary WF_ROOT with two fake runs (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
  *     as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers and beside
@@ -14,33 +14,62 @@
  *
  * Exits non-zero on the first failure, naming the page, the theme and the assertion, with a screenshot
  * of what the page looked like. Both servers are stopped on the way out: on success, on failure, and on a
- * signal. The assertions themselves are made to refuse in checks.test.ts, which `npm run e2e` runs first.
+ * signal. The assertions are made to refuse in checks.test.ts, and the visiting and the exit (visit.ts) in
+ * visit.test.ts, both of which `npm run e2e` runs first.
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
-import { expectCount, expectInside, expectTheme, expectVisible, Refused, settled, watch } from './checks.ts';
-import { FAKE, seed } from './seed.ts';
+import type { Locator, Page } from 'playwright';
+import { expectApart, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, watch } from './checks.ts';
+import { FAKE, NEIGHBOUR, seed } from './seed.ts';
+import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
 const REPO = path.resolve(WEB, '..', '..');
 const API = path.join(REPO, 'apps', 'api');
 const OUT = path.resolve(process.env.WF_ARTIFACTS || path.join(REPO, '.e2e'));
-const THEMES = ['light', 'dark'] as const;
-type Theme = (typeof THEMES)[number];
 
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
-
-type PageSpec = { name: string; route: string; expect: (page: Page) => Promise<void> };
 
 /** On every page: the menu, with both of its places. */
 async function sidebar(page: Page): Promise<void> {
   const menu = page.locator('[data-sidebar="sidebar"]');
   await expectVisible(menu.getByRole('link', { name: 'Factory' }), 'the sidebar has Factory');
   await expectVisible(menu.getByRole('link', { name: 'Runs' }), 'the sidebar has Runs');
+}
+
+/** The fake run on the Factory: its card, its step nodes, and both together. */
+function onTheFloor(page: Page): { card: Locator; steps: Locator; run: Locator; step: (name: string) => Locator } {
+  const card = `.react-flow__node[data-id="${FAKE.id}"]`;
+  const steps = `.react-flow__node[data-id^="${FAKE.id}/"]`;
+  return {
+    card: page.locator(card),
+    steps: page.locator(steps),
+    run: page.locator(`${card}, ${steps}`),
+    step: (name) => page.locator(`.react-flow__node[data-id="${FAKE.id}/${name}"]`),
+  };
+}
+
+/**
+ * Another visit to `page`'s address in the same browser, so what this browser kept, checked by `check` and
+ * watched as the page itself is. A page of its own rather than a reload: a reload cuts off an in-flight
+ * refetch, which the watch would rightly count as a failed request.
+ */
+async function nextVisit(page: Page, check: (again: Page) => Promise<void>): Promise<void> {
+  const again = await page.context().newPage();
+  try {
+    const { problems } = watch(again);
+    await again.goto(page.url(), { waitUntil: 'networkidle' });
+    await check(again);
+    await again.waitForLoadState('networkidle');
+    const seen = problems();
+    if (seen.length) throw new Refused(`no console error and no failed request on the next visit — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+  } finally {
+    await again.close();
+  }
 }
 
 /** The pages, and what each must have. A new page gets a line here, or the check never looks at it. */
@@ -50,12 +79,77 @@ const PAGES: PageSpec[] = [
     route: '/',
     expect: async (page) => {
       await sidebar(page);
-      await expectVisible(page.locator('.react-flow'), 'the Factory canvas');
-      const card = page.locator(`.react-flow__node[data-id="${FAKE.id}"]`);
+      const floor = page.locator('.react-flow');
+      await expectVisible(floor, 'the Factory canvas');
+      const { card, steps, run, step } = onTheFloor(page);
+      const beside = page.locator(`.react-flow__node[data-id="${NEIGHBOUR.id}"]`);
       await expectVisible(card, `the fake run's card on the Factory (${FAKE.id})`);
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
+      await expectVisible(card.locator(`a[href="/runs/${FAKE.id}"]`), "the card's title links to the run's page");
+      await expectVisible(beside, `the run started after it has the card beside it (${NEIGHBOUR.id})`);
       await settled(page);
-      await expectInside(card, page.locator('.react-flow'), 'the card is on the floor');
+      await expectInside(card, floor, 'the card is on the floor');
+      await expectCount(steps, 0, 'a closed card draws no step');
+
+      // A click on the card, away from its title's link, unfolds the run's graph beside it — over the cell
+      // the other run's card is in, which moves aside.
+      await card.locator('time').click();
+      await expectCount(steps, FAKE.steps.length, `the card opens into a node per step (${FAKE.steps.join(', ')})`);
+      for (const name of FAKE.steps) await expectVisible(step(name), `the open run draws ${name}`);
+      await expectVisible(step(FAKE.blocked).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate on the Factory`);
+      await expectCount(page.locator(`.react-flow__edge[data-id="${FAKE.id}/->${FAKE.first}"]`), 1, `one dashed edge from the card into ${FAKE.first}`);
+      await expectCount(page.locator('.react-flow__edge'), FAKE.edges + 1, "the run's edges, and the card's into its first step");
+      await expectVisible(card.getByRole('button', { name: 'Hide steps' }), "the open card's chevron hides the steps");
+      await expectApart(beside, run, 'the card beside it moves out from under the unfolded graph');
+      await settled(page);
+      await expectInside(run, floor, 'the open run, card and steps, is brought onto the screen');
+
+      // Remembered in this browser: the next visit finds the run open.
+      await nextVisit(page, (again) => expectCount(onTheFloor(again).steps, FAKE.steps.length, 'the run is still open on the next visit'));
+
+      // Collapse all folds it away, and the chevron opens it again.
+      await page.getByRole('button', { name: 'Collapse all' }).click();
+      await expectCount(steps, 0, 'Collapse all folds the graph away');
+      await card.getByRole('button', { name: 'Show steps' }).click();
+      await expectCount(steps, FAKE.steps.length, "the card's chevron unfolds it again");
+
+      // Dragged, the card takes its steps with it. Dropped on the other run's card, it stays where it landed,
+      // and the card under it moves aside on the drop — not on whatever changes the floor next.
+      await settled(page);
+      const [from, onto, grip] = [await card.boundingBox(), await beside.boundingBox(), await card.locator('time').boundingBox()];
+      if (!from || !onto || !grip) throw new Refused("the cards to drag and drop onto — one of them is not on the page");
+      await expectMovedWith(steps, card, async () => {
+        const [x, y] = [grip.x + grip.width / 2, grip.y + grip.height / 2];
+        await page.mouse.move(x, y);
+        await page.mouse.down();
+        await page.mouse.move(x + onto.x - from.x, y + onto.y - from.y, { steps: 12 });
+        await page.mouse.up();
+      }, "the open run's steps move with its card when it is dragged");
+      await expectCount(steps, FAKE.steps.length, 'a drop is not a click: the run is still open');
+      await expectApart(beside, run, 'the card the open run was dropped on moves out from under it');
+
+      // Reset layout closes every run as it lays the floor out again, here and on the next visit.
+      await page.getByRole('button', { name: 'Reset layout' }).click();
+      await expectCount(steps, 0, 'Reset layout folds the graph away');
+      await expectVisible(card.getByRole('button', { name: 'Show steps' }), "after a reset the card's chevron shows the steps");
+      await nextVisit(page, async (again) => {
+        const next = onTheFloor(again);
+        // The chevron reads the open runs this browser kept as the page mounts, before any step is read.
+        await expectVisible(next.card.getByRole('button', { name: 'Show steps' }), 'the next visit after a reset finds the run closed');
+        await expectCount(next.steps, 0, 'the next visit after a reset draws no step');
+      });
+
+      // Open again; a click on a step opens its inspector beside the floor, the run's title above the step's name.
+      await card.getByRole('button', { name: 'Show steps' }).click();
+      await expectCount(steps, FAKE.steps.length, 'the chevron unfolds the run again after a reset');
+      await expectApart(beside, run, 'the card beside it moves aside again');
+      await step('review').click();
+      const inspector = page.locator('aside[aria-label="Step review"]');
+      await expectVisible(inspector, 'the step inspector opens on a click on review');
+      await expectVisible(inspector.getByText(FAKE.title), 'the inspector names the run the step is in');
+      // The floor narrows for the inspector and brings the run back into view; judged once it has.
+      await settled(page);
+      await expectInside(run, floor, 'the run is on the floor beside the open inspector');
     },
   },
   {
@@ -147,47 +241,7 @@ function fromNodeModules(file: string): string {
   }
 }
 
-// ─── the pages ──────────────────────────────────────────────────────────────
-
-class PageFailure extends Error {
-  constructor(where: string, cause: unknown, screenshot: string) {
-    const why = cause instanceof Refused ? cause.message : `could not be checked: ${cause instanceof Error ? cause.message : String(cause)}`;
-    super(`${where}: ${why}\n  what it looked like: ${screenshot}`);
-  }
-}
-
-async function visit(context: BrowserContext, base: string, spec: PageSpec, theme: Theme): Promise<string> {
-  const page = await context.newPage();
-  const { problems } = watch(page);
-  const shot = path.join(OUT, `${spec.name}-${theme}.png`);
-  try {
-    await page.goto(base + spec.route, { waitUntil: 'networkidle' });
-    await expectTheme(page, theme);
-    await spec.expect(page);
-    // What a person would see, once whatever the last assertion started has settled.
-    await page.waitForLoadState('networkidle');
-    await settled(page);
-    await page.screenshot({ path: shot, fullPage: true });
-    const seen = problems();
-    if (seen.length) throw new Refused(`no console error and no failed request — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
-    return shot;
-  } catch (err) {
-    fs.rmSync(shot, { force: true });
-    const failed = path.join(OUT, `${spec.name}-${theme}-failed.png`);
-    await page.screenshot({ path: failed, fullPage: true }).catch(() => {});
-    throw new PageFailure(`${spec.route} in the ${theme} theme`, err, failed);
-  } finally {
-    await page.close();
-  }
-}
-
-async function launch(): Promise<Browser> {
-  try {
-    return await chromium.launch();
-  } catch (err) {
-    throw new Error(`Chromium did not start: ${(err as Error).message.split('\n')[0]}\n  If it is not installed, run \`npx playwright install chromium\` once on this machine; every worktree shares ~/.cache/ms-playwright.`);
-  }
-}
+// ─── the run ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
@@ -216,24 +270,10 @@ async function main(): Promise<void> {
     /Local:\s+(http:\/\/[^\s/]+)/);
   console.log(`e2e: api on :${apiPort}, the built app on ${base}, store ${store}`);
 
-  fs.mkdirSync(OUT, { recursive: true });
-  for (const spec of PAGES) {
-    for (const theme of THEMES) {
-      for (const name of [`${spec.name}-${theme}.png`, `${spec.name}-${theme}-failed.png`]) fs.rmSync(path.join(OUT, name), { force: true });
-    }
-  }
-
   const browser = await launch();
-  const shots: string[] = [];
+  let shots: string[];
   try {
-    for (const theme of THEMES) {
-      const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
-      for (const spec of PAGES) {
-        shots.push(await visit(context, base, spec, theme));
-        console.log(`e2e: ${spec.route} in the ${theme} theme ✓`);
-      }
-      await context.close();
-    }
+    shots = await visitAll(browser, base, PAGES, OUT);
   } finally {
     await browser.close();
   }
@@ -242,18 +282,11 @@ async function main(): Promise<void> {
   for (const shot of shots) console.log(`  ${shot}`);
 }
 
-main().then(
-  () => {
-    cleanUp();
-    process.exit(0);
-  },
-  (err: unknown) => {
-    console.error(`\ne2e: FAILED — ${err instanceof Error ? err.message : String(err)}`);
-    for (const { name, output } of servers) {
+exitOn(main(), cleanUp, () =>
+  servers
+    .map(({ name, output }) => {
       const tail = output().trimEnd().split('\n').slice(-15).join('\n    ');
-      if (tail) console.error(`\n  ${name} printed:\n    ${tail}`);
-    }
-    cleanUp();
-    process.exit(1);
-  },
+      return tail ? `\n\n  ${name} printed:\n    ${tail}` : '';
+    })
+    .join(''),
 );

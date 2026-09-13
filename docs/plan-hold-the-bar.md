@@ -557,6 +557,12 @@ owner is not mid-run.
   cleared with the daemon stopped, so the next tick re-filed it). That is `wf retry <run> <step>
   --recheck`, and it should not need surgery. Also: bug 3 was measured — finished `--bg` sessions
   at ~370 MB each, 22 of them, 7 GB; E5 fixes it.
+- **steering by message leaves no trace on the run (F2's review, finding 2):** the operator widened
+  a step's scope and added an ask through cross-session messages; the run's record shows only two
+  commit messages and a closeout, and the reviewer rightly could not tell an authorised change from
+  a step overstepping. A mid-flight instruction to a step should be written on the run — an
+  `asks/` file the tick composes into the record and `wf decide` prints — the same one-writer
+  shape as `.cancelled`. → with F's ask files.
 - **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
   a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
   for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running

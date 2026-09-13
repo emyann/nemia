@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COLUMN_WIDTH, layers, layout, ROW_HEIGHT } from '../src/lib/layout.ts';
+import { COLUMN_WIDTH, extentOf, layers, layout, ROW_HEIGHT } from '../src/lib/layout.ts';
 
 // A layering that loops would hang the suite rather than fail it; these fail it.
 const bounded = { timeout: 2_000 };
@@ -91,4 +91,15 @@ test('a cycle is refused, naming the steps in it, and the layering does not loop
 test('an `after` naming a step the run does not have is drawn as nothing', bounded, () => {
   assert.deepEqual(layers([{ name: 'review', after: ['gone', 'gone'] }, { name: 'other', after: [] }]), [['review', 'other']]);
   assert.deepEqual(layers([]), []);
+});
+
+test("a layout's extent is a column's width per column and a row's height per row of its tallest column", bounded, () => {
+  assert.deepEqual(extentOf(new Map()), { width: 0, height: 0 });
+  assert.deepEqual(extentOf(layout([{ name: 'alone', after: [] }])), { width: COLUMN_WIDTH, height: ROW_HEIGHT });
+  assert.deepEqual(extentOf(layout([
+    { name: 'plan', after: [] },
+    { name: 'api', after: ['plan'] },
+    { name: 'web', after: ['plan'] },
+    { name: 'merge', after: ['api', 'web'] },
+  ])), { width: 3 * COLUMN_WIDTH, height: 2 * ROW_HEIGHT });
 });

@@ -68,10 +68,10 @@ output: review.schema.json # what its closeout declares for a later step: a JSON
 Review the changes on this branch. Be specific about correctness, not style.
 ```
 
-A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `permissionMode`,
-`deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`, `rounds` — and a key the parser
-does not know is refused by name before anything is spent, as is a value it cannot use
-(`src/workflow.ts`). `tools`, `effort` and `guide` are refused with reasons of their own.
+A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `effort`,
+`permissionMode`, `tools`, `deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`,
+`rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
+it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
 
 **No key is control flow.** No conditions, no expressions, no templating, and no loop a keyword
 decides. That is the design, not a missing feature.
@@ -88,6 +88,41 @@ for how long. Whether the work goes round again is still a judgement: the loopin
 `read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
 the shipped reviewer hands its review on as its closeout. `retries` is how many times the run re-files
 a step its check refused (*Trying again*, under the check).
+
+### What a step may have: `tools:` and `effort:`
+
+```md
+---
+after: implement
+# The only tools the session has. Bash is there for `git diff` and `npm test`; nothing that edits.
+tools: Read, Grep, Glob, Bash
+effort: high
+---
+Review the change in this workspace as a second engineer would.
+```
+
+`tools:` is the harness's tool names, comma-separated, and they are the only tools the session has.
+Claude Code is given exactly the list as `--tools`, where a tool not on it does not exist for the
+session — not `--allowedTools`, where an unapproved one is still there to try. The list names Claude
+Code's built-in tools; the servers of the checkout's `.mcp.json` are not on it. Refused at load: a line
+that names no tool; an entry with a space or a comma inside (`Read Grep Glob`, `[Read, Grep]`, or
+`Bash(git diff:*)`, a rule where a tool goes); and any `tools:` on codex. Codex has no tool list, only
+one shell in a sandbox, so its fence is `permissionMode`, and `read-only` writes nothing.
+
+`effort:` is one word the step's harness takes: `low`, `medium`, `high`, `xhigh` or `max` on Claude Code,
+and `none` and `minimal` besides on codex. Another word is refused by name with the list, as a permission
+mode is. Refusing it here matters more than usual: Claude Code itself only warns about an effort it does
+not know, and runs at its default.
+
+Both go to the engine on every filing of the step: the first, each try and each round. Without them, the
+step has the harness's own tools at its own effort.
+
+**The engine is the source of these words.** The permission modes and efforts `src/workflow.ts` refuses
+are copies of agent-engine's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
+`CODEX_EFFORTS`. They are copies because only `runner.ts` may import the engine, and the engine refuses a
+word only when the step is filed, after the run exists. `test/vocabulary.test.ts` imports the engine's
+lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
+codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
 
 ## What one step knows of another
 
@@ -591,8 +626,8 @@ and answers them in `RESPONSE.md`.
 wf start "Give the Factory a legend" --workflows packages/agent-workflows/workflows/ui
 ```
 
-`look` is told to write nothing, and nothing enforces that until the engine carries `tools:`
-(`docs/plan-hold-the-bar.md` §4 I).
+Neither reviewer can write, by machinery rather than by its brief. `look` has `tools: Read, Grep, Glob`,
+so no Edit, Write or Bash. `review` runs on codex, which has no tool list, in `permissionMode: read-only`.
 
 ## Deciding what ships
 
@@ -756,11 +791,11 @@ holding a concurrency slot forever.
 
 | file | |
 |---|---|
-| `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run |
+| `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a word the step's harness does not take, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — and what a step is told, `## From <step>`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
-| `src/runner.ts` | the I/O: run store, git worktree and what it is given, and the engine |
+| `src/runner.ts` | the I/O: run store, git worktree and what it is given, and the engine — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/cli.ts` | the verbs |
 
 `assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,

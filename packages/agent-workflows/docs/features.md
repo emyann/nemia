@@ -7,8 +7,8 @@ questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/ope
 State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
-trying a step again with `retries:` and `wf retry` (§4 F), and going round again with `loop:`,
-`rounds:` and `wf round` (§4 R) have shipped.
+trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
+`rounds:` and `wf round` (§4 R), and a step's `tools:` and `effort:` (§4 I) have shipped.
 
 ## Shipped: the check
 
@@ -67,8 +67,6 @@ for `look` to read. The README section *A step's files* is the account.
 
 What it leaves:
 
-- **`look` writes nothing on its word alone.** `tools:` (§4 I) is what makes it a reader. Until then, a
-  file it wrote would be committed and merged into respond.
 - **Reading outside the worktree, unattended, has not been run.** The screenshots live under `WF_ROOT`,
   outside `look`'s worktree. Nobody has yet run a `claude` step in `auto` mode to see whether it reads
   them without asking. If it stalls `needs-human`, the fix is a directory the step may read, carried on
@@ -102,9 +100,9 @@ worktree (Claude Code 2.1.270, on a machine whose operator has a user-scope serv
 
 What it leaves:
 
-- **Every Claude step has it, the readers too.** `look` and `review` do not need a browser. Per-step
-  choice is `mcp:` on the step once the run passes it through (engine E4 carries it on the task); then the
-  server moves from `.mcp.json` onto `implement` and `respond`.
+- **Every Claude step has it, the readers too.** `look` does not need a browser. Per-step choice is the
+  `mcp:` question under *Shipped: what a step may have*, below: the engine's `mcp` adds servers beside
+  `.mcp.json`, and cannot take that file's servers away.
 - **Codex steps do not have it.** Codex reads no `.mcp.json`. The engine hands a task's `mcp` to Codex as
   one `-c mcp_servers=…` override, so a Codex browser waits on the same `mcp:` key.
 - **Two browser builds.** No `@playwright/mcp` release pins the e2e's playwright 1.62.1 (Chromium 1234),
@@ -250,6 +248,51 @@ What it leaves:
 - **Nothing measures a reviewer that asks again for nits.** The cap and the person are the guard. The
   looping step is told that a finding worth a person's attention and not another round can go with
   `again: false`, and that is prose.
+
+## Shipped: what a step may have — `tools:` and `effort:`
+
+Plan §4 I. A step names the only tools its session has, `tools: Read, Grep, Glob, Bash`, and how hard its
+harness thinks, `effort: high`. Both reach `e.file` on every filing of the step: the first, each try
+(`retries:`, `wf retry`) and each round. The engine gives them to Claude Code as `--tools` and `--effort`
+(B), and `--tools` was measured not to take away the tool a closeout is made with.
+
+- `tools:` is refused at load when it names no tool, when an entry has a space or a comma inside (a list
+  without its commas, a rule such as `Bash(git diff:*)`, a list in brackets or quotes), and on codex, which has
+  no tool list. The codex message names `permissionMode`, the sandbox, instead.
+- `effort:` is refused by name with its harness's list, as a permission mode is.
+- The parser's permission modes and efforts are copies of the engine's, and the modes had drifted: the engine
+  took Claude Code's `manual` and codex's `bypassPermissions`, and the parser refused both at load.
+  `test/vocabulary.test.ts` imports `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
+  `CODEX_EFFORTS` and fails on any difference. The engine is the source.
+- `phaseOfView`, `closeoutAsked` and `exitVerdicts` are exported from the package root, so a consumer words a
+  step as `wf ls` does off the views it already has, with no `logs` call. `wf ls` now says `unknown`, not
+  `pending`, for a task the engine has no record of (plan §4b).
+- `workflows/ui/look.md` has `tools: Read, Grep, Glob`. The two reviewers stay on codex in
+  `permissionMode: read-only`, and their frontmatter gives the Claude form: `tools: Read, Grep, Glob, Bash`.
+
+What it leaves:
+
+- **`mcp:` on a step is the next question.** Every Claude step gets the checkout's `.mcp.json` (E4), readers
+  included. The engine's task `mcp` adds servers beside that file and cannot withhold it. A per-step `mcp:` that
+  narrows — `look` without a browser, or a reader with only the servers it names — needs the engine to leave the
+  checkout's file out when a task asks it to. Until then an `mcp:` key could only add, and a step that named
+  none would still have every server in the file. So the key is not built.
+- **Whether `--tools` narrows a server's tools is read, not measured.** `claude --help` (2.1.270) says the list
+  is "from the built-in set", so `look`'s `browser_*` tools are taken to survive `tools: Read, Grep, Glob`. No
+  live test has filed a step with both a tool list and `.mcp.json`.
+- **The shipped reviewers still cannot be shown to run the suite.** They are on codex, and its `read-only`
+  sandbox writes nothing, while the root `npm test` runs turbo, which writes a cache. Nobody has run it under
+  that sandbox. A Claude reviewer with `tools: Read, Grep, Glob, Bash` has the tool for it, and the operator's own
+  folders run review on Claude. But Bash can also write. And the `auto` classifier that refused `node --test`
+  (plan §4b) is not a tool list, so whether it lets a tool-fenced reviewer's `npm test` through is unmeasured.
+- **The engine's lists are not exported from its root.** The vocabulary test reads them from the engine modules
+  beside the root the package resolves. One export line in `agent-engine/src/facade.ts` would let it import
+  them by name.
+- **The api still carries its copies.** `apps/api/src/app.ts` has `phaseOf`, `askedOf` and `verdictOf`, and
+  its test leaves a lost task out of the words it holds to `list`'s. Both go when the api swaps to these
+  exports, in a follow-up.
+- **Codex's tool-list fence in the engine is unused.** The engine runs a codex task `read-only` when its list has
+  none of Bash, Write or Edit. No step reaches that now, and `permissionMode: read-only` says the same plainly.
 
 ## 1. Forgetting a run (`wf rm`)
 

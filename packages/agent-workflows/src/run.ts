@@ -33,6 +33,15 @@ export type Run = {
   brief: string;
   workflowDir: string;
   /**
+   * The workflow as it was when the run started, read once by `wf start` and never again.
+   *
+   * A fence, not a cache. The folder is a path anybody can edit — with `--no-worktree` a step works
+   * in the very checkout it lives in — and a `check:` is the command that judges a step: one the step
+   * could rewrite would be a step marking its own homework. Every pass reads this. Absent only on
+   * records from before it existed, which fall back to the folder.
+   */
+  workflow?: Workflow[];
+  /**
    * When somebody called the run off, if they did.
    *
    * On the run rather than on a step, because that is what it is about: stopping the step in

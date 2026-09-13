@@ -46,6 +46,14 @@ export const readRun = (id: string): Run => {
 };
 
 /**
+ * The run's steps: the workflow it froze at `wf start`.
+ *
+ * The folder is read only for a record from before the run froze its workflow — and a run started
+ * today never reaches that branch, so nothing written into the folder after `wf start` reaches it.
+ */
+export const stepsOf = (run: Run): Workflow[] => run.workflow ?? loadWorkflows(run.workflowDir);
+
+/**
  * Write down that this run is cancelled, and answer with the time that now stands.
  *
  * `wx` so the FIRST cancellation is the one kept: two people calling the same run off should not
@@ -265,6 +273,7 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
     isolate,
     brief: opts.brief,
     workflowDir: path.resolve(opts.workflowDir),
+    workflow: steps,
     branch,
     steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
     createdAt: new Date().toISOString(),
@@ -301,7 +310,7 @@ export type Advanced = { run: Run; filed: string[]; status: Assessment['status']
  * of what it did last time.
  */
 export async function advance(e: Engine, run: Run): Promise<Advanced> {
-  const steps = loadWorkflows(run.workflowDir);
+  const steps = stepsOf(run);
 
   const { views, phaseOf } = await taskPhases(e, run);
   const signedOff = closeoutReader(views, run);
@@ -401,7 +410,7 @@ export type Cancelled = { run: Run; plan: CancelPlan };
  */
 export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   const run = readRun(id);
-  const steps = loadWorkflows(run.workflowDir);
+  const steps = stepsOf(run);
   const { phaseOf } = await taskPhases(e, run);
 
   const plan = cancelPlan(steps, run, phaseOf);
@@ -431,7 +440,7 @@ export async function tick(e: Engine): Promise<Advanced[]> {
  * narrowed `TaskPhase` the DAG decides on: a person reading the list wants the detail.
  */
 export async function list(e: Engine, run: Run): Promise<Listing> {
-  const steps = loadWorkflows(run.workflowDir);
+  const steps = stepsOf(run);
   const { views } = await taskPhases(e, run);
   return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name));
 }
@@ -526,14 +535,14 @@ export async function decide(e: Engine, id: string): Promise<{
   closeouts: Record<string, Closeout | { error: string } | undefined>;
 }> {
   const run = readRun(id);
-  const steps = loadWorkflows(run.workflowDir);
+  const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run)), closeouts };
 }
 
 export function resultBranches(run: Run): string[] {
-  const steps = loadWorkflows(run.workflowDir);
+  const steps = stepsOf(run);
   return terminalSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));

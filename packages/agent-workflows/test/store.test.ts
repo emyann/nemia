@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-engine';
 import type { Run, TaskPhase } from '../src/run.ts';
 
@@ -23,7 +24,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, cancel, list, markCancelled, readRun } = await import('../src/runner.ts');
+const { advance, cancel, list, markCancelled, readRun, start } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -163,4 +164,44 @@ test('a step whose task the engine no longer has is unknown, not queued — canc
   const { plan } = await cancel(forgetful, run.id);
   assert.deepEqual(stopped, [], 'nobody to stop');
   assert.ok(plan.kind === 'finished' || plan.stop.length === 0, 'and nothing reported as stopped');
+});
+
+// ─── the workflow a run froze ───────────────────────────────────────────────
+
+/** A repository with one commit, so `wf start` has a base to record. */
+const aRepo = (): string => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'base');
+  return repo;
+};
+
+/** An engine that has never heard of anything, and remembers every task it is asked to file. */
+const recording = () => {
+  const filed: Array<{ id: string; brief: string; harness?: string; cwd: string }> = [];
+  const e = {
+    view: async (id: string) => ({ id, phase: 'unknown', sessionId: null, state: { brief: '', settled: null, attempts: [], stopRequested: false } }),
+    file: async (spec: { id: string; brief: string; harness?: string; cwd: string }) => { filed.push(spec); return spec.id; },
+    stop: async () => {},
+  } as unknown as Engine;
+  return { e, filed };
+};
+
+test('a run reads the workflow it froze at `wf start` — the folder edited afterwards never reaches it', async () => {
+  const folder = fs.mkdtempSync(path.join(ROOT, 'frozen-'));
+  fs.writeFileSync(path.join(folder, 'implement.md'), 'implement it as asked\n');
+  fs.writeFileSync(path.join(folder, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: folder, isolate: false });
+
+  // Somebody — a step working in this checkout, say — rewrites the folder the run was started from.
+  fs.writeFileSync(path.join(folder, 'implement.md'), 'something else entirely\n');
+  fs.rmSync(path.join(folder, 'review.md'));
+
+  const { e, filed } = recording();
+  await advance(e, readRun(run.id));
+  assert.deepEqual(filed.map((f) => f.id), [`${run.id}-implement`]);
+  assert.match(filed[0]!.brief, /implement it as asked/);
+  assert.doesNotMatch(filed[0]!.brief, /something else/);
+  assert.deepEqual(readRun(run.id).workflow?.map((s) => s.name), ['implement', 'review'], 'the deleted step is still the run\'s');
 });

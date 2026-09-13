@@ -3,8 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifacts, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, tick } from './runner.ts';
-import { loadWorkflows } from './workflow.ts';
+import { artifacts, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, readArtifact, readRun, resultBranches, start, stepsOf, tick } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -55,7 +54,7 @@ export async function main(argv: string[]): Promise<void> {
         workflowDir: path.resolve(flag(rest, 'workflows', './workflows')!),
         isolate: !rest.includes('--no-worktree'),
       });
-      const steps = loadWorkflows(run.workflowDir);
+      const steps = stepsOf(run);
       console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.name).join(' → ')}`);
       console.log(`workspace: ${run.workspace}`);
       console.log(`run 'wf tick' (or 'wf up') to start it`);
@@ -189,7 +188,9 @@ export async function main(argv: string[]): Promise<void> {
     case 'show': {
       if (!rest[0]) return console.log(HELP);
       const run = readRun(rest[0]);
-      console.log(JSON.stringify({ ...run, brief: `${run.brief.slice(0, 120)}…` }, null, 2));
+      // The frozen workflow is shown by its keys; each step's prose is what `wf logs` is for.
+      const workflow = run.workflow?.map(({ body, ...keys }) => ({ ...keys, body: `${body.slice(0, 60)}…` }));
+      console.log(JSON.stringify({ ...run, brief: `${run.brief.slice(0, 120)}…`, workflow }, null, 2));
       return;
     }
 

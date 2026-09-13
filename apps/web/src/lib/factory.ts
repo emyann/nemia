@@ -94,15 +94,24 @@ export const toggleOpen = (open: readonly string[], id: string): string[] =>
   open.includes(id) ? open.filter((other) => other !== id) : [...open, id];
 
 /**
+ * The Factory's open runs after a person drops a card they dragged: an open run moved claims its cells
+ * first, as one opened last does. The same list when nothing changes: a closed card, or the last already.
+ */
+export const movedOpen = (open: string[], id: string): string[] =>
+  open.includes(id) && open.at(-1) !== id ? [...open.filter((other) => other !== id), id] : open;
+
+/**
  * Where each run's card goes, for the runs on the floor, oldest first. `spans` holds the runs drawn open
- * and the cells each takes (`spanOf`), the run opened last first; a run not in it takes one cell.
+ * and the cells each takes (`spanOf`), the run a person opened or moved last first; a run not in it
+ * takes one cell.
  *
- * Claims are made open runs first, the one opened last first, then closed cards oldest first — so the
- * card a person just opened is never the one moved. In order of claim:
+ * Claims are made open runs first, the one opened or moved last first, then closed cards oldest first —
+ * so the run a person just opened or dropped is never the one moved aside. In order of claim:
  *
  * 1. A card on the floor now stays where it is: a person is looking at it. Unless an open run that
- *    claimed before it is in any of its cells — a graph unfolding over the cards beside it — and then
- *    it takes a free place (3). Cards never move for a closed card, even stacked: a person put them there.
+ *    claimed before it is in any of its cells — a graph unfolding, or dropped, over the cards beside
+ *    it, or a closed card dropped on a graph — and then it takes a free place (3). Cards never move for
+ *    a closed card, even stacked: a person put them there.
  * 2. A card coming onto the floor goes back where it was left (`saved`), unless a card placed before
  *    it is in any of those cells. The cells were free while this card was off the floor — finished and
  *    hidden, say — and a run that started meanwhile took one; putting both there would hide one under
@@ -110,9 +119,10 @@ export const toggleOpen = (open: readonly string[], id: string): string[] =>
  * 3. Any other card takes the first free place, row by row: the first cell from which every cell it
  *    takes is free. An open run wider than the grid starts a row, and its graph runs past the grid's edge.
  *
- * A card is in the cell nearest its corner, an open run in the cells its span covers from there, and
- * what lies off the grid is in no cell. A card off the floor holds no cell: finished runs pile up, and
- * holding their cells would leave holes that never close.
+ * A card is in the cell nearest its corner, and an open run in the cells its span covers from there —
+ * beyond the grid's edges as well as on the grid, so a graph running past the edge moves a card a person
+ * parked there; only (3) keeps to the grid. A card off the floor holds no cell: finished runs pile up,
+ * and holding their cells would leave holes that never close.
  */
 export function placeRuns(
   ids: readonly string[],
@@ -125,8 +135,8 @@ export function placeRuns(
   const spanOfId = (id: string) => spans.get(id) ?? ONE_CELL;
   const at = new Map<string, Point>();
   // Every cell a placed card is in; and the cells of the open runs, which a card on the floor yields to.
-  const taken = new Set<number>();
-  const unfolded = new Set<number>();
+  const taken = new Set<string>();
+  const unfolded = new Set<string>();
   const put = (id: string, point: Point) => {
     at.set(id, point);
     for (const cell of cellsOf(point, spanOfId(id))) {
@@ -134,7 +144,7 @@ export function placeRuns(
       if (spans.has(id)) unfolded.add(cell);
     }
   };
-  const free = (point: Point, span: Span, of: ReadonlySet<number>) => cellsOf(point, span).every((cell) => !of.has(cell));
+  const free = (point: Point, span: Span, of: ReadonlySet<string>) => cellsOf(point, span).every((cell) => !of.has(cell));
 
   for (const id of order) {
     const here = onFloor.get(id);
@@ -160,13 +170,13 @@ export function placeRuns(
   return new Map(ids.map((id) => [id, at.get(id)!]));
 }
 
-/** The grid's cells a card at `point` is in: from the cell nearest its corner, `span` across and down. */
-function cellsOf({ x, y }: Point, span: Span): number[] {
+/** The cells a card at `point` is in, as `row:column`: from the cell nearest its corner, `span` across and down, on the grid or off it. */
+function cellsOf({ x, y }: Point, span: Span): string[] {
   const column = Math.round(x / CELL_WIDTH);
   const row = Math.round(y / CELL_HEIGHT);
-  const cells: number[] = [];
-  for (let r = Math.max(row, 0); r < row + span.rows; r++) {
-    for (let c = Math.max(column, 0); c < Math.min(column + span.columns, GRID_COLUMNS); c++) cells.push(r * GRID_COLUMNS + c);
+  const cells: string[] = [];
+  for (let r = row; r < row + span.rows; r++) {
+    for (let c = column; c < column + span.columns; c++) cells.push(`${r}:${c}`);
   }
   return cells;
 }

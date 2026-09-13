@@ -29,6 +29,7 @@ import {
   graphAt,
   inFlight,
   keepLayout,
+  movedOpen,
   ONE_CELL,
   placeRuns,
   spanOf,
@@ -88,7 +89,8 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  * Laid out on a grid, oldest first, the first time a run is seen in this browser — so a run that
  * starts takes the next free cell and moves no card already down — and after that wherever a person
  * dragged it, until "Reset layout". A click on a card, or Enter on one, opens it: its graph unfolds to
- * the right over as many cells as it needs, and the cards in them move aside (`placeRuns`). The steps
+ * the right over as many cells as it needs, and the cards in them move aside (`placeRuns`) — when it opens,
+ * and when a card is dropped where a person dragged it. The steps
  * are the card's children in React Flow, placed relative to it, so they move with it when it is
  * dragged. A click on a step opens its inspector beside the floor. Which runs are open is kept in this
  * browser with the layout.
@@ -164,14 +166,17 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     const at = placeRuns(ids, new Map(), readFactoryLayout());
     return shown.map((run) => nodeOf(run, at.get(run.id)!));
   });
-  // Which runs and graphs `placed` was last laid out for: whatever reads the cards' positions waits for it.
-  const layoutKey = `${idsKey} ${spansKey}`;
+  // Cards a person has dropped where they dragged them: the floor is laid out again on each drop, so a
+  // card left under a graph moves then, and not on whatever changes the floor next.
+  const [drops, setDrops] = useState(0);
+  // Which runs, graphs and drops `placed` was last laid out for: whatever reads the cards' positions waits for it.
+  const layoutKey = `${idsKey} ${spansKey} ${drops}`;
   const [placedFor, setPlacedFor] = useState('');
 
   // Set when a card has moved — dragged, or moved aside by a graph — and cleared once the arrangement is saved.
   const moved = useRef(false);
 
-  // Runs that started, finished, were asked for, opened or closed since: every card where it belongs.
+  // Runs that started, finished, were asked for, opened, closed or dropped since: every card where it belongs.
   useEffect(() => {
     setPlaced((current) => {
       const have = new Map(current.map((node) => [node.id, node]));
@@ -209,7 +214,14 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const [sizes, setSizes] = useState<ReadonlyMap<string, { width: number; height: number }>>(() => new Map());
 
   const onNodesChange = useCallback((changes: NodeChange<FloorNode>[]) => {
-    if (changes.some((change) => change.type === 'position' && !change.dragging)) moved.current = true;
+    const dropped = changes.flatMap((change) => (change.type === 'position' && !change.dragging ? [change.id] : []));
+    if (dropped.length) {
+      moved.current = true;
+      // An open run dropped claims its cells first, as one opened last does, so what it lands on moves aside
+      // and not the card a person just put down; a closed card dropped on a graph takes a free cell.
+      setOpen((current) => dropped.reduce(movedOpen, current));
+      setDrops((n) => n + 1);
+    }
     // Only cards are kept here, and a change to a step matches none of them.
     const kept = changes.filter((change) => change.type !== 'select' && change.type !== 'remove') as NodeChange<RunFlowNode>[];
     setPlaced((current) => applyNodeChanges(kept, current));
@@ -363,10 +375,10 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   };
   const close = useCallback(() => setSelected(null), []);
 
-  // Laid out on the grid again with every run closed, and the saved arrangement forgotten, so the next visit agrees.
+  // Laid out on the grid again with every run closed, and the saved arrangement forgotten, so the next visit
+  // agrees. The open runs are forgotten by the effect that keeps them, their one writer.
   const resetLayout = () => {
     forgetFactoryLayout();
-    forgetFactoryOpen();
     setOpen([]);
     setSelected(null);
     const at = placeRuns(ids, new Map(), null);

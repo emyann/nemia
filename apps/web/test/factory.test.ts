@@ -11,6 +11,7 @@ import {
   GRID_COLUMNS,
   inFlight,
   keepLayout,
+  movedOpen,
   ONE_CELL,
   placeRuns,
   repoName,
@@ -126,7 +127,7 @@ test('a card goes where it was left, and a new one into the first cell no card i
     ['r-2', { x: 0, y: 0 }],
     // Near the third cell, not on it: it is still in that cell.
     ['r-4', { x: 2 * CELL_WIDTH + 10, y: -8 }],
-    // Dragged off the grid: in no cell.
+    // Dragged off the grid: in a cell beyond it, which no other card is in.
     ['r-6', { x: -500, y: 40 }],
     // Not on the floor now, so in no cell either.
     ['finished', { x: CELL_WIDTH, y: 0 }],
@@ -302,4 +303,59 @@ test('a card coming back onto the floor does not land in an open run\'s graph', 
   const at = placeRuns(['a', 'b'], new Map([['b', { x: 0, y: 0 }]]), new Map([['a', { x: CELL_WIDTH, y: 0 }]]), spans);
   assert.deepEqual(Object.fromEntries(at), { a: { x: 3 * CELL_WIDTH, y: 0 }, b: { x: 0, y: 0 } });
   assert.deepEqual(overlapping(at, spans), []);
+});
+
+// ─── what the review found ───────────────────────────────────────────────────
+
+test('an open run dropped over closed cards moves them aside at once, and the pass after moves nothing', () => {
+  // The review's probe: b, open across four cells, is dragged into row 1 over c and d. The floor is laid
+  // out again on the drop, so how it looks does not wait on some later change to it.
+  const ids = ['a', 'b', 'c', 'd'];
+  const spans = new Map([['b', { columns: 4, rows: 1 }]]);
+  const dropped = new Map([
+    ['a', { x: 0, y: 0 }],
+    ['b', { x: 0, y: CELL_HEIGHT }],
+    ['c', { x: CELL_WIDTH, y: CELL_HEIGHT }],
+    ['d', { x: 2 * CELL_WIDTH, y: CELL_HEIGHT }],
+  ]);
+  const at = placeRuns(ids, dropped, null, spans);
+  assert.deepEqual(Object.fromEntries(at), {
+    a: { x: 0, y: 0 },
+    b: { x: 0, y: CELL_HEIGHT },
+    c: { x: CELL_WIDTH, y: 0 },
+    d: { x: 2 * CELL_WIDTH, y: 0 },
+  });
+  assert.deepEqual(overlapping(at, spans), []);
+  assert.deepEqual(placeRuns(ids, at, null, spans), at);
+});
+
+test("a closed card dropped on an open run's graph takes a free cell, and the graph stays", () => {
+  const spans = new Map([['b', { columns: 3, rows: 1 }]]);
+  const at = placeRuns(['a', 'b'], new Map([['a', { x: CELL_WIDTH + 12, y: 8 }], ['b', { x: 0, y: 0 }]]), null, spans);
+  assert.deepEqual(Object.fromEntries(at), { a: { x: 3 * CELL_WIDTH, y: 0 }, b: { x: 0, y: 0 } });
+});
+
+test('a run dropped claims its cells first, as one opened last does; a drop opens no closed run', () => {
+  const open = ['a', 'b', 'c'];
+  assert.deepEqual(movedOpen(open, 'a'), ['b', 'c', 'a']);
+  assert.equal(movedOpen(open, 'c'), open, 'last already: the same list, so nothing changes for it');
+  assert.equal(movedOpen(open, 'closed'), open);
+});
+
+test("a graph running past the grid's edge moves a card parked beyond it, and one parked clear of it stays", () => {
+  // The review's probe: b opens at the grid's last column across four cells, and c was left right of the grid in its row.
+  const spans = new Map([['b', { columns: 4, rows: 1 }]]);
+  const onFloor = new Map([['a', { x: 0, y: 0 }], ['b', { x: 3 * CELL_WIDTH, y: 0 }], ['c', { x: 4 * CELL_WIDTH, y: 0 }]]);
+  const at = placeRuns(['a', 'b', 'c'], onFloor, null, spans);
+  assert.deepEqual(Object.fromEntries(at), { a: { x: 0, y: 0 }, b: { x: 3 * CELL_WIDTH, y: 0 }, c: { x: CELL_WIDTH, y: 0 } });
+  assert.deepEqual(overlapping(at, spans), []);
+
+  const clear = new Map([...onFloor, ['c', { x: 8 * CELL_WIDTH, y: 0 }]]);
+  assert.deepEqual(placeRuns(['a', 'b', 'c'], clear, null, spans).get('c'), { x: 8 * CELL_WIDTH, y: 0 });
+
+  // A run wider than the grid, placed fresh, does not start a row where a card is parked past the edge.
+  const wide = new Map([['w', { columns: 6, rows: 1 }]]);
+  const parked = placeRuns(['p', 'w'], new Map([['p', { x: 5 * CELL_WIDTH, y: 0 }]]), null, wide);
+  assert.deepEqual(Object.fromEntries(parked), { p: { x: 5 * CELL_WIDTH, y: 0 }, w: { x: 0, y: CELL_HEIGHT } });
+  assert.deepEqual(overlapping(parked, wide), []);
 });

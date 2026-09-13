@@ -19,7 +19,7 @@ export { artifactLines, dueNote, outputLines, owedFields, roundDueNote, tryNote 
 export type { Retry, RetryAsk, RetryMode, Round, RoundAsk } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
 import { artifactPlace, type ArtifactFile } from './run.ts';
-import { assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryMode, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
+import { askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryMode, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -790,9 +790,16 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       const resumeFrom = r.mode === 'nudge' ? sessionIn(views, record.taskId!) : undefined;
       // What the check said, as data in the brief: the frozen command, its exit, and both tails.
       const refusal = record.check && step.check ? await refusalOf(e, step.check, record.check.taskId) : undefined;
+      // A new session of a loop's target within a round owes replies to the round's findings, and is handed them as its first try was:
+      // off the looping step's try that asked, since the looping step's own place is unfiled until the target is verified.
+      const asking = resumeFrom ? undefined : askingTry(steps, run, r.step);
+      const askedWith = asking ? (await e.view(asking.taskId)).state.attempts.at(-1)?.closeout : undefined;
+      const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
+      const reads = (name: string): Closeout | undefined =>
+        (asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name));
       await e.file({
         id: taskId,
-        brief: composeBrief(step, run, steps, signedOff, files, undefined, {
+        brief: composeBrief(step, run, steps, reads, files, undefined, {
           try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), resumed: Boolean(resumeFrom),
           status: stepStatus(step, run, phaseOf, signedOff, asked, steps), ...(refusal ? { refusal } : {}),
         }),

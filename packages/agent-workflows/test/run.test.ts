@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, nextTry, outputLines, parseCloseout, refusedCheck, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, type Closeout, type EarlierTry, type RetryAsk, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, nextTry, outputLines, parseCloseout, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, type Closeout, type EarlierTry, type RetryAsk, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -1289,4 +1289,32 @@ test('`wf round` with no step takes the loop only when there is one — with sev
   const two: Workflow[] = [...LOOP.slice(0, 2), step('docs', ['review']), { ...step('proof', ['docs']), output: { file: 'proof.json', schema: LOOPING }, loop: 'docs', rounds: 2 }];
   assert.deepEqual(roundAsk(two, run({ implement: 'i1', review: 'r1', docs: null, proof: null }), undefined, ALL_SUCCEEDED),
     { refusal: 'r-1 has 2 loops, closing at review, proof: name the one to go round again — wf round r-1 <step>.' });
+});
+
+test("a new session of a loop's target within a round is handed the findings it owes replies to — a fresh try, or a nudge with no session to continue — and a continued one is not handed them twice", () => {
+  const r = reviewDue(2);
+  assert.deepEqual(askingTry(LOOP, r, 'implement'), { looping: LOOPING_REVIEW, taskId: 'r1' });
+  assert.equal(askingTry(LOOP, inRound(1), 'implement'), undefined, 'round 1 owes nothing');
+  assert.equal(askingTry(LOOP, r, 'review'), undefined, 'the looping step answers nobody');
+
+  // What the runner reads for review: the closeout of its try that asked, since its own place is unfiled.
+  const fromAsking = (name: string) => (name === 'review' ? reviewed(true) : undefined);
+  const newSessions = [
+    { try: 3, by: 'ask' as const, mode: 'fresh' as const, model: 'opus', resumed: false, status: 'unsigned' as const },
+    { try: 3, by: 'retries' as const, mode: 'nudge' as const, resumed: false, status: 'failed (check)' as const },
+  ];
+  for (const retry of newSessions) {
+    const brief = composeBrief(IMPLEMENT, r, LOOP, fromAsking, FILES, undefined, retry);
+    const at = (h: string) => brief.indexOf(h);
+    assert.ok(at('## Try 3\n') < at('## Round 2 of 3\n') && at('## Round 2 of 3\n') < at('## From review\n') && at('## From review\n') < at('## When you are finished'), brief);
+    assert.deepEqual(jsonIn(brief.slice(at('## From review\n'))), { findings: FOUND }, retry.mode);
+    for (const answer of ['**Fix it.**', '**Say why not.**', '**Sign off blocked.**']) assert.ok(brief.includes(answer), answer);
+    assert.equal(brief.match(/This is a new session/g)?.length, 1, 'said once, by the try');
+    assert.doesNotMatch(brief, /REVIEWER-SUMMARY/);
+    assert.match(brief, /- `replies`: your answer to each finding you were handed this round/);
+  }
+  const nudged = composeBrief(IMPLEMENT, r, LOOP, fromAsking, FILES, undefined, { try: 3, by: 'retries', mode: 'nudge', resumed: true, status: 'failed (check)' });
+  assert.doesNotMatch(nudged, /## Round 2 of 3|## From review/, 'the continued session was handed them already');
+  assert.match(nudged, /- `replies`: your answer/, 'and still owes them');
+  assert.doesNotMatch(composeBrief(IMPLEMENT, inRound(1), LOOP, fromAsking, FILES, undefined, newSessions[0]), /## Round|## From review/, 'round 1 has no findings to hand');
 });

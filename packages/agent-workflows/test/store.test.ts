@@ -1213,3 +1213,24 @@ test('a round ask file the run cannot read is not honoured, and not touched: the
   assert.deepEqual(roundAsksOf(run.id), ['round-review-2', 'round-review-3']);
   assert.equal(b.filings.length, filed);
 });
+
+test("REFUSED before the fix, now handed: a fresh try of implement inside round 2 gets the round's findings off review's try that asked — review's own place is unfiled — and owes replies to them", async () => {
+  const run = started(looped());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  b.settle(`${run.id}-implement-try2`, 'succeeded', { ...SIGNED, summary: 'IMPLEMENTER-SUMMARY' });   // signed, and answered nothing
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.checked, pass.blocked], [[], ['review']]);
+  assert.match((await list(b.e, readRun(run.id))).steps[0]!.status, /^unsigned/);
+
+  await retry(b.e, run.id, 'implement', { mode: 'fresh' });
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['implement']);
+  const spec = b.tasks.get(`${run.id}-implement-try3`)!.spec;
+  assert.equal(spec.resumeFrom, undefined, 'a new session');
+  assert.match(spec.brief, /\n## Try 3\n[\s\S]*\n## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*/);
+  assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
+  assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|IMPLEMENTER-SUMMARY/);
+  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+});

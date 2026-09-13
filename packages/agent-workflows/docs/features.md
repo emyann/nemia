@@ -244,10 +244,6 @@ What it leaves:
 - **`workflows/ui/` does not loop.** Its review is `workflows/review.md` less `loop:`, `rounds:` and
   `again`, and its respond is still the fan-in of review and look. A test holds the copy to the original,
   less the loop.
-- **A fresh try of the target inside a round is not handed the findings again.** `wf retry --fresh` (or
-  `--model`) composes a new session's brief from the current tries, and the looping step's closeout that
-  asked for the round is behind it on the record. `--nudge`, the default and what `retries:` files,
-  continues the session that has them. Reading the looping step's last try would close it.
 - **`wf logs <run> <step>`** on a step of the loop waiting for its round says it has not run: it reads the
   current try, which is not filed yet. The earlier tries are under their own ids, for `ae logs`.
 - **An ask carries no message**, as `wf retry`'s does not: `wf round` says once more, not what to look at.

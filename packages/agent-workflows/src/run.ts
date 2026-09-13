@@ -564,6 +564,20 @@ const roundWord = (round: number, cap: number): string => (round <= cap ? `round
 export const owesReplies = (steps: readonly Workflow[], run: Run, name: string): boolean =>
   steps.some((s) => s.loop === name) && roundOf(run, name) > 1;
 
+/**
+ * The looping step, and its try that asked for the round a loop's target is on — or undefined when the target owes no `replies`.
+ *
+ * The looping step's own place is unfiled until the target is verified, so the closeout whose findings the target owes answers to is
+ * behind it, on this try. `advance` reads it from there for a new session of the target within the round — a fresh try, or a nudge with
+ * no session left to continue — which would otherwise be asked for replies to findings nobody handed it.
+ */
+export function askingTry(steps: readonly Workflow[], run: Run, name: string): { looping: Workflow; taskId: string } | undefined {
+  const looping = steps.find((s) => s.loop === name);
+  if (!looping || !owesReplies(steps, run, name)) return undefined;
+  const taskId = [...(run.steps[looping.name]?.tries ?? [])].reverse().find((t) => t.then === 'round')?.taskId;
+  return taskId ? { looping, taskId } : undefined;
+}
+
 /** The fields a step's closeout must give on the try it is on: what its `output:` declares, and `replies` on a loop's target past round 1. */
 export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[]): string[] =>
   [...outputFields(step), ...(owesReplies(steps, run, step.name) ? [LOOP_REPLIES] : [])];
@@ -1309,7 +1323,8 @@ export function composeBrief(
     ...(artifactsDir ? [artifactsContract(artifactsDir)] : []),
     closeoutContract(step, Boolean(round) || owesReplies(steps, run, step.name)),
   ].join('\n');
-  const again = retry ? retrySection(step, retry) : round ? roundSection(step, round, steps, closeoutOf) : '';
+  const again = retry ? retrySection(step, retry) + retriedInRound(step, run, steps, retry, closeoutOf)
+    : round ? roundSection(step, round, steps, closeoutOf) : '';
   // A try or a round that continues the last session has everything but what became of it.
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
   // What this step reads of the steps it waits on — their declared output, and only if it asked — and, on a
@@ -1364,6 +1379,21 @@ export function composeBrief(
   if (given) parts.push(given);
   parts.push(contracts);
   return parts.join('\n');
+}
+
+/**
+ * For a new session of a loop's target within a round past the first — a fresh try, or a nudge with no session left to continue — the
+ * round's contract and findings, as the round's first try was given them. It owes `replies` (`owesReplies`), and a session that was never
+ * handed the findings could honestly answer only an empty list, which would read as signed. A try that continues the session has them
+ * already, and is given nothing more. `closeoutOf` answers for the looping step with its try that asked (`askingTry`, in `advance`).
+ */
+function retriedInRound(step: Workflow, run: Run, steps: readonly Workflow[], retry: RetryBriefing, closeoutOf: (step: string) => Closeout | undefined): string {
+  const looping = steps.find((s) => s.loop === step.name);
+  if (retry.resumed || !looping || !owesReplies(steps, run, step.name)) return '';
+  const round = roundOf(run, step.name);
+  const rounds = capOf(looping);
+  // `resumed: true` only keeps the section from saying this is a new session: `retrySection` has just said so.
+  return roundSection(step, { loop: looping.name, round, rounds, by: round > rounds ? 'ask' : 'again', resumed: true }, steps, closeoutOf);
 }
 
 /** What a step tried again is told of the try before it: see `retrySection`. */

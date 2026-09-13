@@ -517,7 +517,9 @@ rounds: 3
   answers: fix it; say why not, in `replies`, which the run adds to its closeout from round 2 (`fixed`
   or `won't fix`, and why) and hands the next reviewer as data, under *Replies from implement*; or
   sign off `blocked`, which stops the run for a person. A target that answers nothing is `unsigned`.
-  The looping step is told, every round, what its `again` does and which round it is.
+  The looping step is told, every round, what its `again` does and which round it is. A new session of
+  the target within a round — `wf retry --fresh`, or a nudge with no session left to continue — is
+  handed the round's contract and findings again, off the looping step's try that asked for the round.
 - **At the cap, a person.** `again: true` on the last round files nothing: the step reads
   `rounds exhausted`, nothing that waits on it runs, and `wf decide` says `ROUNDS EXHAUSTED`, prints
   the last findings and offers `wf round <run>` — the person's once more. Like `wf retry`, it writes an

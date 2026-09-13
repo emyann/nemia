@@ -34,6 +34,12 @@ export type PromiseJournal = {
 
 /** A harness, in Promises. Only needed for one that `HarnessSpec` cannot describe. */
 export type PromiseRunner = {
+  /**
+   * Start the session; reject if that fails. When you know nothing started under `r.name`, reject
+   * with an error whose `refused` is `true`, and the attempt ends `unstartable` at once. Otherwise
+   * the engine cannot rule a session out, and its grace window finds out: the session is adopted if
+   * it appears, the attempt `lost` if it never does.
+   */
   spawn(r: SpawnRequest): Promise<void>;
   observe(): Promise<Map<string, Sighting>>;
   stop(sessionId: string): Promise<void>;
@@ -155,7 +161,14 @@ const runnerOf = (harnesses: Record<string, HarnessConfig>, fallback: string, ro
       h === 'claude-bg' ? claudeOps()
         : isSpec(h) ? detachedOps(h, root)
         : {
-            spawn: (r: SpawnRequest) => wrap(() => h.spawn(r), (m) => new RunnerError({ verb: 'spawn', message: m })),
+            spawn: (r: SpawnRequest) => Effect.tryPromise({
+              try: () => h.spawn(r),
+              // A rejection is not proof that nothing started; a runner that knows says `refused`.
+              catch: (cause) => new RunnerError({
+                verb: 'spawn', message: cause instanceof Error ? cause.message : String(cause),
+                ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
+              }),
+            }),
             observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })),
             stop: (id: string) => wrap(() => h.stop(id), (m) => new RunnerError({ verb: 'stop', message: m })),
             logs: (id: string) => wrap(() => h.logs(id), (m) => new RunnerError({ verb: 'logs', message: m })),

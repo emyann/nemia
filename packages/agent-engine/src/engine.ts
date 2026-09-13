@@ -123,11 +123,18 @@ export const step = Effect.fn('step')(function* (
       break;
 
     case 'spawn': {
-      // A harness that refuses to start the session has answered, and the answer is recorded like
-      // any other ending — `failed`, `unstartable`, in the harness's own words — so `decide` settles
-      // or retries it as it would any failure. Let out as an error instead, it rejected the whole
-      // tick: every task behind this one stalled, on every pass, for as long as this one existed.
-      const refused = yield* runner.spawn({
+      // A spawn that fails is answered by what the harness can vouch for.
+      //
+      // `refused` — nothing started: the attempt ends `failed`, `unstartable`, in the harness's
+      // words, and `decide` settles or retries it like any failure. Let out as an error instead, it
+      // rejected the whole tick, and every task behind this one stalled on every pass.
+      //
+      // Anything else is no proof that nothing started: a launcher can create the session and lose
+      // its acknowledgement. Ending that attempt left a working session nothing would adopt, stop or
+      // bound, and a retry beside it. So the call is written down as having returned — `spawned`,
+      // with its error — and the grace window `decide` already keeps for a session the harness has
+      // not registered tells which it was: adopted if it shows up, `lost` if it never does.
+      const failed = yield* runner.spawn({
         name: action.name, brief: state.brief, cwd: state.cwd,
         model: state.model, permissionMode: state.permissionMode, harness: state.harness,
         worktree: state.worktree, closeoutSchema: state.closeoutSchema,
@@ -137,11 +144,11 @@ export const step = Effect.fn('step')(function* (
         resumeFrom: state.attempts.find((a) => a.n === action.attempt)?.resumeFrom,
       }).pipe(
         Effect.as(undefined),
-        Effect.catchTag('RunnerError', (e) => Effect.succeed(e.message)),
+        Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
       );
-      yield* journal.append(taskId, refused === undefined
-        ? { kind: 'spawned', at: at(), attempt: action.attempt }
-        : { kind: 'ended', at: at(), attempt: action.attempt, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: refused });
+      yield* journal.append(taskId, failed?.refused
+        ? { kind: 'ended', at: at(), attempt: action.attempt, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: failed.message }
+        : { kind: 'spawned', at: at(), attempt: action.attempt, ...(failed ? { error: failed.message } : {}) });
       break;
     }
 

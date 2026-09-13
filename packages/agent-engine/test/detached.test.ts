@@ -413,3 +413,24 @@ test("no exit code yet, or the worker's -1 for none, is reported as no code at a
   assert.equal('exitCode' in seen.get('ae/t15/1')!, false, 'still running: no code');
   assert.equal('exitCode' in seen.get('ae/t16/1')!, false, 'killed by a signal: no code, not -1');
 });
+
+test('a detached spawn that throws says nothing started — the worker is never launched', async () => {
+  const broken: HarnessSpec = { name: 'sh', command: () => { throw new Error('no command for this'); } };
+  const e = await Effect.runPromise(detachedOps(broken, root()).spawn(req('ae/t17/1', root())).pipe(
+    Effect.as(undefined),
+    Effect.catchTag('RunnerError', (err) => Effect.succeed(err)),
+  ));
+  assert.equal(e?.refused, true);
+});
+
+test('a detached worker aimed at a directory that is not there is refused, and cannot take the engine down', async () => {
+  // Before, `spawn` returned, the child emitted ENOENT a moment later, and nobody heard it: the
+  // process that launched the worker — the engine, and this test runner — died.
+  const e = await Effect.runPromise(detachedOps(sh('true'), root()).spawn(req('ae/t18/1', path.join(root(), 'gone'))).pipe(
+    Effect.as(undefined),
+    Effect.catchTag('RunnerError', (err) => Effect.succeed(err)),
+  ));
+  assert.equal(e?.refused, true);
+  assert.match(e?.message ?? '', /is not a directory/);
+  await new Promise((r) => setTimeout(r, 300));
+});

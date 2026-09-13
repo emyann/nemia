@@ -285,3 +285,24 @@ test('a busy session is not read for usage — nothing it has consumed is final'
     assert.equal(asked, 0);
   } finally { restore(); }
 });
+
+// ─── a spawn that fails: did anything start? ────────────────────────────────
+
+test('claude that could not even be launched says nothing started; one that ran and failed does not', async () => {
+  const caught = (cwd: string) => Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'b', cwd }).pipe(
+    Effect.as(undefined),
+    Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
+  ));
+  const missing = await caught(path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'ae-nocwd-')), 'gone'));
+  assert.equal(missing?.refused, true, 'the OS refused the process: no session can exist');
+
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  fs.writeFileSync(path.join(dir, 'claude'), '#!/bin/sh\necho "something went wrong" >&2\nexit 1\n', { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    const ran = await caught(dir);
+    assert.ok(ran, 'it failed');
+    assert.notEqual(ran?.refused, true, 'claude ran and exited 1: whether it registered a session is not known');
+  } finally { process.env.PATH = prev; }
+});

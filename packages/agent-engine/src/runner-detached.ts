@@ -70,6 +70,7 @@ export const STALE_MS = 30_000;
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-worker.ts');
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
+const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 
 type RunFile = {
   name?: string; state: Observed; pid: number; heartbeatAt: string;
@@ -125,6 +126,9 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     spawn: (r) =>
       Effect.try({
         try: () => {
+          // Checked here because `spawn` does not throw for it: the child emits the error later, and
+          // unheard, that event kills the process that launched the worker — the engine.
+          if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
           fs.mkdirSync(dir, { recursive: true });
           // A re-spawn of the same attempt must not find the previous one's answer waiting for it.
           try { fs.rmSync(closeoutFile(r.name)); } catch { /* nothing to clear */ }
@@ -147,9 +151,14 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           const child = spawn(process.execPath, [WORKER, runFile(r.name)], {
             detached: true, stdio: 'ignore', cwd: r.cwd,
           });
+          // Heard, so a launch that fails after `spawn` returns never takes the engine down with it;
+          // the run file it leaves says working with no pid, and the lease calls that dead.
+          child.on('error', () => {});
           child.unref();
         },
-        catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}` }),
+        // Everything in `try` runs before the worker is launched, or is the launch: whatever threw,
+        // no session is running under the name.
+        catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}`, refused: true }),
       }),
 
     // The registry is ours: a directory, read fresh every pass. Same shape as `claude agents`.

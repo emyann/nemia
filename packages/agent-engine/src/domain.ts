@@ -100,7 +100,7 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  *   `harness`      the harness reported a terminal state. It ran, and this is what it concluded.
  *   `lost`         we never heard: the session vanished, or a detached worker stopped beating.
  *                  The work in the transcript is real; nobody said it was finished.
- *   `unstartable`  the harness refused to start it: the spawn call itself failed. Nothing ran.
+ *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
  *
  * Everything about resume policy hangs on this distinction, which is why it is recorded rather
  * than inferred later.
@@ -150,8 +150,12 @@ export type Event =
     }
   /** INTENT: we are about to spawn `nameFor(taskId, attempt)`. */
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string }
-  /** RESULT: the spawn call returned. The session is the harness's problem now. */
-  | { kind: 'spawned'; at: string; attempt: number }
+  /**
+   * RESULT: the spawn call returned. The session is the harness's problem now. `error` when the call
+   * failed without the harness vouching that nothing started: whether a session exists is then the
+   * grace window's to find out.
+   */
+  | { kind: 'spawned'; at: string; attempt: number; error?: string }
   /**
    * An attempt reached a terminal state, as observed — never as assumed. `usage` and `exitCode`
    * come from the same sighting, when its runner measured them; `decide` reads neither.
@@ -181,7 +185,7 @@ export type Attempt = {
   usage: Usage | null;
   /** How its process exited; `null` for a harness whose process is not ours, or one that never exited. */
   exitCode: number | null;
-  /** What the harness said when it refused to start this attempt (`reason: 'unstartable'`). */
+  /** What a failed spawn call said: the refusal behind `unstartable`, or an error after which a session may still exist. */
   error?: string;
 };
 
@@ -231,12 +235,12 @@ export function fold(taskId: string, events: readonly Event[]): State {
         break;
       case 'spawned': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) a.spawnedAt = e.at;
+        if (a) { a.spawnedAt = e.at; a.error = e.error; }
         break;
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; a.error = e.error; }
+        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; a.error = e.error ?? a.error; }
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;

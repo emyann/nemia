@@ -150,7 +150,8 @@ export const attemptLine = (a: Attempt): string => {
   if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
   const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : ''}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
-  return `attempt ${a.n}  ${how}${exit}  ${usageLine(a.usage)}`;
+  const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
+  return `attempt ${a.n}  ${how}${exit}  ${usageLine(a.usage)}${failedCall}`;
 };
 
 const line = (v: TaskView) => {
@@ -171,6 +172,7 @@ const KINDS: Record<string, string> = {
 const entryLine = (taskId: string, event: Event) => {
   const extra = event.kind === 'settled' ? `  ${event.outcome}`
     : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? '' : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
+    : event.kind === 'spawned' && event.error ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
     : '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };

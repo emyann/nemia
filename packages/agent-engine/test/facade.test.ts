@@ -324,3 +324,26 @@ test('file() refuses a tool list that is not a list of names, and journals one t
   const [filed] = await journal.read(id);
   assert.deepEqual((filed as { tools?: string[] }).tools, ['Read', 'Grep', 'Glob'], 'on the record, for the runner');
 });
+
+test('a PromiseRunner whose spawn rejects is not taken to have started nothing — unless it says so', async () => {
+  const sessions = new Map<string, Sighting>();
+  const launcher: PromiseRunner = {
+    ...fakeHarness(sessions),
+    async spawn(r) {
+      if (r.brief === 'refuse') throw Object.assign(new Error('quota: no sessions today'), { refused: true });
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+      throw new Error('launcher: lost the acknowledgement');
+    },
+  };
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { launcher }, defaultHarness: 'launcher' });
+  const maybe = await engine.file({ brief: 'start', cwd: '/r' });
+  const no = await engine.file({ brief: 'refuse', cwd: '/r' });
+
+  await engine.tick();
+  assert.equal((await engine.view(no)).state.settled, 'failed', 'said nothing started: unstartable');
+  assert.equal((await engine.view(no)).state.attempts[0]?.reason, 'unstartable');
+  assert.equal((await engine.view(maybe)).state.settled, null, 'said nothing: not failed');
+
+  await engine.tick();
+  assert.equal((await engine.view(maybe)).phase, 'running (working)', 'and its session is adopted');
+});

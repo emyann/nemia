@@ -20,6 +20,12 @@ import type { Observed, Sighting, Usage } from './domain.ts';
 export class RunnerError extends Schema.TaggedError<RunnerError>()('RunnerError', {
   verb: Schema.String,
   message: Schema.String,
+  /**
+   * The harness vouches that nothing started: no session can exist under the name. Set by a spawn,
+   * and only when that is certain — the OS would not create the process, or a detached worker was
+   * never launched. Absent, a failed spawn may still have left a session running.
+   */
+  refused: Schema.optionalKey(Schema.Boolean),
 }) {}
 
 export type SpawnRequest = {
@@ -399,7 +405,13 @@ const sh = (cmd: string, args: string[], o: { cwd?: string; verb: string }) =>
   Effect.callback<string, RunnerError>((resume) => {
     const child = execFile(cmd, args, { cwd: o.cwd, maxBuffer: 8 * 1024 * 1024 }, (err, stdout, stderr) => {
       resume(err
-        ? Effect.fail(new RunnerError({ verb: o.verb, message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim() }))
+        ? Effect.fail(new RunnerError({
+            verb: o.verb, message: `${cmd} ${args[0]}: ${stderr || err.message}`.trim(),
+            // The OS never created the process — no binary, no cwd — so nothing ran and nothing
+            // started. Any other failure ran the command, and whether it registered a session first
+            // is not something its exit code says.
+            ...((err as NodeJS.ErrnoException).syscall?.startsWith('spawn') ? { refused: true } : {}),
+          }))
         : Effect.succeed(stdout));
     });
     return Effect.sync(() => child.kill());

@@ -116,6 +116,14 @@ export type Event =
        * it never learns the shape, because the shape is somebody else's vocabulary.
        */
       closeoutSchema?: object;
+      /**
+       * The only tools the session may have, in its harness's names for them. Carried, never read
+       * here: a runner turns it into whatever fence its harness has, and `decide` never learns what
+       * a tool is. Absent means the harness's own set.
+       */
+      tools?: string[];
+      /** How hard the harness should think, in its own words. Carried, never read here. */
+      effort?: string;
     }
   /** INTENT: we are about to spawn `nameFor(taskId, attempt)`. */
   | { kind: 'starting'; at: string; attempt: number; resumeFrom?: string }
@@ -162,6 +170,9 @@ export type State = {
   worktree?: string | boolean;
   /** The shape of the workload's closing statement. See the `filed` event. */
   closeoutSchema?: object;
+  /** The session's tools and effort. See the `filed` event. `decide` never reads either. */
+  tools?: string[];
+  effort?: string;
   attempts: Attempt[];
   stopRequested: boolean;
   settled: Outcome | null;
@@ -181,6 +192,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
         s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
+        s.tools = e.tools; s.effort = e.effort;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom });

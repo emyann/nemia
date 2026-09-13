@@ -423,3 +423,33 @@ test('no schema, no statement: a task ends exactly as it did before', async () =
   assert.equal(v.state.settled, 'succeeded');
   assert.equal(v.state.attempts[0]?.closeout, undefined);
 });
+
+// ─── the fence and the effort: carried, never read ──────────────────────────
+
+import fs from 'node:fs';
+
+test('tools and effort are declared by the task and reach every attempt untouched', async () => {
+  const b = board();
+  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], effort: 'low' }));
+  await b.run(tick());
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'failed' });
+  await b.run(tick());
+  assert.equal(b.spawned.length, 2, 'a retry was spawned');
+  for (const r of b.spawned) {
+    assert.deepEqual(r.tools, ['Read', 'Grep'], 'the retry is fenced exactly as the first attempt was');
+    assert.equal(r.effort, 'low');
+  }
+
+  const plain = board();
+  await plain.run(file(spec));
+  await plain.run(tick());
+  assert.equal(plain.spawned[0]!.tools, undefined, 'no list, no fence');
+  assert.equal(plain.spawned[0]!.effort, undefined);
+});
+
+test('decide never reads tools or effort — a knob on the workload is a field, not a judgement', () => {
+  const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
+  const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
+  assert.ok(body.includes('return'), 'found the body of decide');
+  assert.doesNotMatch(body, /\.tools|\.effort/);
+});

@@ -21,7 +21,7 @@ import { createEngine, type Engine, type Event, type ResumePolicy, type TaskSpec
  */
 export const BRIEF_KEYS = [
   'cwd', 'harness', 'model', 'permissionMode', 'maxAttempts', 'deadlineSeconds',
-  'resume', 'resumeFrom', 'worktree', 'closeoutSchema',
+  'resume', 'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort',
 ] as const satisfies readonly (keyof TaskSpec)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
@@ -101,6 +101,12 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     closeoutSchema = parsed;
   }
 
+  // One line, comma-separated: `tools: Read, Grep, Glob`. Which names a harness has is its to say.
+  const toolList = meta.get('tools')?.split(',').map((t) => t.trim());
+  if (toolList?.some((t) => !t)) {
+    throw refuse(`\`tools: ${meta.get('tools')}\` has an empty name in it. List tool names separated by commas, like \`tools: Read, Grep, Glob\`.`);
+  }
+
   const worktree = meta.get('worktree');
   return {
     brief,
@@ -117,6 +123,8 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     closeoutSchema,
     // `worktree: true` lets the harness name it, `false` is no worktree, any other value names it.
     worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
+    tools: toolList,
+    effort: meta.get('effort'),
   };
 }
 
@@ -161,6 +169,11 @@ const HELP = `ae — an engine for agent sessions
     resumeFrom       a session id to continue, instead of starting cold
     worktree         true, or a name — the harness cuts it
     closeoutSchema   a JSON Schema file — the workload ends by answering in that shape
+    tools            Read, Grep, Glob — the only tools the session has (codex: read-only
+                     unless the list has Bash, Write or Edit)
+    effort           claude: low | medium | high | xhigh | max
+                     codex:  none | minimal | low | medium | high | xhigh | max
+  a key not listed here, or a value the harness cannot take, is refused (exit 2)
 
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster
   AE_MAX_CONCURRENT  sessions per harness at once (default 3)`;

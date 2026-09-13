@@ -37,6 +37,10 @@ export type SpawnRequest = {
   worktree?: string | boolean;
   /** A JSON Schema the workload's final answer must satisfy. Passed through; never interpreted. */
   closeoutSchema?: object;
+  /** The only tools the session may have, in this harness's names. Absent: the harness's own set. */
+  tools?: string[];
+  /** How hard the harness should think, in its own words. */
+  effort?: string;
 };
 
 /**
@@ -123,10 +127,20 @@ export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: num
  */
 export const CLAUDE_PERMISSION_MODES: readonly string[] = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'manual', 'plan'];
 
+/**
+ * The efforts Claude Code takes. Refused here rather than left to the CLI, because the CLI does not
+ * refuse one: 2.1.270 prints a warning for an unknown `--effort` and runs at its default effort —
+ * a knob that silently does nothing.
+ */
+export const CLAUDE_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+
 /** What Claude Code cannot be asked for, as a sentence that says what to write instead. */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   if (task.permissionMode !== undefined && !CLAUDE_PERMISSION_MODES.includes(task.permissionMode)) {
     return `\`permissionMode: ${task.permissionMode}\` is not a mode Claude Code has. Its modes are: ${CLAUDE_PERMISSION_MODES.join(', ')}.`;
+  }
+  if (task.effort !== undefined && !CLAUDE_EFFORTS.includes(task.effort)) {
+    return `\`effort: ${task.effort}\` is not an effort Claude Code has. Its efforts are: ${CLAUDE_EFFORTS.join(', ')}.`;
   }
   return undefined;
 };
@@ -192,6 +206,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     spawn: (r) => sh('claude', [
       '--bg',
       '--name', r.name,
+      // The fence. `--tools`, not `--allowedTools`: a tool the session does not have beats one it
+      // may not use, and `--allowedTools` only pre-approves. VARIADIC — directly before the prompt
+      // it would take the prompt as a tool name, the `--worktree` trap — so it goes here, and the
+      // `--permission-mode` that always comes next ends the list. An empty list is no tools at all.
+      ...(r.tools ? ['--tools', r.tools.join(',')] : []),
       // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
       // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first
       // session that wants to run its own tests stops and waits for a person who is not there.
@@ -199,6 +218,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // exactly this: long tasks, no prompt fatigue. Overridable per task; never silently.
       '--permission-mode', r.permissionMode ?? 'auto',
       ...(r.model ? ['--model', r.model] : []),
+      ...(r.effort ? ['--effort', r.effort] : []),
       // `--resume` continues that conversation in the background. The NAME is still ours and
       // still new, so a resumed attempt is a distinct row on the board from the one it continues.
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),

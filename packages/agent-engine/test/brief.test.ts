@@ -42,6 +42,8 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
     resumeFrom: ['abc-123', 'abc-123'],
     worktree: ['my-branch', 'my-branch'],
     closeoutSchema: [schema, { type: 'object' }],
+    tools: ['Read, Grep,Glob', ['Read', 'Grep', 'Glob']],
+    effort: ['high', 'high'],
   };
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];
@@ -76,6 +78,11 @@ test('a key given twice, a line that is not key: value, and an empty value are r
   refuses(brief('harness: claude\nharness: codex'), /`harness` is given twice/);
   refuses(brief('harness codex'), /`harness codex` is not a `key: value` line/);
   refuses(brief('model:'), /`model:` has no value/);
+});
+
+test('a tool list with an empty name in it is refused', () => {
+  refuses(brief('tools: Read,,Grep'), /has an empty name in it.*tools: Read, Grep, Glob/);
+  refuses(brief('tools: Read,'), /has an empty name in it/);
 });
 
 test('frontmatter that is never closed is refused, not read as the prompt', () => {

@@ -94,6 +94,18 @@ export type TaskSpec = {
    * engine: its shape is yours.
    */
   closeoutSchema?: object;
+  /**
+   * The only tools the session may have, in its harness's names — `['Read', 'Grep', 'Glob']`.
+   * Absent: the harness's own set; empty: none at all. Claude Code is given exactly the list
+   * (`--tools`). Codex has no tool list, so it runs `read-only` when the list has none of Bash,
+   * Write or Edit, and is not narrowed otherwise. Carried on the task; `decide` never reads it.
+   */
+  tools?: string[];
+  /**
+   * How hard the harness should think, in its own words: `--effort` for Claude Code,
+   * `model_reasoning_effort` for Codex. Carried on the task; `decide` never reads it.
+   */
+  effort?: string;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };
@@ -106,9 +118,10 @@ export type Engine = {
    *
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
-   * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model or
-   * resumeFrom; or a word its harness does not take (Claude Code's permission modes, a
-   * `HarnessSpec`'s own `refuses`). A harness brought as a `PromiseRunner` is asked nothing.
+   * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model,
+   * resumeFrom or effort; a `tools` that is not a list of names; or a word its harness does not take
+   * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists).
+   * A harness brought as a `PromiseRunner` is asked nothing.
    */
   file(spec: TaskSpec): Promise<string>;
   /** One pass: start what may start, notice what ended, settle what is over. */
@@ -201,6 +214,11 @@ const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
   }
   if (spec.model === '') return "`model` is empty. Leave it out for the harness's default.";
   if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
+  if (spec.effort === '') return "`effort` is empty. Leave it out for the harness's default.";
+  // One name per entry: a comma inside one would split into two names on the way to the harness.
+  if (spec.tools !== undefined && !(Array.isArray(spec.tools) && spec.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))) {
+    return `\`tools: ${JSON.stringify(spec.tools)}\` is not a list of tool names. Give one name per entry, like ["Read", "Grep", "Glob"].`;
+  }
   const h = harnesses[spec.harness]!;
   return (h === 'claude-bg' ? claudeRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
 };

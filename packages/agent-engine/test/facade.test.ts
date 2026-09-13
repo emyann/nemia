@@ -300,3 +300,27 @@ test('a harness brought as a spec is asked its own refusals; one brought as a ru
   await refused(engine, { brief: 'b', cwd: '/r', model: 'huge' }, /picky runs no huge models/);
   assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'fake', permissionMode: 'anything' }));
 });
+
+test('file() refuses an effort its harness does not have — Claude Code would have ignored it', async () => {
+  const { journal, engine } = shipped();
+  await refused(engine, { brief: 'b', cwd: '/r', effort: 'extreme' }, /`effort: extreme` is not an effort Claude Code has/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', effort: 'extreme' }, /not a reasoning effort Codex has/);
+  await refused(engine, { brief: 'b', cwd: '/r', effort: '' }, /`effort` is empty/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  await engine.file({ brief: 'b', cwd: '/r', effort: 'xhigh' });
+  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', effort: 'minimal' });
+  assert.equal((await journal.list()).length, 2);
+});
+
+test('file() refuses a tool list that is not a list of names, and journals one that is', async () => {
+  const { journal, engine } = shipped();
+  for (const tools of [['Read,Grep'], [''], [' Read'], 'Read' as unknown as string[]]) {
+    await refused(engine, { brief: 'b', cwd: '/r', tools }, /is not a list of tool names/);
+  }
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  const id = await engine.file({ brief: 'b', cwd: '/r', tools: ['Read', 'Grep', 'Glob'] });
+  const [filed] = await journal.read(id);
+  assert.deepEqual((filed as { tools?: string[] }).tools, ['Read', 'Grep', 'Glob'], 'on the record, for the runner');
+});

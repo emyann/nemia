@@ -338,3 +338,52 @@ test("the runner merges what a spec prepares into what its command is given", as
   assert.deepEqual(given?.trustedDirs, ['/somewhere']);
   assert.ok(given?.closeoutFile, 'alongside what the runner chose itself');
 });
+
+// ─── the fence and the effort, per harness ──────────────────────────────────
+
+test('at shipped defaults neither detached harness is given a tool list or an effort', async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const c = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
+  assert.equal(c.some((a) => a.startsWith('model_reasoning_effort')), false);
+  assert.equal(c[c.indexOf('-s') + 1], 'workspace-write');
+  const d = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
+  assert.equal(d.includes('--tools'), false);
+  assert.equal(d.includes('--effort'), false);
+});
+
+test('codex runs read-only when its tools have none of Bash, Write or Edit — whatever sandbox it named', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const sandbox = (r: { tools?: string[]; permissionMode?: string }) => {
+    const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', ...r }).args;
+    return args[args.indexOf('-s') + 1];
+  };
+  assert.equal(sandbox({ tools: ['Read', 'Grep', 'Glob'] }), 'read-only');
+  assert.equal(sandbox({ tools: ['Read', 'Grep', 'Glob'], permissionMode: 'danger-full-access' }), 'read-only', 'the narrower fence wins');
+  assert.equal(sandbox({ tools: [] }), 'read-only', 'no tools at all');
+  assert.equal(sandbox({ tools: ['Read', 'Bash'] }), 'workspace-write', 'a list with a shell does not narrow codex');
+  assert.equal(sandbox({ tools: ['Read', 'Bash'], permissionMode: 'read-only' }), 'read-only', 'and the mode it named still holds');
+});
+
+test('effort reaches codex as a config override before `resume`, and claude-detached as --effort', async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const c = codex.command({ name: 'ae/t/2', brief: 'the prompt', cwd: '/wt', effort: 'high', resumeFrom: 'abc' }).args;
+  const i = c.indexOf('model_reasoning_effort="high"');
+  assert.ok(i > 0 && c[i - 1] === '-c', '-c model_reasoning_effort="high"');
+  assert.ok(i < c.indexOf('resume'), 'before resume, which rejects flags after its id');
+  assert.equal(c.at(-1), 'the prompt');
+
+  const d = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', effort: 'max', tools: ['Read', 'Grep'] }).args;
+  assert.equal(d[d.indexOf('--effort') + 1], 'max');
+  assert.equal(d[d.indexOf('--tools') + 1], 'Read,Grep');
+  assert.equal(d[d.indexOf('--tools') + 2], '--permission-mode', 'a flag ends the variadic list');
+});
+
+test('an effort a harness does not have is refused by that harness, in its own words', async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const task = (effort: string) => ({ brief: 'b', cwd: '/r', effort });
+  assert.match(codex.refuses!(task('extreme')) ?? '', /not a reasoning effort Codex has.*none, minimal, low, medium, high, xhigh, max/);
+  // Claude Code would only warn and run at its default, so the engine refuses what the CLI ignores.
+  assert.match(claudeDetached.refuses!(task('minimal')) ?? '', /not an effort Claude Code has.*low, medium, high, xhigh, max/);
+  assert.equal(codex.refuses!(task('minimal')), undefined);
+  assert.equal(claudeDetached.refuses!(task('xhigh')), undefined);
+});

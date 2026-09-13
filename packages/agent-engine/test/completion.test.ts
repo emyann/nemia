@@ -197,3 +197,48 @@ test('Claude Code is handed the schema as --json-schema, and the prompt still co
     assert.equal(args.at(-1), 'the prompt');
   } finally { process.env.PATH = prev; }
 });
+
+// ─── the fence and the effort ───────────────────────────────────────────────
+
+import type { SpawnRequest } from '../src/runner.ts';
+
+/** The argv `claudeOps().spawn` hands to `claude`, recorded by a fake one on PATH. */
+const argvOf = async (r: Partial<SpawnRequest>) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  const argsFile = path.join(dir, 'args');
+  fs.writeFileSync(path.join(dir, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: dir, ...r }));
+    return fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
+  } finally { process.env.PATH = prev; }
+};
+
+test('at shipped defaults Claude Code is given neither --tools nor --effort', async () => {
+  const args = await argvOf({});
+  assert.equal(args.includes('--tools'), false, 'no list: every tool the harness has');
+  assert.equal(args.includes('--effort'), false, "no effort: the harness's own");
+});
+
+test('tools reach Claude Code as --tools, and a flag ends the list before the prompt', async () => {
+  // `--tools <tools...>` is variadic. Directly before the prompt it would take the prompt as a tool
+  // name — the `--worktree` trap again — so it goes before `--permission-mode`, which always follows.
+  const args = await argvOf({ tools: ['Read', 'Grep', 'Glob'] });
+  const i = args.indexOf('--tools');
+  assert.notEqual(i, -1);
+  assert.equal(args[i + 1], 'Read,Grep,Glob');
+  assert.equal(args[i + 2], '--permission-mode');
+  assert.equal(args.at(-1), 'the prompt');
+});
+
+test('an empty tool list reaches Claude Code as no tools at all, not as every tool', async () => {
+  const args = await argvOf({ tools: [] });
+  assert.equal(args[args.indexOf('--tools') + 1], '');
+});
+
+test('effort reaches Claude Code as --effort', async () => {
+  const args = await argvOf({ effort: 'high' });
+  assert.equal(args[args.indexOf('--effort') + 1], 'high');
+  assert.equal(args.at(-1), 'the prompt');
+});

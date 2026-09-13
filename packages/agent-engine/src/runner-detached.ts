@@ -42,7 +42,7 @@ export type HarnessSpec = {
   nativeIdPattern?: string;
   /**
    * What this harness cannot be asked for, as a sentence that names what to write instead — or
-   * `undefined` when it can do what the task says. Permission modes are the harness's own words,
+   * `undefined` when it can do what the task says. Permission modes and efforts are its own words,
    * so the check lives on the spec, and `file()` asks it before anything is journalled. A spec
    * without one is asked nothing.
    */
@@ -229,14 +229,30 @@ const repositoryOf = (cwd: string): string | undefined => {
  */
 export const CODEX_SANDBOXES: readonly string[] = ['read-only', 'workspace-write', 'danger-full-access'];
 
+/** The tools that change files. Codex has no tool list — one shell, three sandboxes — so these decide. */
+const WRITES: readonly string[] = ['Bash', 'Write', 'Edit'];
+
 /**
- * The sandbox a task runs in: the one it named, `workspace-write` when it named none. A word that
- * is not a sandbox never arrives through `file()`, which refuses it; a direct caller gets the default.
+ * The sandbox a task runs in: the one it named, `workspace-write` when it named none — and
+ * `read-only` whenever its `tools` has none of Bash, Write or Edit, whatever it named, because the
+ * narrower of two fences is the one that was asked for. A list that has one of them does not
+ * narrow Codex at all: Codex cannot take its shell away and leave its edits.
+ *
+ * A word that is not a sandbox never arrives through `file()`, which refuses it; a direct caller
+ * gets the default.
  */
 const sandboxOf = (r: SpawnRequest): string => {
+  if (r.tools && !r.tools.some((t) => WRITES.includes(t))) return 'read-only';
   const asked = r.permissionMode === 'bypassPermissions' ? 'danger-full-access' : r.permissionMode;
   return asked !== undefined && CODEX_SANDBOXES.includes(asked) ? asked : 'workspace-write';
 };
+
+/**
+ * The reasoning efforts the Codex API names (codex-cli 0.154.0, its default model). Codex checks
+ * none itself: a bad one is sent, refused by the API, and the session exits 1 — so `file()` refuses
+ * it first.
+ */
+export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
  * Codex, through `codex exec`. Verified against codex-cli 0.154.0:
@@ -245,6 +261,7 @@ const sandboxOf = (r: SpawnRequest): string => {
  *   -s <mode>               sandbox: read-only | workspace-write | danger-full-access
  *   --skip-git-repo-check   allow running outside a git repository
  *   exec resume <id>        continue a previous session
+ *   -c key="value"          a config override: `model_reasoning_effort`, project trust
  */
 export const codex: HarnessSpec = {
   name: 'codex',
@@ -267,6 +284,8 @@ export const codex: HarnessSpec = {
       // message conform; `-o` writes it where the runner chose, outside the workspace, so it
       // cannot travel into the next step's branch. Verified against 0.154.0, strict schema.
       ...(io?.closeoutFile ? ['--output-schema', io.closeoutSchemaFile!, '-o', io.closeoutFile] : []),
+      // Effort is a config override: `codex exec` has no flag for it.
+      ...(r.effort ? ['-c', `model_reasoning_effort="${r.effort}"`] : []),
       // Trust, as found by `prepare`: what lets a repository's own `.codex/rules` load in a worktree.
       ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),
       // `resume` LAST, after every flag: its own usage is `[SESSION_ID] [PROMPT]`, and it rejects
@@ -276,10 +295,15 @@ export const codex: HarnessSpec = {
       r.brief,
     ],
   }),
-  refuses: (task) =>
-    task.permissionMode !== undefined && task.permissionMode !== 'bypassPermissions' && !CODEX_SANDBOXES.includes(task.permissionMode)
-      ? `\`permissionMode: ${task.permissionMode}\` is not a sandbox Codex has. Its modes are: ${CODEX_SANDBOXES.join(', ')} (and bypassPermissions, meaning danger-full-access).`
-      : undefined,
+  refuses: (task) => {
+    if (task.permissionMode !== undefined && task.permissionMode !== 'bypassPermissions' && !CODEX_SANDBOXES.includes(task.permissionMode)) {
+      return `\`permissionMode: ${task.permissionMode}\` is not a sandbox Codex has. Its modes are: ${CODEX_SANDBOXES.join(', ')} (and bypassPermissions, meaning danger-full-access).`;
+    }
+    if (task.effort !== undefined && !CODEX_EFFORTS.includes(task.effort)) {
+      return `\`effort: ${task.effort}\` is not a reasoning effort Codex has. Its efforts are: ${CODEX_EFFORTS.join(', ')}.`;
+    }
+    return undefined;
+  },
   // Best effort: codex prints a thread/session id in its JSONL. Only needed for resume.
   nativeIdPattern: '"(?:thread_id|session_id|id)"\\s*:\\s*"([0-9a-f-]{16,})"',
   /**
@@ -311,8 +335,11 @@ export const claudeDetached: HarnessSpec = {
     cmd: 'claude',
     args: [
       '-p', r.brief,
+      // Variadic, and ended by the flag after it, as for `claude --bg`.
+      ...(r.tools ? ['--tools', r.tools.join(',')] : []),
       '--permission-mode', r.permissionMode ?? 'auto',
       ...(r.model ? ['--model', r.model] : []),
+      ...(r.effort ? ['--effort', r.effort] : []),
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
       ...(r.worktree ? ['--worktree', worktreeName(r)] : []),
     ],

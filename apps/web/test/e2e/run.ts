@@ -2,7 +2,7 @@
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
  *  1. Builds the web app.
- *  2. Seeds a store in a temporary WF_ROOT with two fake runs, and beside it a checkout for the api to serve
+ *  2. Seeds a store in a temporary WF_ROOT with three fake runs, and beside it a checkout for the api to serve
  *     (`HKB_REPO`) on the Capabilities page (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, watch } from './checks.ts';
-import { CHECKOUT, FAKE, NEIGHBOUR, seed, seedCheckout } from './seed.ts';
+import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -100,8 +100,13 @@ const PAGES: PageSpec[] = [
       // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight.
       // Its followers read `waiting`, and will for ever; they do not keep it on the floor.
       await expectCount(card, 0, `a run whose check refused is finished, not in flight: no card on the floor by default (${FAKE.id})`);
-      await expectVisible(page.getByText('1 in flight · 1 finished · 1 waiting on you'), 'the Factory counts it finished, and waiting on you');
+      // So is the loop out of rounds: it waits on a person, and nothing of it moves.
+      await expectVisible(page.getByText('1 in flight · 2 finished · 2 waiting on you'), 'the Factory counts both finished, and waiting on you');
       await showFinished(page);
+      await expectVisible(
+        page.locator(`.react-flow__node[data-id="${LOOPING.id}"] [data-state="exhausted"][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
+        `the loop's card shows ${LOOPING.exhausted} out of rounds as an amber chip, its note after what that means on hover (${LOOPING.id})`,
+      );
       await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
       await expectVisible(card.getByText(/^started .+ ago$/), 'the card reads finished: when it started, not a clock still counting');
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
@@ -208,6 +213,12 @@ const PAGES: PageSpec[] = [
       await expectVisible(row, `the runs list has a row for ${FAKE.id}`);
       await expectVisible(row.getByText(`waiting on you: ${FAKE.waitingOnYou.join(', ')}`), `the row says ${FAKE.waitingOnYou.join(' and ')} are waiting on you`);
       await expectVisible(row.locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }), `the row shows ${FAKE.refused}'s refused check as a red chip`);
+      const loop = page.locator(`li a[href="/runs/${LOOPING.id}"]`);
+      await expectVisible(loop.getByText(`waiting on you: ${LOOPING.exhausted}`), `the runs list says ${LOOPING.exhausted}, out of rounds, is waiting on you`);
+      await expectVisible(
+        loop.locator(`[data-state="exhausted"][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
+        `the row shows ${LOOPING.exhausted} as an amber chip, its note after what that means on hover`,
+      );
     },
   },
   {
@@ -224,6 +235,39 @@ const PAGES: PageSpec[] = [
       await graph.locator('.react-flow__node[data-id="review"]').click();
       await expectVisible(page.locator('aside[aria-label="Step review"]'), 'the step inspector opens on a click on review');
       // The canvas narrows for the inspector and fits itself again; judged once it has.
+      await settled(page);
+      await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas beside the open inspector');
+    },
+  },
+  {
+    name: 'loop',
+    route: `/runs/${LOOPING.id}`,
+    expect: async (page) => {
+      await sidebar(page);
+      // The folder beside the record reads as the loop the run froze: nothing has drifted, and nothing is unread.
+      await expectCount(page.getByText(/no longer reads as a workflow|has changed since this run started/), 0, 'no warning about the workflow folder');
+      await expectVisible(page.getByText(`Waiting on you: ${LOOPING.exhausted}`), `the run's page says ${LOOPING.exhausted} is waiting on you`);
+      const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
+      const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);
+      await expectCount(graph.locator('.react-flow__node'), LOOPING.steps.length, `the loop's graph has a node per step (${LOOPING.steps.join(', ')})`);
+      // On the canvas there is no room under a chip: the note follows what the state means, on hover.
+      await expectVisible(
+        node(LOOPING.exhausted).locator(`[data-state="exhausted"][title^="rounds exhausted: "][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
+        `${LOOPING.exhausted}, out of rounds, is an amber chip on the graph, its note after what that means on hover`,
+      );
+      await expectVisible(
+        node('implement').locator(`[data-state="unverified"][title$="${LOOPING.notes.implement}"]`),
+        `implement's chip on the graph ends its title with the round it is on (${LOOPING.notes.implement})`,
+      );
+      // Under the chip on the run's page, where there is room. Before a click: the inspector has a heading of its own.
+      for (const name of LOOPING.steps) {
+        const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name, exact: true }) });
+        await expectVisible(section.locator('[data-note]', { hasText: LOOPING.notes[name] }), `the run's page shows ${name}'s note under its chip (${LOOPING.notes[name]})`);
+      }
+      await node(LOOPING.exhausted).click();
+      const inspector = page.locator(`aside[aria-label="Step ${LOOPING.exhausted}"]`);
+      await expectVisible(inspector.locator('[data-state="exhausted"]'), `the step inspector opens on a click on ${LOOPING.exhausted}`);
+      await expectVisible(inspector.locator('[data-note]', { hasText: LOOPING.notes.review }), `the inspector's Details show ${LOOPING.exhausted}'s note under its chip`);
       await settled(page);
       await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas beside the open inspector');
     },

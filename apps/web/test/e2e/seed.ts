@@ -1,5 +1,5 @@
 /**
- * The store `npm run e2e` serves: two fake runs, written the way `wf` and the engine write theirs.
+ * The store `npm run e2e` serves: three fake runs, written the way `wf` and the engine write theirs.
  *
  * FAKE has five steps in two lanes, frozen on the record as `wf start` freezes them, with the folder beside
  * it. `implement` signed off blocked, `review` was filed and the engine has no record of its task
@@ -47,6 +47,25 @@ export const FAKE = {
 export const NEIGHBOUR = {
   id: 'a-run-beside-it-e2e1',
   title: 'A run beside it',
+} as const;
+
+/**
+ * A third run, started last: `review` loops back to `implement`, the loop is on round 3 of the 3 a loop runs when it
+ * does not say, and review asked for another. So review reads `rounds exhausted` and waits on you, nothing of the run
+ * moves, and `assess` has it failed — finished, off the Factory's floor until finished runs are shown. Newest, so its
+ * card takes the cell after NEIGHBOUR's and moves neither of the others.
+ */
+export const LOOPING = {
+  id: 'go-round-again-e2e2',
+  title: 'Go round again',
+  steps: ['implement', 'review'],
+  /** The looping step, out of rounds. */
+  exhausted: 'review',
+  /** What `wf ls` prints beside each step: the round it is on, and for the loop out of rounds, the command that takes it once more. */
+  notes: {
+    implement: 'round 3 of 3',
+    review: 'round 3 of 3, and it asked again — once more: wf round go-round-again-e2e2 review',
+  },
 } as const;
 
 const STEPS = [
@@ -214,4 +233,42 @@ export function seed(root: string, now = Date.now()): void {
     { kind: 'ended', at: ago(2), attempt: 1, sessionId: `ae/${NEIGHBOUR.id}-sketch/1`, observed: 'failed', reason: 'harness' },
     { kind: 'settled', at: ago(2), outcome: 'failed' },
   ]));
+
+  // LOOPING: review loops back to implement, on round 3. Each step's place holds its round-3 task, and a try behind it for
+  // each round before, moved there with `then: 'round'` as the run moves it when it files a round.
+  const loopDir = path.join(root, 'workflow-loop');
+  const again = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
+  write(path.join(loopDir, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
+  write(path.join(loopDir, 'review.md'), '---\nharness: codex\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it, and say whether it needs another round.\n');
+  write(path.join(loopDir, 'review.json'), `${JSON.stringify(again, null, 2)}\n`);
+  const loopWorkspace = path.join(root, 'worktrees', LOOPING.id, 'implement');
+  const loopBranch = `wf/${LOOPING.id}/implement`;
+  const roundTask = (name: string, round: number) => `${LOOPING.id}-${name}-${round}`;
+  write(path.join(root, 'runs', `${LOOPING.id}.json`), JSON.stringify({
+    id: LOOPING.id, repo: '/code/hkb-v2', workspace: '/code/hkb-v2', baseRef: '19c9365', branch: 'main', isolate: true,
+    brief: `${LOOPING.title}\n\nA third run seeded by npm run e2e: review loops back to implement, and asked for another round on the last of the three a loop runs.`,
+    workflowDir: loopDir,
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.', harness: 'claude' },
+      // `rounds` as the parser sets it for a loop that does not say.
+      {
+        name: 'review', after: ['implement'], body: 'Review it, and say whether it needs another round.', harness: 'codex',
+        loop: 'implement', rounds: 3, output: { file: 'review.json', schema: again },
+      },
+    ],
+    createdAt: ago(4),
+    steps: Object.fromEntries(LOOPING.steps.map((name) => [name, {
+      taskId: roundTask(name, 3), workspace: loopWorkspace, branch: loopBranch,
+      tries: [1, 2].map((round) => ({ taskId: roundTask(name, round), then: 'round' })),
+    }])),
+  }, null, 2));
+  // A declared field is a field of the closeout, beside the four every closeout has: implement answers the findings it
+  // was handed, as a loop's target owes from round 2, and review asks for another round.
+  signedOff(roundTask('implement', 3), loopWorkspace, 'Implement it.', 3.9, 2.5, {
+    outcome: 'done', summary: 'Answered the second review.', needs: null, artifacts: [],
+    replies: [{ finding: 'apps/web/src/lib/status.ts — a word it does not know reads as working', answer: "won't fix", why: 'On purpose, and a test says so.' }],
+  });
+  signedOff(roundTask('review', 3), loopWorkspace, 'Review it, and say whether it needs another round.', 2.4, 0.5, {
+    outcome: 'done', summary: 'One finding is still open.', needs: null, artifacts: [], again: true,
+  });
 }

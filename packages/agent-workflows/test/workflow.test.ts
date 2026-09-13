@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
+import { STEP_KEYS, type StepKey } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -136,4 +137,116 @@ test('the shipped examples are valid workflows too', () => {
   assert.deepEqual(split.map((s) => s.name), ['split']);
   assert.deepEqual(split[0]!.after, [], 'nothing precedes it — splitting is the first thing');
   assert.equal(fansOut(split), false);
+});
+
+/** A step with this frontmatter and a body, as a folder hands it to the parser. */
+const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n---\nDo the work.\n`);
+
+test('every key a step has is read — none is accepted and then dropped', () => {
+  const values: Record<StepKey, string> = {
+    after: 'implement', resume: 'implement', harness: 'codex', model: 'gpt-5.1', permissionMode: 'read-only',
+    deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1',
+  };
+  const w = fm('review', Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n'));
+  for (const key of STEP_KEYS) assert.notEqual(w[key], undefined, `${key} is on the list and never read`);
+  assert.equal(w.deadlineSeconds, 900);
+  assert.equal(w.retries, 1);
+});
+
+test('a key a step does not have is refused by name, with the keys it does have', () => {
+  const list = "A step's keys are: after, resume, harness, model, permissionMode, deadlineSeconds, maxAttempts, check, retries.";
+  assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
+    assert.ok(e instanceof WorkflowError);
+    assert.equal(e.exitCode, 2, 'the author has something to fix');
+    assert.ok(e.message.startsWith(`review: \`colour\` is not a key a step has. ${list}`), e.message);
+    return true;
+  });
+  assert.throws(() => fm('review', 'Harness: codex'), /`Harness` is not a key a step has/, 'keys are exact');
+  assert.throws(() => fm('review', 'constructor: x'), /`constructor` is not a key a step has/, 'not an Object.prototype lookup');
+});
+
+test('`afer: implement` is refused — accepted, it made the reviewer a root that starts beside the implementer', () => {
+  const shipped = path.join(import.meta.dirname, '..', 'workflows');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-'));
+  for (const f of fs.readdirSync(shipped).filter((f) => f.endsWith('.md'))) fs.copyFileSync(path.join(shipped, f), path.join(dir, f));
+  const review = path.join(dir, 'review.md');
+  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace(/^after:/m, 'afer:'));
+  assert.match(fs.readFileSync(review, 'utf8'), /^afer: implement$/m, 'the typo is really in the file');
+
+  assert.throws(() => loadWorkflows(dir), /review: `afer` is not a key a step has\. A step's keys are: after, /);
+});
+
+test('tools, effort and guide are refused by name, never silently dropped', () => {
+  assert.throws(() => fm('review', 'harness: codex\ntools: Read, Grep, Glob'), /review: a step may not set `tools` — the engine does not carry a tool list/);
+  assert.throws(() => fm('review', 'effort: high'), /review: a step may not set `effort` — /);
+  assert.throws(() => fm('implement', 'guide: CLAUDE.md'), /implement: a step may not set `guide` — the harness reads CLAUDE\.md/);
+});
+
+test('an empty check is refused, and so is one that reads as "no check" but runs as a command', () => {
+  assert.throws(() => fm('implement', 'check:'), /implement: `check` has no value\. Give the command that must exit 0/);
+  assert.throws(() => fm('implement', 'check:   '), /`check` has no value/);
+  for (const none of ['none', '""', "''"]) assert.throws(() => fm('implement', `check: ${none}`), /exits 127/, none);
+  assert.throws(() => fm('implement', 'model:'), /implement: `model` has no value\. Delete the line/, 'empty is not absent, for any key');
+});
+
+test('deadlineSeconds: 5m is refused, with the seconds to write instead', () => {
+  assert.throws(() => fm('review', 'deadlineSeconds: 5m'), /review: `deadlineSeconds: 5m` is not a count\. .* with no unit — `deadlineSeconds: 300`\./);
+  assert.throws(() => fm('review', 'deadlineSeconds: 2h'), /`deadlineSeconds: 7200`/);
+  for (const bad of ['0', '-5', '1.5', '9e2', 'NaN', 'Infinity', 'ninety', '0x10']) {
+    assert.throws(() => fm('review', `deadlineSeconds: ${bad}`), /is not a count\. .*above zero/, bad);
+  }
+});
+
+test('maxAttempts and retries are whole counts; retries may be 0, which is what absent means', () => {
+  for (const bad of ['0', 'two', '1.5', '-1']) {
+    assert.throws(() => fm('x', `maxAttempts: ${bad}`), /`maxAttempts: .*` is not a count\. .*above zero/, bad);
+  }
+  for (const bad of ['-1', '1.5', 'once']) {
+    assert.throws(() => fm('x', `retries: ${bad}`), /`retries: .*` is not a count\. .*zero or more/, bad);
+  }
+  assert.equal(fm('x', 'retries: 0').retries, 0);
+  assert.equal(fm('x', 'maxAttempts: 3').maxAttempts, 3);
+});
+
+test("harness: banana is refused with the harnesses there are; harness: check is the run's own", () => {
+  assert.throws(() => fm('review', 'harness: banana'), /review: `harness: banana` is not a harness a step can run on\. The harnesses are: claude, codex, claude-detached\./);
+  assert.throws(() => fm('review', 'harness: check'), /`harness: check` is the run's own harness .*Put the command in `check:`/);
+  assert.throws(() => fm('review', 'harness: Codex'), /not a harness a step can run on/, 'names are exact');
+  for (const h of ['claude', 'codex', 'claude-detached']) assert.equal(fm('x', `harness: ${h}`).harness, h);
+});
+
+test("permissionMode: yolo is refused with the modes of the step's own harness", () => {
+  assert.throws(
+    () => fm('implement', 'permissionMode: yolo'),
+    /implement: `permissionMode: yolo` is not a mode claude has \(there is no `harness:` line, so the step runs on claude\)\. On claude it is one of: default, acceptEdits, auto, dontAsk, bypassPermissions, plan\./,
+  );
+  assert.throws(() => fm('review', 'harness: codex\npermissionMode: yolo'), /On codex it is one of: workspace-write, danger-full-access, read-only\./);
+  // Checked against the harness the step runs on, wherever the harness line is — not against every mode anyone has.
+  assert.throws(() => fm('review', 'permissionMode: bypassPermissions\nharness: codex'), /`bypassPermissions` is claude's word, and this step does not run on claude/);
+  assert.throws(() => fm('implement', 'permissionMode: read-only'), /not a mode claude has .*`read-only` is codex's word/);
+
+  assert.equal(fm('review', 'harness: codex\npermissionMode: read-only').permissionMode, 'read-only');
+  assert.equal(fm('x', 'harness: claude-detached\npermissionMode: bypassPermissions').permissionMode, 'bypassPermissions');
+  assert.equal(fm('x', 'permissionMode: auto').permissionMode, 'auto');
+});
+
+test('a key set twice is refused rather than last-one-wins', () => {
+  assert.throws(() => fm('review', 'harness: claude\nharness: codex'), /review: `harness` is set twice/);
+  assert.throws(() => fm('integrate', 'after: docs\nafter: tests'), /`after` is set twice.*`after: a, b`/);
+});
+
+test('a frontmatter line that is not `key: value` is refused; blank lines and # comments are not keys', () => {
+  assert.throws(() => fm('review', 'afer implement'), /review: `afer implement` is not `key: value`/);
+  assert.throws(() => fm('review', ': codex'), /is not `key: value`/);
+  const w = fm('review', '# a second opinion\nharness: codex\n\nafter: implement');
+  assert.equal(w.harness, 'codex');
+  assert.deepEqual(w.after, ['implement']);
+});
+
+test('frontmatter that never closes is refused; a file saved on Windows keeps its keys', () => {
+  assert.throws(() => parseWorkflow('review', '---\nharness: codex\nafter: implement\nReview it.'), /review: the frontmatter opened on the first line never closes/);
+  const crlf = parseWorkflow('review', '\uFEFF---\r\nharness: codex\r\nafter: implement\r\n---\r\nReview it.\r\n');
+  assert.equal(crlf.harness, 'codex');
+  assert.deepEqual(crlf.after, ['implement']);
+  assert.equal(parseWorkflow('x', '---\n---\nbody').body, 'body', 'an empty frontmatter is still frontmatter');
 });

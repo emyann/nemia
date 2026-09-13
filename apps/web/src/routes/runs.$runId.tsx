@@ -1,7 +1,10 @@
-import type { ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { code, Facts, specRows, Told, when } from '../components/Facts';
+import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip } from '../components/StatusChip';
+import { StepInspector } from '../components/StepInspector';
 import { runQuery, type RunDetail } from '../lib/api';
 
 export const Route = createFileRoute('/runs/$runId')({
@@ -22,7 +25,16 @@ type Step = RunDetail['steps'][number];
 function RunPage() {
   const { runId } = Route.useParams();
   const { data: run } = useSuspenseQuery(runQuery(runId));
+  // Keyed by run: the step selected and where the nodes were dragged belong to the run they were on.
+  return <Run key={run.id} run={run} />;
+}
+
+function Run({ run }: { run: RunDetail }) {
   const runCancelled = run.cancelledAt !== null;
+  const [selected, setSelected] = useState<string | null>(null);
+  const close = useCallback(() => setSelected(null), []);
+  // A step the folder has lost since it was clicked is off the canvas, and its panel goes with it.
+  const inspected = run.steps.find((s) => s.name === selected);
 
   return (
     <article className="space-y-6">
@@ -41,8 +53,16 @@ function RunPage() {
         </p>
       )}
 
-      <header className="space-y-4">
-        <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
+      <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
+
+      <section aria-label="The run's steps as a graph" className="flex flex-col gap-4 md:flex-row">
+        <div className="min-w-0 flex-1">
+          <RunCanvas run={run} selected={inspected?.name ?? null} onSelect={setSelected} />
+        </div>
+        {inspected && <StepInspector run={run} step={inspected} onClose={close} />}
+      </section>
+
+      <section className="space-y-4">
         <div className="whitespace-pre-wrap leading-relaxed">{run.brief}</div>
         <Facts
           rows={[
@@ -54,7 +74,7 @@ function RunPage() {
             ['workflow', code(run.workflowDir)],
           ]}
         />
-      </header>
+      </section>
 
       {run.steps.map((step) => (
         <StepSection key={step.name} step={step} runCancelled={runCancelled} />
@@ -73,32 +93,11 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
         <StatusChip status={step.status} runCancelled={runCancelled} />
       </div>
 
-      {spec && (
-        <Facts
-          rows={[
-            ['harness', code(spec.harness)],
-            ['model', code(spec.model)],
-            ['after', spec.after.length ? code(spec.after.join(', ')) : null],
-            ['resume', code(spec.resume)],
-            ['permission mode', code(spec.permissionMode)],
-            ['deadline', spec.deadlineSeconds === null ? null : `${spec.deadlineSeconds} s`],
-            ['max attempts', spec.maxAttempts],
-          ]}
-        />
-      )}
+      {spec && <Facts rows={specRows(spec)} />}
 
       {step.body && <div className="whitespace-pre-wrap text-sm leading-relaxed">{step.body}</div>}
 
-      {step.told && (
-        <details className="text-sm">
-          <summary className="cursor-pointer text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
-            {step.taskId ? 'What it was told' : 'What it would be told now'}
-          </summary>
-          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 text-xs dark:bg-neutral-900">
-            {step.told}
-          </pre>
-        </details>
-      )}
+      {step.told && <Told told={step.told} filed={step.taskId !== null} />}
 
       <Facts
         rows={[
@@ -133,21 +132,3 @@ function BackToRuns() {
     </Link>
   );
 }
-
-/** Label and value, one per row. A value that is not set reads as a dash. */
-function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]> }) {
-  return (
-    <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
-      {rows.map(([label, value]) => (
-        <div key={label} className="contents">
-          <dt className="text-neutral-500">{label}</dt>
-          <dd className="min-w-0 break-words">{value ?? '—'}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-const code = (value: string | null) => (value === null ? null : <span className="font-mono text-xs">{value}</span>);
-
-const when = (iso: string) => <time dateTime={iso}>{new Date(iso).toLocaleString()}</time>;

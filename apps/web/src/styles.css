@@ -1,7 +1,74 @@
 @import "tailwindcss";
+/* React Flow's stylesheet, imported once, below the utilities so a class on a canvas element wins. */
+@import "@xyflow/react/dist/style.css" layer(base);
 
 @layer base {
   body {
     @apply bg-neutral-50 text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100;
+  }
+
+  /*
+   * React Flow in the board's palette. Its own `-default` colours stay underneath for anything not
+   * named here. Dark follows `prefers-color-scheme`, as Tailwind's `dark:` does and as React Flow's
+   * `colorMode="system"` does.
+   */
+  .react-flow {
+    --xy-background-color: var(--color-neutral-50);
+    --xy-background-pattern-dots-color: var(--color-neutral-300);
+    --xy-edge-stroke: var(--color-neutral-400);
+    --xy-edge-stroke-width: 1.5;
+    --xy-edge-stroke-selected: var(--color-neutral-700);
+    --xy-connectionline-stroke: var(--color-neutral-400);
+    --xy-handle-background-color: var(--color-neutral-400);
+    --xy-handle-border-color: var(--color-white);
+    --xy-node-color: var(--color-neutral-900);
+    --xy-node-border: 1px solid var(--color-neutral-300);
+    --xy-node-background-color: var(--color-white);
+    --xy-node-boxshadow-hover: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+    --xy-node-boxshadow-selected: 0 0 0 2px var(--color-neutral-900);
+    --xy-selection-background-color: rgb(115 115 115 / 0.08);
+    --xy-selection-border: 1px dotted var(--color-neutral-400);
+    --xy-minimap-background-color: var(--color-white);
+    --xy-minimap-mask-background-color: rgb(229 229 229 / 0.6);
+    --xy-minimap-mask-stroke-color: var(--color-neutral-300);
+    --xy-minimap-node-background-color: var(--color-neutral-300);
+    --xy-minimap-node-stroke-color: transparent;
+    --xy-controls-button-background-color: var(--color-white);
+    --xy-controls-button-background-color-hover: var(--color-neutral-100);
+    --xy-controls-button-color: var(--color-neutral-700);
+    --xy-controls-button-color-hover: var(--color-neutral-900);
+    --xy-controls-button-border-color: var(--color-neutral-200);
+    --xy-controls-box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --xy-attribution-background-color: transparent;
+    --xy-edge-label-background-color: var(--color-white);
+    --xy-edge-label-color: var(--color-neutral-700);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .react-flow {
+      --xy-background-color: var(--color-neutral-950);
+      --xy-background-pattern-dots-color: var(--color-neutral-800);
+      --xy-edge-stroke: var(--color-neutral-600);
+      --xy-edge-stroke-selected: var(--color-neutral-300);
+      --xy-connectionline-stroke: var(--color-neutral-600);
+      --xy-handle-background-color: var(--color-neutral-600);
+      --xy-handle-border-color: var(--color-neutral-950);
+      --xy-node-color: var(--color-neutral-100);
+      --xy-node-border: 1px solid var(--color-neutral-700);
+      --xy-node-background-color: var(--color-neutral-900);
+      --xy-node-boxshadow-selected: 0 0 0 2px var(--color-neutral-100);
+      --xy-selection-border: 1px dotted var(--color-neutral-600);
+      --xy-minimap-background-color: var(--color-neutral-900);
+      --xy-minimap-mask-background-color: rgb(10 10 10 / 0.6);
+      --xy-minimap-mask-stroke-color: var(--color-neutral-700);
+      --xy-minimap-node-background-color: var(--color-neutral-700);
+      --xy-controls-button-background-color: var(--color-neutral-900);
+      --xy-controls-button-background-color-hover: var(--color-neutral-800);
+      --xy-controls-button-color: var(--color-neutral-300);
+      --xy-controls-button-color-hover: var(--color-neutral-100);
+      --xy-controls-button-border-color: var(--color-neutral-800);
+      --xy-edge-label-background-color: var(--color-neutral-900);
+      --xy-edge-label-color: var(--color-neutral-300);
+    }
   }
 }

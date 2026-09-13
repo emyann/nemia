@@ -398,6 +398,24 @@ owner is not mid-run.
   the copy to the engine's exports. → I, with the `tools:`/`effort:` pass-through.
 - **the plan:** count fields need their least value stated (A's review); a "definition of done" that
   lists several things in one sentence gets read as one rule.
+- **apps/api tests hit the live registry.** Every `e.view` runs `claude agents --json` against this
+  machine; under parallel turbo the api test process dies with "Promise resolution is still pending
+  but the event loop has already resolved" while other packages' tests run beside it (seen at C's
+  merge, twice; serial runs pass every time, ~23 s). The api's `engine()` should take a fake
+  harness under test (`createEngine({ harnesses })` accepts a `PromiseRunner`); until then verify
+  merges with `npx turbo run test --concurrency=1`. → the next apps package.
+- **agent-engine (`fold`, the `ended` case):** the `ended` event carries `at` and `fold` drops it, so
+  `Attempt` has no end time and the board cannot say how long a finished attempt ran (K's review;
+  the responder recommended the engine keep it — `batch/v1` `JobStatus.completionTime`). One line
+  in `fold` plus `endedAt` on `Attempt`, then `endedAt` in the api's `latest` and a duration on the
+  node. → a small engine run after E2, then an apps follow-up.
+- **the engine, found by C's run:** a session that gives its closeout and is then marked `blocked`
+  never ends — `closedOut` handles `working` only. → E2 (`fix-one-gap-in-agent-engine-h35j`).
+- **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
+  a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
+  for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running
+  session by hand. A small convention would do: `wf start --input <file>` copies into
+  `runs/<id>/inputs/` and every brief gains one line naming the directory. → with J.
 
 ## 5. What the plan does not do
 

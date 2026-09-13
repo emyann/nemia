@@ -570,7 +570,21 @@ test('every finished step is handed off — failed and stopped too — and none 
     },
   });
   const p = phases({ t1: 'succeeded', t2: 'failed', t3: 'stopped', t4: 'running', t5: 'succeeded', c5: 'running' });
-  assert.deepEqual(handOffDue(r, p), ['ok', 'broke', 'halted']);
+  const independent = ['ok', 'broke', 'halted', 'live', 'judged', 'unfiled'].map((name) => step(name));
+  assert.deepEqual(handOffDue(independent, r, p), ['ok', 'broke', 'halted']);
+});
+
+test("a step is no longer handed off once a later step works in its workspace — what is there is that step's", () => {
+  const chain: Workflow[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
+  const withReview = (review: Run['steps'][string]) => run({}, { steps: { implement: { taskId: 't1', workspace: '/w' }, review } });
+
+  assert.deepEqual(handOffDue(chain, withReview({ taskId: null }), phases({ t1: 'succeeded' })), ['implement'], 'nothing after it yet');
+  assert.deepEqual(handOffDue(chain, withReview({ taskId: 't2', workspace: '/w' }), phases({ t1: 'succeeded', t2: 'running' })), [],
+    "review is working there: its work in progress is not implement's to commit");
+  assert.deepEqual(handOffDue(chain, withReview({ taskId: 't2', workspace: '/w', check: { taskId: 'c2' } }), phases({ t1: 'succeeded', t2: 'succeeded', c2: 'running' })), [],
+    "review's check is running there: what the suite leaves is nobody's to commit");
+  assert.deepEqual(handOffDue(chain, withReview({ taskId: 't2', workspace: '/wt/review' }), phases({ t1: 'succeeded', t2: 'running' })), ['implement'],
+    'a follower in a worktree of its own takes nothing from this one');
 });
 
 test('`wf decide` names every step that did not earn a follower, each in its own word', () => {

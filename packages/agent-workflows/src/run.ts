@@ -206,11 +206,31 @@ export const checkTaskId = (run: Run, step: string): string => `${run.id}-${step
  * And only until its check is filed. The check judges the tree the step handed on; whatever the suite
  * leaves behind — coverage, a cache, a temp file — is the suite's, and committing it on a later pass
  * would put it on the branch under the step's name.
+ *
+ * Nor once a step that waits on it has been filed in the same workspace — a follower that inherits it,
+ * or every later step of a `--no-worktree` run. The directory is that step's now: its work in progress,
+ * and later its own check's litter, are in it. Handing the step off before its follower is filed is
+ * enough, and `advance` does that in the same pass that files the follower.
  */
-export function handOffDue(run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
+export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
+  const finished = ['succeeded', 'failed', 'stopped'];
   return Object.entries(run.steps)
-    .filter(([, s]) => s.taskId && s.workspace && !s.check && ['succeeded', 'failed', 'stopped'].includes(phaseOf(s.taskId)))
+    .filter(([name, s]) => s.taskId && s.workspace && !s.check && finished.includes(phaseOf(s.taskId))
+      && ![...downstreamOf(steps, name)].some((later) => run.steps[later]?.taskId && run.steps[later]?.workspace === s.workspace))
     .map(([name]) => name);
+}
+
+/** Every step that waits on `name`, directly or through another. */
+function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
+  const found = new Set<string>();
+  const queue = [name];
+  while (queue.length) {
+    const current = queue.pop()!;
+    for (const s of steps) {
+      if (s.after.includes(current) && !found.has(s.name)) { found.add(s.name); queue.push(s.name); }
+    }
+  }
+  return found;
 }
 
 // ─── calling one off ────────────────────────────────────────────────────────

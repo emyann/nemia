@@ -396,9 +396,10 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // this IS the contract: every step is told the run commits what it leaves (`closeoutContract`),
   // which is also exactly what a sandboxed step that cannot write git's metadata needs.
   //
-  // Every finished step, failed and stopped too, and before its check is filed: the check judges the
-  // committed tree, and nothing it leaves behind is committed afterwards (`handOffDue`).
-  for (const name of handOffDue(run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
+  // Every finished step, failed and stopped too, until its check is filed or a later step works in its
+  // workspace: the check judges the committed tree, and nothing it leaves behind — nor the next step's
+  // work in progress — is committed under this step's name (`handOffDue`).
+  for (const name of handOffDue(steps, run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
 
   const { ready, check, blocked, status } = assess(steps, run, phaseOf, signedOff, asked);
 

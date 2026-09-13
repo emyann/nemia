@@ -448,3 +448,31 @@ test('a check filed by a pass that died, on a run then cancelled, is found and s
   assert.deepEqual(readRun(run.id).steps.implement?.check, { taskId: id }, 'the tick puts it on the record');
   assert.equal(filings.filter((f) => f === id).length, 1);
 });
+
+test("an unchecked step's hand-off stops once the step after it works in the same workspace — the next check's litter stays off the branch", async () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\ncheck: npm test\n---\nreview it\n');
+  const run = started(dir);   // both steps in the one checkout, as an inheriting follower would be
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  fs.writeFileSync(path.join(run.repo, 'feature.txt'), 'work\n');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+
+  await advance(e, readRun(run.id));   // hands implement off, then files review in the same workspace
+  assert.match(gitOut(run.repo, 'log', '-1', '--format=%s'), /^implement: hand off/);
+
+  fs.writeFileSync(path.join(run.repo, 'half-reviewed.txt'), 'wip\n');
+  await advance(e, readRun(run.id));
+  assert.match(gitOut(run.repo, 'status', '--porcelain'), /half-reviewed\.txt/, "review's work in progress is not committed under implement's name");
+
+  settle(`${run.id}-review`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));   // hands review off, then files its check
+  assert.match(gitOut(run.repo, 'log', '-1', '--format=%s'), /^review: hand off/);
+
+  fs.writeFileSync(path.join(run.repo, 'coverage.out'), 'litter\n');
+  await advance(e, readRun(run.id));
+  await advance(e, readRun(run.id));
+  assert.match(gitOut(run.repo, 'status', '--porcelain'), /coverage\.out/, 'left untracked — by implement as well as by review');
+  assert.doesNotMatch(gitOut(run.repo, 'log', '--format=%s'), /implement: hand off[\s\S]*implement: hand off/, 'implement was handed off once');
+});

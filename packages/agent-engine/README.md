@@ -426,6 +426,8 @@ and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 Every attempt records `usage` — `{ turns, toolCalls, inputTokens?, outputTokens?, costUsd? }` — and
 `exitCode`, copied from the sighting that ended it. **Each is `null` when nothing measured it,
 never `0`**: a zero that means "nobody counted" reads as "cost nothing". `decide` reads neither.
+An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of its `starting` and
+`ended` entries, `endedAt` being `null` while it runs — so how long it took is on the record.
 
 | runner | `usage` | `exitCode` |
 |---|---|---|

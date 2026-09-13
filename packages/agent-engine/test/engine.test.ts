@@ -505,11 +505,11 @@ test('tools and effort are declared by the task and reach every attempt untouche
   assert.equal(plain.spawned[0]!.effort, undefined);
 });
 
-test('decide never reads tools, effort, usage or an exit code — carried on the record, never judged', () => {
+test('decide never reads tools, effort, usage, an exit code or an end time — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.effort|\.usage|\.exitCode/);
+  assert.doesNotMatch(body, /\.tools|\.effort|\.usage|\.exitCode|\.endedAt/);
 });
 
 // ─── usage: carried from the sighting, null when nobody measured ────────────
@@ -535,6 +535,24 @@ test('an attempt nobody measured records null — not zeros that would read as f
   const [a] = (await b.run(view(id, new Map()))).state.attempts;
   assert.equal(a!.usage, null);
   assert.equal(a!.exitCode, null);
+});
+
+// ─── when an attempt ended: the time the engine wrote it down ───────────────
+
+test('the settled view carries when its attempt ended, as journalled — and null while it ran', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(tick());
+  assert.equal((await b.run(view(id, new Map()))).state.attempts[0]!.endedAt, null, 'in flight, it has not ended');
+
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done' });
+  await b.run(tick());
+  const v = await b.run(view(id, new Map()));
+  const ended = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'ended');
+  assert.equal(v.state.settled, 'succeeded');
+  assert.ok(ended, 'the end was journalled');
+  assert.equal(v.state.attempts[0]!.endedAt, ended.at);
+  assert.ok(Date.parse(v.state.attempts[0]!.startedAt) <= Date.parse(ended.at), 'and it ended after it started');
 });
 
 // ─── a harness that refuses to start ────────────────────────────────────────

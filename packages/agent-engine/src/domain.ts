@@ -174,6 +174,8 @@ export type Attempt = {
   /** Null until the spawn call returned: the window a crash can land in. */
   spawnedAt: string | null;
   ended: Observed | null;
+  /** The `at` of the `ended` entry: when the engine wrote the end down. Null while the attempt runs. */
+  endedAt: string | null;
   reason: EndReason | null;
   /** The harness's own id for this attempt, once something has seen it. What `--resume` takes. */
   nativeId: string | null;
@@ -231,7 +233,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.tools = e.tools; s.effort = e.effort;
         break;
       case 'starting':
-        s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, usage: null, exitCode: null });
+        s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, usage: null, exitCode: null });
         break;
       case 'spawned': {
         const a = s.attempts.find((x) => x.n === e.attempt);
@@ -240,7 +242,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
       }
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
-        if (a) { a.ended = e.observed; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; a.error = e.error ?? a.error; }
+        if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; a.error = e.error ?? a.error; }
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;

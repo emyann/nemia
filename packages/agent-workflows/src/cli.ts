@@ -66,8 +66,9 @@ export async function main(argv: string[]): Promise<void> {
       if (!results.length) return console.log('no runs');
       for (const r of results) {
         const filed = r.filed.length ? `  filed: ${r.filed.join(', ')}` : '';
+        const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
         const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
-        console.log(`${r.run.id}  ${r.status}${filed}${blocked}`);
+        console.log(`${r.run.id}  ${r.status}${filed}${checked}${blocked}`);
       }
       return;
     }
@@ -78,6 +79,7 @@ export async function main(argv: string[]): Promise<void> {
       for (;;) {
         for (const r of await tick(e)) {
           if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
+          if (r.checked.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  checking ${r.checked.join(', ')}`);
         }
         await new Promise((r) => setTimeout(r, every));
       }

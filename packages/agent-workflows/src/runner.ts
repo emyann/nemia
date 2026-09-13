@@ -10,9 +10,9 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 'agent-engine';
-import { CHECK } from './check.ts';
+import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief } from './check.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, listing, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -130,8 +130,9 @@ async function taskPhases(e: Engine, run: Run): Promise<{
   phaseOf: (taskId: string) => TaskPhase;
 }> {
   const views = new Map<string, TaskView>();
-  for (const { taskId } of Object.values(run.steps)) {
+  for (const { taskId, check } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
+    if (check) views.set(check.taskId, await e.view(check.taskId));
   }
   return {
     views,
@@ -141,6 +142,16 @@ async function taskPhases(e: Engine, run: Run): Promise<{
     },
   };
 }
+
+/** Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing. */
+const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
+  Boolean(views.get(taskId)?.state.closeoutSchema);
+
+/**
+ * Where a check's stderr goes: beside the run records, outside every workspace — a file inside one
+ * would be committed by the next hand-off and ride the branch.
+ */
+export const checkStderr = (taskId: string): string => path.join(HOME, 'checks', `${taskId}.stderr`);
 
 /**
  * Gitignored directories a fresh worktree needs in order to be usable.
@@ -261,6 +272,14 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
       'Either drop --no-worktree, or make the steps a chain.',
     );
   }
+  // A check's task is its step's id plus `-check`, so a step named that would share an id with it and
+  // the run would read one task as the other.
+  const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
+  if (clash) {
+    throw Object.assign(new Error(
+      `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
+    ), { exitCode: 2 });
+  }
   const id = runId(opts.brief);
   const isolate = opts.isolate ?? true;
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
@@ -300,7 +319,8 @@ function handOff(workspace: string, step: string): void {
   } catch { /* nothing to hand off, or a tree git will not commit */ }
 }
 
-export type Advanced = { run: Run; filed: string[]; status: Assessment['status']; blocked: string[] };
+/** One pass's work: the steps it filed, the steps whose checks it filed, and where the run stands. */
+export type Advanced = { run: Run; filed: string[]; checked: string[]; status: Assessment['status']; blocked: string[] };
 
 /**
  * One pass over one run: tick the engine, then file whatever became ready.
@@ -339,12 +359,44 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // branch that did not contain it. Asking every step's prose to remember is not a contract — so
   // this IS the contract: every step is told the run commits what it leaves (`closeoutContract`),
   // which is also exactly what a sandboxed step that cannot write git's metadata needs.
-  for (const [name, st] of Object.entries(run.steps)) {
-    if (!st.taskId || !st.workspace || phaseOf(st.taskId) !== 'succeeded') continue;
-    handOff(st.workspace, name);
-  }
+  //
+  // Every finished step, failed and stopped too, and before its check is filed: the check judges the
+  // committed tree, and nothing it leaves behind is committed afterwards (`handOffDue`).
+  for (const name of handOffDue(run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
 
-  const { ready, blocked, status } = assess(steps, run, phaseOf, signedOff);
+  const { ready, check, blocked, status } = assess(steps, run, phaseOf, signedOff, closeoutAsked(views));
+
+  // The fact the run establishes for itself: each signed step's `check:`, executed where the work is.
+  // An engine task on the `check` harness, so it outlives this pass, has a deadline, and is stopped
+  // by a cancel like anything else. Nothing is ready on it in this pass — a follower waits for the
+  // check to SETTLE, on a later one.
+  const checked: string[] = [];
+  for (const name of check) {
+    const step = steps.find((s) => s.name === name)!;
+    const workspace = run.steps[name]!.workspace ?? run.workspace;
+    const taskId = checkTaskId(run, name);
+    // A pass that filed this check and died before writing the run down left it on the engine's board
+    // under the id it derived. Adopted, not filed again.
+    if (!(await e.view(taskId)).state.brief) {
+      fs.mkdirSync(path.dirname(checkStderr(taskId)), { recursive: true });
+      await e.file({
+        id: taskId,
+        harness: 'check',
+        // The command from the workflow this run froze — never from the workspace it is about to judge.
+        brief: checkBrief(step.check!, {
+          WF_RUN: run.id, WF_STEP: name, WF_BASE_REF: run.baseRef, WF_WORKSPACE: workspace, WF_STDERR: checkStderr(taskId),
+        }),
+        cwd: workspace,
+        deadlineSeconds: CHECK_DEADLINE_SECONDS,
+        // One attempt, never resumed: a check that refused has said what it has to say, and running a
+        // suite until it passes would let a flaky suite decide what ships.
+        maxAttempts: 1,
+        resume: 'never',
+      });
+    }
+    run.steps[name] = { ...run.steps[name]!, check: { taskId } };
+    checked.push(name);
+  }
 
   /** The harness's own id for a step's session — what `--resume` takes. */
   const sessionOf = (stepName: string): string | undefined => {
@@ -381,9 +433,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
-  if (filed.length) writeRun(run);
+  if (filed.length || checked.length) writeRun(run);
 
-  return { run, filed, status, blocked };
+  return { run, filed, checked, status, blocked };
 }
 
 export type Cancelled = { run: Run; plan: CancelPlan };
@@ -411,9 +463,9 @@ export type Cancelled = { run: Run; plan: CancelPlan };
 export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   const run = readRun(id);
   const steps = stepsOf(run);
-  const { phaseOf } = await taskPhases(e, run);
+  const { views, phaseOf } = await taskPhases(e, run);
 
-  const plan = cancelPlan(steps, run, phaseOf);
+  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views));
   if (plan.kind === 'finished') return { run, plan };
 
   for (const { taskId } of plan.stop) await e.stop(taskId);
@@ -538,7 +590,7 @@ export async function decide(e: Engine, id: string): Promise<{
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
-  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run)), closeouts };
+  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run), closeoutAsked(views)), closeouts };
 }
 
 export function resultBranches(run: Run): string[] {

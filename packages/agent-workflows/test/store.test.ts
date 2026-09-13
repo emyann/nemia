@@ -14,6 +14,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-engine';
 import type { Run, TaskPhase } from '../src/run.ts';
+import { readCheckBrief } from '../src/check.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-store-'));
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -204,4 +205,200 @@ test('a run reads the workflow it froze at `wf start` — the folder edited afte
   assert.match(filed[0]!.brief, /implement it as asked/);
   assert.doesNotMatch(filed[0]!.brief, /something else/);
   assert.deepEqual(readRun(run.id).workflow?.map((s) => s.name), ['implement', 'review'], 'the deleted step is still the run\'s');
+});
+
+// ─── the check, at shipped defaults ─────────────────────────────────────────
+
+const gitOut = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim();
+
+/**
+ * An engine board a test settles by hand. It keeps what each task was filed with — so a view carries
+ * the closeout schema the run really asked for — and counts every filing.
+ */
+const board = () => {
+  type Filed = { id: string; brief: string; harness?: string; cwd: string; closeoutSchema?: object } & Record<string, unknown>;
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown }>();
+  const filings: string[] = [];
+  const stopped: string[] = [];
+  const e = {
+    view: async (id: string) => {
+      const t = tasks.get(id);
+      const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
+      return {
+        id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
+        state: {
+          brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false,
+          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: 's', closeout: t.closeout }],
+        },
+      };
+    },
+    file: async (spec: Filed) => { filings.push(spec.id); tasks.set(spec.id, { spec, phase: 'pending' }); return spec.id; },
+    stop: async (id: string) => { stopped.push(id); },
+  } as unknown as Engine;
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
+  return { e, tasks, filings, stopped, settle };
+};
+
+const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
+
+/** A workflow folder: `implement`, with whatever frontmatter it is given, and `review` after it. */
+const folder = (implementKeys = '') => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), `${implementKeys ? `---\n${implementKeys}\n---\n` : ''}implement it\n`);
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+  return dir;
+};
+
+/** `wf start`, for real, over a fresh repository, the steps working in the checkout itself. */
+const started = (dir: string) => start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir, isolate: false });
+
+test('no `check:` → the run never files a check task, from the first pass to the last', async () => {
+  const run = started(folder());
+  const { e, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', SIGNED);
+  const last = await advance(e, readRun(run.id));
+
+  assert.deepEqual(filings, [`${run.id}-implement`, `${run.id}-review`]);
+  assert.equal(last.status, 'succeeded');
+  assert.equal(readRun(run.id).steps.implement?.check, undefined);
+});
+
+test('the run files a signed step\'s check itself: the frozen command, in its workspace, on the check harness, once', async () => {
+  const run = started(folder('check: npm test && npm run typecheck'));
+  const { e, tasks, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+
+  const pass = await advance(e, readRun(run.id));
+  const id = `${run.id}-implement-check`;
+  assert.deepEqual([pass.checked, pass.filed], [['implement'], []], 'the follower waits for the check, not for the agent');
+  assert.deepEqual(readRun(run.id).steps.implement, {
+    // Still the step's own task: apps/api reads `taskId`, and the check is not it.
+    taskId: `${run.id}-implement`, workspace: run.repo, branch: run.branch, check: { taskId: id },
+  });
+
+  const spec = tasks.get(id)!.spec;
+  assert.deepEqual(
+    { harness: spec.harness, cwd: spec.cwd, deadlineSeconds: spec.deadlineSeconds, maxAttempts: spec.maxAttempts, resume: spec.resume, closeoutSchema: spec.closeoutSchema },
+    { harness: 'check', cwd: run.repo, deadlineSeconds: 600, maxAttempts: 1, resume: 'never', closeoutSchema: undefined },
+  );
+  assert.deepEqual(readCheckBrief(spec.brief), {
+    command: 'npm test && npm run typecheck',
+    env: { WF_RUN: run.id, WF_STEP: 'implement', WF_BASE_REF: run.baseRef, WF_WORKSPACE: run.repo, WF_STDERR: path.join(ROOT, 'checks', `${id}.stderr`) },
+  });
+  assert.ok(fs.existsSync(path.join(ROOT, 'checks')), 'the stderr file has somewhere to go');
+
+  await advance(e, readRun(run.id));
+  assert.equal(filings.filter((f) => f === id).length, 1, 'filed once, however many passes');
+
+  settle(id, 'succeeded');
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review'], 'exit 0, and the follower is filed');
+});
+
+test('a check that exits non-zero leaves the follower unfiled, pass after pass, and the run failed', async () => {
+  const run = started(folder('check: npm test'));
+  const { e, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-check`, 'failed');
+
+  for (let i = 0; i < 3; i++) {
+    const pass = await advance(e, readRun(run.id));
+    assert.deepEqual([pass.filed, pass.checked, pass.blocked, pass.status], [[], [], ['review'], 'failed']);
+  }
+  assert.ok(!filings.includes(`${run.id}-review`));
+});
+
+test('UNSIGNED at shipped defaults: a step that ends without the closeout the run asked for files nothing after it', async () => {
+  const run = started(folder('check: npm test'));
+  const { e, tasks, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  assert.ok(tasks.get(`${run.id}-implement`)!.spec.closeoutSchema, 'the run asked');
+  settle(`${run.id}-implement`, 'succeeded');   // …and the session went quiet without one
+
+  const pass = await advance(e, readRun(run.id));
+  assert.deepEqual([pass.filed, pass.checked, pass.blocked], [[], [], ['review']]);
+  assert.deepEqual(filings, [`${run.id}-implement`]);
+});
+
+test('a `check:` planted in the folder after `wf start` never reaches the check the run files', async () => {
+  const dir = folder('check: npm test');
+  const run = started(dir);
+  // The command a step would like to be judged by.
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: true\n---\nimplement it\n');
+
+  const { e, tasks, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  assert.equal(readCheckBrief(tasks.get(`${run.id}-implement-check`)!.spec.brief).command, 'npm test');
+});
+
+test('a pass that filed a check and died before writing the run down is adopted, never filed twice', async () => {
+  const run = started(folder('check: npm test'));
+  const { e, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  const before = readRun(run.id);
+  await advance(e, readRun(run.id));   // files the check…
+  writeRun(before);                    // …and, as far as the record knows, never did
+
+  const again = await advance(e, readRun(run.id));
+  assert.equal(filings.filter((f) => f.endsWith('-check')).length, 1);
+  assert.deepEqual(again.checked, ['implement']);
+  assert.deepEqual(readRun(run.id).steps.implement?.check, { taskId: `${run.id}-implement-check` });
+});
+
+test('a FAILED step is handed off: what it left is committed where the run can show it', async () => {
+  const run = started(folder());
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  fs.writeFileSync(path.join(run.repo, 'half-done.txt'), 'work\n');
+  settle(`${run.id}-implement`, 'failed');
+
+  await advance(e, readRun(run.id));
+  assert.equal(gitOut(run.repo, 'status', '--porcelain'), '');
+  assert.match(gitOut(run.repo, 'log', '-1', '--format=%s'), /^implement: hand off/);
+});
+
+test("nothing is committed for a step once its check is filed — the suite's litter stays off the branch", async () => {
+  const run = started(folder('check: npm test'));
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  fs.writeFileSync(path.join(run.repo, 'feature.txt'), 'work\n');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+
+  await advance(e, readRun(run.id));   // hands off the work, then files the check on that tree
+  assert.match(gitOut(run.repo, 'show', '--name-only', '--format=', 'HEAD'), /feature\.txt/);
+
+  fs.writeFileSync(path.join(run.repo, 'coverage.out'), 'litter\n');
+  await advance(e, readRun(run.id));
+  assert.match(gitOut(run.repo, 'status', '--porcelain'), /coverage\.out/, 'left untracked');
+});
+
+test('cancelling stops a running check — from the verb, and again from every pass', async () => {
+  const run = started(folder('check: npm test'));
+  const { e, stopped, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  const id = `${run.id}-implement-check`;
+  settle(id, 'running');
+
+  const { plan } = await cancel(e, run.id);
+  assert.deepEqual(plan, { kind: 'cancel', stop: [{ name: 'implement (check)', taskId: id }] });
+  await advance(e, readRun(run.id));
+  assert.deepEqual(stopped, [id, id]);
+});
+
+test("a step named for another step's check is refused at `wf start`, before anything is spent", () => {
+  const dir = folder('check: npm test');
+  fs.writeFileSync(path.join(dir, 'implement-check.md'), 'a step of its own\n');
+  // With worktrees: a second root would otherwise be refused first, for running beside `implement`.
+  assert.throws(() => start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }), (err: Error & { exitCode?: number }) =>
+    err.exitCode === 2 && /implement-check/.test(err.message) && /Rename implement-check\.md/.test(err.message));
 });

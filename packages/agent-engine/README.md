@@ -287,7 +287,8 @@ runner's file is outside the workspace, owner-only, and rewritten or cleared on 
 itself is journalled as filed, like every field on the task, so a secret in it is on disk there too.
 A `.mcp.json` that is not JSON ends the attempt `unstartable`, naming the file: named on the command
 line, it stops Claude Code before a session exists. With `worktree`, the file named is the `cwd`'s
-own, not the worktree's copy of it.
+own, not the worktree's copy of it. Both files are named by absolute path: Claude Code resolves the
+flag's path from inside the session's `cwd`.
 
 **Strict is not the whole fence.** Claude in Chrome — which drives the operator's own browser, and
 whatever they are signed in to there — is switched on by a user setting
@@ -311,7 +312,9 @@ name quoted, because Codex splits a dotted `-c` key on every dot, quotes or none
 streamable HTTP servers. But the override is merged into the operator's `~/.codex/config.toml`, not
 put in its place — `-c mcp_servers={}` leaves every server there loaded (codex-cli 0.154.0) — and
 Codex has no strict flag. **A Codex task still has the operator's Codex servers**
-([open issue 9](docs/open-issues.md)).
+([open issue 9](docs/open-issues.md)). A task's server named like one in that `config.toml` is
+refused at spawn, `unstartable`: Codex would merge the two, and run the task's command with the
+operator's args and env.
 
 `ae start` has no `mcp` key: a brief's values are one line each, so the map is the API's for now.
 

@@ -135,13 +135,29 @@ config names it. hkb closed the same hole with `strictMcpConfig` (its ADR-013).
 override is merged into the table `~/.codex/config.toml` has, not put in its place: with
 `-c mcp_servers={}`, a configured server stayed listed and enabled (`codex mcp list`, codex-cli
 0.154.0). Codex has no strict flag. A task's server that shares an operator server's name is merged
-into it, and fails to load if the transports differ (`url is not supported for stdio`).
+into it — the task's command runs with the operator's args and env — or fails to load if the transports
+differ (`url is not supported for stdio`). So `prepare` refuses such a task at spawn, reading the
+names from `config.toml` the way `codex mcp add` writes them (found in review). An inline
+`mcp_servers = {…}` table is not read, and a name it misses meets the merge.
 
 **Proposed fix.** `-c mcp_servers.<name>.enabled=false` disables a server (measured with `codex mcp
 list`), so a `prepare` could disable every server the operator's Codex has that the task does not
 name. Not done: the names would have to come from `config.toml`, a profile, and whatever else 0.154.0
 layers in, and a list that misses one is a fence that looks closed. The machine this was measured on
 has no Codex servers configured.
+
+### 10. A relative `cwd` fails a detached harness
+
+`file()` takes any non-empty `cwd`, and `ae start` resolves one before filing, so only an API caller
+journals a relative one. The detached runner launches its worker in that `cwd`, and the worker
+launches the harness in the same relative path again, now from inside it: measured with `sh` as the
+harness and `cwd: 'repo'`, the worker logged `spawn sh ENOENT` and the attempt failed. `claude --bg`
+starts in the right place, because `execFile` resolves the `cwd` from the ticking process — which
+need not be the one that filed the task. The MCP configs are named by absolute path (found in
+review); the `cwd` itself is not.
+
+**Fix.** `file()` resolves or refuses a relative `cwd`. Resolving is what `ae start` already does;
+refusing is the honest answer for an API whose filer and ticker may be different processes.
 
 ## Verified live, once
 

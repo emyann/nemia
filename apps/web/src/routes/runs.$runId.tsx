@@ -92,7 +92,7 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
       {step.told && (
         <details className="text-sm">
           <summary className="cursor-pointer text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
-            What it was told
+            {step.taskId ? 'What it was told' : 'What it would be told now'}
           </summary>
           <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded bg-neutral-100 p-3 text-xs dark:bg-neutral-900">
             {step.told}

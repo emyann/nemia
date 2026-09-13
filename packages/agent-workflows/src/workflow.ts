@@ -11,13 +11,17 @@
  *     ---
  *     Review the changes on this branch. Be specific about correctness, not style.
  *
- * **No key is control flow.** No conditions, no loops, no expressions. That is deliberate. The
- * interesting decisions in this kind of work — is this good enough, did it actually do what was
- * asked — are not predicates a workflow language could evaluate. They are judgements, and a
+ * **No key is control flow.** No conditions, no expressions, and no loop a keyword decides. That is
+ * deliberate. The interesting decisions in this kind of work — is this good enough, did it actually do
+ * what was asked — are not predicates a workflow language could evaluate. They are judgements, and a
  * judgement belongs to a step with an agent in it, not to a keyword. The workflow is a team, not a
  * program: `after` orders, `resume` continues, `check` measures, `retries` counts, `output` declares
- * what a step's closeout says for the steps after it and `input` reads it, and the rest say who does
- * the work and for how long.
+ * what a step's closeout says for the steps after it and `input` reads it, `loop` is the edge back and
+ * `rounds` counts it, and the rest say who does the work and for how long.
+ *
+ * `loop` is the one edge that points backwards, and it is still not a condition: whether the work goes
+ * round again is the looping step's agent's word — `again`, in its closeout, the way `blocked` is — and
+ * the run only files the round and counts, the way `maxAttempts` is a count.
  *
  * **The keys are a closed list.** A key the parser does not know is refused by name, and a value
  * it cannot use is refused with the fix, before anything is spent. Accepting and ignoring is what
@@ -74,7 +78,28 @@ export type Workflow = {
    * lacks one of them is `unsigned`.
    */
   output?: StepOutput;
+  /**
+   * The step to run again when this one's closeout says `again: true`: one this step waits on through `after`.
+   *
+   * A round files that step again — its last session continued, handed this step's declared output as data —
+   * then every step between them, then this one, a new session. `again: false` lets what waits on this step
+   * start. A step with `loop:` declares `again` in its `output:`. Like `after` it is a relationship: the
+   * judgement is the agent's, and the run only files the round and counts it.
+   */
+  loop?: string;
+  /** How many rounds a `loop:` may run, the first included — then a person decides. Set to `DEFAULT_ROUNDS` when a loop does not say. */
+  rounds?: number;
 };
+
+/** The rounds a `loop:` runs when its step does not say. */
+export const DEFAULT_ROUNDS = 3;
+
+/**
+ * The field the run adds to a loop's target's closeout from its second round: its answer to each finding it
+ * was handed, which the next round's looping step is given as data. The run's, like the four every closeout
+ * has, so a target's `output:` may not declare it. The schema itself is `REPLIES_SCHEMA` in run.ts.
+ */
+export const LOOP_REPLIES = 'replies';
 
 /** A step's declared output: the file as the step names it, and the schema that file held at `wf start`. */
 export type StepOutput = { file: string; schema: OutputSchema };
@@ -90,7 +115,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'harness', 'model', 'permissionMode', 'deadlineSeconds', 'maxAttempts', 'check', 'retries', 'output',
+  'after', 'resume', 'input', 'harness', 'model', 'permissionMode', 'deadlineSeconds', 'maxAttempts', 'check', 'retries', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -150,6 +175,7 @@ const COUNTS = {
   deadlineSeconds: { least: 1, counts: 'the seconds the engine lets the step run before stopping it', example: 900 },
   maxAttempts: { least: 1, counts: 'how many attempts the engine may make at the step', example: 1 },
   retries: { least: 0, counts: 'how many times the run re-files the step after its check refuses it', example: 1 },
+  rounds: { least: 1, counts: 'how many rounds `loop:` may run, the first included', example: 3 },
 } as const;
 
 export class WorkflowError extends Error {
@@ -187,6 +213,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
   // `resume: x` implies `after: x` — continuing a session that has not run is not a thing.
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
   const harness = harnessOf(name, meta.harness);
+  const output = outputOf(name, meta.output, read);
 
   return {
     name,
@@ -201,8 +228,38 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),
     input: meta.input?.split(',').map((s) => s.trim()).filter(Boolean),
-    output: outputOf(name, meta.output, read),
+    output,
+    loop: loopOf(name, meta.loop, output),
+    rounds: roundsOf(name, meta.loop, meta.rounds),
   };
+}
+
+/**
+ * `loop:` as written, refused unless the step can say whether to go round again: one step, and `again` declared
+ * boolean in its `output:`. That the step it names comes before this one is the workflow's to say (`validate`).
+ */
+function loopOf(step: string, loop: string | undefined, output: StepOutput | undefined): string | undefined {
+  if (loop === undefined) return undefined;
+  if (loop.includes(',')) {
+    refuse(`${step}: \`loop: ${loop}\` names more than one step. A loop runs one earlier step again, and every step between it and this one follows: name the first of them.`);
+  }
+  const named = `${step}: \`loop: ${loop}\` runs ${loop} again when this step's closeout says \`again: true\``;
+  const declare = 'Declare it — `"again": { "type": "boolean" }`, listed in `required` — so the run reads a yes or a no, never prose.';
+  if (!output) refuse(`${named}, and this step declares no \`output:\`, so its closeout has no \`again\`. Give it an \`output:\` schema. ${declare}`);
+  const again = output.schema.properties.again;
+  if (!again) refuse(`${named}, and \`output: ${output.file}\` does not declare \`again\`. ${declare}`);
+  if (again.type !== 'boolean') {
+    refuse(`${named}, and \`output: ${output.file}\` declares \`again\` as ${JSON.stringify(again.type ?? again)}. It is \`"type": "boolean"\`: true or false, and nothing the run would have to interpret.`);
+  }
+  return loop;
+}
+
+/** `rounds:`, which counts the rounds of a loop: refused on a step with no `loop:`, and `DEFAULT_ROUNDS` on one that does not say. */
+function roundsOf(step: string, loop: string | undefined, rounds: string | undefined): number | undefined {
+  if (rounds !== undefined && loop === undefined) {
+    refuse(`${step}: \`rounds: ${rounds}\` counts the rounds of a loop, and this step has no \`loop:\`. Add \`loop: <step>\`, naming the earlier step to run again, or delete the line. To try one step again after its check refuses it, that is \`retries:\`.`);
+  }
+  return loop === undefined ? undefined : countOf(step, 'rounds', rounds) ?? DEFAULT_ROUNDS;
 }
 
 /** The frontmatter as key → value: every line a key a step has, set once, to something. */
@@ -437,6 +494,86 @@ export function validate(steps: readonly Workflow[]): void {
     }
   }
   if (pending.size) throw new WorkflowError(`these steps wait on each other: ${[...pending.keys()].sort().join(', ')}`);
+
+  validateLoops(steps);
+}
+
+/** Every step `name` waits on, directly or through another. */
+function upstreamOf(steps: readonly Workflow[], name: string): Set<string> {
+  const found = new Set<string>();
+  const queue = [name];
+  while (queue.length) {
+    const at = queue.pop();
+    const current = steps.find((s) => s.name === at);
+    for (const a of current?.after ?? []) {
+      if (!found.has(a)) { found.add(a); queue.push(a); }
+    }
+  }
+  return found;
+}
+
+/**
+ * The steps a round of `looping`'s loop files again, in the workflow's order: its target, every step between
+ * the target and it, and itself. `[]` for a step with no `loop:`.
+ */
+export function loopSpan(steps: readonly Workflow[], looping: Workflow): string[] {
+  const target = looping.loop;
+  if (!target) return [];
+  const up = upstreamOf(steps, looping.name);
+  return steps
+    .filter((s) => s.name === target || s.name === looping.name || (up.has(s.name) && upstreamOf(steps, s.name).has(target)))
+    .map((s) => s.name);
+}
+
+/**
+ * The ways a loop cannot run as a round: it names no earlier step, or a round could not file its steps again as
+ * they were filed the first time.
+ *
+ * A round works in the workspaces the first one made. A step that inherits its predecessor's gets the target's
+ * new commits by being there; one that forked or merged a worktree of its own was cut once, from the first
+ * round's branch, and would review work that is no longer the change. So a loop's steps are a chain. A step in
+ * one is a new session each round, so it cannot `resume:` another; a step in two would be re-filed by a round of
+ * either; and a target's `output:` may not take the field the run adds to it.
+ */
+function validateLoops(steps: readonly Workflow[]): void {
+  const spans = new Map<string, Workflow>();
+  for (const s of steps.filter((x) => x.loop)) {
+    const target = s.loop!;
+    const named = `${s.name}: \`loop: ${target}\``;
+    if (target === s.name) {
+      throw new WorkflowError(`${named} names this step. A loop runs an earlier step again, then every step between it and this one, then this one: name the step this one reviews, which it waits on through \`after\`.`);
+    }
+    const producer = steps.find((x) => x.name === target);
+    if (!producer) throw new WorkflowError(`${named} names a step that is not here. Correct the name, or delete the line.`);
+    if (!upstreamOf(steps, s.name).has(target)) {
+      throw new WorkflowError(`${named}, but ${s.name} does not wait on ${target}, directly or through the steps between — a loop runs again work that finished before this step. Add ${target} to \`after:\`, or name a step ${s.name} waits on.`);
+    }
+    if (producer.output && Object.hasOwn(producer.output.schema.properties, LOOP_REPLIES)) {
+      throw new WorkflowError(`${target}: \`output: ${producer.output.file}\` declares \`${LOOP_REPLIES}\`, and ${s.name} loops back to ${target} (\`loop: ${target}\`), so from round 2 the run adds \`${LOOP_REPLIES}\` to its closeout: its answer to each finding. Rename the field.`);
+    }
+
+    const span = loopSpan(steps, s);
+    for (const name of span) {
+      const other = spans.get(name);
+      if (other) {
+        throw new WorkflowError(`${name} is in two loops: ${other.name}'s (\`loop: ${other.loop}\`) and ${s.name}'s (\`loop: ${target}\`). A round of either would file it again under the other. Give it one loop: make one loop's steps end before the other's begin.`);
+      }
+      spans.set(name, s);
+      if (name === target) continue;
+      const step = steps.find((x) => x.name === name)!;
+      if (step.resume) {
+        throw new WorkflowError(`${name}: \`resume: ${step.resume}\`, and ${name} is in ${s.name}'s loop (\`loop: ${target}\`), which files it as a new session each round — so it cannot continue another. Delete the line: only the loop's first step, ${target}, is continued, and the run does that itself.`);
+      }
+      const [from] = step.after;
+      const siblings = steps.filter((x) => from !== undefined && x.after.includes(from)).map((x) => x.name);
+      if (step.after.length !== 1 || siblings.length !== 1) {
+        const why = step.after.length > 1
+          ? `it waits on ${step.after.join(' and ')}, so it merges their branches into a worktree of its own`
+          : `${siblings.filter((x) => x !== name).join(' and ')} ${siblings.length > 2 ? 'wait' : 'waits'} on ${from} too, so ${name} forks a worktree of its own`;
+        throw new WorkflowError(`${named} files ${span.filter((x) => x !== target).join(', then ')} again after ${target} each round, in the workspace ${target} works in, and ${name} does not work there: ${why}, cut once, which would not have the next round's work. A loop's steps are a chain — each waits on the one before it, and nothing else does. Move what runs beside them after ${s.name}.`);
+      }
+    }
+  }
 }
 
 /**

@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
-import { CLOSEOUT_FIELDS, outputFields, STEP_KEYS, type StepKey } from '../src/workflow.ts';
+import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -27,6 +27,13 @@ const FINDINGS = {
   },
   required: ['findings'],
   additionalProperties: false,
+};
+
+/** `FINDINGS`, and `again`: what a step with `loop:` declares. */
+const LOOPING = {
+  ...FINDINGS,
+  properties: { ...FINDINGS.properties, again: { type: 'boolean' } },
+  required: ['findings', 'again'],
 };
 
 test('a step is frontmatter and prose, and the prose is the point', () => {
@@ -164,18 +171,20 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   const values: Record<StepKey, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'codex', model: 'gpt-5.1', permissionMode: 'read-only',
     deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
+    loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
-  const w = parseWorkflow('review', text, (file) => (file === 'review.schema.json' ? JSON.stringify(FINDINGS) : undefined));
+  const w = parseWorkflow('review', text, (file) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined));
   for (const key of STEP_KEYS) assert.notEqual(w[key], undefined, `${key} is on the list and never read`);
   assert.equal(w.deadlineSeconds, 900);
   assert.equal(w.retries, 1);
   assert.deepEqual(w.input, ['implement']);
-  assert.deepEqual(w.output, { file: 'review.schema.json', schema: FINDINGS });
+  assert.deepEqual(w.output, { file: 'review.schema.json', schema: LOOPING });
+  assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, harness, model, permissionMode, deadlineSeconds, maxAttempts, check, retries, output.";
+  const list = "A step's keys are: after, resume, input, harness, model, permissionMode, deadlineSeconds, maxAttempts, check, retries, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -422,4 +431,77 @@ test('an output schema is read strict wherever an object can sit — and one tha
   for (const [product, at] of under) {
     assert.match(refusal(around(product)), new RegExp(`is not strict at ${at.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: \`optional\` is not in \`required\``), at);
   }
+});
+
+// ─── the edge back: `loop:` and `rounds:` ───────────────────────────────────
+
+/** implement → review, declaring `findings` and `again`, with `reviewKeys` beside `after` and `output` — and whatever `files` add or replace. */
+const loopFiles = (reviewKeys: string, files: Record<string, string | object | null> = {}) => ({
+  'review.md': `---\nafter: implement\noutput: review.schema.json\n${reviewKeys}\n---\nreview it\n`,
+  'review.schema.json': LOOPING,
+  ...files,
+});
+/** A step `loop:`-ing back to `target`, declaring `again`, as a folder would load it. */
+const looping = (name: string, after: string[], target: string): Workflow => ({ ...step(name, after), loop: target, rounds: DEFAULT_ROUNDS, output: { file: `${name}.json`, schema: LOOPING as never } });
+
+test('`loop:` names the step to run again and `rounds:` counts, 3 unless it says — and a loop is its target, what is between, and itself', () => {
+  const steps = loadWorkflows(outputFolder(loopFiles('loop: implement')));
+  const review = steps.find((s) => s.name === 'review')!;
+  assert.deepEqual([review.loop, review.rounds, DEFAULT_ROUNDS], ['implement', 3, 3]);
+  assert.equal(loadWorkflows(outputFolder(loopFiles('loop: implement\nrounds: 1'))).find((s) => s.name === 'review')!.rounds, 1);
+  assert.deepEqual([steps[0]!.loop, steps[0]!.rounds], [undefined, undefined], 'a step with no loop counts no rounds');
+
+  // A step between, a step after the loop — not in it — and a second loop that starts where the first ends.
+  const chain = [step('implement'), step('test', ['implement']), looping('review', ['test'], 'implement'), step('docs', ['review']), looping('proof', ['docs'], 'docs')];
+  validate(chain);
+  assert.deepEqual(loopSpan(chain, chain[2]!), ['implement', 'test', 'review']);
+  assert.deepEqual(loopSpan(chain, chain[4]!), ['docs', 'proof']);
+  assert.deepEqual(loopSpan(chain, chain[1]!), [], 'a step with no loop spans nothing');
+});
+
+test('REFUSED at load: `loop:` naming a step that is not an ancestor — one beside it, one after it, itself, one not here, or two', () => {
+  const docs = { 'docs.md': '---\nafter: implement\n---\ndocument it\n' };
+  assert.match(refusal(loopFiles('loop: docs', docs)),
+    /^review: `loop: docs`, but review does not wait on docs, directly or through the steps between — a loop runs again work that finished before this step\. Add docs to `after:`, or name a step review waits on\.$/);
+  assert.match(refusal(loopFiles('loop: ship', { 'ship.md': '---\nafter: review\n---\nship it\n' })), /^review: `loop: ship`, but review does not wait on ship/);
+  assert.match(refusal(loopFiles('loop: review')), /^review: `loop: review` names this step\. A loop runs an earlier step again/);
+  assert.match(refusal(loopFiles('loop: implemnt')), /^review: `loop: implemnt` names a step that is not here\. Correct the name, or delete the line\./);
+  assert.match(refusal(loopFiles('loop: implement, docs', docs)), /^review: `loop: implement, docs` names more than one step\./);
+});
+
+test('REFUSED at load: a step with `loop:` whose output does not declare `again` as a boolean — or declares nothing', () => {
+  const lacks = /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and `output: review\.schema\.json` does not declare `again`\. Declare it — `"again": \{ "type": "boolean" \}`, listed in `required`/;
+  assert.match(refusal(loopFiles('loop: implement', { 'review.schema.json': FINDINGS })), lacks);
+  assert.match(refusal({ 'review.md': '---\nafter: implement\nloop: implement\n---\nreview it\n' }),
+    /^review: `loop: implement` runs implement again when this step's closeout says `again: true`, and this step declares no `output:`, so its closeout has no `again`\./);
+  for (const type of ['string', ['boolean', 'null']]) {
+    const schema = { ...LOOPING, properties: { ...LOOPING.properties, again: { type } } };
+    assert.match(refusal(loopFiles('loop: implement', { 'review.schema.json': schema })), /declares `again` as .*It is `"type": "boolean"`: true or false, and nothing the run would have to interpret\./, JSON.stringify(type));
+  }
+});
+
+test('REFUSED at load: `rounds:` on a step with no `loop:`, and rounds that are not a count above zero', () => {
+  assert.match(refusal({ 'review.md': '---\nafter: implement\nrounds: 2\n---\nreview it\n' }),
+    /^review: `rounds: 2` counts the rounds of a loop, and this step has no `loop:`\. Add `loop: <step>`.*that is `retries:`\./);
+  for (const bad of ['0', 'three', '-1', '2.5']) {
+    assert.match(refusal(loopFiles(`loop: implement\nrounds: ${bad}`)), /`rounds: .*` is not a count\. `rounds` is how many rounds `loop:` may run, the first included: a whole number above zero/, bad);
+  }
+});
+
+test('REFUSED at load: a loop a round could not file again as it was — a step in it that forks, merges or resumes, a step in two loops, a target that declares `replies`', () => {
+  // implement → review (loop: implement), and docs beside review: review forks a worktree cut once, off round 1.
+  assert.match(refusal(loopFiles('loop: implement', { 'docs.md': '---\nafter: implement\n---\ndocument it\n' })),
+    /^review: `loop: implement` files review again after implement each round, in the workspace implement works in, and review does not work there: docs waits on implement too, so review forks a worktree of its own, cut once, which would not have the next round's work\. A loop's steps are a chain/);
+  // Read in the workflow's order, so review's merge is found before test's fork beside it.
+  assert.throws(() => validate([step('implement'), looping('review', ['implement', 'test'], 'implement'), step('test', ['implement'])]),
+    /review does not work there: it waits on implement and test, so it merges their branches into a worktree of its own/);
+  assert.throws(() => validate([step('implement'), { ...step('test', ['implement']), resume: 'implement' }, looping('review', ['test'], 'implement')]),
+    /test: `resume: implement`, and test is in review's loop \(`loop: implement`\), which files it as a new session each round/);
+  assert.throws(() => validate([step('implement'), { ...looping('review', [], 'implement'), resume: 'implement', after: ['implement'] }]),
+    /review: `resume: implement`, and review is in review's loop/, 'the looping step is a new session each round, too');
+  assert.throws(() => validate([step('a'), looping('b', ['a'], 'a'), looping('c', ['b'], 'b')]),
+    /b is in two loops: b's \(`loop: a`\) and c's \(`loop: b`\)\. A round of either would file it again under the other/);
+  const replies = { type: 'object', properties: { replies: { type: 'string' } }, required: ['replies'], additionalProperties: false };
+  assert.match(refusal(loopFiles('loop: implement', { 'implement.md': '---\noutput: implement.schema.json\n---\nimplement it\n', 'implement.schema.json': replies })),
+    /^implement: `output: implement\.schema\.json` declares `replies`, and review loops back to implement \(`loop: implement`\), so from round 2 the run adds `replies` to its closeout/);
 });

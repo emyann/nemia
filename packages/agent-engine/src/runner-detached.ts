@@ -22,7 +22,7 @@ import os from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Observed, Sighting } from './domain.ts';
-import { RunnerError, worktreeName, type RunnerOps, type SpawnRequest } from './runner.ts';
+import { claudeRefuses, RunnerError, worktreeName, type RunnerOps, type SpawnRequest } from './runner.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {
@@ -40,6 +40,13 @@ export type HarnessSpec = {
    * id — needed only to resume later. Optional: the name is the key, this is just a handle.
    */
   nativeIdPattern?: string;
+  /**
+   * What this harness cannot be asked for, as a sentence that names what to write instead — or
+   * `undefined` when it can do what the task says. Permission modes and efforts are its own words,
+   * so the check lives on the spec, and `file()` asks it before anything is journalled. A spec
+   * without one is asked nothing.
+   */
+  refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
 };
 
 /**
@@ -63,6 +70,7 @@ export const STALE_MS = 30_000;
 
 const WORKER = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'bin', 'ae-worker.ts');
 const safe = (name: string) => name.replace(/[^a-zA-Z0-9]+/g, '_');
+const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 
 type RunFile = {
   name?: string; state: Observed; pid: number; heartbeatAt: string;
@@ -118,6 +126,9 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     spawn: (r) =>
       Effect.try({
         try: () => {
+          // Checked here because `spawn` does not throw for it: the child emits the error later, and
+          // unheard, that event kills the process that launched the worker — the engine.
+          if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);
           fs.mkdirSync(dir, { recursive: true });
           // A re-spawn of the same attempt must not find the previous one's answer waiting for it.
           try { fs.rmSync(closeoutFile(r.name)); } catch { /* nothing to clear */ }
@@ -140,9 +151,14 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           const child = spawn(process.execPath, [WORKER, runFile(r.name)], {
             detached: true, stdio: 'ignore', cwd: r.cwd,
           });
+          // Heard, so a launch that fails after `spawn` returns never takes the engine down with it;
+          // the run file it leaves says working with no pid, and the lease calls that dead.
+          child.on('error', () => {});
           child.unref();
         },
-        catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}` }),
+        // Everything in `try` runs before the worker is launched, or is the launch: whatever threw,
+        // no session is running under the name.
+        catch: (cause) => new RunnerError({ verb: 'spawn', message: `${spec.name}: ${String(cause)}`, refused: true }),
       }),
 
     // The registry is ours: a directory, read fresh every pass. Same shape as `claude agents`.
@@ -154,7 +170,12 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       // output by the worker — present only once the harness has printed it, which is why resume
       // is best-effort for this kind of harness and exact for one with a registry.
       for (const { name, run } of readAll()) {
-        m.set(name, { sessionId: name, state: observedState(run, now), nativeId: run.nativeId, closeout: statementOf(name) });
+        m.set(name, {
+          sessionId: name, state: observedState(run, now), nativeId: run.nativeId, closeout: statementOf(name),
+          // The process's own exit code, once it has one. The worker writes -1 when there is none —
+          // killed by a signal, or never started — and that is reported as no code, not as a code.
+          ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
+        });
       }
       return m;
     }),
@@ -217,12 +238,44 @@ const repositoryOf = (cwd: string): string | undefined => {
 };
 
 /**
+ * Codex's sandboxes, which a task names as its `permissionMode`. `bypassPermissions`, Claude's
+ * word, is also taken, as the widest, because the spec has always emitted it that way.
+ */
+export const CODEX_SANDBOXES: readonly string[] = ['read-only', 'workspace-write', 'danger-full-access'];
+
+/** The tools that change files. Codex has no tool list — one shell, three sandboxes — so these decide. */
+const WRITES: readonly string[] = ['Bash', 'Write', 'Edit'];
+
+/**
+ * The sandbox a task runs in: the one it named, `workspace-write` when it named none — and
+ * `read-only` whenever its `tools` has none of Bash, Write or Edit, whatever it named, because the
+ * narrower of two fences is the one that was asked for. A list that has one of them does not
+ * narrow Codex at all: Codex cannot take its shell away and leave its edits.
+ *
+ * A word that is not a sandbox never arrives through `file()`, which refuses it; a direct caller
+ * gets the default.
+ */
+const sandboxOf = (r: SpawnRequest): string => {
+  if (r.tools && !r.tools.some((t) => WRITES.includes(t))) return 'read-only';
+  const asked = r.permissionMode === 'bypassPermissions' ? 'danger-full-access' : r.permissionMode;
+  return asked !== undefined && CODEX_SANDBOXES.includes(asked) ? asked : 'workspace-write';
+};
+
+/**
+ * The reasoning efforts the Codex API names (codex-cli 0.154.0, its default model). Codex checks
+ * none itself: a bad one is sent, refused by the API, and the session exits 1 — so `file()` refuses
+ * it first.
+ */
+export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
+
+/**
  * Codex, through `codex exec`. Verified against codex-cli 0.154.0:
  *   --json                  JSONL events on stdout
  *   -C <dir>                working root
  *   -s <mode>               sandbox: read-only | workspace-write | danger-full-access
  *   --skip-git-repo-check   allow running outside a git repository
  *   exec resume <id>        continue a previous session
+ *   -c key="value"          a config override: `model_reasoning_effort`, project trust
  */
 export const codex: HarnessSpec = {
   name: 'codex',
@@ -233,7 +286,9 @@ export const codex: HarnessSpec = {
       '--json',
       '--skip-git-repo-check',
       '-C', r.cwd,
-      '-s', r.permissionMode === 'bypassPermissions' ? 'danger-full-access' : 'workspace-write',
+      // The sandbox the task named, as itself. `read-only` used to fall through to `workspace-write`,
+      // so a task that asked for a reviewer that cannot write got one that could.
+      '-s', sandboxOf(r),
       ...(r.model ? ['-m', r.model] : []),
       // Codex's worktree flag takes NO value, so it is safe immediately before the prompt —
       // unlike Claude's. The spec is where that difference lives, so the engine never learns
@@ -243,6 +298,8 @@ export const codex: HarnessSpec = {
       // message conform; `-o` writes it where the runner chose, outside the workspace, so it
       // cannot travel into the next step's branch. Verified against 0.154.0, strict schema.
       ...(io?.closeoutFile ? ['--output-schema', io.closeoutSchemaFile!, '-o', io.closeoutFile] : []),
+      // Effort is a config override: `codex exec` has no flag for it.
+      ...(r.effort ? ['-c', `model_reasoning_effort="${r.effort}"`] : []),
       // Trust, as found by `prepare`: what lets a repository's own `.codex/rules` load in a worktree.
       ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),
       // `resume` LAST, after every flag: its own usage is `[SESSION_ID] [PROMPT]`, and it rejects
@@ -252,6 +309,15 @@ export const codex: HarnessSpec = {
       r.brief,
     ],
   }),
+  refuses: (task) => {
+    if (task.permissionMode !== undefined && task.permissionMode !== 'bypassPermissions' && !CODEX_SANDBOXES.includes(task.permissionMode)) {
+      return `\`permissionMode: ${task.permissionMode}\` is not a sandbox Codex has. Its modes are: ${CODEX_SANDBOXES.join(', ')} (and bypassPermissions, meaning danger-full-access).`;
+    }
+    if (task.effort !== undefined && !CODEX_EFFORTS.includes(task.effort)) {
+      return `\`effort: ${task.effort}\` is not a reasoning effort Codex has. Its efforts are: ${CODEX_EFFORTS.join(', ')}.`;
+    }
+    return undefined;
+  },
   // Best effort: codex prints a thread/session id in its JSONL. Only needed for resume.
   nativeIdPattern: '"(?:thread_id|session_id|id)"\\s*:\\s*"([0-9a-f-]{16,})"',
   /**
@@ -283,11 +349,15 @@ export const claudeDetached: HarnessSpec = {
     cmd: 'claude',
     args: [
       '-p', r.brief,
+      // Variadic, and ended by the flag after it, as for `claude --bg`.
+      ...(r.tools ? ['--tools', r.tools.join(',')] : []),
       '--permission-mode', r.permissionMode ?? 'auto',
       ...(r.model ? ['--model', r.model] : []),
+      ...(r.effort ? ['--effort', r.effort] : []),
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
       ...(r.worktree ? ['--worktree', worktreeName(r)] : []),
     ],
   }),
   nativeIdPattern: '"session_id"\\s*:\\s*"([0-9a-f-]{16,})"',
+  refuses: claudeRefuses,
 };

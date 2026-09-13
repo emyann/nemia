@@ -8,37 +8,155 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { createEngine, type Engine, type Event, type ResumePolicy } from './facade.ts';
+import { createEngine, type Attempt, type Engine, type Event, type ResumePolicy, type TaskSpec, type TaskView, type Usage } from './facade.ts';
 
-/** A brief is a markdown file: optional `key: value` frontmatter, body is the prompt. */
-export function parseBrief(text: string, fallbackCwd: string) {
-  const m = /^---\n([\s\S]*?)\n---\n?/.exec(text);
-  const meta: Record<string, string> = {};
-  if (m) for (const line of m[1]!.split('\n')) {
+/**
+ * Every key a brief may have — a closed list, on purpose.
+ *
+ * The parser used to collect any `key: value` line and read the ones it knew, so a typo was a
+ * default and a bad value was a surprise: `maxAtempts: 3` ran once, and `deadlineSeconds: 5m`
+ * became NaN, was journalled as `null`, and stopped the task on its first pass. A key this list
+ * does not name is refused by name, with the list. A test feeds every key through the parser, so
+ * none can be accepted here and then dropped.
+ */
+export const BRIEF_KEYS = [
+  'cwd', 'harness', 'model', 'permissionMode', 'maxAttempts', 'deadlineSeconds',
+  'resume', 'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort',
+] as const satisfies readonly (keyof TaskSpec)[];
+export type BriefKey = (typeof BRIEF_KEYS)[number];
+
+const isBriefKey = (key: string): key is BriefKey => (BRIEF_KEYS as readonly string[]).includes(key);
+
+/** Exhaustive by type: a policy added to `ResumePolicy` and not here does not compile. */
+const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
+
+/** A refusal: exit code 2, and a sentence that says what to write instead. */
+const refuse = (message: string) => Object.assign(new Error(`brief: ${message}`), { exitCode: 2 });
+
+const isDirectory = (p: string) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
+
+/**
+ * A brief is a markdown file: optional `key: value` frontmatter, body is the prompt.
+ *
+ * It refuses rather than guesses: a key not in `BRIEF_KEYS`, a key given twice, a line that is not
+ * `key: value`, an empty value, a count or a number of seconds that is not one, a `resume` that is
+ * not a policy, a `cwd` or schema file that is not there, and a brief with nothing to do. What a
+ * value means to a harness — a permission mode, a harness name — is the engine's to check, and
+ * `file()` checks it, so this is not the only door that does.
+ */
+export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
+  const source = text.replace(/\r\n/g, '\n');
+  const m = /^---\n(?:([\s\S]*?)\n)?---[ \t]*(?:\n|$)/.exec(source);
+  if (!m && source.startsWith('---\n')) throw refuse('the frontmatter opened with `---` is never closed. End it with a `---` line of its own.');
+
+  const meta = new Map<BriefKey, string>();
+  for (const raw of m?.[1]?.split('\n') ?? []) {
+    // `#` after a space starts a comment, as it would in YAML — so `harness: codex  # the reviewer`
+    // means codex, and not a harness called "codex  # the reviewer".
+    const line = raw.replace(/(^|\s)#.*$/, '').trim();
+    if (!line) continue;
     const i = line.indexOf(':');
-    if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim();
+    if (i <= 0) throw refuse(`\`${line}\` is not a \`key: value\` line. Write it as \`key: value\`, or delete it.`);
+    const key = line.slice(0, i).trim();
+    const value = line.slice(i + 1).trim();
+    if (!isBriefKey(key)) throw refuse(`\`${key}\` is not a key a brief has. A brief's keys are: ${BRIEF_KEYS.join(', ')}.`);
+    if (meta.has(key)) throw refuse(`\`${key}\` is given twice. Keep one.`);
+    if (!value) throw refuse(`\`${key}:\` has no value. Give it one, or delete the line.`);
+    meta.set(key, value);
   }
+
+  const brief = (m ? source.slice(m[0].length) : source).trim();
+  if (!brief) throw refuse('there is no prompt. Write what the session should do below the frontmatter.');
+
+  const maxAttempts = meta.get('maxAttempts');
+  // Digits alone are not a count: 309 nines is `Infinity` once converted, so the number is checked too.
+  if (maxAttempts !== undefined && !(/^[1-9]\d*$/.test(maxAttempts) && Number.isSafeInteger(Number(maxAttempts)))) {
+    throw refuse(`\`maxAttempts: ${maxAttempts}\` is not a number of attempts. Write a whole number from 1, like \`maxAttempts: 2\`.`);
+  }
+  const deadlineSeconds = meta.get('deadlineSeconds');
+  if (deadlineSeconds !== undefined && !(Number.isFinite(Number(deadlineSeconds)) && Number(deadlineSeconds) > 0)) {
+    throw refuse(`\`deadlineSeconds: ${deadlineSeconds}\` is not a number of seconds. Write seconds above 0, like \`deadlineSeconds: 900\` for fifteen minutes.`);
+  }
+  const resume = meta.get('resume');
+  if (resume !== undefined && !Object.hasOwn(RESUME_POLICIES, resume)) {
+    throw refuse(`\`resume: ${resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}. To continue a particular session, that is \`resumeFrom: <session id>\`.`);
+  }
+  const cwd = meta.get('cwd');
+  if (cwd !== undefined && !isDirectory(path.resolve(cwd))) {
+    throw refuse(`\`cwd: ${cwd}\` is not a directory (${path.resolve(cwd)}). Give the directory the session should work in.`);
+  }
+
+  // A path to a JSON Schema file: frontmatter is one line per key, and a schema is not.
+  let closeoutSchema: object | undefined;
+  const schemaPath = meta.get('closeoutSchema');
+  if (schemaPath !== undefined) {
+    let schemaText: string;
+    try { schemaText = fs.readFileSync(path.resolve(schemaPath), 'utf8'); }
+    catch (e) { throw refuse(`\`closeoutSchema: ${schemaPath}\` cannot be read (${(e as Error).message}). It is a path to a JSON Schema file, relative to where you run \`ae\`.`); }
+    let parsed: unknown;
+    try { parsed = JSON.parse(schemaText); }
+    catch (e) { throw refuse(`\`closeoutSchema: ${schemaPath}\` is not JSON (${(e as Error).message}).`); }
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+      throw refuse(`\`closeoutSchema: ${schemaPath}\` is not a JSON Schema: a schema is a JSON object.`);
+    }
+    closeoutSchema = parsed;
+  }
+
+  // One line, comma-separated: `tools: Read, Grep, Glob`. Which names a harness has is its to say.
+  const toolList = meta.get('tools')?.split(',').map((t) => t.trim());
+  if (toolList?.some((t) => !t)) {
+    throw refuse(`\`tools: ${meta.get('tools')}\` has an empty name in it. List tool names separated by commas, like \`tools: Read, Grep, Glob\`.`);
+  }
+
+  const worktree = meta.get('worktree');
   return {
-    brief: (m ? text.slice(m[0].length) : text).trim(),
-    cwd: meta.cwd ? path.resolve(meta.cwd) : fallbackCwd,
-    model: meta.model,
-    permissionMode: meta.permissionMode,
-    harness: meta.harness,
-    maxAttempts: meta.maxAttempts ? Number(meta.maxAttempts) : 1,
-    deadlineSeconds: meta.deadlineSeconds ? Number(meta.deadlineSeconds) : undefined,
-    resume: meta.resume as ResumePolicy | undefined,
+    brief,
+    cwd: cwd !== undefined ? path.resolve(cwd) : fallbackCwd,
+    model: meta.get('model'),
+    permissionMode: meta.get('permissionMode'),
+    harness: meta.get('harness'),
+    maxAttempts: maxAttempts !== undefined ? Number(maxAttempts) : 1,
+    deadlineSeconds: deadlineSeconds !== undefined ? Number(deadlineSeconds) : undefined,
+    resume: resume as ResumePolicy | undefined,
     // Which session to CONTINUE, as opposed to `resume` which is the retry policy between
     // attempts of this task. Two different questions that the same English word answers.
-    resumeFrom: meta.resumeFrom,
-    // A path to a JSON Schema file: frontmatter is one line per key, and a schema is not.
-    closeoutSchema: meta.closeoutSchema ? JSON.parse(fs.readFileSync(path.resolve(meta.closeoutSchema), 'utf8')) as object : undefined,
-    // `worktree: true` lets the harness name it; any other value names it yourself.
-    worktree: meta.worktree === undefined ? undefined : meta.worktree === 'true' ? true : meta.worktree,
+    resumeFrom: meta.get('resumeFrom'),
+    closeoutSchema,
+    // `worktree: true` lets the harness name it, `false` is no worktree, any other value names it.
+    worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
+    tools: toolList,
+    effort: meta.get('effort'),
   };
 }
 
-const line = (v: { id: string; phase: string; state: { harness?: string; attempts: unknown[]; maxAttempts: number; brief: string }; costUsd?: number; turns?: number }) => {
-  const meter = v.costUsd !== undefined ? ` $${v.costUsd.toFixed(3)}/${v.turns ?? 0}t` : '';
+/** A count for a person: 20400 → 20.4k, 1234567 → 1.2M. */
+const count = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
+
+/**
+ * What an attempt consumed, for a person — and when its runner measured nothing, saying so. A zero
+ * would read as "cost nothing"; the truth is "nobody counted".
+ */
+export const usageLine = (u: Usage | null): string => {
+  if (!u) return 'usage not measured';
+  const tokens = u.inputTokens !== undefined && u.outputTokens !== undefined
+    ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out` : ' · tokens not measured';
+  const cost = u.costUsd !== undefined ? ` · $${u.costUsd.toFixed(3)}` : ' · cost not measured';
+  return `${u.turns} turns · ${u.toolCalls} tool calls${tokens}${cost}`;
+};
+
+/** One attempt, for `ae show`: how it ended, how its process exited if it has one, what it consumed. */
+export const attemptLine = (a: Attempt): string => {
+  if (a.ended === null) return `attempt ${a.n}  running`;
+  if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
+  const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : ''}`;
+  const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
+  const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
+  return `attempt ${a.n}  ${how}${exit}  ${usageLine(a.usage)}${failedCall}`;
+};
+
+const line = (v: TaskView) => {
+  const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
+  const meter = u ? `  ${u.costUsd !== undefined ? `$${u.costUsd.toFixed(3)}/` : ''}${u.turns}t` : '';
   return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${v.state.attempts.length}/${v.state.maxAttempts}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 
@@ -53,7 +171,8 @@ const KINDS: Record<string, string> = {
 
 const entryLine = (taskId: string, event: Event) => {
   const extra = event.kind === 'settled' ? `  ${event.outcome}`
-    : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'lost' ? ' (lost)' : ''}`
+    : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? '' : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
+    : event.kind === 'spawned' && event.error ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
     : '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };
@@ -78,6 +197,11 @@ const HELP = `ae — an engine for agent sessions
     resumeFrom       a session id to continue, instead of starting cold
     worktree         true, or a name — the harness cuts it
     closeoutSchema   a JSON Schema file — the workload ends by answering in that shape
+    tools            Read, Grep, Glob — the only tools the session has (codex: read-only
+                     unless the list has Bash, Write or Edit)
+    effort           claude: low | medium | high | xhigh | max
+                     codex:  none | minimal | low | medium | high | xhigh | max
+  a key not listed here, or a value the harness cannot take, is refused (exit 2)
 
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster
   AE_MAX_CONCURRENT  sessions per harness at once (default 3)`;
@@ -114,6 +238,7 @@ export async function main(argv: string[]): Promise<void> {
       const { entries } = await engine.feed(0);
       for (const e of entries.filter((x) => x.taskId === arg)) console.log(entryLine(e.taskId, e.event));
       console.log(`\ncwd: ${v.state.cwd}\nbrief: ${v.state.brief.slice(0, 200)}`);
+      for (const a of v.state.attempts) console.log(attemptLine(a));
       return;
     }
 

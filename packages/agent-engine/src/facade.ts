@@ -15,7 +15,7 @@ import path from 'node:path';
 import os from 'node:os';
 import type { Event, ResumePolicy, Sighting } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
-import { claudeOps, Runner, RunnerError, type SpawnRequest } from './runner.ts';
+import { claudeOps, claudeRefuses, Runner, RunnerError, type SpawnRequest } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { composite } from './runner-composite.ts';
 import { DEFAULT_MAX_CONCURRENT, file, requestStop, tick, view, type TaskView } from './engine.ts';
@@ -28,27 +28,18 @@ export type PromiseJournal = {
   read(taskId: string): Promise<Event[]>;
   list(): Promise<string[]>;
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
-  /**
-   * Watch everything that happens, as it happens.
-   *
-   * The engine's event-driven surface: a consumer reacts to work finishing without polling a task
-   * or knowing what a tick is. Pushed by the store when it can signal (the file store watches the
-   * feed), and backed by a timer so that a store which cannot — or an OS that drops the event —
-   * costs latency rather than correctness.
-   *
-   * Delivery is at-least-once in order, and the cursor never expires, so a consumer that starts
-   * at 0 replays the whole history first.
-   */
-  watch(options: {
-    onEntry: (entry: FeedEntry) => void | Promise<void>;
-    from?: Cursor;
-    intervalMs?: number;
-    onError?: (e: unknown) => void;
-  }): { stop(): void };
+  // No `watch` here: a store only has to answer `feed`. `Engine.watch` is built on it, and a
+  // required `watch` on the store was a method nothing ever called.
 };
 
 /** A harness, in Promises. Only needed for one that `HarnessSpec` cannot describe. */
 export type PromiseRunner = {
+  /**
+   * Start the session; reject if that fails. When you know nothing started under `r.name`, reject
+   * with an error whose `refused` is `true`, and the attempt ends `unstartable` at once. Otherwise
+   * the engine cannot rule a session out, and its grace window finds out: the session is adopted if
+   * it appears, the attempt `lost` if it never does.
+   */
   spawn(r: SpawnRequest): Promise<void>;
   observe(): Promise<Map<string, Sighting>>;
   stop(sessionId: string): Promise<void>;
@@ -94,6 +85,18 @@ export type TaskSpec = {
    * engine: its shape is yours.
    */
   closeoutSchema?: object;
+  /**
+   * The only tools the session may have, in its harness's names — `['Read', 'Grep', 'Glob']`.
+   * Absent: the harness's own set; empty: none at all. Claude Code is given exactly the list
+   * (`--tools`). Codex has no tool list, so it runs `read-only` when the list has none of Bash,
+   * Write or Edit, and is not narrowed otherwise. Carried on the task; `decide` never reads it.
+   */
+  tools?: string[];
+  /**
+   * How hard the harness should think, in its own words: `--effort` for Claude Code,
+   * `model_reasoning_effort` for Codex. Carried on the task; `decide` never reads it.
+   */
+  effort?: string;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };
@@ -101,7 +104,16 @@ export type TaskSpec = {
 export type TickReport = { tasks: number; actions: number; running: Record<string, number> };
 
 export type Engine = {
-  /** File work. Returns the task id. Nothing runs until a tick. */
+  /**
+   * File work. Returns the task id. Nothing runs until a tick.
+   *
+   * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
+   * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
+   * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model,
+   * resumeFrom or effort; a `tools` that is not a list of names; or a word its harness does not take
+   * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists).
+   * A harness brought as a `PromiseRunner` is asked nothing.
+   */
   file(spec: TaskSpec): Promise<string>;
   /** One pass: start what may start, notice what ended, settle what is over. */
   tick(): Promise<TickReport>;
@@ -149,7 +161,14 @@ const runnerOf = (harnesses: Record<string, HarnessConfig>, fallback: string, ro
       h === 'claude-bg' ? claudeOps()
         : isSpec(h) ? detachedOps(h, root)
         : {
-            spawn: (r: SpawnRequest) => wrap(() => h.spawn(r), (m) => new RunnerError({ verb: 'spawn', message: m })),
+            spawn: (r: SpawnRequest) => Effect.tryPromise({
+              try: () => h.spawn(r),
+              // A rejection is not proof that nothing started; a runner that knows says `refused`.
+              catch: (cause) => new RunnerError({
+                verb: 'spawn', message: cause instanceof Error ? cause.message : String(cause),
+                ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
+              }),
+            }),
             observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })),
             stop: (id: string) => wrap(() => h.stop(id), (m) => new RunnerError({ verb: 'stop', message: m })),
             logs: (id: string) => wrap(() => h.logs(id), (m) => new RunnerError({ verb: 'logs', message: m })),
@@ -161,6 +180,46 @@ const runnerOf = (harnesses: Record<string, HarnessConfig>, fallback: string, ro
 /** A Promise the consumer wrote becomes an Effect with the engine's error type on it. */
 const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
   Effect.tryPromise({ try: f, catch: (cause) => onError(cause instanceof Error ? cause.message : String(cause)) });
+
+// ─── what the door refuses ──────────────────────────────────────────────────
+
+/** Exhaustive by type: a policy added to `ResumePolicy` and not here does not compile. */
+const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
+
+/**
+ * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`.
+ *
+ * Checked at the API, so the CLI is not the only door that checks. A journalled task is a promise
+ * the loop keeps trying to honour, so a value it cannot use is cheapest refused before it is
+ * written: `deadlineSeconds: NaN` was journalled as `null` and stopped its task on the first pass,
+ * and a permission mode the harness rejects failed the spawn, which failed the whole tick. Which
+ * words a harness takes is asked of the harness; the engine never learns them.
+ */
+const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+  if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
+  if (typeof spec.cwd !== 'string' || !spec.cwd) return '`cwd` is empty. Give the directory the session should work in.';
+  if (!Object.hasOwn(harnesses, spec.harness)) {
+    return `\`harness: ${spec.harness}\` is not a harness this engine has. Its harnesses are: ${Object.keys(harnesses).join(', ')}.`;
+  }
+  if (spec.maxAttempts !== undefined && !(Number.isInteger(spec.maxAttempts) && spec.maxAttempts >= 1)) {
+    return `\`maxAttempts: ${spec.maxAttempts}\` is not a number of attempts. Give a whole number from 1.`;
+  }
+  if (spec.deadlineSeconds !== undefined && !(Number.isFinite(spec.deadlineSeconds) && spec.deadlineSeconds > 0)) {
+    return `\`deadlineSeconds: ${spec.deadlineSeconds}\` is not a number of seconds. Give seconds above 0, or leave it out for no deadline.`;
+  }
+  if (spec.resume !== undefined && !Object.hasOwn(RESUME_POLICIES, spec.resume)) {
+    return `\`resume: ${spec.resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}.`;
+  }
+  if (spec.model === '') return "`model` is empty. Leave it out for the harness's default.";
+  if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
+  if (spec.effort === '') return "`effort` is empty. Leave it out for the harness's default.";
+  // One name per entry: a comma inside one would split into two names on the way to the harness.
+  if (spec.tools !== undefined && !(Array.isArray(spec.tools) && spec.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))) {
+    return `\`tools: ${JSON.stringify(spec.tools)}\` is not a list of tool names. Give one name per entry, like ["Read", "Grep", "Glob"].`;
+  }
+  const h = harnesses[spec.harness]!;
+  return (h === 'claude-bg' ? claudeRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
+};
 
 // ─── the engine ─────────────────────────────────────────────────────────────
 
@@ -189,7 +248,12 @@ export function createEngine(options: EngineOptions = {}): Engine {
     // The harness is RESOLVED here, never left implicit. A task filed without one would otherwise
     // be counted in a pool called 'default' while an identical task that named its harness went
     // in another — two ceilings for one subscription, each the full size.
-    file: (spec) => go(file({ ...spec, harness: spec.harness ?? fallback })),
+    file: async (spec) => {
+      const task = { ...spec, harness: spec.harness ?? fallback };
+      const refused = refusalOf(task, harnesses);
+      if (refused) throw Object.assign(new Error(`file: ${refused}`), { exitCode: 2 });
+      return go(file(task));
+    },
     tick: () => go(tick(max)),
     view: (taskId) => go(Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => view(taskId, o)))),
     list: () => go(Effect.gen(function* () {
@@ -268,7 +332,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
 export { codex, claudeDetached } from './runner-detached.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { nameFor } from './domain.ts';
-export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt } from './domain.ts';
+export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage } from './domain.ts';
 export type { SpawnRequest } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { TaskView } from './engine.ts';

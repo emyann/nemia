@@ -232,3 +232,118 @@ test('watch() keeps its host process alive, even with a store that cannot push',
     createEngine({ journal: store }).watch({ onEntry: () => {} });
   `), true);
 });
+
+// ─── the door refuses what the loop cannot run ──────────────────────────────
+
+import { type Engine, type HarnessSpec, type ResumePolicy, type TaskSpec } from '../src/facade.ts';
+
+/** An engine at shipped defaults — the three built-in harnesses — over a store a test can read. */
+const shipped = () => {
+  const journal = memoryJournal();
+  return { journal, engine: createEngine({ journal }) };
+};
+
+/** Rejected with exit code 2 and a sentence that matches. */
+const refused = (engine: Engine, spec: TaskSpec, says: RegExp) =>
+  assert.rejects(engine.file(spec), (e: Error & { exitCode?: number }) => {
+    assert.equal(e.exitCode, 2, e.message);
+    assert.match(e.message, says);
+    return true;
+  });
+
+test('file() refuses a harness the engine does not have — it used to run on the fallback', async () => {
+  const { journal, engine } = shipped();
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'banana' }, /`harness: banana` is not a harness this engine has.*claude, codex, claude-detached/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+});
+
+test('file() refuses counts and seconds the loop cannot use — NaN was journalled as null', async () => {
+  const { journal, engine } = shipped();
+  for (const deadlineSeconds of [Number.NaN, 0, -5, Infinity]) {
+    await refused(engine, { brief: 'b', cwd: '/r', deadlineSeconds }, /is not a number of seconds/);
+  }
+  for (const maxAttempts of [0, 1.5, Number.NaN]) {
+    await refused(engine, { brief: 'b', cwd: '/r', maxAttempts }, /is not a number of attempts/);
+  }
+  await refused(engine, { brief: 'b', cwd: '/r', resume: 'sometimes' as ResumePolicy }, /is not a retry policy/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+});
+
+test("file() refuses a permission mode outside its harness's own words", async () => {
+  const { journal, engine } = shipped();
+  await refused(engine, { brief: 'b', cwd: '/r', permissionMode: 'yolo' }, /`permissionMode: yolo` is not a mode Claude Code has/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'claude-detached', permissionMode: 'read-only' }, /not a mode Claude Code has/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', permissionMode: 'auto' }, /`permissionMode: auto` is not a sandbox Codex has/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  // The words each harness does have are filed.
+  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', permissionMode: 'read-only' });
+  await engine.file({ brief: 'b', cwd: '/r', permissionMode: 'default' });
+  assert.equal((await journal.list()).length, 2);
+});
+
+test('file() refuses an empty brief, cwd, model or resumeFrom', async () => {
+  const { engine } = shipped();
+  await refused(engine, { brief: '  ', cwd: '/r' }, /`brief` is empty/);
+  await refused(engine, { brief: 'b', cwd: '' }, /`cwd` is empty/);
+  await refused(engine, { brief: 'b', cwd: '/r', model: '' }, /`model` is empty/);
+  await refused(engine, { brief: 'b', cwd: '/r', resumeFrom: '' }, /`resumeFrom` is empty/);
+});
+
+test('a harness brought as a spec is asked its own refusals; one brought as a runner is asked nothing', async () => {
+  const picky: HarnessSpec = {
+    name: 'picky',
+    command: () => ({ cmd: 'true', args: [] }),
+    refuses: (task) => (task.model === 'huge' ? 'picky runs no huge models' : undefined),
+  };
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { picky, fake: fakeHarness(new Map()) }, defaultHarness: 'picky' });
+  await refused(engine, { brief: 'b', cwd: '/r', model: 'huge' }, /picky runs no huge models/);
+  assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness: 'fake', permissionMode: 'anything' }));
+});
+
+test('file() refuses an effort its harness does not have — Claude Code would have ignored it', async () => {
+  const { journal, engine } = shipped();
+  await refused(engine, { brief: 'b', cwd: '/r', effort: 'extreme' }, /`effort: extreme` is not an effort Claude Code has/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', effort: 'extreme' }, /not a reasoning effort Codex has/);
+  await refused(engine, { brief: 'b', cwd: '/r', effort: '' }, /`effort` is empty/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  await engine.file({ brief: 'b', cwd: '/r', effort: 'xhigh' });
+  await engine.file({ brief: 'b', cwd: '/r', harness: 'codex', effort: 'minimal' });
+  assert.equal((await journal.list()).length, 2);
+});
+
+test('file() refuses a tool list that is not a list of names, and journals one that is', async () => {
+  const { journal, engine } = shipped();
+  for (const tools of [['Read,Grep'], [''], [' Read'], 'Read' as unknown as string[]]) {
+    await refused(engine, { brief: 'b', cwd: '/r', tools }, /is not a list of tool names/);
+  }
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  const id = await engine.file({ brief: 'b', cwd: '/r', tools: ['Read', 'Grep', 'Glob'] });
+  const [filed] = await journal.read(id);
+  assert.deepEqual((filed as { tools?: string[] }).tools, ['Read', 'Grep', 'Glob'], 'on the record, for the runner');
+});
+
+test('a PromiseRunner whose spawn rejects is not taken to have started nothing — unless it says so', async () => {
+  const sessions = new Map<string, Sighting>();
+  const launcher: PromiseRunner = {
+    ...fakeHarness(sessions),
+    async spawn(r) {
+      if (r.brief === 'refuse') throw Object.assign(new Error('quota: no sessions today'), { refused: true });
+      sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' });
+      throw new Error('launcher: lost the acknowledgement');
+    },
+  };
+  const engine = createEngine({ journal: memoryJournal(), harnesses: { launcher }, defaultHarness: 'launcher' });
+  const maybe = await engine.file({ brief: 'start', cwd: '/r' });
+  const no = await engine.file({ brief: 'refuse', cwd: '/r' });
+
+  await engine.tick();
+  assert.equal((await engine.view(no)).state.settled, 'failed', 'said nothing started: unstartable');
+  assert.equal((await engine.view(no)).state.attempts[0]?.reason, 'unstartable');
+  assert.equal((await engine.view(maybe)).state.settled, null, 'said nothing: not failed');
+
+  await engine.tick();
+  assert.equal((await engine.view(maybe)).phase, 'running (working)', 'and its session is adopted');
+});

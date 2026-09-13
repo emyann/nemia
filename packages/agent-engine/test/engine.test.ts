@@ -9,8 +9,8 @@ import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
-import { file, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
-import { fold, nameFor, type Sighting } from '../src/domain.ts';
+import { file, GRACE_MS, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
+import { decide, fold, nameFor, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 
 /** One board: a journal and a fake harness whose session states a test moves by hand. */
@@ -422,4 +422,146 @@ test('no schema, no statement: a task ends exactly as it did before', async () =
   const v = await b.run(view(id, new Map()));
   assert.equal(v.state.settled, 'succeeded');
   assert.equal(v.state.attempts[0]?.closeout, undefined);
+});
+
+// ─── the fence and the effort: carried, never read ──────────────────────────
+
+import fs from 'node:fs';
+
+test('tools and effort are declared by the task and reach every attempt untouched', async () => {
+  const b = board();
+  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], effort: 'low' }));
+  await b.run(tick());
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'failed' });
+  await b.run(tick());
+  assert.equal(b.spawned.length, 2, 'a retry was spawned');
+  for (const r of b.spawned) {
+    assert.deepEqual(r.tools, ['Read', 'Grep'], 'the retry is fenced exactly as the first attempt was');
+    assert.equal(r.effort, 'low');
+  }
+
+  const plain = board();
+  await plain.run(file(spec));
+  await plain.run(tick());
+  assert.equal(plain.spawned[0]!.tools, undefined, 'no list, no fence');
+  assert.equal(plain.spawned[0]!.effort, undefined);
+});
+
+test('decide never reads tools, effort, usage or an exit code — carried on the record, never judged', () => {
+  const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
+  const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
+  assert.ok(body.includes('return'), 'found the body of decide');
+  assert.doesNotMatch(body, /\.tools|\.effort|\.usage|\.exitCode/);
+});
+
+// ─── usage: carried from the sighting, null when nobody measured ────────────
+
+test('what a session consumed and how it exited go on the attempt, from the sighting that ended it', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(tick());
+  const usage = { turns: 3, toolCalls: 5, inputTokens: 1200, outputTokens: 80 };
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done', usage, exitCode: 0 });
+  await b.run(tick());
+  const [a] = (await b.run(view(id, new Map()))).state.attempts;
+  assert.deepEqual(a!.usage, usage);
+  assert.equal(a!.exitCode, 0);
+});
+
+test('an attempt nobody measured records null — not zeros that would read as free', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(tick());
+  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'done' }); // the fake harness measures nothing
+  await b.run(tick());
+  const [a] = (await b.run(view(id, new Map()))).state.attempts;
+  assert.equal(a!.usage, null);
+  assert.equal(a!.exitCode, null);
+});
+
+// ─── a harness that refuses to start ────────────────────────────────────────
+
+import { RunnerError, testOps } from '../src/runner.ts';
+
+/**
+ * A board whose harness fails some spawns, two ways.
+ *
+ *   brief `refuse`           it says nothing started: `refused`, in the words a CLI would use
+ *   brief `start-then-fail`  it registers the session, then fails without saying so — a launcher
+ *                            that lost its acknowledgement, the case a spawn error cannot rule out
+ */
+const refusingBoard = () => {
+  const sessions = new Map<string, Sighting>();
+  const ops = testOps({ sessions });
+  const layer = Layer.mergeAll(Journal.test(), Runner.layer({
+    ...ops,
+    spawn: (r) => r.brief === 'refuse'
+      ? Effect.fail(new RunnerError({ verb: 'spawn', message: "claude --bg: error: option '--permission-mode <mode>' argument 'yolo' is invalid.", refused: true }))
+      : r.brief === 'start-then-fail'
+        ? ops.spawn(r).pipe(Effect.andThen(Effect.fail(new RunnerError({ verb: 'spawn', message: 'launcher: lost the acknowledgement' }))))
+        : ops.spawn(r),
+  }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  return { sessions, run };
+};
+
+test('a spawn the harness refuses ends the attempt, unstartable, in its words — and the tick goes on', async () => {
+  const b = refusingBoard();
+  const bad = await b.run(file({ ...spec, brief: 'refuse', id: 'a-bad' }));
+  const good = await b.run(file({ ...spec, id: 'b-good' }));
+
+  // Before, this pass rejected: every task behind the bad one stalled, on every pass.
+  await b.run(tick());
+
+  const v = await b.run(view(bad, new Map()));
+  assert.equal(v.state.settled, 'failed');
+  assert.equal(v.state.attempts[0]?.reason, 'unstartable');
+  assert.match(v.state.attempts[0]?.error ?? '', /argument 'yolo' is invalid/);
+  assert.ok(b.sessions.has(nameFor(good, 1)), 'the task behind it started in the same pass');
+});
+
+test('an unstartable attempt spends an attempt like any other failure, and settles when they run out', async () => {
+  const b = refusingBoard();
+  const id = await b.run(file({ ...spec, brief: 'refuse', maxAttempts: 2 }));
+  await b.run(tick());
+  const v = await b.run(view(id, new Map()));
+  assert.deepEqual(v.state.attempts.map((a) => a.reason), ['unstartable', 'unstartable']);
+  assert.equal(v.state.settled, 'failed');
+});
+
+test('a spawn error that does not say nothing started is recorded as spawned, and its session adopted', async () => {
+  // The reviewer's case: the session exists, the spawn call failed anyway. Ending the attempt here
+  // left a working session nothing would adopt, stop or bound, and a retry beside it.
+  const b = refusingBoard();
+  const id = await b.run(file({ ...spec, brief: 'start-then-fail', maxAttempts: 2 }));
+
+  await b.run(tick());
+  let v = await b.run(view(id, new Map()));
+  assert.equal(v.state.settled, null, 'not failed: a session may exist under the name');
+  assert.equal(v.state.attempts.length, 1, 'and no second attempt beside it');
+  assert.ok(v.state.attempts[0]!.spawnedAt, 'recorded as spawned, so the grace window applies');
+  assert.match(v.state.attempts[0]!.error ?? '', /lost the acknowledgement/);
+
+  await b.run(tick());
+  assert.equal((await b.run(view(id, await b.run(Effect.flatMap(Runner, (r) => r.observe))))).phase, 'running (working)', 'adopted');
+
+  // Stop reaches it, as it reaches any session the engine knows.
+  await b.run(requestStop(id));
+  await b.run(tick());
+  await b.run(tick());
+  v = await b.run(view(id, new Map()));
+  assert.equal(v.state.settled, 'stopped');
+  assert.equal(b.sessions.size, 1, 'one session, ever');
+});
+
+test('...and when no session shows up, the grace window ends it lost, as for any spawn never registered', async () => {
+  const b = board();
+  const id = await b.run(file(spec));
+  await b.run(step(id, new Map()));                                           // start
+  await b.run(Effect.flatMap(Journal, (j) => j.append(id, {                   // a spawn that returned an error
+    kind: 'spawned', at: new Date().toISOString(), attempt: 1, error: 'launcher: lost the acknowledgement',
+  })));
+  const state = fold(id, await b.run(Effect.flatMap(Journal, (j) => j.read(id))));
+  const later = { at: new Date(Date.now() + GRACE_MS + 1_000), graceMs: GRACE_MS, used: 0, max: 1 };
+  assert.deepEqual(decide(state, new Map(), later), { do: 'record-end', attempt: 1, sessionId: '(never seen)', observed: 'failed', reason: 'lost' });
 });

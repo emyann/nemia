@@ -42,7 +42,7 @@ export { composite } from './runner-composite.ts';
 export { sdkRunner } from './runner-sdk.ts';
 
 // ─── the vocabulary ─────────────────────────────────────────────────────────
-export type { Event, State, Attempt, Observed, Outcome, Sighting, EndReason, ResumePolicy } from './domain.ts';
+export type { Event, State, Attempt, Observed, Outcome, Sighting, EndReason, ResumePolicy, Usage } from './domain.ts';
 export { fold, nameFor } from './domain.ts';
 
 // NOT exported, on purpose: `decide`. It is the engine's judgement, and a consumer that wants to

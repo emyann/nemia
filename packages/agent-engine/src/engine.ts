@@ -7,7 +7,7 @@
  */
 import { Effect } from 'effect';
 import { randomUUID } from 'node:crypto';
-import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State } from './domain.ts';
+import { decide, fold, nameFor, needsHuman, type Action, type Event, type ResumePolicy, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal } from './journal.ts';
 import { Runner } from './runner.ts';
 
@@ -20,13 +20,17 @@ export const DEFAULT_MAX_CONCURRENT = 3;
 /** A live session is one the engine is still waiting on. `done`/`failed`/`stopped` are not. */
 const LIVE = new Set(['working', 'busy', 'blocked']);
 
-export type TaskView = { id: string; state: State; phase: string; sessionId: string | null; costUsd?: number; turns?: number };
+export type TaskView = {
+  id: string; state: State; phase: string; sessionId: string | null;
+  /** What the attempt in flight has consumed so far, when its runner can see inside it. Settled attempts carry theirs on `state.attempts`. */
+  usage?: Usage;
+};
 
 /** File a task. The only write a person makes; everything after is the loop's. */
 export const file = Effect.fn('file')(function* (spec: {
   brief: string; cwd: string; maxAttempts?: number; model?: string; permissionMode?: string;
   harness?: string; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
-  worktree?: string | boolean; closeoutSchema?: object; id?: string;
+  worktree?: string | boolean; closeoutSchema?: object; tools?: string[]; effort?: string; id?: string;
 }) {
   const journal = yield* Journal;
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.
@@ -36,6 +40,7 @@ export const file = Effect.fn('file')(function* (spec: {
     maxAttempts: spec.maxAttempts ?? 1, model: spec.model, permissionMode: spec.permissionMode,
     harness: spec.harness, deadlineSeconds: spec.deadlineSeconds, resume: spec.resume,
     resumeFrom: spec.resumeFrom, worktree: spec.worktree, closeoutSchema: spec.closeoutSchema,
+    tools: spec.tools, effort: spec.effort,
   });
   return id;
 });
@@ -117,25 +122,47 @@ export const step = Effect.fn('step')(function* (
       yield* journal.append(taskId, { kind: 'starting', at: at(), attempt: action.attempt, resumeFrom: action.resumeFrom });
       break;
 
-    case 'spawn':
-      yield* runner.spawn({
+    case 'spawn': {
+      // A spawn that fails is answered by what the harness can vouch for.
+      //
+      // `refused` — nothing started: the attempt ends `failed`, `unstartable`, in the harness's
+      // words, and `decide` settles or retries it like any failure. Let out as an error instead, it
+      // rejected the whole tick, and every task behind this one stalled on every pass.
+      //
+      // Anything else is no proof that nothing started: a launcher can create the session and lose
+      // its acknowledgement. Ending that attempt left a working session nothing would adopt, stop or
+      // bound, and a retry beside it. So the call is written down as having returned — `spawned`,
+      // with its error — and the grace window `decide` already keeps for a session the harness has
+      // not registered tells which it was: adopted if it shows up, `lost` if it never does.
+      const failed = yield* runner.spawn({
         name: action.name, brief: state.brief, cwd: state.cwd,
         model: state.model, permissionMode: state.permissionMode, harness: state.harness,
         worktree: state.worktree, closeoutSchema: state.closeoutSchema,
+        tools: state.tools, effort: state.effort,
         // Taken from the journal rather than recomputed: the decision was made when the attempt
         // was started, possibly by an engine that has since died.
         resumeFrom: state.attempts.find((a) => a.n === action.attempt)?.resumeFrom,
-      });
-      yield* journal.append(taskId, { kind: 'spawned', at: at(), attempt: action.attempt });
+      }).pipe(
+        Effect.as(undefined),
+        Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),
+      );
+      yield* journal.append(taskId, failed?.refused
+        ? { kind: 'ended', at: at(), attempt: action.attempt, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: failed.message }
+        : { kind: 'spawned', at: at(), attempt: action.attempt, ...(failed ? { error: failed.message } : {}) });
       break;
+    }
 
-    case 'record-end':
+    case 'record-end': {
+      // What the attempt consumed and how its process exited are read off the same sighting the
+      // ending came from, and written beside it. Facts for the record; `decide` sees neither.
+      const seen = observed.get(nameFor(taskId, action.attempt));
       yield* journal.append(taskId, {
         kind: 'ended', at: at(), attempt: action.attempt, sessionId: action.sessionId,
         observed: action.observed, reason: action.reason, nativeId: action.nativeId,
-        closeout: action.closeout,
+        closeout: action.closeout, usage: seen?.usage, exitCode: seen?.exitCode,
       });
       break;
+    }
 
     case 'stop':
       yield* runner.stop(action.sessionId);
@@ -244,5 +271,5 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
     : last?.ended === null ? 'starting'
     : last ? 'between attempts'
     : 'pending';
-  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? null, costUsd: sighting?.costUsd, turns: sighting?.turns };
+  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? null, usage: sighting?.usage };
 });

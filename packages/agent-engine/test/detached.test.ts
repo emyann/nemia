@@ -186,6 +186,29 @@ test('the default permission mode is `auto` — a fleet cannot wait for a person
   assert.equal(chosen[chosen.indexOf('--permission-mode') + 1], 'dontAsk', 'and a task may still choose');
 });
 
+test('codex runs read-only when the task says read-only — never widened to workspace-write', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const sandbox = (permissionMode?: string) => {
+    const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', permissionMode }).args;
+    return args[args.indexOf('-s') + 1];
+  };
+  assert.equal(sandbox('read-only'), 'read-only');
+  assert.equal(sandbox(), 'workspace-write', 'the shipped default is unchanged');
+  assert.equal(sandbox('bypassPermissions'), 'danger-full-access');
+  // Codex's own words are its own sandboxes. `danger-full-access` used to become workspace-write.
+  assert.equal(sandbox('danger-full-access'), 'danger-full-access');
+  assert.equal(sandbox('workspace-write'), 'workspace-write');
+});
+
+test("codex refuses a permission mode that is not one of its sandboxes; Claude's harnesses refuse Codex's", async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const task = (permissionMode: string) => ({ brief: 'b', cwd: '/r', permissionMode });
+  assert.match(codex.refuses!(task('acceptEdits')) ?? '', /not a sandbox Codex has.*read-only, workspace-write, danger-full-access/);
+  assert.match(claudeDetached.refuses!(task('read-only')) ?? '', /not a mode Claude Code has/);
+  assert.equal(codex.refuses!(task('read-only')), undefined);
+  assert.equal(claudeDetached.refuses!(task('auto')), undefined);
+});
+
 // ─── the closing statement ──────────────────────────────────────────────────
 
 test('codex is given the schema and an output file, and the prompt still comes last', async () => {
@@ -314,4 +337,100 @@ test("the runner merges what a spec prepares into what its command is given", as
   await Effect.runPromise(detachedOps(spy, root()).spawn({ name: 'ae/t13/1', brief: 'x', cwd: root(), closeoutSchema: {} }));
   assert.deepEqual(given?.trustedDirs, ['/somewhere']);
   assert.ok(given?.closeoutFile, 'alongside what the runner chose itself');
+});
+
+// ─── the fence and the effort, per harness ──────────────────────────────────
+
+test('at shipped defaults neither detached harness is given a tool list or an effort', async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const c = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
+  assert.equal(c.some((a) => a.startsWith('model_reasoning_effort')), false);
+  assert.equal(c[c.indexOf('-s') + 1], 'workspace-write');
+  const d = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
+  assert.equal(d.includes('--tools'), false);
+  assert.equal(d.includes('--effort'), false);
+});
+
+test('codex runs read-only when its tools have none of Bash, Write or Edit — whatever sandbox it named', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const sandbox = (r: { tools?: string[]; permissionMode?: string }) => {
+    const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', ...r }).args;
+    return args[args.indexOf('-s') + 1];
+  };
+  assert.equal(sandbox({ tools: ['Read', 'Grep', 'Glob'] }), 'read-only');
+  assert.equal(sandbox({ tools: ['Read', 'Grep', 'Glob'], permissionMode: 'danger-full-access' }), 'read-only', 'the narrower fence wins');
+  assert.equal(sandbox({ tools: [] }), 'read-only', 'no tools at all');
+  assert.equal(sandbox({ tools: ['Read', 'Bash'] }), 'workspace-write', 'a list with a shell does not narrow codex');
+  assert.equal(sandbox({ tools: ['Read', 'Bash'], permissionMode: 'read-only' }), 'read-only', 'and the mode it named still holds');
+});
+
+test('effort reaches codex as a config override before `resume`, and claude-detached as --effort', async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const c = codex.command({ name: 'ae/t/2', brief: 'the prompt', cwd: '/wt', effort: 'high', resumeFrom: 'abc' }).args;
+  const i = c.indexOf('model_reasoning_effort="high"');
+  assert.ok(i > 0 && c[i - 1] === '-c', '-c model_reasoning_effort="high"');
+  assert.ok(i < c.indexOf('resume'), 'before resume, which rejects flags after its id');
+  assert.equal(c.at(-1), 'the prompt');
+
+  const d = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', effort: 'max', tools: ['Read', 'Grep'] }).args;
+  assert.equal(d[d.indexOf('--effort') + 1], 'max');
+  assert.equal(d[d.indexOf('--tools') + 1], 'Read,Grep');
+  assert.equal(d[d.indexOf('--tools') + 2], '--permission-mode', 'a flag ends the variadic list');
+});
+
+test('an effort a harness does not have is refused by that harness, in its own words', async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const task = (effort: string) => ({ brief: 'b', cwd: '/r', effort });
+  assert.match(codex.refuses!(task('extreme')) ?? '', /not a reasoning effort Codex has.*none, minimal, low, medium, high, xhigh, max/);
+  // Claude Code would only warn and run at its default, so the engine refuses what the CLI ignores.
+  assert.match(claudeDetached.refuses!(task('minimal')) ?? '', /not an effort Claude Code has.*low, medium, high, xhigh, max/);
+  assert.equal(codex.refuses!(task('minimal')), undefined);
+  assert.equal(claudeDetached.refuses!(task('xhigh')), undefined);
+});
+
+// ─── the exit code: a fact about the process ────────────────────────────────
+
+test("a detached session's exit code is on its sighting, and no usage is invented beside it", async () => {
+  const dir = root();
+  const ops = detachedOps(sh('exit 3'), dir);
+  await Effect.runPromise(ops.spawn(req('ae/t14/1', dir)));
+  const seen = await settle(ops, 'ae/t14/1', 'failed');
+  assert.equal(seen?.exitCode, 3);
+  assert.equal(seen?.usage, undefined, 'a generic harness measures no usage, and reports none rather than 0');
+});
+
+test("no exit code yet, or the worker's -1 for none, is reported as no code at all", async () => {
+  const dir = root();
+  const ops = detachedOps(sh('true'), dir);
+  const runs = path.join(dir, 'runs', 'sh');
+  fs.mkdirSync(runs, { recursive: true });
+  const write = (name: string, patch: object) => fs.writeFileSync(path.join(runs, `${name.replace(/\//g, '_')}.json`), JSON.stringify({
+    name, pid: 999999, logFile: '/dev/null', heartbeatAt: new Date().toISOString(), ...patch,
+  }));
+  write('ae/t15/1', { state: 'working' });
+  write('ae/t16/1', { state: 'stopped', exitCode: -1 });
+  const seen = await Effect.runPromise(ops.observe);
+  assert.equal('exitCode' in seen.get('ae/t15/1')!, false, 'still running: no code');
+  assert.equal('exitCode' in seen.get('ae/t16/1')!, false, 'killed by a signal: no code, not -1');
+});
+
+test('a detached spawn that throws says nothing started — the worker is never launched', async () => {
+  const broken: HarnessSpec = { name: 'sh', command: () => { throw new Error('no command for this'); } };
+  const e = await Effect.runPromise(detachedOps(broken, root()).spawn(req('ae/t17/1', root())).pipe(
+    Effect.as(undefined),
+    Effect.catchTag('RunnerError', (err) => Effect.succeed(err)),
+  ));
+  assert.equal(e?.refused, true);
+});
+
+test('a detached worker aimed at a directory that is not there is refused, and cannot take the engine down', async () => {
+  // Before, `spawn` returned, the child emitted ENOENT a moment later, and nobody heard it: the
+  // process that launched the worker — the engine, and this test runner — died.
+  const e = await Effect.runPromise(detachedOps(sh('true'), root()).spawn(req('ae/t18/1', path.join(root(), 'gone'))).pipe(
+    Effect.as(undefined),
+    Effect.catchTag('RunnerError', (err) => Effect.succeed(err)),
+  ));
+  assert.equal(e?.refused, true);
+  assert.match(e?.message ?? '', /is not a directory/);
+  await new Promise((r) => setTimeout(r, 300));
 });

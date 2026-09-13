@@ -27,11 +27,11 @@
  */
 import { Effect, Layer } from 'effect';
 import { query, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { Observed, Sighting } from './domain.ts';
+import type { Observed, Sighting, Usage } from './domain.ts';
 import { renderTranscript, Runner, RunnerError } from './runner.ts';
 
 /** What the in-process runner knows about one session it is running. */
-type Live = { sessionId: string; state: Observed; abort: AbortController; costUsd: number; turns: number };
+type Live = { sessionId: string; state: Observed; abort: AbortController; toolCalls: number; usage?: Usage };
 
 export const sdkRunner = () => {
   const live = new Map<string, Live>();
@@ -54,12 +54,24 @@ export const sdkRunner = () => {
       try {
         for await (const m of q) {
           if (m.type === 'system' && m.subtype === 'init') set({ sessionId: m.session_id });
-          else if (m.type === 'result') {
+          else if (m.type === 'assistant') {
+            const calls = (m.message.content as Array<{ type?: string }>).filter((b) => b.type === 'tool_use').length;
+            set({ toolCalls: (live.get(name)?.toolCalls ?? 0) + calls });
+          } else if (m.type === 'result') {
+            // Measured at the end, from what the SDK reports — and only what it reports: a cost or a
+            // token count it leaves out stays out, rather than becoming a 0 that reads as free.
+            const u = m.usage as { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number } | undefined;
             set({
               sessionId: m.session_id,
               state: m.is_error ? 'failed' : 'done',
-              costUsd: m.total_cost_usd ?? 0,
-              turns: m.num_turns ?? 0,
+              usage: {
+                turns: m.num_turns,
+                toolCalls: live.get(name)?.toolCalls ?? 0,
+                ...(typeof u?.input_tokens === 'number' && typeof u.output_tokens === 'number'
+                  ? { inputTokens: u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0), outputTokens: u.output_tokens }
+                  : {}),
+                ...(typeof m.total_cost_usd === 'number' ? { costUsd: m.total_cost_usd } : {}),
+              },
             });
           }
         }
@@ -75,7 +87,7 @@ export const sdkRunner = () => {
     spawn: (r) =>
       Effect.gen(function* () {
         const abort = new AbortController();
-        live.set(r.name, { sessionId: `(starting ${r.name})`, state: 'working', abort, costUsd: 0, turns: 0 });
+        live.set(r.name, { sessionId: `(starting ${r.name})`, state: 'working', abort, toolCalls: 0 });
         // Detached: `spawn` returns at once, the same as handing the work to the harness would.
         // The difference is only that this fiber dies with the process, and the harness's does not.
         yield* Effect.forkDetach(pump(r.name, r, abort));
@@ -83,8 +95,8 @@ export const sdkRunner = () => {
 
     observe: Effect.sync(() => {
       const m = new Map<string, Sighting>();
-      // Cost and turns ride the same seam: the CLI runner simply leaves them undefined.
-      for (const [name, s] of live) m.set(name, { sessionId: s.sessionId, state: s.state, costUsd: s.costUsd, turns: s.turns });
+      // Usage rides the same seam as every runner's: present once measured, absent before.
+      for (const [name, s] of live) m.set(name, { sessionId: s.sessionId, state: s.state, ...(s.usage ? { usage: s.usage } : {}) });
       return m;
     }),
 

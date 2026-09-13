@@ -227,5 +227,6 @@ test('a task filed AGAINST a session continues it on the first attempt', () => {
 test("...and `resume: never` does not override that — they are different statements", () => {
   // "do not resume a FAILURE" is a retry policy. "this task IS a continuation" is what the work is.
   const s = fold(TASK, [{ kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 1, resume: 'never', resumeFrom: 'sess-1' }]);
-  assert.equal(decide(s, seen(), now()).do === 'start' ? decide(s, seen(), now()).resumeFrom : null, 'sess-1');
+  const action = decide(s, seen(), now());
+  assert.equal(action.do === 'start' ? action.resumeFrom : null, 'sess-1');
 });

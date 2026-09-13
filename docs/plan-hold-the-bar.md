@@ -339,8 +339,19 @@ owner is not mid-run.
   is right. Fix in `list`, then delete the api's copy of the rule. Also: `list` throws when the
   workflow folder is gone, so a consumer must catch it; and each `view` is a `claude agents` call
   (~300 ms), so a consumer reads each task once per request. → F or G, whoever touches `runner.ts` first.
-- **agent-engine (`runner-detached.ts:236`):** codex `permissionMode: danger-full-access` passes A's
-  parser but is not mapped; only `bypassPermissions` is. → check at B's trial merge.
+- **agent-workflows and the board (step order):** `run.steps` is keyed in the folder's file order —
+  alphabetical — so `wf ls` and the board show `implement · respond · review` for a workflow that
+  runs implement → review → respond. Order steps by `after` (a topological sort in `workflow.ts`,
+  applied at `wf start`) so a row reads as the DAG runs. → G, with the decider screen.
+- **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
+  mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
+  `bypassPermissions`). What remains is that A's `PERMISSION_MODES` in `workflow.ts` is a copy of
+  the engine's lists and already differs: the engine takes `manual` for Claude, the parser does
+  not; the engine takes `bypassPermissions` for codex, the parser does not. The engine now exports
+  `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES`, `CODEX_EFFORTS` — but `workflow.ts`
+  may not import the engine (`runner.ts` is the only importer). Either the run validates modes
+  through `e.file()`'s own refusal and the parser stops copying, or a test in agent-workflows pins
+  the copy to the engine's exports. → I, with the `tools:`/`effort:` pass-through.
 - **the plan:** count fields need their least value stated (A's review); a "definition of done" that
   lists several things in one sentence gets read as one rule.
 

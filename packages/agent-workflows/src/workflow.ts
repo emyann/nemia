@@ -313,6 +313,9 @@ function outputOf(step: string, file: string | undefined, read: ((file: string) 
     refuse(`${named} declares ${taken.map((k) => `\`${k}\``).join(', ')}, which every closeout already has. ${CLOSEOUT_FIELDS.map((k) => `\`${k}\``).join(', ')} are the run's, and \`summary\` goes to the person who decides, never to a step. Rename the field.`);
   }
   const loose = looseAt(schema, '');
+  if (loose && 'ref' in loose) {
+    refuse(`${named} uses \`${loose.ref}\` at ${loose.at || 'the top'}. The run checks a schema is strict by reading it, and does not follow references — an object it did not read would reach the harness unchecked. Inline what it points at, and delete \`${loose.ref}\`.`);
+  }
   if (loose) {
     refuse(`${named} is not strict at ${loose.at || 'the top'}: ${loose.why}. Codex refuses a structured output whose objects do not list every property in \`required\` and set \`"additionalProperties": false\`. A field that may be absent is required and nullable instead — \`"type": ["string", "null"]\`.`);
   }
@@ -321,9 +324,27 @@ function outputOf(step: string, file: string | undefined, read: ((file: string) 
 
 const isObject = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 
-/** The first object in a schema that is not strict, and why — or `undefined` when every one is. */
-function looseAt(node: unknown, at: string): { at: string; why: string } | undefined {
+/** Keywords whose value is a schema. `items` may also be an array of them, as older drafts wrote it. */
+const ONE_SCHEMA = ['items', 'additionalItems', 'additionalProperties', 'unevaluatedItems', 'unevaluatedProperties', 'contains', 'propertyNames', 'not', 'if', 'then', 'else'];
+/** Keywords whose value is an array of schemas. */
+const SCHEMA_LISTS = ['allOf', 'anyOf', 'oneOf', 'prefixItems'];
+/** Keywords whose value maps a name to a schema. */
+const SCHEMA_MAPS = ['properties', 'patternProperties', 'dependentSchemas', 'dependencies', '$defs', 'definitions'];
+/** Keywords that stand for a schema written somewhere else. */
+const REFERENCES = ['$ref', '$dynamicRef', '$recursiveRef'];
+
+/**
+ * The first object in a schema that is not strict, and why; or the first reference; or `undefined`.
+ *
+ * Every keyword that holds a schema is read, because an object the walk skips is an object nobody
+ * checked. A reference is refused rather than followed: resolving one is a second reading of the
+ * schema that can disagree with the harness's, and a `$ref` under a field once carried a loose object
+ * past this check to the harness.
+ */
+function looseAt(node: unknown, at: string): { at: string; why: string } | { at: string; ref: string } | undefined {
   if (!isObject(node)) return undefined;
+  const ref = REFERENCES.find((k) => Object.hasOwn(node, k));
+  if (ref) return { at, ref };
   const types = Array.isArray(node.type) ? node.type : [node.type];
   if (types.includes('object') || 'properties' in node) {
     const properties = isObject(node.properties) ? Object.keys(node.properties) : [];
@@ -334,12 +355,20 @@ function looseAt(node: unknown, at: string): { at: string; why: string } | undef
     if (stray.length) return { at, why: `\`required\` names ${stray.map((p) => `\`${String(p)}\``).join(', ')}, which is not a property` };
     if (node.additionalProperties !== false) return { at, why: '`additionalProperties` is not `false`' };
   }
-  const children: Array<[string, unknown]> = [
-    ...Object.entries(isObject(node.properties) ? node.properties : {}).map(([k, v]): [string, unknown] => [at ? `${at}.${k}` : k, v]),
-    ...(Array.isArray(node.items) ? node.items : [node.items]).map((v): [string, unknown] => [`${at}[]`, v]),
-    ...(Array.isArray(node.prefixItems) ? node.prefixItems : []).map((v): [string, unknown] => [`${at}[]`, v]),
-    ...['anyOf', 'oneOf', 'allOf'].flatMap((k) => (Array.isArray(node[k]) ? node[k] as unknown[] : []).map((v, i): [string, unknown] => [`${at}.${k}[${i}]`, v])),
-  ];
+  const below = (k: string) => (at ? `${at}.${k}` : k);
+  const children: Array<[string, unknown]> = [];
+  for (const k of SCHEMA_MAPS) {
+    const map = node[k];
+    if (isObject(map)) for (const [name, v] of Object.entries(map)) children.push([k === 'properties' ? below(name) : below(`${k}.${name}`), v]);
+  }
+  for (const k of ONE_SCHEMA) {
+    const values = k === 'items' && Array.isArray(node.items) ? node.items : [node[k]];
+    for (const v of values) children.push([k === 'items' ? `${at}[]` : below(k), v]);
+  }
+  for (const k of SCHEMA_LISTS) {
+    const list = node[k];
+    if (Array.isArray(list)) list.forEach((v, i) => children.push([k === 'prefixItems' ? `${at}[]` : `${at}.${k}[${i}]`, v]));
+  }
   for (const [where, child] of children) {
     const found = looseAt(child, where);
     if (found) return found;

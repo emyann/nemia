@@ -35,7 +35,7 @@ into the workspace. There are two keys, and neither is control flow. `output: <f
 names a JSON Schema beside the step. It is read at `wf start` and frozen on the run with the step, and
 its properties are merged into the closeout the step is filed with, still strict. `input: <step>` on
 the consumer puts the producer's declared fields, and nothing else, in its brief under
-`## From <step>`, as data. At load, the run refuses a missing file, a schema that is not strict, a
+`## From <step>`, as data. At load, the run refuses a missing file, a schema that is not strict or uses `$ref`, a
 schema naming a base field, and an `input:` on a step that is not `after` the producer or that
 declares no output. A producer whose closeout lacks a declared field is `unsigned`, and nothing that
 waits on it is filed. `wf decide` prints the declared output after the summary.

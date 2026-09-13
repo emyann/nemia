@@ -385,3 +385,41 @@ test('`input:` naming no step, or a step that declares no output, is refused —
   assert.match(refusal(respond('after: implement\ninput: implement')),
     /respond: `input: implement`, but implement declares no `output:`, so nothing of its closeout travels — its summary goes to the person who decides, never to a step\. Give implement\.md an `output:` schema/);
 });
+
+test('an output schema is read strict wherever an object can sit — and one that points elsewhere with `$ref` is refused', () => {
+  const loose = { type: 'object', properties: { optional: { type: 'string' } } };
+  const around = (product: object) => ({ 'review.schema.json': { type: 'object', properties: { product }, required: ['product'], additionalProperties: false } });
+
+  // The review's case: a definition nested under the field, and a reference to it. The walk read neither,
+  // and the schema loaded with a loose object in it.
+  assert.match(refusal(around({ $defs: { value: loose }, $ref: '#/properties/product/$defs/value' })),
+    /^review: `output: review\.schema\.json` uses `\$ref` at product\. The run checks a schema is strict by reading it, and does not follow references .* Inline what it points at, and delete `\$ref`\./);
+  // However strict the target: what is checked must be what the harness is handed, not what a pointer says it is.
+  const strict = { ...loose, required: ['optional'], additionalProperties: false };
+  for (const ref of ['$ref', '$dynamicRef', '$recursiveRef']) {
+    assert.match(refusal(around({ $defs: { value: strict }, [ref]: '#/properties/product/$defs/value' })), new RegExp(`uses \`\\${ref}\` at product\\.`), ref);
+  }
+
+  // Every keyword that holds a schema is read.
+  const under: Array<[object, string]> = [
+    [{ type: 'string', $defs: { value: loose } }, 'product.$defs.value'],
+    [{ type: 'string', definitions: { value: loose } }, 'product.definitions.value'],
+    [{ type: 'string', not: loose }, 'product.not'],
+    [{ if: loose, then: { type: 'string' }, else: { type: 'string' } }, 'product.if'],
+    [{ if: { type: 'string' }, then: loose, else: { type: 'string' } }, 'product.then'],
+    [{ if: { type: 'string' }, then: { type: 'string' }, else: loose }, 'product.else'],
+    [{ type: 'array', items: [loose] }, 'product[]'],
+    [{ type: 'array', contains: loose }, 'product.contains'],
+    [{ type: 'array', additionalItems: loose }, 'product.additionalItems'],
+    [{ type: 'array', unevaluatedItems: loose }, 'product.unevaluatedItems'],
+    [{ type: 'string', additionalProperties: loose }, 'product.additionalProperties'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, patternProperties: { '^x-': loose } }, 'product.patternProperties.^x-'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, dependentSchemas: { a: loose } }, 'product.dependentSchemas.a'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, dependencies: { a: loose } }, 'product.dependencies.a'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, unevaluatedProperties: loose }, 'product.unevaluatedProperties'],
+    [{ type: 'object', properties: {}, required: [], additionalProperties: false, propertyNames: loose }, 'product.propertyNames'],
+  ];
+  for (const [product, at] of under) {
+    assert.match(refusal(around(product)), new RegExp(`is not strict at ${at.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}: \`optional\` is not in \`required\``), at);
+  }
+});

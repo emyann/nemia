@@ -131,7 +131,7 @@ A second engineer has reviewed your change. Their findings are below, under *Fro
   so it sits inside the same fence as a `check:`, and editing the folder afterwards changes nothing.
   Its properties are merged into the closeout schema the step is filed with. The merged schema stays
   strict: every property required and no others allowed, because Codex enforces strict output
-  schemas. At load, the run refuses a schema whose objects are not strict, a schema that names
+  schemas. At load, the run refuses a schema whose objects are not strict or that uses `$ref`, a schema that names
   `outcome`, `summary`, `artifacts` or `needs`, and a file that is not there. Each refusal names the fix.
 - **`input: <step>`** hands this step the producer's declared fields, under `## From <step>` in its
   brief, as JSON labelled as data. It gets those fields only, never the producer's summary, needs or

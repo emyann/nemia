@@ -16,7 +16,7 @@ import type { RunDetail } from '../lib/api';
 import { forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
 import { layout, type Point } from '../lib/layout';
 import { stepState } from '../lib/status';
-import { stepEdges, stepMinimapFill } from './stepGraph';
+import { stepData, stepEdges, stepMinimapFill } from './stepGraph';
 import { StepNode, type StepFlowNode } from './StepNode';
 
 type Props = { run: RunDetail; selected: string | null; onSelect: (step: string | null) => void };
@@ -68,7 +68,7 @@ const nodeAt = (run: RunDetail, index: number, position: Point): StepFlowNode =>
   // The graph reads left to right: an edge leaves a step on its right and arrives on the left.
   sourcePosition: Position.Right,
   targetPosition: Position.Left,
-  data: { step: run.steps[index]!, index, runCancelled: run.cancelledAt !== null },
+  data: stepData(run, index),
 });
 
 function Canvas({ run, selected, onSelect, computed }: Props & { computed: ReadonlyMap<string, Point> }) {
@@ -101,11 +101,9 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
     const indexOf = new Map(run.steps.map((s, i) => [s.name, i]));
     return placed.flatMap((node) => {
       const index = indexOf.get(node.id);
-      return index === undefined
-        ? []
-        : [{ ...node, data: { step: run.steps[index]!, index, runCancelled }, selected: node.id === selected }];
+      return index === undefined ? [] : [{ ...node, data: stepData(run, index), selected: node.id === selected }];
     });
-  }, [placed, run, runCancelled, selected]);
+  }, [placed, run, selected]);
 
   const edges = useMemo(() => stepEdges(run), [run]);
 

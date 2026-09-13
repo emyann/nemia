@@ -2,6 +2,18 @@ import { MarkerType, type Edge } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
 import { edgesOf } from '../lib/canvas';
 import { stepState, type StepState } from '../lib/status';
+import type { StepNodeData } from './StepNode';
+
+/**
+ * What a step's node shows, on its run's page and on the Factory alike: read off the run as the api gives it, whose
+ * `waitingOnYou` decides the human gate beside the step's own word.
+ */
+export const stepData = (run: RunDetail, index: number): StepNodeData => ({
+  step: run.steps[index]!,
+  index,
+  runCancelled: run.cancelledAt !== null,
+  waitingOnYou: run.waitingOnYou.includes(run.steps[index]!.name),
+});
 
 /** The minimap in the chips' colours, so a glance at it says what the nodes say. */
 export const stepMinimapFill: Record<StepState, string> = {

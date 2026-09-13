@@ -42,7 +42,7 @@ import { stepState } from '@/lib/status';
 import { RunNode, type RunFlowNode } from './RunNode';
 import { StepInspector } from './StepInspector';
 import { StepNode, type StepFlowNode } from './StepNode';
-import { stepEdges, stepMinimapFill } from './stepGraph';
+import { stepData, stepEdges, stepMinimapFill } from './stepGraph';
 
 // Declared once: a new object per render makes React Flow warn and mount every node afresh.
 const nodeTypes = { run: RunNode, step: StepNode };
@@ -253,7 +253,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
         data: { run, finished: !flying.has(run.id), open: isOpen, reading: graph === null, trouble: graph && 'error' in graph ? graph.error : null, onToggle: toggle },
       };
       if (!graph || !('run' in graph)) return [head];
-      const runCancelled = graph.run.cancelledAt !== null;
       // After their card: React Flow places a child from its parent, so the parent comes first.
       return [
         head,
@@ -269,7 +268,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
             sourcePosition: Position.Right,
             targetPosition: Position.Left,
             ariaLabel: `Inspect step ${step.name} of run: ${titleOf(run)}`,
-            data: { step, index, runCancelled },
+            data: stepData(graph.run, index),
             selected: selected?.runId === run.id && selected.step === step.name,
           }),
         ),

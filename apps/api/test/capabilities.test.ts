@@ -143,6 +143,17 @@ test('a server whose command does not exist is an error on its entry: a 200, and
   assert.deepEqual(working.tools.map((tool: { name: string }) => tool.name), ['echo', 'wipe']);
 });
 
+test('a server that offers no tools lists none, and is not asked tools/list, which it has no answer to', async () => {
+  const repo = repoWith({
+    '.mcp.json': { mcpServers: { prompts: fixture({ HKB_TEST_MODE: 'prompts' }) } },
+    '.claude/settings.json': { enabledMcpjsonServers: ['prompts'] },
+  });
+  const { status, body } = await served(repo);
+  assert.equal(status, 200);
+  assert.deepEqual([body.mcp[0].tools, body.mcp[0].error], [[], null]);
+  assert.ok(Date.parse(body.mcp[0].checkedAt) > 0, 'it was asked, and answered');
+});
+
 test('a server that exits before it answers is an error with what it printed on stderr', async () => {
   const repo = repoWith({
     '.mcp.json': { mcpServers: { crash: fixture({ HKB_TEST_MODE: 'crash' }) } },

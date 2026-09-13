@@ -330,6 +330,9 @@ async function ask(repo: string, server: Declared & { command: string }, deadlin
 
 async function listTools(client: Client, transport: StdioClientTransport): Promise<NonNullable<Answer['tools']>> {
   await client.connect(transport);
+  // A server that offers no tools — only prompts or resources — has no `tools/list` to answer, and says so with
+  // -32601. It lists none: asking would report a working server as broken.
+  if (!client.getServerCapabilities()?.tools) return [];
   const tools: NonNullable<Answer['tools']> = [];
   let cursor: string | undefined;
   do {

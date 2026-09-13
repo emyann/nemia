@@ -17,7 +17,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createEngine, type McpServer, type TaskSpec } from '../src/facade.ts';
 import { claudeOps } from '../src/runner.ts';
-import { codex, detachedOps, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { codex, codexMcpServerNames, detachedOps, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
 
 const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-mcp-${label}-`));
 
@@ -43,10 +43,13 @@ const argvIn = (file: string) => fs.readFileSync(file, 'utf8').replace(/\n$/, ''
 
 /**
  * File one task at shipped defaults, run one tick, and return the argv its harness was given — none
- * when the spawn was refused before anything ran.
+ * when the spawn was refused before anything ran. Codex reads its config from `codexHome`, an empty
+ * one unless a test gives one, so no case depends on the servers this machine's own Codex has.
  */
-const spawnAtDefaults = (task: Omit<TaskSpec, 'brief'>) => {
+const spawnAtDefaults = (task: Omit<TaskSpec, 'brief'>, codexHome = tmp('codex-home')) => {
   const bin = fakeBin();
+  const prevHome = process.env.CODEX_HOME;
+  process.env.CODEX_HOME = codexHome;
   return onPath(bin, async () => {
     const root = tmp('root');
     const engine = createEngine({ root });
@@ -58,6 +61,8 @@ const spawnAtDefaults = (task: Omit<TaskSpec, 'brief'>) => {
     const until = Date.now() + 15_000;
     while (attempt?.reason !== 'unstartable' && !fs.existsSync(file) && Date.now() < until) await new Promise((r) => setTimeout(r, 50));
     return { root, attempt, args: fs.existsSync(file) ? argvIn(file) : undefined };
+  }).finally(() => {
+    if (prevHome === undefined) delete process.env.CODEX_HOME; else process.env.CODEX_HOME = prevHome;
   });
 };
 
@@ -209,4 +214,31 @@ test('a relative cwd or root still names each config by an absolute path — Cla
     // What Claude Code does with each: resolve it from inside the session's cwd.
     for (const c of configs) assert.ok(fs.existsSync(path.resolve(here, 'repo', c)), `${c} is found from inside repo`);
   } finally { process.chdir(was); }
+});
+
+test("a task's server named like one in the operator's Codex config is refused at spawn — Codex would merge the two", async () => {
+  // As `codex mcp add` writes them. Measured on 0.154.0: a task's `docs` would run the task's command
+  // with the operator's SECRET, and a task's `browser` would not load beside the operator's url.
+  const home = tmp('codex-home');
+  fs.writeFileSync(path.join(home, 'config.toml'), [
+    '[mcp_servers.browser]', 'url = "https://operator.example/mcp"', '',
+    '[mcp_servers.docs]', 'command = "operator-docs"', '', '[mcp_servers.docs.env]', 'SECRET = "operator"', '',
+  ].join('\n'));
+
+  const clash = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', mcp: MCP }, home);
+  assert.equal(clash.args, undefined, 'codex never ran');
+  assert.equal(clash.attempt?.reason, 'unstartable');
+  assert.match(clash.attempt?.error ?? '', /`mcp.browser`, `mcp.docs`: .*config\.toml already has a server by that name.*Give the task's server another name/);
+
+  const apart = await spawnAtDefaults({ cwd: tmp('bare'), harness: 'codex', mcp: { mine: { command: 'x' } } }, home);
+  assert.ok(apart.args?.some((a) => a.startsWith('mcp_servers={"mine"')), 'a name the operator does not use is given to codex');
+});
+
+test('the MCP server names a Codex config gives are read the way codex mcp add writes them, and only those', () => {
+  const toml = [
+    '[mcp_servers.probe]', 'command = "echo"', '', '[mcp_servers.probe.env]', 'K = "v"', '',
+    '[mcp_servers."quoted-name"]', 'url = "https://e.example/mcp"', '',
+    '[projects."/r"]', 'trust_level = "trusted"', '[mcp_servers_extra.nope]', 'x = 1',
+  ].join('\n');
+  assert.deepEqual([...codexMcpServerNames(toml)].sort(), ['probe', 'quoted-name']);
 });

@@ -32,7 +32,8 @@ export type HarnessSpec = {
   /**
    * What this harness needs to know about the machine before it runs — read from disk, from git —
    * kept out of `command` so that stays a pure function of what it is given. Merged into the `io`
-   * the command receives.
+   * the command receives. A throw refuses the spawn: nothing has run, and the attempt ends
+   * `unstartable` in its words.
    */
   prepare?: (r: SpawnRequest) => Partial<HarnessIO>;
   /**
@@ -237,6 +238,20 @@ export const trustedProjects = (toml: string): Set<string> => {
   return trusted;
 };
 
+/**
+ * The MCP server names a Codex config gives, as `codex mcp add` writes them: `[mcp_servers.<name>]`
+ * tables and the tables under them. Not TOML in general — an inline `mcp_servers = {…}` is not read —
+ * so a name it misses meets Codex's own merge, which is where a task stood before this was read.
+ */
+export const codexMcpServerNames = (toml: string): Set<string> => {
+  const names = new Set<string>();
+  for (const raw of toml.split('\n')) {
+    const table = /^\[mcp_servers\.(?:"((?:[^"\\]|\\.)*)"|([\w-]+))(?:\.[^\]]*)?\]$/.exec(raw.trim());
+    if (table) names.add(table[1] ?? table[2]!);
+  }
+  return names;
+};
+
 /** The repository a directory's commits land in: the parent of its git common dir. */
 const repositoryOf = (cwd: string): string | undefined => {
   try {
@@ -364,14 +379,24 @@ export const codex: HarnessSpec = {
    * So a worktree whose repository you already trust in your own Codex config is trusted for the
    * run, and nothing else is. Trusting a repository you never trusted would also load whatever other
    * Codex settings it ships, and that is not a decision this engine gets to make for you.
+   *
+   * The same config is read for the MCP servers it names. Codex merges a task's `mcp_servers` into
+   * the operator's, so a task server with one of their names becomes a mix of the two — the task's
+   * command with the operator's args and env, measured on 0.154.0 — or fails to load when the
+   * transports differ. Such a task is refused here, at spawn, where the config is read as it is now.
    */
   prepare: (r) => {
+    const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
+    let toml: string;
+    try { toml = fs.readFileSync(config, 'utf8'); } catch { return {}; }
+    const operators = codexMcpServerNames(toml);
+    const taken = Object.keys(r.mcp ?? {}).filter((name) => operators.has(name));
+    if (taken.length) {
+      throw new Error(`${taken.map((n) => `\`mcp.${n}\``).join(', ')}: ${config} already has a server by that name, and Codex merges a task's server into the operator's — keeping the operator's args and env beside the task's — rather than replacing it. Give the task's server another name.`);
+    }
     const repo = repositoryOf(r.cwd);
     if (!repo) return {};
-    const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
-    let trusted: Set<string>;
-    try { trusted = trustedProjects(fs.readFileSync(config, 'utf8')); } catch { return {}; }
-    return trusted.has(repo) ? { trustedDirs: [...new Set([repo, r.cwd])] } : {};
+    return trustedProjects(toml).has(repo) ? { trustedDirs: [...new Set([repo, r.cwd])] } : {};
   },
 };
 

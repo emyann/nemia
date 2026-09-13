@@ -233,7 +233,11 @@ export const codex: HarnessSpec = {
       '--json',
       '--skip-git-repo-check',
       '-C', r.cwd,
-      '-s', r.permissionMode === 'bypassPermissions' ? 'danger-full-access' : 'workspace-write',
+      // `read-only` is emitted as itself. It used to fall through to `workspace-write`, so a task
+      // that asked for a reviewer that cannot write got one that could.
+      '-s', r.permissionMode === 'bypassPermissions' ? 'danger-full-access'
+        : r.permissionMode === 'read-only' ? 'read-only'
+        : 'workspace-write',
       ...(r.model ? ['-m', r.model] : []),
       // Codex's worktree flag takes NO value, so it is safe immediately before the prompt —
       // unlike Claude's. The spec is where that difference lives, so the engine never learns

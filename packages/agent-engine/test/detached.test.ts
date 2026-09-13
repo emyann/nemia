@@ -186,6 +186,17 @@ test('the default permission mode is `auto` — a fleet cannot wait for a person
   assert.equal(chosen[chosen.indexOf('--permission-mode') + 1], 'dontAsk', 'and a task may still choose');
 });
 
+test('codex runs read-only when the task says read-only — never widened to workspace-write', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  const sandbox = (permissionMode?: string) => {
+    const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', permissionMode }).args;
+    return args[args.indexOf('-s') + 1];
+  };
+  assert.equal(sandbox('read-only'), 'read-only');
+  assert.equal(sandbox(), 'workspace-write', 'the shipped default is unchanged');
+  assert.equal(sandbox('bypassPermissions'), 'danger-full-access');
+});
+
 // ─── the closing statement ──────────────────────────────────────────────────
 
 test('codex is given the schema and an output file, and the prompt still comes last', async () => {

@@ -6,37 +6,15 @@ import type { RunSummary } from './api';
 import { COLUMN_WIDTH, NODE_WIDTH, type Point } from './layout.ts';
 
 /**
- * First words of a step's status — `wf ls`'s, before any ` · ` — that say the step will not move
- * again by itself. `unknown` is a task the engine has no record of, which never moves again. `done`,
- * `verified ✓`, `unverified` and `unsigned` are words `wf ls` has and the api does not use yet; every
- * word starting `failed`, `failed ✗ check (…)` among them, is stopped too.
- */
-const STOPPED = new Set(['succeeded', 'done', 'verified', 'verified ✓', 'unverified', 'unsigned', 'stopped', 'unknown']);
-
-/**
- * Whether a step is still to move: not started, or started and not stopped.
+ * Whether a run is in flight, and so on the Factory by default: the run's status, as `assess` decides it
+ * and the api carries it, is `running`.
  *
- * A word this does not know counts as moving — `running (working)`, `starting`, `between attempts`,
- * `needs-human`, `checking`, and whatever the engine says next — so a new word puts a run on the
- * floor rather than hiding it.
+ * Nothing here reads a step's words. Finished is succeeded, failed or cancelled — and failed includes a
+ * run stopped at a refused check, or at a step signed off blocked, whose followers read `waiting` and
+ * will never be filed. `wf decide` reads that run as over, so it is off the floor; a person it waits on
+ * finds it under "Show finished", or on Runs.
  */
-export function stepInFlight(status: string, runCancelled: boolean): boolean {
-  const [word = ''] = status.split(' · ');
-  // Not started; on a run somebody called off, it never will be.
-  if (word === 'waiting' || word === 'pending') return !runCancelled;
-  return !(STOPPED.has(word) || word.startsWith('failed'));
-}
-
-/**
- * Whether a run is in flight, and so on the Factory by default: a step still to move, or a step
- * waiting on a person. Finished is every step stopped and nobody waited on.
- *
- * `waitingOnYou` is the api's, which already leaves out a run somebody called off. A step still
- * `waiting` counts even behind a failure it will never get past — `wf decide` reads that run as
- * over — so a failed run stays on the floor until somebody calls it off.
- */
-export const inFlight = (run: RunSummary): boolean =>
-  run.waitingOnYou.length > 0 || run.steps.some((step) => stepInFlight(step.status, run.cancelledAt !== null));
+export const inFlight = (run: Pick<RunSummary, 'status'>): boolean => run.status === 'running';
 
 /** A card's title: the brief's first line with words on it, without a heading's hashes; else the run id. */
 export const titleOf = (run: Pick<RunSummary, 'id' | 'brief'>): string =>

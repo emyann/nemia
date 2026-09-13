@@ -5,7 +5,7 @@
  */
 import type { StepAttempts } from './api';
 import type { Point } from './layout';
-import type { StepState } from './status';
+import { satisfiesAfter, type StepState } from './status.ts';
 
 /** A session is going, so its attempt's time is still counting. */
 export const isLive = (state: StepState): boolean => state === 'working' || state === 'needs-human';
@@ -42,7 +42,7 @@ export function attemptLine(attempts: StepAttempts, live: boolean, now: number):
 
 export type CanvasEdge = { id: string; source: string; target: string; complete: boolean };
 
-/** One edge per `after` between steps the run has. Complete when the steps at both ends are done. */
+/** One edge per `after` between steps the run has. Complete when the work at both ends is done: verified, or on its own word. */
 export function edgesOf(steps: ReadonlyArray<{ name: string; after: readonly string[]; state: StepState }>): CanvasEdge[] {
   const stateOf = new Map(steps.map((s) => [s.name, s.state]));
   return steps.flatMap((step) =>
@@ -52,7 +52,7 @@ export function edgesOf(steps: ReadonlyArray<{ name: string; after: readonly str
         id: `${parent}->${step.name}`,
         source: parent,
         target: step.name,
-        complete: stateOf.get(parent) === 'done' && step.state === 'done',
+        complete: satisfiesAfter(stateOf.get(parent)!) && satisfiesAfter(step.state),
       })),
   );
 }

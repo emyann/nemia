@@ -56,19 +56,22 @@ test('an attempt that is over says how long it took, once the record keeps when 
   assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now), '#1 · started 30m 00s ago');
 });
 
-test('an edge is complete only when both of its ends are done', () => {
+test('an edge is complete only when the work at both of its ends is done: verified, or on its own word', () => {
   const edges = edgesOf([
-    { name: 'implement', after: [], state: 'done' },
-    { name: 'review', after: ['implement'], state: 'done' },
+    { name: 'implement', after: [], state: 'verified' },
+    { name: 'review', after: ['implement'], state: 'unverified' },
     { name: 'respond', after: ['review', 'implement'], state: 'working' },
     // Signed off blocked: not done, so the edge into it is not complete.
     { name: 'gate', after: ['implement'], state: 'blocked' },
+    // Refused by its check: the session ended, and the work is not done.
+    { name: 'deploy', after: ['review'], state: 'failed-check' },
   ]);
   assert.deepEqual(edges.map((e) => [e.source, e.target, e.complete]), [
     ['implement', 'review', true],
     ['review', 'respond', false],
     ['implement', 'respond', false],
     ['implement', 'gate', false],
+    ['review', 'deploy', false],
   ]);
 });
 

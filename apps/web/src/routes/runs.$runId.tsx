@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { code, Facts, specRows, Told, when } from '../components/Facts';
+import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
@@ -42,8 +42,8 @@ function Run({ run }: { run: RunDetail }) {
 
       {run.waitingOnYou.length > 0 && (
         <p className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> signed off blocked —{' '}
-          <code>wf decide {run.id}</code>
+          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, or refused by its
+          check —{' '}<code>wf decide {run.id}</code>
         </p>
       )}
 
@@ -94,6 +94,8 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
       </div>
 
       {spec && <Facts rows={specRows(spec)} />}
+
+      {step.check && <Check check={step.check} />}
 
       {step.body && <div className="whitespace-pre-wrap text-sm leading-relaxed">{step.body}</div>}
 

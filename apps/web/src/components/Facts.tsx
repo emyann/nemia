@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { StepSpec } from '../lib/api';
+import type { StepCheck, StepLog, StepSpec } from '../lib/api';
 
 /** Label and value, one per row. A value that is not set reads as a dash. */
 export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]> }) {
@@ -27,6 +27,42 @@ export const specRows = (spec: StepSpec): Array<[string, ReactNode]> => [
 ];
 
 export const code = (value: string | null) => (value === null ? null : <span className="font-mono text-xs">{value}</span>);
+
+/**
+ * The command a step is judged by, and once its check refused, what it exited with and the last lines of
+ * each stream: its output first, where a test runner says what failed, then its stderr.
+ */
+export function Check({ check: { command, refused } }: { check: StepCheck }) {
+  return (
+    <section aria-label="Check" className="space-y-2">
+      <h3 className="text-xs font-medium text-neutral-500">Check</h3>
+      <Facts
+        rows={[
+          ['command', code(command)],
+          ...(refused
+            ? [['refused', <span className="font-mono text-xs font-semibold text-red-700 dark:text-red-400">{refused.exit}</span>] as [string, ReactNode]]
+            : []),
+        ]}
+      />
+      {refused?.unreadable && <p className="text-xs text-red-600 dark:text-red-400">{refused.unreadable}</p>}
+      {refused && <Stream name="output" log={refused.stdout} />}
+      {refused && refused.stderr.lines.length > 0 && <Stream name="stderr" log={refused.stderr} />}
+    </section>
+  );
+}
+
+/** One of a refused check's streams, as the api cut it: its last lines, and whether there were more. */
+function Stream({ name, log }: { name: string; log: StepLog }) {
+  if (!log.lines.length) return <p className="text-xs text-neutral-500">No {name}.</p>;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs text-neutral-500">{log.truncated ? `The last ${log.lines.length} lines of its ${name}` : `Its ${name}`}</p>
+      <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 font-mono text-[11px] leading-snug dark:bg-neutral-950">
+        {log.lines.join('\n')}
+      </pre>
+    </div>
+  );
+}
 
 export const when = (iso: string) => <time dateTime={iso}>{new Date(iso).toLocaleString()}</time>;
 

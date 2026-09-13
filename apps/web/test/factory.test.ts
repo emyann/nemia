@@ -16,20 +16,20 @@ import {
   placeRuns,
   repoName,
   spanOf,
-  stepInFlight,
   titleOf,
   toggleOpen,
   type Span,
 } from '../src/lib/factory.ts';
 import { COLUMN_WIDTH, extentOf, layout, NODE_WIDTH, ROW_HEIGHT, type Point } from '../src/lib/layout.ts';
 
-/** A run with one step per status, filed unless it is still waiting. */
+/** A run with one step per status, filed unless it is still waiting, and `status` as `assess` put it. */
 const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunSummary => ({
   id: 'r-1',
   repo: '/code/app',
   brief: 'Do the thing',
   createdAt: '2026-09-13T00:00:00.000Z',
   cancelledAt: null,
+  status: 'running',
   steps: statuses.map((status, i) => ({ name: `step-${i}`, taskId: status === 'waiting' ? null : `t-${i}`, branch: null, status })),
   waitingOnYou: [],
   ...extra,
@@ -37,55 +37,32 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
 
 const cancelledAt = '2026-09-13T01:00:00.000Z';
 
-test('a run shows by default while any step is still to move', () => {
+test('a run is in flight, and on the Factory by default, while the api says it is running', () => {
   const shown: Array<[string, RunSummary]> = [
     ['started, nothing filed yet', run(['waiting', 'waiting'])],
-    ['filed and queued for a slot', run(['pending', 'waiting'])],
     ['a session at work', run(['running (working)', 'waiting'])],
-    ['a session gone quiet, not finished', run(['working (quiescent)'])],
-    ['spawned, not yet seen by its harness', run(['starting'])],
-    ['between attempts', run(['between attempts'])],
-    ['a session asking a person', run(['needs-human'])],
     ['its check still running', run(['verified ✓', 'checking'])],
-    ['one step done, the next still to be filed', run(['succeeded · done', 'waiting'])],
-    // A choice, so it is named: a follower that will never be filed still keeps the run on the floor.
-    ['a follower still waiting behind a failure', run(['failed', 'waiting'])],
-    ['a word the engine has not used before', run(['paused (rate limited)'])],
+    ['done on its own word, the next step still to be filed', run(['unverified · done', 'waiting'])],
   ];
   for (const [why, r] of shown) assert.equal(inFlight(r), true, why);
 });
 
-test('a run waiting on you shows, though every session in it has ended', () => {
-  assert.equal(inFlight(run(['succeeded · BLOCKED'], { waitingOnYou: ['step-0'] })), true);
-  assert.equal(inFlight(run(['verified ✓', 'failed ✗ check (exit 1)'], { waitingOnYou: ['step-1'] })), true);
-});
-
-test('a run is finished, and hidden by default, when every step has stopped and nobody is waited on', () => {
+test('a run is finished, and hidden by default, once the api says it succeeded, failed or was cancelled', () => {
   const hidden: Array<[string, RunSummary]> = [
-    ['done on every step', run(['succeeded · done', 'succeeded'])],
-    ['verified, and done on its own word', run(['verified ✓', 'unverified'])],
-    ['failed and stopped', run(['failed', 'stopped'])],
-    ['a closeout nobody could read', run(['succeeded · closeout unreadable'])],
-    ['a task the engine has no record of, which never moves again', run(['unknown'])],
-    ['no steps at all', run([])],
+    ['verified, and done on its own word', run(['verified ✓', 'unverified · done'], { status: 'succeeded' })],
+    // What the rule is for: the follower of a refused check reads `waiting`, and will for ever.
+    ['stopped at a refused check, its follower waiting for ever', run(['failed ✗ check (exit 1)', 'waiting'], { status: 'failed', waitingOnYou: ['step-0'] })],
+    ['a step signed off blocked, waiting on you', run(['succeeded · BLOCKED', 'waiting'], { status: 'failed', waitingOnYou: ['step-0'] })],
+    ['a session that failed', run(['failed', 'waiting'], { status: 'failed' })],
+    ['called off, a step still running until the stop lands', run(['running (working)', 'waiting'], { status: 'cancelled', cancelledAt })],
   ];
   for (const [why, r] of hidden) assert.equal(inFlight(r), false, why);
 });
 
-test('on a run somebody called off, a step not yet started never will be', () => {
-  // The api empties `waitingOnYou` on a cancelled run, so a blocked step waits on nobody.
-  assert.equal(inFlight(run(['succeeded · BLOCKED', 'waiting'], { cancelledAt })), false);
-  assert.equal(inFlight(run(['stopped', 'pending'], { cancelledAt })), false);
-  // A step still running when the run was called off is running until the stop lands.
-  assert.equal(inFlight(run(['running (working)', 'waiting'], { cancelledAt })), true);
-});
-
-test('a step is moving unless the first word of its status says it stopped', () => {
-  const stopped = ['succeeded', 'succeeded · done', 'succeeded · BLOCKED', 'done', 'verified ✓', 'unverified', 'unsigned',
-    'failed', 'failed · done', 'failed ✗ check (exit 1)', 'stopped', 'unknown'];
-  for (const status of stopped) assert.equal(stepInFlight(status, false), false, status);
-  const moving = ['waiting', 'pending', 'starting', 'running (working)', 'working (quiescent)', 'between attempts', 'needs-human', 'checking'];
-  for (const status of moving) assert.equal(stepInFlight(status, false), true, status);
+test("no step's word puts a finished run back on the floor, and none takes a running one off it", () => {
+  // The words that used to decide it, each on a run whose status says otherwise.
+  assert.equal(inFlight(run(['waiting', 'pending', 'checking', 'needs-human'], { status: 'failed' })), false);
+  assert.equal(inFlight(run(['failed', 'stopped', 'unknown'], { status: 'running' })), true);
 });
 
 test("a card's title is the brief's first line with words on it, or the run id", () => {

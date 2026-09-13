@@ -54,14 +54,17 @@ const FIT = { padding: 0.15, maxZoom: 1 };
 /** A handful of cells fits on a screen; past that, the minimap says where the rest are. */
 const HANDFUL = 5;
 
-/** The minimap in the cards' terms — waiting on you, still going, or finished — and a step in its chip's colour. */
+/**
+ * The minimap in the cards' terms — waiting on you, still going, or finished — and a step in its chip's colour.
+ * Waiting on you before finished: a run stopped at a step that needs a person is over, and still wants finding.
+ */
 const minimapFill = (node: FloorNode) =>
   node.type === 'step'
     ? stepMinimapFill[stepState(node.data.step.status, node.data.runCancelled)]
-    : node.data.finished
-      ? 'var(--color-neutral-400)'
-      : node.data.run.waitingOnYou.length
-        ? 'var(--color-amber-500)'
+    : node.data.run.waitingOnYou.length
+      ? 'var(--color-amber-500)'
+      : node.data.finished
+        ? 'var(--color-neutral-400)'
         : 'var(--color-sky-500)';
 
 /** A step's node on the floor, named by its run too: two runs may each have an `implement`. */
@@ -395,6 +398,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setFits((n) => n + 1);
   };
   const finished = runs.length - flying.size;
+  // Said beside the counts: a run stopped at a step that needs a person is finished, so off the floor by default.
+  const waiting = runs.filter((run) => run.waitingOnYou.length > 0).length;
   const cells = placed.reduce((sum, node) => {
     const { columns, rows } = spans.get(node.id) ?? ONE_CELL;
     return sum + columns * rows;
@@ -412,6 +417,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
         <p className="text-sm text-muted-foreground">
           <span className="font-medium text-foreground">{flying.size}</span> in flight
           {finished > 0 && ` · ${finished} finished`}
+          {waiting > 0 && ` · ${waiting} waiting on you`}
         </p>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <Switch checked={showFinished} onCheckedChange={toggleFinished} />

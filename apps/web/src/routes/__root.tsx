@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Link, Outlet, useMatches, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
-import { Factory, List, Workflow } from 'lucide-react';
+import { Blocks, Factory, List, Workflow } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -28,6 +28,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 const NAV = [
   { to: '/', label: 'Factory', icon: Factory, active: (path: string) => path === '/' },
   { to: '/runs', label: 'Runs', icon: List, active: (path: string) => path === '/runs' || path.startsWith('/runs/') },
+  { to: '/capabilities', label: 'Capabilities', icon: Blocks, active: (path: string) => path === '/capabilities' },
 ] as const;
 
 function Root() {

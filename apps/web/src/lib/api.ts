@@ -118,6 +118,44 @@ export const runsQuery = queryOptions({
   refetchInterval: 5_000,
 });
 
+/** Mirrors `Described` in apps/api/src/capabilities.ts: a skill or an agent, and the file it was read from. */
+export type Described = { name: string; description: string | null; source: string };
+
+/** Mirrors `McpServer` in apps/api/src/capabilities.ts: a server as `.mcp.json` declares it, and what it answered. */
+export type McpServer = {
+  name: string;
+  source: string;
+  type: string;
+  command: string | null;
+  args: string[];
+  url: string | null;
+  enabled: boolean;
+  /** `denied` is the rule in `permissions.deny` that refuses the tool, if one does. */
+  tools: Array<{ name: string; description: string | null; denied: string | null }> | null;
+  error: string | null;
+  notAsked: string | null;
+  checkedAt: string | null;
+};
+
+/** Mirrors `Capabilities` in apps/api/src/capabilities.ts: what the repository the api runs in offers a step. */
+export type Capabilities = {
+  repo: string;
+  skills: Described[];
+  agents: Described[];
+  mcp: McpServer[];
+  denied: Array<{ rule: string; source: string }>;
+  warnings: string[];
+};
+
+/**
+ * What the repository offers a step. Not polled: it changes when a person edits the checkout, and the api asks
+ * each server for its tools once while it runs. Read again on each visit.
+ */
+export const capabilitiesQuery = queryOptions({
+  queryKey: ['capabilities'],
+  queryFn: () => get<Capabilities>('/api/capabilities'),
+});
+
 export const runQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],

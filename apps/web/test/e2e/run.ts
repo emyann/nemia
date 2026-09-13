@@ -2,7 +2,8 @@
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
  *  1. Builds the web app.
- *  2. Seeds a store in a temporary WF_ROOT with two fake runs (seed.ts).
+ *  2. Seeds a store in a temporary WF_ROOT with two fake runs, and beside it a checkout for the api to serve
+ *     (`HKB_REPO`) on the Capabilities page (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
  *     as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers and beside
@@ -23,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, watch } from './checks.ts';
-import { FAKE, NEIGHBOUR, seed } from './seed.ts';
+import { CHECKOUT, FAKE, NEIGHBOUR, seed, seedCheckout } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -34,11 +35,12 @@ const OUT = path.resolve(process.env.WF_ARTIFACTS || path.join(REPO, '.e2e'));
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
 
-/** On every page: the menu, with both of its places. */
+/** On every page: the menu, with each of its places. */
 async function sidebar(page: Page): Promise<void> {
   const menu = page.locator('[data-sidebar="sidebar"]');
   await expectVisible(menu.getByRole('link', { name: 'Factory' }), 'the sidebar has Factory');
   await expectVisible(menu.getByRole('link', { name: 'Runs' }), 'the sidebar has Runs');
+  await expectVisible(menu.getByRole('link', { name: 'Capabilities' }), 'the sidebar has Capabilities');
 }
 
 /** Finished runs on the Factory's floor too. Off by default, on every visit. */
@@ -226,6 +228,46 @@ const PAGES: PageSpec[] = [
       await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas beside the open inspector');
     },
   },
+  {
+    name: 'capabilities',
+    route: '/capabilities',
+    expect: async (page) => {
+      await sidebar(page);
+      await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Capabilities' }), 'the sidebar lights Capabilities on its page');
+      const { skill, bareSkill, agent, server, missing, denied } = CHECKOUT;
+      const section = (title: string) => page.locator(`section[aria-label="${title}"]`);
+      for (const [title, count] of [['Skills', 2], ['Agents', 1], ['MCP servers', 2], ['Denied', denied.length]] as const) {
+        await expectVisible(section(title).locator('h2 [data-count]', { hasText: new RegExp(`^${count}$`) }), `the ${title} section counts ${count}`);
+      }
+
+      const skills = section('Skills');
+      await expectVisible(skills.getByText(skill.name, { exact: true }), `the skill in .claude/skills/${skill.dir} by the name its frontmatter gives (${skill.name})`);
+      await expectVisible(skills.getByText(skill.description, { exact: true }), `${skill.name} with its description`);
+      await expectVisible(skills.getByText(`.claude/skills/${skill.dir}/SKILL.md`, { exact: true }), `${skill.name} with where it was read from`);
+      await expectVisible(skills.getByText(bareSkill, { exact: true }), `a SKILL.md without frontmatter, listed by its directory (${bareSkill})`);
+      const agents = section('Agents');
+      await expectVisible(agents.getByText(agent.description, { exact: true }), `the agent ${agent.name} with its description`);
+      await expectVisible(agents.getByText(`.claude/agents/${agent.file}`, { exact: true }), `${agent.name} with where it was read from`);
+
+      const listing = page.locator(`li[aria-label="MCP server ${server.name}"]`);
+      await expectVisible(listing.getByText('enabled', { exact: true }), `${server.name} reads as enabled by the settings`);
+      for (const tool of server.tools) {
+        await expectVisible(listing.locator('li').getByText(tool, { exact: true }), `${server.name} lists ${tool}, as the server itself answered tools/list`);
+      }
+      await expectVisible(listing.getByText(server.said, { exact: true }), 'a tool with the first line of its description');
+      await expectCount(listing.getByText(server.secondLine), 0, 'and only its first line');
+      await expectVisible(listing.locator(`li[data-denied="${server.denied}"]`, { hasText: 'denied' }), `the tool ${server.denied} refuses is marked denied`);
+      await expectVisible(listing.getByText('.mcp.json', { exact: true }).first(), `${server.name} with where it was read from`);
+      await expectVisible(
+        page.locator(`li[aria-label="MCP server ${missing.name}"]`).getByText(`there is no command \`${missing.command}\``),
+        `a server whose command does not exist shows its error on its entry (${missing.name}), and the page still renders`,
+      );
+
+      const rules = section('Denied');
+      for (const rule of denied) await expectVisible(rules.getByText(rule, { exact: true }), `the denied list has ${rule}`);
+      await expectVisible(rules.getByText(`refuses ${server.name} · wipe`), `the denied list says which listed tool ${server.denied} refuses`);
+    },
+  },
 ];
 
 // ─── the servers, and stopping them ─────────────────────────────────────────
@@ -304,6 +346,8 @@ async function main(): Promise<void> {
 
   store = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-'));
   seed(store);
+  const checkout = path.join(store, 'checkout');
+  seedCheckout(checkout, path.join(API, 'test', 'fixtures', 'mcp-server.ts'));
   // A `claude` that sees no sessions, first on the api's PATH. The engine observes `claude agents` on every
   // list; the pages are about the store, not about the sessions on this machine.
   const bin = path.join(store, 'bin');
@@ -311,7 +355,7 @@ async function main(): Promise<void> {
   fs.writeFileSync(path.join(bin, 'claude'), "#!/bin/sh\necho '[]'\n", { mode: 0o755 });
 
   const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API,
-    { ...process.env, PORT: '0', WF_ROOT: store, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` },
+    { ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` },
     /api listening on http:\/\/localhost:(\d+)/);
   const base = await startServer('vite preview', [vite, 'preview', '--port', '0', '--host', '127.0.0.1'], WEB,
     { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },

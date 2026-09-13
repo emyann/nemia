@@ -2,7 +2,6 @@
   "name": "agent-workflows",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
   "directories": {
     "test": "test"
   },
@@ -15,7 +14,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "agent-engine": "file:../agent-engine"
+    "agent-engine": "*"
   },
   "devDependencies": {
     "@types/node": "^22.20.2",
@@ -23,5 +22,11 @@
   },
   "bin": {
     "wf": "bin/wf.ts"
+  },
+  "exports": {
+    ".": "./src/runner.ts",
+    "./run": "./src/run.ts",
+    "./workflow": "./src/workflow.ts",
+    "./package.json": "./package.json"
   }
 }

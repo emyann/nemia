@@ -806,7 +806,10 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
         model: r.model ?? step.model,
+        effort: step.effort,
         permissionMode: step.permissionMode,
+        // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
+        tools: step.tools,
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
         resumeFrom,
@@ -843,7 +846,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
         model: target.model,
+        effort: target.effort,
         permissionMode: target.permissionMode,
+        tools: target.tools,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
         resumeFrom,
@@ -918,9 +923,12 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,
+      effort: step.effort,
       // Left to the engine's default (`auto`) unless the step says otherwise: a workflow runs
       // unattended by definition, and a mode that prompts is a mode that stalls.
       permissionMode: step.permissionMode,
+      // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
+      tools: step.tools,
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,

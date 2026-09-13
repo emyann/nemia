@@ -1015,10 +1015,10 @@ test('`wf retry` takes one way to try, and `--model` with a name — anything el
 /** `findings` and `again`, as `workflows/review.schema.json` declares them. */
 const LOOPING = { ...FINDINGS, properties: { ...FINDINGS.properties, again: { type: 'boolean' } }, required: ['findings', 'again'] };
 
-/** implement, checked → review, looping back to it with `rounds:` at its default unless `reviewKeys` say — the shape `workflows/` ships. */
-const looped = (reviewKeys = '') => {
+/** implement, checked → review, looping back to it with `rounds:` at its default unless `reviewKeys` say — the shape `workflows/` ships. Each key set ends with a newline. */
+const looped = (reviewKeys = '', implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\ncheck: npm test\n${implementKeys}---\nimplement it\n`);
   fs.writeFileSync(path.join(dir, 'review.md'), `---\nafter: implement\noutput: review.schema.json\nloop: implement\n${reviewKeys}---\nreview it\n`);
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(LOOPING, null, 2));
   return dir;
@@ -1233,4 +1233,57 @@ test("REFUSED before the fix, now handed: a fresh try of implement inside round 
   assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
   assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|IMPLEMENTER-SUMMARY/);
   assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+});
+
+// ─── what a step may have: `tools:` and `effort:` ───────────────────────────
+
+test('REFUSED before, now carried: a step with `tools:` and `effort:` reaches `e.file` with exactly that list and that effort — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
+  const TOOLS = ['Read', 'Grep', 'Glob', 'Bash'];
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ntools: Read, Grep, Glob, Bash\neffort: high', 'failed', 1);
+  const first = tasks.get(`${run.id}-implement`)!.spec;
+  assert.deepEqual([first.tools, first.effort], [TOOLS, 'high'], 'the first filing');
+
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.deepEqual([nudged.tools, nudged.effort, nudged.resumeFrom], [TOOLS, 'high', `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+
+  settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
+  settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
+  await retry(e, run.id, 'implement', { mode: 'fresh', model: 'opus' });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  const fresh = tasks.get(`${run.id}-implement-try3`)!.spec;
+  assert.deepEqual([fresh.tools, fresh.effort, fresh.model, fresh.resumeFrom], [TOOLS, 'high', 'opus', undefined], 'a new session on the model asked for, fenced the same');
+
+  // The check is the run's own, on a harness with no tools to narrow.
+  const check = tasks.get(`${run.id}-implement-check`)!.spec;
+  assert.deepEqual([check.harness, check.tools, check.effort], ['check', undefined, undefined]);
+});
+
+test("at shipped defaults a step names neither, and is filed with neither: the harness's own tools, at its own effort", async () => {
+  const run = started(folder());
+  const { e, tasks } = board();
+  await advance(e, readRun(run.id));
+  const spec = tasks.get(`${run.id}-implement`)!.spec;
+  assert.deepEqual([spec.tools, spec.effort], [undefined, undefined]);
+});
+
+test("a round files its target with the target's tools and effort, and the looping step — a new session each round — with its own", async () => {
+  const REVIEWS = ['Read', 'Grep', 'Glob', 'Bash'];
+  const EDITS = ['Read', 'Edit', 'Write', 'Bash'];
+  const run = started(looped('tools: Read, Grep, Glob, Bash\neffort: max\n', 'tools: Read, Edit, Write, Bash\neffort: low\n'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const implement1 = b.tasks.get(`${run.id}-implement`)!.spec;
+  assert.deepEqual([implement1.tools, implement1.effort], [EDITS, 'low']);
+  await toReview(b, run.id, 1, true);
+  const review1 = b.tasks.get(`${run.id}-review`)!.spec;
+  assert.deepEqual([review1.tools, review1.effort], [REVIEWS, 'max']);
+
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  const implement2 = b.tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.deepEqual([implement2.tools, implement2.effort, implement2.resumeFrom], [EDITS, 'low', `native-${run.id}-implement`], 'the round, continuing implement');
+  await toReview(b, run.id, 2, false);
+  const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
+  assert.deepEqual([review2.tools, review2.effort, review2.resumeFrom], [REVIEWS, 'max', undefined], "round 2's review");
 });

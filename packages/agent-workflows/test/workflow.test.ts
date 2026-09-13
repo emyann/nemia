@@ -207,8 +207,8 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 
 test('every key a step has is read — none is accepted and then dropped', () => {
   const values: Record<StepKey, string> = {
-    after: 'implement', resume: 'implement', input: 'implement', harness: 'codex', model: 'gpt-5.1', permissionMode: 'read-only',
-    deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
+    after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
+    tools: 'Read, Grep, Glob, Bash', deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -219,10 +219,11 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual(w.input, ['implement']);
   assert.deepEqual(w.output, { file: 'review.schema.json', schema: LOOPING });
   assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
+  assert.deepEqual([w.effort, w.tools], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash']]);
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, harness, model, permissionMode, deadlineSeconds, maxAttempts, check, retries, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, deadlineSeconds, maxAttempts, check, retries, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -244,10 +245,54 @@ test('`afer: implement` is refused — accepted, it made the reviewer a root tha
   assert.throws(() => loadWorkflows(dir), /review: `afer` is not a key a step has\. A step's keys are: after, /);
 });
 
-test('tools, effort and guide are refused by name, never silently dropped', () => {
-  assert.throws(() => fm('review', 'harness: codex\ntools: Read, Grep, Glob'), /review: a step may not set `tools` — the engine does not carry a tool list/);
-  assert.throws(() => fm('review', 'effort: high'), /review: a step may not set `effort` — /);
+test('guide is refused by name, never silently dropped', () => {
   assert.throws(() => fm('implement', 'guide: CLAUDE.md'), /implement: a step may not set `guide` — the harness reads CLAUDE\.md/);
+});
+
+/** Refused with exit 2 and a message that matches `pattern` — the message itself, not `String(err)`. */
+const refusedWith = (pattern: RegExp) => (e: unknown) => e instanceof WorkflowError && e.exitCode === 2 && pattern.test(e.message);
+
+test('tools: is the list of names the harness is given, one name per entry, trimmed; effort: one word — and absent, neither is set', () => {
+  const w = fm('review', 'tools: Read,Grep , Glob,  Bash,\neffort: high');
+  assert.deepEqual(w.tools, ['Read', 'Grep', 'Glob', 'Bash'], 'a trailing comma adds no name');
+  assert.equal(w.effort, 'high');
+  assert.deepEqual(fm('look', 'tools: mcp__playwright__browser_take_screenshot').tools, ['mcp__playwright__browser_take_screenshot']);
+  const bare = fm('implement', 'harness: claude');
+  assert.deepEqual([bare.tools, bare.effort], [undefined, undefined], "absent: the harness's own set, at its own effort");
+});
+
+test('REFUSED: an empty tools: — blank, or only commas — is not "every tool", nor "none"', () => {
+  assert.throws(() => fm('review', 'tools:'), refusedWith(/^review: `tools` has no value, which reads as every tool to one person and as none to another\. Name the tools .*`tools: Read, Grep, Glob, Bash`/));
+  assert.throws(() => fm('review', 'tools: ,'), refusedWith(/^review: `tools: ,` names no tool\. .*Without the line, the step has the harness's own set\./));
+  assert.throws(() => fm('review', 'tools:  , ,'), refusedWith(/names no tool/));
+});
+
+test('REFUSED: a tools: entry with a space or a comma inside — a list without its commas, a rule, or a list in brackets or quotes', () => {
+  assert.throws(() => fm('review', 'tools: Read Grep Glob'), refusedWith(/^review: `tools: Read Grep Glob` has a space inside `Read Grep Glob`, which is not one name\. A step's tools are .*bare and comma-separated/));
+  assert.throws(() => fm('review', 'tools: Read, Bash(git diff, git log)'),
+    refusedWith(/^review: `tools: Read, Bash\(git diff, git log\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Read`, `Bash\(git diff`, `git log\)` as names\./));
+  assert.throws(() => fm('review', 'tools: [Read, Grep]'), refusedWith(/has a comma inside an entry/));
+  assert.throws(() => fm('review', 'tools: "Read, Grep"'), refusedWith(/has a comma inside an entry/));
+  assert.throws(() => fm('review', 'tools: Read, Bash(npm test)'), refusedWith(/has `Bash\(npm test\)`, which is not a tool name: it is a rule for what a tool may run, .*`Bash`, whole/));
+  assert.throws(() => fm('review', 'tools: Read, Bash(git:*)'), refusedWith(/has `Bash\(git:\*\)`, which is not a tool name: it is a rule/), 'a rule with no space in it too');
+  assert.throws(() => fm('review', 'tools: "Read"'), refusedWith(/has `"Read"`, which is not a tool name: a name is written bare/));
+});
+
+test('REFUSED: tools: on a codex step, naming the sandbox permissionMode sets instead', () => {
+  assert.throws(() => fm('review', 'harness: codex\ntools: Read, Grep, Glob'),
+    refusedWith(/^review: `tools: Read, Grep, Glob` is a tool list, and codex has none: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — `read-only` reads and runs commands and writes nothing.*`permissionMode: read-only` for a step that must not write\./));
+  assert.throws(() => fm('review', 'tools: Read\nharness: codex\npermissionMode: read-only'), refusedWith(/codex has none/), 'wherever the harness line is, and beside the sandbox too');
+  for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('review', `harness: ${h}\ntools: Read`).tools, ['Read'], h);
+});
+
+test("REFUSED: an effort the step's harness does not take, by name, with the efforts it does", () => {
+  assert.throws(() => fm('implement', 'effort: extreme'),
+    refusedWith(/^implement: `effort: extreme` is not an effort claude has \(there is no `harness:` line, so the step runs on claude\)\. On claude it is one of: low, medium, high, xhigh, max\. Without the line, the harness uses its own default\.$/));
+  assert.throws(() => fm('review', 'harness: codex\neffort: ultra'), refusedWith(/On codex it is one of: none, minimal, low, medium, high, xhigh, max\./));
+  assert.throws(() => fm('implement', 'effort: minimal'), refusedWith(/not an effort claude has .*`minimal` is codex's word, and this step does not run on codex/));
+  assert.throws(() => fm('implement', 'effort: High'), refusedWith(/not an effort claude has/), 'words are exact');
+  assert.equal(fm('review', 'harness: codex\neffort: minimal').effort, 'minimal');
+  assert.equal(fm('x', 'harness: claude-detached\neffort: max').effort, 'max');
 });
 
 test('an empty check is refused, and so is one that reads as "no check" but runs as a command', () => {
@@ -286,16 +331,19 @@ test("harness: banana is refused with the harnesses there are; harness: check is
 test("permissionMode: yolo is refused with the modes of the step's own harness", () => {
   assert.throws(
     () => fm('implement', 'permissionMode: yolo'),
-    /implement: `permissionMode: yolo` is not a mode claude has \(there is no `harness:` line, so the step runs on claude\)\. On claude it is one of: default, acceptEdits, auto, dontAsk, bypassPermissions, plan\./,
+    /implement: `permissionMode: yolo` is not a mode claude has \(there is no `harness:` line, so the step runs on claude\)\. On claude it is one of: acceptEdits, auto, bypassPermissions, default, dontAsk, manual, plan\./,
   );
-  assert.throws(() => fm('review', 'harness: codex\npermissionMode: yolo'), /On codex it is one of: workspace-write, danger-full-access, read-only\./);
+  assert.throws(() => fm('review', 'harness: codex\npermissionMode: yolo'), /On codex it is one of: read-only, workspace-write, danger-full-access, bypassPermissions\./);
   // Checked against the harness the step runs on, wherever the harness line is — not against every mode anyone has.
-  assert.throws(() => fm('review', 'permissionMode: bypassPermissions\nharness: codex'), /`bypassPermissions` is claude's word, and this step does not run on claude/);
+  assert.throws(() => fm('review', 'permissionMode: manual\nharness: codex'), /`manual` is claude's word, and this step does not run on claude/);
   assert.throws(() => fm('implement', 'permissionMode: read-only'), /not a mode claude has .*`read-only` is codex's word/);
 
   assert.equal(fm('review', 'harness: codex\npermissionMode: read-only').permissionMode, 'read-only');
   assert.equal(fm('x', 'harness: claude-detached\npermissionMode: bypassPermissions').permissionMode, 'bypassPermissions');
   assert.equal(fm('x', 'permissionMode: auto').permissionMode, 'auto');
+  // The engine's words, which the first copies refused: Claude Code's `manual`, and codex's `bypassPermissions`, its widest sandbox.
+  assert.equal(fm('x', 'permissionMode: manual').permissionMode, 'manual');
+  assert.equal(fm('review', 'harness: codex\npermissionMode: bypassPermissions').permissionMode, 'bypassPermissions');
 });
 
 test('a key set twice is refused rather than last-one-wins', () => {

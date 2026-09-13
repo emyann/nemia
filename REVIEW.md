@@ -1,0 +1,1 @@
+No findings worth changing: the diff meets the requested scope and behavior, covers the required refusals, and passes root tests and typechecking; the new settlement regression fails against the original engine code.

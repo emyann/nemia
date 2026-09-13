@@ -3,6 +3,7 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { stepLogQuery, type RunDetail } from '../lib/api';
 import { isLive } from '../lib/canvas';
 import { stepState, type StepState } from '../lib/status';
+import { cn } from '../lib/utils';
 import { code, Facts, specRows, Told, when } from './Facts';
 import { StatusChip } from './StatusChip';
 
@@ -11,8 +12,18 @@ type Step = RunDetail['steps'][number];
 const TABS = ['Details', 'Output', 'Activity'] as const;
 type Tab = (typeof TABS)[number];
 
+type Props = {
+  run: RunDetail;
+  step: Step;
+  onClose: () => void;
+  /** Which run the step is in, above its name: on the Factory, where the steps of several runs are drawn. */
+  runTitle?: string;
+  /** Classes over the panel's own, for where it sits: beside the run's canvas by default. */
+  className?: string;
+};
+
 /** What is going on in one step, beside the canvas, for the node that was clicked. */
-export function StepInspector({ run, step, onClose }: { run: RunDetail; step: Step; onClose: () => void }) {
+export function StepInspector({ run, step, onClose, runTitle, className }: Props) {
   const [tab, setTab] = useState<Tab>('Details');
   const runCancelled = run.cancelledAt !== null;
   const state = stepState(step.status, runCancelled);
@@ -28,11 +39,19 @@ export function StepInspector({ run, step, onClose }: { run: RunDetail; step: St
   return (
     <aside
       aria-label={`Step ${step.name}`}
-      className="flex h-[30rem] min-h-0 flex-col rounded border border-neutral-200 bg-white text-sm md:w-80 md:shrink-0 dark:border-neutral-800 dark:bg-neutral-900"
+      className={cn(
+        'flex h-[30rem] min-h-0 flex-col rounded border border-neutral-200 bg-white text-sm md:w-80 md:shrink-0 dark:border-neutral-800 dark:bg-neutral-900',
+        className,
+      )}
     >
       <header className="flex items-center justify-between gap-2 border-b border-neutral-200 px-3 py-2 dark:border-neutral-800">
         <div className="min-w-0">
           <p className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">step inspector</p>
+          {runTitle && (
+            <p className="truncate text-xs text-neutral-500" title={runTitle}>
+              {runTitle}
+            </p>
+          )}
           <h2 className="truncate font-semibold" title={step.name}>
             {step.name}
           </h2>
@@ -69,8 +88,8 @@ export function StepInspector({ run, step, onClose }: { run: RunDetail; step: St
       <div role="tabpanel" className={`min-h-0 flex-1 p-3 ${tab === 'Activity' ? 'flex flex-col gap-2' : 'space-y-4 overflow-auto'}`}>
         {tab === 'Details' && <Details step={step} state={state} runCancelled={runCancelled} />}
         {tab === 'Output' && <Output step={step} state={state} />}
-        {/* Keyed by step, so a log never stands in for another step's while that one loads. */}
-        {tab === 'Activity' && <Activity key={step.name} runId={run.id} step={step} live={isLive(state)} />}
+        {/* Keyed by run and step, so a log never stands in for another step's while that one loads. */}
+        {tab === 'Activity' && <Activity key={`${run.id}/${step.name}`} runId={run.id} step={step} live={isLive(state)} />}
       </div>
     </aside>
   );

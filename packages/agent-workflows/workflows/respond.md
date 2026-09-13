@@ -2,6 +2,7 @@
 harness: claude
 after: review
 resume: implement
+check: npm test && npm run typecheck
 ---
 A second engineer has reviewed your change. Their findings are in REVIEW.md in this workspace.
 

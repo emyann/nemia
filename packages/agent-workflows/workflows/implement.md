@@ -1,5 +1,6 @@
 ---
 harness: claude
+check: npm test && npm run typecheck
 ---
 Implement what was asked, in this repository.
 

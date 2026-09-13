@@ -11,6 +11,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createEngine, type Engine } from 'agent-engine';
 import { CHECK, checkBrief, checkContract, lastLines, readCheckBrief, readVerdict, stdoutTail, type CheckEnv } from '../src/check.ts';
+import { loadWorkflows } from '../src/workflow.ts';
 
 const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr' };
 
@@ -154,3 +155,14 @@ test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfi
   assert.equal(readVerdict(await e.logs(hung)), 'unfinished');
 });
 
+// ─── what this repository ships ─────────────────────────────────────────────
+
+test("this repository's own workflow checks the suite and the types after every step that edits, and its reviewer does not edit", () => {
+  // The check a person runs by hand at every trial merge, run by the run instead. A step that breaks
+  // either half now blocks what follows it rather than handing it on.
+  const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
+  assert.equal(steps.implement?.check, 'npm test && npm run typecheck');
+  assert.equal(steps.respond?.check, 'npm test && npm run typecheck');
+  assert.equal(steps.review?.harness, 'codex');
+  assert.equal(steps.review?.permissionMode, 'read-only');
+});

@@ -69,7 +69,8 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   if (!brief) throw refuse('there is no prompt. Write what the session should do below the frontmatter.');
 
   const maxAttempts = meta.get('maxAttempts');
-  if (maxAttempts !== undefined && !/^[1-9]\d*$/.test(maxAttempts)) {
+  // Digits alone are not a count: 309 nines is `Infinity` once converted, so the number is checked too.
+  if (maxAttempts !== undefined && !(/^[1-9]\d*$/.test(maxAttempts) && Number.isSafeInteger(Number(maxAttempts)))) {
     throw refuse(`\`maxAttempts: ${maxAttempts}\` is not a number of attempts. Write a whole number from 1, like \`maxAttempts: 2\`.`);
   }
   const deadlineSeconds = meta.get('deadlineSeconds');

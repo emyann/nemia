@@ -57,13 +57,14 @@ test('an unknown key is refused by name, with the list of keys a brief has', () 
 });
 
 test('`deadlineSeconds: 5m` is refused — it became NaN, and stopped the task on its first pass', () => {
-  for (const bad of ['5m', '0', '-30', 'Infinity', 'soon']) {
+  for (const bad of ['5m', '0', '-30', 'Infinity', 'soon', '1e400']) {
     refuses(brief(`deadlineSeconds: ${bad}`), /is not a number of seconds.*deadlineSeconds: 900/);
   }
 });
 
 test('a maxAttempts that is not a whole number from 1 is refused', () => {
-  for (const bad of ['0', '2.5', 'two', '-1', '1e2']) {
+  // The last is digits only, and converts to Infinity: the syntax passes, the number does not.
+  for (const bad of ['0', '2.5', 'two', '-1', '1e2', '9'.repeat(309)]) {
     refuses(brief(`maxAttempts: ${bad}`), /is not a number of attempts/);
   }
 });

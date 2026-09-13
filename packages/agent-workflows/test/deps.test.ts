@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { depsPlan, worktreeInclude, type DepsListing } from '../src/deps.ts';
+import { depsPlan, lockfileParting, worktreeInclude, type DepsListing } from '../src/deps.ts';
 import { composeBrief, type Run } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 
@@ -62,26 +62,55 @@ test('the plan: workspace packages to the worktree\'s copy, everything else to m
   ]);
 });
 
-test('.worktreeinclude: paths to copy, node_modules set aside, and every line outside the repository refused by name', () => {
+test('.worktreeinclude: paths to copy, a leading / anchored at the root as gitignore\'s is, node_modules set aside, and every line outside the repository refused by name', () => {
   const text = [
     '# what a worktree needs', '',
-    '.env.local', 'config/local/', './tools/cache.json', '  spaced.txt  ', '.env.local',
+    '.env.local', 'config/local/', './tools/cache.json', '  spaced.txt  ', '.env.local', '/.env.local',
     'node_modules', 'apps/web/node_modules',
-    '../x', 'a/../../y', '/etc/hosts', 'C:\\secrets', '.', '.git', '.git/hooks',
+    '../x', 'a/../../y', '/etc/hosts', '/../z', 'C:\\secrets', '.', '/', '.git', '.git/hooks',
   ].join('\n');
   assert.deepEqual(worktreeInclude(text), {
-    copy: ['.env.local', 'config/local', 'tools/cache.json', 'spaced.txt'],
+    // `/etc/hosts` is the repository's etc/hosts, as a line in a .gitignore would be: nothing outside it.
+    copy: ['.env.local', 'config/local', 'tools/cache.json', 'spaced.txt', 'etc/hosts'],
     provisioned: ['node_modules', 'apps/web/node_modules'],
     refused: [
       { line: '../x', why: 'is outside the repository' },
       { line: 'a/../../y', why: 'is outside the repository' },
-      { line: '/etc/hosts', why: 'is absolute' },
+      { line: '/../z', why: 'is outside the repository' },
       { line: 'C:\\secrets', why: 'is absolute' },
       { line: '.', why: 'is the repository itself' },
+      { line: '/', why: 'is the repository itself' },
       { line: '.git', why: 'is git\'s own' },
       { line: '.git/hooks', why: 'is git\'s own' },
     ],
   });
+});
+
+test('what parts a worktree\'s lockfile from what main has on disk: a package missing, another version, a link elsewhere — not an optional one main did not take', () => {
+  const lock = (packages: Record<string, object>) => ({
+    name: 'fixture', lockfileVersion: 3, packages: { '': { name: 'fixture' }, 'packages/x': { version: '1.0.0' }, ...packages },
+  });
+  const third = { version: '1.0.0', resolved: 'https://registry.npmjs.org/third/-/third-1.0.0.tgz' };
+  const base = { 'node_modules/x': { resolved: 'packages/x', link: true }, 'node_modules/third': third };
+  const onDisk = {
+    'node_modules/x': { link: true, resolved: 'packages/x' },
+    'node_modules/third': { link: false, version: '1.0.0' },
+    'node_modules/third/node_modules/deep': { link: false, version: '2.0.0' },
+    'apps/web/node_modules/third': { link: false, version: '1.0.0' },
+  } as const;
+
+  assert.equal(lockfileParting(lock(base), onDisk), null);
+  assert.equal(lockfileParting(lock({ ...base, 'node_modules/@esbuild/darwin-arm64': { version: '0.25.0', optional: true } }), onDisk), null,
+    'a platform build this machine did not install');
+  assert.equal(lockfileParting(lock({ ...base, 'node_modules/y': { version: '1.0.0' } }), onDisk), 'node_modules/y', 'one main does not have');
+  assert.equal(lockfileParting(lock({ ...base, 'node_modules/third': { ...third, version: '2.0.0' } }), onDisk), 'node_modules/third', 'another version');
+  assert.equal(lockfileParting(lock({ ...base, 'node_modules/x': { version: '1.0.0' } }), onDisk), 'node_modules/x', 'a package where main has a link');
+  assert.equal(lockfileParting(lock({ ...base, 'node_modules/x': { resolved: 'packages/x2', link: true } }), onDisk), 'node_modules/x', 'a link that leads elsewhere');
+  assert.equal(lockfileParting(lock({ ...base, 'node_modules/third/node_modules/deep': { version: '2.0.0' } }), onDisk), null, 'nested in a package, it rides that package\'s link');
+  assert.equal(lockfileParting(lock({ ...base, 'apps/web/node_modules/third': third }), onDisk), 'apps/web/node_modules/third',
+    'nested in a workspace, links to the root tree cannot give it, though main has it');
+  assert.equal(lockfileParting(lock({ ...base, 'packages/x': { version: '9.9.9' } }), onDisk), null, 'a workspace package\'s own entry is the worktree\'s copy');
+  assert.equal(lockfileParting(null, onDisk), 'package-lock.json', 'a lockfile that did not parse');
 });
 
 test('the brief says a tree was installed, under Where to look and before the closeout — and nothing of a linked one', () => {
@@ -152,7 +181,9 @@ function aCheckout(): { main: string; wt: string } {
   write(path.join(nm, 'third/cli.js'), "#!/usr/bin/env node\nconsole.log('main-third-cli');\n", 0o755);
   link('../x/bin.js', path.join(nm, '.bin/xbin'));
   link('../third/cli.js', path.join(nm, '.bin/third'));
-  write(path.join(nm, '.package-lock.json'), '{}\n');
+  // npm's record of what it installed: what the lockfile named. The run does not read it — it can name what
+  // is not there — but a check that did would be fooled by it, so it is as npm would leave it.
+  fs.copyFileSync(path.join(main, 'package-lock.json'), path.join(nm, '.package-lock.json'));
   write(path.join(nm, '.vite-temp/cache'), 'main\n');
 
   const wt = path.join(fs.mkdtempSync(path.join(ROOT, 'wt-')), 'implement');
@@ -234,6 +265,24 @@ test('a lockfile that differs from main\'s provisions a tree of its own with npm
   assert.deepEqual(await provisionDeps(main, wt), { tree: 'own', installed: false }, 'a second call runs nothing');
   assert.deepEqual(snapshot(nm), once, 'and changes nothing');
   assert.deepEqual(snapshot(path.join(main, 'node_modules')), mains, 'main\'s tree was not written');
+});
+
+test('a lockfile main has not installed yet provisions a tree of its own, though it is main\'s lockfile byte for byte', async () => {
+  const { main, wt } = aCheckout();
+  // packages/y is merged into both, and main's lockfile names it — written by `npm install
+  // --package-lock-only`, as CLAUDE.md's worktree note used to advise — but main's tree was installed before.
+  for (const root of [main, wt]) {
+    write(path.join(root, 'packages/y/package.json'), JSON.stringify({ name: 'y', version: '1.0.0' }));
+    write(path.join(root, 'packages/y/index.js'), "module.exports = 'y';\n");
+  }
+  npmLockfile(main);
+  fs.copyFileSync(path.join(main, 'package-lock.json'), path.join(wt, 'package-lock.json'));
+  assert.ok(!fs.existsSync(path.join(main, 'node_modules/y')), 'main has not installed it');
+  assert.match(fs.readFileSync(path.join(main, 'node_modules/.package-lock.json'), 'utf8'), /node_modules\/y/,
+    'though npm\'s record of main\'s tree says it has: --package-lock-only rewrote it, which is why the run reads the disk');
+
+  assert.deepEqual(await provisionDeps(main, wt), { tree: 'own', installed: true });
+  assert.equal(required(path.join(wt, 'apps/app'), 'y').value, 'y', 'the package the lockfile names is there');
 });
 
 test('a second provisioning is a no-op, and replaces nothing a step installed over a link', async () => {

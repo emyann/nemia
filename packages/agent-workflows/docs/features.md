@@ -93,9 +93,10 @@ branch's app imported main's workspace packages, and M1's check was refused four
 §4b): a dependency the branch pinned was not in the shared tree, and main moving under the branch
 failed tests the branch never touched. `depsPlan` (`src/deps.ts`, pure) gives the worktree a directory
 of its own. Workspace packages link to the worktree's copies and third-party packages to main's, and
-`.bin` and every `@scope` belong to the worktree. When the worktree's `package-lock.json` differs from
-main's, `provisionDeps` runs `npm ci` there instead, and the brief says so under *Where to look*.
-`.worktreeinclude` paths are copied from the main checkout at the cut, and `node_modules` is never
+`.bin` and every `@scope` belong to the worktree. When the worktree's `package-lock.json` asks for a
+package main's `node_modules` does not have on disk (`lockfileParting`), `provisionDeps` runs `npm ci`
+there instead, and the brief says so under *Where to look*. The gitignored
+paths `.worktreeinclude` lists are copied from the main checkout at the cut, and `node_modules` is never
 copied. A pass that dies mid-cut no longer wedges the run. `Advanced.notes` carries what the cut had to
 say, and `wf up` and `wf tick` print it. The README section *What a worktree is given* is the account.
 
@@ -114,13 +115,22 @@ What it leaves:
 - **The cut is the only time the run provisions.** A step that changes the lockfile mid-session installs
   for itself. `npm install` in a linked worktree replaces the links it touches with directories and
   writes nothing of main's (measured with a local tarball, not a registry).
-- **npm only.** The lockfile compared is `package-lock.json`, so a change to another package manager's
-  lockfile goes unseen and that tree is linked as npm's would be.
+- **npm only.** The worktree's `package-lock.json` is compared with what is on disk in main's
+  `node_modules`, so a change to another package manager's lockfile goes unseen and that tree is linked
+  as npm's would be.
+- **An optional package main did not install is taken for a platform build.** That is right for the
+  84 such entries in this repository's lockfile. It is wrong for an optional package a branch adds that
+  this machine would take: the worktree links, and the package is missing until a step installs it.
+- **A package main has and the branch dropped is not looked for.** The worktree links, so the dropped
+  package still resolves there and a test that needs it passes. Finding it would mean walking main's
+  whole tree.
+- **A version is compared, not contents.** A package main has at the lockfile's version is taken to be
+  it, wherever it was fetched from.
 - **A workspace bin has to be committed executable.** A linked `.bin` runs the worktree's file with the
   mode git gave it, whereas npm would chmod it at install. This repository's bins are `100755`.
 - **`.worktreeinclude` takes paths, not patterns.** Claude Code's reads gitignore patterns, but a glob
-  here is a path nothing has: it is skipped and named. Patterns would need
-  `git ls-files --others --ignored` and a matcher.
+  here is a path nothing has: it is skipped and named. A leading `/` is read as gitignore reads it, the
+  root of the repository. Patterns would need `git ls-files --others --ignored` and a matcher.
 - **Worktrees cut before this keep their link.** `provisionDeps` leaves a `node_modules` that is a link
   alone (`shared`), and nothing re-provisions a worktree after its cut.
 

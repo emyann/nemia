@@ -12,7 +12,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 'agent-engine';
 import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type Verdict } from './check.ts';
-import { depsPlan, inside, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Provisioned, type WorktreeInclude } from './deps.ts';
+import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 
 export { verdictWord } from './check.ts';
 export { artifactLines, outputLines } from './run.ts';
@@ -208,11 +208,50 @@ const NPM_CI_TIMEOUT_MS = 10 * 60_000;
 const execFileAsync = promisify(execFile);
 const lstatOf = (p: string) => fs.lstatSync(p, { throwIfNoEntry: false });
 
-/** Whether the worktree's `package-lock.json` says anything main's does not — one of them missing included. */
-function lockfileDiffers(mainRoot: string, worktree: string): boolean {
-  const read = (root: string) => { try { return fs.readFileSync(path.join(root, 'package-lock.json')); } catch { return null; } };
-  const [mine, mains] = [read(worktree), read(mainRoot)];
-  return mine === null || mains === null ? mine !== mains : !mine.equals(mains);
+/**
+ * Where the worktree's `package-lock.json` asks for a tree the main checkout does not have on disk, or
+ * null when links will do: `lockfileParting`, over a look at each package path the lockfile names.
+ *
+ * A main checkout with no `node_modules` has no tree to part from and none to link, so its lockfile is
+ * compared byte for byte instead, as before: a different one is installed in the worktree, and the same
+ * one leaves nothing to provision. A worktree without a lockfile parts only from a main checkout that
+ * has one — a repository without one is not npm's, and links are all there is.
+ */
+export function lockfileParts(mainRoot: string, worktree: string): string | null {
+  const read = (file: string): string | null => { try { return fs.readFileSync(file, 'utf8'); } catch { return null; } };
+  const wanted = read(path.join(worktree, 'package-lock.json'));
+  const mains = read(path.join(mainRoot, 'package-lock.json'));
+  if (wanted === null) return mains === null ? null : 'package-lock.json';
+  if (!fs.statSync(path.join(mainRoot, 'node_modules'), { throwIfNoEntry: false })?.isDirectory()) {
+    return wanted === mains ? null : 'package-lock.json';
+  }
+
+  let lock: unknown = null;
+  try { lock = JSON.parse(wanted); } catch { /* parts at package-lock.json */ }
+  const installed: Record<string, Installed | null> = {};
+  for (const key of Object.keys(lockfilePackages(lock) ?? {}).filter(isModuleKey)) {
+    const at = path.join(mainRoot, key);
+    const st = lstatOf(at);
+    if (!st) installed[key] = null;
+    else if (st.isSymbolicLink()) {
+      installed[key] = { link: true, resolved: path.relative(mainRoot, path.resolve(path.dirname(at), fs.readlinkSync(at))).split(path.sep).join('/') };
+    } else {
+      let version: string | undefined;
+      try { version = JSON.parse(fs.readFileSync(path.join(at, 'package.json'), 'utf8')).version; } catch { /* a package without a manifest has no version */ }
+      installed[key] = { link: false, version };
+    }
+  }
+  return lockfileParting(lock, installed);
+}
+
+/** Whether git ignores a path in a checkout. `git check-ignore` says no for a tracked path, and for one git has not been told to ignore. */
+function ignored(repo: string, rel: string): boolean {
+  try {
+    execFileSync('git', ['check-ignore', '-q', '--', rel], { cwd: repo, stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Main's `node_modules`, listed for `depsPlan`: names and link targets, nothing below a package. */
@@ -237,8 +276,8 @@ function listDeps(modules: string): DepsListing | null {
  * A worktree holds tracked files only, so without this a step that runs the tests fails on its first
  * command through no fault of its own. It used to be one link to the main checkout's whole tree, which
  * tested a branch against main's workspace packages and hid a dependency the branch added. Links cost no
- * install; when the worktree's `package-lock.json` differs from main's they would be the wrong tree, so
- * `npm ci` installs one here — about a minute, which the step is told (`depsLines`).
+ * install; when the worktree's `package-lock.json` asks for packages main has not installed they would be
+ * the wrong tree, so `npm ci` installs one here — about a minute, which the step is told (`depsLines`).
  *
  * Idempotent, so a pass that died halfway can run it again and a second call changes nothing: a tree npm
  * installed (it has `.package-lock.json`, which the plan never makes) is left alone, and so is a
@@ -251,7 +290,7 @@ export async function provisionDeps(mainRoot: string, worktree: string): Promise
   if (lstatOf(modules)?.isSymbolicLink()) return { tree: 'shared' };
   if (lstatOf(path.join(modules, '.package-lock.json'))) return { tree: 'own', installed: false };
 
-  if (lockfileDiffers(mainRoot, worktree)) {
+  if (lockfileParts(mainRoot, worktree)) {
     try {
       await execFileAsync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: worktree, timeout: NPM_CI_TIMEOUT_MS, maxBuffer: 64 * 1024 * 1024 });
       return { tree: 'own', installed: true };
@@ -288,10 +327,13 @@ function readInclude(repo: string): WorktreeInclude | null {
  * gitignored files a repository says a worktree needs, as Claude Code's `--worktree` does. Never
  * `node_modules`: `provisionDeps` makes that, and a copy would cost minutes per step.
  *
- * Read from the main checkout, never from the worktree a step can edit. Nothing already in the worktree
- * is overwritten, so a second pass copies nothing. What a person should hear comes back as lines for
- * the run's log, never as an error: a path the main checkout does not have is skipped, and one that
- * leads outside the repository — as written, or through a link — is refused.
+ * Read from the main checkout, never from the worktree a step can edit. Only a path git ignores there is
+ * copied, as Claude Code's file copies only ignored files: anything else lands in the worktree as an
+ * untracked file, and the hand-off's `git add -A` commits it onto the run's branch — a token in a notes
+ * file included. Nothing already in the worktree is overwritten, so a second pass copies nothing. What a
+ * person should hear comes back as lines for the run's log, never as an error: a path the main checkout
+ * does not have is skipped, and one that leads outside the repository — as written, or through a link —
+ * or that git does not ignore is refused.
  */
 function includeFiles(repo: string, worktree: string): string[] {
   const include = readInclude(repo);
@@ -304,6 +346,7 @@ function includeFiles(repo: string, worktree: string): string[] {
     let real: string;
     try { real = fs.realpathSync(from); } catch { absent.push(rel); continue; }
     if (!inside(root, real)) { notes.push(`.worktreeinclude: refused "${rel}" leads outside the repository`); continue; }
+    if (!ignored(repo, rel)) { notes.push(`.worktreeinclude: refused "${rel}" is not gitignored — the hand-off would commit it`); continue; }
     const to = path.join(worktree, rel);
     try {
       fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -391,7 +434,7 @@ async function workspaceFor(
   // After the merges, because the step works on the merged tree — its lockfile included.
   const notes = includeFiles(run.repo, workspace);
   const deps = await provisionDeps(run.repo, workspace);
-  if (deps.tree === 'own' && deps.installed) notes.push('node_modules: installed with npm ci — package-lock.json differs from the main checkout\'s');
+  if (deps.tree === 'own' && deps.installed) notes.push('node_modules: installed with npm ci — package-lock.json asks for packages the main checkout has not installed');
   if (deps.tree === 'failed') notes.push(`node_modules: not provisioned — ${deps.error.split('\n').at(-1)}`);
   return { workspace, branch, conflicted, deps, notes };
 }

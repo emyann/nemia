@@ -9,8 +9,8 @@
  *   main's packages: a branch's api change was tested against main's agent-workflows, and once main
  *   moved under the branch its check failed on tests it never touched. `depsPlan` gives the worktree
  *   a `node_modules` of its own made of links: a workspace package to the worktree's own copy, every
- *   other package to main's. When the branch's lockfile differs from main's, links would lie, and the
- *   runner runs `npm ci` instead.
+ *   other package to main's. When the branch's lockfile asks for a tree main has not installed, links
+ *   would lie, and the runner runs `npm ci` instead (`lockfileParting`).
  * - **`.worktreeinclude`**, the gitignored paths a repository says a new worktree needs, the file
  *   Claude Code's `--worktree` reads. `worktreeInclude` parses it.
  */
@@ -36,7 +36,7 @@ export type DepsAction = { kind: 'dir'; path: string } | { kind: 'link'; path: s
 export type Provisioned =
   /** Made from `depsPlan`: `made` is how many entries this call added, so 0 on a second call. */
   | { tree: 'linked'; made: number }
-  /** A tree npm installed here, because the lockfile differs from main's. `installed`: this call ran `npm ci`. */
+  /** A tree npm installed here, because the lockfile asks for one main has not installed. `installed`: this call ran `npm ci`. */
   | { tree: 'own'; installed: boolean }
   /** It could not be made: `npm ci` exited non-zero or timed out, or a link could not be written. */
   | { tree: 'failed'; error: string }
@@ -113,6 +113,55 @@ export function depsPlan(mainRoot: string, worktree: string, main: DepsListing):
   return actions;
 }
 
+/** A `packages` entry of a lockfile, as far as telling two trees apart needs. */
+type LockEntry = { version?: string; resolved?: string; link?: boolean; optional?: boolean };
+
+/** What the main checkout has on disk at a lockfile's package path: a link and where it leads, or a package and its version. */
+export type Installed = { link: true; resolved: string } | { link: false; version?: string };
+
+/** Whether a lockfile key names an installed package — `node_modules/a`, `node_modules/a/node_modules/b`, `apps/web/node_modules/c`. */
+export const isModuleKey = (key: string): boolean => key.startsWith('node_modules/') || key.includes('/node_modules/');
+
+/** A lockfile's `packages`, or null when it has none — which is to say, it is not a lockfile. */
+export const lockfilePackages = (lock: unknown): Record<string, LockEntry> | null => {
+  const packages = (lock as { packages?: unknown } | null)?.packages;
+  return packages && typeof packages === 'object' ? packages as Record<string, LockEntry> : null;
+};
+
+/**
+ * Where the tree a worktree's lockfile asks for parts from the tree the main checkout has installed: the
+ * first package path they disagree on, or null when links to main's tree give the worktree what its
+ * lockfile names.
+ *
+ * `installed` is what is on disk in the main checkout at each of the lockfile's package paths, read by
+ * the runner — not main's `package-lock.json`, and not npm's record of the tree either. The links point at
+ * what is on disk, a lockfile can be ahead of it (merged in, with no install since), and
+ * `npm install --package-lock-only` rewrites `node_modules/.package-lock.json` to name packages it did
+ * not install (npm 11.19, measured).
+ *
+ * A package parts when main does not have it, when one side is a link and the other is not, when a link
+ * leads elsewhere, or when the versions differ. So does one nested in a workspace's own `node_modules`,
+ * which links to main's root tree cannot give. An optional package main does not have is not a
+ * difference: it is a platform build this machine did not take, as all 84 of this repository's were at
+ * 2026-09-13. A package main has and the lockfile does not name is not looked for. A lockfile that did
+ * not parse parts at `package-lock.json`.
+ */
+export function lockfileParting(wanted: unknown, installed: Readonly<Record<string, Installed | null | undefined>>): string | null {
+  const want = lockfilePackages(wanted);
+  if (!want) return 'package-lock.json';
+  for (const [key, entry] of Object.entries(want)) {
+    if (!isModuleKey(key)) continue;
+    const there = installed[key];
+    if (!there) {
+      if (entry?.optional) continue;
+      return key;
+    }
+    if (!key.startsWith('node_modules/')) return key;
+    if (entry?.link ? !there.link || there.resolved !== entry.resolved : there.link || there.version !== entry?.version) return key;
+  }
+  return null;
+}
+
 /**
  * What a step is told of its `node_modules`, under `## Where to look` — only when the run did more than
  * link it: a tree of its own that `npm ci` took a minute to install, or one it could not make.
@@ -120,9 +169,9 @@ export function depsPlan(mainRoot: string, worktree: string, main: DepsListing):
 export function depsLines(deps: Provisioned | undefined): string[] {
   if (deps?.tree === 'own') {
     return [
-      'Its `node_modules` is its own: this branch\'s `package-lock.json` differs from the main checkout\'s, so the run',
-      'installed it with `npm ci` when it cut this worktree — about a minute before you started. `npm install` here',
-      'changes this tree and nobody else\'s.',
+      'Its `node_modules` is its own: this branch\'s `package-lock.json` asks for packages the main checkout has not',
+      'installed, so the run installed them with `npm ci` when it cut this worktree — about a minute before you',
+      'started. `npm install` here changes this tree and nobody else\'s.',
     ];
   }
   if (deps?.tree === 'failed') {
@@ -146,20 +195,23 @@ export type WorktreeInclude = {
 /**
  * Parse `.worktreeinclude`: one gitignored path per line, file or directory, relative to the repository
  * root. Blank lines and `#` comments are skipped. Paths, not patterns — a glob is a name nothing has.
+ * A leading `/` anchors a line at the root, as it does in the gitignore syntax of Claude Code's file:
+ * `/.env.local` is the repository's `.env.local`, never the machine's root.
  *
- * Refused by name: an absolute path, one that climbs out of the repository, the repository itself, and
- * `.git`, which in a worktree is a file git owns. Never copied: anything that is or is inside a
- * `node_modules`.
+ * Refused by name: a path on a drive (`C:\`), one that climbs out of the repository, the repository
+ * itself, and `.git`, which in a worktree is a file git owns. Never copied: anything that is or is
+ * inside a `node_modules`. Whether git ignores a path is a fact about the checkout, not the text, so the
+ * runner asks git at the cut.
  */
 export function worktreeInclude(text: string): WorktreeInclude {
   const out: WorktreeInclude = { copy: [], provisioned: [], refused: [] };
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
-    const rel = path.posix.normalize(line.replaceAll('\\', '/')).replace(/\/+$/, '');
+    const rel = path.posix.normalize(line.replaceAll('\\', '/').replace(/^\/+/, '') || '.').replace(/\/+$/, '');
     const segments = rel.split('/');
     const why =
-      path.posix.isAbsolute(line) || /^[A-Za-z]:[\\/]/.test(line) ? 'is absolute'
+      /^[A-Za-z]:[\\/]/.test(line) ? 'is absolute'
       : rel === '..' || rel.startsWith('../') ? 'is outside the repository'
       : rel === '.' || rel === '' ? 'is the repository itself'
       : segments[0] === '.git' ? 'is git\'s own'

@@ -11,6 +11,7 @@ wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
 wf decide r-xyz      # what it produced, and the choice it leaves you
 wf retry r-xyz implement --recheck   # its check was killed before it finished: run it again
+wf round r-xyz       # the review still asks for more after the last round it allows: once more
 ```
 
 To follow it live, use the engine rather than this package — a run's task ids carry the run and the
@@ -29,7 +30,8 @@ that has to be installed before you can see anything. Moving it down made the se
 
 **A workflow orders steps and hands them a workspace. Anything that decides *whether the work is
 good* belongs in a step, not here.** That is the same line the engine draws one layer down, and it
-is why there is no condition, loop or expression in the format.
+is why there is no condition or expression in the format — and why its one loop turns on a step's
+word, not on a keyword.
 
 Definition of done — a closed list, so there is a finish line:
 
@@ -43,8 +45,9 @@ Definition of done — a closed list, so there is a finish line:
       exit code, not the agent's word, decides whether what follows is filed.
 - [x] **declared outputs** — a step's `output:` schema adds fields to its closeout, and a step that
       names it in `input:` is handed those fields as data. The review travels this way, not as a file.
-- [ ] **rounds** — `after` is a DAG and cannot loop, so a second round is a *new run* over the same
-      worktree, started by the decider. That keeps rounds countable and deliberate.
+- [x] **rounds** — `loop:` on a step runs an earlier step again while the step's closeout says
+      `again: true`, at most `rounds:` times, then a person, whose `wf round` is the once more.
+      `after` stays a DAG: a round is one more try of the steps the run already has, counted.
 - [x] **the splitter** — `wf-examples/split` proposes parts that touch disjoint files, and is
       allowed to answer "these cannot be split, run them in sequence".
 
@@ -66,18 +69,20 @@ Review the changes on this branch. Be specific about correctness, not style.
 ```
 
 A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `permissionMode`,
-`deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output` — and a key the parser does not know is
-refused by name before anything is spent, as is a value it cannot use (`src/workflow.ts`). `tools`,
-`effort` and `guide` are refused with reasons of their own.
+`deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`, `rounds` — and a key the parser
+does not know is refused by name before anything is spent, as is a value it cannot use
+(`src/workflow.ts`). `tools`, `effort` and `guide` are refused with reasons of their own.
 
-**No key is control flow.** No conditions, no loops, no expressions, no templating. That is the
-design, not a missing feature.
+**No key is control flow.** No conditions, no expressions, no templating, and no loop a keyword
+decides. That is the design, not a missing feature.
 
 The interesting decisions in this kind of work — *is this good enough*, *did it do what was asked*
 — are not predicates a workflow language could evaluate. They are judgements, and a judgement
 belongs to a step with an agent in it. **The workflow is a team, not a program.** The prose is the
 logic: `after` orders, `resume` continues, `check` measures, `retries` counts, `output` declares and
-`input` reads, and the rest say who does the work and for how long.
+`input` reads, `loop` is the edge back and `rounds` counts it, and the rest say who does the work and
+for how long. Whether the work goes round again is still a judgement: the looping step's own `again`
+(*Going round again*, under the check).
 
 `permissionMode` is the harness's word, checked against the harness the step runs on. On codex,
 `read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
@@ -93,6 +98,8 @@ it is between two engineers. A later step is told:
 - **the original request** (the spec — you cannot judge completeness without it)
 - where to look: `git diff <baseRef>`, and who was there before it
 - what a step it waits on declared in its closeout — **only if it asks**, with `input:` (below)
+- in a round of a loop, what the loop hands on: the reviewer's findings to the step it loops back to,
+  and that step's replies to the next reviewer (*Going round again*)
 
 And deliberately **not** told: the previous step's transcript, reasoning, or self-assessment.
 
@@ -105,7 +112,7 @@ say something to the next one writes a file, deliberately, like a person would �
 
 ### Declared output: `output:` and `input:`
 
-Two keys, neither control flow — one declares, one reads. This repository's review and reply:
+Two keys, neither control flow — one declares, one reads. `workflows/ui/`'s review and its reply:
 
 ```md
 ---
@@ -119,12 +126,12 @@ Review the change in this workspace as a second engineer would. …
 
 ```md
 ---
-after: review
+after: review, look
 resume: implement
-input: review
-check: npm test && npm run typecheck
+input: review, look
+check: npm test && npm run typecheck && npm run build && npm run e2e
 ---
-A second engineer has reviewed your change. Their findings are below, under *From review* …
+Two reviewers have been through your change. One read the code: its findings are below, under *From review* …
 ```
 
 - **`output: <file>`** names a JSON Schema beside the step, relative to the workflow folder. `wf start`
@@ -147,14 +154,16 @@ process does not* was written against handing the implementer's account to the r
 output is an artifact: the step's deliberate product, exactly what `REVIEW.md` used to be. What
 changed is the transport, not the rule. The summary still goes to the person who decides and nowhere
 else. Nothing from any step's closeout reaches a step that did not ask for it. `implement` declares
-nothing and `review` reads nothing, so the reviewer judges the diff.
+nothing and `review` reads nothing, so the reviewer judges the diff — and in a round, it is handed
+implement's replies to the last findings and nothing else, because its own `loop:` asked for them.
 
 The transport buys three things. The reviewer writes nothing, so it runs `permissionMode: read-only`.
 The harness enforces the review's shape. And the review lives on the engine's record of the attempt,
 not on a branch, so `git branch -D` no longer deletes the only copy. `wf decide` prints a declared
 output after the step's summary: `findings` as a list, any other field as `name: value`. A step that
-wants a file for a person still writes one. `respond` writes `RESPONSE.md`, because a reply is for
-the person who decides.
+wants a file for a person still writes one: `workflows/ui/respond.md` writes `RESPONSE.md`, because a
+reply is for the person who decides. In `workflows/`, implement's replies travel on its closeout
+instead, to the next reviewer and to `wf decide`.
 
 ## It works, and here is the run that proved it
 
@@ -396,8 +405,8 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
 
-This repository's own `workflows/implement.md` and `workflows/respond.md` carry
-`check: npm test && npm run typecheck` — the check a person used to run by hand at every trial merge.
+This repository's own `workflows/implement.md` carries `check: npm test && npm run typecheck` — the
+check a person used to run by hand at every trial merge — and every round of it is checked again.
 `workflows/ui/`, for a change to the web app, adds `npm run build && npm run e2e`. Point the folder at
 another repository and change that line.
 
@@ -412,13 +421,14 @@ another repository and change that line.
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
 | `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
+| `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, below |
 | `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** — unless it is tried again, below |
 | `failed`, `stopped` | the engine's verdict on the step's own task | **never runs** |
 
-`→ waiting on you` names every step that is blocked, unsigned or refused by its check, and has no try
-due. `wf decide` prints `FAILED CHECK:`, `CHECK DID NOT FINISH:`, `UNSIGNED:` and `UNVERIFIED:` first,
-then each check's command and exit code and, for a check that refused, the last 20 lines of stdout and
-of stderr.
+`→ waiting on you` names every step that is blocked, unsigned, refused by its check or out of rounds,
+and has no try or round due. `wf decide` prints `FAILED CHECK:`, `CHECK DID NOT FINISH:`, `UNSIGNED:`,
+`UNVERIFIED:` and `ROUNDS EXHAUSTED` first, then each check's command and exit code and, for a check
+that refused, the last 20 lines of stdout and of stderr.
 
 **`unsigned` blocks every `claude-detached` step** until engine open issue 4 is fixed: that harness
 never hands the closeout schema on, so its steps never sign off. `claude` and `codex` steps do.
@@ -473,6 +483,69 @@ retries: 1
 
 This repository's workflows declare no `retries:`. A flaky suite would spend a whole session on a nudge, so
 whether a refusal is the agent's to answer or a person's is left to each workflow's author.
+
+### Going round again: `loop:` and `rounds:`
+
+The shipped workflow used to be implement, review, respond, and then a person read the reply beside
+the findings. When the reply changed code, nobody reviewed the change; when a finding was wrong, the
+argument reached the person cold. The edge back closes that: implement ⇄ review until the reviewer says
+the change is done, at most a few rounds — more is the sign of a design question or a decision — then a
+person.
+
+```md
+---
+harness: codex
+after: implement
+permissionMode: read-only
+output: review.schema.json   # findings, and again: boolean
+loop: implement
+rounds: 3
+---
+```
+
+- **`loop: <step>`** names a step this one waits on, through `after`, to run again. **`rounds: N`**
+  caps the rounds, the first included, and is 3 when it does not say. The looping step's `output:`
+  must declare `again` as a boolean.
+- **The judgement stays the reviewer's.** When the looping step is verified — or unverified, with no
+  check — and its closeout says `again: true` with rounds left, the next tick files a round: the target
+  again, its last session continued and handed what the looping step declared, as data, under *From
+  review* — the findings, never `again` or the summary. Then every step between them, then the looping
+  step, each a new session. `again: false` lets what waits on the looping step start, or ends the run
+  succeeded. It is the rule `blocked` already follows: an agent's word the run routes on, and a count,
+  with no condition and no expression.
+- **The loop contract is the run's, not the folder's.** The target is told `respond.md`'s three honest
+  answers: fix it; say why not, in `replies`, which the run adds to its closeout from round 2 (`fixed`
+  or `won't fix`, and why) and hands the next reviewer as data, under *Replies from implement*; or
+  sign off `blocked`, which stops the run for a person. A target that answers nothing is `unsigned`.
+  The looping step is told, every round, what its `again` does and which round it is. A new session of
+  the target within a round — `wf retry --fresh`, or a nudge with no session left to continue — is
+  handed the round's contract and findings again, off the looping step's try that asked for the round.
+- **At the cap, a person.** `again: true` on the last round files nothing: the step reads
+  `rounds exhausted`, nothing that waits on it runs, and `wf decide` says `ROUNDS EXHAUSTED`, prints
+  the last findings and offers `wf round <run>` — the person's once more. Like `wf retry`, it writes an
+  ask, `runs/<id>.asks/round-<step>-<n>`, which the next tick honours once. It is refused while a round
+  is running, while the run would go round itself, on a loop that ended with `again: false`, on a
+  step of the loop that stopped (that is `wf retry`'s), and on a cancelled run.
+- **A round is a try.** Each step of the loop moves its current try behind it with `then: 'round'`, so
+  `steps[name].taskId` and `.check` stay the current try's and ids stay `<run>-<step>-try<n>`. A pass
+  that files a round and dies before writing the record is adopted by the next, as a try is. `wf ls`
+  says `round 2 of 3` beside each step of the loop, and `round 2 of 3 due` while the next tick has it
+  to file.
+- **A loop is a chain.** At load the run refuses a `loop:` that names no step this one waits on, a
+  looping step without a boolean `again`, `rounds:` without `loop:`, a step in the loop that forks or
+  merges a worktree of its own (cut once, off round 1's branch, it would judge work that is no longer
+  the change), a step in it that `resume:`s, a step in two loops, and a target whose `output:` already
+  declares `replies`.
+
+**`retries:` and `loop:` answer different questions.** `retries:` is the run's answer to a *check*
+refusing one step: that step again, nudged with what the check said, because the work did not pass.
+`loop:` is the answer to a *reviewer* asking for more: an earlier step again, handed the findings, then
+the steps back to the reviewer, because the work passed and a second engineer is not done with it. A
+check that refuses the target inside a round is still `retries:`'s, and `retries:` counts within a
+round: a round is new work, and its check may refuse it afresh.
+
+This repository's `workflows/` is implement ⇄ review: `review.md` loops back to `implement` with
+`rounds: 3`. `respond.md` is gone, and its three answers are the loop contract.
 
 ## A step's files: `runs/<id>/artifacts/<step>/`
 
@@ -683,8 +756,8 @@ holding a concurrency slot forever.
 
 | file | |
 |---|---|
-| `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a cycle, a dangling `after`, a loose `output:` schema, or an `input:` on work that has not finished |
-| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check or another try, blocked, done — and what a step is told, `## From <step>` and `## Try <n>` included |
+| `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run |
+| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — and what a step is told, `## From <step>`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/runner.ts` | the I/O: run store, git worktree and what it is given, and the engine |

@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifactFiles, artifactLines, artifacts, artifactsDir, cancel, decide, diffStat, dueNote, engine, list, listRuns, missingArtifacts, outputLines, readArtifact, readRun, resultBranches, retry, start, stepsOf, tick, tryNote, verdictWord, type RetryMode } from './runner.ts';
+import { artifactFiles, artifactLines, artifacts, artifactsDir, cancel, decide, diffStat, dueNote, engine, list, listRuns, missingArtifacts, outputLines, owedFields, readArtifact, readRun, resultBranches, retry, round, roundDueNote, start, stepsOf, tick, tryNote, verdictWord, type RetryMode } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -18,28 +18,31 @@ const HELP = `wf — run a workflow of agent steps
                                --nudge (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
                                --recheck runs its check again, and files no session
+  wf round <runId> [<step>]    once more: a loop out of rounds goes round again, once, on the
+                               next tick — the step it loops to continued, then a new reviewer
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
 
 A workflow is a folder of markdown files. One file is one step:
 
     ---
-    harness: claude       # claude (default) | codex | claude-detached
-    after: review         # what must finish first: verified, or unverified if it has no check
-    input: review         # handed what review's closeout declares with output:, as data
-    check: npm test       # the run executes it in the step's workspace; exit 0 files what follows
+    harness: codex        # claude (default) | codex | claude-detached
+    after: implement      # what must finish first: verified, or unverified if it has no check
+    output: review.json   # what its closeout declares for a later step: a JSON Schema beside it
+    loop: implement       # again: true in its closeout runs implement again, then this step
+    rounds: 3             # at most this many rounds (3 unless set), then a person decides
     ---
-    Answer each finding the review hands you, in RESPONSE.md.
+    Review the change in this workspace as a second engineer would.
 
 No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, \`retries\` counts the
 tries the run may re-file a step its check refused, \`output\` declares what a closeout says for a later
-step (a JSON Schema beside the step) and \`input\` reads it, and the rest (model, permissionMode,
-deadlineSeconds, maxAttempts) say who does the work and for how long. Everything else the agent is
-told is prose.
+step and \`input\` reads it, \`loop\` is the edge back and \`rounds\` counts it — whether to go round is the
+step's own \`again\` — and the rest (model, permissionMode, deadlineSeconds, maxAttempts) say who does
+the work and for how long. Everything else the agent is told is prose.
 
   wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
   · unverified (no check: declared) · unsigned (ended without its closeout, or without a field its
-  output: declares) · BLOCKED.
+  output: declares) · BLOCKED · rounds exhausted (asked for another round on the last).
 
   WF_ROOT            where runs and the engine's board live
   WF_MAX_CONCURRENT  sessions per harness at once (default 2)
@@ -100,9 +103,10 @@ export async function main(argv: string[]): Promise<void> {
       for (const r of results) {
         const filed = r.filed.length ? `  filed: ${r.filed.join(', ')}` : '';
         const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
+        const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
         const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
         const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
-        console.log(`${r.run.id}  ${r.status}${filed}${tried}${checked}${blocked}`);
+        console.log(`${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}`);
         for (const note of r.notes) console.log(`   ${note}`);
       }
       return;
@@ -116,6 +120,7 @@ export async function main(argv: string[]): Promise<void> {
           for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
           if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
           if (r.tried.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  tried again ${r.tried.join(', ')}`);
+          if (r.looped.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  round again ${r.looped.join(', ')}`);
           if (r.checked.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  checking ${r.checked.join(', ')}`);
         }
         await new Promise((r) => setTimeout(r, every));
@@ -166,7 +171,7 @@ export async function main(argv: string[]): Promise<void> {
     // and does not decide anything itself.
     case 'decide': {
       if (!rest[0]) return console.log(HELP);
-      const { run, decision, closeouts, checks, retrying, offers } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers } = await decide(e, rest[0]);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
       const steps = stepsOf(run);
 
@@ -175,6 +180,8 @@ export async function main(argv: string[]): Promise<void> {
         console.log(`${head}\n\n  still running: ${decision.waiting.join(', ')}`);
         // A try the next tick files is why a run that had stopped is running again: said, with whose word it is.
         for (const r of retrying) console.log(`  ${r.step}: ${dueNote(steps.find((s) => s.name === r.step)!, run, r)}`);
+        // So is a loop going round again.
+        for (const r of rounding) console.log(`  ${r.step}: ${roundDueNote(steps, r)}`);
         return console.log('  nothing to decide yet');
       }
       if (decision.kind === 'shipped') return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}`);
@@ -189,9 +196,11 @@ export async function main(argv: string[]): Promise<void> {
       // A step that stopped itself and said why is a different thing from one that broke, and the
       // difference decides whether you read a summary or a log.
       if (decision.stuck.length) console.log(`  BLOCKED, waiting on you: ${decision.stuck.join(', ')}`);
+      // A reviewer still asking after the rounds its workflow allows is the sign of a design question or a decision, and it is yours.
+      if (decision.exhausted.length) console.log(`  ROUNDS EXHAUSTED, waiting on you: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
-      // What a person can do about a step short of starting over: try it again, the way that fits why it stopped.
-      if (offers.length) console.log(`\n  try again, once, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
+      // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.
+      if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
 
       // Each step's own closeout: the summary is written FOR this moment. The reviewer never saw
       // it — that is the point of the field — and you are the audience it was addressed to. Above it,
@@ -204,8 +213,8 @@ export async function main(argv: string[]): Promise<void> {
         if (!c && !check) continue;
         const blocked = c && !('error' in c) && c.outcome === 'blocked';
         const step = steps.find((s) => s.name === name);
-        // The try whose closeout and check these are, when it is not the first.
-        const tried = step ? tryNote(step, run.steps[name]) : '';
+        // The try — and the round — whose closeout and check these are, when it is not the first.
+        const tried = step ? tryNote(step, run.steps[name], steps) : '';
         console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}${tried ? `  (${tried})` : ''}`);
         if (check) {
           console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
@@ -218,7 +227,8 @@ export async function main(argv: string[]): Promise<void> {
         if (!c) continue;
         if ('error' in c) { console.log(`    closeout unreadable — ${c.error}`); continue; }
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
-        for (const line of step ? outputLines(step, c) : []) console.log(`    ${line}`);
+        // What it declared — and, for a loop's target past its first round, its replies to the findings.
+        for (const line of step ? outputLines(step, c, owedFields(step, run, steps)) : []) console.log(`    ${line}`);
         if (c.needs) console.log(`    needs: ${c.needs}`);
         // What it declared that is not where it says, then what is in the directory the run made for its
         // files: the screenshots a UI step's check took, say, which are on no branch.
@@ -266,6 +276,19 @@ export async function main(argv: string[]): Promise<void> {
       const { ask, file } = await retry(e, runId, stepName, retryHow(rest.slice(2)));
       const how = ask.model ? `--model ${ask.model}` : `--${ask.mode}`;
       console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how}) — the next tick files it, once`);
+      console.log(`   ${file}`);
+      return;
+    }
+
+    // A person's "once more" for a loop whose rounds are spent. Like `wf retry`, it writes the ask and nothing else: the tick honours it once.
+    case 'round': {
+      const [runId, stepName, ...extra] = rest;
+      if (!runId || runId.startsWith('--')) return console.log(HELP);
+      if (extra.length || stepName?.startsWith('--')) {
+        usage('wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>].');
+      }
+      const { ask, file } = await round(e, runId, stepName);
+      console.log(`${runId}  asked: round ${ask.round} of ${ask.step}'s loop — the next tick files it, once`);
       console.log(`   ${file}`);
       return;
     }

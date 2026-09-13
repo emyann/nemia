@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, decide, list, markCancelled, missingArtifacts, readRun, retry, start } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, decide, list, markCancelled, missingArtifacts, readRun, retry, round, start } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -1008,4 +1008,229 @@ test('`wf retry` takes one way to try, and `--model` with a name — anything el
   ] as const) {
     await assert.rejects(main(['retry', 'no-such-run', 'implement', ...flags]), refusedWith(pattern), flags.join(' '));
   }
+});
+
+// ─── going round again, at shipped defaults ─────────────────────────────────
+
+/** `findings` and `again`, as `workflows/review.schema.json` declares them. */
+const LOOPING = { ...FINDINGS, properties: { ...FINDINGS.properties, again: { type: 'boolean' } }, required: ['findings', 'again'] };
+
+/** implement, checked → review, looping back to it with `rounds:` at its default unless `reviewKeys` say — the shape `workflows/` ships. */
+const looped = (reviewKeys = '') => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), `---\nafter: implement\noutput: review.schema.json\nloop: implement\n${reviewKeys}---\nreview it\n`);
+  fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(LOOPING, null, 2));
+  return dir;
+};
+const REPLIES = [{ finding: 'src/flag.ts:12', answer: 'fixed', why: 'the flag is parsed before it is read' }];
+const reviewSays = (again: boolean) => ({ ...SIGNED, summary: 'REVIEWER-SUMMARY', findings: FOUND, again });
+const ANSWERED = { ...SIGNED, summary: 'IMPLEMENTER-SUMMARY', replies: REPLIES };
+/** A step's task on round `n`: its first try's id, then its try's. */
+const onRound = (id: string, step: string, n: number) => (n === 1 ? `${id}-${step}` : `${id}-${step}-try${n}`);
+
+/**
+ * Round `n` up to review's word: implement's try signs off — answering, past round 1 — and its check is filed and passes, then review is
+ * filed and signs off saying `again`. The pass that reads that word is the caller's.
+ */
+const toReview = async (b: ReturnType<typeof board>, id: string, n: number, again: boolean) => {
+  b.settle(onRound(id, 'implement', n), 'succeeded', n === 1 ? SIGNED : ANSWERED);
+  assert.deepEqual((await advance(b.e, readRun(id))).checked, ['implement'], `round ${n}: implement's check`);
+  b.settle(`${onRound(id, 'implement', n)}-check`, 'succeeded', undefined, 0);
+  assert.deepEqual((await advance(b.e, readRun(id))).filed, ['review'], `round ${n}: review`);
+  b.settle(onRound(id, 'review', n), 'succeeded', reviewSays(again));
+};
+const roundAsksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('round-')) : []);
+/** The JSON under a brief's `heading`. */
+const dataUnder = (brief: string, heading: string) => JSON.parse(new RegExp(`${heading}\\n[\\s\\S]*?\\n\`\`\`json\\n([\\s\\S]*?)\\n\`\`\``).exec(brief)![1]!);
+
+test('implement ⇄ review: `again: true` files round 2 — implement continued as -try2, handed the findings and not the summary; review a new session as -try2, handed the replies — and `again: false` ends the run', async () => {
+  const run = started(looped());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  const pass = await advance(b.e, readRun(run.id));
+  const try2 = `${run.id}-implement-try2`;
+  assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.status], [['review'], [], [], 'running']);
+  assert.ok(pass.notes.includes('review: round 2 — again, rounds: 3; implement goes again'), pass.notes.join('\n'));
+
+  const spec = b.tasks.get(try2)!.spec;
+  assert.deepEqual({ resumeFrom: spec.resumeFrom, cwd: spec.cwd }, { resumeFrom: `native-${run.id}-implement`, cwd: run.repo }, "implement's own session, continued");
+  assert.match(spec.brief, /^## Round 2 of 3\n/);
+  assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
+  assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|"again"/);
+  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+  assert.deepEqual(readRun(run.id).steps, {
+    implement: { taskId: try2, workspace: run.repo, branch: run.branch, tries: [{ taskId: `${run.id}-implement`, check: { taskId: `${run.id}-implement-check` }, then: 'round' }] },
+    review: { taskId: null, workspace: run.repo, branch: run.branch, tries: [{ taskId: `${run.id}-review`, then: 'round' }] },
+  });
+  assert.deepEqual((await list(b.e, readRun(run.id))).steps.map((s) => [s.name, s.note]), [['implement', 'round 2 of 3'], ['review', 'round 2 of 3']]);
+  await advance(b.e, readRun(run.id));
+  assert.equal(b.filings.filter((f) => f === try2).length, 1, 'filed once, however many passes');
+
+  await toReview(b, run.id, 2, false);
+  const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
+  assert.equal(review2.resumeFrom, undefined, 'the reviewer is a new session each round');
+  assert.match(review2.brief, /^review it\n\n## What was asked for\n\nadd a flag/);
+  assert.deepEqual(dataUnder(review2.brief, '## Replies from implement'), { replies: REPLIES });
+  assert.doesNotMatch(review2.brief, /IMPLEMENTER-SUMMARY|REVIEWER-SUMMARY/);
+
+  const last = await advance(b.e, readRun(run.id));
+  assert.deepEqual([last.looped, last.filed, last.status], [[], [], 'succeeded']);
+  assert.deepEqual(b.filings, [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`, try2, `${try2}-check`, `${run.id}-review-try2`]);
+  const { decision: d, closeouts } = await decide(b.e, run.id);
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted], ['succeeded', []]);
+  assert.deepEqual((closeouts.implement as { output?: object }).output, { replies: REPLIES }, "what decide prints beside the review's findings");
+});
+
+test("REFUSED at the cap, at shipped defaults: `again: true` on round 3 files nothing, reads exhausted and waits on you — and `wf round` takes it once more, once", async () => {
+  const run = started(looped());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  for (const n of [1, 2]) {
+    await toReview(b, run.id, n, true);
+    assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review'], `round ${n + 1}`);
+  }
+  await toReview(b, run.id, 3, true);
+  const filed = [...b.filings];
+  for (let i = 0; i < 3; i++) {
+    const pass = await advance(b.e, readRun(run.id));
+    assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.checked, pass.status], [[], [], [], [], 'failed'], `pass ${i + 1}`);
+  }
+  assert.deepEqual(b.filings, filed, 'nothing filed at the cap');
+  const l = await list(b.e, readRun(run.id));
+  assert.deepEqual([l.steps[1]!.status, l.steps[1]!.note, l.waitingOnYou], ['rounds exhausted', `round 3 of 3, and it asked again — once more: wf round ${run.id} review`, ['review']]);
+  const { decision: d, offers, closeouts } = await decide(b.e, run.id);
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.failed], ['blocked', ['review'], []]);
+  assert.deepEqual(offers, [`review: it asked for round 4, and \`rounds: 3\` are spent. Its findings are below. Once more — implement continued, then a new review:  wf round ${run.id} review`]);
+  assert.deepEqual((closeouts.review as { output?: object }).output, { findings: FOUND, again: true }, 'the last findings, for decide to print');
+
+  // A person's once more: an ask, written whole, and no record.
+  const { ask, file } = await round(b.e, run.id);
+  assert.equal(file, path.join(asksDir(run.id), 'round-review-4'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), ask);
+  assert.deepEqual([ask.step, ask.round, readRun(run.id).steps.implement?.taskId], ['review', 4, `${run.id}-implement-try3`], 'the verb writes no record');
+  await assert.rejects(round(b.e, run.id), refusedWith(/^round 4 of review's loop is already asked for/));
+  assert.match((await list(b.e, readRun(run.id))).steps[1]!.note ?? '', /^round 4 asked \(wf round\) — the next tick files implement/);
+
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual(pass.looped, ['review']);
+  assert.match(b.tasks.get(`${run.id}-implement-try4`)!.spec.brief, /^## Round 4, past rounds: 3\n\nreview asked for another round after the 3 its `rounds:` allows, and a person said once more/);
+  assert.deepEqual(roundAsksOf(run.id), [], 'consumed');
+  assert.ok(fs.existsSync(path.join(asksDir(run.id), 'done', 'round-review-4')), 'moved whole');
+  await assert.rejects(round(b.e, run.id), refusedWith(/^round 4 of review's loop is still running/));
+
+  // A pass that filed the round and wrote the record, and died before consuming the ask: the ask is spent, and files nothing.
+  fs.copyFileSync(path.join(asksDir(run.id), 'done', 'round-review-4'), file);
+  const again = await advance(b.e, readRun(run.id));
+  assert.deepEqual([again.looped, again.filed, roundAsksOf(run.id)], [[], [], []]);
+  assert.equal(b.filings.filter((f) => f === `${run.id}-implement-try4`).length, 1);
+});
+
+test('`wf round` refuses a round still running, a round the run files itself and a cancelled run — exit 2, and no ask written', async () => {
+  const run = started(looped('rounds: 1\n'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await assert.rejects(round(b.e, run.id), refusedWith(/^round 1 of review's loop is still running, so there is nothing to go round again until it ends/));
+  assert.deepEqual(roundAsksOf(run.id), []);
+
+  const more = started(looped());
+  const m = board();
+  await advance(m.e, readRun(more.id));
+  await toReview(m, more.id, 1, true);
+  await assert.rejects(round(m.e, more.id), refusedWith(/^the run goes round again itself: review asked for another round, and `rounds: 3` has 2 left/));
+  assert.deepEqual(roundAsksOf(more.id), []);
+
+  // `rounds: 1`: round 1 is the last, so review is out of rounds — and then the run is called off.
+  await toReview(b, run.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, []);
+  markCancelled(run.id);
+  await assert.rejects(round(b.e, run.id), refusedWith(/was cancelled at .*a round would never be honoured/));
+  await assert.rejects(round(b.e, run.id, 'review'), refusedWith(/was cancelled at /));
+  assert.deepEqual(roundAsksOf(run.id), []);
+
+  const { main } = await import('../src/cli.ts');
+  await assert.rejects(main(['round', 'no-such-run', 'review', 'again']), refusedWith(/^wf round takes the run and, when the run has more than one loop, the step/));
+});
+
+test('a pass that filed a round and died before writing the run down is adopted, never filed twice — and a run cancelled in that window stops it', async () => {
+  const run = started(looped());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  const before = readRun(run.id);
+  await advance(b.e, readRun(run.id));   // files round 2…
+  writeRun(before);                      // …and, as far as the record knows, never did
+  const try2 = `${run.id}-implement-try2`;
+
+  const again = await advance(b.e, readRun(run.id));
+  assert.deepEqual(again.looped, [], 'adopted before the pass assessed anything, so there was nothing left to file');
+  assert.equal(b.filings.filter((f) => f === try2).length, 1);
+  const record = readRun(run.id).steps;
+  assert.deepEqual([record.implement?.taskId, record.review?.taskId, record.review?.tries?.map((t) => t.then)], [try2, null, ['round']]);
+
+  // The same window, and the run called off in it.
+  writeRun(before);
+  b.settle(try2, 'running');
+  const { plan } = await cancel(b.e, run.id);
+  assert.deepEqual(plan, { kind: 'cancel', stop: [{ name: 'implement', taskId: try2 }] }, 'the verb finds it');
+  assert.equal(readRun(run.id).steps.implement?.taskId, `${run.id}-implement`, 'and does not write the run to do so');
+  await advance(b.e, readRun(run.id));
+  assert.deepEqual(b.stopped, [try2, try2], 'and so does every pass');
+  assert.equal(b.filings.filter((f) => f === try2).length, 1);
+});
+
+test('the shipped workflow goes round as its folder says: review filed read-only on codex, asked for `again` and told its round — implement filed as round 2 asked for `replies`, and checked', async () => {
+  const run = started(path.join(import.meta.dirname, '..', 'workflows'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  const review = b.tasks.get(`${run.id}-review`)!.spec;
+  assert.deepEqual([review.harness, review.permissionMode], ['codex', 'read-only']);
+  assert.deepEqual((review.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'findings', 'again']);
+  assert.match(review.brief, /\n## Round 1 of 3\n\nThis step closes a loop \(`loop: implement`\)/);
+
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  const implement = b.tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.deepEqual((implement.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+  assert.match(implement.brief, /^## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*[\s\S]*## Before you sign off\n[\s\S]*`npm test && npm run typecheck`/);
+});
+
+test('a round ask file the run cannot read is not honoured, and not touched: the pass says so, and files nothing', async () => {
+  const run = started(looped('rounds: 1\n'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, [], 'out of rounds, on the first');
+  fs.mkdirSync(asksDir(run.id), { recursive: true });
+  fs.writeFileSync(path.join(asksDir(run.id), 'round-review-2'), 'once more, please');
+  fs.writeFileSync(path.join(asksDir(run.id), 'round-review-3'), '[]');
+  const filed = b.filings.length;
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual(pass.looped, []);
+  assert.ok(pass.notes.some((n) => /round-review-2: unreadable .* so it is not honoured — remove it, and ask with wf round/.test(n)), pass.notes.join('\n'));
+  assert.ok(pass.notes.some((n) => /round-review-3: it is not an ask wf round wrote, so it is not honoured/.test(n)), pass.notes.join('\n'));
+  assert.deepEqual(roundAsksOf(run.id), ['round-review-2', 'round-review-3']);
+  assert.equal(b.filings.length, filed);
+});
+
+test("REFUSED before the fix, now handed: a fresh try of implement inside round 2 gets the round's findings off review's try that asked — review's own place is unfiled — and owes replies to them", async () => {
+  const run = started(looped());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  b.settle(`${run.id}-implement-try2`, 'succeeded', { ...SIGNED, summary: 'IMPLEMENTER-SUMMARY' });   // signed, and answered nothing
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.checked, pass.blocked], [[], ['review']]);
+  assert.match((await list(b.e, readRun(run.id))).steps[0]!.status, /^unsigned/);
+
+  await retry(b.e, run.id, 'implement', { mode: 'fresh' });
+  assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['implement']);
+  const spec = b.tasks.get(`${run.id}-implement-try3`)!.spec;
+  assert.equal(spec.resumeFrom, undefined, 'a new session');
+  assert.match(spec.brief, /\n## Try 3\n[\s\S]*\n## Round 2 of 3\n[\s\S]*\*\*Say why not\.\*\*/);
+  assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
+  assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|IMPLEMENTER-SUMMARY/);
+  assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
 });

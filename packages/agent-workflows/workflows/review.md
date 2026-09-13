@@ -1,11 +1,14 @@
 ---
 harness: codex
 after: implement
-# The review travels as this step's closeout — `findings`, in the shape review.schema.json declares —
-# and respond is handed it with `input: review`. Nothing is written to the workspace, so the reviewer
-# reads and does not edit.
+# The review travels as this step's closeout — `findings` and `again`, in the shape review.schema.json declares.
+# `again: true` sends the change round again (`loop: implement`): implement's own session is continued and handed
+# the findings as data, then this step reviews again, a new session — at most `rounds: 3`, then a person decides.
+# Nothing is written to the workspace, so the reviewer reads and does not edit.
 permissionMode: read-only
 output: review.schema.json
+loop: implement
+rounds: 3
 ---
 Review the change in this workspace as a second engineer would.
 

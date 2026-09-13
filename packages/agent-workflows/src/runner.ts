@@ -15,11 +15,11 @@ import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdo
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 
 export { verdictWord } from './check.ts';
-export { artifactLines, dueNote, outputLines, tryNote } from './run.ts';
-export type { Retry, RetryAsk, RetryMode } from './run.ts';
+export { artifactLines, dueNote, outputLines, owedFields, roundDueNote, tryNote } from './run.ts';
+export type { Retry, RetryAsk, RetryMode, Round, RoundAsk } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
 import { artifactPlace, type ArtifactFile } from './run.ts';
-import { assess, cancelPlan, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, parseCloseout, retriesDue, retryLines, retryRefusal, spentAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryMode, type Run, type TaskPhase } from './run.ts';
+import { askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryMode, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -86,27 +86,47 @@ export const markCancelled = (id: string): string => {
  * moves the file into `done/` — consumed, never edited. Naming the try is what makes an ask honoured once: a
  * pass that dies after filing the try and before consuming the ask files nothing more, because the next pass
  * finds the try on the board (`adoptTries`) or on the record (`spentAsks`).
+ *
+ * `wf round` is the same, in `round-<step>-<n>`: the looping step, and the round it asks for (`adoptRounds`, `spentRoundAsks`).
  */
 const asksDir = (id: string) => path.join(runsDir(), `${id}.asks`);
 export const askFile = (id: string, step: string, n: number): string => path.join(asksDir(id), `retry-${step}-${n}`);
+export const roundAskFile = (id: string, step: string, round: number): string => path.join(asksDir(id), `round-${step}-${round}`);
 
-/** The asks waiting in a run's directory, and a line for each file there that names a retry and cannot be read as one. */
-export function readAsks(id: string): { asks: RetryAsk[]; notes: string[] } {
+/** The asks waiting in a run's directory — tries and rounds — and a line for each file there that names one and cannot be read as one. */
+export function readAsks(id: string): { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] } {
   const asks: RetryAsk[] = [];
+  const rounds: RoundAsk[] = [];
   const notes: string[] = [];
   let names: string[];
   try {
     names = fs.readdirSync(asksDir(id), { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
-  } catch { return { asks, notes }; }
+  } catch { return { asks, rounds, notes }; }
   for (const name of names) {
     // Anything else is not an ask: the file the verb writes before linking it into place starts with a dot.
-    const named = /^retry-(.+)-(\d+)$/.exec(name);
-    if (!named) continue;
-    const ask = askIn(path.join(asksDir(id), name), named[1]!, Number(named[2]));
-    if (typeof ask === 'string') notes.push(`${path.join(asksDir(id), name)}: ${ask}, so it is not honoured — remove it, and ask with wf retry`);
-    else asks.push(ask);
+    const tried = /^retry-(.+)-(\d+)$/.exec(name);
+    const again = /^round-(.+)-(\d+)$/.exec(name);
+    const file = path.join(asksDir(id), name);
+    if (tried) {
+      const ask = askIn(file, tried[1]!, Number(tried[2]));
+      if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with wf retry`);
+      else asks.push(ask);
+    } else if (again) {
+      const ask = roundAskIn(file, again[1]!, Number(again[2]));
+      if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with wf round`);
+      else rounds.push(ask);
+    }
   }
-  return { asks, notes };
+  return { asks, rounds, notes };
+}
+
+/** One round ask file, read: the looping step and the round from its name, when from what it holds — or why it cannot be read. */
+function roundAskIn(file: string, step: string, round: number): RoundAsk | string {
+  let held: unknown;
+  try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
+  if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an ask wf round wrote';
+  const { at } = held as Record<string, unknown>;
+  return { step, round, at: typeof at === 'string' ? at : '' };
 }
 
 /** One ask file, read: the step and the try from its name, how and when from what it holds — or why it cannot be read. */
@@ -124,8 +144,7 @@ function askIn(file: string, step: string, n: number): RetryAsk | string {
  * name that exists, as `wx` does, and unlike `wx` leaves no moment in which the tick can read an ask that has
  * been created and not yet written. False when an ask for that try was already there.
  */
-function writeAsk(id: string, ask: RetryAsk): boolean {
-  const file = askFile(id, ask.step, ask.try);
+function writeAsk(file: string, ask: RetryAsk | RoundAsk): boolean {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const whole = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${Date.now()}`);
   fs.writeFileSync(whole, `${JSON.stringify(ask, null, 2)}\n`, { flag: 'wx' });
@@ -141,9 +160,12 @@ function writeAsk(id: string, ask: RetryAsk): boolean {
 }
 
 /** Move each ask the run's record already answers into `done/`. The tick's one touch on a person's file, and never an edit. */
-function consumeAsks(run: Run, asks: readonly RetryAsk[]): void {
-  for (const ask of spentAsks(run, asks)) {
-    const file = askFile(run.id, ask.step, ask.try);
+function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
+  const spent = [
+    ...spentAsks(run, asks).map((a) => askFile(run.id, a.step, a.try)),
+    ...spentRoundAsks(run, rounds).map((a) => roundAskFile(run.id, a.step, a.round)),
+  ];
+  for (const file of spent) {
     const done = path.join(asksDir(run.id), 'done', path.basename(file));
     try {
       fs.mkdirSync(path.dirname(done), { recursive: true });
@@ -246,7 +268,7 @@ async function adoptChecks(
 ): Promise<string[]> {
   const adopted: string[] = [];
   for (const step of steps) {
-    if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked) !== 'checking') continue;
+    if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps) !== 'checking') continue;
     const taskId = checkTaskId(run, step.name);
     const view = await e.view(taskId);
     if (!view.state.brief) continue;   // not filed: due, and this pass's to file
@@ -284,6 +306,36 @@ async function adoptTries(
     views.set(taskId, view);
     const record = run.steps[r.step]!;
     run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : nextTry(record, r, taskId);
+    adopted.push(r.step);
+  }
+  return adopted;
+}
+
+/**
+ * Rounds a pass filed and never wrote down, put back on the record — in memory, and before anything asks what is in flight, as `adoptTries`
+ * does and for its reason.
+ *
+ * Looked for only where a round is due (`roundsDue`, cancelled or not), under the target's next try's id. A pass that filed the round and died
+ * left the looping step's `again: true` on the record, so the round reads due again; finding its task filed, this moves the loop on as the
+ * pass would have (`roundFiled`), and nothing is filed twice.
+ */
+async function adoptRounds(
+  e: Engine,
+  run: Run,
+  steps: readonly Workflow[],
+  views: Map<string, TaskView>,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+  asked: (taskId: string) => boolean,
+  asks: readonly RoundAsk[],
+): Promise<string[]> {
+  const adopted: string[] = [];
+  for (const r of roundsDue(steps, run, phaseOf, closeoutOf, asked, asks)) {
+    const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
+    const view = await e.view(taskId);
+    if (!view.state.brief) continue;   // not filed: due, and this pass's to file
+    views.set(taskId, view);
+    Object.assign(run.steps, roundFiled(steps, run, r, taskId));
     adopted.push(r.step);
   }
   return adopted;
@@ -652,9 +704,10 @@ function handOff(workspace: string, step: string): void {
  * One pass's work: the steps it filed, the steps whose checks it filed, the steps it tried again, and where the
  * run stands — and `notes`, each line starting with its step: what cutting a worktree had to say (a path
  * `.worktreeinclude` lists that the main checkout does not have, a line it refused, an `npm ci` that ran or
- * failed), each try filed and on whose word, and an ask file that cannot be read.
+ * failed), each try and each round filed and on whose word, and an ask file that cannot be read. `looped` names the
+ * looping steps whose loop this pass took round again.
  */
-export type Advanced = { run: Run; filed: string[]; checked: string[]; tried: string[]; status: Assessment['status']; blocked: string[]; notes: string[] };
+export type Advanced = { run: Run; filed: string[]; checked: string[]; tried: string[]; looped: string[]; status: Assessment['status']; blocked: string[]; notes: string[] };
 
 /**
  * One pass over one run: tick the engine, then file whatever became ready.
@@ -671,7 +724,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   // A person's word, read on every pass: an ask made while this pass was elsewhere is read by the next.
-  const { asks, notes: askNotes } = readAsks(run.id);
+  const { asks, rounds: roundAsks, notes: askNotes } = readAsks(run.id);
+  const adoptedRounds = await adoptRounds(e, run, steps, views, phaseOf, signedOff, asked, roundAsks);
   const adoptedTries = await adoptTries(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks);
   const adopted = await adoptChecks(e, run, steps, views, phaseOf, signedOff, asked);
 
@@ -705,7 +759,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // work in progress — is committed under this step's name (`handOffDue`).
   for (const name of handOffDue(steps, run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
 
-  const { ready, check, retry, blocked, status } = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks);
+  const { ready, check, retry, round, blocked, status } = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks);
 
   // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
   // workspace and on the branch it had, under its next try's derived id, and the try it replaces moves behind
@@ -736,11 +790,18 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       const resumeFrom = r.mode === 'nudge' ? sessionIn(views, record.taskId!) : undefined;
       // What the check said, as data in the brief: the frozen command, its exit, and both tails.
       const refusal = record.check && step.check ? await refusalOf(e, step.check, record.check.taskId) : undefined;
+      // A new session of a loop's target within a round owes replies to the round's findings, and is handed them as its first try was:
+      // off the looping step's try that asked, since the looping step's own place is unfiled until the target is verified.
+      const asking = resumeFrom ? undefined : askingTry(steps, run, r.step);
+      const askedWith = asking ? (await e.view(asking.taskId)).state.attempts.at(-1)?.closeout : undefined;
+      const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
+      const reads = (name: string): Closeout | undefined =>
+        (asking && name === asking.looping.name && findings && !('error' in findings) ? findings : signedOff(name));
       await e.file({
         id: taskId,
-        brief: composeBrief(step, run, steps, signedOff, files, undefined, {
+        brief: composeBrief(step, run, steps, reads, files, undefined, {
           try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), resumed: Boolean(resumeFrom),
-          status: stepStatus(step, run, phaseOf, signedOff, asked), ...(refusal ? { refusal } : {}),
+          status: stepStatus(step, run, phaseOf, signedOff, asked, steps), ...(refusal ? { refusal } : {}),
         }),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
@@ -749,10 +810,47 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
         resumeFrom,
-        closeoutSchema: closeoutSchemaOf(step),
+        // A loop's target tried again within a round still owes its answers to the findings it was handed.
+        closeoutSchema: closeoutSchemaOf(step, owesReplies(steps, run, r.step)),
       });
     }
     run.steps[r.step] = nextTry(record, r, taskId);
+  }
+
+  // Another round: a looping step said `again: true` with rounds left, or a person's `wf round` took a loop out of rounds once more. The
+  // loop's target goes on in its workspace, its session continued under its next try's id and handed what the looping step declared, as data.
+  // Every other step of the loop moves behind, unfiled, and a later pass files each once what it waits on is verified — a new session. To the
+  // engine, this is one more task.
+  const looped: string[] = [];
+  for (const r of round) {
+    const looping = steps.find((s) => s.name === r.step)!;
+    const target = steps.find((s) => s.name === r.target)!;
+    const record = run.steps[r.target]!;
+    const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
+    looped.push(r.step);
+    notes.push(`${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : 'wf round'}; ${r.target} goes again`);
+    // A round an earlier pass filed and never wrote down was adopted above. Looked up once more all the same, as a try is.
+    if (!(await e.view(taskId)).state.brief) {
+      const files = artifactsDir(run, r.target);
+      fs.mkdirSync(files, { recursive: true });
+      const resumeFrom = record.taskId ? sessionIn(views, record.taskId) : undefined;
+      await e.file({
+        id: taskId,
+        // Read off the closeout that asked for the round, before the record moves it behind.
+        brief: composeBrief(target, run, steps, signedOff, files, undefined, undefined, {
+          loop: r.step, round: r.round, rounds: capOf(looping), by: r.by, resumed: Boolean(resumeFrom),
+        }),
+        cwd: record.workspace ?? run.workspace,
+        harness: target.harness,
+        model: target.model,
+        permissionMode: target.permissionMode,
+        deadlineSeconds: target.deadlineSeconds,
+        maxAttempts: target.maxAttempts,
+        resumeFrom,
+        closeoutSchema: closeoutSchemaOf(target, true),
+      });
+    }
+    Object.assign(run.steps, roundFiled(steps, run, r, taskId));
   }
 
   // The fact the run establishes for itself: each signed step's `check:`, executed where the work is.
@@ -811,8 +909,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       // The task id is chosen, not generated, so the harness session reads `ae/<run>-<step>/1`.
       // A person scanning their sessions then sees which run and which step, and two steps of one
       // run share a prefix — which is what makes a resumed step legible as a continuation rather
-      // than a duplicate.
-      id: stepTaskId(run, name),
+      // than a duplicate. A step of a loop filed for a later round is on a later try, and its id says which.
+      id: stepTaskId(run, name, tryOf(run, name)),
       // What the steps it reads declared, if it names any in `input:` — read off the same closeouts the
       // assessment that made it ready just read, so it is handed what it was filed on.
       // And, when the run installed its `node_modules` or could not, why its start was slow or what to run.
@@ -831,15 +929,16 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       // answer without reading it; what the fields mean is ours — see `Closeout`.
       closeoutSchema: closeoutSchemaOf(step),
     });
-    run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
+    // The tries a round moved behind stay with it.
+    run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
-  if (filed.length || checked.length || tried.length || adopted.length || adoptedTries.length) writeRun(run);
-  // After the record is written, never before: an ask is consumed once the record holds its try — this pass's,
-  // or one a pass that died before consuming it wrote down.
-  consumeAsks(run, asks);
+  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length) writeRun(run);
+  // After the record is written, never before: an ask is consumed once the record holds its try or its round — this
+  // pass's, or one a pass that died before consuming it wrote down.
+  consumeAsks(run, asks, roundAsks);
 
-  return { run, filed, checked, tried, status, blocked, notes };
+  return { run, filed, checked, tried, looped, status, blocked, notes };
 }
 
 export type Cancelled = { run: Run; plan: CancelPlan };
@@ -868,14 +967,15 @@ export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
-  // A check or a try filed by a pass that died before writing the run down is in flight too. Found here so
+  // A check, a try or a round filed by a pass that died before writing the run down is in flight too. Found here so
   // the verb stops it at once; on the record only in memory, because this verb never writes the run.
-  const { asks } = readAsks(id);
+  const { asks, rounds } = readAsks(id);
   const verdictOf = exitVerdicts(views, run);
+  await adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), rounds);
   await adoptTries(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks);
   await adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views));
 
-  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks);
+  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, rounds);
   if (plan.kind === 'finished') return { run, plan };
 
   for (const { taskId } of plan.stop) await e.stop(taskId);
@@ -906,8 +1006,9 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
   const { views, phaseOf } = await taskPhases(e, run);
   // Only a refused check's log is read here: its exit code is the one number on its line.
   const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
+  const { asks, rounds } = readAsks(run.id);
   return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name),
-    closeoutAsked(views), (name) => refused.get(name)?.verdict, readAsks(run.id).asks);
+    closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds);
 }
 
 export type Asked = { run: Run; ask: RetryAsk; file: string };
@@ -931,8 +1032,36 @@ export async function retry(e: Engine, id: string, stepName: string, how: { mode
   if (refused) refuse(refused);
   const ask: RetryAsk = { step: stepName, try: tryOf(run, stepName) + 1, mode: how.mode, ...(how.model ? { model: how.model } : {}), at: new Date().toISOString() };
   // Someone asked in the moment since the look above: said as the look would have said it.
-  if (!writeAsk(id, ask)) refuse(refusal(readAsks(id).asks) ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
+  if (!writeAsk(askFile(id, stepName, ask.try), ask)) refuse(refusal(readAsks(id).asks) ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
   return { run, ask, file: askFile(id, stepName, ask.try) };
+}
+
+export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
+
+/**
+ * Ask for one more round of a loop whose rounds are spent — `wf round` — by writing the ask, and nothing else. The next tick honours it once.
+ *
+ * Refused before anything is written, with what to do instead (`roundAsk`): a round still running, one the run files itself, a loop that
+ * ended without asking again, a step of the loop that stopped, a cancelled run, a round already asked for. Like `wf retry`'s, the ask is the
+ * person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be left out when the run has one loop.
+ */
+export async function round(e: Engine, id: string, stepName?: string): Promise<RoundAsked> {
+  const run = readRun(id);
+  const steps = stepsOf(run);
+  const { views, phaseOf } = await taskPhases(e, run);
+  const answer = (asks: readonly RoundAsk[]) => roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks);
+  const refuse = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
+
+  const first = answer(readAsks(id).rounds);
+  if ('refusal' in first) return refuse(first.refusal);
+  const ask: RoundAsk = { step: first.step, round: first.round, at: new Date().toISOString() };
+  const file = roundAskFile(id, ask.step, ask.round);
+  // Someone asked in the moment since the look above: said as the look would have said it.
+  if (!writeAsk(file, ask)) {
+    const now = answer(readAsks(id).rounds);
+    refuse('refusal' in now ? now.refusal : `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.`);
+  }
+  return { run, ask, file };
 }
 
 /**
@@ -1110,7 +1239,9 @@ export async function decide(e: Engine, id: string): Promise<{
   checks: Record<string, CheckReport>;
   /** The tries the next tick files: asked for, or covered by `retries:`. */
   retrying: Retry[];
-  /** For each step a person may try again, the `wf retry` that does it (`retryLines`). */
+  /** The rounds the next tick files: asked for with `again: true`, or with `wf round`. */
+  rounding: Round[];
+  /** For each loop out of rounds, the `wf round` that goes once more (`roundLines`); for each step a person may try again, the `wf retry` (`retryLines`). */
   offers: string[];
 }> {
   const run = readRun(id);
@@ -1118,16 +1249,17 @@ export async function decide(e: Engine, id: string): Promise<{
   const { views, phaseOf } = await taskPhases(e, run);
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
   const checks = Object.fromEntries(await checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped'));
-  const { asks } = readAsks(id);
+  const { asks, rounds } = readAsks(id);
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   // The verdict the screen prints, off the log: a refusal and a check that did not finish, told apart by it.
   const verdictOf = (name: string) => checks[name]?.verdict;
-  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks);
+  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds);
   return {
     run, decision: d, closeouts, checks,
     retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks),
-    offers: retryLines(steps, run, d, phaseOf, reader, asked),
+    rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds),
+    offers: [...roundLines(steps, run, d), ...retryLines(steps, run, d, phaseOf, reader, asked)],
   };
 }
 

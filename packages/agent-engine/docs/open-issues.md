@@ -255,3 +255,18 @@ has no Codex servers configured.
 | every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `7200295` |
 | a released session that had ended by quiet was removed without a `claude stop` — and a worktree task's was never touched, left `working` for good — because `release` read the runner's translated `done` | `release` stops on the state `claude agents` itself listed (found in review) | engine `c2ebd62` |
 | a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `9c4221e` |
+
+## A closeout given ten seconds before the session ended was not read (2026-09-13, half-verified)
+
+Task `let-a-step-say-which-tools-i-v27t-implement`, session `b948c622…`: the transcript holds one
+`StructuredOutput` tool_use at 22:54:01.237Z (`outcome`, `summary`, `artifacts`, `needs`; the tool
+answered "provided successfully"); the engine observed the session `done` at 22:54:11.057Z and journaled
+`ended` with `usage` read from that transcript and no `closeout`, so the step read `unsigned`.
+`lastStructuredOutput` on the file finds the statement today, and there is one transcript for the id.
+The only cache on that path is `finalStatements` in `runner.ts` (`statementOf`): a session once seen in
+`done`/`failed`/`stopped` has its statement pinned, `undefined` included. The session had earlier been
+`blocked` on a login-refresh race ("another Claude Code process is refreshing it, or exited
+mid-refresh") and was bridged by Remote Control when a cross-session message reached it — if the
+registry showed it final for one observation in that window, the pin explains it. Not reproduced.
+Fix if so: pin only a statement that was found, or re-read once when the pinned value is `undefined`
+and the transcript's mtime is newer than the pin. Remedy in the run: `wf retry <run> <step>` (nudge).

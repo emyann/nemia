@@ -62,11 +62,43 @@ export type RunDetail = {
     branch: string | null;
     status: string;
     closeout: StepCloseout | null;
+    attempts: StepAttempts;
   }>;
 };
 
 /**
- * One engine for the process, and the api only reads through it — `view`, never `tick` or `file`.
+ * A step's attempts as the engine's view has them: how many, and when and how the latest went.
+ *
+ * No end time. The engine journals one on its `ended` event, but the view folds it away
+ * (`state.attempts[n]` keeps how and why an attempt ended, not when), and the one export that still
+ * has it is `feed`, which reads the whole store's history. So `ended` says whether the latest
+ * attempt is over, and how long it took is not known here once it is.
+ */
+export type StepAttempts = {
+  count: number;
+  latest: {
+    startedAt: string;
+    /** The harness's last word on the attempt — `done`, `failed`, `stopped`; null while it runs. */
+    ended: string | null;
+    /** `harness` when the harness said it ended, `lost` when the engine stopped seeing it; null while it runs. */
+    reason: string | null;
+  } | null;
+};
+
+/** The tail of a step's session output, oldest line first. */
+export type StepLog = {
+  lines: string[];
+  /**
+   * Whether the api cut lines off the top. A harness can hand over less than all of its output
+   * already — the detached runner keeps only its last few thousand characters — and that cut is
+   * not visible here, so its first line may start mid-line.
+   */
+  truncated: boolean;
+};
+
+/**
+ * One engine for the process, and the api only reads through it — `view` and `logs`, never `tick`
+ * or `file`.
  * Filing and advancing work is `wf`'s job, so a board left open in a tab cannot start anything.
  */
 const e = engine();
@@ -241,10 +273,39 @@ async function detail(run: Run): Promise<RunDetail> {
         closeout: c && !('error' in c)
           ? { outcome: c.outcome, summary: c.summary, needs: c.needs ?? null, artifacts: c.artifacts }
           : null,
+        attempts: attemptsOf(run, name, views),
       };
     }),
   };
 }
+
+/** Off the engine's view of the step's task. A step with no task, or one the engine has lost, has had none. */
+function attemptsOf(run: Run, name: string, views: Views): StepAttempts {
+  const taskId = run.steps[name]?.taskId;
+  const attempts = (taskId && views.get(taskId)?.state.attempts) || [];
+  const latest = attempts.at(-1);
+  return {
+    count: attempts.length,
+    latest: latest ? { startedAt: latest.startedAt, ended: latest.ended, reason: latest.reason } : null,
+  };
+}
+
+/** How much of a step's output the board is given: the end of it, which is where a running step is. */
+const LOG_LINES = 200;
+
+/** The last `max` lines of a session's output, and whether there were more. */
+function tailOf(output: string, max: number): StepLog {
+  const lines = output.split(/\r?\n/);
+  // Output that ends in a newline has not begun another line.
+  if (lines.at(-1) === '') lines.pop();
+  return lines.length > max ? { lines: lines.slice(-max), truncated: true } : { lines, truncated: false };
+}
+
+/** Found among the runs the store has, not read by path, so no id can name a file outside it. */
+const findRun = (id: string): Run | undefined => listRuns().find((r) => r.id === id);
+
+const noSuchRun = (id: string) =>
+  `No run '${id}' in this store. GET /api/runs (or \`wf ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;
 
 export const app = new Hono()
   .get('/api/health', (c) => c.json({ ok: true }))
@@ -256,10 +317,27 @@ export const app = new Hono()
   })
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');
-    // Found among the runs the store has, not read by path, so no id can name a file outside it.
-    const run = listRuns().find((r) => r.id === id);
-    if (!run) {
-      return c.json({ error: `No run '${id}' in this store. GET /api/runs (or \`wf ls\`) lists the runs it has; check WF_ROOT if you expected it here.` }, 404);
-    }
+    const run = findRun(id);
+    if (!run) return c.json({ error: noSuchRun(id) }, 404);
     return c.json(await detail(run));
+  })
+  .get('/api/runs/:id/steps/:step/log', async (c) => {
+    const id = c.req.param('id');
+    const step = c.req.param('step');
+    const run = findRun(id);
+    if (!run) return c.json({ error: noSuchRun(id) }, 404);
+    // The steps the run's page shows: those on the record, and any the folder has gained since.
+    if (!stepNames(run, workflowsOf(run).steps).includes(step)) {
+      return c.json({ error: `Run '${id}' has no step '${step}'. GET /api/runs/${id} lists the steps it has.` }, 404);
+    }
+    const taskId = run.steps[step]?.taskId;
+    if (!taskId) return c.json({ lines: [], truncated: false } satisfies StepLog);
+    try {
+      return c.json(tailOf(await e.logs(taskId), LOG_LINES));
+    } catch (err) {
+      const why = err instanceof Error ? err.message : String(err);
+      return c.json({
+        error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
+      }, 502);
+    }
   });

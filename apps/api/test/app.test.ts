@@ -37,6 +37,32 @@ const settledTask = (taskId: string, closeout: object) => journal(taskId, [
   { kind: 'settled', at, outcome: 'succeeded' },
 ]);
 
+const later = '2026-09-12T00:40:00.000Z';
+
+/** A task on its second attempt, still running: the engine lost sight of the first. */
+const retryingTask = (taskId: string) => journal(taskId, [
+  { ...filed(taskId), maxAttempts: 2 },
+  { kind: 'starting', at, attempt: 1 },
+  { kind: 'spawned', at, attempt: 1 },
+  { kind: 'ended', at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'failed', reason: 'lost' },
+  { kind: 'starting', at: later, attempt: 2 },
+  { kind: 'spawned', at: later, attempt: 2 },
+]);
+
+/**
+ * A session of the `codex` harness as its worker leaves it on disk: a run file, and the output.
+ * `unreadable` puts a directory where the output should be, so reading it fails.
+ */
+const codexSession = (taskId: string, attempt: number, output: string | { unreadable: true }) => {
+  const name = `ae/${taskId}/${attempt}`;
+  const dir = path.join(root, 'engine', 'runs', 'codex');
+  const base = path.join(dir, name.replace(/[^a-zA-Z0-9]+/g, '_'));
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(`${base}.json`, JSON.stringify({ name, state: 'done', pid: 0, heartbeatAt: at, logFile: `${base}.log`, exitCode: 0 }));
+  if (typeof output === 'string') fs.writeFileSync(`${base}.log`, output);
+  else fs.mkdirSync(`${base}.log`);
+};
+
 const workflowFolder = (files: Record<string, string>) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-workflow-'));
   for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
@@ -119,6 +145,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
     status: 'succeeded · BLOCKED',
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
+    attempts: { count: 1, latest: { startedAt: at, ended: 'done', reason: 'harness' } },
   });
 
   assert.deepEqual({ ...review, told: undefined }, {
@@ -129,6 +156,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     taskId: null, workspace: null, branch: null,
     status: 'waiting',
     closeout: null,
+    attempts: { count: 0, latest: null },
   });
   // Not filed, so what it would be given now: implement has run in this workspace, so look there.
   assert.ok(review.told.startsWith('Review what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.'), review.told);
@@ -186,8 +214,12 @@ test('a run whose workflow folder is gone still answers, from its record', async
       taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
       status: 'succeeded · BLOCKED',
       closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
+      attempts: { count: 1, latest: { startedAt: at, ended: 'done', reason: 'harness' } },
     },
-    { name: 'review', spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', closeout: null },
+    {
+      name: 'review', spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', closeout: null,
+      attempts: { count: 0, latest: null },
+    },
   ]);
 
   // Same record, same engine: the same words with the folder as without it.
@@ -230,6 +262,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     taskId: 't-6', workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
     status: 'succeeded · BLOCKED',
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
+    attempts: { count: 1, latest: { startedAt: at, ended: 'done', reason: 'harness' } },
   });
   assert.deepEqual([review.body, review.spec.after, review.status], ['Review it.', ['replacement'], 'waiting']);
   assert.deepEqual([replacement.body, replacement.taskId, replacement.status, replacement.closeout], ['Do the original thing.', null, 'waiting', null]);
@@ -256,4 +289,87 @@ test('a run id cannot name a file outside the run store', async () => {
 
   const res = await app.request('/api/runs/..%2Fescape');
   assert.equal(res.status, 404);
+});
+
+test('each step says how many attempts it has had, when the latest began, and how it ended', async () => {
+  retryingTask('t-7');
+  writeRun({ ...r2, id: 'r-7', steps: { implement: { taskId: 't-7', branch: 'wf/r-7/implement' }, review: { taskId: null } } });
+
+  const run = await (await app.request('/api/runs/r-7')).json();
+  assert.deepEqual(run.steps.map((s: { attempts: unknown }) => s.attempts), [
+    // The second attempt is still going, so it has not ended; the one the engine lost is counted.
+    { count: 2, latest: { startedAt: later, ended: null, reason: null } },
+    { count: 0, latest: null },
+  ]);
+
+  // A task the engine has no record of has had no attempts it can speak for.
+  assert.deepEqual((await (await app.request('/api/runs/r-4')).json()).steps[0].attempts, { count: 0, latest: null });
+
+  // The list is kept as it was.
+  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), ['name', 'taskId', 'branch', 'status']);
+});
+
+const numbered = (n: number) => Array.from({ length: n }, (_, i) => `line ${i + 1}`);
+
+const logOf = async (url: string) => {
+  const res = await app.request(url);
+  return { status: res.status, body: await res.json() };
+};
+
+test('a step\'s log is the end of its session\'s output: the last 200 lines, and whether there were more', async () => {
+  settledTask('t-8', blocked);
+  codexSession('t-8', 1, numbered(250).join('\n') + '\n');
+  writeRun({ ...r2, id: 'r-8', steps: { implement: { taskId: 't-8', branch: 'wf/r-8/implement' }, review: { taskId: null } } });
+  assert.deepEqual(await logOf('/api/runs/r-8/steps/implement/log'), {
+    status: 200,
+    body: { lines: numbered(250).slice(-200), truncated: true },
+  });
+
+  // As many lines as it shows is all of them, and output with no final newline loses no line.
+  settledTask('t-9', blocked);
+  codexSession('t-9', 1, numbered(200).join('\n'));
+  writeRun({ ...r2, id: 'r-9', steps: { implement: { taskId: 't-9', branch: 'wf/r-9/implement' }, review: { taskId: null } } });
+  assert.deepEqual(await logOf('/api/runs/r-9/steps/implement/log'), {
+    status: 200,
+    body: { lines: numbered(200), truncated: false },
+  });
+});
+
+test('a step with no task has no log yet, and one filed but not started has the engine\'s word for it', async () => {
+  assert.deepEqual(await logOf('/api/runs/r-8/steps/review/log'), { status: 200, body: { lines: [], truncated: false } });
+  // A step the folder gained after the run started has no task either.
+  assert.deepEqual(await logOf('/api/runs/r-6/steps/replacement/log'), { status: 200, body: { lines: [], truncated: false } });
+  // Filed and waiting for a slot: there is no session to read, and the engine says so.
+  assert.deepEqual(await logOf('/api/runs/r-5/steps/implement/log'), {
+    status: 200,
+    body: { lines: ['(no session yet)'], truncated: false },
+  });
+});
+
+test('a log for a run or a step that does not exist is refused with a 404 that says where to look', async () => {
+  const noRun = await logOf('/api/runs/no-such-run/steps/implement/log');
+  assert.equal(noRun.status, 404);
+  assert.match(noRun.body.error, /No run 'no-such-run'/);
+  assert.match(noRun.body.error, /GET \/api\/runs/);
+
+  const noStep = await logOf('/api/runs/r-8/steps/deploy/log');
+  assert.equal(noStep.status, 404);
+  assert.match(noStep.body.error, /Run 'r-8' has no step 'deploy'/);
+  assert.match(noStep.body.error, /GET \/api\/runs\/r-8 lists the steps/);
+
+  // Names every object answers to are not steps, and a run id is not a path out of the store.
+  for (const url of ['/api/runs/r-8/steps/constructor/log', '/api/runs/r-8/steps/__proto__/log', '/api/runs/..%2Fescape/steps/implement/log']) {
+    assert.equal((await app.request(url)).status, 404, url);
+  }
+});
+
+test('output the engine cannot read is a 502 that says how to read it from the command line', async () => {
+  settledTask('t-10', blocked);
+  codexSession('t-10', 1, { unreadable: true });
+  writeRun({ ...r2, id: 'r-10', steps: { implement: { taskId: 't-10', branch: 'wf/r-10/implement' }, review: { taskId: null } } });
+
+  const { status, body } = await logOf('/api/runs/r-10/steps/implement/log');
+  assert.equal(status, 502);
+  assert.match(body.error, /Could not read the output of step 'implement' \(task t-10\)/);
+  assert.match(body.error, /`wf logs r-10 implement`/);
 });

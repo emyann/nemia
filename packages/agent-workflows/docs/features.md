@@ -6,8 +6,9 @@ questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/ope
 
 State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
-step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`, and
-trying a step again with `retries:` and `wf retry` (§4 F) have shipped.
+step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
+trying a step again with `retries:` and `wf retry` (§4 F), and going round again with `loop:`,
+`rounds:` and `wf round` (§4 R) have shipped.
 
 ## Shipped: the check
 
@@ -24,7 +25,7 @@ What it leaves for wave 2 of the plan, in its order:
 - **Retries** (§4 F). Shipped: *Shipped: trying again*, below.
 - **The decider screen** (§4 G): what a branch touched, grouped; the full diff of check-affecting files
   such as `package.json`; whether a lesson was written where the next agent reads.
-- **Rounds** (§4 H) — section 1 below.
+- **Rounds** (§4 R, which absorbed §4 H). Shipped: *Shipped: going round again*, below.
 
 ## Shipped: declared outputs and inputs
 
@@ -41,7 +42,8 @@ waits on it is filed. `wf decide` prints the declared output after the summary.
 The anchoring rule is kept by making both ends declared. A step's summary still goes only to the
 person who decides, and nothing from any closeout reaches a step that did not ask for it.
 `workflows/review.md` now declares `findings` (`review.schema.json`) and runs read-only.
-`workflows/respond.md` reads them with `input: review` and still writes `RESPONSE.md` for the person.
+`workflows/respond.md` read them with `input: review` until the loop replaced it; `workflows/ui/respond.md`
+still does, and writes `RESPONSE.md` for the person.
 The README section *Declared output* is the full account.
 
 What it leaves:
@@ -203,41 +205,57 @@ What it leaves:
 - **`bin/wf.ts` exits 1 on every error**, including the verbs' refusals, which set `exitCode` 2.
 - **No `retries:` on this repository's workflows.** A flaky suite would spend a whole session on a nudge.
 
-## 1. Rounds
+## Shipped: going round again — `loop:`, `rounds:` and `wf round`
 
-**Wave 2** (`docs/plan-hold-the-bar.md` §4 H). **Registered.** The last unchecked item in the README's definition of done:
+Plan §4 R, which absorbed §4 H. The shipped workflow is implement ⇄ review until the reviewer says the
+change is done, at most three rounds, then a person: the README's last unchecked item. `respond` was not
+a third kind of work — J had already made it `resume: implement` with `input: review` and the check — so
+the loop replaced it, and its three honest answers moved into the contract the run appends.
 
-> **rounds** — `after` is a DAG and cannot loop, so a second round is a *new run* over the same
-> worktree, started by the decider. That keeps rounds countable and deliberate.
+- `loop: <step>` on the looping step names an ancestor by `after`, and `rounds: N` caps it, 3 by default.
+  A looping step declares `again: boolean` in its `output:`. Refused at load: a loop naming no step it
+  waits on, a looping step without a boolean `again`, `rounds:` without `loop:`, a step in the loop that
+  forks, merges or resumes, a step in two loops, and a target that declares `replies`.
+- The looping step verified (or unverified) with `again: true` and rounds left: the next tick files the
+  target again — its last session continued, handed the looping step's declared output as data, without
+  `again` or the summary — then the steps between, then the looping step, as new sessions. `again: false`
+  continues to what comes after, or ends the run succeeded.
+- From round 2 the target owes `replies` (`fixed`, or `won't fix` and why), merged into its closeout
+  schema, and the next round's looping step is handed them as data. A target that gives none is `unsigned`.
+- At the cap with `again: true`: `rounds exhausted`, waiting on a person. `wf decide` says so, prints the
+  last findings and offers `wf round <run> [<step>]`, which writes `runs/<id>.asks/round-<step>-<n>`,
+  honoured once. Refused while a round runs or the run would go round itself, on a loop that ended, on a
+  step of the loop that stopped, and on a cancelled run.
+- A round is F's tries: `then: 'round'`, ids `<run>-<step>-try<n>`, adoption after a dead pass as for a
+  try, and `round 2 of 3` in the row's `note`. `retries:` now counts within a round.
 
-**Today.** A run ends at `wf decide`, which prints the material and the `git merge` / `git branch -D`
-commands and does nothing itself. If a reply needs another pass, a person starts a new run by hand
-and the link to the previous round is lost.
+The README section *Going round again* is the account, and says how `loop:` and `retries:` differ.
 
-**Sketch.** `wf round <runId>`, offered by `wf decide`, files a new run:
+What it leaves:
 
-- its workspace starts from the previous run's **result branch**, not from the base;
-- its record names the run it follows and its round number;
-- its steps are told where the previous round's artifacts are — `RESPONSE.md` on that branch, and the
-  review's `findings` on the previous run's engine record, where a declared output lives — intent and
-  artifacts, never process, as `composeBrief` already does;
-- whatever the person decided at `wf decide` — the answers to the previous round's `needs` — goes into
-  the new run's brief as new intent.
+- **The board does not see rounds yet.** `apps/api`'s `judge` passes `assess` no round asks, and its
+  `moving` does not count `round`: a run with a round due reads running and not moving until the tick
+  files it, and a round a person asked for reads waiting on you until then. `apps/web`'s `stepState` does
+  not know `rounds exhausted` and draws it as working. `note` is not in the api's payload, and the canvas
+  draws no loop edge. Each is an argument or a word in the apps, from what `listing` already says.
+- **A loop is a chain.** A step in the loop that forks or merges is refused, because its worktree is cut
+  once and a round would not bring the target's new commits into it. Merging the target's branch into
+  such a worktree each round would lift that, and a loop over `workflows/ui/`'s two reviewers needs it.
+- **`workflows/ui/` does not loop.** Its review is `workflows/review.md` less `loop:`, `rounds:` and
+  `again`, and its respond is still the fan-in of review and look. A test holds the copy to the original,
+  less the loop.
+- **A fresh try of the target inside a round is not handed the findings again.** `wf retry --fresh` (or
+  `--model`) composes a new session's brief from the current tries, and the looping step's closeout that
+  asked for the round is behind it on the record. `--nudge`, the default and what `retries:` files,
+  continues the session that has them. Reading the looping step's last try would close it.
+- **`wf logs <run> <step>`** on a step of the loop waiting for its round says it has not run: it reads the
+  current try, which is not filed yet. The earlier tries are under their own ids, for `ae logs`.
+- **An ask carries no message**, as `wf retry`'s does not: `wf round` says once more, not what to look at.
+- **Nothing measures a reviewer that asks again for nits.** The cap and the person are the guard. The
+  looping step is told that a finding worth a person's attention and not another round can go with
+  `again: false`, and that is prose.
 
-**To decide first.**
-
-- Which steps a round runs: the whole workflow folder again, or a round-specific one (for example
-  `review` then `respond`).
-- Whether `respond` resumes the previous round's session (a resume across runs) or starts cold.
-- Who stops the rounds: a cap, or only a person at each `wf decide`.
-- How `wf ls` shows a chain of rounds — grouped under the first run, or one run per round.
-
-**Constraints from what exists.** Keep `after` a DAG; rounds are new runs. A run record holds no
-status of its own except cancellation — the link to the previous run is a fact about where the run
-came from, not a status, so it fits. `wf decide` is read-only today; `wf round` would be the first
-verb that acts on a decision.
-
-## 2. Forgetting a run (`wf rm`)
+## 1. Forgetting a run (`wf rm`)
 
 **Why.** Runs, worktrees and branches accumulate, and clearing them is manual: `git worktree
 remove`, `git branch -D`, deleting `~/.agent-workflows/runs/<id>.json`.
@@ -290,7 +308,7 @@ Write tests for the pure part — whatever decides what may be removed and what 
 the style of the tests already in `test/`. Run the whole suite before you commit.
 ```
 
-## 3. A run that grows steps from a plan
+## 2. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
 

@@ -328,6 +328,22 @@ fan-out.
 `git diff` and the check. Owns `workflow.ts`, `runner.ts`, their tests, README. Refusal test: a
 step with `tools:` reaches the engine with exactly that list.
 
+## 4b. Findings from wave 1, for the packages that own them
+
+Recorded here at merge time so they are not lost; fold each into its ledger when that package's
+owner is not mid-run.
+
+- **agent-workflows (`list`, `runner.ts`):** `wf ls` prints `pending` for a task the engine has no
+  record of; `phaseOfView` already draws the `unknown` line for the DAG, `listing`'s phase word does
+  not. The board (run W) words it `unknown` itself and tests that it matches `list` wherever `list`
+  is right. Fix in `list`, then delete the api's copy of the rule. Also: `list` throws when the
+  workflow folder is gone, so a consumer must catch it; and each `view` is a `claude agents` call
+  (~300 ms), so a consumer reads each task once per request. → F or G, whoever touches `runner.ts` first.
+- **agent-engine (`runner-detached.ts:236`):** codex `permissionMode: danger-full-access` passes A's
+  parser but is not mapped; only `bypassPermissions` is. → check at B's trial merge.
+- **the plan:** count fields need their least value stated (A's review); a "definition of done" that
+  lists several things in one sentence gets read as one rule.
+
 ## 5. What the plan does not do
 
 No mid-run human gate (REPORT G10, refuted: the run boundary is the gate). No `guide:`, `inputs:`,

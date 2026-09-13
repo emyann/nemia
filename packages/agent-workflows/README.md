@@ -211,6 +211,39 @@ instead of the reasoning behind it.
 A conflicting merge is left conflicted on purpose, and the step is told so in its brief. Resolving
 it is the work that a fan-in step exists to do.
 
+### What a worktree is given
+
+A worktree holds tracked files only. When the run cuts one, after any merge and before the step is
+filed, it fills in the rest:
+
+- **A `node_modules` of its own.** It used to be one link to the main checkout's tree. npm workspaces
+  are links whose real path is the main checkout, so through that link a branch's app imported main's
+  packages: the branch was tested against code it did not contain. Now the worktree gets a directory in
+  which each workspace package (`packages/*`, `apps/*`) links to the worktree's own copy. Every
+  third-party package links to the main checkout's, one inode and no install. `.bin` and each `@scope`
+  are directories of the worktree's own, so installing into the worktree never writes main's tree, and a
+  workspace package's bin runs the worktree's file. npm's and tools' dot files (`.package-lock.json`,
+  `.vite-temp`) are left out. `src/deps.ts` decides from names, and `provisionDeps` in `src/runner.ts`
+  does the work.
+- **An install of its own, when the lockfile differs.** The worktree's `package-lock.json` may not be the
+  main checkout's: a parent step added a dependency, or main moved on. Then links would point at the
+  wrong tree, so the run runs `npm ci --no-audit --no-fund` in the worktree instead. That takes about a
+  minute, and the step's brief says so under *Where to look*, so the step knows why it started late.
+  `wf up` prints it too. If `npm ci` fails, the step is told what npm said and to run it itself.
+- **What `.worktreeinclude` lists.** This file sits at the root of the main checkout and is read the way
+  Claude Code's `--worktree` reads it: one gitignored path per line, file or directory, relative to the
+  root, with blank lines and `#` comments skipped. Each path is copied from the main checkout and never
+  over anything the worktree already has. A path the main checkout does not have is skipped and named
+  in the run's log line, never an error. A path outside the repository (`../x`, an absolute path, or
+  one that leads out through a link) is refused by name, by `wf start` and again at the cut.
+  **`node_modules` is never copied**, listed or not: it is provisioned as above, because a copy costs
+  minutes per step.
+
+All of it is idempotent. A tree npm installed is left alone, a linked tree gains only what it lacks,
+and nothing already there is replaced. A pass that dies after cutting a worktree, in the minute
+`npm ci` takes for instance, leaves the worktree for the next pass to take up. Before, `git worktree
+add` would have refused the branch on every pass after.
+
 ### A merge carries commits, not working trees
 
 The first bug this design produced, and it was silent. A `review` step wrote `REVIEW.md` and never
@@ -334,6 +367,10 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
 - **The command comes from the run, never from a checkout.** `wf start` freezes the workflow onto the
   run record (`run.workflow`) and every pass reads that copy. A `check:` written into the folder
   afterwards — by a step working in it, say — never reaches the run.
+- **It tests the branch.** The command runs in the step's worktree, so it resolves that worktree's
+  `node_modules`: the branch's own workspace packages, and its own install when its lockfile differs
+  (*What a worktree is given*, above). Nothing about the check changed for this; the tree under it did.
+  A check no longer passes or fails on what `main` holds.
 - **A step is told before it is judged.** Every brief with a check says the command must exit 0 in the
   workspace, that the run executes it afterwards, and not to weaken it.
 - **It is an engine task,** on a `check` harness the run hands the engine (`src/check.ts`): `sh -c` with
@@ -586,7 +623,8 @@ holding a concurrency slot forever.
 | `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a cycle, a dangling `after`, a loose `output:` schema, or an `input:` on work that has not finished |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, blocked, done — and what a step is told, `## From <step>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
-| `src/runner.ts` | the I/O: run store, git worktree, and the engine |
+| `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
+| `src/runner.ts` | the I/O: run store, git worktree and what it is given, and the engine |
 | `src/cli.ts` | the verbs |
 
 `assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,

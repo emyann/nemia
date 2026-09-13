@@ -5,7 +5,8 @@ today, what the feature has to settle, and what earlier work already taught abou
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
 State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
-outputs (package J), and a step's files directory with `workflows/ui/` (U1) have shipped.
+outputs (package J), a step's files directory with `workflows/ui/` (U1), and a worktree's own
+`node_modules` with `.worktreeinclude` have shipped.
 
 ## Shipped: the check
 
@@ -79,12 +80,49 @@ What it leaves:
 - **The board does not show a step's files.** That needs a small api endpoint over
   `runs/<id>/artifacts/` and a list in the step inspector (plan, *The `ui/` workflow*).
 - **The api does not tell an unfiled step its directory.** `composeBrief` takes the directory as a fifth
-  argument, and the api's "what it would be told now" does not pass it yet. In a worktree, `apps/api`
-  resolves `agent-workflows` through the main checkout's `node_modules`, so an app change that needs a
-  package change from the same branch fails `typecheck` until the package is merged. It is one line in
-  `toldOf`, once this has landed.
+  argument, and the api's "what it would be told now" does not pass it yet. It is one line in `toldOf`.
+  A worktree the run cuts now resolves its own `agent-workflows`, so the app change and the package
+  change can land on one branch. A worktree made by hand still links main's tree.
 - **No clean-up and no size cap.** Screenshots accumulate per run under `WF_ROOT`, as check stderr files
   do. `wf rm`, when it comes, removes `runs/<id>/` whole.
+
+## Shipped: a worktree's own `node_modules`, and `.worktreeinclude`
+
+A worktree the run cuts no longer links the main checkout's whole `node_modules`. Through that link a
+branch's app imported main's workspace packages, and M1's check was refused four times over it (plan
+§4b): a dependency the branch pinned was not in the shared tree, and main moving under the branch
+failed tests the branch never touched. `depsPlan` (`src/deps.ts`, pure) gives the worktree a directory
+of its own. Workspace packages link to the worktree's copies and third-party packages to main's, and
+`.bin` and every `@scope` belong to the worktree. When the worktree's `package-lock.json` differs from
+main's, `provisionDeps` runs `npm ci` there instead, and the brief says so under *Where to look*.
+`.worktreeinclude` paths are copied from the main checkout at the cut, and `node_modules` is never
+copied. A pass that dies mid-cut no longer wedges the run. `Advanced.notes` carries what the cut had to
+say, and `wf up` and `wf tick` print it. The README section *What a worktree is given* is the account.
+
+`.worktreeinclude` was added to the brief mid-run, by a cross-session message relayed from the person
+who asked. It is recorded here because the run's record would not show it (plan §4b, *steering by
+message*).
+
+What it leaves:
+
+- **`npm ci` runs inside the tick.** It is awaited, so `wf up` files nothing else for that minute, and a
+  slow registry makes every run wait. If that hurts, the fix is an install filed as an engine task, the
+  way the check is.
+- **Only the root `node_modules`.** A workspace's nested `node_modules`, where npm puts a conflicting
+  version, is not provisioned. Here `apps/web/node_modules` holds only vite's caches. The day one holds
+  a package, the worktree resolves the root's version of it.
+- **The cut is the only time the run provisions.** A step that changes the lockfile mid-session installs
+  for itself. `npm install` in a linked worktree replaces the links it touches with directories and
+  writes nothing of main's (measured with a local tarball, not a registry).
+- **npm only.** The lockfile compared is `package-lock.json`, so a change to another package manager's
+  lockfile goes unseen and that tree is linked as npm's would be.
+- **A workspace bin has to be committed executable.** A linked `.bin` runs the worktree's file with the
+  mode git gave it, whereas npm would chmod it at install. This repository's bins are `100755`.
+- **`.worktreeinclude` takes paths, not patterns.** Claude Code's reads gitignore patterns, but a glob
+  here is a path nothing has: it is skipped and named. Patterns would need
+  `git ls-files --others --ignored` and a matcher.
+- **Worktrees cut before this keep their link.** `provisionDeps` leaves a `node_modules` that is a link
+  alone (`shared`), and nothing re-provisions a worktree after its cut.
 
 ## 1. Rounds
 

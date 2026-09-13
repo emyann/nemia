@@ -37,7 +37,7 @@ Definition of done — a closed list, and it is closed:
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
 change seems to belong in here, check it against the boundary above first: it almost certainly
-knows about a second workload. A knob on the workload — `model`, `tools`, `effort` — is a field
+knows about a second workload. A knob on the workload — `model`, `tools`, `effort`, `mcp` — is a field
 carried on the task and read by a runner, never a callback into `decide`.
 
 ### The one real decision in here: resume policy
@@ -213,7 +213,8 @@ is not there, and a brief with no prompt.
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks:
 a harness the engine does not have (it used to run on the fallback, silently), counts and seconds
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `tools` that
-is not a list of names, and a word the task's harness does not have. Those words belong to the
+is not a list of names, an `mcp` that is not a map of `.mcp.json` servers (below), and a word the
+task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
 
@@ -237,10 +238,10 @@ recorded as spawned, with its error, and the grace window decides: the session i
 appears, the attempt `lost` if it never does. Either way the tick goes on; it used to reject, and
 every task behind the failed one stalled on every pass.
 
-## Narrowing a session: `tools` and `effort`
+## Narrowing a session: `tools`, `effort` and `mcp`
 
-Both are fields on the task, carried on the `filed` event and `State` and read only by a runner.
-`decide` never reads either, and a test reads `decide` to keep it so.
+All three are fields on the task, carried on the `filed` event and `State` and read only by a runner.
+`decide` never reads any of them, and a test reads `decide` to keep it so.
 
 | harness | `tools: Read, Grep, Glob` | `effort: high` |
 |---|---|---|
@@ -261,6 +262,61 @@ the tool a closing statement is made with — and the control wrote the file.
 **Codex has no tool list**, only one shell and three sandboxes, so the list can only take writing
 away: a list with none of Bash, Write or Edit runs `read-only` whatever sandbox the task named,
 and a list with any of them leaves the sandbox as the task named it.
+
+### MCP servers: `mcp`, and never the operator's
+
+A Claude Code session spawned with no MCP flags loads every server the operator has: user scope
+(`~/.claude.json`) and their claude.ai connectors — mail, calendar, drive — beside the checkout's
+`.mcp.json` (measured on 2.1.270, from the `init` event of `claude -p`). An unattended step could
+reach whatever the person who started the engine can. So every `claude` and `claude-detached` spawn
+is `--strict-mcp-config`, which loads only what `--mcp-config` names — and `--no-chrome`, below. The
+runner names:
+
+| the task | `--mcp-config` | the session has |
+|---|---|---|
+| no `mcp`, no `.mcp.json` in its `cwd` | nothing | no MCP server at all |
+| a `.mcp.json` in its `cwd` | `<cwd>/.mcp.json` — strict alone would drop it | the repository's servers |
+| `mcp: { … }` | that, and a file the runner writes under its root | the repository's and the task's |
+
+— and in no row the operator's. `mcp` maps a name (letters, digits, `-`, `_`) to a server in a
+`.mcp.json` entry's shape: `{ "command": "npx", "args": [...], "env": {...} }`, or
+`{ "type": "http", "url": "https://...", "headers": {...} }` (`"sse"` too). `file()` refuses any other
+shape, with the fix in the sentence: a key an entry does not take, an argument or a value that is not
+a string, and a `url` with no `type`, from which Claude Code loads nothing and says nothing. The
+runner's file is outside the workspace, owner-only, and rewritten or cleared on every spawn; the map
+itself is journalled as filed, like every field on the task, so a secret in it is on disk there too.
+A `.mcp.json` that is not JSON ends the attempt `unstartable`, naming the file: named on the command
+line, it stops Claude Code before a session exists. With `worktree`, the file named is the `cwd`'s
+own, not the worktree's copy of it. Both files are named by absolute path: Claude Code resolves the
+flag's path from inside the session's `cwd`.
+
+**Strict is not the whole fence.** Claude in Chrome — which drives the operator's own browser, and
+whatever they are signed in to there — is switched on by a user setting
+(`claudeInChromeDefaultEnabled`), named in no MCP config, and was still connecting in a `--bg` session
+spawned strict. So every Claude Code spawn also passes `--no-chrome`, and a step that needs a browser
+names one in `mcp` or its `.mcp.json`. A plugin can bring MCP servers too; whether strict holds those
+back was not measured, because the one plugin on the machine that found this is disabled.
+
+**Verified live:** `test/live.test.ts` (`AE_LIVE=1`) files two `--bg` sessions, each told to wait
+while any MCP server is still connecting and then to name every server and MCP tool it has. On
+2.1.270, on a machine with user-scope servers, claude.ai connectors and Chrome switched on, the one
+with no `mcp` in an empty directory had none, and its transcript was told of no server at all; the
+control, given one stdio server, had that server and its tool, and nothing else. The first run
+asked without waiting, and both sessions answered while their servers were still connecting — which
+is how Chrome was found.
+
+**Codex is given the servers, but not fenced.** `codex exec` takes them per invocation as one config
+override, `-c mcp_servers={"name"={"command"=...,"args"=[...],"env"={...}}}` — one value with every
+name quoted, because Codex splits a dotted `-c` key on every dot, quotes or none. A `url` server's
+`headers` become `http_headers`; an SSE server is refused, since Codex connects only to stdio and
+streamable HTTP servers. But the override is merged into the operator's `~/.codex/config.toml`, not
+put in its place — `-c mcp_servers={}` leaves every server there loaded (codex-cli 0.154.0) — and
+Codex has no strict flag. **A Codex task still has the operator's Codex servers**
+([open issue 9](docs/open-issues.md)). A task's server named like one in that `config.toml` is
+refused at spawn, `unstartable`: Codex would merge the two, and run the task's command with the
+operator's args and env.
+
+`ae start` has no `mcp` key: a brief's values are one line each, so the map is the API's for now.
 
 ## What "done" means, and why the harness decides it
 
@@ -500,6 +556,7 @@ reason `Runner` is a seam and not an import.
 | run state | `claude agents --json` | an in-memory map |
 | usage | turns, tool calls and tokens from the transcript, once the session is idle; no cost | from the SDK's result, cost included |
 | narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session | not wired: it passes only `model` and `permissionMode` |
+| MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json` and the task's `mcp`, never the operator's | not wired |
 | good for | the fleet, long work, unattended | one task in the foreground, with a human watching |
 
 The Agent SDK is a typed wrapper around the same CLI, but the wrapping is over **stdio
@@ -558,12 +615,13 @@ selector, and it is why no attempt can ever run twice.
 | `test/engine.test.ts` | the crash cases, the ceiling, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done", its argv and its usage, with a fake `claude` on `PATH` |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
+| `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence and `--strict-mcp-config` against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 

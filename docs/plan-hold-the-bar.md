@@ -312,7 +312,39 @@ tsconfig*.json`); `cost: not measured` until a runner fills it, never `0`; the l
 `missingArtifacts` applied to `CLAUDE.md`: `lesson: CLAUDE.md +2 −0` or `lesson: nothing written
 where the next agent reads`; the four commands, none run. Owns `cli.ts`, `check.ts`, tests.
 
-### H — `wf round` · wave 2 · after C
+### R — Rounds: implement ⇄ review until the reviewer says done, at most N · after U1
+
+**The question (operator, 2026-09-13, from the canvas):** the workflow is implement → review;
+`respond` is not a third kind of work — J already writes it as `resume: implement` + `input:
+review` + the check. What is missing is the edge back: a loop until the review finds nothing,
+short-circuited after a few rounds because that is the sign of a design problem or a decision.
+
+**Why it does not break "no loops".** The README's reason for excluding loops is that the
+decision — is this good enough — is a judgement. Here the judgement stays with the reviewer: its
+closeout says `again`, the way `blocked` is already an agent's word the run routes on; the run
+files the next round and counts, the way `maxAttempts` is a count. One relationship and one
+number, no condition and no expression.
+
+**Shape.** On the looping step: `loop: <step>` — the step to run again (must be an ancestor via
+`after`) — and `rounds: N` (default 3). A step with `loop:` must declare `again: boolean` in its
+`output:` schema (refused at load otherwise). Round 1 as today. When the looping step is verified
+(or unverified) with `again: true` and the round count is below N: the run files the target step
+again — resumed from its last session, `input:` the looping step (the findings, as data) — then
+the steps between them and the looping step again, fresh sessions except the resumed one. `again:
+false` → the run is `succeeded` (or continues to the steps after). Cap reached with `again` still
+true → the run ends `awaiting` with **rounds exhausted**, the last findings printed, waiting on
+a person; `wf round <run>` is the decider's manual "once more" from there. The loop contract the
+run appends to a resumed step's brief carries `respond.md`'s three honest answers: fix it; say why
+not (the replies travel as the step's own declared output, so the next reviewer reads them as
+data); or sign off `blocked` — needs a decision — which stops the run. Record: derived task ids
+`<run>-<step>@<round>` (adoption after a dead tick as for checks); `wf ls` shows `review · round 2
+of 3`; the board's canvas draws the loop edge with the round count. The engine does not change.
+Refusal tests: `loop:` on a step whose target is not an ancestor; a looping step without `again`
+in its schema; `again: true` at the cap files nothing and reads exhausted; a resumed round is
+given the findings and not the summary; a fresh reviewer each round. Absorbs H; F's `retries:`
+stays the check-failure retry of a single step.
+
+### H — `wf round` · wave 2 · after C — *absorbed by R; kept as the manual "once more" after the cap*
 
 A new run with `follows: { run, round, because }`, cut from the previous result branch,
 `baseRef` at the result tip; refused while the previous run is `running` or ends in several

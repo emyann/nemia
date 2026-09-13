@@ -22,7 +22,7 @@ import os from 'node:os';
 import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Observed, Sighting } from './domain.ts';
-import { claudeRefuses, RunnerError, worktreeName, type RunnerOps, type SpawnRequest } from './runner.ts';
+import { checkoutMcpConfig, claudeMcpArgs, claudeRefuses, RunnerError, worktreeName, writeMcpConfig, type McpServer, type RunnerOps, type SpawnRequest } from './runner.ts';
 
 /** Everything this engine needs to know about a harness. Add one by writing one of these. */
 export type HarnessSpec = {
@@ -32,7 +32,8 @@ export type HarnessSpec = {
   /**
    * What this harness needs to know about the machine before it runs — read from disk, from git —
    * kept out of `command` so that stays a pure function of what it is given. Merged into the `io`
-   * the command receives.
+   * the command receives. A throw refuses the spawn: nothing has run, and the attempt ends
+   * `unstartable` in its words.
    */
   prepare?: (r: SpawnRequest) => Partial<HarnessIO>;
   /**
@@ -63,6 +64,10 @@ export type HarnessIO = {
   closeoutFile?: string;
   /** Directories to treat as trusted for this run. Codex loads a project's rules only when trusted. */
   trustedDirs?: string[];
+  /** Present when the task named MCP servers: its `mcp`, written as an MCP config (`{"mcpServers": …}`). */
+  mcpConfigFile?: string;
+  /** The checkout's own `.mcp.json`, when there is one. Found by a spec's `prepare`, which reads the disk. */
+  checkoutMcpConfig?: string;
 };
 
 /** How long a run file may go unbeaten before `observe` calls it dead. Worker beats every 5s. */
@@ -83,14 +88,15 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   const logFile = (name: string) => path.join(dir, `${safe(name)}.log`);
   const closeoutFile = (name: string) => path.join(dir, `${safe(name)}.closeout.json`);
   const schemaFile = (name: string) => path.join(dir, `${safe(name)}.schema.json`);
+  const mcpFile = (name: string) => path.join(dir, `${safe(name)}.mcp.json`);
 
   const readAll = (): Array<{ name: string; run: RunFile }> => {
     if (!fs.existsSync(dir)) return [];
     const out: Array<{ name: string; run: RunFile }> = [];
     for (const f of fs.readdirSync(dir)) {
-      // Run files only. A closeout or a schema is also JSON, and a payload that happened to carry
-      // a `name` would otherwise be read as a session.
-      if (!f.endsWith('.json') || f.endsWith('.closeout.json') || f.endsWith('.schema.json')) continue;
+      // Run files only. A closeout, a schema or an MCP config is also JSON, and a payload that
+      // happened to carry a `name` would otherwise be read as a session.
+      if (!f.endsWith('.json') || f.endsWith('.closeout.json') || f.endsWith('.schema.json') || f.endsWith('.mcp.json')) continue;
       try {
         const run = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as RunFile;
         if (run.name) out.push({ name: run.name, run });
@@ -137,6 +143,9 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
             fs.writeFileSync(schemaFile(r.name), JSON.stringify(r.closeoutSchema));
             io = { closeoutSchemaFile: schemaFile(r.name), closeoutFile: closeoutFile(r.name) };
           }
+          // Written, or cleared, on every spawn: a re-spawn is given the servers its task names, no more.
+          const mcpConfigFile = writeMcpConfig(mcpFile(r.name), r.mcp);
+          if (mcpConfigFile) io = { ...io, mcpConfigFile };
           io = { ...io, ...spec.prepare?.(r) };
           const { cmd, args } = spec.command(r, io);
           const plan = {
@@ -229,6 +238,20 @@ export const trustedProjects = (toml: string): Set<string> => {
   return trusted;
 };
 
+/**
+ * The MCP server names a Codex config gives, as `codex mcp add` writes them: `[mcp_servers.<name>]`
+ * tables and the tables under them. Not TOML in general — an inline `mcp_servers = {…}` is not read —
+ * so a name it misses meets Codex's own merge, which is where a task stood before this was read.
+ */
+export const codexMcpServerNames = (toml: string): Set<string> => {
+  const names = new Set<string>();
+  for (const raw of toml.split('\n')) {
+    const table = /^\[mcp_servers\.(?:"((?:[^"\\]|\\.)*)"|([\w-]+))(?:\.[^\]]*)?\]$/.exec(raw.trim());
+    if (table) names.add(table[1] ?? table[2]!);
+  }
+  return names;
+};
+
 /** The repository a directory's commits land in: the parent of its git common dir. */
 const repositoryOf = (cwd: string): string | undefined => {
   try {
@@ -268,6 +291,23 @@ const sandboxOf = (r: SpawnRequest): string => {
  */
 export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'];
 
+/** A TOML basic string. JSON's escapes are TOML's; TOML also wants DEL escaped. */
+const tomlString = (s: string) => JSON.stringify(s).replace(/\x7f/g, '\\u007f');
+const tomlTable = (entries: ReadonlyArray<readonly [string, string | undefined]>) =>
+  `{${entries.flatMap(([k, v]) => (v === undefined ? [] : [`${tomlString(k)}=${v}`])).join(',')}}`;
+const tomlStrings = (m: Record<string, string> | undefined) =>
+  m === undefined ? undefined : tomlTable(Object.entries(m).map(([k, v]) => [k, tomlString(v)] as const));
+
+/**
+ * A task's `mcp` as Codex's `mcp_servers` table, inline: `command`, `args`, `env`, or `url` with its
+ * headers as `http_headers`. One value with every name quoted, because a dotted `-c` key is split on
+ * every dot, quotes or none ("invalid transport in `mcp_servers."a`", 0.154.0).
+ */
+export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
+  tomlTable(Object.entries(mcp).map(([name, s]) => [name, 'command' in s
+    ? tomlTable([['command', tomlString(s.command)], ['args', s.args && `[${s.args.map((a) => tomlString(a)).join(',')}]`], ['env', tomlStrings(s.env)]])
+    : tomlTable([['url', tomlString(s.url)], ['http_headers', tomlStrings(s.headers)]])] as const));
+
 /**
  * Codex, through `codex exec`. Verified against codex-cli 0.154.0:
  *   --json                  JSONL events on stdout
@@ -275,7 +315,7 @@ export const CODEX_EFFORTS: readonly string[] = ['none', 'minimal', 'low', 'medi
  *   -s <mode>               sandbox: read-only | workspace-write | danger-full-access
  *   --skip-git-repo-check   allow running outside a git repository
  *   exec resume <id>        continue a previous session
- *   -c key="value"          a config override: `model_reasoning_effort`, project trust
+ *   -c key="value"          a config override: `model_reasoning_effort`, project trust, `mcp_servers`
  */
 export const codex: HarnessSpec = {
   name: 'codex',
@@ -300,6 +340,10 @@ export const codex: HarnessSpec = {
       ...(io?.closeoutFile ? ['--output-schema', io.closeoutSchemaFile!, '-o', io.closeoutFile] : []),
       // Effort is a config override: `codex exec` has no flag for it.
       ...(r.effort ? ['-c', `model_reasoning_effort="${r.effort}"`] : []),
+      // MCP servers, as one override of the whole table. Merged into the operator's own
+      // `mcp_servers`, never put in their place — `-c mcp_servers={}` leaves every one of them
+      // loaded (0.154.0) — so unlike Claude Code, a Codex task still has the operator's servers.
+      ...(r.mcp && Object.keys(r.mcp).length ? ['-c', `mcp_servers=${codexMcpServers(r.mcp)}`] : []),
       // Trust, as found by `prepare`: what lets a repository's own `.codex/rules` load in a worktree.
       ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),
       // `resume` LAST, after every flag: its own usage is `[SESSION_ID] [PROMPT]`, and it rejects
@@ -316,6 +360,10 @@ export const codex: HarnessSpec = {
     if (task.effort !== undefined && !CODEX_EFFORTS.includes(task.effort)) {
       return `\`effort: ${task.effort}\` is not a reasoning effort Codex has. Its efforts are: ${CODEX_EFFORTS.join(', ')}.`;
     }
+    const sse = Object.entries(task.mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
+    if (sse) {
+      return `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`;
+    }
     return undefined;
   },
   // Best effort: codex prints a thread/session id in its JSONL. Only needed for resume.
@@ -331,27 +379,39 @@ export const codex: HarnessSpec = {
    * So a worktree whose repository you already trust in your own Codex config is trusted for the
    * run, and nothing else is. Trusting a repository you never trusted would also load whatever other
    * Codex settings it ships, and that is not a decision this engine gets to make for you.
+   *
+   * The same config is read for the MCP servers it names. Codex merges a task's `mcp_servers` into
+   * the operator's, so a task server with one of their names becomes a mix of the two — the task's
+   * command with the operator's args and env, measured on 0.154.0 — or fails to load when the
+   * transports differ. Such a task is refused here, at spawn, where the config is read as it is now.
    */
   prepare: (r) => {
+    const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
+    let toml: string;
+    try { toml = fs.readFileSync(config, 'utf8'); } catch { return {}; }
+    const operators = codexMcpServerNames(toml);
+    const taken = Object.keys(r.mcp ?? {}).filter((name) => operators.has(name));
+    if (taken.length) {
+      throw new Error(`${taken.map((n) => `\`mcp.${n}\``).join(', ')}: ${config} already has a server by that name, and Codex merges a task's server into the operator's — keeping the operator's args and env beside the task's — rather than replacing it. Give the task's server another name.`);
+    }
     const repo = repositoryOf(r.cwd);
     if (!repo) return {};
-    const config = path.join(process.env.CODEX_HOME ?? path.join(os.homedir(), '.codex'), 'config.toml');
-    let trusted: Set<string>;
-    try { trusted = trustedProjects(fs.readFileSync(config, 'utf8')); } catch { return {}; }
-    return trusted.has(repo) ? { trustedDirs: [...new Set([repo, r.cwd])] } : {};
+    return trustedProjects(toml).has(repo) ? { trustedDirs: [...new Set([repo, r.cwd])] } : {};
   },
 };
 
 /** Claude Code run the same way — detached by us rather than by the harness. For comparison. */
 export const claudeDetached: HarnessSpec = {
   name: 'claude-detached',
-  command: (r) => ({
+  command: (r, io) => ({
     cmd: 'claude',
     args: [
       '-p', r.brief,
       // Variadic, and ended by the flag after it, as for `claude --bg`.
       ...(r.tools ? ['--tools', r.tools.join(',')] : []),
       '--permission-mode', r.permissionMode ?? 'auto',
+      // Strict on every spawn, as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
+      ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
       ...(r.model ? ['--model', r.model] : []),
       ...(r.effort ? ['--effort', r.effort] : []),
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
@@ -359,5 +419,10 @@ export const claudeDetached: HarnessSpec = {
     ],
   }),
   nativeIdPattern: '"session_id"\\s*:\\s*"([0-9a-f-]{16,})"',
+  /** The checkout's `.mcp.json`, found on disk here so that `command` stays a function of what it is given. */
+  prepare: (r) => {
+    const found = checkoutMcpConfig(r.cwd);
+    return found ? { checkoutMcpConfig: found } : {};
+  },
   refuses: claudeRefuses,
 };

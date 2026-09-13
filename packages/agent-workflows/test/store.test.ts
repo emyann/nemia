@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, cancel, decide, list, markCancelled, readRun, start } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, decide, list, markCancelled, missingArtifacts, readRun, start } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -289,9 +289,14 @@ test('the run files a signed step\'s check itself: the frozen command, in its wo
   );
   assert.deepEqual(readCheckBrief(spec.brief), {
     command: 'npm test && npm run typecheck',
-    env: { WF_RUN: run.id, WF_STEP: 'implement', WF_BASE_REF: run.baseRef, WF_WORKSPACE: run.repo, WF_STDERR: path.join(ROOT, 'checks', `${id}.stderr`) },
+    env: {
+      WF_RUN: run.id, WF_STEP: 'implement', WF_BASE_REF: run.baseRef, WF_WORKSPACE: run.repo, WF_STDERR: path.join(ROOT, 'checks', `${id}.stderr`),
+      // The step's own files directory, where a check that takes screenshots puts them.
+      WF_ARTIFACTS: path.join(ROOT, 'runs', run.id, 'artifacts', 'implement'),
+    },
   });
   assert.ok(fs.existsSync(path.join(ROOT, 'checks')), 'the stderr file has somewhere to go');
+  assert.ok(fs.statSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement')).isDirectory(), 'and so do its files');
 
   await advance(e, readRun(run.id));
   assert.equal(filings.filter((f) => f === id).length, 1, 'filed once, however many passes');
@@ -597,4 +602,75 @@ test('`wf start` refuses an `output:` file that is not there, and an `input:` on
     err.exitCode === 2 && /respond: `input: review`, but respond does not wait on review/.test(err.message));
 
   assert.equal(runs(), before, 'no run record for either');
+});
+
+// ─── a step's files, outside every workspace ────────────────────────────────
+
+/** A closeout that declares `artifacts`, and nothing else of note. */
+const declaring = (artifacts: string[]) => ({ outcome: 'done' as const, summary: 'did it', artifacts });
+
+test('a step is told where its files go — a directory the run made for it, outside every workspace — and so is a step that resumes', async () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  fs.writeFileSync(path.join(dir, 'respond.md'), '---\nresume: implement\n---\nanswer it\n');
+  const run = started(dir);
+  const { e, tasks, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['respond']);
+
+  for (const name of ['implement', 'respond']) {
+    const files = path.join(ROOT, 'runs', run.id, 'artifacts', name);
+    const brief = tasks.get(`${run.id}-${name}`)!.spec.brief;
+    assert.ok(fs.statSync(files).isDirectory(), `${name}: made before the step was filed`);
+    assert.ok(!files.startsWith(run.repo + path.sep), `${name}: not in the workspace, where it would ride the branch`);
+    const told = brief.indexOf('\n## Files for the steps after you\n');
+    assert.ok(told >= 0, `${name}: ${brief}`);
+    assert.ok(brief.includes(`Put them in \`${files}\`; name them in \`artifacts\` by absolute path.`), `${name}: ${brief}`);
+    assert.ok(told < brief.indexOf('\n## When you are finished\n'), `${name}: beside the closeout, which stays last`);
+  }
+});
+
+test("a declared file in the step's files directory counts when it is there, is reported when it is not, and is listed with its size", async () => {
+  const run = started(folder());
+  await advance(board().e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  fs.mkdirSync(path.join(files, 'shots'));
+  fs.writeFileSync(path.join(files, 'factory-light.png'), 'png');
+  fs.writeFileSync(path.join(files, 'shots', 'run-dark.png'), 'a png');
+  const declared = [path.join(files, 'factory-light.png'), path.join(files, 'shots', 'run-dark.png'), path.join(files, 'never-written.png'), path.join(files, 'shots')];
+
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(declared)), [path.join(files, 'never-written.png'), path.join(files, 'shots')], 'a directory is not a file');
+  assert.deepEqual(artifactFiles(run, 'implement'), [
+    { path: path.join(files, 'factory-light.png'), bytes: 3 },
+    { path: path.join(files, 'shots', 'run-dark.png'), bytes: 5 },
+  ]);
+  assert.deepEqual(artifactFiles(run, 'review'), [], 'a step never filed has no directory, and lists nothing');
+});
+
+test("an absolute path outside the step's files directory is refused, and never read — however it gets out", async (t) => {
+  const run = started(folder());
+  await advance(board().e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  // Every one of these is a file that exists: looking would have found it.
+  const secret = path.join(ROOT, 'secret.txt');
+  fs.writeFileSync(secret, "not a step's to name\n");
+  const review = artifactsDir(run, 'review');
+  fs.mkdirSync(review, { recursive: true });
+  fs.writeFileSync(path.join(review, 'shot.png'), 'png');
+  fs.mkdirSync(`${files}-old`, { recursive: true });
+  fs.writeFileSync(path.join(`${files}-old`, 'shot.png'), 'png');
+  const outside = [secret, path.join(files, '..', '..', '..', '..', 'secret.txt'), path.join(review, 'shot.png'), path.join(`${files}-old`, 'shot.png'), files];
+
+  const spies = ['existsSync', 'statSync', 'lstatSync', 'realpathSync', 'readFileSync', 'openSync', 'accessSync', 'readdirSync']
+    .map((method) => t.mock.method(fs, method as 'statSync'));
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(outside)), outside);
+  const looked = spies.flatMap((spy) => spy.mock.calls.map((call) => String(call.arguments[0])))
+    .filter((p) => outside.some((o) => path.resolve(p) === path.resolve(o)));
+  assert.deepEqual(looked, [], 'refused without being opened, stat-ed or resolved');
+
+  // A link inside the directory that leads out is as outside as where it leads, and is not listed.
+  fs.symlinkSync(secret, path.join(files, 'link.txt'));
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])), [path.join(files, 'link.txt')]);
+  assert.deepEqual(artifactFiles(run, 'implement'), []);
 });

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, cancelPlan, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, outputLines, parseCloseout, stepStatus, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
+import { artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, outputLines, parseCloseout, stepStatus, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -825,4 +825,55 @@ test('a declared field named `__proto__` travels like any other — into the bri
   assert.equal(JSON.stringify(jsonIn(brief)), '{"__proto__":"product"}');
   assert.deepEqual(outputLines(producer, said), ['__proto__: product']);
   assert.equal(JSON.stringify(closeoutSchemaOf(producer).required), '["outcome","summary","artifacts","needs","__proto__"]');
+});
+
+// ─── files for the steps after it ───────────────────────────────────────────
+
+const FILES = '/wf/runs/r-1/artifacts/implement';
+
+test('a step is told where its files go, before its closeout — a fresh step, a fan-in and a resumed one alike', () => {
+  const fanIn = step('integrate', ['a', 'b']);
+  const resumed: Workflow = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
+  const briefs = [
+    composeBrief(step('implement'), run({ implement: null }), STEPS, undefined, FILES),
+    composeBrief(fanIn, run({ a: 't1', b: 't2', integrate: null }), [step('a'), step('b'), fanIn], undefined, FILES),
+    composeBrief(resumed, run({ implement: 't1', respond: null }), [step('implement'), resumed], undefined, FILES),
+  ];
+  for (const brief of briefs) {
+    const told = brief.indexOf('\n## Files for the steps after you\n');
+    assert.ok(told >= 0, brief);
+    assert.ok(brief.includes(`Put them in \`${FILES}\`; name them in \`artifacts\` by absolute path.`), brief);
+    assert.ok(told < brief.indexOf('\n## When you are finished\n'), 'the closeout stays last');
+  }
+  // What it will be judged by, then where its files go, then how to finish.
+  assert.ok(briefs[2]!.indexOf('\n## Before you sign off\n') < briefs[2]!.indexOf('\n## Files for the steps after you\n'));
+  assert.match(artifactsContract(FILES), /given the same\ndirectory as `WF_ARTIFACTS`/);
+});
+
+test('a declared artifact is on the branch by a relative path, in the files directory by an absolute one inside it, and outside anywhere else', () => {
+  for (const f of ['RESPONSE.md', 'docs/notes.md', '../outside.md']) assert.equal(artifactPlace(f, FILES), 'branch', f);
+  for (const f of [`${FILES}/factory-light.png`, `${FILES}/shots/run-dark.png`, `${FILES}/shots/../factory-light.png`, `${FILES}/..hidden.png`]) {
+    assert.equal(artifactPlace(f, FILES), 'files', f);
+  }
+  for (const f of ['/etc/passwd', FILES, `${FILES}/`, `${FILES}/..`, `${FILES}/../review/shot.png`, `${FILES}-old/shot.png`, `${FILES}2/shot.png`]) {
+    assert.equal(artifactPlace(f, FILES), 'outside', f);
+  }
+});
+
+test("`wf decide` tells apart why a declared file is missing, then lists the step's files with their sizes", () => {
+  const lines = artifactLines(FILES, ['NOTES.md', `${FILES}/gone.png`, '/etc/passwd'], [
+    { path: `${FILES}/factory-light.png`, bytes: 512 },
+    { path: `${FILES}/shots/run-dark.png`, bytes: 48_230 },
+    { path: `${FILES}/trace.zip`, bytes: 3 * 1024 * 1024 },
+  ]);
+  assert.deepEqual(lines, [
+    '!! declared but not on the branch: NOTES.md  — it did not travel',
+    `!! declared but not in ${FILES}: ${FILES}/gone.png`,
+    `!! declared outside ${FILES}, and not read: /etc/passwd  — a step's files go in its own directory`,
+    'files:',
+    `  ${FILES}/factory-light.png  512 B`,
+    `  ${FILES}/shots/run-dark.png  47.1 KB`,
+    `  ${FILES}/trace.zip  3.0 MB`,
+  ]);
+  assert.deepEqual(artifactLines(FILES, [], []), [], 'nothing missing and no files: nothing to say');
 });

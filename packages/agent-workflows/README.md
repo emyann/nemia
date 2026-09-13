@@ -343,13 +343,15 @@ nothing that waits on the step ever runs. A step with no `check:` has nothing ru
   `steps[name].check` — beside the step's own `taskId`, never in place of it. The engine is unchanged.
 - **The gate is the exit code the engine recorded.** The `[wf check] exit N` line in the log is the
   number shown to a person; a command that prints one of its own changes that number and nothing else.
-- The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE` and `WF_STDERR`.
+- The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE`, `WF_STDERR`, and `WF_ARTIFACTS` — the
+  step's files directory, where a check that takes screenshots puts them (*A step's files*, below).
 - The run commits what a step left **before** filing its check and never after, so what a suite leaves
   behind is not committed under the step's name.
 
 This repository's own `workflows/implement.md` and `workflows/respond.md` carry
 `check: npm test && npm run typecheck` — the check a person used to run by hand at every trial merge.
-Point the folder at another repository and change that line.
+`workflows/ui/`, for a change to the web app, adds `npm run build && npm run e2e`. Point the folder at
+another repository and change that line.
 
 ### What a step's line says
 
@@ -371,6 +373,53 @@ and, for a check that refused, the last 20 lines of stdout and of stderr.
 
 **`unsigned` blocks every `claude-detached` step** until engine open issue 4 is fixed: that harness
 never hands the closeout schema on, so its steps never sign off. `claude` and `codex` steps do.
+
+## A step's files: `runs/<id>/artifacts/<step>/`
+
+Some of what a step makes is for the steps after it and the person who decides, and does not belong on
+the branch: a screenshot, a log, a report. Written into the worktree, it is committed by the hand-off and
+rides the branch into what ships; gitignored, it never reaches the next step's worktree at all. So the run
+makes a directory per step, beside the run's record under `WF_ROOT` and outside every workspace, before
+it files the step.
+
+- **The step is told where it is**, on its brief, beside the closeout contract (`artifactsContract`):
+  *put them in `<dir>`; name them in `artifacts` by absolute path*. Mechanism, like the closeout: no
+  workflow author has to remember to say it.
+- **The step's check is given it** as `WF_ARTIFACTS`.
+- **A declared artifact is looked for where its path says** (`artifactPlace`). A path from the workspace
+  root is looked for on the branch, as before. An absolute path is looked for in the step's own
+  directory, on disk, with links followed. Any other absolute path — another step's directory, a `..`
+  that climbs out, a link inside that leads out, `/etc/passwd` — is reported and never opened, stat-ed or
+  resolved: a closeout is an agent's text.
+- **`wf decide` lists the directory** after the step's closeout, each file by absolute path with its
+  size, below whatever it declared that is not where it says.
+
+A file reaches a later step by its path, declared. `workflows/ui/implement.md` declares `screenshots`,
+the absolute paths of its PNGs, and `look` reads them with `input: implement`.
+
+### `workflows/ui/`: a change a person will see
+
+```
+implement ──► review (codex, read-only: the code)       ──┐
+          └─► look   (claude: implement's screenshots)   ──┴─► respond (resumes implement)
+```
+
+`implement` and `respond` carry `check: npm test && npm run typecheck && npm run build && npm run e2e`.
+`npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a seeded
+store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
+have, and screenshots each into `WF_ARTIFACTS`. `implement` is told to run it into its own directory and
+read the PNGs before it signs off, and declares `screenshots` and `pages` (`implement.schema.json`).
+`look` is handed those and nothing else of implement, reads the images, and declares `findings` by page
+and theme (`look.schema.json`). `review` is `workflows/review.md` and its schema, copied, and a test holds
+the copy to the original. `respond` is the fan-in: it reads both reviews, continues implement's session,
+and answers them in `RESPONSE.md`.
+
+```bash
+wf start "Give the Factory a legend" --workflows packages/agent-workflows/workflows/ui
+```
+
+`look` is told to write nothing, and nothing enforces that until the engine carries `tools:`
+(`docs/plan-hold-the-bar.md` §4 I).
 
 ## Deciding what ships
 

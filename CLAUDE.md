@@ -9,10 +9,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 ## Check your work
 
 - `npm test` — from the root, turbo runs `node --test test/*.test.ts` in every package
-  (181 engine · 135 workflows · 16 api · 17 web at 2026-09-13). Runs from a package directory
+  (181 engine · 169 workflows · 21 api · 33 web at 2026-09-13). Runs from a package directory
   too. Not bare `node --test` from the root: `agent-engine/test/facade.test.ts` is cwd-relative.
-  To verify a merge, run it serially — `npx turbo run test --concurrency=1` — until the api
-  tests stop depending on the machine's live `claude agents` registry (plan §4b).
+  It runs the packages one at a time (`--concurrency=1`), on purpose: the api tests hit the machine's
+  live `claude agents` registry and die under contention (plan §4b), and a check must be
+  deterministic before it is fast. `npx turbo run test` is the parallel form when you want it.
 - `npm run typecheck` — `tsc --noEmit` per package. **This is the lint.** There is no eslint or
   biome, on purpose, until one replaces more code than it adds.
 - Run both before you commit. Green is the floor, not the bar: a change that makes the suite
@@ -20,10 +21,19 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - `npm run build` too when you touch `apps/web`: the router plugin regenerates
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).
+- For `apps/web` changes, run `npm run e2e` and read the PNGs it writes before you sign off (`.e2e/`,
+  or `$WF_ARTIFACTS` in a run); `npx playwright install chromium` once per machine. A new page gets
+  a line in `PAGES` (`apps/web/test/e2e/run.ts`), or the check never looks at it.
 - **A guard is not proven by a test that asks whether it allows.** Every new refusal — a parser
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's
   admission gate, worktree base and lease each were).
+- **In a worktree, `node_modules` is a link into the main checkout.** So `apps/api` imports the main
+  checkout's `agent-workflows`, not the branch's: an app change that needs a package change from the
+  same branch fails `typecheck` until the package is merged — land the package first. And `npm
+  install` from a worktree reads the linked tree as extraneous and rewrites the main checkout's: add a
+  dependency with `npm install --package-lock-only`, and if the branch needs it before the merge,
+  unpack it (`npm pack` + `tar`) into `node_modules`, which adds and removes nothing (learned by U1).
 
 ## Rules the code keeps
 

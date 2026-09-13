@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifacts, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, outputLines, readArtifact, readRun, resultBranches, start, stepsOf, tick, verdictWord } from './runner.ts';
+import { artifactFiles, artifactLines, artifacts, artifactsDir, cancel, decide, diffStat, engine, list, listRuns, missingArtifacts, outputLines, readArtifact, readRun, resultBranches, start, stepsOf, tick, verdictWord } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -181,8 +181,10 @@ export async function main(argv: string[]): Promise<void> {
         const step = steps.find((s) => s.name === name);
         for (const line of step ? outputLines(step, c) : []) console.log(`    ${line}`);
         if (c.needs) console.log(`    needs: ${c.needs}`);
-        const missing = missingArtifacts(run, name, c);
-        if (missing.length) console.log(`    !! declared but not on the branch: ${missing.join(', ')}  — it did not travel`);
+        // What it declared that is not where it says, then what is in the directory the run made for its
+        // files: the screenshots a UI step's check took, say, which are on no branch.
+        const files = artifactLines(artifactsDir(run, name), missingArtifacts(run, name, c), artifactFiles(run, name));
+        for (const line of files) console.log(`    ${line}`);
       }
       console.log();
 

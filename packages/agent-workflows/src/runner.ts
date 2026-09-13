@@ -13,8 +13,9 @@ import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 
 import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type Verdict } from './check.ts';
 
 export { verdictWord } from './check.ts';
-export { outputLines } from './run.ts';
+export { artifactLines, outputLines } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
+import { artifactPlace, type ArtifactFile } from './run.ts';
 import { assess, cancelPlan, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, stepStatus, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -187,6 +188,17 @@ const closeoutAsked =(views: ReadonlyMap<string, TaskView>) => (taskId: string):
  * would be committed by the next hand-off and ride the branch.
  */
 export const checkStderr = (taskId: string): string => path.join(HOME, 'checks', `${taskId}.stderr`);
+
+/**
+ * The directory the run makes for a step's files: screenshots, logs, reports — for the steps after it
+ * and the person who decides.
+ *
+ * Beside the run's record, outside every workspace, for the reason a check's stderr is: a file written
+ * into a worktree is committed by the next hand-off and rides the branch, and a gitignored one never
+ * reaches the next step's worktree at all. `advance` makes it before it files the step, tells the step in
+ * its brief (`artifactsContract`), and hands it to the step's check as `WF_ARTIFACTS`.
+ */
+export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'artifacts', step);
 
 /**
  * Gitignored directories a fresh worktree needs in order to be usable.
@@ -417,12 +429,16 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     // Looked up once more all the same: filing an id the engine already holds would journal it twice.
     if (!(await e.view(taskId)).state.brief) {
       fs.mkdirSync(path.dirname(checkStderr(taskId)), { recursive: true });
+      // Made here as well as at filing: a step filed before the run made these has none.
+      const files = artifactsDir(run, name);
+      fs.mkdirSync(files, { recursive: true });
       await e.file({
         id: taskId,
         harness: 'check',
         // The command from the workflow this run froze — never from the workspace it is about to judge.
         brief: checkBrief(step.check!, {
           WF_RUN: run.id, WF_STEP: name, WF_BASE_REF: run.baseRef, WF_WORKSPACE: workspace, WF_STDERR: checkStderr(taskId),
+          WF_ARTIFACTS: files,
         }),
         cwd: workspace,
         deadlineSeconds: CHECK_DEADLINE_SECONDS,
@@ -447,6 +463,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   for (const name of ready) {
     const step = steps.find((s) => s.name === name)!;
     const place = workspaceFor(run, steps, step);
+    // Made before the step is told of it, so the directory its brief names is there when it starts.
+    const files = artifactsDir(run, name);
+    fs.mkdirSync(files, { recursive: true });
 
     const taskId = await e.file({
       // The task id is chosen, not generated, so the harness session reads `ae/<run>-<step>/1`.
@@ -456,7 +475,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       id: `${run.id}-${name}`,
       // What the steps it reads declared, if it names any in `input:` — read off the same closeouts the
       // assessment that made it ready just read, so it is handed what it was filed on.
-      brief: composeBrief(step, run, steps, signedOff),
+      brief: composeBrief(step, run, steps, signedOff, files),
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,
@@ -617,20 +636,58 @@ export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run) =
 };
 
 /**
- * Artifacts a step DECLARED that are not on its branch.
+ * Artifacts a step DECLARED that are not where it says they are.
  *
  * The whole point of declaring them. The first real run lost the reviewer's entire output because
  * REVIEW.md was written and never committed, and nothing anywhere noticed — the merge was clean
  * and empty. A declared file that is not on the branch is now a mismatch somebody can see. Since
  * the run commits whatever a step leaves, a missing one was never written — or was written where
  * git will not take it, like a gitignored path.
+ *
+ * An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
+ * on disk: present when it is a file inside the directory once every link on the way is followed, so a
+ * link that leads out is as missing as where it leads. Any other absolute path is reported without being
+ * looked at (`artifactPlace`).
  */
 export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): string[] {
+  if (!closeout || 'error' in closeout) return [];
   const branch = run.steps[stepName]?.branch;
-  if (!branch || !closeout || 'error' in closeout) return [];
+  const dir = artifactsDir(run, stepName);
   return closeout.artifacts.filter((f) => {
+    const place = artifactPlace(f, dir);
+    if (place === 'outside') return true;
+    if (place === 'files') return !isFileIn(f, dir);
+    if (!branch) return false;
     try { git(run.repo, 'cat-file', '-e', `${branch}:${f}`); return false; } catch { return true; }
   });
+}
+
+/** Whether `file` is a regular file inside `dir`, with every link on the way to either followed. */
+function isFileIn(file: string, dir: string): boolean {
+  try {
+    const real = fs.realpathSync(file);
+    return artifactPlace(real, fs.realpathSync(dir)) === 'files' && fs.statSync(real).isFile();
+  } catch { return false; }
+}
+
+/**
+ * Every file in a step's files directory, every level down, with its size: what `wf decide` lists after
+ * the step's closeout. Regular files only, and no link is followed, so nothing outside the directory is
+ * listed because something inside it points there.
+ */
+export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactFile[] {
+  const found: ArtifactFile[] = [];
+  const walk = (dir: string): void => {
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const entry of entries) {
+      const at = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(at);
+      else if (entry.isFile()) found.push({ path: at, bytes: fs.lstatSync(at).size });
+    }
+  };
+  walk(artifactsDir(run, stepName));
+  return found.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 /**

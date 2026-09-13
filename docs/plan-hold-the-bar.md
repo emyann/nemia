@@ -507,6 +507,13 @@ owner is not mid-run.
   node. → a small engine run after E2, then an apps follow-up.
 - **the engine, found by C's run:** a session that gives its closeout and is then marked `blocked`
   never ends — `closedOut` handles `working` only. → E2 (`fix-one-gap-in-agent-engine-h35j`).
+- **the artifacts directory and Codex (U1's review):** every brief now names
+  `runs/<id>/artifacts/<step>/`, and a Codex step in `workspace-write` cannot write there (only the
+  worktree and tmp; the engine passes no `--add-dir`). Latent while the reviewer is Opus. The fix is
+  hkb's `exports`: a step lists a relative path under `artifacts` and the run *collects* it into the
+  directory at hand-off, before the check — then no step needs to write outside its workspace. → with R.
+- **the e2e script has no refusal test (U1's review):** nothing proves a page with a console error or a
+  failed request makes `npm run e2e` exit non-zero. → F2's brief.
 - **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
   a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
   for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running

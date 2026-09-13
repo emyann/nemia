@@ -11,11 +11,18 @@
  *     ---
  *     Review the changes on this branch. Be specific about correctness, not style.
  *
- * **There is exactly one non-prose key: `after`.** No conditions, no loops, no expressions. That
- * is deliberate. The interesting decisions in this kind of work — is this good enough, did it
- * actually do what was asked — are not predicates a workflow language could evaluate. They are
- * judgements, and a judgement belongs to a step with an agent in it, not to a keyword. The
- * workflow is a team, not a program.
+ * **No key is control flow.** No conditions, no loops, no expressions. That is deliberate. The
+ * interesting decisions in this kind of work — is this good enough, did it actually do what was
+ * asked — are not predicates a workflow language could evaluate. They are judgements, and a
+ * judgement belongs to a step with an agent in it, not to a keyword. The workflow is a team, not a
+ * program: `after` orders, `resume` continues, `check` measures, `retries` counts, and the rest
+ * say who does the work and for how long.
+ *
+ * **The keys are a closed list.** A key the parser does not know is refused by name, and a value
+ * it cannot use is refused with the fix, before anything is spent. Accepting and ignoring is what
+ * this replaces: `afer: implement` read as no `after` at all and started the reviewer at once,
+ * beside the implementer, with write access; `deadlineSeconds: 5m` read as NaN and stopped the
+ * step on its first tick. A `check:` the parser drops is a constraint nobody enforces.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -41,39 +48,189 @@ export type Workflow = {
   permissionMode?: string;
   deadlineSeconds?: number;
   maxAttempts?: number;
+  /**
+   * A shell command the run executes in the step's workspace after the step hands off; exit 0 is
+   * what makes the step verified. It measures, it does not route. The command is read from the
+   * workflow the run froze, never from a checkout the step can edit.
+   */
+  check?: string;
+  /** How many times the run re-files the step after its check refuses it. Absent means none. */
+  retries?: number;
 };
 
-export class WorkflowError extends Error {}
+/** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
+export const STEP_KEYS = [
+  'after', 'resume', 'harness', 'model', 'permissionMode', 'deadlineSeconds', 'maxAttempts', 'check', 'retries',
+] as const;
+export type StepKey = (typeof STEP_KEYS)[number];
 
-const FRONTMATTER = /^---\n([\s\S]*?)\n---\n?/;
+/**
+ * Keys refused with a reason of their own, because each is one somebody will write expecting it to
+ * work, and "not a key a step has" would be a worse answer than the truth.
+ */
+const REFUSED: Record<string, string> = {
+  tools: 'the engine does not carry a tool list to the harness yet, so the step would run with every tool while'
+    + ' this file said otherwise. Delete the line; `tools` is reserved, and is accepted once the engine enforces it',
+  effort: 'the engine does not carry an effort level to the harness yet, so the line would change nothing.'
+    + ' Delete it; `effort` is reserved, and is accepted once the engine passes it on',
+  guide: 'the harness reads CLAUDE.md or AGENTS.md from the step\'s workspace on its own. Standing rules belong'
+    + ' in that file, and what only this step needs to know belongs in the body',
+};
+
+/** The harness a step runs on when it names none. */
+const DEFAULT_HARNESS = 'claude';
+
+const CLAUDE_MODES = ['default', 'acceptEdits', 'auto', 'dontAsk', 'bypassPermissions', 'plan'];
+
+/**
+ * The harnesses a step may run on, and the permission modes each understands.
+ *
+ * A copy of the engine's vocabulary, not an import — `runner.ts` is the only file here that imports
+ * the engine — and checked here because nothing below checks it: an unknown `harness` falls
+ * silently to the default, and an unknown mode is refused by the Claude CLI at spawn (which rejects
+ * the whole tick) or read by Codex as `workspace-write`.
+ *
+ * Codex's list is the plan's (`docs/plan-hold-the-bar.md` §4 A), and ahead of the engine: today
+ * `agent-engine/src/runner-detached.ts:236` passes `-s danger-full-access` only for
+ * `bypassPermissions` and `-s workspace-write` for everything else, so `read-only` waits on the
+ * engine's own change and `danger-full-access` is accepted here and not yet honoured there.
+ *
+ * `check` is not on the list. That harness is the run's own: it executes a step's `check:`
+ * command, and no step runs on it.
+ */
+export const PERMISSION_MODES: Readonly<Record<string, readonly string[]>> = {
+  claude: CLAUDE_MODES,
+  codex: ['workspace-write', 'danger-full-access', 'read-only'],
+  'claude-detached': CLAUDE_MODES,
+};
+export const HARNESSES: readonly string[] = Object.keys(PERMISSION_MODES);
+
+/** The keys that are counts: what each counts, the least that means anything, and an example. */
+const COUNTS = {
+  deadlineSeconds: { least: 1, counts: 'the seconds the engine lets the step run before stopping it', example: 900 },
+  maxAttempts: { least: 1, counts: 'how many attempts the engine may make at the step', example: 1 },
+  retries: { least: 0, counts: 'how many times the run re-files the step after its check refuses it', example: 1 },
+} as const;
+
+export class WorkflowError extends Error {
+  /** A step that is wrong is its author's to fix, and the message says how. */
+  readonly exitCode = 2;
+}
+
+function refuse(why: string): never {
+  throw new WorkflowError(why);
+}
+
+const isStepKey = (key: string): key is StepKey => (STEP_KEYS as readonly string[]).includes(key);
+
+const FRONTMATTER = /^---[ \t]*\n([\s\S]*?\n)?---[ \t]*(?:\n|$)/;
 
 export function parseWorkflow(name: string, text: string): Workflow {
+  // A file saved with a byte-order mark or `\r\n` is the same file. Left in, either one hides the
+  // frontmatter in the body, and every key in it is dropped without a word.
+  text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
   const m = FRONTMATTER.exec(text);
-  const meta: Record<string, string> = {};
-  if (m) {
-    for (const line of m[1]!.split('\n')) {
-      const i = line.indexOf(':');
-      if (i > 0) meta[line.slice(0, i).trim()] = line.slice(i + 1).trim();
-    }
+  if (!m && /^---[ \t]*\n/.test(text)) {
+    refuse(`${name}: the frontmatter opened on the first line never closes, so every key in it would be read as prose. End it with a line that is just \`---\`.`);
   }
+  const meta: Partial<Record<StepKey, string>> = m ? readKeys(name, m[1] ?? '') : {};
   const body = (m ? text.slice(m[0].length) : text).trim();
   if (!body) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
 
   const after = (meta.after ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   // `resume: x` implies `after: x` — continuing a session that has not run is not a thing.
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
+  const harness = harnessOf(name, meta.harness);
 
   return {
     name,
     after,
     resume: meta.resume,
     body,
-    harness: meta.harness,
+    harness,
     model: meta.model,
-    permissionMode: meta.permissionMode,
-    deadlineSeconds: meta.deadlineSeconds ? Number(meta.deadlineSeconds) : undefined,
-    maxAttempts: meta.maxAttempts ? Number(meta.maxAttempts) : undefined,
+    permissionMode: modeOf(name, meta.permissionMode, harness),
+    deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
+    maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
+    check: checkOf(name, meta.check),
+    retries: countOf(name, 'retries', meta.retries),
   };
+}
+
+/** The frontmatter as key → value: every line a key a step has, set once, to something. */
+function readKeys(step: string, block: string): Partial<Record<StepKey, string>> {
+  const meta: Partial<Record<StepKey, string>> = {};
+  for (const raw of block.split('\n')) {
+    const line = raw.trim();
+    // Blank lines group a long frontmatter; `#` is the comment character every reader expects.
+    if (!line || line.startsWith('#')) continue;
+    const i = line.indexOf(':');
+    if (i <= 0) {
+      refuse(`${step}: \`${line}\` is not \`key: value\`. Each frontmatter line is a key, a colon and its value, and a list stays on one line: \`after: a, b\`.`);
+    }
+    const key = line.slice(0, i).trim();
+    const value = line.slice(i + 1).trim();
+
+    if (Object.hasOwn(REFUSED, key)) refuse(`${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`);
+    if (!isStepKey(key)) {
+      refuse(`${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`);
+    }
+    // Refused rather than last-one-wins: both values are something the author meant, and picking
+    // one silently is how a step ends up waiting on half of what it was written to wait on.
+    if (Object.hasOwn(meta, key)) {
+      refuse(`${step}: \`${key}\` is set twice, and a step that says two things says nothing. Keep one line${key === 'after' ? ' and list every step on it: `after: a, b`' : ''}.`);
+    }
+    if (!value) {
+      refuse(key === 'check'
+        ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
+        : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
+    }
+    meta[key] = value;
+  }
+  return meta;
+}
+
+function harnessOf(step: string, harness: string | undefined): string | undefined {
+  if (harness === undefined || HARNESSES.includes(harness)) return harness;
+  if (harness === 'check') {
+    refuse(`${step}: \`harness: check\` is the run's own harness — it executes a step's \`check:\` command, and no step runs on it. Put the command in \`check:\` and run the step on one of: ${HARNESSES.join(', ')}.`);
+  }
+  return refuse(`${step}: \`harness: ${harness}\` is not a harness a step can run on. The harnesses are: ${HARNESSES.join(', ')}. Without the line, the step runs on ${DEFAULT_HARNESS}.`);
+}
+
+/** A permission mode is the harness's vocabulary, so it is checked against the harness the step runs on. */
+function modeOf(step: string, mode: string | undefined, harness: string | undefined): string | undefined {
+  const on = harness ?? DEFAULT_HARNESS;
+  const modes = PERMISSION_MODES[on]!;
+  if (mode === undefined || modes.includes(mode)) return mode;
+  const owner = HARNESSES.find((h) => PERMISSION_MODES[h]!.includes(mode));
+  return refuse(
+    `${step}: \`permissionMode: ${mode}\` is not a mode ${on} has${harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`}.`
+    + ` On ${on} it is one of: ${modes.join(', ')}.`
+    + (owner ? ` \`${mode}\` is ${owner}'s word, and this step does not run on ${owner}.` : '')
+    + ' Without the line, the harness uses its own default.',
+  );
+}
+
+function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined): number | undefined {
+  if (value === undefined) return undefined;
+  const { least, counts, example } = COUNTS[key];
+  const n = /^\d+$/.test(value) ? Number(value) : NaN;
+  if (Number.isSafeInteger(n) && n >= least) return n;
+  // `5m` is the one that shipped: NaN, journalled as null, and the step stopped on its first tick.
+  // The unit is what the author meant, so the message does the arithmetic rather than the author.
+  const unit = key === 'deadlineSeconds' ? /^(\d+)\s*([smh])$/.exec(value) : null;
+  const instead = unit ? `\`${key}: ${Math.max(least, Number(unit[1]) * { s: 1, m: 60, h: 3600 }[unit[2] as 's' | 'm' | 'h'])}\`` : `for example \`${key}: ${example}\``;
+  return refuse(`${step}: \`${key}: ${value}\` is not a count. \`${key}\` is ${counts}: a whole number ${least ? 'above zero' : 'of zero or more'}, in digits${unit ? ' with no unit' : ''} — ${instead}.`);
+}
+
+function checkOf(step: string, check: string | undefined): string | undefined {
+  // Each of these reads as "no check" to a person and as a command to the shell, which cannot find
+  // it: exit 127 on every attempt, for a check nobody meant to run.
+  if (check !== undefined && ['none', '""', "''"].includes(check)) {
+    refuse(`${step}: \`check: ${check}\` would run \`${check}\` as a shell command, which exits 127 and fails the step every time. Delete the line — a step without \`check:\` runs no check.`);
+  }
+  return check;
 }
 
 /** Read a folder of steps and check that they form a workflow rather than a wish. */

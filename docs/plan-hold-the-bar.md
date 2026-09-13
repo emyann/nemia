@@ -113,8 +113,10 @@ and `retries?: number`; `parseWorkflow` reads both. Nothing else in that commit.
   legal list: `` review: `afer` is not a key a step has. A step's keys are: after, … ``.
 - `tools:` is refused **by name** with its own message — reserved, not passed through until
   package I — never silently dropped.
-- Refused with a message naming the fix: an empty `check:`; `deadlineSeconds`, `maxAttempts`,
-  `retries` that are not a positive finite integer (`5m` is the case that shipped); a `harness`
+- Refused with a message naming the fix: an empty `check:`; `deadlineSeconds` and `maxAttempts`
+  that are not a whole number above zero, `retries` that is not a whole number of zero or more
+  (`5m` is the case that shipped; `retries: 0` is the documented default and a legitimate explicit
+  value — the first wording here said "positive" for all three and A's review caught it); a `harness`
   outside `claude | codex | claude-detached` (and `check`, which is the run's own); a
   `permissionMode` outside the harness's list — claude: `default | acceptEdits | auto | dontAsk
   | bypassPermissions | plan`; codex: `workspace-write | danger-full-access | read-only`
@@ -154,7 +156,10 @@ the closeout as a finding.
 
 **Commit 1, in the first hour.** codex: `permissionMode === 'read-only'` → `-s read-only`
 (`runner-detached.ts:236` today maps everything but `bypassPermissions` to `workspace-write`).
-One test.
+One test. *Found by A's run, to check at B's trial merge:* `permissionMode: danger-full-access`
+passes A's parser (it is in codex's list) but the same line maps only `bypassPermissions` to
+`-s danger-full-access` — honour the codex word too, or the parser's list is a declaration
+without enforcement.
 
 **Definition of done, in order.**
 

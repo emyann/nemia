@@ -14,27 +14,25 @@
  *
  * Exits non-zero on the first failure, naming the page, the theme and the assertion, with a screenshot
  * of what the page looked like. Both servers are stopped on the way out: on success, on failure, and on a
- * signal. The assertions themselves are made to refuse in checks.test.ts, which `npm run e2e` runs first.
+ * signal. The assertions are made to refuse in checks.test.ts, and the visiting and the exit (visit.ts) in
+ * visit.test.ts, both of which `npm run e2e` runs first.
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
-import { expectCount, expectInside, expectTheme, expectVisible, Refused, settled, watch } from './checks.ts';
+import type { Page } from 'playwright';
+import { expectCount, expectInside, expectVisible, settled } from './checks.ts';
 import { FAKE, seed } from './seed.ts';
+import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
 const REPO = path.resolve(WEB, '..', '..');
 const API = path.join(REPO, 'apps', 'api');
 const OUT = path.resolve(process.env.WF_ARTIFACTS || path.join(REPO, '.e2e'));
-const THEMES = ['light', 'dark'] as const;
-type Theme = (typeof THEMES)[number];
 
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
-
-type PageSpec = { name: string; route: string; expect: (page: Page) => Promise<void> };
 
 /** On every page: the menu, with both of its places. */
 async function sidebar(page: Page): Promise<void> {
@@ -147,47 +145,7 @@ function fromNodeModules(file: string): string {
   }
 }
 
-// ─── the pages ──────────────────────────────────────────────────────────────
-
-class PageFailure extends Error {
-  constructor(where: string, cause: unknown, screenshot: string) {
-    const why = cause instanceof Refused ? cause.message : `could not be checked: ${cause instanceof Error ? cause.message : String(cause)}`;
-    super(`${where}: ${why}\n  what it looked like: ${screenshot}`);
-  }
-}
-
-async function visit(context: BrowserContext, base: string, spec: PageSpec, theme: Theme): Promise<string> {
-  const page = await context.newPage();
-  const { problems } = watch(page);
-  const shot = path.join(OUT, `${spec.name}-${theme}.png`);
-  try {
-    await page.goto(base + spec.route, { waitUntil: 'networkidle' });
-    await expectTheme(page, theme);
-    await spec.expect(page);
-    // What a person would see, once whatever the last assertion started has settled.
-    await page.waitForLoadState('networkidle');
-    await settled(page);
-    await page.screenshot({ path: shot, fullPage: true });
-    const seen = problems();
-    if (seen.length) throw new Refused(`no console error and no failed request — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
-    return shot;
-  } catch (err) {
-    fs.rmSync(shot, { force: true });
-    const failed = path.join(OUT, `${spec.name}-${theme}-failed.png`);
-    await page.screenshot({ path: failed, fullPage: true }).catch(() => {});
-    throw new PageFailure(`${spec.route} in the ${theme} theme`, err, failed);
-  } finally {
-    await page.close();
-  }
-}
-
-async function launch(): Promise<Browser> {
-  try {
-    return await chromium.launch();
-  } catch (err) {
-    throw new Error(`Chromium did not start: ${(err as Error).message.split('\n')[0]}\n  If it is not installed, run \`npx playwright install chromium\` once on this machine; every worktree shares ~/.cache/ms-playwright.`);
-  }
-}
+// ─── the run ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
@@ -216,24 +174,10 @@ async function main(): Promise<void> {
     /Local:\s+(http:\/\/[^\s/]+)/);
   console.log(`e2e: api on :${apiPort}, the built app on ${base}, store ${store}`);
 
-  fs.mkdirSync(OUT, { recursive: true });
-  for (const spec of PAGES) {
-    for (const theme of THEMES) {
-      for (const name of [`${spec.name}-${theme}.png`, `${spec.name}-${theme}-failed.png`]) fs.rmSync(path.join(OUT, name), { force: true });
-    }
-  }
-
   const browser = await launch();
-  const shots: string[] = [];
+  let shots: string[];
   try {
-    for (const theme of THEMES) {
-      const context = await browser.newContext({ colorScheme: theme, viewport: { width: 1280, height: 800 } });
-      for (const spec of PAGES) {
-        shots.push(await visit(context, base, spec, theme));
-        console.log(`e2e: ${spec.route} in the ${theme} theme ✓`);
-      }
-      await context.close();
-    }
+    shots = await visitAll(browser, base, PAGES, OUT);
   } finally {
     await browser.close();
   }
@@ -242,18 +186,11 @@ async function main(): Promise<void> {
   for (const shot of shots) console.log(`  ${shot}`);
 }
 
-main().then(
-  () => {
-    cleanUp();
-    process.exit(0);
-  },
-  (err: unknown) => {
-    console.error(`\ne2e: FAILED — ${err instanceof Error ? err.message : String(err)}`);
-    for (const { name, output } of servers) {
+exitOn(main(), cleanUp, () =>
+  servers
+    .map(({ name, output }) => {
       const tail = output().trimEnd().split('\n').slice(-15).join('\n    ');
-      if (tail) console.error(`\n  ${name} printed:\n    ${tail}`);
-    }
-    cleanUp();
-    process.exit(1);
-  },
+      return tail ? `\n\n  ${name} printed:\n    ${tail}` : '';
+    })
+    .join(''),
 );

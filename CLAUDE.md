@@ -34,12 +34,15 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's
   admission gate, worktree base and lease each were).
-- **In a worktree, `node_modules` is a link into the main checkout.** So `apps/api` imports the main
-  checkout's `agent-workflows`, not the branch's: an app change that needs a package change from the
-  same branch fails `typecheck` until the package is merged — land the package first. And `npm
-  install` from a worktree reads the linked tree as extraneous and rewrites the main checkout's: add a
-  dependency with `npm install --package-lock-only`, and if the branch needs it before the merge,
-  unpack it (`npm pack` + `tar`) into `node_modules`, which adds and removes nothing (learned by U1).
+- **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
+  links to the worktree's copy, so an app change can lean on a package change from the same branch;
+  third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the
+  worktree's directory, never main's. When the worktree's `package-lock.json` differs from what main
+  has on disk, the run does `npm ci` there instead — about a minute, and the brief says so. Two habits
+  keep that minute rare: a step that adds a dependency commits the lockfile (`npm install
+  --package-lock-only` is enough; the next step's worktree installs it), and after merging such a
+  branch, `npm install` on main before the next run, or every worktree cut from it pays the minute
+  (main's lockfile ahead of its tree counts as a difference). (U1 hit the linked tree; W2 replaced it.)
 
 ## Rules the code keeps
 

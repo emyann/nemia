@@ -633,6 +633,10 @@ owner is not mid-run.
   no Edit or Write on the list — so the reviewer is read-only by machinery, not by prose (plan §4 I's aim). The
   shipped `review.md` stays on codex, whose fence is the sandbox. E6 froze the old folder, so the first
   run to test the fence is the next one filed.
+- **E6's usage assertion cannot tell the retry's count from the first try's (E6's review):**
+  `packages/agent-engine/test/resume.test.ts:134` expects the same usage the first try recorded, so the
+  refusal rests on the view assertion alone; have the retry write a different number of responses. → the
+  next engine run, with anything else that opens `resume.test.ts`.
 
 ## 5. What the plan does not do
 

@@ -71,12 +71,37 @@ JOIN KEY  a name we choose        →  claude --name ae/<task>/<attempt>
 ```
 
 That's the whole engine. `decide()` is pure, total, and returns exactly one step; everything
-effectful is the four verbs of `Runner`. Kubernetes' control plane for the loop, durable
+effectful is the four verbs of `Runner`, and a fifth, optional one that lets a finished session go. Kubernetes' control plane for the loop, durable
 execution's journal for the memory, and the local harness as the kubelet.
 
 **The engine never holds a session.** `claude --bg` hands it to the harness, which already owns
 resume, stop, logs and a registry that outlives us. So a three-hour session is not a three-hour
 process here — the engine can be killed, upgraded or restarted at any point in it.
+
+### Letting a finished session go
+
+Claude Code keeps every `--bg` session in `claude agents` until something removes it, and one that
+has given its closeout stays there `working/idle` for good — every run used to leave its sessions
+behind, to be cleared by hand. So once an attempt's end is on the record, the engine **releases** its
+session: `claude stop` if it still runs, then `claude rm`. Whether it still runs is the registry's
+word, not the runner's: a session quiet for ninety seconds is reported `done`, and `claude agents`
+still has it working. It is I/O applied to the record, not a
+decision — `decide` is not asked — and it is level-triggered: asked on every pass that still sees such
+a session, so a crash between writing the end and releasing is repaired by the next pass, and a
+release the harness refuses is asked again.
+
+**Measured before relying on it** (`test/live.test.ts`, Claude Code 2.1.270): a session told a word
+settled and was released in the same pass; it was gone from `claude agents`, `ae logs` still read its
+transcript, and a second task filed with `resumeFrom` its id said the word back. `ae logs` finds a released session by the id recorded when its attempt ended, or when its task
+settled with the attempt still open, and asks the task's own harness for it.
+
+A task settled with no end on the record — stopped by a person, or past its deadline — has its
+session's id written on its `settled` entry instead, so that session is released like any other and
+`ae logs` still reads it. One kind is left listed: a task that asked for a `worktree` has its session
+stopped and not removed, because `claude rm` deletes the worktree with the session and the task's work
+is in it. (So is a session whose task settled before its id was recorded: removed, it could not be
+read.) `release` is optional on `Runner`: the detached runner has none, because its run files are the
+record `logs` reads.
 
 ### Why there are no leases
 
@@ -119,7 +144,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 |---|---|
 | `'claude-bg'` | Claude Code's background sessions; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, for anything else at all |
+| a `PromiseRunner` | four async methods, and an optional fifth, `release`, for anything else at all |
 
 **`src/cli.ts` imports `createEngine`, and types, and nothing else from the engine.** That is
 deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
@@ -153,7 +178,7 @@ Three are wired:
 |---|---|---|
 | `claude` | `claude --bg --name` | **the harness** — `claude agents --json`, free |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
-| `claude-detached` | `claude -p`, same worker | us (there to compare the two paths) |
+| `claude-detached` | `claude -p --output-format json`, same worker | us (there to compare the two paths) |
 
 **Why two mechanisms and not one.** Claude Code keeps a registry of background sessions and will
 answer questions about them from any process. Codex has no such thing: `codex exec` runs in the
@@ -168,7 +193,7 @@ price of running more than one harness. It is a handful of lines, because the en
 journal and a seam.
 
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
-optionally the words it refuses:
+optionally the words it refuses and a reader of what it prints:
 
 ```ts
 export const codex: HarnessSpec = {
@@ -212,7 +237,9 @@ is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks:
 a harness the engine does not have (it used to run on the fallback, silently), counts and seconds
-it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `tools` that
+it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
+not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
+once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
 is not a list of names, an `mcp` that is not a map of `.mcp.json` servers (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
@@ -441,12 +468,18 @@ said so. That holds when the harness then marks the session `blocked` as much as
 `working` — a step that called `StructuredOutput` and ended its turn has been seen `blocked`, idle,
 and until that was fixed it waited on a person for ever and held its slot.
 
-How each harness is asked, both verified live:
+How each harness is asked — `claude` and `codex` verified live:
 
 | harness | how | where the answer lands |
 |---|---|---|
 | Claude Code | `--json-schema`: the session gets a `StructuredOutput` tool and calls it to finish. Works under `--bg`, though documented only for `-p` (2.1.270). | the session's transcript |
+| `claude-detached` | `-p --json-schema --output-format json`: `claude -p` prints one `result` object, and the answer is its `structured_output` (one live `-p` call, 2.1.270; under the engine, a fake `claude` only) | the worker's capture of its output, stamped with when that was last written |
 | Codex | `exec --output-schema`, with `-o` at a file the runner chose outside the workspace (0.154.0, strict schema) | that file |
+
+A detached run's end is written only once the harness's pipes have closed and its output is in the
+log. `exit` can come first, and the pass that records the end would then miss an answer still in the
+pipe — for good, since an end is written once. Two seconds at most: a child the harness leaves behind
+can hold a pipe open for as long as it likes.
 
 Runners report the statement **and when it was made**. The engine decides whether it belongs to this
 attempt, records it on the attempt (`state.attempts[n].closeout`), and never reads it. Two rules
@@ -479,16 +512,18 @@ and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 
 ## What an attempt consumed
 
-Every attempt records `usage` — `{ turns, toolCalls, inputTokens?, outputTokens?, costUsd? }` — and
+Every attempt records `usage` — `{ turns?, toolCalls?, inputTokens?, outputTokens?, costUsd? }` — and
 `exitCode`, copied from the sighting that ended it. **Each is `null` when nothing measured it,
-never `0`**: a zero that means "nobody counted" reads as "cost nothing". `decide` reads neither.
+never `0`**: a zero that means "nobody counted" reads as "cost nothing". A count its runner could not
+see is absent from `usage` in the same way, and `ae show` names it not measured. `decide` reads neither.
 An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of its `starting` and
 `ended` entries, `endedAt` being `null` while it runs — so how long it took is on the record.
 
 | runner | `usage` | `exitCode` |
 |---|---|---|
 | `claude` | from the transcript it already reads: responses, tool calls and tokens since the session's own start; no cost | `null` — the process is the harness's |
-| `codex`, `claude-detached` | `null` — not measured | the worker's record of the process |
+| `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens from `turn.completed`; no turns — a Codex turn is a prompt, not a model response — and no cost | the worker's record of the process |
+| `claude-detached` | `null` — not measured ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
 | `sdkRunner()` | from the SDK's result message, cost included when the SDK gives one | `null` |
 
 Two measured traps shape the transcript count. A response is written as one line per content block,
@@ -501,6 +536,18 @@ consumed, naming what was not measured — and an attempt still running as `runn
 ```
 attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · cost not measured
 attempt 2  failed  09:05:02 → 09:05:40 (38s)  exit 1  usage not measured
+```
+
+Codex's stream is read by the same rule. Tokens are given only when every turn that started completed
+with them, and tool calls only while every item in the stream is of a type seen before —
+`command_execution` and `file_change` are calls, `agent_message` is not. Nothing is added to
+`input_tokens` or `output_tokens`: in every run measured (codex-cli 0.154.0), cached tokens were a part
+of the first and reasoning tokens a part of the second. `cache_write_input_tokens` was 0 in all of
+them, so whether `input_tokens` counts it is unknown, and a stream where it is not 0 gives no input
+count:
+
+```
+attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  turns not measured · <calls> tool calls · <in> in · <out> out · cost not measured
 ```
 
 ## Letting a sandboxed Codex step commit
@@ -617,11 +664,12 @@ selector, and it is why no attempt can ever run twice.
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
+| `test/release.test.ts` | letting a finished Claude Code session go, at shipped defaults — a fake `claude` that keeps a registry |
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence and `--strict-mcp-config` against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, `--strict-mcp-config`, and what a released session still has, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 

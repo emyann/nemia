@@ -21,7 +21,9 @@ export const DEFAULT_MAX_CONCURRENT = 3;
 export const LIVE: ReadonlySet<Sighting['state']> = new Set(['working', 'blocked']);
 
 export type TaskView = {
-  id: string; state: State; phase: string; sessionId: string | null;
+  id: string; state: State; phase: string;
+  /** The session as its harness lists it — or, once the harness has let it go, its own id as recorded. */
+  sessionId: string | null;
   /** What the attempt in flight has consumed so far, when its runner can see inside it. Settled attempts carry theirs on `state.attempts`. */
   usage?: Usage;
 };
@@ -172,9 +174,15 @@ export const step = Effect.fn('step')(function* (
       yield* runner.stop(action.sessionId);
       break;
 
-    case 'settle':
-      yield* journal.append(taskId, { kind: 'settled', at: at(), outcome: action.outcome, note: action.note });
+    case 'settle': {
+      // An attempt left open — stopped by a person, or past its deadline — has no `ended` to carry its
+      // session's id, so it is written here, read off the sighting as an ending's facts are: what `logs`
+      // reads once the harness has let the session go. A fact for the record; `decide` never reads it.
+      const last = state.attempts.at(-1);
+      const open = last && last.ended === null ? observed.get(nameFor(taskId, last.n))?.nativeId : undefined;
+      yield* journal.append(taskId, { kind: 'settled', at: at(), outcome: action.outcome, note: action.note, ...(open ? { nativeId: open } : {}) });
       break;
+    }
   }
 
   return action;
@@ -206,6 +214,32 @@ export const settleTask = Effect.fn('settleTask')(function* (
 });
 
 /**
+ * Let the harness go of the sessions a task has finished with: every attempt whose end is on the
+ * record and whose session the harness still lists. I/O applied to what the journal already says,
+ * not a judgement — `decide` is not asked, and learns nothing.
+ *
+ * An attempt with a written end — or, in a task settled while it was open (stopped by a person, or
+ * past its deadline), one whose session's id the `settled` entry recorded. A task settled before that id
+ * was recorded keeps its session listed: released, `logs` would have nothing to read.
+ *
+ * Level-triggered like the rest: asked on every pass that still observes such a session, so a crash
+ * between writing an end and releasing is repaired by the next pass. A release the harness refuses is
+ * not the pass's failure; it is asked again.
+ */
+const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, observed: ReadonlyMap<string, Sighting>) {
+  const runner = yield* Runner;
+  if (!runner.release) return;
+  for (const attempt of state.attempts) {
+    const finished = attempt.ended !== null || (state.settled !== null && attempt.nativeId !== null);
+    const session = finished ? observed.get(nameFor(state.taskId, attempt.n)) : undefined;
+    if (!session) continue;
+    yield* runner.release(session, { worktree: state.worktree }).pipe(
+      Effect.catchTag('RunnerError', () => Effect.succeed(undefined)),
+    );
+  }
+});
+
+/**
  * One pass over every task on the board. This is the whole daemon.
  *
  * **Admission is serial, and that is deliberate.** Two tasks decided concurrently would each read
@@ -227,11 +261,11 @@ export const tick = Effect.fn('tick')(function* (maxConcurrent = DEFAULT_MAX_CON
   // Which harness each live session belongs to — the sighting does not say, so it comes from the
   // task that owns the name. Two small file reads per task per pass; the board is local and tiny.
   const used = new Map<string, number>();
-  const harnessOf = new Map<string, string>();
+  const states = new Map<string, State>();
   for (const id of ids) {
     const state = fold(id, yield* journal.read(id));
     const harness = state.harness ?? 'default';
-    harnessOf.set(id, harness);
+    states.set(id, state);
     const last = state.attempts.at(-1);
     if (last && last.ended === null) {
       const seen = observed.get(nameFor(id, last.n));
@@ -241,12 +275,15 @@ export const tick = Effect.fn('tick')(function* (maxConcurrent = DEFAULT_MAX_CON
 
   const taken: Action[] = [];
   for (const id of ids) {
-    const harness = harnessOf.get(id) ?? 'default';
+    const harness = states.get(id)?.harness ?? 'default';
     const before = used.get(harness) ?? 0;
     const actions = yield* settleTask(id, observed, { used: before, max: maxConcurrent });
     taken.push(...actions);
     // A slot is spent the moment we journal the intent, not when the harness confirms it.
     if (actions.some((a) => a.do === 'start')) used.set(harness, before + 1);
+    // Against the journal as this pass left it — so an end written just now is let go now — read again
+    // only when the pass wrote to it.
+    yield* releaseFinished(actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : states.get(id)!, observed);
   }
 
   return {
@@ -275,5 +312,6 @@ export const view = Effect.fn('view')(function* (taskId: string, observed: Reado
     : last?.ended === null ? 'starting'
     : last ? 'between attempts'
     : 'pending';
-  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? null, usage: sighting?.usage };
+  // A released session is in no observation; the id its end was recorded with is what `logs` reads then.
+  return { id: taskId, state, phase, sessionId: sighting?.sessionId ?? last?.nativeId ?? null, usage: sighting?.usage };
 });

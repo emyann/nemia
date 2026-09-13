@@ -56,5 +56,12 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
       owner.has(sessionId)
         ? pick(owner.get(sessionId)).logs(sessionId)
         : Effect.fail(new RunnerError({ verb: 'logs', message: `no harness owns ${sessionId} — run a pass first` })),
+
+    // Only to the harness that reported the session, and only if it has the verb. Sent to the fallback
+    // instead, a release would ask the wrong registry to remove something by an id it never gave.
+    release: (session, task) => {
+      const ops = owner.has(session.sessionId) ? pick(owner.get(session.sessionId)) : undefined;
+      return ops?.release ? ops.release(session, task) : Effect.succeed(undefined);
+    },
   };
 };

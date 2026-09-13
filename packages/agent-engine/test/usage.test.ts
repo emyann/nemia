@@ -8,6 +8,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/runner.ts';
+import { codexOutput } from '../src/runner-detached.ts';
 import { attemptLine, usageLine } from '../src/cli.ts';
 import { fold, type Event } from '../src/domain.ts';
 
@@ -81,6 +82,54 @@ test('a measured attempt prints what was measured, and names what was not', () =
     { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'harness', exitCode: 3, usage: { turns: 1, toolCalls: 0 } },
   ]).attempts;
   assert.equal(attemptLine(a!), 'attempt 1  failed  09:00:01 → 09:05:00 (4m 59s)  exit 3  1 turns · 0 tool calls · tokens not measured · cost not measured');
+});
+
+test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {
+  assert.equal(
+    usageLine({ toolCalls: 12, inputTokens: 373_710, outputTokens: 1_082 }),
+    'turns not measured · 12 tool calls · 373.7k in · 1.1k out · cost not measured',
+  );
+  assert.equal(usageLine({ inputTokens: 10, outputTokens: 5 }), 'turns not measured · tool calls not measured · 10 in · 5 out · cost not measured');
+});
+
+// ─── Codex: its exec --json stream ──────────────────────────────────────────
+
+/** A stream as `codex exec --json` writes it (0.154.0, shapes from a real run's log, text shortened). */
+const codexStream = (...events: object[]) => ['Reading additional input from stdin...', ...events.map((e) => JSON.stringify(e))].join('\n');
+const THREAD = { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' };
+const TURN = { type: 'turn.started' };
+const item = (phase: 'started' | 'completed', id: string, type: string, rest: object = {}) => ({ type: `item.${phase}`, item: { id, type, ...rest } });
+const USED = { input_tokens: 373710, cached_input_tokens: 313856, cache_write_input_tokens: 0, output_tokens: 1082, reasoning_output_tokens: 108 };
+const completed = (usage: object = USED) => ({ type: 'turn.completed', usage });
+
+test("a Codex run's usage is read from its stream: tokens from turn.completed, tool calls by item, and no turns", () => {
+  const read = codexOutput(codexStream(
+    THREAD, TURN,
+    item('completed', 'item_0', 'agent_message', { text: 'reading the diff' }),
+    item('started', 'item_1', 'command_execution', { command: "/bin/bash -lc 'git diff'", status: 'in_progress' }),
+    item('completed', 'item_1', 'command_execution', { exit_code: 0, status: 'completed' }),
+    item('completed', 'item_2', 'file_change', { status: 'completed' }),
+    completed(),
+  ));
+  // Cached tokens are part of input_tokens and reasoning part of output_tokens: neither is added.
+  assert.deepEqual(read.usage, { toolCalls: 2, inputTokens: 373710, outputTokens: 1082 });
+  assert.equal('turns' in read.usage!, false, "Codex's turns are prompts, not model responses");
+  assert.equal('costUsd' in read.usage!, false);
+});
+
+test('a Codex stream that cannot say is not made to: a turn cut short gives no tokens, an unknown item no tool-call count', () => {
+  assert.deepEqual(codexOutput(codexStream(THREAD, TURN, item('started', 'item_1', 'command_execution'))).usage, { toolCalls: 1 }, 'killed mid-turn: the calls seen, no tokens');
+  assert.deepEqual(codexOutput(codexStream(TURN, completed(), TURN)).usage, { toolCalls: 0 }, 'the first turn of two is not the whole');
+  assert.deepEqual(codexOutput(codexStream(TURN, completed({ output_tokens: 5 }))).usage, { toolCalls: 0 }, 'a turn.completed without both counts');
+  assert.deepEqual(codexOutput(codexStream(TURN, item('completed', 'item_1', 'mcp_tool_call'), completed())).usage, { inputTokens: 373710, outputTokens: 1082 }, 'a type never seen is not guessed at');
+  assert.deepEqual(codexOutput(codexStream(TURN, completed({ ...USED, cache_write_input_tokens: 5 }))).usage, { toolCalls: 0, outputTokens: 1082 }, 'whether input_tokens counts cache writes is unknown');
+  assert.deepEqual(codexOutput(codexStream(TURN, completed(), TURN, completed({ ...USED, input_tokens: 1, output_tokens: 2 }))).usage, { toolCalls: 0, inputTokens: 373711, outputTokens: 1084 }, 'turns that all completed are summed');
+});
+
+test('a Codex stream with no turn in it measured nothing, and reports no usage at all', () => {
+  assert.deepEqual(codexOutput(''), {});
+  assert.deepEqual(codexOutput('Reading additional input from stdin...\nError: not logged in'), {});
+  assert.deepEqual(codexOutput(codexStream(THREAD)), {});
 });
 
 // ─── when it ran, for a person ──────────────────────────────────────────────

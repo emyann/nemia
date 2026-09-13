@@ -1,9 +1,11 @@
 /**
  * The compute seam — the ONLY file that knows what runs an agent.
  *
- * Four verbs, and the engine needs no fifth: spawn one, observe all, stop one, read one's logs.
- * Swap the layer and the same engine drives a different harness; `Runner.test()` drives nothing
- * at all, which is how the engine's tests cost zero dollars.
+ * Four verbs the engine cannot run without: spawn one, observe all, stop one, read one's logs. A
+ * fifth, `release`, is optional — letting go of a session whose end is on the record, for a harness
+ * whose registry would otherwise keep it for ever. Swap the layer and the same engine drives a
+ * different harness; `Runner.test()` drives nothing at all, which is how the engine's tests cost zero
+ * dollars.
  *
  * The Claude layer shells out on purpose. `claude --bg` hands the session to the harness, which
  * already owns resume, stop, cross-session messaging and a registry that outlives us — the thing
@@ -65,8 +67,9 @@ export type McpServer =
  * The seam itself, as a plain value.
  *
  * Four verbs. A harness that cannot do one of them is not a harness this engine can drive, and a
- * harness that needs a fifth is asking the engine to learn something about it — which is the line
- * this type exists to hold.
+ * harness that needs another to be driven is asking the engine to learn something about it — which is
+ * the line this type exists to hold. `release` does not cross it: optional, told only what the record
+ * already says, and answering nothing the engine acts on.
  */
 export type RunnerOps = {
   readonly spawn: (r: SpawnRequest) => Effect.Effect<void, RunnerError>;
@@ -74,6 +77,16 @@ export type RunnerOps = {
   readonly observe: Effect.Effect<Map<string, Sighting>, RunnerError>;
   readonly stop: (sessionId: string) => Effect.Effect<void, RunnerError>;
   readonly logs: (sessionId: string) => Effect.Effect<string, RunnerError>;
+  /**
+   * Let go of a session whose attempt's end the engine has written down: stop it if it still runs,
+   * and take it out of the harness's registry. Optional — a harness whose registry is the record
+   * (a detached runner's run files, which `logs` reads) has nothing to let go of.
+   *
+   * Asked on every pass that still observes such a session, so it must be idempotent and needs no
+   * memory: one that fails is asked again next pass. Given the session as observed, to tell a live one
+   * from one that has exited, and the task's `worktree`, since a harness may remove the one it cut.
+   */
+  readonly release?: (session: Sighting, task: { worktree?: string | boolean }) => Effect.Effect<void, RunnerError>;
 };
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
@@ -363,6 +376,14 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * told from its own, and a wrong count is worse than none.
    */
   const finalUsage = new Map<string, Usage | undefined>();
+
+  /**
+   * Each of our sessions' state as `claude agents` itself last listed it, before this runner's own
+   * definition of finished is applied: a session quiet for the window is reported `done` while Claude
+   * Code still has it running, and `release` must stop that one. Rebuilt by every `observe`, which a
+   * pass always makes before it releases anything.
+   */
+  const listed = new Map<string, Observed>();
   const usageOf = async (s: Sighting, since: number | undefined) => {
     if (since === undefined) return undefined;
     if (finalUsage.has(s.sessionId)) return finalUsage.get(s.sessionId);
@@ -419,6 +440,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       Effect.map((out) => {
         const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string; startedAt?: unknown }>;
         const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
+        listed.clear();
         for (const row of rows) {
           // `state` and `status` answer different questions and are NOT a fallback chain. `state`
           // is the session's lifecycle; `status` is whether its process is busy this instant. A
@@ -428,6 +450,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           // Only sessions WE named are ours. Everything else on the machine is somebody else's.
           // For this harness the session id IS the native id — `--resume` takes exactly it.
           if (row.name?.startsWith('ae/') && row.sessionId && state) {
+            listed.set(row.sessionId, state);
             m.set(row.name, {
               sighting: { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId },
               // When THIS session started, as the harness recorded it: what usage is counted from.
@@ -478,6 +501,31 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
 
     // `claude stop` takes the short id, which is the uuid's first block.
     stop: (sessionId) => sh('claude', ['stop', short(sessionId)], { verb: 'stop' }).pipe(Effect.asVoid),
+
+    /**
+     * A session whose end is on the record, let go: `claude stop` if it still runs, then `claude rm`.
+     * Without this it stayed in `claude agents` for good — one that gave its closeout sat `working/idle`
+     * there — and every run's sessions were cleared by hand. Measured before relying on it
+     * (`test/live.test.ts`, 2.1.270): once removed, `ae logs` still reads the session's transcript and
+     * `--resume <id>` still continues it.
+     *
+     * Only stopped when the task asked for a worktree: `claude rm` deletes "a background session and its
+     * worktree", and the task's work is in that worktree.
+     */
+    release: (session, task) => Effect.gen(function* () {
+      // The registry's word, not the sighting's: quiescence reports a quiet `working/idle` session
+      // `done`, and it is still running (found in review). A session this runner has not listed — no
+      // `observe` made here — has only its sighting to go by.
+      const running = listed.get(session.sessionId) ?? session.state;
+      if (running === 'working' || running === 'blocked') {
+        // Failing only if it exited since it was observed — which leaves `rm` exactly as able to go on.
+        yield* sh('claude', ['stop', short(session.sessionId)], { verb: 'release' }).pipe(
+          Effect.catchTag('RunnerError', () => Effect.succeed('')),
+        );
+      }
+      if (task.worktree) return;
+      yield* sh('claude', ['rm', short(session.sessionId)], { verb: 'release' });
+    }),
 
     // The one verb where the Agent SDK is simply better than the CLI: `getSessionMessages` reads
     // the stored transcript as TYPED messages, and it works on sessions it never started — the

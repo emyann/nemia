@@ -290,6 +290,19 @@ test('file() refuses an empty brief, cwd, model or resumeFrom', async () => {
   await refused(engine, { brief: 'b', cwd: '/r', resumeFrom: '' }, /`resumeFrom` is empty/);
 });
 
+test('file() refuses a cwd that is not absolute, naming it resolved — on every harness, so no detached worker is launched into repo/repo', async () => {
+  // The process that ticks resolves a relative cwd, and it need not be the one that filed it. A
+  // detached worker resolved it twice, from inside itself: `cwd: 'repo'` failed with `spawn sh ENOENT`.
+  const { journal, engine } = shipped();
+  for (const harness of ['claude', 'codex', 'claude-detached']) {
+    await refused(engine, { brief: 'b', cwd: 'repo', harness }, new RegExp(`\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}`));
+  }
+  await refused(engine, { brief: 'b', cwd: './repo' }, /`cwd: \.\/repo` is not an absolute path/);
+  await refused(engine, { brief: 'b', cwd: '~/repo' }, /`cwd: ~\/repo` is not an absolute path/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled, so no tick can spawn it');
+  assert.ok(await engine.file({ brief: 'b', cwd: path.resolve('repo') }), 'the same directory, resolved, is filed');
+});
+
 test('a harness brought as a spec is asked its own refusals; one brought as a runner is asked nothing', async () => {
   const picky: HarnessSpec = {
     name: 'picky',

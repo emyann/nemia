@@ -141,7 +141,9 @@ export const usageLine = (u: Usage | null): string => {
   const tokens = u.inputTokens !== undefined && u.outputTokens !== undefined
     ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out` : ' · tokens not measured';
   const cost = u.costUsd !== undefined ? ` · $${u.costUsd.toFixed(3)}` : ' · cost not measured';
-  return `${u.turns} turns · ${u.toolCalls} tool calls${tokens}${cost}`;
+  const turns = u.turns !== undefined ? `${u.turns} turns` : 'turns not measured';
+  const calls = u.toolCalls !== undefined ? `${u.toolCalls} tool calls` : 'tool calls not measured';
+  return `${turns} · ${calls}${tokens}${cost}`;
 };
 
 /** A length of time for a person: 42s, 4m 59s, 1h 02m. */
@@ -174,7 +176,8 @@ export const attemptLine = (a: Attempt): string => {
 
 const line = (v: TaskView) => {
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
-  const meter = u ? `  ${u.costUsd !== undefined ? `$${u.costUsd.toFixed(3)}/` : ''}${u.turns}t` : '';
+  const measured = u ? [u.costUsd !== undefined ? `$${u.costUsd.toFixed(3)}` : '', u.turns !== undefined ? `${u.turns}t` : ''].filter(Boolean) : [];
+  const meter = measured.length ? `  ${measured.join('/')}` : '';
   return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${v.state.attempts.length}/${v.state.maxAttempts}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 

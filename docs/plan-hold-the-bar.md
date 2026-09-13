@@ -461,6 +461,35 @@ person would notice). `respond.md`: `after: review, look`, `input: review, look`
 implement` — a fan-in the run already knows how to cut; the checks run again on its result.
 The board's inspector shows a step's artifacts (a small api endpoint for `runs/<id>/artifacts/`).
 
+### M1 — Playwright MCP in the repository · filed 2026-09-13
+
+Root `.mcp.json` naming Playwright's MCP server from `node_modules` (headless chromium, isolated
+context), `@playwright/mcp` pinned at the root, `enabledMcpjsonServers` in `.claude/settings.json`,
+one sentence on `workflows/ui/implement.md`; a config test in agent-workflows and a live gated one
+that a `--bg` step in the checkout has `browser_navigate` and none of the operator's servers.
+Cost per step: one small MCP process at session start; Chromium only when a step uses it. Per-step
+`mcp:` (I) stays the tidier surface for later.
+
+### B1 — The capabilities page: what this repository offers a step · later, apps + api
+
+**The ask (operator, 2026-09-13):** a page on the board, like the skills/agents/MCP panels in
+VS Code and Cursor, listing the skills, MCP servers (and their tools) and agents available to
+this repository, checkable.
+
+**Where the responsibility falls.** Two different questions, two owners:
+- *What the repository offers* is content on disk: `.claude/skills/*/SKILL.md` (name, description),
+  `.claude/agents/*.md`, `.mcp.json` (servers), `CLAUDE.md`. The api can read the checkout and
+  serve an inventory with no engine involvement.
+- *What a step was actually given* is on the engine's record already: `tools`, `effort`, `mcp`,
+  `permissionMode`, the harness — carried on `State` since B and E4. The api exposes it per step;
+  the inspector's Details shows it. That is the engine's whole contribution, and it is done.
+- *What tools an MCP server exposes* is the harness's to answer: the Agent SDK's init message lists
+  connected servers and tools, and an MCP client can ask a server directly. The api can start a
+  configured server and list its tools (an MCP client, cached), which is the "check what tools this
+  repository has access to" the ask names.
+- *Checking a box* is declaring: per-step `mcp:`/`tools:` in the workflow folder (I) is what a
+  toggle writes; the board does not hold configuration of its own.
+
 ### I — `tools:` and `effort:` pass-through · wave 2 · after A, B, C
 
 `workflow.ts` accepts both (A refused them by name); `runner.ts` passes them to `e.file`;
@@ -514,6 +543,20 @@ owner is not mid-run.
   directory at hand-off, before the check — then no step needs to write outside its workspace. → with R.
 - **the e2e script has no refusal test (U1's review):** nothing proves a page with a console error or a
   failed request makes `npm run e2e` exit non-zero. → F2's brief.
+- **the Factory's "in flight" rule (seen on U1's run):** a run whose step failed its check shows in
+  flight, because its followers are `waiting` and will wait for ever. The run's overall status is
+  already decided by `assess` (`running | succeeded | failed | cancelled`) and the api does not
+  expose it; `/api/runs` should carry it and the Factory should read `status === 'running'`. A
+  run merged by hand after a refused check stays `failed` on the record — true — until F's
+  `wf retry --recheck` exists to re-run a check without a session. → the next apps run.
+- **F is next, and `--recheck` first (two refused checks in one day, both environmental):** U1's
+  check died in the parallel-turbo api flake; M1's detached-worker test read an empty log with
+  exit 4 while the machine was at 12 GB and 22 finished sessions were being stopped. Both times
+  the work was fine and the run had no way to re-run the check: done by hand (a raw review for
+  U1; for M1 the refused check's journal moved to `engine/refused/` and the record's `check`
+  cleared with the daemon stopped, so the next tick re-filed it). That is `wf retry <run> <step>
+  --recheck`, and it should not need surgery. Also: bug 3 was measured — finished `--bg` sessions
+  at ~370 MB each, 22 of them, 7 GB; E5 fixes it.
 - **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
   a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
   for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running

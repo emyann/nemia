@@ -82,10 +82,13 @@ export type Sighting = {
  * "nobody counted" reads as "cost nothing", which is the one reading a record must never allow.
  */
 export type Usage = {
-  /** Model responses, each counted once however many lines it was written as. */
-  turns: number;
-  /** Tool calls the model made. */
-  toolCalls: number;
+  /**
+   * Model responses, each counted once however many lines it was written as. Absent from a runner
+   * that cannot see them: Codex's stream reports turns of a prompt, not the responses inside one.
+   */
+  turns?: number;
+  /** Tool calls the model made. Absent when its runner could not count them. */
+  toolCalls?: number;
   /** Every input token the model read, cached ones included. */
   inputTokens?: number;
   outputTokens?: number;
@@ -170,8 +173,12 @@ export type Event =
   | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number; error?: string }
   /** The operator asked for it to stop. */
   | { kind: 'stop-requested'; at: string }
-  /** Terminal. Nothing moves after this. */
-  | { kind: 'settled'; at: string; outcome: Outcome; note?: string };
+  /**
+   * Terminal. Nothing moves after this. `nativeId` is the session of an attempt it left open —
+   * stopped by a person, or past its deadline, with no `ended` to carry it — as the harness still
+   * listed it: what `logs` reads once that session has been let go. `decide` never reads it.
+   */
+  | { kind: 'settled'; at: string; outcome: Outcome; note?: string; nativeId?: string };
 
 export type Attempt = {
   n: number;
@@ -254,7 +261,12 @@ export function fold(taskId: string, events: readonly Event[]): State {
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;
-      case 'settled': s.settled = e.outcome; break;
+      case 'settled': {
+        s.settled = e.outcome;
+        const open = s.attempts.at(-1);
+        if (open && open.ended === null && e.nativeId) open.nativeId = e.nativeId;
+        break;
+      }
     }
   }
   return s;

@@ -15,7 +15,7 @@ import path from 'node:path';
 import os from 'node:os';
 import type { Event, ResumePolicy, Sighting } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
-import { claudeOps, claudeRefuses, mcpRefuses, Runner, RunnerError, type McpServer, type SpawnRequest } from './runner.ts';
+import { claudeOps, claudeRefuses, mcpRefuses, Runner, RunnerError, type McpServer, type RunnerOps, type SpawnRequest } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { composite } from './runner-composite.ts';
 import { DEFAULT_MAX_CONCURRENT, file, requestStop, tick, view, type TaskView } from './engine.ts';
@@ -44,6 +44,12 @@ export type PromiseRunner = {
   observe(): Promise<Map<string, Sighting>>;
   stop(sessionId: string): Promise<void>;
   logs(sessionId: string): Promise<string>;
+  /**
+   * Optional. Let go of a session whose attempt's end the engine has written down — stop it if it
+   * runs, drop it from your registry. Called on every pass that still observes it, so make it
+   * idempotent; a rejection is asked again on the next.
+   */
+  release?(session: Sighting, task: { worktree?: string | boolean }): Promise<void>;
 };
 
 /**
@@ -118,8 +124,8 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
    * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model,
-   * resumeFrom or effort; a `tools` that is not a list of names; an `mcp` whose entries are not
-   * MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
+   * resumeFrom or effort; a `cwd` that is not absolute; a `tools` that is not a list of names; an
+   * `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
    * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists).
    * A harness brought as a `PromiseRunner` is asked nothing.
    */
@@ -163,28 +169,30 @@ const journalOf = (j: PromiseJournal) => Journal.layer({
 
 const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
 
-const runnerOf = (harnesses: Record<string, HarnessConfig>, fallback: string, root: string) =>
-  Runner.layer(composite(
-    Object.fromEntries(Object.entries(harnesses).map(([name, h]) => [
-      name,
-      h === 'claude-bg' ? claudeOps({ root })
-        : isSpec(h) ? detachedOps(h, root)
-        : {
-            spawn: (r: SpawnRequest) => Effect.tryPromise({
-              try: () => h.spawn(r),
-              // A rejection is not proof that nothing started; a runner that knows says `refused`.
-              catch: (cause) => new RunnerError({
-                verb: 'spawn', message: cause instanceof Error ? cause.message : String(cause),
-                ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
-              }),
+/** Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. */
+const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Record<string, RunnerOps> =>
+  Object.fromEntries(Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => [
+    name,
+    h === 'claude-bg' ? claudeOps({ root })
+      : isSpec(h) ? detachedOps(h, root)
+      : {
+          spawn: (r: SpawnRequest) => Effect.tryPromise({
+            try: () => h.spawn(r),
+            // A rejection is not proof that nothing started; a runner that knows says `refused`.
+            catch: (cause) => new RunnerError({
+              verb: 'spawn', message: cause instanceof Error ? cause.message : String(cause),
+              ...((cause as { refused?: unknown } | null)?.refused === true ? { refused: true } : {}),
             }),
-            observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })),
-            stop: (id: string) => wrap(() => h.stop(id), (m) => new RunnerError({ verb: 'stop', message: m })),
-            logs: (id: string) => wrap(() => h.logs(id), (m) => new RunnerError({ verb: 'logs', message: m })),
-          },
-    ])),
-    fallback,
-  ));
+          }),
+          observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })),
+          stop: (id: string) => wrap(() => h.stop(id), (m) => new RunnerError({ verb: 'stop', message: m })),
+          logs: (id: string) => wrap(() => h.logs(id), (m) => new RunnerError({ verb: 'logs', message: m })),
+          ...(h.release ? {
+            release: (session: Sighting, task: { worktree?: string | boolean }) =>
+              wrap(() => h.release!(session, task), (m) => new RunnerError({ verb: 'release', message: m })),
+          } : {}),
+        },
+  ]));
 
 /** A Promise the consumer wrote becomes an Effect with the engine's error type on it. */
 const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
@@ -207,6 +215,11 @@ const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always:
 const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
   if (typeof spec.cwd !== 'string' || !spec.cwd) return '`cwd` is empty. Give the directory the session should work in.';
+  // Resolved against whichever process ticks the task, which need not be the one filing it — and a
+  // detached worker resolved it twice, from inside itself (`spawn sh ENOENT`, open issue 10).
+  if (!path.isAbsolute(spec.cwd)) {
+    return `\`cwd: ${spec.cwd}\` is not an absolute path, and the process that runs the task need not be the one filing it. Give the directory resolved — from here that is ${path.resolve(spec.cwd)}.`;
+  }
   if (!Object.hasOwn(harnesses, spec.harness)) {
     return `\`harness: ${spec.harness}\` is not a harness this engine has. Its harnesses are: ${Object.keys(harnesses).join(', ')}.`;
   }
@@ -246,9 +259,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
 
   // Kept beside the Layer so `watch` can use an optional `subscribe` when the store has one.
   const journalOps = options.journal ? undefined : Journal.filesOps(root);
+  const runners = runnersOf(harnesses, root);
   const layer = Layer.mergeAll(
     options.journal ? journalOf(options.journal) : Journal.layer(journalOps!),
-    runnerOf(harnesses, fallback, root),
+    Runner.layer(composite(runners, fallback)),
   );
   // Every method is the same shape: an Effect, provided and run. The layer is built once, so
   // services are shared across calls exactly as they would be inside one Effect program.
@@ -274,9 +288,11 @@ export function createEngine(options: EngineOptions = {}): Engine {
     })),
     stop: (taskId) => go(requestStop(taskId)),
     logs: (taskId) => go(Effect.gen(function* () {
-      const runner = yield* Runner;
-      const v = yield* view(taskId, yield* runner.observe);
-      return v.sessionId ? yield* runner.logs(v.sessionId) : '(no session yet)';
+      const v = yield* view(taskId, yield* (yield* Runner).observe);
+      if (!v.sessionId) return '(no session yet)';
+      // Asked of the task's own harness, not of whichever reported the session this pass: a session its
+      // harness has released is in no observation, and its transcript is still there to read.
+      return yield* (runners[v.state.harness ?? fallback] ?? runners[fallback]!).logs(v.sessionId);
     })),
     feed: (after = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after))),
 

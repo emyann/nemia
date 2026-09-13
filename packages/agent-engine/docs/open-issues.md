@@ -2,10 +2,12 @@
 
 What is still wrong, what is only half-verified, and what is waiting on a decision — written down so
 it can be picked up later without reconstructing it from commit history. The last section is a
-record of what was fixed, with commits, so the open items have their context.
+record of what was fixed, with commits, so the open items have their context. A fixed item leaves
+its number behind rather than renumbering the rest, so "bug 9" means the same thing everywhere.
 
 State as of 2026-09-13: agent-engine after the hold-the-bar engine work (repository
-`docs/plan-hold-the-bar.md` §4 B and E4), agent-workflows `0e7b02a`.
+`docs/plan-hold-the-bar.md` §4 B and E4) and bugs 3, 4, 7 and issue 10 (engine `7200295`),
+agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -53,24 +55,21 @@ follows; this only keeps its work on its branch.
 
 **Status.** Deferred on purpose (2026-09-12): fix it when it bites.
 
-### 3. Claude sessions stay in the registry after their task settles
+### 3. A worktree task's Claude session stays in the registry
 
-A `--bg` session that has given its closeout stays `working/idle` in `claude agents` indefinitely.
-The engine settles the task but never stops or removes the session, so every run leaves its sessions
-behind; each one had to be cleared by hand with `claude stop` and `claude rm`. Stopping (and
-possibly removing) a session once its task settles belongs in the engine. `test/live.test.ts` clears
-its own two sessions for this reason.
+A `--bg` session is released once its attempt's end, or its task's settling, is on the record (engine
+`7200295`, and two fixes from review in the table below): stopped if `claude agents` still has it
+running, then removed. One kind is left there, stopped: a task that asked for a `worktree`, because
+`claude rm` deletes the worktree the harness cut and the task's work is in it. Removing it safely would
+need that work somewhere else first. A session whose task a person or a deadline settled before the
+`settled` entry carried its id stays listed too, since `ae logs` could not read it once removed.
 
-A session seen `blocked` after giving its closeout now ends its attempt and settles, and stays in the
-registry afterwards like every other.
+### 4. `claude-detached` measures no usage
 
-### 4. `claude-detached` ignores `closeoutSchema`, and measures no usage
-
-`agent-engine/src/runner-detached.ts`: the spec's `command` does not take the harness `io`, so a
-task on this harness never gets a closeout. Completion itself still works — `claude -p` exits — but
-the workflow sees no statement. Only `claude` (background sessions) and `codex` support closeouts. The
-fix is `--json-schema` plus reading `structured_output` from the JSON output, which also carries the
-usage this harness records as `null` today. Low priority: this harness exists for comparison.
+`agent-engine/src/runner-detached.ts`. Its closeout is read now (engine `3e44ab6`), from the one
+`result` object `claude -p --output-format json` prints; what the attempt consumed is not, and it
+records `usage: null`. The same object carries `num_turns`, `usage` and `total_cost_usd` (seen in one
+live call on 2.1.270), but no count of tool calls. Low priority: this harness exists for comparison.
 
 ### 5. An unstartable first attempt of a continuation retries cold
 
@@ -96,17 +95,8 @@ the task on its first pass, or a permission mode its harness rejects, which now 
 window and ends the attempt `lost` rather than stalling the tick.
 
 **Fix.** The harness-agnostic half of `refusalOf` can move under the Effect `file` as it is. The
-vocabulary half needs the runner to answer, and `RunnerOps` has no verb for that — the four verbs are
-the line that type holds — so it would be a value passed to `file`, not a fifth verb.
-
-### 7. Codex usage is not measured
-
-**Where.** `agent-engine/src/runner-detached.ts`. Every Codex attempt records `usage: null`.
-
-`codex exec --json` does report it: its `turn.completed` event carries `input_tokens`,
-`cached_input_tokens`, `output_tokens` and `reasoning_output_tokens` (seen in a 0.154.0 run log). The
-fix is an optional `HarnessSpec` reader of the worker's log, once it is decided what `turns` means for
-Codex, whose turns are prompts rather than model responses.
+vocabulary half needs the runner to answer, and `RunnerOps` has no verb for that — the four it
+requires are the line that type holds — so it would be a value passed to `file`, not another verb.
 
 ### 8. A Codex `tools` list that names Bash, Write or Edit narrows nothing
 
@@ -146,19 +136,6 @@ name. Not done: the names would have to come from `config.toml`, a profile, and 
 layers in, and a list that misses one is a fence that looks closed. The machine this was measured on
 has no Codex servers configured.
 
-### 10. A relative `cwd` fails a detached harness
-
-`file()` takes any non-empty `cwd`, and `ae start` resolves one before filing, so only an API caller
-journals a relative one. The detached runner launches its worker in that `cwd`, and the worker
-launches the harness in the same relative path again, now from inside it: measured with `sh` as the
-harness and `cwd: 'repo'`, the worker logged `spawn sh ENOENT` and the attempt failed. `claude --bg`
-starts in the right place, because `execFile` resolves the `cwd` from the ticking process — which
-need not be the one that filed the task. The MCP configs are named by absolute path (found in
-review); the `cwd` itself is not.
-
-**Fix.** `file()` resolves or refuses a relative `cwd`. Resolving is what `ae start` already does;
-refusing is the honest answer for an API whose filer and ticker may be different processes.
-
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
@@ -173,7 +150,32 @@ refusing is the honest answer for an API whose filer and ticker may be different
   session starts, so the brief has the session sleep while one is still connecting; the first run did
   not, answered too early in both sessions, and so showed Chrome still connecting under strict.
 
+- **Releasing a settled session** (engine `7200295`). `test/live.test.ts` on Claude Code 2.1.270,
+  2026-09-13, `--model haiku`: a session told a word settled and was released in the same pass — gone
+  from `claude agents` — and afterwards `ae logs` still read its transcript, and a second task resuming
+  its id said the word back and was released in turn. Whether the first was still running when it was
+  released, and so whether `claude stop` came before `rm` on a live session, was not recorded.
+
 ## Verified by tests, not by a live run
+
+- **Releasing a quiet session, or one a person or a deadline stopped** (engine `c2ebd62`, `9c4221e`). A
+  fake `claude` that keeps a registry, at shipped defaults. The live run released a session that had
+  given its closeout; none that ended by quiet, and none settled without an end.
+
+- **Codex usage** (engine `bb3de3c`). Measured on the `exec --json` streams of seventeen codex-cli
+  0.154.0 runs the worker had captured (`~/.agent-workflows/engine/runs/codex`): the sixteen whose
+  turn completed each ended in one `turn.completed` carrying `input_tokens`, `cached_input_tokens`,
+  `cache_write_input_tokens` (0 in all), `output_tokens` and `reasoning_output_tokens`, with cached
+  below input and reasoning below output in every one; every item was a `command_execution`, a
+  `file_change` or an `agent_message`. Read back by the reader, all sixteen give their tokens and
+  tool calls, and the one cut short gives its tool calls and no tokens. End to end with a fake `codex`
+  only: no live attempt has recorded it, and no stream with an MCP call, a resume or a second turn has
+  been read.
+
+- **`claude-detached`'s closeout** (engine `3e44ab6`). A fake `claude` on `PATH`, at shipped defaults.
+  That `-p --output-format json --json-schema` prints one `result` line whose `structured_output` is
+  the answer was seen in one live `claude -p` call (2.1.270, `--model haiku`: `{"ok":true}`), not
+  under the engine.
 
 - **`claude-detached` under the MCP fence** (engine `5340772`, `945bf46`). Argv tests only; the live
   run was `--bg`. That `-p` takes `--strict-mcp-config --no-chrome`, and loads a `.mcp.json` named by
@@ -207,15 +209,14 @@ refusing is the honest answer for an API whose filer and ticker may be different
 1. **Quiescence: stalled or done** for a task that asked for a closeout — bug 1, deferred.
 2. **Why a Claude session stays `working` instead of reaching `done`.** Twenty-plus sessions measured:
    not resume, not duration, not the two together. It is the reason the quiescence floor exists.
-3. **Should the engine stop a session once its task settles** — bug 3.
-4. **`wf ls` choices merged as implemented** (`7f07b71`), open to revisit: an extra "waiting on you"
+3. **`wf ls` choices merged as implemented** (`7f07b71`), open to revisit: an extra "waiting on you"
    line for a run with a blocked step; `closeout unreadable` for an answer that cannot be parsed; no
    such line for a cancelled run. The reasons are in `RESPONSE.md` on
    `wf/make-wf-ls-say-how-each-fini-zpp7/respond`.
-5. **Should a task be able to ask for Claude in Chrome?** Every Claude Code spawn is `--no-chrome`
+4. **Should a task be able to ask for Claude in Chrome?** Every Claude Code spawn is `--no-chrome`
    (bug 9): a step cannot drive the operator's signed-in browser. Allowing it would be a field that
    says so, not a default; nothing has asked for one.
-6. **hkb migration**: two decisions to make before starting — see
+5. **hkb migration**: two decisions to make before starting — see
    [hkb-migration.md](hkb-migration.md), "Two consequences to decide on *before* starting".
 
 ## Fixed
@@ -248,3 +249,9 @@ refusing is the honest answer for an API whose filer and ticker may be different
 | the tests were never typechecked, and a required `PromiseJournal.watch` that nothing called hid there | `test/` in the typecheck; the dead method gone | engine `9aaa38b` |
 | the README claimed `AE_RUNNER=sdk`, "refuse a tool call: no", 25 tests, a file table 2–3× off, and "three next things" already done (bug 5) | made true; `test/readme.test.ts` refuses each of those classes | engine `f947da4` |
 | a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |
+| a relative `cwd` filed through the API failed a detached harness: its worker was launched in `repo`, then launched the harness in `repo` again, from inside it (`spawn sh ENOENT`) | `file()` refuses a `cwd` that is not absolute, naming it resolved; the detached runner resolves the one it is handed, as `claude --bg` always has | engine `7425471` |
+| a `claude-detached` task never gave a closeout: its spec dropped `closeoutSchema` | `--json-schema` and `--output-format json`, and the answer read from the result's `structured_output` in the worker's capture, stamped with when that was written. The worker writes a run's end only once the harness's output is in the log: `exit` can come before the pipes drain, and the pass that records the end missed the answer (found writing the test) | engine `3e44ab6` |
+| every Codex attempt recorded `usage: null`, though its `exec --json` stream reports tokens | read from the worker's capture of that stream: tool calls by item, tokens from `turn.completed`, each absent when the stream cannot say. `turns` and `toolCalls` may now be absent from any `Usage` — a Codex turn is a prompt, not a model response — and `ae show` names what was not measured | engine `bb3de3c` |
+| every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `7200295` |
+| a released session that had ended by quiet was removed without a `claude stop` — and a worktree task's was never touched, left `working` for good — because `release` read the runner's translated `done` | `release` stops on the state `claude agents` itself listed (found in review) | engine `c2ebd62` |
+| a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `9c4221e` |

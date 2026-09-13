@@ -23,7 +23,7 @@ const journal = (taskId: string, events: object[]) => {
   fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
   fs.writeFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((e) => JSON.stringify(e) + '\n').join(''));
 };
-const filed = (taskId: string) => ({ kind: 'filed', at, brief: filedBrief(taskId), cwd: '/code/app', maxAttempts: 1 });
+const filed = (taskId: string) => ({ kind: 'filed', at, brief: filedBrief(taskId), cwd: '/code/app', maxAttempts: 1, harness: 'codex' });
 
 /** A task filed and waiting for a slot: the engine has its brief and nothing else. */
 const queuedTask = (taskId: string) => journal(taskId, [filed(taskId)]);

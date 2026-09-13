@@ -587,6 +587,22 @@ owner is not mid-run.
   for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running
   session by hand. A small convention would do: `wf start --input <file>` copies into
   `runs/<id>/inputs/` and every brief gains one line naming the directory. → with J.
+- **checks killed by the harness, not by the code (2026-09-13, B2):** three of B2's `respond` checks
+  ended `stopped · harness` with 16 GB available and `/proc/pressure/memory` at 0.00 — Claude Code
+  2.1.270's "low on memory" rule stopped the `wf up` background task and the check's `claude --bg`
+  session at the same instant: first at the e2e's Chromium pass, then 47 s in, then 0 s in (latched).
+  The OS never saw pressure (sampled through the trial merge's own suite: min 15.9 GB available).
+  Suspect `.wslconfig` `autoMemoryReclaim=gradual`. Each time the only remedy was the hand surgery
+  (journal → `engine/refused/`, clear `steps.<step>.check`) that nobody records — that is four
+  environmental refusals in a day (M1's flake and WF_STDERR leak before). `wf retry --recheck` goes
+  first in F, and a check that ends `stopped` should read as *not run*, distinct from refused. The
+  daemon now runs detached (`setsid nohup npx wf up`) so the harness has nothing of it to kill. → F.
+- **the api re-derives what the package keeps private (B2):** `phaseOfView`, `closeoutAsked`,
+  `readVerdict` and `checkReports` are not exported, so `apps/api/src/app.ts` carries copies of the
+  first three (`phaseOf`, `askedOf`, `verdictOf`) and reads a refused check's exit off the engine's
+  attempt rather than the log `wf ls` reads — two sources that agree today and a test holds the words
+  to `list`'s. Export a log-free verdict and the two predicates; the copies go. → I, with the
+  mode-list copies.
 
 ## 5. What the plan does not do
 

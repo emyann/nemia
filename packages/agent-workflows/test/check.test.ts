@@ -9,7 +9,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { codex, createEngine, type Engine } from 'agent-engine';
+import { createEngine, type Engine } from 'agent-engine';
+// The engine beside this package in THIS tree, by path — see the read-only test at the end.
+import { codex } from '../../agent-engine/src/runner-detached.ts';
 import { CHECK, checkBrief, checkContract, lastLines, readCheckBrief, readVerdict, stdoutTail, type CheckEnv } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow.ts';
 
@@ -172,6 +174,10 @@ test('the shipped review is not read-only on an engine that honours it while res
   // Both hold only while the engine runs a read-only codex step as workspace-write. The day it emits
   // `-s read-only` (plan B, commit 1) the reviewer cannot write the file the responder reads — so this
   // refuses, at that trial merge, until somebody has decided how a review reaches respond.
+  //
+  // It asks the engine in this tree, not the one `agent-engine` resolves to: in a run's worktree,
+  // node_modules is a link into the main checkout, whose engine can be anything — a trial merge half
+  // done included. Asked that way, this failed in a worktree whose own engine had not changed.
   const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
   const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: os.tmpdir(), permissionMode: 'read-only' });
   const sandbox = args[args.indexOf('-s') + 1];

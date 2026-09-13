@@ -31,13 +31,18 @@ export const CHECK_DEADLINE_SECONDS = 600;
 /** How many lines of each stream `wf decide` shows for a check that refused. */
 export const CHECK_TAIL_LINES = 20;
 
-/** What the command is told about the run it judges. `WF_STDERR` is where its stderr goes. */
+/**
+ * What the command is told about the run it judges. `WF_STDERR` is where its stderr goes. `WF_ARTIFACTS`
+ * is the directory the run made for the step's files, where a check that makes files for a person — a
+ * screenshot of each page — puts them, off the branch.
+ */
 export type CheckEnv = {
   WF_RUN: string;
   WF_STEP: string;
   WF_BASE_REF: string;
   WF_WORKSPACE: string;
   WF_STDERR: string;
+  WF_ARTIFACTS: string;
 };
 
 /**

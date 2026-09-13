@@ -11,6 +11,7 @@
  * asked to stop a task, but it has never heard of the run — which is why `cancelledAt` lives on
  * the run, and is the only state this file writes down rather than derives.
  */
+import path from 'node:path';
 import { checkContract, verdictWord, type Verdict } from './check.ts';
 import { CLOSEOUT_FIELDS, outputFields, terminalSteps, type Workflow } from './workflow.ts';
 
@@ -516,6 +517,68 @@ export const closeoutContract = (step?: Workflow): string => {
   ].join('\n');
 };
 
+// ─── files for the steps after it ───────────────────────────────────────────
+
+/**
+ * Where a step's files go, told on its brief beside the closeout contract.
+ *
+ * A file a step writes into its workspace is committed by the hand-off and rides the branch — a
+ * screenshot, under the step's name, into what ships — and a gitignored one never reaches the next
+ * step's worktree at all. So the run makes a directory per step, beside the run's record and outside
+ * every workspace (`artifactsDir` in runner.ts), and says where it is. Mechanism, like the closeout: a
+ * step does not have to find somewhere, and a workflow author does not have to remember to say where.
+ */
+export const artifactsContract = (dir: string): string => [
+  '', '## Files for the steps after you', '',
+  `Put them in \`${dir}\`; name them in \`artifacts\` by absolute path.`,
+  '',
+  'The run made that directory for this step, outside every workspace, so a file there reaches the',
+  'steps after you and the person who decides without riding the branch: a screenshot, a log, a',
+  'report. A file that belongs on the branch, such as `RESPONSE.md`, stays in the workspace and is',
+  "named by its path from the workspace root. The run's check of this step is given the same",
+  'directory as `WF_ARTIFACTS`. An absolute path anywhere else is refused, and not read.',
+].join('\n');
+
+/**
+ * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
+ *
+ *   branch   a path from the workspace root — on the step's branch, where it travelled
+ *   files    an absolute path inside the step's files directory — on disk, where the run keeps it
+ *   outside  any other absolute path — refused. A closeout is an agent's text, and the run does not
+ *            look at a file on this machine because a step named it. `..` is resolved first, so a path
+ *            that climbs out of the directory is outside however it is spelled.
+ */
+export type ArtifactPlace = 'branch' | 'files' | 'outside';
+
+export function artifactPlace(file: string, dir: string): ArtifactPlace {
+  if (!path.isAbsolute(file)) return 'branch';
+  const within = path.relative(path.resolve(dir), path.resolve(file));
+  // Empty is the directory itself, which is not a file in it.
+  return within && within !== '..' && !within.startsWith(`..${path.sep}`) && !path.isAbsolute(within) ? 'files' : 'outside';
+}
+
+/** A file in a step's files directory, by absolute path, and its size. */
+export type ArtifactFile = { path: string; bytes: number };
+
+/**
+ * What `wf decide` prints about a step's files, after its closeout: each declared file that is not where
+ * it says, told apart by why, and then every file in the step's directory with its size.
+ */
+export function artifactLines(dir: string, missing: readonly string[], files: readonly ArtifactFile[]): string[] {
+  const at = (place: ArtifactPlace) => missing.filter((f) => artifactPlace(f, dir) === place);
+  const [onBranch, inFiles, outside] = [at('branch'), at('files'), at('outside')];
+  return [
+    ...(onBranch.length ? [`!! declared but not on the branch: ${onBranch.join(', ')}  — it did not travel`] : []),
+    ...(inFiles.length ? [`!! declared but not in ${dir}: ${inFiles.join(', ')}`] : []),
+    ...(outside.length ? [`!! declared outside ${dir}, and not read: ${outside.join(', ')}  — a step's files go in its own directory`] : []),
+    ...(files.length ? ['files:', ...files.map((f) => `  ${f.path}  ${sizeOf(f.bytes)}`)] : []),
+  ];
+}
+
+/** Bytes, as a person reads them. */
+const sizeOf = (bytes: number): string =>
+  bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
+
 // ─── handing it back ────────────────────────────────────────────────────────
 
 /**
@@ -700,11 +763,17 @@ export function composeBrief(
   steps: readonly Workflow[],
   /** How each step signed off. Read only for the steps this one names in `input:`. */
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  /** The directory the run made for this step's files (`artifactsDir` in runner.ts). */
+  artifactsDir?: string,
 ): string {
   // What finishing means, on every brief: the command this step will be judged by, when it has one,
-  // and then the closeout — last, because it says to give it last. Mechanism, not prose a workflow
-  // author has to remember to repeat.
-  const contracts = [...(step.check ? [checkContract(step.check)] : []), closeoutContract(step)].join('\n');
+  // where its files for the steps after it go, and then the closeout — last, because it says to give it
+  // last. Mechanism, not prose a workflow author has to remember to repeat.
+  const contracts = [
+    ...(step.check ? [checkContract(step.check)] : []),
+    ...(artifactsDir ? [artifactsContract(artifactsDir)] : []),
+    closeoutContract(step),
+  ].join('\n');
   // What this step reads of the steps it waits on — their declared output, and only if it asked.
   const given = (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n');
 

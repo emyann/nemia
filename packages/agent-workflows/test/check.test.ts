@@ -15,7 +15,7 @@ import { codex } from '../../agent-engine/src/runner-detached.ts';
 import { CHECK, checkBrief, checkContract, lastLines, readCheckBrief, readVerdict, stdoutTail, type CheckEnv } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow.ts';
 
-const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr' };
+const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr', WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement' };
 
 test('the verdict is the last trailer in the log — one the command printed earlier changes nothing', () => {
   assert.equal(readVerdict('ok 1\n# pass 3\n\n[wf check] exit 0\n'), 0);

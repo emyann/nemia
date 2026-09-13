@@ -351,7 +351,7 @@ test('a pass that filed a check and died before writing the run down is adopted,
 
   const again = await advance(e, readRun(run.id));
   assert.equal(filings.filter((f) => f.endsWith('-check')).length, 1);
-  assert.deepEqual(again.checked, ['implement']);
+  assert.deepEqual(again.checked, [], 'adopted before the pass assessed anything, so there was nothing left to file');
   assert.deepEqual(readRun(run.id).steps.implement?.check, { taskId: `${run.id}-implement-check` });
 });
 
@@ -426,4 +426,25 @@ test('`wf ls` and `wf decide` read a refused check from its log and its stderr f
     command: 'npm test', passed: false, verdict: 1,
     stdout: 'not ok 3 - parses a trailing comma\n# fail 1', stderr: 'npm error Test failed.',
   });
+});
+
+test('a check filed by a pass that died, on a run then cancelled, is found and stopped — by the verb, and by every pass', async () => {
+  const run = started(folder('check: npm test'));
+  const { e, filings, stopped, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  const before = readRun(run.id);
+  await advance(e, readRun(run.id));   // files the check…
+  writeRun(before);                    // …and, as far as the record knows, never did
+  const id = `${run.id}-implement-check`;
+  settle(id, 'running');
+
+  const { plan } = await cancel(e, run.id);
+  assert.deepEqual(plan, { kind: 'cancel', stop: [{ name: 'implement (check)', taskId: id }] }, 'the verb finds it');
+  assert.equal(readRun(run.id).steps.implement?.check, undefined, 'and does not write the run to do so');
+
+  await advance(e, readRun(run.id));
+  assert.deepEqual(stopped, [id, id], 'a cancelled run files no check, and still finds the one it filed');
+  assert.deepEqual(readRun(run.id).steps.implement?.check, { taskId: id }, 'the tick puts it on the record');
+  assert.equal(filings.filter((f) => f === id).length, 1);
 });

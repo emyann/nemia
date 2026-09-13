@@ -14,7 +14,7 @@ import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdo
 
 export { verdictWord } from './check.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, stepStatus, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -145,8 +145,40 @@ async function taskPhases(e: Engine, run: Run): Promise<{
   };
 }
 
+/**
+ * Checks a pass filed and never wrote down, put back on the record. In memory: `advance` is the one
+ * writer of the run's json, and writes it; `cancel` only needs them in view.
+ *
+ * A pass that dies between `e.file` and `writeRun` leaves a check on the engine's board that the
+ * record does not name. It is looked for under the id the run derives, for every step whose check is
+ * due and unrecorded, and BEFORE anything asks what is in flight. Waiting for filing time to adopt it
+ * was not enough: a run cancelled in that window files no more checks, so it was never adopted, never
+ * stopped, and its suite ran on to the deadline.
+ */
+async function adoptChecks(
+  e: Engine,
+  run: Run,
+  steps: readonly Workflow[],
+  views: Map<string, TaskView>,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+  asked: (taskId: string) => boolean,
+): Promise<string[]> {
+  const adopted: string[] = [];
+  for (const step of steps) {
+    if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked) !== 'checking') continue;
+    const taskId = checkTaskId(run, step.name);
+    const view = await e.view(taskId);
+    if (!view.state.brief) continue;   // not filed: due, and this pass's to file
+    views.set(taskId, view);
+    run.steps[step.name] = { ...run.steps[step.name]!, check: { taskId } };
+    adopted.push(step.name);
+  }
+  return adopted;
+}
+
 /** Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing. */
-const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
+const closeoutAsked =(views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
   Boolean(views.get(taskId)?.state.closeoutSchema);
 
 /**
@@ -336,6 +368,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
 
   const { views, phaseOf } = await taskPhases(e, run);
   const signedOff = closeoutReader(views, run);
+  const asked = closeoutAsked(views);
+  const adopted = await adoptChecks(e, run, steps, views, phaseOf, signedOff, asked);
 
   // A cancelled run is enforced by every pass, not only by the verb that cancelled it.
   //
@@ -366,7 +400,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // committed tree, and nothing it leaves behind is committed afterwards (`handOffDue`).
   for (const name of handOffDue(run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
 
-  const { ready, check, blocked, status } = assess(steps, run, phaseOf, signedOff, closeoutAsked(views));
+  const { ready, check, blocked, status } = assess(steps, run, phaseOf, signedOff, asked);
 
   // The fact the run establishes for itself: each signed step's `check:`, executed where the work is.
   // An engine task on the `check` harness, so it outlives this pass, has a deadline, and is stopped
@@ -377,8 +411,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     const step = steps.find((s) => s.name === name)!;
     const workspace = run.steps[name]!.workspace ?? run.workspace;
     const taskId = checkTaskId(run, name);
-    // A pass that filed this check and died before writing the run down left it on the engine's board
-    // under the id it derived. Adopted, not filed again.
+    // A check an earlier pass filed and never wrote down was adopted above, before this list was made.
+    // Looked up once more all the same: filing an id the engine already holds would journal it twice.
     if (!(await e.view(taskId)).state.brief) {
       fs.mkdirSync(path.dirname(checkStderr(taskId)), { recursive: true });
       await e.file({
@@ -435,7 +469,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
-  if (filed.length || checked.length) writeRun(run);
+  if (filed.length || checked.length || adopted.length) writeRun(run);
 
   return { run, filed, checked, status, blocked };
 }
@@ -466,6 +500,9 @@ export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
+  // A check filed by a pass that died before writing the run down is in flight too. Found here so the
+  // verb stops it at once; on the record only in memory, because this verb never writes the run.
+  await adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views));
 
   const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views));
   if (plan.kind === 'finished') return { run, plan };

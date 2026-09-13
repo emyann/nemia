@@ -102,7 +102,11 @@ export const checkScript = (command: string): string => [
   command,
   ')',
   '}',
-  'if [ -n "${WF_STDERR:-}" ]; then wf_check 2>"$WF_STDERR"; else wf_check; fi',
+  // The path is the run's plumbing, not the command's: captured and UNSET before the command runs, or
+  // a command that itself runs a check — this package's own suite, under its own check — would see it
+  // and send its stderr into this file instead of its own log. Measured: the check.test.ts case that
+  // asserts "stderr stays in the log when there is no file for it" read an empty log inside a check.
+  'if [ -n "${WF_STDERR:-}" ]; then wf_stderr="$WF_STDERR"; unset WF_STDERR; wf_check 2>"$wf_stderr"; else wf_check; fi',
   `c=$?; printf '\\n${TRAILER} %d\\n' "$c"; exit "$c"`,
 ].join('\n');
 

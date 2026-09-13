@@ -9,10 +9,11 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { createEngine, type Engine } from 'agent-engine';
 // The engine beside this package in THIS tree, by path — see the read-only test at the end.
 import { codex } from '../../agent-engine/src/runner-detached.ts';
-import { CHECK, checkBrief, checkContract, lastLines, readCheckBrief, readVerdict, stdoutTail, type CheckEnv } from '../src/check.ts';
+import { CHECK, checkBrief, checkContract, checkScript, lastLines, readCheckBrief, readVerdict, stdoutTail, type CheckEnv } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow.ts';
 
 const ENV: CheckEnv = { WF_RUN: 'r-1', WF_STEP: 'implement', WF_BASE_REF: 'abc123', WF_WORKSPACE: '/wt', WF_STDERR: '/tmp/x.stderr', WF_ARTIFACTS: '/wf/runs/r-1/artifacts/implement' };
@@ -197,4 +198,14 @@ test('the shipped review is read-only on an engine that honours it, and that is 
     'workflows/review.md is read-only, and review.md or respond.md hands the review on as a REVIEW.md the reviewer cannot write. '
     + 'The review travels as the closeout: `output:` on review.md, `input: review` on respond.md.');
   assert.ok(steps.review?.output && steps.respond?.input?.includes('review'), 'it reaches respond as a declared closeout');
+});
+
+test('the command a check runs does not inherit WF_STDERR, so a check inside a check keeps its own stderr', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-check-leak-'));
+  const file = path.join(dir, 'outer.stderr');
+  const out = execFileSync('sh', ['-c', checkScript('printf "seen=%s\\n" "${WF_STDERR-unset}"; echo said >&2')], {
+    env: { ...process.env, WF_STDERR: file }, encoding: 'utf8',
+  });
+  assert.match(out, /seen=unset/, 'the command must not see the file the run redirects its stderr to');
+  assert.equal(fs.readFileSync(file, 'utf8').trim(), 'said', 'the redirection itself still holds');
 });

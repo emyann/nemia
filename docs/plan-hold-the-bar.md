@@ -631,7 +631,8 @@ owner is not mid-run.
   exact read-only commands (`npm test`, `npm run typecheck|build|e2e`, `npx turbo run test:*`, `node --test:*`,
   `git diff|log|show|status|branch`). In `dontAsk` any other Bash command is denied without a prompt, and there is
   no Edit or Write on the list — so the reviewer is read-only by machinery, not by prose (plan §4 I's aim). The
-  shipped `review.md` stays on codex, whose fence is the sandbox. First run to test it: E6's review.
+  shipped `review.md` stays on codex, whose fence is the sandbox. E6 froze the old folder, so the first
+  run to test the fence is the next one filed.
 
 ## 5. What the plan does not do
 

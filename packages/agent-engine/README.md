@@ -381,7 +381,9 @@ open issue 1 in `docs/open-issues.md`, deferred, with the reason there.
 Everything above is us guessing from outside. A task may instead declare `closeoutSchema` — a JSON
 Schema — and the harness asks the workload for a final answer in that shape. **The moment it gives
 one, the attempt is over:** no ninety-second wait, no stall to characterise, because the workload
-said so.
+said so. That holds when the harness then marks the session `blocked` as much as when it stays
+`working` — a step that called `StructuredOutput` and ended its turn has been seen `blocked`, idle,
+and until that was fixed it waited on a person for ever and held its slot.
 
 How each harness is asked, both verified live:
 

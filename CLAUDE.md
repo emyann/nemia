@@ -30,6 +30,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   deletes every build whose playwright is not listed alive in `~/.cache/ms-playwright/.links`, so
   install through the checkout's own `node_modules`, never from an `npx` download. (Learned by the run
   that added the browser, whose install deleted the e2e's builds.)
+- **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
+  pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
+  Learned by R, whose refusal tests passed for the wrong reason until anchored right.
 - **A guard is not proven by a test that asks whether it allows.** Every new refusal — a parser
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's

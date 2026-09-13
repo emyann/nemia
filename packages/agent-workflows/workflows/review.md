@@ -3,7 +3,8 @@ harness: codex
 after: implement
 # A review reads; it does not edit. Honoured once the engine emits `-s read-only` for codex
 # (docs/plan-hold-the-bar.md, B commit 1) — and from then this step cannot write REVIEW.md, which
-# respond reads. How the review reaches respond has to be settled before that merges.
+# respond reads. How the review reaches respond has to be settled before that merges, and
+# test/check.test.ts refuses this pair on any engine that honours read-only until it is.
 permissionMode: read-only
 ---
 Review the change in this workspace as a second engineer would.

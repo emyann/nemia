@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createEngine, type Engine } from 'agent-engine';
+import { codex, createEngine, type Engine } from 'agent-engine';
 import { CHECK, checkBrief, checkContract, lastLines, readCheckBrief, readVerdict, stdoutTail, type CheckEnv } from '../src/check.ts';
 import { loadWorkflows } from '../src/workflow.ts';
 
@@ -165,4 +165,19 @@ test("this repository's own workflow checks the suite and the types after every 
   assert.equal(steps.respond?.check, 'npm test && npm run typecheck');
   assert.equal(steps.review?.harness, 'codex');
   assert.equal(steps.review?.permissionMode, 'read-only');
+});
+
+test('the shipped review is not read-only on an engine that honours it while respond still needs its REVIEW.md', () => {
+  // review.md sets `permissionMode: read-only` and asks for REVIEW.md; respond.md answers REVIEW.md.
+  // Both hold only while the engine runs a read-only codex step as workspace-write. The day it emits
+  // `-s read-only` (plan B, commit 1) the reviewer cannot write the file the responder reads — so this
+  // refuses, at that trial merge, until somebody has decided how a review reaches respond.
+  const steps = Object.fromEntries(loadWorkflows(path.join(import.meta.dirname, '..', 'workflows')).map((s) => [s.name, s]));
+  const { args } = codex.command({ name: 'probe', brief: 'probe', cwd: os.tmpdir(), permissionMode: 'read-only' });
+  const sandbox = args[args.indexOf('-s') + 1];
+  const reviewCannotWrite = sandbox === 'read-only' && steps.review?.harness === 'codex' && steps.review?.permissionMode === 'read-only';
+  const handedOnAsAFile = /REVIEW\.md/.test(steps.review?.body ?? '') && /REVIEW\.md/.test(steps.respond?.body ?? '');
+  assert.ok(!(reviewCannotWrite && handedOnAsAFile),
+    'codex now runs a read-only step read-only, and workflows/review.md is read-only while respond.md reads the REVIEW.md it can no longer write. '
+    + 'Decide how a review reaches respond — the run writes it from the closeout, or review keeps workspace-write — then change workflows/ and this test.');
 });

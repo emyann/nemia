@@ -9,7 +9,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { createEngine, type Engine, type TaskView } from 'agent-engine';
+import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 'agent-engine';
+import { CHECK } from './check.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
 import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, listing, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
 
@@ -71,9 +72,24 @@ const writeRun = (run: Run) => {
   fs.writeFileSync(runFile(run.id), JSON.stringify(run, null, 2));
 };
 
+/**
+ * The engine, with one harness of the run's own beside the three it ships.
+ *
+ * `check` runs a step's `check:` command (`src/check.ts`). Passing `harnesses` REPLACES the engine's
+ * default map rather than adding to it, so the defaults are named again here — leaving them out would
+ * quietly send every `claude` step to whichever harness came first.
+ */
+export const HARNESSES = {
+  claude: 'claude-bg',
+  codex,
+  'claude-detached': claudeDetached,
+  check: CHECK,
+} as const;
+
 export const engine = (): Engine => createEngine({
   root: path.join(HOME, 'engine'),
   maxConcurrent: Number(process.env.WF_MAX_CONCURRENT) || 2,
+  harnesses: HARNESSES,
 });
 
 /**

@@ -12,9 +12,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine } from 'agent-engine';
+import type { Engine, TaskView } from 'agent-engine';
 import type { Run, TaskPhase } from '../src/run.ts';
-import { readCheckBrief } from '../src/check.ts';
+import { readCheckBrief, verdictWord } from '../src/check.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-store-'));
 const WORKFLOW = path.join(ROOT, 'workflow');
@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, decide, list, markCancelled, missingArtifacts, readRun, retry, round, start } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, phaseOfView, readRun, retry, round, start } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -1015,10 +1015,10 @@ test('`wf retry` takes one way to try, and `--model` with a name — anything el
 /** `findings` and `again`, as `workflows/review.schema.json` declares them. */
 const LOOPING = { ...FINDINGS, properties: { ...FINDINGS.properties, again: { type: 'boolean' } }, required: ['findings', 'again'] };
 
-/** implement, checked → review, looping back to it with `rounds:` at its default unless `reviewKeys` say — the shape `workflows/` ships. */
-const looped = (reviewKeys = '') => {
+/** implement, checked → review, looping back to it with `rounds:` at its default unless `reviewKeys` say — the shape `workflows/` ships. Each key set ends with a newline. */
+const looped = (reviewKeys = '', implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\ncheck: npm test\n${implementKeys}---\nimplement it\n`);
   fs.writeFileSync(path.join(dir, 'review.md'), `---\nafter: implement\noutput: review.schema.json\nloop: implement\n${reviewKeys}---\nreview it\n`);
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(LOOPING, null, 2));
   return dir;
@@ -1233,4 +1233,117 @@ test("REFUSED before the fix, now handed: a fresh try of implement inside round 
   assert.deepEqual(dataUnder(spec.brief, '## From review'), { findings: FOUND });
   assert.doesNotMatch(spec.brief, /REVIEWER-SUMMARY|IMPLEMENTER-SUMMARY/);
   assert.deepEqual((spec.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
+});
+
+// ─── what a step may have: `tools:` and `effort:` ───────────────────────────
+
+test('REFUSED before, now carried: a step with `tools:` and `effort:` reaches `e.file` with exactly that list and that effort — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
+  const TOOLS = ['Read', 'Grep', 'Glob', 'Bash'];
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ntools: Read, Grep, Glob, Bash\neffort: high', 'failed', 1);
+  const first = tasks.get(`${run.id}-implement`)!.spec;
+  assert.deepEqual([first.tools, first.effort], [TOOLS, 'high'], 'the first filing');
+
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.deepEqual([nudged.tools, nudged.effort, nudged.resumeFrom], [TOOLS, 'high', `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+
+  settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
+  settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
+  await retry(e, run.id, 'implement', { mode: 'fresh', model: 'opus' });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  const fresh = tasks.get(`${run.id}-implement-try3`)!.spec;
+  assert.deepEqual([fresh.tools, fresh.effort, fresh.model, fresh.resumeFrom], [TOOLS, 'high', 'opus', undefined], 'a new session on the model asked for, fenced the same');
+
+  // The check is the run's own, on a harness with no tools to narrow.
+  const check = tasks.get(`${run.id}-implement-check`)!.spec;
+  assert.deepEqual([check.harness, check.tools, check.effort], ['check', undefined, undefined]);
+});
+
+test("at shipped defaults a step names neither, and is filed with neither: the harness's own tools, at its own effort", async () => {
+  const run = started(folder());
+  const { e, tasks } = board();
+  await advance(e, readRun(run.id));
+  const spec = tasks.get(`${run.id}-implement`)!.spec;
+  assert.deepEqual([spec.tools, spec.effort], [undefined, undefined]);
+});
+
+test("a round files its target with the target's tools and effort, and the looping step — a new session each round — with its own", async () => {
+  const REVIEWS = ['Read', 'Grep', 'Glob', 'Bash'];
+  const EDITS = ['Read', 'Edit', 'Write', 'Bash'];
+  const run = started(looped('tools: Read, Grep, Glob, Bash\neffort: max\n', 'tools: Read, Edit, Write, Bash\neffort: low\n'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const implement1 = b.tasks.get(`${run.id}-implement`)!.spec;
+  assert.deepEqual([implement1.tools, implement1.effort], [EDITS, 'low']);
+  await toReview(b, run.id, 1, true);
+  const review1 = b.tasks.get(`${run.id}-review`)!.spec;
+  assert.deepEqual([review1.tools, review1.effort], [REVIEWS, 'max']);
+
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  const implement2 = b.tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.deepEqual([implement2.tools, implement2.effort, implement2.resumeFrom], [EDITS, 'low', `native-${run.id}-implement`], 'the round, continuing implement');
+  await toReview(b, run.id, 2, false);
+  const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
+  assert.deepEqual([review2.tools, review2.effort, review2.resumeFrom], [REVIEWS, 'max', undefined], "round 2's review");
+});
+
+// ─── what a consumer reads without a log: `phaseOfView`, `closeoutAsked`, `exitVerdicts` ───
+
+/** Every task a run's record names, viewed once, as the tick views them: all the exports are given — no engine, and so no log. */
+const viewsOf = async (e: Engine, run: Run): Promise<Map<string, TaskView>> => {
+  const views = new Map<string, TaskView>();
+  for (const { taskId, check } of Object.values(run.steps)) {
+    if (taskId) views.set(taskId, await e.view(taskId));
+    if (check) views.set(check.taskId, await e.view(check.taskId));
+  }
+  return views;
+};
+
+test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose attempt has no exit code — the word `wf ls` reads off the log — and no retry is spent on it', async () => {
+  const refused = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
+  refused.logs.set(`${refused.run.id}-implement-check`, 'not ok 1 - parses a trailing comma\n\n[wf check] exit 1\n');
+  // Killed at its deadline: the engine settles it `failed`, with no exit code on its attempt and no trailer on its log.
+  const killed = await throughCheck('check: npm test\nretries: 1', 'failed');
+  killed.logs.set(`${killed.run.id}-implement-check`, 'ok 1 - builds\n');
+
+  for (const [b, verdict] of [[refused, 1], [killed, 'unfinished']] as const) {
+    const run = readRun(b.run.id);
+    const verdictOf = exitVerdicts(await viewsOf(b.e, run), run);
+    assert.equal(verdictOf('implement'), verdict);
+    assert.equal(verdictOf('review'), undefined, 'a step with no check filed has no verdict at all');
+    assert.equal((await list(b.e, run)).steps[0]!.status, `failed ✗ check (${verdictWord(verdict)})`, "`wf ls`'s word, which it read off the log");
+  }
+  assert.deepEqual((await advance(killed.e, readRun(killed.run.id))).tried, [], 'a check that did not finish spends no retry');
+  assert.deepEqual((await advance(refused.e, readRun(refused.run.id))).tried, ['implement'], 'a refusal does');
+});
+
+test("`phaseOfView` and `closeoutAsked` say what `wf ls` says: `unknown` for a task the engine has no record of, not `pending`; `unsigned` only for a step that was asked for its closeout", async () => {
+  const b = board();
+  const run = started(folder());
+  await advance(b.e, readRun(run.id));
+  const implement = `${run.id}-implement`;
+  // Filed, and waiting for a slot.
+  let views = await viewsOf(b.e, readRun(run.id));
+  assert.deepEqual([phaseOfView(views.get(implement)), (await list(b.e, readRun(run.id))).steps[0]!.status], ['pending', 'pending']);
+
+  // A record naming a task the engine has no record of. The engine folds it to a filed task's state, and says `pending`;
+  // `wf ls` said so too, which is in flight, for a task nobody will ever move.
+  const lost = aRun('r-lost', { implement: { taskId: 'r-lost-implement' }, review: { taskId: null } });
+  writeRun(lost);
+  const lostView = await b.e.view('r-lost-implement');
+  assert.equal(lostView.phase, 'pending', "the engine's own word");
+  assert.deepEqual([phaseOfView(lostView), phaseOfView(undefined), (await list(b.e, lost)).steps[0]!.status], ['unknown', 'unknown', 'unknown']);
+
+  // Settled without the closeout the run asked for.
+  b.settle(implement, 'succeeded');
+  views = await viewsOf(b.e, readRun(run.id));
+  assert.deepEqual([phaseOfView(views.get(implement)), closeoutAsked(views)(implement)], ['succeeded', true]);
+  assert.equal((await list(b.e, readRun(run.id))).steps[0]!.status, 'unsigned');
+
+  // A task from before closeouts was never asked for one, so it is not unsigned: it lists `unverified`.
+  const before = aRun('r-before', { implement: { taskId: 't-before' }, review: { taskId: null } });
+  const { e: old } = engineWith({ 't-before': 'succeeded' });
+  const oldViews = await viewsOf(old, before);
+  assert.deepEqual([phaseOfView(oldViews.get('t-before')), closeoutAsked(oldViews)('t-before'), (await list(old, before)).steps[0]!.status], ['succeeded', false, 'unverified']);
 });

@@ -215,8 +215,11 @@ export const engine = (): Engine => createEngine({
  * cleared read as running for ever: `wf cancel` claimed to stop steps nobody can find, and
  * `wf decide` said "still running". `unknown` was in the type for this and was simply unreachable.
  * Found by the `wf rm` run (34774e0), whose verb was not kept; this was.
+ *
+ * Exported, log-free, so a consumer narrows a view as the tick does. No view at all is `unknown` too.
  */
-const phaseOfView = (v: TaskView): TaskPhase => {
+export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
+  if (!v) return 'unknown';
   if (v.state.settled) return v.state.settled;
   if (v.state.attempts.length) return 'running';
   return v.state.brief ? 'pending' : 'unknown';
@@ -240,10 +243,7 @@ async function taskPhases(e: Engine, run: Run): Promise<{
   }
   return {
     views,
-    phaseOf: (taskId) => {
-      const v = views.get(taskId);
-      return v ? phaseOfView(v) : 'unknown';
-    },
+    phaseOf: (taskId) => phaseOfView(views.get(taskId)),
   };
 }
 
@@ -341,21 +341,28 @@ async function adoptRounds(
   return adopted;
 }
 
-/** Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing. */
-const closeoutAsked =(views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
+/**
+ * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing. What tells a
+ * step that ended without one — `unsigned` — from a task that was never asked. Exported, log-free, for a consumer
+ * that words a step as `wf ls` does.
+ */
+export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
   Boolean(views.get(taskId)?.state.closeoutSchema);
 
 /**
  * What each step's current check exited with, off the engine's record: the code its process gave, or
- * `unfinished` when it gave none — killed by a signal, stopped, or never started. What the tick tells a refusal
- * from a check that did not finish by (`refusedCheck`), without reading a log: a run waiting on a person costs
- * no more each pass. The check prints the code it exits with, so this and the log's `[wf check] exit N` agree.
+ * `unfinished` when it gave none — killed by a signal, stopped, or never started — and `undefined` for a step
+ * with no check filed. What the tick tells a refusal from a check that did not finish by (`refusedCheck`),
+ * without reading a log: a run waiting on a person costs no more each pass. The check prints the code it exits
+ * with, so this and the log's `[wf check] exit N`, which `wf ls` reads, agree.
+ *
+ * Exported for a consumer that words a check as `wf ls` does, without a `logs` call per refused check.
  */
-const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string): Verdict | undefined => {
+export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string): Verdict | undefined => {
   const taskId = run.steps[step]?.check?.taskId;
-  const last = taskId ? views.get(taskId)?.state.attempts.at(-1) : undefined;
-  if (!last) return undefined;
-  return typeof last.exitCode === 'number' ? last.exitCode : 'unfinished';
+  if (!taskId) return undefined;
+  const exitCode = views.get(taskId)?.state.attempts.at(-1)?.exitCode;
+  return typeof exitCode === 'number' ? exitCode : 'unfinished';
 };
 
 /** The harness's own id for a task's last session — what `--resume` takes. */
@@ -806,7 +813,10 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
         model: r.model ?? step.model,
+        effort: step.effort,
         permissionMode: step.permissionMode,
+        // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
+        tools: step.tools,
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
         resumeFrom,
@@ -843,7 +853,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
         model: target.model,
+        effort: target.effort,
         permissionMode: target.permissionMode,
+        tools: target.tools,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
         resumeFrom,
@@ -918,9 +930,12 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,
+      effort: step.effort,
       // Left to the engine's default (`auto`) unless the step says otherwise: a workflow runs
       // unattended by definition, and a mode that prompts is a mode that stalls.
       permissionMode: step.permissionMode,
+      // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
+      tools: step.tools,
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
@@ -1007,8 +1022,13 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
   // Only a refused check's log is read here: its exit code is the one number on its line.
   const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
   const { asks, rounds } = readAsks(run.id);
-  return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name),
-    closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds);
+  // The engine's own word, but `unknown` for a task it has no record of, as `phaseOfView` has it: the engine folds
+  // that task to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight.
+  const wordOf = (taskId: string): string => {
+    const v = views.get(taskId);
+    return v?.state.brief ? v.phase : 'unknown';
+  };
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds);
 }
 
 export type Asked = { run: Run; ask: RetryAsk; file: string };

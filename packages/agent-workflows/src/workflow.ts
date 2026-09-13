@@ -50,7 +50,16 @@ export type Workflow = {
   body: string;
   harness?: string;
   model?: string;
+  /** How hard the harness should think, in its own words: one of `EFFORTS` for the harness the step runs on. */
+  effort?: string;
   permissionMode?: string;
+  /**
+   * The only tools the session may have, in the harness's names — `tools: Read, Grep, Glob, Bash`. Absent: the
+   * harness's own set. Claude Code is given exactly the list (`--tools`), which names its built-in tools; the
+   * servers of the checkout's `.mcp.json` are not on it. Refused on codex, which has no tool list: its fence is
+   * the sandbox `permissionMode` names.
+   */
+  tools?: string[];
   deadlineSeconds?: number;
   maxAttempts?: number;
   /**
@@ -115,7 +124,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'harness', 'model', 'permissionMode', 'deadlineSeconds', 'maxAttempts', 'check', 'retries', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'deadlineSeconds', 'maxAttempts', 'check', 'retries', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -134,10 +143,6 @@ export const outputFields = (step: Workflow): string[] => Object.keys(step.outpu
  * work, and "not a key a step has" would be a worse answer than the truth.
  */
 const REFUSED: Record<string, string> = {
-  tools: 'the engine does not carry a tool list to the harness yet, so the step would run with every tool while'
-    + ' this file said otherwise. Delete the line; `tools` is reserved, and is accepted once the engine enforces it',
-  effort: 'the engine does not carry an effort level to the harness yet, so the line would change nothing.'
-    + ' Delete it; `effort` is reserved, and is accepted once the engine passes it on',
   guide: 'the harness reads CLAUDE.md or AGENTS.md from the step\'s workspace on its own. Standing rules belong'
     + ' in that file, and what only this step needs to know belongs in the body',
 };
@@ -145,30 +150,45 @@ const REFUSED: Record<string, string> = {
 /** The harness a step runs on when it names none. */
 const DEFAULT_HARNESS = 'claude';
 
-const CLAUDE_MODES = ['default', 'acceptEdits', 'auto', 'dontAsk', 'bypassPermissions', 'plan'];
+/*
+ * The words each harness takes, copied from the engine — which is the source. `CLAUDE_PERMISSION_MODES` and
+ * `CLAUDE_EFFORTS` are agent-engine's `src/runner.ts`; `CODEX_SANDBOXES` and `CODEX_EFFORTS` its
+ * `src/runner-detached.ts`, whose `codex.refuses` also takes `bypassPermissions`, as the widest sandbox.
+ *
+ * A copy and not an import, because `runner.ts` is the only file here that imports the engine, and the engine
+ * refuses these words only when the run files a step — after `wf start`, with a run on the record. Checked here,
+ * so a word is refused before anything is spent. `test/vocabulary.test.ts` imports the engine's lists and fails
+ * the moment a copy differs: the first copies did, for `manual` and codex's `bypassPermissions`.
+ */
+const CLAUDE_MODES = ['acceptEdits', 'auto', 'bypassPermissions', 'default', 'dontAsk', 'manual', 'plan'];
+const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 
 /**
- * The harnesses a step may run on, and the permission modes each understands.
+ * The harnesses a step may run on, and the permission modes each takes.
  *
- * A copy of the engine's vocabulary, not an import — `runner.ts` is the only file here that imports
- * the engine — and checked here because nothing below checks it: an unknown `harness` falls
- * silently to the default, and an unknown mode is refused by the Claude CLI at spawn (which rejects
- * the whole tick) or read by Codex as `workspace-write`.
- *
- * Codex's list is the plan's (`docs/plan-hold-the-bar.md` §4 A), and ahead of the engine: today
- * `agent-engine/src/runner-detached.ts:236` passes `-s danger-full-access` only for
- * `bypassPermissions` and `-s workspace-write` for everything else, so `read-only` waits on the
- * engine's own change and `danger-full-access` is accepted here and not yet honoured there.
+ * Checked here because nothing below checks it early enough: an unknown `harness` falls silently to the
+ * default, and an unknown mode is refused by the engine only when the run files the step.
  *
  * `check` is not on the list. That harness is the run's own: it executes a step's `check:`
  * command, and no step runs on it.
  */
 export const PERMISSION_MODES: Readonly<Record<string, readonly string[]>> = {
   claude: CLAUDE_MODES,
-  codex: ['workspace-write', 'danger-full-access', 'read-only'],
+  codex: ['read-only', 'workspace-write', 'danger-full-access', 'bypassPermissions'],
   'claude-detached': CLAUDE_MODES,
 };
 export const HARNESSES: readonly string[] = Object.keys(PERMISSION_MODES);
+
+/**
+ * The efforts each harness takes: `--effort` for Claude Code, `model_reasoning_effort` for Codex. Checked for the
+ * reason a mode is, and one more: Claude Code does not refuse an effort it does not know — it warns, and runs at
+ * its default, a line that silently changes nothing.
+ */
+export const EFFORTS: Readonly<Record<string, readonly string[]>> = {
+  claude: CLAUDE_EFFORTS,
+  codex: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
+  'claude-detached': CLAUDE_EFFORTS,
+};
 
 /** The keys that are counts: what each counts, the least that means anything, and an example. */
 const COUNTS = {
@@ -222,7 +242,9 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     body,
     harness,
     model: meta.model,
-    permissionMode: modeOf(name, meta.permissionMode, harness),
+    effort: wordOf(name, 'effort', meta.effort, harness),
+    permissionMode: wordOf(name, 'permissionMode', meta.permissionMode, harness),
+    tools: toolsOf(name, meta.tools, harness),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
     maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
     check: checkOf(name, meta.check),
@@ -288,7 +310,9 @@ function readKeys(step: string, block: string): Partial<Record<StepKey, string>>
     if (!value) {
       refuse(key === 'check'
         ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
-        : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
+        : key === 'tools'
+          ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
+          : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
     }
     meta[key] = value;
   }
@@ -303,18 +327,58 @@ function harnessOf(step: string, harness: string | undefined): string | undefine
   return refuse(`${step}: \`harness: ${harness}\` is not a harness a step can run on. The harnesses are: ${HARNESSES.join(', ')}. Without the line, the step runs on ${DEFAULT_HARNESS}.`);
 }
 
-/** A permission mode is the harness's vocabulary, so it is checked against the harness the step runs on. */
-function modeOf(step: string, mode: string | undefined, harness: string | undefined): string | undefined {
+const VOCABULARY = {
+  permissionMode: { lists: PERMISSION_MODES, noun: 'a mode' },
+  effort: { lists: EFFORTS, noun: 'an effort' },
+} as const;
+
+/** A permission mode or an effort is the harness's vocabulary, so it is checked against the harness the step runs on. */
+function wordOf(step: string, key: keyof typeof VOCABULARY, word: string | undefined, harness: string | undefined): string | undefined {
+  const { lists, noun } = VOCABULARY[key];
   const on = harness ?? DEFAULT_HARNESS;
-  const modes = PERMISSION_MODES[on]!;
-  if (mode === undefined || modes.includes(mode)) return mode;
-  const owner = HARNESSES.find((h) => PERMISSION_MODES[h]!.includes(mode));
+  const words = lists[on]!;
+  if (word === undefined || words.includes(word)) return word;
+  const owner = HARNESSES.find((h) => lists[h]!.includes(word));
   return refuse(
-    `${step}: \`permissionMode: ${mode}\` is not a mode ${on} has${harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`}.`
-    + ` On ${on} it is one of: ${modes.join(', ')}.`
-    + (owner ? ` \`${mode}\` is ${owner}'s word, and this step does not run on ${owner}.` : '')
+    `${step}: \`${key}: ${word}\` is not ${noun} ${on} has${harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`}.`
+    + ` On ${on} it is one of: ${words.join(', ')}.`
+    + (owner ? ` \`${word}\` is ${owner}'s word, and this step does not run on ${owner}.` : '')
     + ' Without the line, the harness uses its own default.',
   );
+}
+
+const TOOLS_EXAMPLE = '`tools: Read, Grep, Glob, Bash`';
+
+/**
+ * `tools:` as the list of names the harness is given, refused unless each entry is one name.
+ *
+ * Split on commas, as `after:` is — so a comma inside an entry, in a rule's parentheses or in quotes, would reach
+ * the harness as the pieces of one; and a space inside one is a list written without its commas, or a rule where
+ * a name goes. Refused on codex, which has no tool list: one shell in a sandbox, so a list there narrows nothing
+ * the sandbox does not, and the engine leaves the sandbox as `permissionMode` named it whenever the list has Bash.
+ */
+function toolsOf(step: string, tools: string | undefined, harness: string | undefined): string[] | undefined {
+  if (tools === undefined) return undefined;
+  const named = `${step}: \`tools: ${tools}\``;
+  const written = `A step's tools are the harness's names for them, bare and comma-separated: ${TOOLS_EXAMPLE}.`;
+  if (harness === 'codex') {
+    refuse(`${named} is a tool list, and codex has none: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`permissionMode: read-only\` for a step that must not write.`);
+  }
+  if (/\([^)]*,|\[[^\]]*,|"[^"]*,|'[^']*,/.test(tools)) {
+    const pieces = tools.split(',').map((s) => `\`${s.trim()}\``).join(', ');
+    refuse(`${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as names. ${written}`);
+  }
+  const names = tools.split(',').map((s) => s.trim()).filter(Boolean);
+  if (!names.length) refuse(`${named} names no tool. ${written} Without the line, the step has the harness's own set.`);
+  const spaced = names.find((n) => /\s/.test(n));
+  if (spaced && !spaced.includes('(')) refuse(`${named} has a space inside \`${spaced}\`, which is not one name. ${written}`);
+  const dressed = names.find((n) => /[\s()[\]"'`]/.test(n));
+  if (dressed) {
+    refuse(`${named} has \`${dressed}\`, which is not a tool name: ${dressed.includes('(')
+      ? `it is a rule for what a tool may run, and \`tools:\` says which tools the session has — \`${dressed.slice(0, dressed.indexOf('('))}\`, whole`
+      : 'a name is written bare, without quotes or brackets'}. ${written}`);
+  }
+  return names;
 }
 
 function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined): number | undefined {

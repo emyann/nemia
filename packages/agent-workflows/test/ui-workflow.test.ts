@@ -50,6 +50,14 @@ test('look reads implement on Claude, which reads images, and hands on findings 
   assert.deepEqual(findings.items.properties.theme.enum, ['light', 'dark', 'both']);
 });
 
+test('the two reviewers write nothing by machinery: look has only tools that read, review the read-only sandbox — and the steps that edit have every tool', () => {
+  assert.deepEqual(steps.look?.tools, ['Read', 'Grep', 'Glob']);
+  assert.deepEqual(steps.look?.tools?.filter((t) => ['Edit', 'Write', 'NotebookEdit', 'Bash'].includes(t)), [], 'nothing that writes');
+  // Codex has no tool list, so its reviewer's fence is its sandbox, and a `tools:` line on it would be refused at load.
+  assert.deepEqual([steps.review?.harness, steps.review?.permissionMode, steps.review?.tools], ['codex', 'read-only', undefined]);
+  assert.deepEqual([steps.implement?.tools, steps.respond?.tools], [undefined, undefined]);
+});
+
 test('review is the review workflows/ ships — codex, read-only, the same prose and the same findings — less its loop', () => {
   // workflows/ loops its review back to implement. ui/ does not: its respond is a fan-in of two reviewers, and a
   // loop whose steps fork is refused at load. Everything else is the same review, and held to it here.

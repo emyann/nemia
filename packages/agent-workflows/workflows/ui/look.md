@@ -2,9 +2,13 @@
 harness: claude
 after: implement
 # The screenshots and the routes, as data — nothing else of implement's closeout. On Claude because it
-# reads images. It is told to write nothing; nothing enforces that until the engine carries `tools:`
-# (docs/plan-hold-the-bar.md §4 I), so a file it did write would be committed and merged into respond.
+# reads images.
 input: implement
+# Read for the screenshots, and Grep and Glob for the code a page is meant to show — and nothing that
+# writes: no Edit, no Write, no Bash, so no file of its own is committed and merged into respond. These are
+# Claude Code's built-in tools (`--tools`); the browser's `browser_*` tools, which open a page and
+# photograph it outside the workspace, come from the checkout's `.mcp.json` and are not on this line.
+tools: Read, Grep, Glob
 # The findings travel as this step's closeout, and respond is handed them with `input: look`.
 output: look.schema.json
 ---

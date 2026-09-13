@@ -67,7 +67,7 @@ export function StepNode({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
-        <StatusChip status={step.status} runCancelled={runCancelled} />
+        <StatusChip status={step.status} runCancelled={runCancelled} note={step.note} />
         <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
           {attemptLine(step.attempts, live, now) ?? 'no attempt yet'}
         </span>

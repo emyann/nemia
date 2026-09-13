@@ -3,7 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
-import { StatusChip } from '../components/StatusChip';
+import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { runQuery, type RunDetail } from '../lib/api';
 
@@ -88,9 +88,12 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
 
   return (
     <section className="space-y-4 border-t border-neutral-200 pt-6 dark:border-neutral-800">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-semibold">{step.name}</h2>
-        <StatusChip status={step.status} runCancelled={runCancelled} />
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="font-semibold">{step.name}</h2>
+          <StatusChip status={step.status} runCancelled={runCancelled} />
+        </div>
+        <StepNote note={step.note} />
       </div>
 
       {spec && <Facts rows={specRows(spec)} />}

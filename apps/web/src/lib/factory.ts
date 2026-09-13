@@ -55,27 +55,47 @@ export const CELL_HEIGHT = 220;
 export const GRID_COLUMNS = 4;
 
 /**
- * Where each run's card goes: where it was left, if it was; else the first cell, row by row, that no
- * card is in. A card is in the cell nearest its corner, and one dragged off the grid is in none.
+ * Where each run's card goes, for the runs on the floor, oldest first. In order of claim:
+ *
+ * 1. A card on the floor now stays where it is: a person is looking at it.
+ * 2. A card coming onto the floor goes back where it was left (`saved`), unless a card placed
+ *    before it is in that cell. The cell was free while this card was off the floor — finished and
+ *    hidden, say — and a run that started meanwhile took it; putting both there would hide one
+ *    under the other, so the card coming back takes a free cell instead.
+ * 3. Any other card takes the first free cell, row by row.
+ *
+ * A card is in the cell nearest its corner, and one dragged off the grid is in none. A card off the
+ * floor holds no cell: finished runs pile up, and holding their cells would leave holes that never
+ * close.
  */
-export function placeRuns(ids: readonly string[], kept: ReadonlyMap<string, Point>): Map<string, Point> {
-  const taken = new Set(ids.flatMap((id) => {
-    const left = kept.get(id);
-    return left ? [cellOf(left)] : [];
-  }));
+export function placeRuns(
+  ids: readonly string[],
+  onFloor: ReadonlyMap<string, Point>,
+  saved: ReadonlyMap<string, Point> | null,
+): Map<string, Point> {
   const at = new Map<string, Point>();
+  const taken = new Set<number>();
+  const put = (id: string, point: Point) => {
+    at.set(id, point);
+    taken.add(cellOf(point));
+  };
+  for (const id of ids) {
+    const here = onFloor.get(id);
+    if (here) put(id, here);
+  }
+  for (const id of ids) {
+    const left = saved?.get(id);
+    if (at.has(id) || !left) continue;
+    const cell = cellOf(left);
+    if (cell === -1 || !taken.has(cell)) put(id, left);
+  }
   let cell = 0;
   for (const id of ids) {
-    const left = kept.get(id);
-    if (left) {
-      at.set(id, left);
-      continue;
-    }
+    if (at.has(id)) continue;
     while (taken.has(cell)) cell++;
-    taken.add(cell);
-    at.set(id, { x: (cell % GRID_COLUMNS) * CELL_WIDTH, y: Math.floor(cell / GRID_COLUMNS) * CELL_HEIGHT });
+    put(id, { x: (cell % GRID_COLUMNS) * CELL_WIDTH, y: Math.floor(cell / GRID_COLUMNS) * CELL_HEIGHT });
   }
-  return at;
+  return new Map(ids.map((id) => [id, at.get(id)!]));
 }
 
 function cellOf({ x, y }: Point): number {

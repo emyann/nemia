@@ -78,7 +78,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // Where each card is and how big React Flow measured it, changed only through `onNodesChange`, a
   // run joining or leaving the floor, and a reset. What a card shows is read from the runs below.
   const [placed, setPlaced] = useState<RunFlowNode[]>(() => {
-    const at = placeRuns(ids, readFactoryLayout() ?? new Map());
+    const at = placeRuns(ids, new Map(), readFactoryLayout());
     return shown.map((run) => nodeOf(run, at.get(run.id)!));
   });
 
@@ -86,8 +86,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   useEffect(() => {
     setPlaced((current) => {
       const have = new Map(current.map((node) => [node.id, node]));
-      const kept = new Map([...(readFactoryLayout() ?? []), ...current.map((node) => [node.id, node.position] as const)]);
-      const at = placeRuns(ids, kept);
+      // Cards on the floor stay put; one coming back yields its old cell to a card that took it meanwhile.
+      const at = placeRuns(ids, new Map(current.map((node) => [node.id, node.position])), readFactoryLayout());
       const next = shown.map((run) => have.get(run.id) ?? nodeOf(run, at.get(run.id)!));
       return next.length === current.length && next.every((node, i) => node === current[i]) ? current : next;
     });
@@ -128,7 +128,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // Laid out on the grid again, and the saved arrangement forgotten, so the next visit agrees.
   const resetLayout = () => {
     forgetFactoryLayout();
-    const at = placeRuns(ids, new Map());
+    const at = placeRuns(ids, new Map(), null);
     setPlaced((current) => current.map((node) => ({ ...node, position: at.get(node.id) ?? node.position })));
     setFits((n) => n + 1);
   };

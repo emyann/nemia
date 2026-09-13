@@ -104,7 +104,7 @@ test('runs go on the floor oldest first, so a new one takes the next cell and mo
 
 test('laid out fresh, the cards fill the grid row by row', () => {
   assert.equal(GRID_COLUMNS, 4, 'the cells below assume four to a row');
-  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b', 'c', 'd', 'e'], new Map())), {
+  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b', 'c', 'd', 'e'], new Map(), null)), {
     a: { x: 0, y: 0 },
     b: { x: CELL_WIDTH, y: 0 },
     c: { x: 2 * CELL_WIDTH, y: 0 },
@@ -114,7 +114,7 @@ test('laid out fresh, the cards fill the grid row by row', () => {
 });
 
 test('a card goes where it was left, and a new one into the first cell no card is in', () => {
-  const at = placeRuns(['r-1', 'r-2', 'r-3', 'r-4', 'r-5', 'r-6'], new Map([
+  const at = placeRuns(['r-1', 'r-2', 'r-3', 'r-4', 'r-5', 'r-6'], new Map(), new Map([
     ['r-2', { x: 0, y: 0 }],
     // Near the third cell, not on it: it is still in that cell.
     ['r-4', { x: 2 * CELL_WIDTH + 10, y: -8 }],
@@ -131,6 +131,32 @@ test('a card goes where it was left, and a new one into the first cell no card i
     'r-5': { x: 0, y: CELL_HEIGHT },
     'r-6': { x: -500, y: 40 },
   });
+});
+
+test('a card coming back onto the floor does not land on a card that took its cell meanwhile', () => {
+  // `a` was on the floor in the first cell when a drag saved the arrangement.
+  const saved = new Map([['a', { x: 0, y: 0 }]]);
+  // `a` finishes and drops off the floor; `b` starts, and takes the first free cell, which is `a`'s.
+  const hidden = placeRuns(['b'], new Map(), saved);
+  assert.deepEqual(Object.fromEntries(hidden), { b: { x: 0, y: 0 } });
+  // Show finished: `a` comes back. `b` is on the floor where a person can see it, so `b` stays and `a` moves.
+  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b'], hidden, saved)), {
+    a: { x: CELL_WIDTH, y: 0 },
+    b: { x: 0, y: 0 },
+  });
+});
+
+test('two cards saved in one cell: the older keeps it, the other takes a free cell', () => {
+  // How the stack gets saved: the next drag writes `b` where it was placed, beside `a`'s old position.
+  const saved = new Map([['a', { x: 0, y: 0 }], ['b', { x: 12, y: 6 }], ['c', { x: CELL_WIDTH, y: 0 }]]);
+  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b', 'c'], new Map(), saved)), {
+    a: { x: 0, y: 0 },
+    b: { x: 2 * CELL_WIDTH, y: 0 },
+    c: { x: CELL_WIDTH, y: 0 },
+  });
+  // Cards on the floor are never moved for one another, even stacked: a person put them there.
+  const stacked = new Map([['a', { x: 0, y: 0 }], ['b', { x: 12, y: 6 }]]);
+  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b'], stacked, saved)), Object.fromEntries(stacked));
 });
 
 test('what is saved is every card as last left, and nothing for a run the store no longer lists', () => {

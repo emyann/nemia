@@ -179,10 +179,11 @@ unchanged. The README section *Trying again* is the account.
 
 What it leaves:
 
-- **The board does not see asks or tries.** `apps/api` calls `assess` and `listing` without the ask files or
-  a verdict per step. Its `moving` ignores a try that is due, its `waitingOnYou` still names a step whose retry
-  was asked for, and `note` is not in its payload. That is one argument each in `judge`, plus a verb on the
-  board if a person should be able to ask from there.
+- **The board does not see asks.** `apps/api` gives `assess` and `listing` each check's verdict, as the tick
+  does, so a try `retries:` covers reads the same in both places: running, moving, and waiting on nobody. It
+  reads no ask files, though. Until the tick files a try a person asked for, the board shows that run failed,
+  not moving, and waiting on you. `note` is not in its payload either. Fixing that is one argument each in
+  `judge`, plus a verb on the board if a person should be able to ask from there.
 - **An ask carries no message.** A nudge tells the step what happened, not what the person wants done
   differently. That is plan §4b's *steering by message*: the same file shape, with text the tick composes into
   the brief.
@@ -194,7 +195,9 @@ What it leaves:
 - **Two readings of one verdict.** The tick tells a refusal by the exit code the engine recorded, so no log is
   read per pass. `wf ls` and `wf decide` read the log's `[wf check] exit N`. They agree while the check prints
   the code it exits with. A record from before the engine kept exit codes reads as "did not finish" to the
-  tick, so it offers `--recheck` rather than spending a retry.
+  tick, so it offers `--recheck` rather than spending a retry. A caller that passes no verdict gets the same
+  reading. F's review found the api passing none, and reading a check stopped at its deadline as a refusal
+  with a try due.
 - **The engine's deadline is `failed`, not `stopped`.** A check stopped at its deadline settles `failed` with
   no exit code, so the missing exit code, not the phase, is what says it did not finish.
 - **`bin/wf.ts` exits 1 on every error**, including the verbs' refusals, which set `exitCode` 2.

@@ -122,7 +122,10 @@ export function assess(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   /** Whether a task was asked for a closeout: the schema on the engine's record of its filing. */
   askedCloseout: (taskId: string) => boolean = () => false,
-  /** What each step's current check exited with. Read only for a check that did not pass — see `refusedCheck`. */
+  /**
+   * What each step's current check exited with. Read only for a check that did not pass — see `refusedCheck`.
+   * Left out, no check is taken to have refused, so no try of `retries:` is due.
+   */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   /** What people asked for with `wf retry`, and the run has not consumed yet. */
   asks: readonly RetryAsk[] = [],
@@ -306,10 +309,15 @@ export const modeWord = (how: { mode: RetryMode; model?: string }): string => (h
  * Refused: it ran to its end and exited non-zero — settled `failed`, with an exit code. Did not finish:
  * `stopped` — killed, or never started — or `failed` without an exit code, which is a check stopped at its
  * deadline or lost. That is no verdict on the work: `retries:` spends no try on it, and `wf decide` offers
- * `wf retry --recheck`. A verdict nobody read (`undefined`) leaves it to the phase. Measured, on 2026-09-13:
- * three checks were killed by the harness for "low memory" with 16 GB free, and the work was fine each time.
+ * `wf retry --recheck`. Measured, on 2026-09-13: three checks were killed by the harness for "low memory" with
+ * 16 GB free, and the work was fine each time.
+ *
+ * Only a number is a refusal. A verdict nobody read (`undefined`) is no evidence of one, and is read as `listing`
+ * already words it: `unfinished`. Read the other way, a caller that passed none — the api's `assess`, as first
+ * shipped — called a check stopped at its deadline refused, and a run the tick had left waiting on a person read
+ * running, with a try due that the tick would never file.
  */
-export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): boolean => phase === 'failed' && verdict !== 'unfinished';
+export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): boolean => phase === 'failed' && typeof verdict === 'number';
 
 /**
  * What a person may ask for a step, and the status that says why. Pure.

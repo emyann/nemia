@@ -599,12 +599,16 @@ test('`wf decide` names every step that did not earn a follower, each in its own
     },
   });
   const p = phases({ t1: 'succeeded', c1: 'failed', t2: 'succeeded', t3: 'succeeded', t4: 'failed' });
-  const d = decision(four, r, p, nothingShipped, (name) => (name === 'c' ? undefined : signedDone()), asked);
+  // `a`'s check exited 1: it refused.
+  const d = decision(four, r, p, nothingShipped, (name) => (name === 'c' ? undefined : signedDone()), asked, (name) => (name === 'a' ? 1 : undefined));
   assert.equal(d.kind, 'awaiting');
   if (d.kind !== 'awaiting') return;
-  assert.deepEqual({ failedCheck: d.failedCheck, unverified: d.unverified, unsigned: d.unsigned, failed: d.failed },
-    { failedCheck: ['a'], unverified: ['b'], unsigned: ['c'], failed: ['d'] });
+  assert.deepEqual({ failedCheck: d.failedCheck, unfinishedCheck: d.unfinishedCheck, unverified: d.unverified, unsigned: d.unsigned, failed: d.failed },
+    { failedCheck: ['a'], unfinishedCheck: [], unverified: ['b'], unsigned: ['c'], failed: ['d'] });
   assert.equal(d.outcome, 'failed');
+  // With no exit code to read, the same check did not finish — and the run is failed all the same.
+  const unread = decision(four, r, p, nothingShipped, (name) => (name === 'c' ? undefined : signedDone()), asked);
+  assert.deepEqual(unread.kind === 'awaiting' && [unread.failedCheck, unread.unfinishedCheck, unread.outcome], [[], ['a'], 'failed']);
 });
 
 test('a run whose check is still running has nothing to decide yet, and names the step', () => {
@@ -729,7 +733,16 @@ test('a check that did not finish is no refusal: `retries:` spends nothing on it
       ['implement: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  wf retry r-1 implement --recheck'], why);
   }
   assert.equal(refusedCheck('failed', 1), true);
-  assert.equal(refusedCheck('failed', undefined), true, 'a verdict nobody read leaves it to the phase');
+  assert.equal(refusedCheck('failed', undefined), false, 'a verdict nobody read is no refusal');
+  // The review's case: a caller that gives no verdict — the api's `assess` once — for a check stopped at its
+  // deadline. It must read what the tick reads: failed, waiting on a person, and no try due.
+  const deadline = phases({ t1: 'succeeded', c1: 'failed' });
+  const unread = assess(RETRIED, onTry(), deadline, signedDone, asked);
+  assert.deepEqual([unread.retry, unread.blocked, unread.status], [[], ['review'], 'failed']);
+  assert.deepEqual(assess(RETRIED, onTry(), deadline, signedDone, asked, () => 'unfinished'), unread, 'the same as the tick, which reads no exit code');
+  assert.deepEqual(cancelPlan(RETRIED, onTry(), deadline, signedDone, asked), { kind: 'finished', status: 'failed' });
+  const told = decision(RETRIED, onTry(), deadline, nothingShipped, signedDone, asked);
+  assert.deepEqual(told.kind === 'awaiting' && [told.failedCheck, told.unfinishedCheck], [[], ['implement']]);
   // A refusal with no tries left is offered the other way.
   const d = decision(RETRIED, onTry(SPENT), phases({ t1: 'succeeded', c1: 'failed' }), nothingShipped, signedDone, asked, () => 1);
   assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck], [['implement'], []]);

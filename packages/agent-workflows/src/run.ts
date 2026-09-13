@@ -12,6 +12,7 @@
  * the run, and is the only state this file writes down rather than derives.
  */
 import type { TaskView } from 'agent-engine';
+import { checkContract } from './check.ts';
 import { terminalSteps, type Workflow } from './workflow.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
@@ -548,9 +549,14 @@ export function listing(
  * one, it writes a file, deliberately, like a person would.
  */
 export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[]): string {
+  // What finishing means, on every brief: the command this step will be judged by, when it has one,
+  // and then the closeout — last, because it says to give it last. Mechanism, not prose a workflow
+  // author has to remember to repeat.
+  const contracts = [...(step.check ? [checkContract(step.check)] : []), closeoutContract()].join('\n');
+
   // A step that CONTINUES another already has the context — its own. Repeating the spec back and
   // pointing it at the workspace would be telling someone what they spent an hour doing.
-  if (step.resume) return step.body + closeoutContract();
+  if (step.resume) return step.body + contracts;
 
   const earlier = step.after.length
     ? step.after
@@ -565,7 +571,7 @@ export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',
       'several others is for. `git status` shows them.',
-      closeoutContract(),
+      contracts,
     ].join('\n');
   }
 
@@ -587,7 +593,7 @@ export function composeBrief(step: Workflow, run: Run, steps: readonly Workflow[
     );
   }
 
-  parts.push(closeoutContract());
+  parts.push(contracts);
   return parts.join('\n');
 }
 

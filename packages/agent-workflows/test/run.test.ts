@@ -595,3 +595,27 @@ test('a run whose check is still running has nothing to decide yet, and names th
   const d = decision(CHECKED, withCheck('c1'), phases({ t1: 'succeeded', c1: 'running' }), nothingShipped, signedDone, asked);
   assert.deepEqual(d, { kind: 'running', waiting: ['implement'] });
 });
+
+test('a step with `check:` is told the command before it is judged by it — resumed, merged or not — and the closeout stays last', () => {
+  const implement: Workflow = { ...step('implement'), check: 'npm test && npm run typecheck' };
+  const respond: Workflow = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
+  const integrate: Workflow = { name: 'integrate', after: ['a', 'b'], body: 'combine', check: 'npm run build' };
+  const cases: Array<[Workflow, Workflow[]]> = [
+    [implement, [implement]],
+    [{ ...step('review', ['implement']), check: 'npm test' }, STEPS],
+    [respond, [implement, respond]],
+    [integrate, [step('a'), step('b'), integrate]],
+  ];
+  for (const [s, steps] of cases) {
+    const brief = composeBrief(s, run({ implement: 't1', a: 't2', b: 't3' }), steps);
+    assert.ok(brief.includes(`must exit 0 in this workspace: \`${s.check}\``), s.name);
+    assert.match(brief, /comes from the run, not from this checkout/);
+    assert.ok(brief.indexOf('## Before you sign off') < brief.indexOf('## When you are finished'), `${s.name}: the closeout is last`);
+  }
+});
+
+test('a step without `check:` is told of no check — no command the run will not run', () => {
+  for (const s of [step('implement'), step('review', ['implement'])]) {
+    assert.doesNotMatch(composeBrief(s, run({ implement: 't1', review: null }), STEPS), /Before you sign off|must exit 0/);
+  }
+});

@@ -158,7 +158,7 @@ has no Codex servers configured.
 
 ## Verified by tests, not by a live run
 
-- **Releasing a quiet session, or one a person or a deadline stopped** (engine `TBD-R1`, `TBD-R2`). A
+- **Releasing a quiet session, or one a person or a deadline stopped** (engine `c2ebd62`, `9c4221e`). A
   fake `claude` that keeps a registry, at shipped defaults. The live run released a session that had
   given its closeout; none that ended by quiet, and none settled without an end.
 
@@ -253,5 +253,5 @@ has no Codex servers configured.
 | a `claude-detached` task never gave a closeout: its spec dropped `closeoutSchema` | `--json-schema` and `--output-format json`, and the answer read from the result's `structured_output` in the worker's capture, stamped with when that was written. The worker writes a run's end only once the harness's output is in the log: `exit` can come before the pipes drain, and the pass that records the end missed the answer (found writing the test) | engine `3e44ab6` |
 | every Codex attempt recorded `usage: null`, though its `exec --json` stream reports tokens | read from the worker's capture of that stream: tool calls by item, tokens from `turn.completed`, each absent when the stream cannot say. `turns` and `toolCalls` may now be absent from any `Usage` — a Codex turn is a prompt, not a model response — and `ae show` names what was not measured | engine `bb3de3c` |
 | every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `7200295` |
-| a released session that had ended by quiet was removed without a `claude stop` — and a worktree task's was never touched, left `working` for good — because `release` read the runner's translated `done` | `release` stops on the state `claude agents` itself listed (found in review) | engine `TBD-R1` |
-| a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `TBD-R2` |
+| a released session that had ended by quiet was removed without a `claude stop` — and a worktree task's was never touched, left `working` for good — because `release` read the runner's translated `done` | `release` stops on the state `claude agents` itself listed (found in review) | engine `c2ebd62` |
+| a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `9c4221e` |

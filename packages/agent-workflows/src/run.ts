@@ -295,7 +295,11 @@ export type Decision =
   | { kind: 'running'; waiting: string[] }
   | { kind: 'cancelled'; at: string }
   | { kind: 'shipped'; branches: string[] }
-  | { kind: 'awaiting'; outcome: 'succeeded' | 'failed' | 'blocked'; branches: string[]; failed: string[]; stuck: string[] };
+  | {
+      kind: 'awaiting'; outcome: 'succeeded' | 'failed' | 'blocked'; branches: string[]; failed: string[]; stuck: string[];
+      /** The steps worked on the base branch itself (`--no-worktree`): there is nothing to merge. */
+      direct: boolean;
+    };
 
 export function decision(
   steps: readonly Workflow[],
@@ -319,9 +323,14 @@ export function decision(
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
 
+  // A run that worked directly on its base branch is never asked whether it shipped. Git's answer
+  // is `main is an ancestor of main` — always yes — and it was read before the steps were
+  // classified, so a failed or blocked `--no-worktree` run printed "shipped" with no closeout.
+  const direct = branches.includes(run.branch);
+
   // Every terminal branch, not some: a fan-out that ends in two branches is not shipped because
   // one of them landed.
-  if (branches.length && branches.every(shipped)) return { kind: 'shipped', branches };
+  if (branches.length && !direct && branches.every(shipped)) return { kind: 'shipped', branches };
 
   // Told apart on purpose. A step that STOPPED itself and said why is a question for you; one the
   // engine recorded as failed is a thing that broke. Lumping them loses the only bit that decides
@@ -334,7 +343,7 @@ export function decision(
   return {
     kind: 'awaiting',
     outcome: failed.length ? 'failed' : stuck.length ? 'blocked' : 'succeeded',
-    branches, failed, stuck,
+    branches, failed, stuck, direct,
   };
 }
 

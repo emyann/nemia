@@ -317,6 +317,27 @@ test('a FAILED run is still decided, and names the step that failed', () => {
   assert.deepEqual(d.kind === 'awaiting' && d.failed, ['review']);
 });
 
+test('a run that worked directly on its base branch is never read as shipped', () => {
+  // `--no-worktree`: every step works on `main`, and `git merge-base --is-ancestor main main` is
+  // always true. Asked first, it printed "shipped" for a run whose last step failed.
+  const direct = run({}, {
+    isolate: false,
+    steps: { implement: { taskId: 't1', branch: 'main' }, review: { taskId: 't2', branch: 'main' } },
+  });
+  const everythingShipped = () => true;
+
+  const failed = decision(STEPS, direct, phases({ t1: 'succeeded', t2: 'failed' }), everythingShipped);
+  assert.equal(failed.kind, 'awaiting');
+  assert.equal(failed.kind === 'awaiting' && failed.outcome, 'failed', 'classified as for any run');
+  assert.equal(failed.kind === 'awaiting' && failed.direct, true);
+
+  const done = decision(STEPS, direct, DONE, everythingShipped);
+  assert.equal(done.kind, 'awaiting', 'nothing to merge is not the same as merged');
+
+  const isolated = decision(STEPS, finished(), DONE, everythingShipped);
+  assert.equal(isolated.kind, 'shipped', 'a worktree run is still asked of git');
+});
+
 test('a run that never filed anything has no branch to ship, and is not "shipped"', () => {
   const d = decision(STEPS, run({ implement: null, review: null }), phases({}), () => true);
   assert.equal(d.kind, 'running');

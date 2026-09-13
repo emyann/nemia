@@ -171,6 +171,13 @@ export async function main(argv: string[]): Promise<void> {
         }
       }
 
+      // Worked on the base branch itself: `merge --no-ff main` into main is nothing, and
+      // `branch -D main` is not a command to print beside it.
+      if (decision.direct) {
+        console.log(`\n  worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`);
+        console.log(`  read it    git -C ${run.repo} diff ${run.baseRef}...${run.branch}`);
+        return;
+      }
       const first = decision.branches[0];
       if (first) {
         console.log(`\n  ship it   git -C ${run.repo} merge --no-ff ${first}`);

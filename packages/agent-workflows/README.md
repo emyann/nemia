@@ -40,6 +40,8 @@ Definition of done — a closed list, so there is a finish line:
       review and a reply are two opinions and something has to say what ships.
 - [x] **the check** — a step's `check:` is executed by the run after the step signs off, and its
       exit code, not the agent's word, decides whether what follows is filed.
+- [x] **declared outputs** — a step's `output:` schema adds fields to its closeout, and a step that
+      names it in `input:` is handed those fields as data. The review travels this way, not as a file.
 - [ ] **rounds** — `after` is a DAG and cannot loop, so a second round is a *new run* over the same
       worktree, started by the decider. That keeps rounds countable and deliberate.
 - [x] **the splitter** — `wf-examples/split` proposes parts that touch disjoint files, and is
@@ -57,14 +59,15 @@ slip in with an example. For now a person reads `PLAN.md` and starts a run per p
 harness: codex             # claude (default) | codex | claude-detached
 after: implement           # what must finish first: verified, or unverified if it has no check
 permissionMode: read-only
+output: review.schema.json # what its closeout declares for a later step: a JSON Schema beside it
 ---
 Review the changes on this branch. Be specific about correctness, not style.
 ```
 
-A step's keys are a closed list — `after`, `resume`, `harness`, `model`, `permissionMode`,
-`deadlineSeconds`, `maxAttempts`, `check`, `retries` — and a key the parser does not know is refused
-by name before anything is spent, as is a value it cannot use (`src/workflow.ts`). `tools`, `effort`
-and `guide` are refused with reasons of their own.
+A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `permissionMode`,
+`deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output` — and a key the parser does not know is
+refused by name before anything is spent, as is a value it cannot use (`src/workflow.ts`). `tools`,
+`effort` and `guide` are refused with reasons of their own.
 
 **No key is control flow.** No conditions, no loops, no expressions, no templating. That is the
 design, not a missing feature.
@@ -72,13 +75,13 @@ design, not a missing feature.
 The interesting decisions in this kind of work — *is this good enough*, *did it do what was asked*
 — are not predicates a workflow language could evaluate. They are judgements, and a judgement
 belongs to a step with an agent in it. **The workflow is a team, not a program.** The prose is the
-logic: `after` orders, `resume` continues, `check` measures, and the rest say who does the work and
-for how long.
+logic: `after` orders, `resume` continues, `check` measures, `output` declares and `input` reads, and
+the rest say who does the work and for how long.
 
 `permissionMode` is the harness's word, checked against the harness the step runs on. On codex,
-`read-only` is honoured once the engine emits `-s read-only` for it (`docs/plan-hold-the-bar.md` §4 B,
-commit 1); until then codex runs such a step as `workspace-write`. `retries` is read and not yet acted
-on: re-filing a step its check refused is the next piece of work (`docs/features.md`).
+`read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
+the shipped reviewer hands its review on as its closeout. `retries` is read and not yet acted on:
+re-filing a step its check refused is the next piece of work (`docs/features.md`).
 
 ## What one step knows of another
 
@@ -88,6 +91,7 @@ it is between two engineers. A later step is told:
 - its own prose
 - **the original request** (the spec — you cannot judge completeness without it)
 - where to look: `git diff <baseRef>`, and who was there before it
+- what a step it waits on declared in its closeout — **only if it asks**, with `input:` (below)
 
 And deliberately **not** told: the previous step's transcript, reasoning, or self-assessment.
 
@@ -96,7 +100,60 @@ transcript — it is an artifact the author *chose* to produce, and the reviewer
 rather than the author's account of it. Passing the implementer's reasoning to the reviewer would
 anchor it on the very context that produced the work, and would put unverifiable claims next to
 verifiable evidence. So: **intent and artifacts travel, process does not.** A step that wants to
-say something to the next one writes a file, deliberately, like a person would.
+say something to the next one writes a file, deliberately, like a person would — or declares it.
+
+### Declared output: `output:` and `input:`
+
+Two keys, neither control flow — one declares, one reads. This repository's review and reply:
+
+```md
+---
+harness: codex
+after: implement
+permissionMode: read-only
+output: review.schema.json
+---
+Review the change in this workspace as a second engineer would. …
+```
+
+```md
+---
+after: review
+resume: implement
+input: review
+check: npm test && npm run typecheck
+---
+A second engineer has reviewed your change. Their findings are below, under *From review* …
+```
+
+- **`output: <file>`** names a JSON Schema beside the step, relative to the workflow folder. `wf start`
+  reads it and freezes it on the run with the step. A schema is part of what the step is judged by,
+  so it sits inside the same fence as a `check:`, and editing the folder afterwards changes nothing.
+  Its properties are merged into the closeout schema the step is filed with. The merged schema stays
+  strict: every property required and no others allowed, because Codex enforces strict output
+  schemas. At load, the run refuses a schema whose objects are not strict, a schema that names
+  `outcome`, `summary`, `artifacts` or `needs`, and a file that is not there. Each refusal names the fix.
+- **`input: <step>`** hands this step the producer's declared fields, under `## From <step>` in its
+  brief, as JSON labelled as data. It gets those fields only, never the producer's summary, needs or
+  artifacts. The producer must be a step this one waits on, directly or through `resume`, and must
+  declare an `output:`. Anything else is refused at load: a step cannot read the product of work that
+  has not finished.
+- **A producer whose closeout lacks a declared field, or cannot be read, is `unsigned`.** It did not
+  say what it was asked to say, and nothing that waits on it is filed.
+
+**The anchoring rule stands, and it is why both ends are declared.** *Intent and artifacts travel,
+process does not* was written against handing the implementer's account to the reviewer. A declared
+output is an artifact: the step's deliberate product, exactly what `REVIEW.md` used to be. What
+changed is the transport, not the rule. The summary still goes to the person who decides and nowhere
+else. Nothing from any step's closeout reaches a step that did not ask for it. `implement` declares
+nothing and `review` reads nothing, so the reviewer judges the diff.
+
+The transport buys three things. The reviewer writes nothing, so it runs `permissionMode: read-only`.
+The harness enforces the review's shape. And the review lives on the engine's record of the attempt,
+not on a branch, so `git branch -D` no longer deletes the only copy. `wf decide` prints a declared
+output after the step's summary: `findings` as a list, any other field as `name: value`. A step that
+wants a file for a person still writes one. `respond` writes `RESPONSE.md`, because a reply is for
+the person who decides.
 
 ## It works, and here is the run that proved it
 
@@ -188,11 +245,12 @@ Every step ends by giving a structured final answer, and that answer is how the 
 ```json
 { "outcome": "done",
   "summary": "one to three sentences, for the person who decides what ships",
-  "artifacts": ["REVIEW.md"],
+  "artifacts": ["RESPONSE.md"],
   "needs": null }
 ```
 
-There is no file to write. The run files each step with `CLOSEOUT_SCHEMA`, and the harness asks for
+There is no file to write. The run files each step with `CLOSEOUT_SCHEMA`, plus whatever fields its
+`output:` declares (`closeoutSchemaOf`), and the harness asks for
 the answer in that shape — Claude Code as a `StructuredOutput` tool the agent calls to finish, Codex
 as `--output-schema`. The engine records the answer on the step's task without reading it; this
 package reads it (`closeoutOf`). The schema is strict — every property required, `needs` nullable
@@ -252,7 +310,8 @@ it.
 
 **`summary` goes to the decider and nowhere else.** The reviewer still gets the diff and no account of
 the work — *read the change, not an account of it* is unchanged. Hermes injects the parent's summary
-into the child's prompt; this is the one place worth diverging.
+into the child's prompt; this is the one place worth diverging. The only part of a closeout that
+reaches another step is what its `output:` declares, and only a step that asks with `input:` gets it.
 
 ## The check: a fact the run does not take on trust
 
@@ -298,7 +357,7 @@ Point the folder at another repository and change that line.
 |---|---|---|
 | `waiting` | not filed yet | — |
 | the engine's word: `running (working)`, `needs-human` | still going | waits |
-| `unsigned` | it succeeded without the closeout it was asked for | **never runs** |
+| `unsigned` | it succeeded without the closeout it was asked for, or without a field its `output:` declares | **never runs** |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
@@ -475,8 +534,8 @@ holding a concurrency slot forever.
 
 | file | |
 |---|---|
-| `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a cycle or a dangling `after` |
-| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, blocked, done — and what a step is told |
+| `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a cycle, a dangling `after`, a loose `output:` schema, or an `input:` on work that has not finished |
+| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, blocked, done — and what a step is told, `## From <step>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/runner.ts` | the I/O: run store, git worktree, and the engine |
 | `src/cli.ts` | the verbs |

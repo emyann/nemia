@@ -4,7 +4,8 @@ The features agent-workflows is still missing, in the order I would take them. E
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
-State as of 2026-09-13: the check has shipped (package C of `docs/plan-hold-the-bar.md`, hkb-v2).
+State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2) and declared
+outputs (package J) have shipped.
 
 ## Shipped: the check
 
@@ -27,6 +28,33 @@ What it leaves for wave 2 of the plan, in its order:
   such as `package.json`; whether a lesson was written where the next agent reads.
 - **Rounds** (§4 H) — section 1 below.
 
+## Shipped: declared outputs and inputs
+
+A step's product can travel to the next step as its closeout, declared, instead of as a file written
+into the workspace. There are two keys, and neither is control flow. `output: <file>` on the producer
+names a JSON Schema beside the step. It is read at `wf start` and frozen on the run with the step, and
+its properties are merged into the closeout the step is filed with, still strict. `input: <step>` on
+the consumer puts the producer's declared fields, and nothing else, in its brief under
+`## From <step>`, as data. At load, the run refuses a missing file, a schema that is not strict, a
+schema naming a base field, and an `input:` on a step that is not `after` the producer or that
+declares no output. A producer whose closeout lacks a declared field is `unsigned`, and nothing that
+waits on it is filed. `wf decide` prints the declared output after the summary.
+
+The anchoring rule is kept by making both ends declared. A step's summary still goes only to the
+person who decides, and nothing from any closeout reaches a step that did not ask for it.
+`workflows/review.md` now declares `findings` (`review.schema.json`) and runs read-only.
+`workflows/respond.md` reads them with `input: review` and still writes `RESPONSE.md` for the person.
+The README section *Declared output* is the full account.
+
+What it leaves:
+
+- **A size cap.** A declared output travels whole into the next brief. hkb capped a result at 4 KB,
+  and no cap is stated here yet.
+- **The board's Output tab** (apps, not this package) can render the declared output from the
+  engine's record, the same way `wf decide` does.
+- **Files as inputs** (plan §4b). `wf start --input <file>` would copy into `runs/<id>/inputs/`, and
+  every brief would name the directory. A closeout carries text, not a screenshot.
+
 ## 1. Rounds
 
 **Wave 2** (`docs/plan-hold-the-bar.md` §4 H). **Registered.** The last unchecked item in the README's definition of done:
@@ -42,8 +70,9 @@ and the link to the previous round is lost.
 
 - its workspace starts from the previous run's **result branch**, not from the base;
 - its record names the run it follows and its round number;
-- its steps are told where the previous round's artifacts are (`REVIEW.md`, `RESPONSE.md` on that
-  branch) — intent and artifacts, never process, as `composeBrief` already does;
+- its steps are told where the previous round's artifacts are — `RESPONSE.md` on that branch, and the
+  review's `findings` on the previous run's engine record, where a declared output lives — intent and
+  artifacts, never process, as `composeBrief` already does;
 - whatever the person decided at `wf decide` — the answers to the previous round's `needs` — goes into
   the new run's brief as new intent.
 
@@ -125,7 +154,8 @@ the style of the tests already in `test/`. Run the whole suite before you commit
 **What it needs.**
 
 - A way for a step to declare new steps. The closeout is the natural carrier: a plan is an artifact,
-  and a schema can give it a shape the run can read.
+  and since `output:` shipped, a step's closeout can already have a declared shape the run reads.
+  What is missing is a run that files steps from it.
 - A run model in which steps can be added after the run starts, while `assess` stays a pure function
   of the steps it is given.
 - A fan-in when the parts are not known in advance: which step merges them, and what it is told.

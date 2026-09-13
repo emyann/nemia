@@ -18,6 +18,15 @@ test('a step is frontmatter and prose, and the prose is the point', () => {
   assert.equal(w.body, 'Read the diff.');
 });
 
+test('check and retries are read — the command verbatim, colons and all', () => {
+  const w = parseWorkflow('implement', '---\ncheck: npm test && node -e "console.log(1 ? 2 : 3)"\nretries: 2\n---\nbuild it');
+  assert.equal(w.check, 'npm test && node -e "console.log(1 ? 2 : 3)"');
+  assert.equal(w.retries, 2);
+  const bare = parseWorkflow('implement', '---\nharness: claude\n---\nbuild it');
+  assert.equal(bare.check, undefined, 'absent means nothing runs');
+  assert.equal(bare.retries, undefined);
+});
+
 test('no frontmatter at all is a valid step', () => {
   assert.deepEqual(parseWorkflow('only', 'Just do it.').after, []);
   assert.equal(parseWorkflow('only', 'Just do it.').body, 'Just do it.');

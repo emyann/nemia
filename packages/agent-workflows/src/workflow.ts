@@ -41,6 +41,14 @@ export type Workflow = {
   permissionMode?: string;
   deadlineSeconds?: number;
   maxAttempts?: number;
+  /**
+   * A shell command the run executes in the step's workspace after the step hands off; exit 0 is
+   * what makes the step verified. It measures, it does not route. The command is read from the
+   * workflow the run froze, never from a checkout the step can edit.
+   */
+  check?: string;
+  /** How many times the run re-files the step after its check refuses it. Absent means none. */
+  retries?: number;
 };
 
 export class WorkflowError extends Error {}
@@ -73,6 +81,8 @@ export function parseWorkflow(name: string, text: string): Workflow {
     permissionMode: meta.permissionMode,
     deadlineSeconds: meta.deadlineSeconds ? Number(meta.deadlineSeconds) : undefined,
     maxAttempts: meta.maxAttempts ? Number(meta.maxAttempts) : undefined,
+    check: meta.check,
+    retries: meta.retries ? Number(meta.retries) : undefined,
   };
 }
 

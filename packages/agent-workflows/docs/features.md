@@ -4,11 +4,32 @@ The features agent-workflows is still missing, in the order I would take them. E
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
-State as of 2026-09-12, master `0e7b02a`.
+State as of 2026-09-13: the check has shipped (package C of `docs/plan-hold-the-bar.md`, hkb-v2).
+
+## Shipped: the check
+
+A step's `check:` is executed by the run after the step signs off, as an engine task on the run's own
+`check` harness; exit 0 is `verified` and files what follows, anything else is `failed (check)` and
+files nothing. With it: the workflow is frozen onto the run at `wf start`; a step that ends without the
+closeout it was asked for is `unsigned` and files nothing; failed and stopped steps are handed off
+(engine open issue 2); `wf ls` and `wf decide` say `verified ✓`, `checking`, `failed ✗ check (exit N)`,
+`unverified` and `unsigned`; `wf decide` no longer reads a `--no-worktree` run as shipped. The README's
+*The check* section is the account.
+
+What it leaves for wave 2 of the plan, in its order:
+
+- **Retries** (§4 F). `retries:` is parsed, and nothing acts on it: a refused check goes to the person at
+  `wf decide`. Next, `retries: n` re-files the step with the verdict as data — the command, the exit
+  code, both tails, "do not weaken it" — and `wf retry <run> <step>` does the same on a person's word,
+  through an ask file. `steps[name].check` becomes `steps[name].tries[]`, and the derived ids
+  (`<run>-<step>-try2`, `…-try2-check`) keep a crashed pass adoptable.
+- **The decider screen** (§4 G): what a branch touched, grouped; the full diff of check-affecting files
+  such as `package.json`; whether a lesson was written where the next agent reads.
+- **Rounds** (§4 H) — section 1 below.
 
 ## 1. Rounds
 
-**Registered.** The last unchecked item in the README's definition of done:
+**Wave 2** (`docs/plan-hold-the-bar.md` §4 H). **Registered.** The last unchecked item in the README's definition of done:
 
 > **rounds** — `after` is a DAG and cannot loop, so a second round is a *new run* over the same
 > worktree, started by the decider. That keeps rounds countable and deliberate.
@@ -58,8 +79,8 @@ back: implement `9efc52a`, review `8a2a31f`, respond `621fcff`.
 - Refuse a run with a step in flight. A step that is **ready but not yet filed** counts too: a pass
   may be filing it at that moment, and a pass that finishes afterwards must not recreate the record
   that was just removed.
-- Commit what a step left before removing its worktree. Failed and stopped steps are not handed off
-  today (open issue 2), so their work exists nowhere else.
+- Commit what a step left before removing its worktree. Failed and stopped steps are handed off since
+  the check shipped (open issue 2), but a worktree can still hold work written after the last pass.
 - A locked worktree makes git refuse. Report it; do not delete the directory behind git's back.
 - A run whose tasks the engine no longer knows must be removable (fixed by `0e7b02a`).
 

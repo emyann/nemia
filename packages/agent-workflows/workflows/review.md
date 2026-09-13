@@ -1,6 +1,10 @@
 ---
 harness: codex
 after: implement
+# A review should read and not edit, and the engine now honours `permissionMode: read-only` for
+# codex — but a read-only reviewer cannot write REVIEW.md, which respond reads. Until the review
+# travels as a closeout the run hands to the next step (docs/plan-hold-the-bar.md §4 J), the
+# reviewer keeps write access, and test/check.test.ts refuses the read-only pair.
 ---
 Review the change in this workspace as a second engineer would.
 

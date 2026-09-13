@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, listing, parseCloseout, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
+import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, stepStatus, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -317,6 +317,27 @@ test('a FAILED run is still decided, and names the step that failed', () => {
   assert.deepEqual(d.kind === 'awaiting' && d.failed, ['review']);
 });
 
+test('a run that worked directly on its base branch is never read as shipped', () => {
+  // `--no-worktree`: every step works on `main`, and `git merge-base --is-ancestor main main` is
+  // always true. Asked first, it printed "shipped" for a run whose last step failed.
+  const direct = run({}, {
+    isolate: false,
+    steps: { implement: { taskId: 't1', branch: 'main' }, review: { taskId: 't2', branch: 'main' } },
+  });
+  const everythingShipped = () => true;
+
+  const failed = decision(STEPS, direct, phases({ t1: 'succeeded', t2: 'failed' }), everythingShipped);
+  assert.equal(failed.kind, 'awaiting');
+  assert.equal(failed.kind === 'awaiting' && failed.outcome, 'failed', 'classified as for any run');
+  assert.equal(failed.kind === 'awaiting' && failed.direct, true);
+
+  const done = decision(STEPS, direct, DONE, everythingShipped);
+  assert.equal(done.kind, 'awaiting', 'nothing to merge is not the same as merged');
+
+  const isolated = decision(STEPS, finished(), DONE, everythingShipped);
+  assert.equal(isolated.kind, 'shipped', 'a worktree run is still asked of git');
+});
+
 test('a run that never filed anything has no branch to ship, and is not "shipped"', () => {
   const d = decision(STEPS, run({ implement: null, review: null }), phases({}), () => true);
   assert.equal(d.kind, 'running');
@@ -404,7 +425,7 @@ const SETTLED = shown({ t1: 'succeeded', t2: 'succeeded' });
 
 test('a step that signed off says how, next to the phase', () => {
   const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: said('done'), review: said('done') }));
-  assert.deepEqual(statuses(l), ['succeeded · done', 'succeeded · done']);
+  assert.deepEqual(statuses(l), ['unverified · done', 'unverified · done']);
   assert.deepEqual(l.waitingOnYou, []);
 });
 
@@ -412,11 +433,11 @@ test('BLOCKED stands out — its session succeeded, and it is the step waiting o
   // The case this exists for: the engine settled both sessions `succeeded`, and without the
   // closeout these two lines were identical.
   const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: said('done'), review: said('blocked') }));
-  assert.deepEqual(statuses(l), ['succeeded · done', 'succeeded · BLOCKED']);
+  assert.deepEqual(statuses(l), ['unverified · done', 'succeeded · BLOCKED']);
   assert.deepEqual(l.waitingOnYou, ['review']);
 });
 
-test('a step with no closeout reads exactly as it did before there were closeouts', () => {
+test('a step with no closeout is credited with nothing — still running, never filed, or from before closeouts', () => {
   // Still running, and never filed.
   const live = listing(STEPS, run({ implement: 't1', review: null }), shown({ t1: 'running (working)' }), signedOff({}));
   assert.deepEqual(live.steps, [
@@ -424,10 +445,11 @@ test('a step with no closeout reads exactly as it did before there were closeout
     { name: 'review', status: 'waiting', branch: null },
   ]);
 
-  // A run from before closeouts: settled, and silent about how. Nothing is inferred for it.
+  // A run from before closeouts: settled, and silent about how. Nothing is inferred for it — and
+  // nothing checked it, so it reads unverified rather than succeeded.
   const old = listing(STEPS, finished(), shown({ t1: 'succeeded', t2: 'failed' }), signedOff({}));
   assert.deepEqual(old.steps, [
-    { name: 'implement', status: 'succeeded', branch: 'wf/r-1/implement' },
+    { name: 'implement', status: 'unverified', branch: 'wf/r-1/implement' },
     { name: 'review', status: 'failed', branch: 'wf/r-1/review' },
   ]);
   assert.deepEqual(old.waitingOnYou, []);
@@ -443,7 +465,7 @@ test('one line per step — the summary and what it needs are for `wf decide`', 
 
 test('a closeout nobody can read is said so, and is not taken for either answer', () => {
   const l = listing(STEPS, finished(), SETTLED, signedOff({ implement: { error: 'not an object' } }));
-  assert.deepEqual(statuses(l), ['succeeded · closeout unreadable', 'succeeded']);
+  assert.deepEqual(statuses(l), ['unverified · closeout unreadable', 'unverified']);
   assert.deepEqual(l.waitingOnYou, []);
 });
 
@@ -451,4 +473,189 @@ test('a cancelled run is waiting on nobody, though its step still says it signed
   const l = listing(STEPS, finished(CANCELLED), shown({ t1: 'succeeded', t2: 'stopped' }), signedOff({ implement: said('blocked') }));
   assert.deepEqual(statuses(l), ['succeeded · BLOCKED', 'stopped']);
   assert.deepEqual(l.waitingOnYou, [], '`wf decide` has nothing to decide for it');
+});
+
+// ─── the check ──────────────────────────────────────────────────────────────
+
+/** `implement` declares a check; `review` waits on it. */
+const CHECKED: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+const signedDone = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
+/** Every task here was filed asking for a closeout — which is what the runner does. */
+const asked = () => true;
+/** `implement` filed and settled as the phases say; its check filed under `checkId`, if given. */
+const withCheck = (checkId: string | null, extra: Partial<Run> = {}) => run({}, {
+  steps: { implement: { taskId: 't1', ...(checkId ? { check: { taskId: checkId } } : {}) }, review: { taskId: null } },
+  ...extra,
+});
+
+test('a step without `check:` gets no check, and its follower is filed on its word — it reads unverified', () => {
+  const p = phases({ t1: 'succeeded' });
+  const a = assess(STEPS, run({ implement: 't1', review: null }), p, signedDone, asked);
+  assert.deepEqual(a.check, []);
+  assert.deepEqual(a.ready, ['review']);
+  assert.equal(stepStatus(STEPS[0]!, run({ implement: 't1' }), p, signedDone, asked), 'unverified');
+});
+
+test("a signed step with `check:` is due its check, and its follower is NOT filed on the engine's succeeded", () => {
+  const a = assess(CHECKED, withCheck(null), phases({ t1: 'succeeded' }), signedDone, asked);
+  assert.deepEqual(a.check, ['implement']);
+  assert.deepEqual(a.ready, [], 'succeeded is the session ending, not the work passing');
+  assert.equal(a.status, 'running');
+});
+
+test('a check already filed is checking, and is never due a second time', () => {
+  for (const c of ['pending', 'running', 'unknown'] as const) {
+    const r = withCheck('c1');
+    const p = phases({ t1: 'succeeded', c1: c });
+    const a = assess(CHECKED, r, p, signedDone, asked);
+    assert.deepEqual([a.check, a.ready, a.status], [[], [], 'running'], c);
+    assert.equal(stepStatus(CHECKED[0]!, r, p, signedDone, asked), 'checking');
+  }
+});
+
+test('a check that exits 0 verifies the step, and only then is its follower filed', () => {
+  const p = phases({ t1: 'succeeded', c1: 'succeeded' });
+  assert.deepEqual(assess(CHECKED, withCheck('c1'), p, signedDone, asked).ready, ['review']);
+  assert.equal(stepStatus(CHECKED[0]!, withCheck('c1'), p, signedDone, asked), 'verified');
+});
+
+test('a check that does not exit 0 fails the step: its follower is never filed, whatever the agent said', () => {
+  for (const c of ['failed', 'stopped'] as const) {
+    const p = phases({ t1: 'succeeded', c1: c });
+    const a = assess(CHECKED, withCheck('c1'), p, signedDone, asked);
+    assert.deepEqual([a.ready, a.blocked, a.status], [[], ['review'], 'failed'], c);
+    assert.equal(stepStatus(CHECKED[0]!, withCheck('c1'), p, signedDone, asked), 'failed (check)');
+  }
+});
+
+test('UNSIGNED: a step asked for a closeout that ended without one satisfies nothing, and is not checked', () => {
+  const p = phases({ t1: 'succeeded' });
+  const none = () => undefined;
+  const a = assess(CHECKED, withCheck(null), p, none, asked);
+  assert.deepEqual([a.ready, a.check, a.blocked, a.status], [[], [], ['review'], 'failed'], 'no signed work to check');
+  assert.equal(stepStatus(CHECKED[0]!, withCheck(null), p, none, asked), 'unsigned');
+  // Without a check the same holds: going quiet is not saying done.
+  assert.deepEqual(assess(STEPS, run({ implement: 't1', review: null }), p, none, asked).ready, []);
+});
+
+test('a task that was never asked for a closeout is not held to one — a run from before closeouts still flows', () => {
+  const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'succeeded' }), () => undefined, () => false);
+  assert.deepEqual(a.ready, ['review']);
+});
+
+test('a cancelled run files no check, however due', () => {
+  const a = assess(CHECKED, withCheck(null, CANCELLED), phases({ t1: 'succeeded' }), signedDone, asked);
+  assert.deepEqual(a.check, []);
+});
+
+test('cancelling stops a check in flight, and a run with a check still due is cancelled rather than called finished', () => {
+  const live = cancelPlan(CHECKED, withCheck('c1'), phases({ t1: 'succeeded', c1: 'running' }), signedDone, asked);
+  assert.deepEqual(live, { kind: 'cancel', stop: [{ name: 'implement (check)', taskId: 'c1' }] });
+
+  // Two roots, one failed: the run reads failed, and a tick would still file `a`'s check.
+  const fan: Workflow[] = [{ ...step('a'), check: 'npm test' }, step('b')];
+  const r = run({}, { steps: { a: { taskId: 't1' }, b: { taskId: 't2' } } });
+  assert.deepEqual(cancelPlan(fan, r, phases({ t1: 'succeeded', t2: 'failed' }), signedDone, asked), { kind: 'cancel', stop: [] });
+});
+
+test('every finished step is handed off — failed and stopped too — and none after its check is filed', () => {
+  const r = run({}, {
+    steps: {
+      ok: { taskId: 't1', workspace: '/w1' },
+      broke: { taskId: 't2', workspace: '/w2' },
+      halted: { taskId: 't3', workspace: '/w3' },
+      live: { taskId: 't4', workspace: '/w4' },
+      judged: { taskId: 't5', workspace: '/w5', check: { taskId: 'c5' } },
+      unfiled: { taskId: null },
+    },
+  });
+  const p = phases({ t1: 'succeeded', t2: 'failed', t3: 'stopped', t4: 'running', t5: 'succeeded', c5: 'running' });
+  const independent = ['ok', 'broke', 'halted', 'live', 'judged', 'unfiled'].map((name) => step(name));
+  assert.deepEqual(handOffDue(independent, r, p), ['ok', 'broke', 'halted']);
+});
+
+test("a step is no longer handed off once a later step works in its workspace — what is there is that step's", () => {
+  const chain: Workflow[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
+  const withReview = (review: Run['steps'][string]) => run({}, { steps: { implement: { taskId: 't1', workspace: '/w' }, review } });
+
+  assert.deepEqual(handOffDue(chain, withReview({ taskId: null }), phases({ t1: 'succeeded' })), ['implement'], 'nothing after it yet');
+  assert.deepEqual(handOffDue(chain, withReview({ taskId: 't2', workspace: '/w' }), phases({ t1: 'succeeded', t2: 'running' })), [],
+    "review is working there: its work in progress is not implement's to commit");
+  assert.deepEqual(handOffDue(chain, withReview({ taskId: 't2', workspace: '/w', check: { taskId: 'c2' } }), phases({ t1: 'succeeded', t2: 'succeeded', c2: 'running' })), [],
+    "review's check is running there: what the suite leaves is nobody's to commit");
+  assert.deepEqual(handOffDue(chain, withReview({ taskId: 't2', workspace: '/wt/review' }), phases({ t1: 'succeeded', t2: 'running' })), ['implement'],
+    'a follower in a worktree of its own takes nothing from this one');
+});
+
+test('`wf decide` names every step that did not earn a follower, each in its own word', () => {
+  const four: Workflow[] = [{ ...step('a'), check: 'npm test' }, step('b'), step('c'), step('d')];
+  const r = run({}, {
+    steps: {
+      a: { taskId: 't1', branch: 'wf/r-1/a', check: { taskId: 'c1' } },
+      b: { taskId: 't2', branch: 'wf/r-1/b' },
+      c: { taskId: 't3', branch: 'wf/r-1/c' },
+      d: { taskId: 't4', branch: 'wf/r-1/d' },
+    },
+  });
+  const p = phases({ t1: 'succeeded', c1: 'failed', t2: 'succeeded', t3: 'succeeded', t4: 'failed' });
+  const d = decision(four, r, p, nothingShipped, (name) => (name === 'c' ? undefined : signedDone()), asked);
+  assert.equal(d.kind, 'awaiting');
+  if (d.kind !== 'awaiting') return;
+  assert.deepEqual({ failedCheck: d.failedCheck, unverified: d.unverified, unsigned: d.unsigned, failed: d.failed },
+    { failedCheck: ['a'], unverified: ['b'], unsigned: ['c'], failed: ['d'] });
+  assert.equal(d.outcome, 'failed');
+});
+
+test('a run whose check is still running has nothing to decide yet, and names the step', () => {
+  const d = decision(CHECKED, withCheck('c1'), phases({ t1: 'succeeded', c1: 'running' }), nothingShipped, signedDone, asked);
+  assert.deepEqual(d, { kind: 'running', waiting: ['implement'] });
+});
+
+test('a step with `check:` is told the command before it is judged by it — resumed, merged or not — and the closeout stays last', () => {
+  const implement: Workflow = { ...step('implement'), check: 'npm test && npm run typecheck' };
+  const respond: Workflow = { name: 'respond', after: ['implement'], body: 'answer', resume: 'implement', check: 'npm test' };
+  const integrate: Workflow = { name: 'integrate', after: ['a', 'b'], body: 'combine', check: 'npm run build' };
+  const cases: Array<[Workflow, Workflow[]]> = [
+    [implement, [implement]],
+    [{ ...step('review', ['implement']), check: 'npm test' }, STEPS],
+    [respond, [implement, respond]],
+    [integrate, [step('a'), step('b'), integrate]],
+  ];
+  for (const [s, steps] of cases) {
+    const brief = composeBrief(s, run({ implement: 't1', a: 't2', b: 't3' }), steps);
+    assert.ok(brief.includes(`must exit 0 in this workspace: \`${s.check}\``), s.name);
+    assert.match(brief, /comes from the run, not from this checkout/);
+    assert.ok(brief.indexOf('## Before you sign off') < brief.indexOf('## When you are finished'), `${s.name}: the closeout is last`);
+  }
+});
+
+test('a step without `check:` is told of no check — no command the run will not run', () => {
+  for (const s of [step('implement'), step('review', ['implement'])]) {
+    assert.doesNotMatch(composeBrief(s, run({ implement: 't1', review: null }), STEPS), /Before you sign off|must exit 0/);
+  }
+});
+
+// ─── what `wf ls` says about a check ────────────────────────────────────────
+
+test('`wf ls` says what the run established, not only what the engine settled', () => {
+  const five: Workflow[] = [...['a', 'b', 'c'].map((n) => ({ ...step(n), check: 'npm test' })), step('d'), step('e')];
+  const r = run({}, {
+    steps: {
+      a: { taskId: 't1', branch: 'wf/r-1/a', check: { taskId: 'c1' } },
+      b: { taskId: 't2', branch: 'wf/r-1/b', check: { taskId: 'c2' } },
+      c: { taskId: 't3', branch: 'wf/r-1/c', check: { taskId: 'c3' } },
+      d: { taskId: 't4', branch: 'wf/r-1/d' },
+      e: { taskId: 't5', branch: 'wf/r-1/e' },
+    },
+  });
+  const words = shown({ t1: 'succeeded', c1: 'succeeded', t2: 'succeeded', c2: 'running (working)', t3: 'succeeded', c3: 'failed', t4: 'succeeded', t5: 'succeeded' });
+  const l = listing(five, r, words, signedOff({ a: said('done'), b: said('done'), c: said('done'), d: said('done') }), asked, (name) => (name === 'c' ? 1 : undefined));
+
+  assert.deepEqual(statuses(l), ['verified ✓', 'checking', 'failed ✗ check (exit 1)', 'unverified · done', 'unsigned']);
+  assert.deepEqual(l.waitingOnYou, ['c', 'e'], 'the check that refused and the step that never signed');
+});
+
+test('a check stopped before it printed its exit code reads unfinished, never a number', () => {
+  const l = listing(CHECKED, withCheck('c1'), shown({ t1: 'succeeded', c1: 'failed' }), signedOff({ implement: said('done') }), asked);
+  assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'waiting']);
 });

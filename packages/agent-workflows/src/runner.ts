@@ -9,9 +9,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { createEngine, type Engine, type TaskView } from 'agent-engine';
+import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 'agent-engine';
+import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type Verdict } from './check.ts';
+
+export { verdictWord } from './check.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, CLOSEOUT_SCHEMA, composeBrief, decision, inFlight, listing, parseCloseout, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, stepStatus, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -45,6 +48,14 @@ export const readRun = (id: string): Run => {
 };
 
 /**
+ * The run's steps: the workflow it froze at `wf start`.
+ *
+ * The folder is read only for a record from before the run froze its workflow — and a run started
+ * today never reaches that branch, so nothing written into the folder after `wf start` reaches it.
+ */
+export const stepsOf = (run: Run): Workflow[] => run.workflow ?? loadWorkflows(run.workflowDir);
+
+/**
  * Write down that this run is cancelled, and answer with the time that now stands.
  *
  * `wx` so the FIRST cancellation is the one kept: two people calling the same run off should not
@@ -71,9 +82,24 @@ const writeRun = (run: Run) => {
   fs.writeFileSync(runFile(run.id), JSON.stringify(run, null, 2));
 };
 
+/**
+ * The engine, with one harness of the run's own beside the three it ships.
+ *
+ * `check` runs a step's `check:` command (`src/check.ts`). Passing `harnesses` REPLACES the engine's
+ * default map rather than adding to it, so the defaults are named again here — leaving them out would
+ * quietly send every `claude` step to whichever harness came first.
+ */
+export const HARNESSES = {
+  claude: 'claude-bg',
+  codex,
+  'claude-detached': claudeDetached,
+  check: CHECK,
+} as const;
+
 export const engine = (): Engine => createEngine({
   root: path.join(HOME, 'engine'),
   maxConcurrent: Number(process.env.WF_MAX_CONCURRENT) || 2,
+  harnesses: HARNESSES,
 });
 
 /**
@@ -106,8 +132,9 @@ async function taskPhases(e: Engine, run: Run): Promise<{
   phaseOf: (taskId: string) => TaskPhase;
 }> {
   const views = new Map<string, TaskView>();
-  for (const { taskId } of Object.values(run.steps)) {
+  for (const { taskId, check } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
+    if (check) views.set(check.taskId, await e.view(check.taskId));
   }
   return {
     views,
@@ -117,6 +144,48 @@ async function taskPhases(e: Engine, run: Run): Promise<{
     },
   };
 }
+
+/**
+ * Checks a pass filed and never wrote down, put back on the record. In memory: `advance` is the one
+ * writer of the run's json, and writes it; `cancel` only needs them in view.
+ *
+ * A pass that dies between `e.file` and `writeRun` leaves a check on the engine's board that the
+ * record does not name. It is looked for under the id the run derives, for every step whose check is
+ * due and unrecorded, and BEFORE anything asks what is in flight. Waiting for filing time to adopt it
+ * was not enough: a run cancelled in that window files no more checks, so it was never adopted, never
+ * stopped, and its suite ran on to the deadline.
+ */
+async function adoptChecks(
+  e: Engine,
+  run: Run,
+  steps: readonly Workflow[],
+  views: Map<string, TaskView>,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+  asked: (taskId: string) => boolean,
+): Promise<string[]> {
+  const adopted: string[] = [];
+  for (const step of steps) {
+    if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked) !== 'checking') continue;
+    const taskId = checkTaskId(run, step.name);
+    const view = await e.view(taskId);
+    if (!view.state.brief) continue;   // not filed: due, and this pass's to file
+    views.set(taskId, view);
+    run.steps[step.name] = { ...run.steps[step.name]!, check: { taskId } };
+    adopted.push(step.name);
+  }
+  return adopted;
+}
+
+/** Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing. */
+const closeoutAsked =(views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
+  Boolean(views.get(taskId)?.state.closeoutSchema);
+
+/**
+ * Where a check's stderr goes: beside the run records, outside every workspace — a file inside one
+ * would be committed by the next hand-off and ride the branch.
+ */
+export const checkStderr = (taskId: string): string => path.join(HOME, 'checks', `${taskId}.stderr`);
 
 /**
  * Gitignored directories a fresh worktree needs in order to be usable.
@@ -237,6 +306,14 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
       'Either drop --no-worktree, or make the steps a chain.',
     );
   }
+  // A check's task is its step's id plus `-check`, so a step named that would share an id with it and
+  // the run would read one task as the other.
+  const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
+  if (clash) {
+    throw Object.assign(new Error(
+      `${clash.name}-check: a step may not be named for another step's check. ${clash.name} has a \`check:\`, and the run files it as ${clash.name}-check. Rename ${clash.name}-check.md.`,
+    ), { exitCode: 2 });
+  }
   const id = runId(opts.brief);
   const isolate = opts.isolate ?? true;
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
@@ -249,6 +326,7 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
     isolate,
     brief: opts.brief,
     workflowDir: path.resolve(opts.workflowDir),
+    workflow: steps,
     branch,
     steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
     createdAt: new Date().toISOString(),
@@ -275,7 +353,8 @@ function handOff(workspace: string, step: string): void {
   } catch { /* nothing to hand off, or a tree git will not commit */ }
 }
 
-export type Advanced = { run: Run; filed: string[]; status: Assessment['status']; blocked: string[] };
+/** One pass's work: the steps it filed, the steps whose checks it filed, and where the run stands. */
+export type Advanced = { run: Run; filed: string[]; checked: string[]; status: Assessment['status']; blocked: string[] };
 
 /**
  * One pass over one run: tick the engine, then file whatever became ready.
@@ -285,10 +364,12 @@ export type Advanced = { run: Run; filed: string[]; status: Assessment['status']
  * of what it did last time.
  */
 export async function advance(e: Engine, run: Run): Promise<Advanced> {
-  const steps = loadWorkflows(run.workflowDir);
+  const steps = stepsOf(run);
 
   const { views, phaseOf } = await taskPhases(e, run);
   const signedOff = closeoutReader(views, run);
+  const asked = closeoutAsked(views);
+  const adopted = await adoptChecks(e, run, steps, views, phaseOf, signedOff, asked);
 
   // A cancelled run is enforced by every pass, not only by the verb that cancelled it.
   //
@@ -314,12 +395,45 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // branch that did not contain it. Asking every step's prose to remember is not a contract — so
   // this IS the contract: every step is told the run commits what it leaves (`closeoutContract`),
   // which is also exactly what a sandboxed step that cannot write git's metadata needs.
-  for (const [name, st] of Object.entries(run.steps)) {
-    if (!st.taskId || !st.workspace || phaseOf(st.taskId) !== 'succeeded') continue;
-    handOff(st.workspace, name);
-  }
+  //
+  // Every finished step, failed and stopped too, until its check is filed or a later step works in its
+  // workspace: the check judges the committed tree, and nothing it leaves behind — nor the next step's
+  // work in progress — is committed under this step's name (`handOffDue`).
+  for (const name of handOffDue(steps, run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
 
-  const { ready, blocked, status } = assess(steps, run, phaseOf, signedOff);
+  const { ready, check, blocked, status } = assess(steps, run, phaseOf, signedOff, asked);
+
+  // The fact the run establishes for itself: each signed step's `check:`, executed where the work is.
+  // An engine task on the `check` harness, so it outlives this pass, has a deadline, and is stopped
+  // by a cancel like anything else. Nothing is ready on it in this pass — a follower waits for the
+  // check to SETTLE, on a later one.
+  const checked: string[] = [];
+  for (const name of check) {
+    const step = steps.find((s) => s.name === name)!;
+    const workspace = run.steps[name]!.workspace ?? run.workspace;
+    const taskId = checkTaskId(run, name);
+    // A check an earlier pass filed and never wrote down was adopted above, before this list was made.
+    // Looked up once more all the same: filing an id the engine already holds would journal it twice.
+    if (!(await e.view(taskId)).state.brief) {
+      fs.mkdirSync(path.dirname(checkStderr(taskId)), { recursive: true });
+      await e.file({
+        id: taskId,
+        harness: 'check',
+        // The command from the workflow this run froze — never from the workspace it is about to judge.
+        brief: checkBrief(step.check!, {
+          WF_RUN: run.id, WF_STEP: name, WF_BASE_REF: run.baseRef, WF_WORKSPACE: workspace, WF_STDERR: checkStderr(taskId),
+        }),
+        cwd: workspace,
+        deadlineSeconds: CHECK_DEADLINE_SECONDS,
+        // One attempt, never resumed: a check that refused has said what it has to say, and running a
+        // suite until it passes would let a flaky suite decide what ships.
+        maxAttempts: 1,
+        resume: 'never',
+      });
+    }
+    run.steps[name] = { ...run.steps[name]!, check: { taskId } };
+    checked.push(name);
+  }
 
   /** The harness's own id for a step's session — what `--resume` takes. */
   const sessionOf = (stepName: string): string | undefined => {
@@ -356,9 +470,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
-  if (filed.length) writeRun(run);
+  if (filed.length || checked.length || adopted.length) writeRun(run);
 
-  return { run, filed, status, blocked };
+  return { run, filed, checked, status, blocked };
 }
 
 export type Cancelled = { run: Run; plan: CancelPlan };
@@ -385,10 +499,13 @@ export type Cancelled = { run: Run; plan: CancelPlan };
  */
 export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   const run = readRun(id);
-  const steps = loadWorkflows(run.workflowDir);
-  const { phaseOf } = await taskPhases(e, run);
+  const steps = stepsOf(run);
+  const { views, phaseOf } = await taskPhases(e, run);
+  // A check filed by a pass that died before writing the run down is in flight too. Found here so the
+  // verb stops it at once; on the record only in memory, because this verb never writes the run.
+  await adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views));
 
-  const plan = cancelPlan(steps, run, phaseOf);
+  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views));
   if (plan.kind === 'finished') return { run, plan };
 
   for (const { taskId } of plan.stop) await e.stop(taskId);
@@ -415,9 +532,58 @@ export async function tick(e: Engine): Promise<Advanced[]> {
  * narrowed `TaskPhase` the DAG decides on: a person reading the list wants the detail.
  */
 export async function list(e: Engine, run: Run): Promise<Listing> {
-  const steps = loadWorkflows(run.workflowDir);
-  const { views } = await taskPhases(e, run);
-  return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name));
+  const steps = stepsOf(run);
+  const { views, phaseOf } = await taskPhases(e, run);
+  // Only a refused check's log is read here: its exit code is the one number on its line.
+  const refused = await checkReports(e, run, steps, phaseOf, (p) => p === 'failed' || p === 'stopped');
+  return listing(steps, run, (taskId) => views.get(taskId)?.phase ?? 'unknown', (name) => closeoutOf(views, run, name),
+    closeoutAsked(views), (name) => refused.get(name)?.verdict);
+}
+
+/**
+ * What a settled check said, for a person to read.
+ *
+ * `passed` is the engine's settled phase — the worker's reading of the exit code, and the only thing
+ * the run gates on. The rest is evidence: the number from the log's last line, and the last lines of
+ * each stream, kept apart because a loud stderr must not push a test runner's stdout verdict off the
+ * screen.
+ */
+export type CheckReport = { command: string; passed: boolean; verdict: Verdict; stdout: string; stderr: string };
+
+async function checkReports(
+  e: Engine,
+  run: Run,
+  steps: readonly Workflow[],
+  phaseOf: (taskId: string) => TaskPhase,
+  want: (phase: TaskPhase) => boolean,
+): Promise<Map<string, CheckReport>> {
+  const reports = new Map<string, CheckReport>();
+  for (const step of steps) {
+    const taskId = run.steps[step.name]?.check?.taskId;
+    if (!taskId || !step.check || !want(phaseOf(taskId))) continue;
+    const log = await e.logs(taskId);
+    reports.set(step.name, {
+      command: step.check,
+      passed: phaseOf(taskId) === 'succeeded',
+      verdict: readVerdict(log),
+      stdout: stdoutTail(log),
+      stderr: lastLines(tailOf(checkStderr(taskId))),
+    });
+  }
+  return reports;
+}
+
+/** The end of a file that may be large, or absent — a check stopped before it started wrote none. */
+function tailOf(file: string, bytes = 64_000): string {
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      const size = fs.fstatSync(fd).size;
+      const buf = Buffer.alloc(Math.min(size, bytes));
+      fs.readSync(fd, buf, 0, buf.length, size - buf.length);
+      return buf.toString('utf8');
+    } finally { fs.closeSync(fd); }
+  } catch { return ''; }
 }
 
 /**
@@ -508,16 +674,19 @@ export async function decide(e: Engine, id: string): Promise<{
   run: Run;
   decision: Decision;
   closeouts: Record<string, Closeout | { error: string } | undefined>;
+  /** Every settled check, by step: what the run's own fact about the step says. */
+  checks: Record<string, CheckReport>;
 }> {
   const run = readRun(id);
-  const steps = loadWorkflows(run.workflowDir);
+  const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const closeouts = Object.fromEntries(Object.keys(run.steps).map((name) => [name, closeoutOf(views, run, name)]));
-  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run)), closeouts };
+  const checks = Object.fromEntries(await checkReports(e, run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped'));
+  return { run, decision: decision(steps, run, phaseOf, (b) => isShipped(run, b), closeoutReader(views, run), closeoutAsked(views)), closeouts, checks };
 }
 
 export function resultBranches(run: Run): string[] {
-  const steps = loadWorkflows(run.workflowDir);
+  const steps = stepsOf(run);
   return terminalSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));

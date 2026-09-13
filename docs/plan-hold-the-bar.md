@@ -321,6 +321,50 @@ terminal branches; `composeBrief` adds *## Previous round* and the person's word
 `cli.ts`, tests, README, `docs/features.md`. Refusal tests: round on a running run; round on a
 fan-out.
 
+### J — The review as a closeout: declared outputs and inputs between steps · wave 2 · after C
+
+**The question (operator, 2026-09-13, at C's merge):** instead of the reviewer writing `REVIEW.md`
+into the workspace, let the review travel as the step's closeout — its own schema if needed — and
+let the run hand that closeout to the next step as input.
+
+**Evaluation — adopt it.** It resolves G2's reviewer half and G6 at once, and it is more in the
+packages' own grain than the file was:
+
+- *It is an artifact, not process.* "Intent and artifacts travel, process does not" was written
+  against passing the implementer's transcript or self-assessment to the reviewer. A reviewer's
+  findings are the reviewer's deliberate product — exactly what `REVIEW.md` is today — and a
+  closeout is a statement the step chose to make. What changes is the transport, not the rule.
+- *The anchoring rule survives by making the transport declared.* `summary` still goes to the
+  decider and nowhere else. A follower gets a predecessor's output only when its file says so —
+  `input: review` on `respond.md` — and the run composes it into the brief under a heading, as
+  data, the way hkb's `inputs` did (data, never instruction). `implement`'s output does not reach
+  `review` unless `review.md` asks, and it must not.
+- *A read-only reviewer becomes possible.* The reviewer writes nothing to the workspace; the
+  harness enforces the shape (StructuredOutput / `--output-schema`); `permissionMode: read-only`
+  and later `tools:` can narrow it without breaking the handoff.
+- *It survives `drop it`.* The closeout lives on the engine's record (the journal, append-only),
+  not on a branch, so `git branch -D` no longer deletes the only copy of the review (G6). The
+  board's inspector and `wf decide` read it from the record, as they already read `summary`.
+- *Costs.* A per-step schema: `CLOSEOUT_SCHEMA` is strict (Codex requires every property
+  required, no extras), so a step's output schema is merged into the base schema at filing —
+  `output: review.schema.json` beside the step, or a conventional `<step>.schema.json`. A review
+  must be given in one StructuredOutput call, so the reviewer writes it whole; long reviews are
+  fine (the transcript and the journal hold them), but a cap like hkb's 4 KB per result is worth
+  stating. A step that wants a file for a person (a report) still writes one; declared output is
+  for what the *next step* consumes.
+
+**Shape.** Two keys, neither control flow — one declares, one reads: `output: <schema file>` on
+the producer (its closeout gains those fields), `input: <step>` on the consumer (the run appends
+`## From <step>` with the producer's declared fields, as data). `REVIEW.md` stays possible and
+stops being required; `workflows/review.md` ships with an `output` schema (`findings[]`: file,
+line, what would go wrong) and `respond.md` with `input: review`. `wf decide` prints the findings;
+the board's Output tab renders them. Refusal tests: a follower with `input:` naming a step it is not
+`after` is refused; a producer whose closeout lacks a declared field is `unsigned`; nothing from a
+step's closeout reaches a follower that did not ask.
+
+Until J lands, `review.md` keeps write access (the line was dropped at C's merge) and C's test
+refuses the read-only pair.
+
 ### I — `tools:` and `effort:` pass-through · wave 2 · after A, B, C
 
 `workflow.ts` accepts both (A refused them by name); `runner.ts` passes them to `e.file`;

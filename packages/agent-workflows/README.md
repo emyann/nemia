@@ -38,6 +38,8 @@ Definition of done — a closed list, so there is a finish line:
 - [x] a finished run names the branch its work is on
 - [x] **the decider** — `wf decide` ends the run by handing the choice to a person, because a
       review and a reply are two opinions and something has to say what ships.
+- [x] **the check** — a step's `check:` is executed by the run after the step signs off, and its
+      exit code, not the agent's word, decides whether what follows is filed.
 - [ ] **rounds** — `after` is a DAG and cannot loop, so a second round is a *new run* over the same
       worktree, started by the decider. That keeps rounds countable and deliberate.
 - [x] **the splitter** — `wf-examples/split` proposes parts that touch disjoint files, and is
@@ -52,19 +54,31 @@ slip in with an example. For now a person reads `PLAN.md` and starts a run per p
 
 ```md
 ---
-harness: codex        # claude (default) | codex
-after: implement      # what must SUCCEED first
+harness: codex             # claude (default) | codex | claude-detached
+after: implement           # what must finish first: verified, or unverified if it has no check
+permissionMode: read-only
 ---
 Review the changes on this branch. Be specific about correctness, not style.
 ```
 
-**There is exactly one non-prose key: `after`.** No conditions, no loops, no expressions, no
-templating. That is the design, not a missing feature.
+A step's keys are a closed list — `after`, `resume`, `harness`, `model`, `permissionMode`,
+`deadlineSeconds`, `maxAttempts`, `check`, `retries` — and a key the parser does not know is refused
+by name before anything is spent, as is a value it cannot use (`src/workflow.ts`). `tools`, `effort`
+and `guide` are refused with reasons of their own.
+
+**No key is control flow.** No conditions, no loops, no expressions, no templating. That is the
+design, not a missing feature.
 
 The interesting decisions in this kind of work — *is this good enough*, *did it do what was asked*
 — are not predicates a workflow language could evaluate. They are judgements, and a judgement
 belongs to a step with an agent in it. **The workflow is a team, not a program.** The prose is the
-logic; `after` is the only thing the runner needs to know.
+logic: `after` orders, `resume` continues, `check` measures, and the rest say who does the work and
+for how long.
+
+`permissionMode` is the harness's word, checked against the harness the step runs on. On codex,
+`read-only` is honoured once the engine emits `-s read-only` for it (`docs/plan-hold-the-bar.md` §4 B,
+commit 1); until then codex runs such a step as `workspace-write`. `retries` is read and not yet acted
+on: re-filing a step its check refused is the next piece of work (`docs/features.md`).
 
 ## What one step knows of another
 
@@ -148,7 +162,8 @@ the next step could read. The moment steps fork it is not: `respond` merged revi
 which did not contain the file, and answered a review it had never seen.
 
 Asking each step's prose to remember to commit is not a contract. The run now commits whatever a
-finished step left behind, before anything merges it, so **the workspace a step hands on is the
+finished step left behind — failed and stopped steps included, so their work stays on their branch —
+before anything merges it, so **the workspace a step hands on is the
 workspace it made** — true by construction rather than by instruction. It is idempotent: a clean
 tree commits nothing.
 
@@ -209,14 +224,15 @@ waiting on you looked like one you could ignore. The outcome now sits beside the
 
 ```
 fix-the-parser-k2q9  Fix the parser so a trailing comma is not an error
-   implement      succeeded · done     wf/fix-the-parser-k2q9/implement
+   implement      verified ✓           wf/fix-the-parser-k2q9/implement
    respond        waiting
    review         succeeded · BLOCKED  wf/fix-the-parser-k2q9/review
    → waiting on you: review  —  wf decide fix-the-parser-k2q9
 ```
 
-A step with no closeout — still running, never filed, or from a run older than closeouts — reads as
-it always did. The summary is left off that screen on purpose: it was written for `wf decide`.
+A step with no closeout — still running, never filed, or from a run older than closeouts — is credited
+with nothing: a settled one reads `unverified`, never `succeeded · done`. The summary is left off that
+screen on purpose: it was written for `wf decide`.
 
 *It makes a lost artifact visible.* `artifacts` are checked against the branch, and a declared file
 that is not there is reported. The first real run lost a reviewer's entire output to exactly that,
@@ -237,6 +253,65 @@ it.
 **`summary` goes to the decider and nowhere else.** The reviewer still gets the diff and no account of
 the work — *read the change, not an account of it* is unchanged. Hermes injects the parent's summary
 into the child's prompt; this is the one place worth diverging.
+
+## The check: a fact the run does not take on trust
+
+The engine settles a step `succeeded` when its session ends, and a session always ends successfully —
+finishing talking is what it does. A run that files the next step on that word is believing the agent.
+`check:` is the fact the run establishes for itself:
+
+```md
+---
+check: npm test && npm run typecheck
+---
+Implement what was asked, in this repository.
+```
+
+After the step signs off, the run commits what it left and executes the command **in the step's
+workspace**. Exit 0 is `verified`, and the next step is filed. Anything else is `failed (check)`, and
+nothing that waits on the step ever runs. A step with no `check:` has nothing run for it and reads
+`unverified` wherever it appears, so it cannot pass for a step somebody checked.
+
+- **The command comes from the run, never from a checkout.** `wf start` freezes the workflow onto the
+  run record (`run.workflow`) and every pass reads that copy. A `check:` written into the folder
+  afterwards — by a step working in it, say — never reaches the run.
+- **A step is told before it is judged.** Every brief with a check says the command must exit 0 in the
+  workspace, that the run executes it afterwards, and not to weaken it.
+- **It is an engine task,** on a `check` harness the run hands the engine (`src/check.ts`): `sh -c` with
+  the command in a subshell, stderr to a file of its own, and the exit code printed last. So a check
+  outlives a tick that dies, is stopped by `wf cancel`, ends at a ten-minute deadline, runs once and is
+  never resumed, and has a concurrency pool of its own. Its task id is `<run>-<step>-check`, recorded as
+  `steps[name].check` — beside the step's own `taskId`, never in place of it. The engine is unchanged.
+- **The gate is the exit code the engine recorded.** The `[wf check] exit N` line in the log is the
+  number shown to a person; a command that prints one of its own changes that number and nothing else.
+- The command sees `WF_RUN`, `WF_STEP`, `WF_BASE_REF`, `WF_WORKSPACE` and `WF_STDERR`.
+- The run commits what a step left **before** filing its check and never after, so what a suite leaves
+  behind is not committed under the step's name.
+
+This repository's own `workflows/implement.md` and `workflows/respond.md` carry
+`check: npm test && npm run typecheck` — the check a person used to run by hand at every trial merge.
+Point the folder at another repository and change that line.
+
+### What a step's line says
+
+| `wf ls` | means | what waits on it |
+|---|---|---|
+| `waiting` | not filed yet | — |
+| the engine's word: `running (working)`, `needs-human` | still going | waits |
+| `unsigned` | it succeeded without the closeout it was asked for | **never runs** |
+| `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
+| `checking` | signed off; its check is due or running | waits |
+| `verified ✓` | its check exited 0 | is filed |
+| `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
+| `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** |
+| `failed`, `stopped` | the engine's verdict on the step's own task | **never runs** |
+
+`→ waiting on you` names every step that is blocked, unsigned or refused by its check. `wf decide`
+prints `FAILED CHECK:`, `UNSIGNED:` and `UNVERIFIED:` first, then each check's command and exit code
+and, for a check that refused, the last 20 lines of stdout and of stderr.
+
+**`unsigned` blocks every `claude-detached` step** until engine open issue 4 is fixed: that harness
+never hands the closeout schema on, so its steps never sign off. `claude` and `codex` steps do.
 
 ## Deciding what ships
 
@@ -268,6 +343,10 @@ which anything in this tool had ever shown anyone.
 
 `wf decide` is read-only. It prints the material and the exact `git merge` / `git branch -D`
 commands, and does not decide anything itself.
+
+A run started with `--no-worktree` worked on the base branch itself, where git's answer to "has it
+landed" is always yes. `wf decide` never asks it for such a run: it says the run worked directly on its
+branch, classifies its steps like any other, and prints the diff against the base instead of a merge.
 
 ## Calling a run off
 
@@ -394,12 +473,14 @@ holding a concurrency slot forever.
 
 ## Layout
 
-| file | lines | |
-|---|---|---|
-| `src/workflow.ts` | 100 | the format: parse a folder of markdown, refuse a cycle or a dangling `after` |
-| `src/run.ts` | 120 | **`assess`** — pure: which steps are ready, blocked, done — and what a step is told |
-| `src/runner.ts` | 140 | the I/O: run store, git worktree, and the engine |
-| `src/cli.ts` | 120 | the verbs |
+| file | |
+|---|---|
+| `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a cycle or a dangling `after` |
+| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, blocked, done — and what a step is told |
+| `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
+| `src/runner.ts` | the I/O: run store, git worktree, and the engine |
+| `src/cli.ts` | the verbs |
 
-`assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it.
-Same split as the engine, one layer up.
+`assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,
+and `test/boundary.test.ts` fails the suite the day another file does — a type import included. Same
+split as the engine, one layer up.

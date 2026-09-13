@@ -59,6 +59,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   A guard that only fires on a transition is wrong after a restart.
 - **One writer per file.** The tick writes the run record; a person's facts (`.cancelled`, an ask)
   get their own files, composed on read. Two writers doing read-modify-write lose updates — and did.
+- **A check that did not finish is not a refusal.** The engine settles a check killed at its
+  deadline as `failed` with no exit code, and one the harness stopped as `stopped`; only a
+  numeric exit is a verdict on the work (`refusedCheck` in `agent-workflows/src/run.ts`).
+  `retries:` spends nothing on it and `wf decide` offers `wf retry <run> <step> --recheck` — use
+  that, never a hand edit of the engine's journal or the run record.
 - **No command from a checkout.** A `check:` comes from the workflow folder frozen on the run
   record at `wf start`, never from a worktree the step can edit.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery
@@ -72,7 +77,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   imperative subject, an optional body saying why. **No attribution trailers**, no session URLs.
 - **Never push, never merge, never `git branch -D`.** `.claude/settings.json` refuses the first
   and the last; a person merges after a trial merge runs the suite. If you are a workflow step,
-  the run commits what you leave and a person decides what ships.
+  commit as you go all the same: the run commits only what you leave uncommitted, in one commit
+  under your step's name, and a person decides what ships. (F's two steps read the old wording as
+  "do not commit" and handed off 1,300 lines in one commit each.)
 
 ## When you miss
 

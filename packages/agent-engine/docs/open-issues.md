@@ -6,7 +6,8 @@ record of what was fixed, with commits, so the open items have their context. A 
 its number behind rather than renumbering the rest, so "bug 9" means the same thing everywhere.
 
 State as of 2026-09-13: agent-engine after the hold-the-bar engine work (repository
-`docs/plan-hold-the-bar.md` §4 B and E4), agent-workflows `0e7b02a`.
+`docs/plan-hold-the-bar.md` §4 B and E4) and bugs 3, 4, 7 and issue 10 (engine `7200295`),
+agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -56,7 +57,7 @@ follows; this only keeps its work on its branch.
 
 ### 3. Some settled Claude sessions still stay in the registry
 
-A `--bg` session is released once its attempt's end is on the record (engine `TBD-3`): stopped if it
+A `--bg` session is released once its attempt's end is on the record (engine `7200295`): stopped if it
 still runs, and removed from `claude agents`. Two kinds are left there, stopped. A task that asked for
 a `worktree`, because `claude rm` deletes the worktree the harness cut and the task's work is in it.
 And a task settled with no `ended` — stopped by a person, or past its deadline — because its session's
@@ -65,7 +66,7 @@ Recording that id would take an event `decide` does not ask for today.
 
 ### 4. `claude-detached` measures no usage
 
-`agent-engine/src/runner-detached.ts`. Its closeout is read now (engine `TBD-4`), from the one
+`agent-engine/src/runner-detached.ts`. Its closeout is read now (engine `3e44ab6`), from the one
 `result` object `claude -p --output-format json` prints; what the attempt consumed is not, and it
 records `usage: null`. The same object carries `num_turns`, `usage` and `total_cost_usd` (seen in one
 live call on 2.1.270), but no count of tool calls. Low priority: this harness exists for comparison.
@@ -149,7 +150,7 @@ has no Codex servers configured.
   session starts, so the brief has the session sleep while one is still connecting; the first run did
   not, answered too early in both sessions, and so showed Chrome still connecting under strict.
 
-- **Releasing a settled session** (engine `TBD-3`). `test/live.test.ts` on Claude Code 2.1.270,
+- **Releasing a settled session** (engine `7200295`). `test/live.test.ts` on Claude Code 2.1.270,
   2026-09-13, `--model haiku`: a session told a word settled and was released in the same pass — gone
   from `claude agents` — and afterwards `ae logs` still read its transcript, and a second task resuming
   its id said the word back and was released in turn. Whether the first was still running when it was
@@ -157,7 +158,7 @@ has no Codex servers configured.
 
 ## Verified by tests, not by a live run
 
-- **Codex usage** (engine `TBD-7`). Measured on the `exec --json` streams of seventeen codex-cli
+- **Codex usage** (engine `bb3de3c`). Measured on the `exec --json` streams of seventeen codex-cli
   0.154.0 runs the worker had captured (`~/.agent-workflows/engine/runs/codex`): the sixteen whose
   turn completed each ended in one `turn.completed` carrying `input_tokens`, `cached_input_tokens`,
   `cache_write_input_tokens` (0 in all), `output_tokens` and `reasoning_output_tokens`, with cached
@@ -167,7 +168,7 @@ has no Codex servers configured.
   only: no live attempt has recorded it, and no stream with an MCP call, a resume or a second turn has
   been read.
 
-- **`claude-detached`'s closeout** (engine `TBD-4`). A fake `claude` on `PATH`, at shipped defaults.
+- **`claude-detached`'s closeout** (engine `3e44ab6`). A fake `claude` on `PATH`, at shipped defaults.
   That `-p --output-format json --json-schema` prints one `result` line whose `structured_output` is
   the answer was seen in one live `claude -p` call (2.1.270, `--model haiku`: `{"ok":true}`), not
   under the engine.
@@ -244,7 +245,7 @@ has no Codex servers configured.
 | the tests were never typechecked, and a required `PromiseJournal.watch` that nothing called hid there | `test/` in the typecheck; the dead method gone | engine `9aaa38b` |
 | the README claimed `AE_RUNNER=sdk`, "refuse a tool call: no", 25 tests, a file table 2–3× off, and "three next things" already done (bug 5) | made true; `test/readme.test.ts` refuses each of those classes | engine `f947da4` |
 | a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |
-| a relative `cwd` filed through the API failed a detached harness: its worker was launched in `repo`, then launched the harness in `repo` again, from inside it (`spawn sh ENOENT`) | `file()` refuses a `cwd` that is not absolute, naming it resolved; the detached runner resolves the one it is handed, as `claude --bg` always has | engine `TBD-10` |
-| a `claude-detached` task never gave a closeout: its spec dropped `closeoutSchema` | `--json-schema` and `--output-format json`, and the answer read from the result's `structured_output` in the worker's capture, stamped with when that was written. The worker writes a run's end only once the harness's output is in the log: `exit` can come before the pipes drain, and the pass that records the end missed the answer (found writing the test) | engine `TBD-4` |
-| every Codex attempt recorded `usage: null`, though its `exec --json` stream reports tokens | read from the worker's capture of that stream: tool calls by item, tokens from `turn.completed`, each absent when the stream cannot say. `turns` and `toolCalls` may now be absent from any `Usage` — a Codex turn is a prompt, not a model response — and `ae show` names what was not measured | engine `TBD-7` |
-| every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `TBD-3` |
+| a relative `cwd` filed through the API failed a detached harness: its worker was launched in `repo`, then launched the harness in `repo` again, from inside it (`spawn sh ENOENT`) | `file()` refuses a `cwd` that is not absolute, naming it resolved; the detached runner resolves the one it is handed, as `claude --bg` always has | engine `7425471` |
+| a `claude-detached` task never gave a closeout: its spec dropped `closeoutSchema` | `--json-schema` and `--output-format json`, and the answer read from the result's `structured_output` in the worker's capture, stamped with when that was written. The worker writes a run's end only once the harness's output is in the log: `exit` can come before the pipes drain, and the pass that records the end missed the answer (found writing the test) | engine `3e44ab6` |
+| every Codex attempt recorded `usage: null`, though its `exec --json` stream reports tokens | read from the worker's capture of that stream: tool calls by item, tokens from `turn.completed`, each absent when the stream cannot say. `turns` and `toolCalls` may now be absent from any `Usage` — a Codex turn is a prompt, not a model response — and `ae show` names what was not measured | engine `bb3de3c` |
+| every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `7200295` |

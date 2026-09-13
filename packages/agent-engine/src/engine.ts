@@ -18,7 +18,7 @@ export const GRACE_MS = 30_000;
 export const DEFAULT_MAX_CONCURRENT = 3;
 
 /** A live session is one the engine is still waiting on. `done`/`failed`/`stopped` are not. */
-const LIVE = new Set(['working', 'busy', 'blocked']);
+export const LIVE: ReadonlySet<Sighting['state']> = new Set(['working', 'blocked']);
 
 export type TaskView = {
   id: string; state: State; phase: string; sessionId: string | null;

@@ -3,7 +3,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
-import { StatusChip } from '../components/StatusChip';
+import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { runQuery, type RunDetail } from '../lib/api';
 
@@ -42,8 +42,8 @@ function Run({ run }: { run: RunDetail }) {
 
       {run.waitingOnYou.length > 0 && (
         <p className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, or refused by its
-          check —{' '}<code>wf decide {run.id}</code>
+          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, refused by its
+          check, or out of rounds —{' '}<code>wf decide {run.id}</code>
         </p>
       )}
 
@@ -88,9 +88,12 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
 
   return (
     <section className="space-y-4 border-t border-neutral-200 pt-6 dark:border-neutral-800">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="font-semibold">{step.name}</h2>
-        <StatusChip status={step.status} runCancelled={runCancelled} />
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="font-semibold">{step.name}</h2>
+          <StatusChip status={step.status} runCancelled={runCancelled} />
+        </div>
+        <StepNote note={step.note} />
       </div>
 
       {spec && <Facts rows={specRows(spec)} />}

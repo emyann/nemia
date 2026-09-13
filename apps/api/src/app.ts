@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
-import { checkStderr, closeoutOf, closeoutReader, engine, listRuns, verdictWord } from 'agent-workflows';
+import { checkStderr, closeoutOf, closeoutReader, engine, listRuns, readAsks, verdictWord } from 'agent-workflows';
 import { assess, composeBrief, inFlight, listing, type Assessment, type Run, type TaskPhase } from 'agent-workflows/run';
 import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
@@ -18,13 +18,17 @@ export type RunSummary = {
   status: RunStatus;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
-   * and not settled — or a step, a check or a try of `retries:` a tick would still file. `status` does not say: `assess` reads a
+   * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
    * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
    */
   moving: boolean;
-  /** `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. */
-  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string }>;
-  /** Steps a person has to act on — blocked, unsigned, or refused by their check — on a run nobody has called off. */
+  /**
+   * `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. `note` is what `wf ls` prints
+   * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
+   * `round 2 of 3`, `round 3 asked (wf round) — …` — and null where it prints nothing.
+   */
+  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null }>;
+  /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds — on a run nobody has called off. */
   waitingOnYou: string[];
 };
 
@@ -93,6 +97,8 @@ export type RunDetail = {
     workspace: string | null;
     branch: string | null;
     status: string;
+    /** As on `RunSummary`. */
+    note: string | null;
     closeout: StepCloseout | null;
     /** Null for a step with no `check:` in the workflow the run froze. */
     check: StepCheck | null;
@@ -262,15 +268,25 @@ const verdictOf = (run: Run, views: Views) => (name: string): number | 'unfinish
   return typeof exitCode === 'number' ? exitCode : 'unfinished';
 };
 
-/** What the run established, over one read of its tasks: each step's word, who is waited on, where the run stands, and whether it still moves. */
-type Judged = { words: ReadonlyMap<string, string>; waitingOnYou: string[]; status: RunStatus; moving: boolean };
+/** What the run established, over one read of its tasks: each step's word and note, who is waited on, where the run stands, and whether it still moves. */
+type Judged = {
+  words: ReadonlyMap<string, string>;
+  notes: ReadonlyMap<string, string | null>;
+  waitingOnYou: string[];
+  status: RunStatus;
+  moving: boolean;
+};
 
 /**
  * What `wf ls` says about each step, what `assess` says about the run, and whether the run still moves.
  *
  * The words are `listing`'s — `verified ✓`, `checking`, `unverified · done`, `failed ✗ check (exit 1)`,
- * `unsigned`, `succeeded · BLOCKED`, and the engine's own word while a step runs — with `wordOf`'s one
- * correction. A step the page shows and the tick does not judge — one the folder gained after the run froze
+ * `unsigned`, `succeeded · BLOCKED`, `rounds exhausted`, and the engine's own word while a step runs — with `wordOf`'s one
+ * correction, and so are the notes beside them.
+ *
+ * Given what people asked for with `wf retry` and `wf round`, read once, as the tick reads them (`readAsks`): without them a
+ * step a person asked to try again, or a loop out of rounds a person sent round once more, reads as waiting on them, and the
+ * run as not moving, for as long as the tick takes to file what they asked for. A step the page shows and the tick does not judge — one the folder gained after the run froze
  * its workflow, or one a pre-freeze record has and its folder lost — is worded as a `bare` step, and has no
  * say in the run's status. Everything is read off the views the request already has: calling `list` would
  * read every task again, and word only the steps the tick judges. The api test holds these words to `list`'s.
@@ -280,21 +296,25 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const asked = askedOf(views);
   const verdicts = verdictOf(run, views);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts);
+  // Unreadable ask files are `notes` the tick prints and does not honour; neither does the board.
+  const { asks, rounds } = readAsks(run.id);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds);
   const phase = phaseOf(views);
   // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
   // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
-  const { status, ready, check, retry } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts);
+  const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds);
   // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
   // for it, whatever its bare steps would make ready: the tick fails on it.
   const tickReads = Boolean(run.workflow ?? folder);
   return {
     words: new Map(said.steps.map((s) => [s.name, s.status])),
+    notes: new Map(said.steps.map((s) => [s.name, s.note ?? null])),
     waitingOnYou: names.filter((name) => said.waitingOnYou.includes(name)),
     status,
     // The line `cancelPlan` draws for a finished run, which `status` does not: nothing in flight, and nothing a
     // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
-    moving: inFlight(run, phase).length > 0 || (tickReads && (ready.length > 0 || check.length > 0 || retry.length > 0)),
+    // A round due is filed as a try is: a loop's looping step settled, and nothing of it in flight until the tick files the round.
+    moving: inFlight(run, phase).length > 0 || (tickReads && (ready.length > 0 || check.length > 0 || retry.length > 0 || round.length > 0)),
   };
 }
 
@@ -331,6 +351,7 @@ function summarize(run: Run, views: Views): RunSummary {
       taskId: run.steps[name]?.taskId ?? null,
       branch: run.steps[name]?.branch ?? null,
       status: judged.words.get(name)!,
+      note: judged.notes.get(name) ?? null,
     })),
     waitingOnYou: judged.waitingOnYou,
   };
@@ -379,6 +400,7 @@ async function detail(run: Run): Promise<RunDetail> {
         workspace: run.steps[name]?.workspace ?? null,
         branch: run.steps[name]?.branch ?? null,
         status: judged.words.get(name)!,
+        note: judged.notes.get(name) ?? null,
         // An unreadable closeout is already in `status`; there is nothing here to show of it.
         closeout: c && !('error' in c)
           ? { outcome: c.outcome, summary: c.summary, needs: c.needs ?? null, artifacts: c.artifacts }

@@ -7,17 +7,30 @@ import { stateClass, stateMeaning, stepState } from '../lib/status';
  * `unverified` carries a dashed circle before its words: its colour is neutral, like a step still to do,
  * and the mark says it is not one — it signed off, and nothing but its own word says it worked.
  * `data-state` is the state the colour was chosen for, so a check can read it without reading a colour.
+ *
+ * `note` is what `wf ls` prints beside the status — `try 2, by retries: 1`, `round 2 of 3` — on its own line after
+ * the meaning, on hover: for where there is no room under the chip, on a canvas or in a list. Where there is, `StepNote`.
  */
-export function StatusChip({ status, runCancelled }: { status: string; runCancelled: boolean }) {
+export function StatusChip({ status, runCancelled, note = null }: { status: string; runCancelled: boolean; note?: string | null }) {
   const state = stepState(status, runCancelled);
   return (
     <span
-      title={stateMeaning[state]}
+      title={note ? `${stateMeaning[state]}\n${note}` : stateMeaning[state]}
       data-state={state}
       className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-[11px] leading-none ${stateClass[state]}`}
     >
       {state === 'unverified' && <CircleDashed aria-hidden strokeWidth={2.5} className="size-2.5 shrink-0" />}
       {status}
     </span>
+  );
+}
+
+/** What `wf ls` prints beside a step's status, under its chip: the try or round it is on, or the one due. Nothing for a step with none. */
+export function StepNote({ note }: { note: string | null }) {
+  if (!note) return null;
+  return (
+    <p data-note className="font-mono text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
+      {note}
+    </p>
   );
 }

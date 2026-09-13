@@ -81,7 +81,7 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
         {run.steps.map((step) => (
           <li key={step.name} className="flex min-w-0 items-center gap-1">
             <span className="truncate text-muted-foreground">{step.name}</span>
-            <StatusChip status={step.status} runCancelled={cancelled} />
+            <StatusChip status={step.status} runCancelled={cancelled} note={step.note} />
           </li>
         ))}
       </ul>

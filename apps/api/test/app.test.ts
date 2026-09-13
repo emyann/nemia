@@ -9,6 +9,7 @@ const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-'));
 process.env.WF_ROOT = root;
 const { app } = await import('../src/app.ts');
 const { engine, list, readRun } = await import('agent-workflows');
+const { DEFAULT_ROUNDS } = await import('agent-workflows/workflow');
 
 const writeRun = (run: { id: string } & Record<string, unknown>) => {
   fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
@@ -109,8 +110,8 @@ test('runs are read from the workflow store and summarized, with what each step 
     moving: false,
     steps: [
       // t-1 is on the record and not in this engine's store: a fresh WF_ROOT has no tasks at all.
-      { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown' },
-      { name: 'review', taskId: null, branch: null, status: 'waiting' },
+      { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown', note: null },
+      { name: 'review', taskId: null, branch: null, status: 'waiting', note: null },
     ],
     waitingOnYou: [],
   }]);
@@ -148,6 +149,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     told: filedBrief('t-2'),
     taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
     status: 'succeeded · BLOCKED',
+    note: null,
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
     check: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
@@ -160,6 +162,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     told: undefined,
     taskId: null, workspace: null, branch: null,
     status: 'waiting',
+    note: null,
     closeout: null,
     check: null,
     attempts: { count: 0, latest: null },
@@ -219,12 +222,13 @@ test('a run whose workflow folder is gone still answers, from its record', async
       name: 'implement', spec: null, body: null, told: filedBrief('t-2'),
       taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
       status: 'succeeded · BLOCKED',
+      note: null,
       closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
       check: null,
       attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
     },
     {
-      name: 'review', spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', closeout: null,
+      name: 'review', spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', note: null, closeout: null,
       check: null, attempts: { count: 0, latest: null },
     },
   ]);
@@ -268,6 +272,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     name: 'original', spec: null, body: null, told: filedBrief('t-6'),
     taskId: 't-6', workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
     status: 'succeeded · BLOCKED',
+    note: null,
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
     check: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
@@ -327,8 +332,9 @@ test('each step says how many attempts it has had, when the latest began, and ho
   // A task the engine has no record of has had no attempts it can speak for.
   assert.deepEqual((await (await app.request('/api/runs/r-4')).json()).steps[0].attempts, { count: 0, latest: null });
 
-  // The list is kept as it was.
-  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), ['name', 'taskId', 'branch', 'status']);
+  // The list is kept as it was, with the note `wf ls` prints beside a step: none, for a step on its first try.
+  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), ['name', 'taskId', 'branch', 'status', 'note']);
+  assert.equal((await listed('r-7')).steps[0].note, null);
 });
 
 const numbered = (n: number) => Array.from({ length: n }, (_, i) => `line ${i + 1}`);
@@ -620,6 +626,109 @@ test('a check that refused with `retries:` left reads as the tick has it — run
       assert.deepEqual([run.status, run.moving, run.waitingOnYou, run.steps[0].status], [status, moving, waitingOnYou, word], `${id}, ${where}: ${why}`);
     }
   }
+});
+
+// ─── a loop, and what people asked for ───────────────────────────────────────
+
+/**
+ * A review that loops back to implement, frozen as `wf start` freezes it: `again` declared boolean in its `output:`,
+ * and `rounds:` as the parser sets it for a loop that does not say — the shipped default.
+ */
+const looped = [
+  { name: 'implement', after: [], body: 'Implement it.' },
+  {
+    name: 'review', after: ['implement'], body: 'Review it.', loop: 'implement', rounds: DEFAULT_ROUNDS,
+    output: { file: 'review.json', schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false } },
+  },
+];
+
+/**
+ * A run whose loop is on `round`, both steps signed off: implement done — with its `replies`, which a loop's target owes
+ * from round 2 — and review saying `again`. Each step has a try behind it for every round before, as `roundFiled` moves it.
+ */
+function seedLoop(id: string, round: number, again: boolean) {
+  const steps: Record<string, object> = {};
+  for (const name of ['implement', 'review']) {
+    steps[name] = {
+      taskId: `t-${id}-${name}-${round}`,
+      tries: Array.from({ length: round - 1 }, (_, i) => ({ taskId: `t-${id}-${name}-${i + 1}`, then: 'round' })),
+    };
+  }
+  // A declared field is a field of the closeout itself, beside the four every closeout has.
+  settledTask(`t-${id}-implement-${round}`, round > 1 ? { ...done, replies: [] } : done);
+  settledTask(`t-${id}-review-${round}`, { ...done, again });
+  writeRun({ ...r2, id, workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'), workflow: looped, steps });
+}
+
+/** A person's ask, as `wf retry` and `wf round` leave one: a file of its own beside the run's record, named for what it asks. */
+function askFor(id: string, name: string, ask: object) {
+  const dir = path.join(root, 'runs', `${id}.asks`);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, name), `${JSON.stringify({ ...ask, at: later }, null, 2)}\n`);
+}
+
+type Row = Said & { note: string | null };
+
+/** A step row as `list` has it: a note only where it prints one. */
+const asListed = ({ name, status, branch, note }: Row) => ({ name, status, branch, ...(note === null ? {} : { note }) });
+
+type Judgement = [id: string, status: string, moving: boolean, waitingOnYou: string[], rows: Array<[name: string, status: string, note: string | null]>, why: string];
+
+/** Each run on both endpoints: where it stands, whether it moves, who it waits on, each step's word and note — and those are `wf ls`'s. */
+async function expectJudged(cases: readonly Judgement[]) {
+  const e = engine();
+  for (const [id, status, moving, waitingOnYou, rows, why] of cases) {
+    const words = await list(e, readRun(id));
+    for (const [where, run] of [['list', await listed(id)], ['detail', await (await app.request(`/api/runs/${id}`)).json()]] as const) {
+      assert.deepEqual([run.status, run.moving, run.waitingOnYou], [status, moving, waitingOnYou], `${id}, ${where}: ${why}`);
+      assert.deepEqual(run.steps.map((s: Row) => [s.name, s.status, s.note]), rows, `${id}, ${where}: ${why}`);
+      assert.deepEqual(run.steps.map(asListed), words.steps, `${id}, ${where}: wf ls's words and notes`);
+      assert.deepEqual(run.waitingOnYou, words.waitingOnYou, `${id}, ${where}: who wf ls says is waited on`);
+    }
+  }
+}
+
+test('a loop out of rounds reads `rounds exhausted`, waits on you, and does not move — until a person sends it round again', async () => {
+  // Round 3 of 3, and review asked for another.
+  seedLoop('r-30', DEFAULT_ROUNDS, true);
+  // The same, and a person asked for round 4 with `wf round`, which the next tick files.
+  seedLoop('r-31', DEFAULT_ROUNDS, true);
+  askFor('r-31', 'round-review-4', { step: 'review', round: 4 });
+
+  await expectJudged([
+    ['r-30', 'failed', false, ['review'], [
+      ['implement', 'unverified · done', 'round 3 of 3'],
+      ['review', 'rounds exhausted', 'round 3 of 3, and it asked again — once more: wf round r-30 review'],
+    ], 'at its cap, and it asked again: a person decides, and no tick files a thing'],
+    ['r-31', 'running', true, [], [
+      ['implement', 'unverified · done', 'round 3 of 3'],
+      ['review', 'rounds exhausted', 'round 4 asked (wf round) — the next tick files implement'],
+    ], 'a person asked for round 4: the next tick files it, and nobody is waited on'],
+  ]);
+});
+
+test('a round the loop asked for, and a try a person asked for, read as the tick has them: a note beside the step, and the run moving', async () => {
+  // Round 1 of 3, and review asked for another: the next tick files round 2 on its word, with nothing of the run in flight.
+  seedLoop('r-32', 1, true);
+  // Signed off blocked, and a person asked for another try with `wf retry r-33 implement`.
+  settledTask('t-33-implement', blocked);
+  writeRun({
+    ...r2, id: 'r-33', workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'),
+    workflow: [{ name: 'implement', after: [], body: 'Implement it.' }, { name: 'review', after: ['implement'], body: 'Review it.' }],
+    steps: { implement: { taskId: 't-33-implement' }, review: { taskId: null } },
+  });
+  askFor('r-33', 'retry-implement-2', { mode: 'nudge' });
+
+  await expectJudged([
+    ['r-32', 'running', true, [], [
+      ['implement', 'unverified · done', null],
+      ['review', 'unverified · done', `round 2 of ${DEFAULT_ROUNDS} due — review asked again, and the next tick files implement`],
+    ], 'review asked again with rounds left: a round due moves the run as a try due does'],
+    ['r-33', 'running', true, [], [
+      ['implement', 'succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
+      ['review', 'waiting', null],
+    ], 'a person asked for another try: the next tick files it, and nobody is waited on'],
+  ]);
 });
 
 test("a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines", async () => {

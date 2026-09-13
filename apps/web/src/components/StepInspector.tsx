@@ -5,7 +5,7 @@ import { duration, isLive } from '../lib/canvas';
 import { stepState, type StepState } from '../lib/status';
 import { cn } from '../lib/utils';
 import { Check, code, Facts, specRows, Told, when } from './Facts';
-import { StatusChip } from './StatusChip';
+import { StatusChip, StepNote } from './StatusChip';
 
 type Step = RunDetail['steps'][number];
 
@@ -101,7 +101,10 @@ function Details({ step, state, runCancelled }: { step: Step; state: StepState; 
 
   return (
     <>
-      <StatusChip status={step.status} runCancelled={runCancelled} />
+      <div className="space-y-1">
+        <StatusChip status={step.status} runCancelled={runCancelled} />
+        <StepNote note={step.note} />
+      </div>
       <Facts
         rows={[
           ['attempts', attempts.count],

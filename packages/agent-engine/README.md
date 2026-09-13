@@ -153,7 +153,7 @@ Three are wired:
 |---|---|---|
 | `claude` | `claude --bg --name` | **the harness** — `claude agents --json`, free |
 | `codex` | `codex exec --json`, in a worker we detach | **us** — a directory of run files |
-| `claude-detached` | `claude -p`, same worker | us (there to compare the two paths) |
+| `claude-detached` | `claude -p --output-format json`, same worker | us (there to compare the two paths) |
 
 **Why two mechanisms and not one.** Claude Code keeps a registry of background sessions and will
 answer questions about them from any process. Codex has no such thing: `codex exec` runs in the
@@ -168,7 +168,7 @@ price of running more than one harness. It is a handful of lines, because the en
 journal and a seam.
 
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
-optionally the words it refuses:
+optionally the words it refuses and a reader of what it prints:
 
 ```ts
 export const codex: HarnessSpec = {
@@ -443,12 +443,18 @@ said so. That holds when the harness then marks the session `blocked` as much as
 `working` — a step that called `StructuredOutput` and ended its turn has been seen `blocked`, idle,
 and until that was fixed it waited on a person for ever and held its slot.
 
-How each harness is asked, both verified live:
+How each harness is asked — `claude` and `codex` verified live:
 
 | harness | how | where the answer lands |
 |---|---|---|
 | Claude Code | `--json-schema`: the session gets a `StructuredOutput` tool and calls it to finish. Works under `--bg`, though documented only for `-p` (2.1.270). | the session's transcript |
+| `claude-detached` | `-p --json-schema --output-format json`: `claude -p` prints one `result` object, and the answer is its `structured_output` (one live `-p` call, 2.1.270; under the engine, a fake `claude` only) | the worker's capture of its output, stamped with when that was last written |
 | Codex | `exec --output-schema`, with `-o` at a file the runner chose outside the workspace (0.154.0, strict schema) | that file |
+
+A detached run's end is written only once the harness's pipes have closed and its output is in the
+log. `exit` can come first, and the pass that records the end would then miss an answer still in the
+pipe — for good, since an end is written once. Two seconds at most: a child the harness leaves behind
+can hold a pipe open for as long as it likes.
 
 Runners report the statement **and when it was made**. The engine decides whether it belongs to this
 attempt, records it on the attempt (`state.attempts[n].closeout`), and never reads it. Two rules

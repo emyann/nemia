@@ -48,6 +48,13 @@ export type HarnessSpec = {
    * without one is asked nothing.
    */
   refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
+  /**
+   * What the harness says in its own output, for one that prints its final answer rather than
+   * writing it where the runner chose. Handed the worker's capture of the harness's stdout and
+   * stderr whenever it has changed, and returns what it found there — nothing it did not. A pure
+   * function of the text, as `command` is of the request.
+   */
+  readOutput?: (output: string) => HarnessOutput;
 };
 
 /**
@@ -68,6 +75,12 @@ export type HarnessIO = {
   mcpConfigFile?: string;
   /** The checkout's own `.mcp.json`, when there is one. Found by a spec's `prepare`, which reads the disk. */
   checkoutMcpConfig?: string;
+};
+
+/** What a harness's output said, as its spec's `readOutput` found it. Each part absent when it does not say. */
+export type HarnessOutput = {
+  /** The final answer, wrapped so that an answer is told apart from none by presence, not by value. */
+  closeout?: { payload: unknown };
 };
 
 /** How long a run file may go unbeaten before `observe` calls it dead. Worker beats every 5s. */
@@ -128,6 +141,27 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
     return { payload, at };
   };
 
+  /**
+   * What the spec reads in the harness's output, with when that output was last written — the time a
+   * statement found there is reported with, as a closeout file's is its own mtime. Read again only
+   * when the capture has changed, so a finished run's output is read once per process.
+   */
+  const outputs = new Map<string, { size: number; mtimeMs: number; read: HarnessOutput }>();
+  const outputOf = (name: string): { read: HarnessOutput; at: number } | undefined => {
+    if (!spec.readOutput) return undefined;
+    let size: number;
+    let mtimeMs: number;
+    try { ({ size, mtimeMs } = fs.statSync(logFile(name))); } catch { return undefined; }
+    let known = outputs.get(name);
+    if (!known || known.size !== size || known.mtimeMs !== mtimeMs) {
+      let text: string;
+      try { text = fs.readFileSync(logFile(name), 'utf8'); } catch { return undefined; }
+      known = { size, mtimeMs, read: spec.readOutput(text) };
+      outputs.set(name, known);
+    }
+    return { read: known.read, at: known.mtimeMs };
+  };
+
   return {
     spawn: (asked) =>
       Effect.try({
@@ -142,6 +176,9 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           fs.mkdirSync(dir, { recursive: true });
           // A re-spawn of the same attempt must not find the previous one's answer waiting for it.
           try { fs.rmSync(closeoutFile(r.name)); } catch { /* nothing to clear */ }
+          // Nor in its output, which a spec that reads one would take the previous answer from.
+          fs.rmSync(logFile(r.name), { force: true });
+          outputs.delete(r.name);
           let io: HarnessIO = {};
           if (r.closeoutSchema) {
             fs.writeFileSync(schemaFile(r.name), JSON.stringify(r.closeoutSchema));
@@ -183,8 +220,11 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
       // output by the worker — present only once the harness has printed it, which is why resume
       // is best-effort for this kind of harness and exact for one with a registry.
       for (const { name, run } of readAll()) {
+        // The file the harness wrote its answer to, when it wrote one; otherwise what its output says.
+        const output = outputOf(name);
+        const printed = output?.read.closeout && { payload: output.read.closeout.payload, at: output.at };
         m.set(name, {
-          sessionId: name, state: observedState(run, now), nativeId: run.nativeId, closeout: statementOf(name),
+          sessionId: name, state: observedState(run, now), nativeId: run.nativeId, closeout: statementOf(name) ?? printed,
           // The process's own exit code, once it has one. The worker writes -1 when there is none —
           // killed by a signal, or never started — and that is reported as no code, not as a code.
           ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
@@ -404,6 +444,24 @@ export const codex: HarnessSpec = {
   },
 };
 
+/**
+ * The final answer in `claude -p --output-format json`'s output: the `structured_output` of its one
+ * `result` object, which Claude Code fills when it was given `--json-schema` and the session answered
+ * in that shape. The last result line is taken and every other line skipped — the worker captures
+ * stderr beside it. No result, a result without the field, or one whose field is `null`, is no answer.
+ */
+export const claudeResultOutput = (output: string): HarnessOutput => {
+  let result: { type?: unknown; structured_output?: unknown } | undefined;
+  for (const line of output.split('\n')) {
+    if (!line.includes('"result"')) continue;
+    try {
+      const parsed = JSON.parse(line) as typeof result;
+      if (parsed?.type === 'result') result = parsed;
+    } catch { /* not the result line */ }
+  }
+  return result?.structured_output != null ? { closeout: { payload: result.structured_output } } : {};
+};
+
 /** Claude Code run the same way — detached by us rather than by the harness. For comparison. */
 export const claudeDetached: HarnessSpec = {
   name: 'claude-detached',
@@ -411,6 +469,9 @@ export const claudeDetached: HarnessSpec = {
     cmd: 'claude',
     args: [
       '-p', r.brief,
+      // One JSON object when it exits, which `readOutput` reads the final answer from — text output
+      // prints only the answer's prose — and which carries the session id `nativeIdPattern` looks for.
+      '--output-format', 'json',
       // Variadic, and ended by the flag after it, as for `claude --bg`.
       ...(r.tools ? ['--tools', r.tools.join(',')] : []),
       '--permission-mode', r.permissionMode ?? 'auto',
@@ -418,10 +479,14 @@ export const claudeDetached: HarnessSpec = {
       ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
       ...(r.model ? ['--model', r.model] : []),
       ...(r.effort ? ['--effort', r.effort] : []),
+      // The closing statement's shape, as for `claude --bg`; the answer comes back as the result's
+      // `structured_output`. It used to be dropped, so a task on this harness never gave a closeout.
+      ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
       ...(r.worktree ? ['--worktree', worktreeName(r)] : []),
     ],
   }),
+  readOutput: claudeResultOutput,
   nativeIdPattern: '"session_id"\\s*:\\s*"([0-9a-f-]{16,})"',
   /** The checkout's `.mcp.json`, found on disk here so that `command` stays a function of what it is given. */
   prepare: (r) => {

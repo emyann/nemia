@@ -65,13 +65,12 @@ its own two sessions for this reason.
 A session seen `blocked` after giving its closeout now ends its attempt and settles, and stays in the
 registry afterwards like every other.
 
-### 4. `claude-detached` ignores `closeoutSchema`, and measures no usage
+### 4. `claude-detached` measures no usage
 
-`agent-engine/src/runner-detached.ts`: the spec's `command` does not take the harness `io`, so a
-task on this harness never gets a closeout. Completion itself still works — `claude -p` exits — but
-the workflow sees no statement. Only `claude` (background sessions) and `codex` support closeouts. The
-fix is `--json-schema` plus reading `structured_output` from the JSON output, which also carries the
-usage this harness records as `null` today. Low priority: this harness exists for comparison.
+`agent-engine/src/runner-detached.ts`. Its closeout is read now (engine `TBD-4`), from the one
+`result` object `claude -p --output-format json` prints; what the attempt consumed is not, and it
+records `usage: null`. The same object carries `num_turns`, `usage` and `total_cost_usd` (seen in one
+live call on 2.1.270), but no count of tool calls. Low priority: this harness exists for comparison.
 
 ### 5. An unstartable first attempt of a continuation retries cold
 
@@ -163,6 +162,11 @@ has no Codex servers configured.
 
 ## Verified by tests, not by a live run
 
+- **`claude-detached`'s closeout** (engine `TBD-4`). A fake `claude` on `PATH`, at shipped defaults.
+  That `-p --output-format json --json-schema` prints one `result` line whose `structured_output` is
+  the answer was seen in one live `claude -p` call (2.1.270, `--model haiku`: `{"ok":true}`), not
+  under the engine.
+
 - **`claude-detached` under the MCP fence** (engine `5340772`, `945bf46`). Argv tests only; the live
   run was `--bg`. That `-p` takes `--strict-mcp-config --no-chrome`, and loads a `.mcp.json` named by
   `--mcp-config` under strict, was seen in `claude -p`'s `init` event, with a model name that cannot
@@ -237,3 +241,4 @@ has no Codex servers configured.
 | the README claimed `AE_RUNNER=sdk`, "refuse a tool call: no", 25 tests, a file table 2–3× off, and "three next things" already done (bug 5) | made true; `test/readme.test.ts` refuses each of those classes | engine `f947da4` |
 | a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |
 | a relative `cwd` filed through the API failed a detached harness: its worker was launched in `repo`, then launched the harness in `repo` again, from inside it (`spawn sh ENOENT`) | `file()` refuses a `cwd` that is not absolute, naming it resolved; the detached runner resolves the one it is handed, as `claude --bg` always has | engine `TBD-10` |
+| a `claude-detached` task never gave a closeout: its spec dropped `closeoutSchema` | `--json-schema` and `--output-format json`, and the answer read from the result's `structured_output` in the worker's capture, stamped with when that was written. The worker writes a run's end only once the harness's output is in the log: `exit` can come before the pipes drain, and the pass that records the end missed the answer (found writing the test) | engine `TBD-4` |

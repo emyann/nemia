@@ -40,11 +40,14 @@ write();
 // otherwise, and an orphaned build still holds the worktree the next attempt wants.
 const child = spawn(plan.cmd, plan.args, { cwd: plan.cwd, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
 const log = fs.createWriteStream(plan.logFile, { flags: 'a' });
+// Heard: output that arrives after the log is closed (a child still holding a pipe) must not crash
+// the one process that says how the run ended.
+log.on('error', () => {});
 
 // The harness's own id, if it prints one. Only needed to RESUME later; the name is still the key.
 const nativeId = plan.nativeIdPattern ? new RegExp(plan.nativeIdPattern) : null;
 const scan = (chunk: Buffer) => {
-  log.write(chunk);
+  if (!log.writableEnded) log.write(chunk);
   if (nativeId && !status.nativeId) {
     const m = nativeId.exec(chunk.toString());
     if (m?.[1]) write({ nativeId: m[1] });
@@ -64,11 +67,24 @@ for (const sig of ['SIGTERM', 'SIGINT'] as const) {
   process.on(sig, () => { stopping = true; killGroup(); });
 }
 
+/**
+ * How long, after the harness exits, its output may still be arriving. `exit` can come before its
+ * pipes have drained, and a spec reads the final answer from that output — so the end is written
+ * only once both pipes have closed and the log is on disk. Bounded, because a child the harness left
+ * behind can hold a pipe open for as long as it likes.
+ */
+const DRAIN_MS = 2_000;
+const closed = (s: NodeJS.ReadableStream & { closed?: boolean }) =>
+  new Promise<void>((resolve) => { if (s.closed) resolve(); else s.once('close', () => resolve()); });
+
 child.on('exit', (code) => {
   clearInterval(beat);
-  write({ state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed', exitCode: code ?? -1 });
-  log.end();
-  setTimeout(() => process.exit(0), 50);
+  const drained = Promise.all([closed(child.stdout), closed(child.stderr)]);
+  const bound = new Promise<void>((resolve) => setTimeout(resolve, DRAIN_MS).unref());
+  void Promise.race([drained, bound]).then(() => log.end(() => {
+    write({ state: stopping ? 'stopped' : code === 0 ? 'done' : 'failed', exitCode: code ?? -1 });
+    setTimeout(() => process.exit(0), 50);
+  }));
 });
 
 child.on('error', (e) => {

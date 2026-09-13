@@ -10,7 +10,8 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { detachedOps, STALE_MS, trustedProjects, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { claudeResultOutput, detachedOps, STALE_MS, trustedProjects, type HarnessIO, type HarnessSpec } from '../src/runner-detached.ts';
+import { createEngine } from '../src/facade.ts';
 import { execFileSync } from 'node:child_process';
 import { composite } from '../src/runner-composite.ts';
 import { testOps } from '../src/runner.ts';
@@ -452,4 +453,134 @@ test('a relative cwd is resolved where the worker is launched — the harness ru
   const repo = fs.realpathSync(path.join(parent, 'repo'));
   assert.equal(given && fs.realpathSync(given), repo, 'the spec is handed the resolved directory, so a `-C` names it too');
   assert.equal(fs.realpathSync(fs.readFileSync(path.join(repo, 'where.txt'), 'utf8').trim()), repo);
+});
+
+// ─── claude -p: the answer it prints ────────────────────────────────────────
+
+/** A `result` object as `claude -p --output-format json` prints it, on one line (2.1.270; keys trimmed). */
+const SESSION = '5e551011-0000-4000-8000-000000000001';
+const resultLine = (o: object) => JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: 'ok', session_id: SESSION, ...o });
+
+test('claude-detached is asked for JSON, and for the schema as --json-schema when the task gives one', async () => {
+  const { claudeDetached } = await import('../src/runner-detached.ts');
+  const schema = { type: 'object', properties: { outcome: { type: 'string' } }, required: ['outcome'] };
+  const args = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', closeoutSchema: schema, resumeFrom: 'abc', worktree: true }).args;
+  assert.deepEqual(args.slice(0, 2), ['-p', 'the prompt'], "the prompt is -p's own value");
+  assert.equal(args[args.indexOf('--output-format') + 1], 'json');
+  assert.deepEqual(JSON.parse(args[args.indexOf('--json-schema') + 1]!), schema);
+  assert.equal(args[args.indexOf('--worktree') + 1], 'ae-t-1', 'and the worktree is still named');
+
+  const plain = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
+  assert.equal(plain.includes('--json-schema'), false, 'no schema, no flag');
+  assert.equal(plain[plain.indexOf('--output-format') + 1], 'json', 'JSON either way: the session id is in it');
+});
+
+test("claude -p's answer is its result object's structured_output, and nothing else in its output is one", () => {
+  // Measured on 2.1.270: `-p --output-format json --json-schema` printed one line, a `result` whose
+  // `structured_output` held the answer.
+  assert.deepEqual(
+    claudeResultOutput(['a warning on stderr', resultLine({ structured_output: { outcome: 'done' } }), ''].join('\n')),
+    { closeout: { payload: { outcome: 'done' } } },
+  );
+  assert.deepEqual(claudeResultOutput(resultLine({})), {}, 'a result without it: no schema was given, or none was answered');
+  assert.deepEqual(claudeResultOutput(resultLine({ structured_output: null })), {}, 'null is no answer');
+  assert.deepEqual(claudeResultOutput(JSON.stringify({ type: 'assistant', result: 'x', structured_output: { outcome: 'done' } })), {}, 'only a result answers');
+  assert.deepEqual(claudeResultOutput(resultLine({ structured_output: { outcome: 'done' } }).slice(0, -8)), {}, 'half a line is not one');
+  assert.deepEqual(claudeResultOutput('The result: {"outcome":"done"}'), {}, 'prose is not one');
+  assert.deepEqual(claudeResultOutput(''), {});
+});
+
+test("a spec that reads its harness's output reports the answer found there, stamped with when it was written — nothing in the workspace", async () => {
+  const dir = root();
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-ws-'));
+  const prints: HarnessSpec = {
+    name: 'sh', readOutput: claudeResultOutput,
+    command: () => ({ cmd: 'sh', args: ['-c', `echo noise >&2; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`] }),
+  };
+  const ops = detachedOps(prints, dir);
+  const before = Date.now();
+  await Effect.runPromise(ops.spawn({ name: 'ae/t20/1', brief: 'x', cwd: workspace, closeoutSchema: { type: 'object' } }));
+
+  const seen = await settle(ops, 'ae/t20/1', 'done');
+  assert.deepEqual(seen.closeout?.payload, { outcome: 'done' });
+  // A filesystem's clock, which some keep to the second: that much slack either side of the run.
+  assert.ok(seen.closeout!.at >= before - 1_000 && seen.closeout!.at <= Date.now() + 1_000, `stamped ${seen.closeout!.at}, spawned ${before}`);
+  assert.deepEqual(fs.readdirSync(workspace), []);
+});
+
+test("a run is not called over before the harness's last output is in its log — the answer read from it would be lost", async () => {
+  // `exit` can come before the pipes drain, and the first pass that sees `done` is the one the engine
+  // records the end on. A child still printing when the harness exits makes that deterministic.
+  const dir = root();
+  const late: HarnessSpec = {
+    name: 'sh', readOutput: claudeResultOutput,
+    command: () => ({ cmd: 'sh', args: ['-c', `(sleep 0.4; printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}') & exit 0`] }),
+  };
+  const ops = detachedOps(late, dir);
+  await Effect.runPromise(ops.spawn({ name: 'ae/t21/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
+
+  const until = Date.now() + 15_000;
+  let seen: Sighting | undefined;
+  while (Date.now() < until) {
+    seen = (await Effect.runPromise(ops.observe)).get('ae/t21/1');
+    if (seen && seen.state !== 'working') break;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  assert.equal(seen?.state, 'done');
+  assert.deepEqual(seen?.closeout?.payload, { outcome: 'done' }, 'the first sighting that says done already has the answer');
+});
+
+test('...and a child that holds a pipe open for good does not keep the run working', async () => {
+  const dir = root();
+  const ops = detachedOps(sh('(sleep 30) & exit 0'), dir);
+  const started = Date.now();
+  await Effect.runPromise(ops.spawn(req('ae/t22/1', dir)));
+  await settle(ops, 'ae/t22/1', 'done', 10_000);
+  assert.ok(Date.now() - started < 10_000, 'ended within the drain bound, not when the child let go');
+});
+
+test('a re-spawn of the same attempt does not find the last answer in the output either', async () => {
+  const dir = root();
+  const quiet: HarnessSpec = { name: 'sh', readOutput: claudeResultOutput, command: () => ({ cmd: 'sh', args: ['-c', 'sleep 2'] }) };
+  const ops = detachedOps(quiet, dir);
+  const leftover = path.join(dir, 'runs', 'sh', 'ae_t23_1.log');
+  fs.mkdirSync(path.dirname(leftover), { recursive: true });
+  fs.writeFileSync(leftover, `${resultLine({ structured_output: { outcome: 'done' } })}\n`);
+
+  await Effect.runPromise(ops.spawn({ name: 'ae/t23/1', brief: 'x', cwd: dir, closeoutSchema: {} }));
+  assert.equal((await Effect.runPromise(ops.observe)).get('ae/t23/1')?.closeout, undefined);
+});
+
+test('claude-detached at shipped defaults: a task that asked for a closeout gets the one it printed, and its session id', async () => {
+  // A fake `claude` on PATH that answers the way `claude -p --output-format json` does — and, asked for
+  // the `claude` harness's registry, as `claude agents` does when nothing of its own is running.
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-fake-claude-'));
+  fs.writeFileSync(path.join(bin, 'claude'), [
+    '#!/bin/sh',
+    `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
+    `printf '%s\\n' "$@" > '${bin}/argv'`,
+    'echo "a warning" >&2',
+    `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`,
+  ].join('\n'), { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${bin}:${prev}`;
+  try {
+    const cwd = root();
+    const engine = createEngine({ root: root() });
+    const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
+    const id = await engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema });
+    const until = Date.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+      await engine.tick();
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const { state } = await engine.view(id);
+    assert.equal(state.settled, 'succeeded');
+    assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
+    assert.equal(state.attempts[0]?.nativeId, SESSION, 'and the session id, from the same JSON');
+    const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
+    assert.deepEqual(JSON.parse(argv[argv.indexOf('--json-schema') + 1]!), schema);
+    assert.equal(argv[argv.indexOf('--output-format') + 1], 'json');
+    assert.deepEqual(fs.readdirSync(cwd), [], 'nothing in the workspace');
+  } finally { process.env.PATH = prev; }
 });

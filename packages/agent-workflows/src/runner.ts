@@ -13,8 +13,9 @@ import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 
 import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type Verdict } from './check.ts';
 
 export { verdictWord } from './check.ts';
+export { outputLines } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, stepStatus, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
+import { assess, cancelPlan, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, parseCloseout, stepStatus, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -453,7 +454,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       // run share a prefix — which is what makes a resumed step legible as a continuation rather
       // than a duplicate.
       id: `${run.id}-${name}`,
-      brief: composeBrief(step, run, steps),
+      // What the steps it reads declared, if it names any in `input:` — read off the same closeouts the
+      // assessment that made it ready just read, so it is handed what it was filed on.
+      brief: composeBrief(step, run, steps, signedOff),
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,
@@ -463,9 +466,10 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
-      // The shape of the step's closing statement. The engine hands it to the harness and records
-      // the answer without reading it; what the fields mean is ours — see `Closeout`.
-      closeoutSchema: CLOSEOUT_SCHEMA,
+      // The shape of the step's closing statement, with the fields its `output:` declares — from the
+      // workflow this run froze, never the folder. The engine hands it to the harness and records the
+      // answer without reading it; what the fields mean is ours — see `Closeout`.
+      closeoutSchema: closeoutSchemaOf(step),
     });
     run.steps[name] = { taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);

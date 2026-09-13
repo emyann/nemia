@@ -1,0 +1,13 @@
+# Lets a Codex step in this repository commit its own work.
+#
+# Codex's sandbox keeps .git read-only on purpose. This rule lets exactly `git add` and
+# `git commit` run outside it, and nothing else. Codex loads it only for a trusted project;
+# agent-engine extends the trust you gave this repository to the worktrees it runs steps in.
+# Without it nothing breaks: the workflow commits whatever a step leaves behind.
+prefix_rule(
+    pattern = ["git", ["add", "commit"]],
+    decision = "allow",
+    justification = "a step commits its own work; the sandbox keeps .git read-only",
+    match = ["git add REVIEW.md", "git commit -m review"],
+    not_match = ["git push origin main", "git -c core.hooksPath=/tmp/x commit -m y"],
+)

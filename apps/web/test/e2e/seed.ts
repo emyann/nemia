@@ -9,6 +9,8 @@
  * failed — finished, not in flight, and off the Factory's floor until finished runs are shown. Nothing
  * runs. The pages must render a run as the api reads it, whatever the engine says of its tasks.
  *
+ * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
+ *
  * Written by hand rather than through agent-workflows: the web app imports no package, and a record
  * format that moves under the pages should fail here, where a person would see it.
  */
@@ -74,6 +76,40 @@ const STEPS = [
     frozen: { name: 'theme', after: ['tokens'], body: 'Apply them to every page.', harness: 'claude', check: FAKE.check },
   },
 ];
+
+/**
+ * The checkout the api serves on the Capabilities page: a skill with frontmatter and one without, an agent, and two MCP
+ * servers its settings enable — one that lists its tools when asked, one whose command does not exist — and the rules
+ * its settings deny, one of them a tool of the first server.
+ */
+export const CHECKOUT = {
+  skill: { dir: 'review', name: 'code-review', description: 'Review a diff for bugs before a person reads it.' },
+  /** A SKILL.md with no frontmatter, listed by its directory. */
+  bareSkill: 'scratch',
+  agent: { file: 'tester.md', name: 'tester', description: 'Writes the tests a change is missing.' },
+  /** apps/api's fixture server: what it lists, the first line of `echo`'s description, and the line after it. */
+  server: { name: 'fixture', tools: ['echo', 'wipe'], said: 'Say it back.', secondLine: 'A second line', denied: 'mcp__fixture__wipe' },
+  missing: { name: 'missing', command: 'hkb-e2e-no-such-mcp-server' },
+  denied: ['Bash(git push:*)', 'mcp__fixture__wipe'],
+} as const;
+
+/** Write CHECKOUT into `repo`. `mcpServer` is the file of the stdio MCP server it declares, which node runs. */
+export function seedCheckout(repo: string, mcpServer: string): void {
+  const { skill, bareSkill, agent, server, missing, denied } = CHECKOUT;
+  write(path.join(repo, '.claude', 'skills', skill.dir, 'SKILL.md'), `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n# Review\n`);
+  write(path.join(repo, '.claude', 'skills', bareSkill, 'SKILL.md'), '# Scratch\n\nNo frontmatter, so it is listed by its directory.\n');
+  write(path.join(repo, '.claude', 'agents', agent.file), `---\nname: ${agent.name}\ndescription: ${agent.description}\n---\nYou write tests.\n`);
+  write(path.join(repo, '.mcp.json'), JSON.stringify({
+    mcpServers: {
+      [server.name]: { command: process.execPath, args: [mcpServer] },
+      [missing.name]: { command: missing.command, args: ['--stdio'] },
+    },
+  }, null, 2));
+  write(path.join(repo, '.claude', 'settings.json'), JSON.stringify({
+    enabledMcpjsonServers: [server.name, missing.name],
+    permissions: { deny: denied },
+  }, null, 2));
+}
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });

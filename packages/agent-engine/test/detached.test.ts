@@ -434,3 +434,22 @@ test('a detached worker aimed at a directory that is not there is refused, and c
   assert.match(e?.message ?? '', /is not a directory/);
   await new Promise((r) => setTimeout(r, 300));
 });
+
+test('a relative cwd is resolved where the worker is launched — the harness runs in repo, not repo/repo', async () => {
+  // Measured before: the worker was launched in `repo`, then launched the harness in `repo` again,
+  // from inside it, and the attempt failed with `spawn sh ENOENT`. `file()` refuses a relative cwd;
+  // this is a caller of the runner itself, the way `claude --bg` has always resolved one.
+  const was = process.cwd();
+  const parent = root();
+  fs.mkdirSync(path.join(parent, 'repo'));
+  let given: string | undefined;
+  const where: HarnessSpec = { name: 'sh', command: (r) => { given = r.cwd; return { cmd: 'sh', args: ['-c', 'pwd > where.txt'] }; } };
+  const ops = detachedOps(where, root());
+  process.chdir(parent);
+  try { await Effect.runPromise(ops.spawn(req('ae/t19/1', 'repo'))); } finally { process.chdir(was); }
+
+  await settle(ops, 'ae/t19/1', 'done');
+  const repo = fs.realpathSync(path.join(parent, 'repo'));
+  assert.equal(given && fs.realpathSync(given), repo, 'the spec is handed the resolved directory, so a `-C` names it too');
+  assert.equal(fs.realpathSync(fs.readFileSync(path.join(repo, 'where.txt'), 'utf8').trim()), repo);
+});

@@ -2,7 +2,8 @@
 
 What is still wrong, what is only half-verified, and what is waiting on a decision — written down so
 it can be picked up later without reconstructing it from commit history. The last section is a
-record of what was fixed, with commits, so the open items have their context.
+record of what was fixed, with commits, so the open items have their context. A fixed item leaves
+its number behind rather than renumbering the rest, so "bug 9" means the same thing everywhere.
 
 State as of 2026-09-13: agent-engine after the hold-the-bar engine work (repository
 `docs/plan-hold-the-bar.md` §4 B and E4), agent-workflows `0e7b02a`.
@@ -146,19 +147,6 @@ name. Not done: the names would have to come from `config.toml`, a profile, and 
 layers in, and a list that misses one is a fence that looks closed. The machine this was measured on
 has no Codex servers configured.
 
-### 10. A relative `cwd` fails a detached harness
-
-`file()` takes any non-empty `cwd`, and `ae start` resolves one before filing, so only an API caller
-journals a relative one. The detached runner launches its worker in that `cwd`, and the worker
-launches the harness in the same relative path again, now from inside it: measured with `sh` as the
-harness and `cwd: 'repo'`, the worker logged `spawn sh ENOENT` and the attempt failed. `claude --bg`
-starts in the right place, because `execFile` resolves the `cwd` from the ticking process — which
-need not be the one that filed the task. The MCP configs are named by absolute path (found in
-review); the `cwd` itself is not.
-
-**Fix.** `file()` resolves or refuses a relative `cwd`. Resolving is what `ae start` already does;
-refusing is the honest answer for an API whose filer and ticker may be different processes.
-
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
@@ -248,3 +236,4 @@ refusing is the honest answer for an API whose filer and ticker may be different
 | the tests were never typechecked, and a required `PromiseJournal.watch` that nothing called hid there | `test/` in the typecheck; the dead method gone | engine `9aaa38b` |
 | the README claimed `AE_RUNNER=sdk`, "refuse a tool call: no", 25 tests, a file table 2–3× off, and "three next things" already done (bug 5) | made true; `test/readme.test.ts` refuses each of those classes | engine `f947da4` |
 | a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |
+| a relative `cwd` filed through the API failed a detached harness: its worker was launched in `repo`, then launched the harness in `repo` again, from inside it (`spawn sh ENOENT`) | `file()` refuses a `cwd` that is not absolute, naming it resolved; the detached runner resolves the one it is handed, as `claude --bg` always has | engine `TBD-10` |

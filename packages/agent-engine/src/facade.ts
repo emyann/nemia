@@ -118,7 +118,7 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
    * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model,
-   * resumeFrom or effort; a `tools` that is not a list of names; an `mcp` whose entries are not
+   * resumeFrom or effort; a `cwd` that is not absolute; a `tools` that is not a list of names; an `mcp` whose entries are not
    * MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
    * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists).
    * A harness brought as a `PromiseRunner` is asked nothing.
@@ -207,6 +207,11 @@ const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always:
 const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
   if (typeof spec.brief !== 'string' || !spec.brief.trim()) return '`brief` is empty. Say what the session should do.';
   if (typeof spec.cwd !== 'string' || !spec.cwd) return '`cwd` is empty. Give the directory the session should work in.';
+  // Resolved against whichever process ticks the task, which need not be the one filing it — and a
+  // detached worker resolved it twice, from inside itself (`spawn sh ENOENT`, open issue 10).
+  if (!path.isAbsolute(spec.cwd)) {
+    return `\`cwd: ${spec.cwd}\` is not an absolute path, and the process that runs the task need not be the one filing it. Give the directory resolved — from here that is ${path.resolve(spec.cwd)}.`;
+  }
   if (!Object.hasOwn(harnesses, spec.harness)) {
     return `\`harness: ${spec.harness}\` is not a harness this engine has. Its harnesses are: ${Object.keys(harnesses).join(', ')}.`;
   }

@@ -129,9 +129,13 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
   };
 
   return {
-    spawn: (r) =>
+    spawn: (asked) =>
       Effect.try({
         try: () => {
+          // Resolved here, from the process that launches, as `claude --bg`'s cwd is. Relative, the
+          // worker started in it and then launched the harness in the same path again, from inside
+          // it: `spawn sh ENOENT` for `cwd: 'repo'`. `file()` refuses one; this is the Effect door.
+          const r = { ...asked, cwd: path.resolve(asked.cwd) };
           // Checked here because `spawn` does not throw for it: the child emits the error later, and
           // unheard, that event kills the process that launched the worker — the engine.
           if (!isDirectory(r.cwd)) throw new Error(`cwd ${r.cwd} is not a directory`);

@@ -212,7 +212,9 @@ is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks:
 a harness the engine does not have (it used to run on the fallback, silently), counts and seconds
-it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `tools` that
+it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
+not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
+once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
 is not a list of names, an `mcp` that is not a map of `.mcp.json` servers (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —

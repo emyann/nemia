@@ -12,7 +12,7 @@
  * the run, and is the only state this file writes down rather than derives.
  */
 import path from 'node:path';
-import { checkContract, verdictWord, type Verdict } from './check.ts';
+import { checkContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
 import { depsLines, type Provisioned } from './deps.ts';
 import { CLOSEOUT_FIELDS, outputFields, terminalSteps, type Workflow } from './workflow.ts';
 
@@ -56,8 +56,12 @@ export type Run = {
    *
    * `taskId` is the step's OWN task, always — `apps/api` reads it. The run's check of the step's work
    * is a task of its own, under `check`, filed once the step has signed off and been handed off.
+   *
+   * Both are the CURRENT try's. A step tried again (`retries:`, `wf retry`) keeps the tries it replaced
+   * beside them, under `tries`, in order — so everything that reads `taskId` and `check` reads the try
+   * that decides the step, as it did before there were tries.
    */
-  steps: Record<string, { taskId: string | null; workspace?: string; branch?: string; check?: { taskId: string } }>;
+  steps: Record<string, StepRecord>;
   createdAt: string;
 };
 
@@ -93,6 +97,8 @@ export type Assessment = {
   ready: string[];
   /** Steps that signed off with a `check:` nobody has filed yet. File their checks. */
   check: string[];
+  /** Steps to try again, and how: a check `retries:` still covers, or a person's `wf retry`. File these. */
+  retry: Retry[];
   /** Steps that can never run, because something they wait on is final without satisfying them. */
   blocked: string[];
   status: 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -116,14 +122,24 @@ export function assess(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   /** Whether a task was asked for a closeout: the schema on the engine's record of its filing. */
   askedCloseout: (taskId: string) => boolean = () => false,
+  /**
+   * What each step's current check exited with. Read only for a check that did not pass — see `refusedCheck`.
+   * Left out, no check is taken to have refused, so no try of `retries:` is due.
+   */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  /** What people asked for with `wf retry`, and the run has not consumed yet. */
+  asks: readonly RetryAsk[] = [],
 ): Assessment {
   // A cancelled run outranks anything its tasks say. Nothing more is filed for it however
   // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
   // a tick after a cancel must not helpfully start the next step of a run somebody just stopped.
-  // Nor its checks: a suite nobody will read the verdict of is a suite nobody asked for.
-  if (run.cancelledAt) return { ready: [], check: [], blocked: [], status: 'cancelled' };
+  // Nor its checks: a suite nobody will read the verdict of is a suite nobody asked for. Nor a try.
+  if (run.cancelledAt) return { ready: [], check: [], retry: [], blocked: [], status: 'cancelled' };
 
   const status = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout)]));
+  // A step about to be tried again is not final: what waits on it waits, and the run is still going.
+  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks);
+  for (const r of retry) status.set(r.step, 'running');
   const ready: string[] = [];
   const check: string[] = [];
   const blocked: string[] = [];
@@ -147,7 +163,7 @@ export function assess(
     : blocked.length || all.some(stopsFollowers) ? 'failed'
     : 'running';
 
-  return { ready, check, blocked, status: overall };
+  return { ready, check, retry, blocked, status: overall };
 }
 
 /**
@@ -201,8 +217,16 @@ export function stepStatus(
  * The id of a step's check task. Derived, never generated: a pass that files the check and dies
  * before writing the run down finds it under this id on the next pass, and adopts it rather than
  * filing a second — the engine's own rule for a session, one layer up.
+ *
+ * The current try's, unless another is named: `<run>-<step>-check` on the first try, as before there were
+ * tries, and `<run>-<step>-try<n>-check` on the n-th.
  */
-export const checkTaskId = (run: Run, step: string): string => `${run.id}-${step}-check`;
+export const checkTaskId = (run: Run, step: string, n = tryOf(run, step)): string =>
+  n <= 1 ? `${run.id}-${step}-check` : `${run.id}-${step}-try${n}-check`;
+
+/** The id of a step's own task on its n-th try: `<run>-<step>`, then `<run>-<step>-try<n>`. Derived, for the reason a check's is. */
+export const stepTaskId = (run: Pick<Run, 'id'>, step: string, n = 1): string =>
+  n <= 1 ? `${run.id}-${step}` : `${run.id}-${step}-try${n}`;
 
 /**
  * The steps whose leftovers the run commits on this pass. Pure.
@@ -239,6 +263,238 @@ function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
     }
   }
   return found;
+}
+
+// ─── trying again ───────────────────────────────────────────────────────────
+
+/**
+ * How a person asks for another try of a step, with `wf retry`.
+ *
+ *   nudge    the last try's session, continued and told what happened — what `retries:` files too
+ *   fresh    a new session on the same branch; on another model, when the ask names one
+ *   recheck  the step's check, run again on the work as it stands, and no session at all
+ */
+export type RetryMode = 'nudge' | 'fresh' | 'recheck';
+
+/**
+ * A try that is over, kept on the step's record behind the one that replaced it.
+ *
+ * `then` is what replaced it: `retries`, the run re-filing the step itself after its check refused — a
+ * nudge on the workflow's word — or the mode a person asked for, with the model a `--model` named. A
+ * recheck replaces only the check, so the try after one has the same `taskId`.
+ */
+export type EarlierTry = { taskId: string; check?: { taskId: string }; then: 'retries' | RetryMode; model?: string };
+
+/** One step on the run's record: its current try's task and check, where it works, and the tries before (`Run.steps`). */
+export type StepRecord = { taskId: string | null; workspace?: string; branch?: string; check?: { taskId: string }; tries?: EarlierTry[] };
+
+/** A person's `wf retry`, as its ask file says it: the step, the try it asks for, how, and when. */
+export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: string; at: string };
+
+/** A try to file on this pass: of which step, its number, how, and on whose word. */
+export type Retry = { step: string; try: number; mode: RetryMode; model?: string; by: 'retries' | 'ask' };
+
+/** The try a step is on: the first, and one more for each try its record keeps behind it. */
+export const tryOf = (run: Run, step: string): number => (run.steps[step]?.tries?.length ?? 0) + 1;
+
+/** The tries `retries:` has filed for a step. A person's do not count: `retries` is what the run may spend on its own word. */
+export const retriesSpent = (record: StepRecord | undefined): number => record?.tries?.filter((t) => t.then === 'retries').length ?? 0;
+
+/** How a try was asked for, as a person typed it: `--nudge`, `--fresh`, `--model <m>`, `--recheck`. */
+export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);
+
+/**
+ * Whether a check that did not pass REFUSED the work, rather than not finishing.
+ *
+ * Refused: it ran to its end and exited non-zero — settled `failed`, with an exit code. Did not finish:
+ * `stopped` — killed, or never started — or `failed` without an exit code, which is a check stopped at its
+ * deadline or lost. That is no verdict on the work: `retries:` spends no try on it, and `wf decide` offers
+ * `wf retry --recheck`. Measured, on 2026-09-13: three checks were killed by the harness for "low memory" with
+ * 16 GB free, and the work was fine each time.
+ *
+ * Only a number is a refusal. A verdict nobody read (`undefined`) is no evidence of one, and is read as `listing`
+ * already words it: `unfinished`. Read the other way, a caller that passed none — the api's `assess`, as first
+ * shipped — called a check stopped at its deadline refused, and a run the tick had left waiting on a person read
+ * running, with a try due that the tick would never file.
+ */
+export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): boolean => phase === 'failed' && typeof verdict === 'number';
+
+/**
+ * What a person may ask for a step, and the status that says why. Pure.
+ *
+ * Only a try that is over and let nothing that waits on it run: its check did not pass, it ended without its
+ * closeout, it signed off blocked, or its session failed or was stopped. `recheck` only where a check did not
+ * pass, since nothing else has a check to run again. A step that signed off blocked only once its session
+ * has settled: a session can outlive its closeout, and a try resuming one still running would be two agents
+ * in one conversation.
+ */
+export function retryable(
+  step: Workflow,
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  askedCloseout: (taskId: string) => boolean = () => false,
+): { status: StepStatus; modes: RetryMode[] } {
+  const status = stepStatus(step, run, phaseOf, closeoutOf, askedCloseout);
+  const taskId = run.steps[step.name]?.taskId;
+  const settled = taskId ? ['succeeded', 'failed', 'stopped'].includes(phaseOf(taskId)) : false;
+  const modes: RetryMode[] =
+    status === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
+    : status === 'unsigned' || status === 'failed' || status === 'stopped' || (status === 'blocked' && settled) ? ['nudge', 'fresh']
+    : [];
+  return { status, modes };
+}
+
+/**
+ * The tries due now. Pure, and blind to cancellation on purpose: `assess` answers for a cancelled run, and
+ * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
+ *
+ * A person's ask for a step's next try, when the step may be tried again that way. Otherwise a check that
+ * REFUSED (`refusedCheck`), while `retries:` has tries left: the step re-filed as a nudge. Past them, or for a
+ * check that did not finish, nothing is due — the step waits on the person, as it always has.
+ *
+ * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
+ * spent (`spentAsks`) and files nothing, whichever pass reads it.
+ */
+export function retriesDue(
+  steps: readonly Workflow[],
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  askedCloseout: (taskId: string) => boolean = () => false,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  asks: readonly RetryAsk[] = [],
+): Retry[] {
+  const due: Retry[] = [];
+  for (const step of steps) {
+    const record = run.steps[step.name];
+    const { status, modes } = retryable(step, run, phaseOf, closeoutOf, askedCloseout);
+    if (!record?.taskId || !modes.length) continue;
+    const next = tryOf(run, step.name) + 1;
+    const ask = asks.find((a) => a.step === step.name && a.try === next && modes.includes(a.mode));
+    if (ask) {
+      due.push({ step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), by: 'ask' });
+    } else if (status === 'failed (check)' && record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name))
+      && retriesSpent(record) < (step.retries ?? 0)) {
+      due.push({ step: step.name, try: next, mode: 'nudge', by: 'retries' });
+    }
+  }
+  return due;
+}
+
+/**
+ * A step's record once a try is filed: the current try moved behind, with what replaced it, and the new one in
+ * its place — the re-filed step's task, or for a recheck the same task, with its check still to file. Pure.
+ */
+export function nextTry(record: StepRecord, retry: Retry, taskId?: string): StepRecord {
+  const { check, tries = [], ...rest } = record;
+  const over: EarlierTry = {
+    taskId: record.taskId!,
+    ...(check ? { check } : {}),
+    then: retry.by === 'retries' ? 'retries' : retry.mode,
+    ...(retry.model ? { model: retry.model } : {}),
+  };
+  return { ...rest, taskId: retry.mode === 'recheck' ? record.taskId : taskId!, tries: [...tries, over] };
+}
+
+/** The asks a record already answers — each names a try its step has reached. The tick consumes these. */
+export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => asks.filter((a) => a.try <= tryOf(run, a.step));
+
+/**
+ * Why `wf retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
+ *
+ * Refused: a step the run does not have; a cancelled run, which files nothing, so the ask would never be
+ * honoured; an ask for the same try already waiting; a step whose last try is not over, or that let what
+ * waits on it run (`retryable`); `--recheck` where no check failed; and a step the run is about to try again
+ * itself, because `retries:` still covers its refusal — that step is not waiting on a person.
+ */
+export function retryRefusal(
+  steps: readonly Workflow[],
+  run: Run,
+  name: string,
+  how: { mode: RetryMode; model?: string },
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  askedCloseout: (taskId: string) => boolean = () => false,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  asks: readonly RetryAsk[] = [],
+): string | null {
+  const step = steps.find((s) => s.name === name);
+  if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
+  if (run.cancelledAt) {
+    return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.`;
+  }
+  const next = tryOf(run, name) + 1;
+  const pending = asks.find((a) => a.step === name && a.try === next);
+  if (pending) {
+    return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
+  }
+  const { status, modes } = retryable(step, run, phaseOf, closeoutOf, askedCloseout);
+  if (!modes.length) {
+    const why: Partial<Record<StepStatus, string>> = {
+      waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: wf ls ${run.id}.`,
+      running: `${name} is still running, so there is nothing to try again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`,
+      checking: `${name}'s check is still due or running, so there is no verdict to act on yet. Wait for it: wf ls ${run.id}.`,
+      verified: `${name} is verified: its check passed, and there is nothing to try again.`,
+      unverified: `${name} signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.`,
+      blocked: `${name} signed off blocked and its session has not ended, so a new try would run beside it. Wait for it to settle: wf ls ${run.id}.`,
+    };
+    return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
+  }
+  if (!modes.includes(how.mode)) {
+    return `--recheck runs a step's check again, and ${name} is ${status}: no check of it failed. Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`;
+  }
+  if (retriesDue([step], run, phaseOf, closeoutOf, askedCloseout, verdictOf).length) {
+    const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);
+    return `the run tries ${name} again itself: its check refused, and \`retries: ${step.retries}\` has ${left} left, so the next tick files try ${next}. Wait for it: wf ls ${run.id}.`;
+  }
+  return null;
+}
+
+/** How a step's record reached the try it is on, for `wf ls` and `wf decide`: `try 2, by retries: 2`. Empty on a first try. */
+export function tryNote(step: Workflow, record: StepRecord | undefined): string {
+  const last = record?.tries?.at(-1);
+  if (!last) return '';
+  const how = last.then === 'retries' ? `by retries: ${step.retries ?? 0}`
+    : last.then === 'recheck' ? 'rechecked on your word'
+    : last.then === 'fresh' ? `fresh${last.model ? ` on ${last.model}` : ''}, on your word`
+    : 'nudged on your word';
+  return `try ${record!.tries!.length + 1}, ${how}`;
+}
+
+/** A try due now, as `wf ls` and `wf decide` say it. */
+export const dueNote = (step: Workflow, run: Run, r: Retry): string => (r.by === 'ask'
+  ? `try ${r.try} asked (${modeWord(r)}) — the next tick files it`
+  : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`);
+
+/**
+ * What `wf decide` offers for each step a person may try again: the command, and what it does. Pure.
+ *
+ * A check that did not finish is said so, with `--recheck` first: the run spent no retry on it, and the work
+ * may pass as it stands. For anything else, `wf retry` continues the step's session, told what happened.
+ */
+export function retryLines(
+  steps: readonly Workflow[],
+  run: Run,
+  d: Decision,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  askedCloseout: (taskId: string) => boolean = () => false,
+): string[] {
+  if (d.kind !== 'awaiting') return [];
+  const lines: string[] = [];
+  for (const step of steps) {
+    const { status, modes } = retryable(step, run, phaseOf, closeoutOf, askedCloseout);
+    if (!modes.length) continue;
+    const command = `wf retry ${run.id} ${step.name}`;
+    const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
+    if (d.unfinishedCheck.includes(step.name)) {
+      lines.push(`${step.name}: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  ${command} --recheck`);
+    } else {
+      lines.push(`${step.name}: ${status}. Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
+    }
+  }
+  return lines;
 }
 
 // ─── calling one off ────────────────────────────────────────────────────────
@@ -296,6 +552,8 @@ export function cancelPlan(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => boolean = () => false,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  asks: readonly RetryAsk[] = [],
 ): CancelPlan {
   // Whatever is in flight is stopped whatever the rest of the run looks like. A fan-out can have
   // one sibling still working while another has already failed the run as a whole, and that
@@ -304,10 +562,10 @@ export function cancelPlan(
   if (run.cancelledAt) return { kind: 'already-cancelled', at: run.cancelledAt, stop };
   if (stop.length) return { kind: 'cancel', stop };
 
-  // Nothing in flight, so the question is only whether a tick would still file something — a step or
-  // a check. `ready` and `check` are the honest test for that; `status` alone is not.
-  const { ready, check, status } = assess(steps, run, phaseOf, closeoutOf, askedCloseout);
-  if (!ready.length && !check.length && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
+  // Nothing in flight, so the question is only whether a tick would still file something — a step, a
+  // check, or a try. `ready`, `check` and `retry` are the honest test for that; `status` alone is not.
+  const { ready, check, retry, status } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks);
+  if (!ready.length && !check.length && !retry.length && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
   return { kind: 'cancel', stop: [] };
 }
 
@@ -606,8 +864,10 @@ export type Decision =
       failed: string[];
       /** Steps that signed off blocked. */
       stuck: string[];
-      /** Steps whose check did not exit 0. */
+      /** Steps whose check refused them: it ran to its end, and did not exit 0. */
       failedCheck: string[];
+      /** Steps whose check did not finish — stopped, or killed before it exited (`refusedCheck`). No verdict on the work. */
+      unfinishedCheck: string[];
       /** Steps that ended without the closeout they were asked for. */
       unsigned: string[];
       /** Steps that declared no check: done on their own word. */
@@ -623,10 +883,13 @@ export function decision(
   shipped: (branch: string) => boolean,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => boolean = () => false,
+  /** What each step's current check exited with: a refusal and a check that did not finish are told apart. */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  asks: readonly RetryAsk[] = [],
 ): Decision {
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
-  const { status, ready } = assess(steps, run, phaseOf, closeoutOf, askedCloseout);
+  const { status, ready, retry } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks);
   const statusOf = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout)]));
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
@@ -635,7 +898,8 @@ export function decision(
       .filter((s) => statusOf.get(s.name) === 'checking'
         || (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name]!.taskId!))))
       .map((s) => s.name);
-    return { kind: 'running', waiting: [...live, ...ready].sort() };
+    // A step the next tick tries again is waited on too: nothing is decided about it yet.
+    return { kind: 'running', waiting: [...live, ...ready, ...retry.map((r) => r.step)].sort() };
   }
 
   const branches = terminalSteps(steps)
@@ -657,22 +921,30 @@ export function decision(
   const named = (...want: StepStatus[]) => steps.filter((s) => want.includes(statusOf.get(s.name)!)).map((s) => s.name).sort();
   const stuck = named('blocked');
   const failed = named('failed', 'stopped');
-  const failedCheck = named('failed (check)');
+  // A check that refused and one that never finished are both `failed (check)`, and both stop what follows. They
+  // ask different things of a person: read what the suite said, or run it again.
+  const checkFailed = named('failed (check)');
+  const unfinishedCheck = checkFailed.filter((name) => !refusedCheck(phaseOf(run.steps[name]!.check!.taskId), verdictOf(name)));
+  const failedCheck = checkFailed.filter((name) => !unfinishedCheck.includes(name));
   const unsigned = named('unsigned');
   const unverified = named('unverified');
   return {
     kind: 'awaiting',
-    outcome: failed.length || failedCheck.length ? 'failed' : stuck.length || unsigned.length ? 'blocked' : 'succeeded',
-    branches, failed, stuck, failedCheck, unsigned, unverified, direct,
+    outcome: failed.length || checkFailed.length ? 'failed' : stuck.length || unsigned.length ? 'blocked' : 'succeeded',
+    branches, failed, stuck, failedCheck, unfinishedCheck, unsigned, unverified, direct,
   };
 }
 
 // ─── what `wf ls` says ──────────────────────────────────────────────────────
 
 export type Listing = {
-  /** One line per step: its name, what to say about it, and the branch it is on. */
-  steps: Array<{ name: string; status: string; branch: string | null }>;
-  /** Steps a person has to act on — blocked, unsigned, or refused by their check — on a run nobody has called off. */
+  /**
+   * One line per step: its name, what to say about it, and the branch it is on — and, only for a step tried
+   * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
+   * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on.
+   */
+  steps: Array<{ name: string; status: string; branch: string | null; note?: string }>;
+  /** Steps a person has to act on — blocked, unsigned, or refused by their check, with no try due — on a run nobody has called off. */
   waitingOnYou: string[];
 };
 
@@ -702,6 +974,8 @@ export function listing(
   askedCloseout: (taskId: string) => boolean = () => false,
   /** What a refused check exited with, as its log tells it. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  /** What people asked for with `wf retry`, and the run has not consumed yet. */
+  asks: readonly RetryAsk[] = [],
 ): Listing {
   // The engine's word for a settled task IS its outcome; any other word is a task still going.
   const settledOf = (taskId: string): TaskPhase => {
@@ -712,16 +986,25 @@ export function listing(
     const c = closeoutOf(name);
     return c && !('error' in c) ? c : undefined;
   };
+  // A step the next tick tries again is waiting on the run, not on you — you asked, or its `retries:` did.
+  const due = run.cancelledAt ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks);
 
   const waitingOnYou: string[] = [];
   const rows = steps.map((step) => {
+    const row = lineOf(step);
+    const retry = due.find((r) => r.step === step.name);
+    const note = retry ? dueNote(step, run, retry) : tryNote(step, run.steps[step.name]);
+    return note ? { ...row, note } : row;
+  });
+
+  function lineOf(step: Workflow): Listing['steps'][number] {
     const { name } = step;
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
     if (!taskId) return { name, status: 'waiting', branch };
 
     const status = stepStatus(step, run, settledOf, readable, askedCloseout);
-    if (status === 'blocked' || status === 'unsigned' || status === 'failed (check)') waitingOnYou.push(name);
+    if ((status === 'blocked' || status === 'unsigned' || status === 'failed (check)') && !due.some((r) => r.step === name)) waitingOnYou.push(name);
     // The run's own verdict, where it has one, and nothing beside it.
     if (status === 'verified') return { name, status: 'verified ✓', branch };
     if (status === 'checking') return { name, status: 'checking', branch };
@@ -733,7 +1016,7 @@ export function listing(
     const said = !c ? '' : 'error' in c ? ' · closeout unreadable' : ` · ${c.outcome === 'blocked' ? 'BLOCKED' : 'done'}`;
     const word = status === 'unsigned' || status === 'unverified' ? status : phaseOf(taskId);
     return { name, status: `${word}${said}`, branch };
-  });
+  }
 
   // A run somebody called off is waiting on nobody — `wf decide` says there is nothing to decide —
   // though each step still signed off the way it did, and its line still says so.
@@ -768,6 +1051,8 @@ export function composeBrief(
   artifactsDir?: string,
   /** What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in runner.ts). */
   deps?: Provisioned,
+  /** For a step tried again: the try, and what became of the one before it (`retrySection`). */
+  retry?: RetryBriefing,
 ): string {
   // What finishing means, on every brief: the command this step will be judged by, when it has one,
   // where its files for the steps after it go, and then the closeout — last, because it says to give it
@@ -777,15 +1062,19 @@ export function composeBrief(
     ...(artifactsDir ? [artifactsContract(artifactsDir)] : []),
     closeoutContract(step),
   ].join('\n');
+  const again = retry ? retrySection(step, retry) : '';
+  // A try that continues the last one's session has everything but what became of it.
+  if (retry?.resumed) return again.slice(1) + contracts;
   // What this step reads of the steps it waits on — their declared output, and only if it asked.
-  const given = (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n');
+  const given = (step.input ?? []).map((from) => fromSection(from, steps, closeoutOf)).join('\n') + again;
   // Said only when the run did more than link its dependencies: a minute of `npm ci`, or a failure.
   const tree = depsLines(deps);
 
   // A step that CONTINUES another already has the context — its own. Repeating the spec back and
   // pointing it at the workspace would be telling someone what they spent an hour doing. What it reads
-  // is new to it all the same, and so is a tree the run installed.
-  if (step.resume) return step.body + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts;
+  // is new to it all the same, and so is a tree the run installed. A new session for a step tried again
+  // continues nothing, and is told what any step starting cold is.
+  if (step.resume && !retry) return step.body + (tree.length ? ['', '## Where to look', '', ...tree].join('\n') : '') + given + contracts;
 
   const earlier = step.after.length
     ? step.after
@@ -826,6 +1115,46 @@ export function composeBrief(
   if (given) parts.push(given);
   parts.push(contracts);
   return parts.join('\n');
+}
+
+/** What a step tried again is told of the try before it: see `retrySection`. */
+export type RetryBriefing = {
+  try: number;
+  by: Retry['by'];
+  mode: RetryMode;
+  model?: string;
+  /** Whether this try continues the last one's session. A nudge whose last try left no session to continue starts a new one. */
+  resumed: boolean;
+  /** Where the last try stood: why it is being tried again. */
+  status: StepStatus;
+  /** What the last try's check said, when it did not pass. */
+  refusal?: CheckRefusal;
+};
+
+/**
+ * `## Try <n>`: why the step is being tried again, and on whose word — then, for a check that did not pass,
+ * what the check said, as data (`refusalSection`).
+ *
+ * A try that continues its session is told only this, since it has the rest. A new session is told it is new
+ * and that the work on the branch is an earlier session's — and, like any step after another, is not given
+ * that session's reasoning. What the check printed travels: it is evidence the run gathered, not an account.
+ */
+export function retrySection(step: Workflow, r: RetryBriefing): string {
+  const why: Partial<Record<StepStatus, string>> = {
+    'failed (check)': "After the last try signed off, the run executed this step's check, and it did not pass.",
+    unsigned: 'The last try ended without the closeout the run asked for, or without a field its `output:` declares, so nothing that waits on this step started.',
+    blocked: 'The last try signed off `blocked`. What it needed may have been settled since.',
+    failed: "The last try's session ended `failed` before it signed off.",
+    stopped: "The last try's session was stopped before it signed off.",
+  };
+  const who = r.by === 'retries'
+    ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
+    : `A person asked for this try: \`wf retry ${modeWord(r)}\`.`;
+  const where = r.resumed
+    ? "This is the last try's session, continued. Finish the work, then sign off again."
+    : 'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n'
+      + 'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
+  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, who, '', where, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
 }
 
 /**

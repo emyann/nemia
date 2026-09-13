@@ -17,7 +17,7 @@ export type RunSummary = {
   status: RunStatus;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
-   * and not settled — or a step or a check a tick would still file. `status` does not say: `assess` reads a
+   * and not settled — or a step, a check or a try of `retries:` a tick would still file. `status` does not say: `assess` reads a
    * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
    */
   moving: boolean;
@@ -278,9 +278,12 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const asked = askedOf(views);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdictOf(run, views));
+  const verdicts = verdictOf(run, views);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts);
   const phase = phaseOf(views);
-  const { status, ready, check } = assess(steps, run, phase, closeoutReader(views, run), asked);
+  // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
+  // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
+  const { status, ready, check, retry } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts);
   // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
   // for it, whatever its bare steps would make ready: the tick fails on it.
   const tickReads = Boolean(run.workflow ?? folder);
@@ -290,7 +293,7 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
     status,
     // The line `cancelPlan` draws for a finished run, which `status` does not: nothing in flight, and nothing a
     // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
-    moving: inFlight(run, phase).length > 0 || (tickReads && (ready.length > 0 || check.length > 0)),
+    moving: inFlight(run, phase).length > 0 || (tickReads && (ready.length > 0 || check.length > 0 || retry.length > 0)),
   };
 }
 

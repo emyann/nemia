@@ -596,6 +596,32 @@ test('a run moves while the engine holds a task of it, or a tick would still fil
   }
 });
 
+test('a check that refused with `retries:` left reads as the tick has it — running, moving, waiting on nobody — and one that did not finish, failed and waiting on you', async () => {
+  const gone = path.join(os.tmpdir(), 'hkb-api-no-such-workflow');
+  const retried = [{ name: 'a', after: [], body: 'A.', check: 'npm test', retries: 1 }, { name: 'b', after: ['a'], body: 'B.' }];
+  // Refused: the check ran to its end and exited 1, and `retries: 1` leaves a try for the next tick to file.
+  settledTask('t-27-a', done);
+  checkTask('r-27-a-check', { settled: 'failed', exitCode: 1 });
+  detachedSession('check', 'r-27-a-check', 1, refusedOutput, 1);
+  writeRun({ ...r2, id: 'r-27', workflowDir: gone, workflow: retried, steps: { a: { taskId: 't-27-a', check: { taskId: 'r-27-a-check' } }, b: { taskId: null } } });
+  // F's review: stopped at its deadline, which the engine settles `failed` with no exit code. No try is spent on it.
+  settledTask('t-28-a', done);
+  checkTask('r-28-a-check', { settled: 'failed' });
+  writeRun({ ...r2, id: 'r-28', workflowDir: gone, workflow: retried, steps: { a: { taskId: 't-28-a', check: { taskId: 'r-28-a-check' } }, b: { taskId: null } } });
+
+  const e = engine();
+  const cases: Array<[id: string, status: string, moving: boolean, waitingOnYou: string[], word: string, why: string]> = [
+    ['r-27', 'running', true, [], 'failed ✗ check (exit 1)', 'refused, with a try left: the next tick files it'],
+    ['r-28', 'failed', false, ['a'], 'failed ✗ check (unfinished)', 'did not finish: it waits on a person, and no tick files a thing'],
+  ];
+  for (const [id, status, moving, waitingOnYou, word, why] of cases) {
+    assert.deepEqual((await list(e, readRun(id))).waitingOnYou, waitingOnYou, `${id}, wf ls: ${why}`);
+    for (const [where, run] of [['list', await listed(id)], ['detail', await (await app.request(`/api/runs/${id}`)).json()]] as const) {
+      assert.deepEqual([run.status, run.moving, run.waitingOnYou, run.steps[0].status], [status, moving, waitingOnYou, word], `${id}, ${where}: ${why}`);
+    }
+  }
+});
+
 test("a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines", async () => {
   const run = await (await app.request('/api/runs/r-20')).json();
   const checkOf = (name: string) => run.steps.find((s: Said) => s.name === name).check;

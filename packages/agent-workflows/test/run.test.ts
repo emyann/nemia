@@ -4,7 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, outputLines, parseCloseout, stepStatus, workspacePlan, type Closeout, type Run, type TaskPhase } from '../src/run.ts';
+import { artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, nextTry, outputLines, parseCloseout, refusedCheck, retryLines, retryRefusal, spentAsks, stepStatus, stepTaskId, tryNote, workspacePlan, type Closeout, type EarlierTry, type RetryAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -598,12 +599,16 @@ test('`wf decide` names every step that did not earn a follower, each in its own
     },
   });
   const p = phases({ t1: 'succeeded', c1: 'failed', t2: 'succeeded', t3: 'succeeded', t4: 'failed' });
-  const d = decision(four, r, p, nothingShipped, (name) => (name === 'c' ? undefined : signedDone()), asked);
+  // `a`'s check exited 1: it refused.
+  const d = decision(four, r, p, nothingShipped, (name) => (name === 'c' ? undefined : signedDone()), asked, (name) => (name === 'a' ? 1 : undefined));
   assert.equal(d.kind, 'awaiting');
   if (d.kind !== 'awaiting') return;
-  assert.deepEqual({ failedCheck: d.failedCheck, unverified: d.unverified, unsigned: d.unsigned, failed: d.failed },
-    { failedCheck: ['a'], unverified: ['b'], unsigned: ['c'], failed: ['d'] });
+  assert.deepEqual({ failedCheck: d.failedCheck, unfinishedCheck: d.unfinishedCheck, unverified: d.unverified, unsigned: d.unsigned, failed: d.failed },
+    { failedCheck: ['a'], unfinishedCheck: [], unverified: ['b'], unsigned: ['c'], failed: ['d'] });
   assert.equal(d.outcome, 'failed');
+  // With no exit code to read, the same check did not finish — and the run is failed all the same.
+  const unread = decision(four, r, p, nothingShipped, (name) => (name === 'c' ? undefined : signedDone()), asked);
+  assert.deepEqual(unread.kind === 'awaiting' && [unread.failedCheck, unread.unfinishedCheck, unread.outcome], [[], ['a'], 'failed']);
 });
 
 test('a run whose check is still running has nothing to decide yet, and names the step', () => {
@@ -658,6 +663,187 @@ test('`wf ls` says what the run established, not only what the engine settled', 
 test('a check stopped before it printed its exit code reads unfinished, never a number', () => {
   const l = listing(CHECKED, withCheck('c1'), shown({ t1: 'succeeded', c1: 'failed' }), signedOff({ implement: said('done') }), asked);
   assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'waiting']);
+});
+
+// ─── trying again ───────────────────────────────────────────────────────────
+
+/** `implement` checked, with `retries: 2`; `review` waits on it. */
+const RETRIED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2 }, step('review', ['implement'])];
+/** `implement` on the try after `tries`: its task `t1`, its check `check`. `review` not filed. */
+const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Partial<Run> = {}) => run({}, {
+  steps: { implement: { taskId: 't1', ...(check ? { check: { taskId: check } } : {}), ...(tries.length ? { tries } : {}) }, review: { taskId: null } },
+  ...extra,
+});
+/** A person's ask for implement's try `n`. */
+const askFor = (n: number, mode: RetryMode = 'nudge', model?: string): RetryAsk =>
+  ({ step: 'implement', try: n, mode, ...(model ? { model } : {}), at: '2026-09-13T10:00:00.000Z' });
+/** Two tries `retries: 2` filed. */
+const SPENT: EarlierTry[] = [{ taskId: 't-a', check: { taskId: 'c-a' }, then: 'retries' }, { taskId: 't-b', check: { taskId: 'c-b' }, then: 'retries' }];
+/** The JSON a brief carries in a fenced block, however long its fence. */
+const dataIn = (brief: string) => JSON.parse(/\n(`{3,})json\n([\s\S]*?)\n\1/.exec(brief)![2]!);
+
+test("a try's ids are derived from its number, and the first try's are the ids a run had before tries", () => {
+  const first = onTry();
+  assert.deepEqual([stepTaskId(first, 'implement'), checkTaskId(first, 'implement')], ['r-1-implement', 'r-1-implement-check']);
+  const second = onTry([{ taskId: 't1', check: { taskId: 'c0' }, then: 'retries' }]);
+  assert.equal(stepTaskId(second, 'implement', 2), 'r-1-implement-try2');
+  assert.equal(checkTaskId(second, 'implement'), 'r-1-implement-try2-check', "the current try's check, unless another is named");
+  assert.equal(checkTaskId(second, 'implement', 1), 'r-1-implement-check');
+});
+
+test('a check that refused, with `retries:` left, is due another try — a nudge on the run\'s word — and the run is still going, waiting on nobody', () => {
+  const p = phases({ t1: 'succeeded', c1: 'failed' });
+  const a = assess(RETRIED, onTry(), p, signedDone, asked, () => 1);
+  assert.deepEqual(a.retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'retries' }]);
+  assert.deepEqual([a.ready, a.blocked, a.status], [[], [], 'running'], 'what waits on it waits; nothing is final yet');
+
+  const l = listing(RETRIED, onTry(), shown({ t1: 'succeeded', c1: 'failed' }), signedOff({ implement: said('done') }), asked, () => 1);
+  assert.deepEqual(l.steps[0], { name: 'implement', status: 'failed ✗ check (exit 1)', branch: null, note: 'try 2 due — retries: 2, 0 spent' });
+  assert.deepEqual(l.waitingOnYou, [], 'the run is about to try it, so it is not waiting on you');
+  assert.deepEqual(decision(RETRIED, onTry(), p, nothingShipped, signedDone, asked, () => 1), { kind: 'running', waiting: ['implement'] });
+  assert.deepEqual(cancelPlan(RETRIED, onTry(), p, signedDone, asked, () => 1), { kind: 'cancel', stop: [] }, 'a tick would still file something');
+});
+
+test('REFUSED past `retries:`: no try is due, and the step waits on you as it did before retries', () => {
+  const p = phases({ t1: 'succeeded', c1: 'failed' });
+  const a = assess(RETRIED, onTry(SPENT), p, signedDone, asked, () => 1);
+  assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
+  assert.deepEqual(listing(RETRIED, onTry(SPENT), shown({ t1: 'succeeded', c1: 'failed' }), signedOff({ implement: said('done') }), asked, () => 1).waitingOnYou, ['implement']);
+  assert.deepEqual(assess(CHECKED, withCheck('c1'), p, signedDone, asked, () => 1).retry, [], 'nor at all, with no `retries:`');
+  assert.deepEqual(cancelPlan(CHECKED, withCheck('c1'), p, signedDone, asked, () => 1), { kind: 'finished', status: 'failed' });
+  // A person's tries are theirs: they do not spend what the run may spend on its own.
+  const yours: EarlierTry[] = [{ ...SPENT[0]!, then: 'nudge' }, { ...SPENT[1]!, then: 'fresh' }];
+  assert.deepEqual(assess(RETRIED, onTry(yours), p, signedDone, asked, () => 1).retry.map((r) => [r.try, r.by]), [[4, 'retries']], 'on try 3, so try 4 is next');
+});
+
+test('a check that did not finish is no refusal: `retries:` spends nothing on it, and `wf decide` says so and offers --recheck', () => {
+  const cases: Array<[TaskPhase, Verdict | undefined, string]> = [
+    ['stopped', undefined, 'stopped: killed, or never started'],
+    ['stopped', 1, 'stopped, whatever it printed'],
+    ['failed', 'unfinished', 'failed with no exit code: stopped at its deadline, or lost'],
+  ];
+  for (const [phase, verdict, why] of cases) {
+    const p = phases({ t1: 'succeeded', c1: phase });
+    const a = assess(RETRIED, onTry(), p, signedDone, asked, () => verdict);
+    assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed'], why);
+    assert.deepEqual(listing(RETRIED, onTry(), shown({ t1: 'succeeded', c1: phase }), signedOff({ implement: said('done') }), asked, () => verdict).waitingOnYou, ['implement'], why);
+    const d = decision(RETRIED, onTry(), p, nothingShipped, signedDone, asked, () => verdict);
+    assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck, d.outcome], [[], ['implement'], 'failed'], why);
+    assert.deepEqual(retryLines(RETRIED, onTry(), d, p, signedDone, asked),
+      ['implement: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  wf retry r-1 implement --recheck'], why);
+  }
+  assert.equal(refusedCheck('failed', 1), true);
+  assert.equal(refusedCheck('failed', undefined), false, 'a verdict nobody read is no refusal');
+  // The review's case: a caller that gives no verdict — the api's `assess` once — for a check stopped at its
+  // deadline. It must read what the tick reads: failed, waiting on a person, and no try due.
+  const deadline = phases({ t1: 'succeeded', c1: 'failed' });
+  const unread = assess(RETRIED, onTry(), deadline, signedDone, asked);
+  assert.deepEqual([unread.retry, unread.blocked, unread.status], [[], ['review'], 'failed']);
+  assert.deepEqual(assess(RETRIED, onTry(), deadline, signedDone, asked, () => 'unfinished'), unread, 'the same as the tick, which reads no exit code');
+  assert.deepEqual(cancelPlan(RETRIED, onTry(), deadline, signedDone, asked), { kind: 'finished', status: 'failed' });
+  const told = decision(RETRIED, onTry(), deadline, nothingShipped, signedDone, asked);
+  assert.deepEqual(told.kind === 'awaiting' && [told.failedCheck, told.unfinishedCheck], [[], ['implement']]);
+  // A refusal with no tries left is offered the other way.
+  const d = decision(RETRIED, onTry(SPENT), phases({ t1: 'succeeded', c1: 'failed' }), nothingShipped, signedDone, asked, () => 1);
+  assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck], [['implement'], []]);
+  assert.match(retryLines(RETRIED, onTry(SPENT), d, phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked)[0]!, /^implement: failed \(check\)\. Continue its session.*wf retry r-1 implement .*retries: 2, 2 spent/);
+});
+
+test("a person's ask is due for the step's next try only, once: an ask for a try the record holds is spent and files nothing", () => {
+  const p = phases({ t1: 'succeeded', c1: 'stopped' });
+  assert.deepEqual(assess(RETRIED, onTry(), p, signedDone, asked, () => undefined, [askFor(2, 'recheck')]).retry,
+    [{ step: 'implement', try: 2, mode: 'recheck', by: 'ask' }]);
+  const l = listing(RETRIED, onTry(), shown({ t1: 'succeeded', c1: 'stopped' }), signedOff({ implement: said('done') }), asked, () => 'unfinished', [askFor(2, 'fresh', 'opus')]);
+  assert.deepEqual([l.steps[0]!.note, l.waitingOnYou], ['try 2 asked (--model opus) — the next tick files it', []]);
+
+  // Honoured: try 2 is on the record, its check running. The same ask is spent, and nothing is due for it.
+  const honoured = onTry([{ taskId: 't1', check: { taskId: 'c1' }, then: 'recheck' }], 'c2');
+  const q = phases({ t1: 'succeeded', c1: 'stopped', c2: 'running' });
+  assert.deepEqual(assess(RETRIED, honoured, q, signedDone, asked, () => undefined, [askFor(2, 'recheck')]).retry, []);
+  assert.deepEqual(spentAsks(honoured, [askFor(2, 'recheck'), askFor(3)]), [askFor(2, 'recheck')]);
+
+  // Not the next try; a way this step cannot be tried; a cancelled run: nothing is due.
+  assert.deepEqual(assess(RETRIED, onTry(), p, signedDone, asked, () => undefined, [askFor(3)]).retry, []);
+  assert.deepEqual(assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' }), signedDone, asked, () => undefined, [askFor(2, 'recheck')]).retry, [], 'no check to run again');
+  assert.deepEqual(assess(RETRIED, onTry([], 'c1', CANCELLED), phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked, () => 1, [askFor(2)]).retry, []);
+});
+
+test('a try moves behind the one that replaces it: the step keeps its workspace and branch, and a recheck keeps its task', () => {
+  const record: StepRecord = { taskId: 'r-1-implement', workspace: '/wt', branch: 'wf/r-1/implement', check: { taskId: 'r-1-implement-check' } };
+  assert.deepEqual(nextTry(record, { step: 'implement', try: 2, mode: 'nudge', by: 'retries' }, 'r-1-implement-try2'), {
+    taskId: 'r-1-implement-try2', workspace: '/wt', branch: 'wf/r-1/implement',
+    tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, then: 'retries' }],
+  });
+  const rechecked = nextTry(record, { step: 'implement', try: 2, mode: 'recheck', by: 'ask' });
+  assert.deepEqual(rechecked, {
+    taskId: 'r-1-implement', workspace: '/wt', branch: 'wf/r-1/implement',
+    tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, then: 'recheck' }],
+  });
+  const fresh = nextTry(rechecked, { step: 'implement', try: 3, mode: 'fresh', model: 'opus', by: 'ask' }, 'r-1-implement-try3');
+  assert.deepEqual(fresh.tries?.map((t) => [t.then, t.model]), [['recheck', undefined], ['fresh', 'opus']]);
+  assert.equal(record.tries, undefined, 'the record it was given is not written into');
+});
+
+test("the current try decides the step: try 2 verified files what waits on it, and the step's line says which try it is", () => {
+  const r = onTry([{ taskId: 't0', check: { taskId: 'c0' }, then: 'retries' }], 'c1');
+  assert.deepEqual(assess(RETRIED, r, phases({ t0: 'succeeded', c0: 'failed', t1: 'succeeded', c1: 'succeeded' }), signedDone, asked, () => 0).ready, ['review']);
+  const l = listing(RETRIED, r, shown({ t1: 'succeeded', c1: 'succeeded' }), signedOff({ implement: said('done') }), asked);
+  assert.deepEqual(l.steps[0], { name: 'implement', status: 'verified ✓', branch: null, note: 'try 2, by retries: 2' });
+  assert.equal(tryNote(RETRIED[0]!, { taskId: 't', tries: [{ taskId: 'a', then: 'fresh', model: 'opus' }] }), 'try 2, fresh on opus, on your word');
+  assert.deepEqual(listing(STEPS, finished(), SETTLED, signedOff({})).steps.map((s) => 'note' in s), [false, false], 'a first try has no note at all');
+});
+
+test('`wf retry` is refused, saying what to do instead: a step still running, a cancelled run, a try already asked for, a step the run tries again itself', () => {
+  const refusal = (r: Run, p: Record<string, TaskPhase>, how: { mode: RetryMode; model?: string } = { mode: 'nudge' }, asks: RetryAsk[] = [], name = 'implement', verdict: Verdict | undefined = 'unfinished') =>
+    retryRefusal(RETRIED, r, name, how, phases(p), signedDone, asked, () => verdict, asks);
+
+  assert.match(refusal(run({ implement: 't1', review: null }), { t1: 'running' })!, /^implement is still running.*wf ls r-1/);
+  assert.match(refusal(onTry([], 'c1', CANCELLED), { t1: 'succeeded', c1: 'stopped' })!, /^r-1 was cancelled at .*never be honoured/);
+  assert.match(refusal(onTry(), { t1: 'succeeded', c1: 'stopped' }, { mode: 'fresh' }, [askFor(2, 'recheck')])!, /^try 2 of implement is already asked for \(--recheck, at /);
+  assert.match(refusal(onTry(), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1)!, /^the run tries implement again itself.*`retries: 2` has 2 left, so the next tick files try 2/);
+  assert.match(refusal(onTry(), { t1: 'succeeded', c1: 'running' })!, /check is still due or running/);
+  assert.match(refusal(onTry(), { t1: 'succeeded', c1: 'succeeded' })!, /is verified/);
+  assert.match(refusal(run({ implement: 't1', review: null }), { t1: 'failed' }, { mode: 'recheck' })!, /^--recheck runs a step's check again, and implement is failed/);
+  assert.match(refusal(onTry(), { t1: 'succeeded', c1: 'stopped' }, { mode: 'nudge' }, [], 'deploy')!, /no step "deploy" — its steps are implement, review/);
+  const blocked = () => said('blocked');
+  assert.match(retryRefusal(RETRIED, run({ implement: 't1', review: null }), 'implement', { mode: 'nudge' }, phases({ t1: 'running' }), blocked, asked)!,
+    /signed off blocked and its session has not ended/);
+
+  // Waiting on you, it may be asked each way it can be tried.
+  for (const mode of ['nudge', 'fresh', 'recheck'] as const) assert.equal(refusal(onTry(), { t1: 'succeeded', c1: 'stopped' }, { mode }), null, mode);
+  assert.equal(refusal(onTry(SPENT), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1), null, 'a refusal past retries');
+  assert.equal(refusal(run({ implement: 't1', review: null }), { t1: 'stopped' }), null, 'a session the harness stopped');
+  assert.equal(retryRefusal(RETRIED, run({ implement: 't1', review: null }), 'implement', { mode: 'fresh' }, phases({ t1: 'succeeded' }), blocked, asked), null, 'blocked, and settled');
+});
+
+test('a step tried again is told what became of the last try: continued, that and no more; a new session, the whole brief — and what the check said, as data', () => {
+  const implement: Workflow = { ...step('implement'), check: 'npm test && npm run typecheck', retries: 1 };
+  const refusal = { command: 'npm test && npm run typecheck', verdict: 1 as Verdict, stdout: 'not ok 3 - parses a trailing comma', stderr: 'npm error Test failed.' };
+
+  const nudged = composeBrief(implement, run({ implement: 't1' }), [implement], undefined, '/wf/runs/r-1/artifacts/implement', undefined,
+    { try: 2, by: 'retries', mode: 'nudge', resumed: true, status: 'failed (check)', refusal });
+  assert.match(nudged, /^## Try 2\n/);
+  assert.doesNotMatch(nudged, /do implement|## What was asked for/, 'the session already has its prose and the spec');
+  assert.match(nudged, /`retries: 1`/);
+  assert.deepEqual(dataIn(nudged), { command: 'npm test && npm run typecheck', exit: 1, stdout: refusal.stdout, stderr: refusal.stderr });
+  assert.match(nudged, /Do not weaken the check to pass it/);
+  const at = (h: string) => nudged.indexOf(h);
+  assert.ok(at('## What the check said') < at('## Before you sign off') && at('## Files for the steps after you') < at('## When you are finished'), 'the contracts stay last');
+
+  const respond: Workflow = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer the review', check: 'npm test' };
+  const fresh = composeBrief(respond, run({ implement: 't1', respond: 't2' }), [step('implement'), respond], undefined, undefined, undefined,
+    { try: 2, by: 'ask', mode: 'fresh', model: 'opus', resumed: false, status: 'failed (check)', refusal: { ...refusal, command: 'npm test', verdict: 'unfinished' } });
+  assert.match(fresh, /^answer the review\n\n## What was asked for\n\nadd a flag/, 'a new session continues nothing, even for a step that resumes another');
+  assert.match(fresh, /This is a new session/);
+  assert.match(fresh, /`wf retry --model opus`/);
+  assert.match(fresh, /It did not finish/);
+  assert.equal(dataIn(fresh).exit, 'unfinished');
+  assert.ok(fresh.indexOf('## Try 2') < fresh.indexOf('## Before you sign off'));
+
+  const stopped = composeBrief(step('implement'), run({ implement: 't1' }), STEPS, undefined, undefined, undefined, { try: 2, by: 'ask', mode: 'nudge', resumed: true, status: 'stopped' });
+  assert.match(stopped, /was stopped before it signed off/);
+  assert.match(stopped, /`wf retry --nudge`/);
+  assert.doesNotMatch(stopped, /What the check said/, 'no check, nothing it said');
 });
 
 // ─── what a step declares, and what it reads ────────────────────────────────

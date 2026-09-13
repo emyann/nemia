@@ -10,6 +10,7 @@ wf up
 wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
 wf decide r-xyz      # what it produced, and the choice it leaves you
+wf retry r-xyz implement --recheck   # its check was killed before it finished: run it again
 ```
 
 To follow it live, use the engine rather than this package — a run's task ids carry the run and the
@@ -75,13 +76,13 @@ design, not a missing feature.
 The interesting decisions in this kind of work — *is this good enough*, *did it do what was asked*
 — are not predicates a workflow language could evaluate. They are judgements, and a judgement
 belongs to a step with an agent in it. **The workflow is a team, not a program.** The prose is the
-logic: `after` orders, `resume` continues, `check` measures, `output` declares and `input` reads, and
-the rest say who does the work and for how long.
+logic: `after` orders, `resume` continues, `check` measures, `retries` counts, `output` declares and
+`input` reads, and the rest say who does the work and for how long.
 
 `permissionMode` is the harness's word, checked against the harness the step runs on. On codex,
 `read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
-the shipped reviewer hands its review on as its closeout. `retries` is read and not yet acted on:
-re-filing a step its check refused is the next piece of work (`docs/features.md`).
+the shipped reviewer hands its review on as its closeout. `retries` is how many times the run re-files
+a step its check refused (*Trying again*, under the check).
 
 ## What one step knows of another
 
@@ -411,15 +412,67 @@ another repository and change that line.
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
 | `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
-| `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** |
+| `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** — unless it is tried again, below |
 | `failed`, `stopped` | the engine's verdict on the step's own task | **never runs** |
 
-`→ waiting on you` names every step that is blocked, unsigned or refused by its check. `wf decide`
-prints `FAILED CHECK:`, `UNSIGNED:` and `UNVERIFIED:` first, then each check's command and exit code
-and, for a check that refused, the last 20 lines of stdout and of stderr.
+`→ waiting on you` names every step that is blocked, unsigned or refused by its check, and has no try
+due. `wf decide` prints `FAILED CHECK:`, `CHECK DID NOT FINISH:`, `UNSIGNED:` and `UNVERIFIED:` first,
+then each check's command and exit code and, for a check that refused, the last 20 lines of stdout and
+of stderr.
 
 **`unsigned` blocks every `claude-detached` step** until engine open issue 4 is fixed: that harness
 never hands the closeout schema on, so its steps never sign off. `claude` and `codex` steps do.
+
+### Trying again: `retries:` and `wf retry`
+
+A check can refuse for a reason that is not the work. On one day on this repository it did four times: a
+flaky parallel suite, a leaked `WF_STDERR`, a package missing from the worktree, and three checks the
+harness killed for "low memory" with 16 GB free. The only remedy each time was editing the engine's journal
+and the run's record by hand, with the daemon stopped, which nobody recorded. Now the run tries a step again,
+on the workflow's word or a person's.
+
+```md
+---
+check: npm test && npm run typecheck
+retries: 1
+---
+```
+
+- **`retries: n`.** When a step's check *refuses* it, the next tick re-files the step, continuing the step's
+  own last session (`resumeFrom` the try before, as `resume:` does between steps). Its brief says what became
+  of the last try, and carries the check's verdict as data: the command, the exit code, the last 20 lines of
+  stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
+  step waits on you, as before.
+- **A check that did not finish did not refuse.** A check refuses when it runs to its end and exits non-zero:
+  the engine settles it `failed`, with an exit code. One that was `stopped` (killed, never started), or
+  `failed` without an exit code (stopped at its deadline, or lost), said nothing about the work. `retries`
+  spends no try on it. `wf ls` already says `failed ✗ check (unfinished)`, and `wf decide` says its check did
+  not finish and offers `wf retry <run> <step> --recheck`.
+- **`wf retry <run> <step> [--nudge | --fresh | --model <m> | --recheck]`** is a person's word for one more
+  try. `--nudge`, the default, continues the step's last session and tells it what happened. `--fresh` starts
+  a new session on the same branch, with the whole brief. `--model <m>` does that on `m`. `--recheck` runs the
+  check again on the work as it stands, and files no session. A step may be tried again when it waits on you
+  (its check did not pass, it ended unsigned, or it signed off blocked and its session has settled), or when
+  its own session failed or was stopped. `--recheck` only applies where a check did not pass. Each refusal
+  says what to do instead: a step still running or checking, a verified step, a cancelled run, a try already
+  asked for, a step the run is about to try again itself.
+- **An ask is a file, like a cancellation.** `wf retry` writes `runs/<id>.asks/retry-<step>-<n>`, whole and
+  exclusively, and never writes the run's json. Every pass reads the directory. The next pass files try `n`,
+  writes the record, then moves the ask into `done/`. The ask names its try, and a try's ids are derived
+  (`<run>-<step>-try<n>`, `<run>-<step>-try<n>-check`). So a pass that dies after filing a try is adopted by
+  the next, and a pass that dies before consuming the ask leaves the try on the record, where the ask is
+  spent and files nothing.
+- **The record keeps the current try where it always was.** `steps[name].taskId` and `steps[name].check` are
+  the current try's, so everything that reads them reads the try that decides the step. The tries before it
+  go under `steps[name].tries`, in order, each with what replaced it: `retries`, `nudge`, `fresh` (and its
+  model) or `recheck`. A person's tries do not spend the step's `retries`.
+- **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
+  0 spent`, `try 2 asked (--recheck) — the next tick files it`, and once filed `try 2, by retries: 1`. A step
+  with a try due is not waiting on you. **`wf decide`** names the try each closeout and check belong to, and
+  under *try again* gives the `wf retry` for each step that can take one.
+
+This repository's workflows declare no `retries:`. A flaky suite would spend a whole session on a nudge, so
+whether a refusal is the agent's to answer or a person's is left to each workflow's author.
 
 ## A step's files: `runs/<id>/artifacts/<step>/`
 
@@ -631,7 +684,7 @@ holding a concurrency slot forever.
 | file | |
 |---|---|
 | `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a cycle, a dangling `after`, a loose `output:` schema, or an `input:` on work that has not finished |
-| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, blocked, done — and what a step is told, `## From <step>` included |
+| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check or another try, blocked, done — and what a step is told, `## From <step>` and `## Try <n>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/runner.ts` | the I/O: run store, git worktree and what it is given, and the engine |

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { checkStderr, closeoutOf, closeoutReader, engine, listRuns, verdictWord } from 'agent-workflows';
-import { assess, composeBrief, listing, type Assessment, type Run, type TaskPhase } from 'agent-workflows/run';
+import { assess, composeBrief, inFlight, listing, type Assessment, type Run, type TaskPhase } from 'agent-workflows/run';
 import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
@@ -15,6 +15,12 @@ export type RunSummary = {
   createdAt: string;
   cancelledAt: string | null;
   status: RunStatus;
+  /**
+   * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
+   * and not settled — or a step or a check a tick would still file. `status` does not say: `assess` reads a
+   * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
+   */
+  moving: boolean;
   /** `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. */
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string }>;
   /** Steps a person has to act on — blocked, unsigned, or refused by their check — on a run nobody has called off. */
@@ -70,6 +76,8 @@ export type RunDetail = {
   createdAt: string;
   cancelledAt: string | null;
   status: RunStatus;
+  /** As on `RunSummary`. */
+  moving: boolean;
   waitingOnYou: string[];
   /** Set when the workflow folder cannot be read, or no longer has the steps the run started with. */
   warning: string | null;
@@ -223,8 +231,17 @@ const wordOf = (views: Views) => (taskId: string): string => {
   return view?.state.brief ? view.phase : 'unknown';
 };
 
-/** Settled one way or another, or not yet: all `assess` asks of a task's phase. */
-const phaseOf = (views: Views) => (taskId: string): TaskPhase => views.get(taskId)?.state.settled ?? 'running';
+/**
+ * A task's phase as the run narrows the engine's view — `phaseOfView` in runner.ts, not exported. A task the
+ * engine has no record of is `unknown`, not `pending`: `pending` is in flight, and a task nobody can find
+ * never moves again.
+ */
+const phaseOf = (views: Views) => (taskId: string): TaskPhase => {
+  const view = views.get(taskId);
+  if (view?.state.settled) return view.state.settled;
+  if (view?.state.attempts.length) return 'running';
+  return view?.state.brief ? 'pending' : 'unknown';
+};
 
 /** Whether a task was asked for a closeout: the schema on the engine's record of its filing. `closeoutAsked` in runner.ts, not exported. */
 const askedOf = (views: Views) => (taskId: string): boolean => Boolean(views.get(taskId)?.state.closeoutSchema);
@@ -244,11 +261,11 @@ const verdictOf = (run: Run, views: Views) => (name: string): number | 'unfinish
   return typeof exitCode === 'number' ? exitCode : 'unfinished';
 };
 
-/** What the run established, over one read of its tasks: each step's word, who is waited on, and where the run stands. */
-type Judged = { words: ReadonlyMap<string, string>; waitingOnYou: string[]; status: RunStatus };
+/** What the run established, over one read of its tasks: each step's word, who is waited on, where the run stands, and whether it still moves. */
+type Judged = { words: ReadonlyMap<string, string>; waitingOnYou: string[]; status: RunStatus; moving: boolean };
 
 /**
- * What `wf ls` says about each step, and what `assess` says about the run.
+ * What `wf ls` says about each step, what `assess` says about the run, and whether the run still moves.
  *
  * The words are `listing`'s — `verified ✓`, `checking`, `unverified · done`, `failed ✗ check (exit 1)`,
  * `unsigned`, `succeeded · BLOCKED`, and the engine's own word while a step runs — with `wordOf`'s one
@@ -262,10 +279,18 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const asked = askedOf(views);
   const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdictOf(run, views));
+  const phase = phaseOf(views);
+  const { status, ready, check } = assess(steps, run, phase, closeoutReader(views, run), asked);
+  // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
+  // for it, whatever its bare steps would make ready: the tick fails on it.
+  const tickReads = Boolean(run.workflow ?? folder);
   return {
     words: new Map(said.steps.map((s) => [s.name, s.status])),
     waitingOnYou: names.filter((name) => said.waitingOnYou.includes(name)),
-    status: assess(steps, run, phaseOf(views), closeoutReader(views, run), asked).status,
+    status,
+    // The line `cancelPlan` draws for a finished run, which `status` does not: nothing in flight, and nothing a
+    // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
+    moving: inFlight(run, phase).length > 0 || (tickReads && (ready.length > 0 || check.length > 0)),
   };
 }
 
@@ -296,6 +321,7 @@ function summarize(run: Run, views: Views): RunSummary {
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     status: judged.status,
+    moving: judged.moving,
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -334,6 +360,7 @@ async function detail(run: Run): Promise<RunDetail> {
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     status: judged.status,
+    moving: judged.moving,
     waitingOnYou: judged.waitingOnYou,
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
     steps: names.map((name) => {

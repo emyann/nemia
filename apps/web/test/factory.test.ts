@@ -22,7 +22,7 @@ import {
 } from '../src/lib/factory.ts';
 import { COLUMN_WIDTH, extentOf, layout, NODE_WIDTH, ROW_HEIGHT, type Point } from '../src/lib/layout.ts';
 
-/** A run with one step per status, filed unless it is still waiting, and `status` as `assess` put it. */
+/** A run with one step per status, filed unless it is still waiting, and `status` and `moving` as the api put them. */
 const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunSummary => ({
   id: 'r-1',
   repo: '/code/app',
@@ -30,6 +30,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   createdAt: '2026-09-13T00:00:00.000Z',
   cancelledAt: null,
   status: 'running',
+  moving: false,
   steps: statuses.map((status, i) => ({ name: `step-${i}`, taskId: status === 'waiting' ? null : `t-${i}`, branch: null, status })),
   waitingOnYou: [],
   ...extra,
@@ -39,30 +40,42 @@ const cancelledAt = '2026-09-13T01:00:00.000Z';
 
 test('a run is in flight, and on the Factory by default, while the api says it is running', () => {
   const shown: Array<[string, RunSummary]> = [
-    ['started, nothing filed yet', run(['waiting', 'waiting'])],
-    ['a session at work', run(['running (working)', 'waiting'])],
-    ['its check still running', run(['verified ✓', 'checking'])],
-    ['done on its own word, the next step still to be filed', run(['unverified · done', 'waiting'])],
+    ['started, nothing filed yet', run(['waiting', 'waiting'], { moving: true })],
+    ['a session at work', run(['running (working)', 'waiting'], { moving: true })],
+    ['its check still running', run(['verified ✓', 'checking'], { moving: true })],
+    // `assess` reads a task nobody can find as running, and it holds nothing: the status alone keeps it on the floor.
+    ['a step the engine has lost', run(['unknown', 'waiting'])],
   ];
   for (const [why, r] of shown) assert.equal(inFlight(r), true, why);
 });
 
-test('a run is finished, and hidden by default, once the api says it succeeded, failed or was cancelled', () => {
+test('a run the api calls failed or cancelled stays in flight while it still moves', () => {
+  const shown: Array<[string, RunSummary]> = [
+    // The review's case: `assess` calls a fan-out failed once one step is final without letting its followers run.
+    ['a check refused while a sibling session still runs', run(['failed ✗ check (exit 1)', 'running (working)', 'waiting'], { status: 'failed', moving: true, waitingOnYou: ['step-0'] })],
+    ['a step failed, and a step waiting only on its sibling is still to be filed', run(['failed', 'unverified · done', 'waiting', 'waiting'], { status: 'failed', moving: true })],
+    ['called off, a step still running until the stop lands', run(['running (working)', 'waiting'], { status: 'cancelled', moving: true, cancelledAt })],
+  ];
+  for (const [why, r] of shown) assert.equal(inFlight(r), true, why);
+});
+
+test('a run is finished, and hidden by default, once it has stopped moving without running', () => {
   const hidden: Array<[string, RunSummary]> = [
     ['verified, and done on its own word', run(['verified ✓', 'unverified · done'], { status: 'succeeded' })],
     // What the rule is for: the follower of a refused check reads `waiting`, and will for ever.
     ['stopped at a refused check, its follower waiting for ever', run(['failed ✗ check (exit 1)', 'waiting'], { status: 'failed', waitingOnYou: ['step-0'] })],
     ['a step signed off blocked, waiting on you', run(['succeeded · BLOCKED', 'waiting'], { status: 'failed', waitingOnYou: ['step-0'] })],
     ['a session that failed', run(['failed', 'waiting'], { status: 'failed' })],
-    ['called off, a step still running until the stop lands', run(['running (working)', 'waiting'], { status: 'cancelled', cancelledAt })],
+    ['called off, and the stop has landed', run(['stopped', 'waiting'], { status: 'cancelled', cancelledAt })],
   ];
   for (const [why, r] of hidden) assert.equal(inFlight(r), false, why);
 });
 
-test("no step's word puts a finished run back on the floor, and none takes a running one off it", () => {
-  // The words that used to decide it, each on a run whose status says otherwise.
-  assert.equal(inFlight(run(['waiting', 'pending', 'checking', 'needs-human'], { status: 'failed' })), false);
-  assert.equal(inFlight(run(['failed', 'stopped', 'unknown'], { status: 'running' })), true);
+test("no step's word decides it: the run's status and whether it moves do", () => {
+  // Runs the api would not send, to hold the Factory to its fields: live-looking words on a run it says has
+  // stopped moving, and final-looking words on one it says is running.
+  assert.equal(inFlight(run(['waiting', 'pending', 'checking', 'needs-human'], { status: 'failed', moving: false })), false);
+  assert.equal(inFlight(run(['failed', 'stopped', 'unknown'], { status: 'running', moving: false })), true);
 });
 
 test("a card's title is the brief's first line with words on it, or the run id", () => {

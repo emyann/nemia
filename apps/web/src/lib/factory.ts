@@ -6,15 +6,16 @@ import type { RunSummary } from './api';
 import { COLUMN_WIDTH, NODE_WIDTH, type Point } from './layout.ts';
 
 /**
- * Whether a run is in flight, and so on the Factory by default: the run's status, as `assess` decides it
- * and the api carries it, is `running`.
+ * Whether a run is in flight, and so on the Factory by default: `assess` has it `running`, or it still moves
+ * — the engine holds a task of it, or a tick would still file one (the api's `moving`).
  *
- * Nothing here reads a step's words. Finished is succeeded, failed or cancelled — and failed includes a
- * run stopped at a refused check, or at a step signed off blocked, whose followers read `waiting` and
- * will never be filed. `wf decide` reads that run as over, so it is off the floor; a person it waits on
- * finds it under "Show finished", or on Runs.
+ * Nothing here reads a step's words. The status alone is not enough: `assess` reads a fan-out as failed once
+ * one step is final without letting its followers run, while a sibling's session still works. A run is
+ * finished once it has stopped moving without running: succeeded; failed at a refused check or a step
+ * signed off blocked, whose followers read `waiting` and will never be filed; or cancelled, its stop landed.
+ * A person such a run waits on finds it under "Show finished", or on Runs.
  */
-export const inFlight = (run: Pick<RunSummary, 'status'>): boolean => run.status === 'running';
+export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'>): boolean => run.status === 'running' || run.moving;
 
 /** A card's title: the brief's first line with words on it, without a heading's hashes; else the run id. */
 export const titleOf = (run: Pick<RunSummary, 'id' | 'brief'>): string =>

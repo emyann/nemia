@@ -106,6 +106,7 @@ test('runs are read from the workflow store and summarized, with what each step 
     id: 'r-1', repo: '/code/app', brief: 'Do the thing', createdAt: '2026-09-12T00:00:00.000Z',
     cancelledAt: '2026-09-12T01:00:00.000Z',
     status: 'cancelled',
+    moving: false,
     steps: [
       // t-1 is on the record and not in this engine's store: a fresh WF_ROOT has no tasks at all.
       { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown' },
@@ -136,7 +137,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', workflowDir, baseRef: 'def456',
     branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', cancelledAt: null,
     // implement signed off blocked, so review can never be filed: the run is over, and failed.
-    status: 'failed', waitingOnYou: ['implement'], warning: null, steps: undefined,
+    status: 'failed', moving: false, waitingOnYou: ['implement'], warning: null, steps: undefined,
   });
 
   assert.deepEqual(implement, {
@@ -534,6 +535,64 @@ test("a run's status is where `assess` puts it — running, succeeded, failed or
   for (const [id, status, why] of cases) {
     assert.equal((await listed(id)).status, status, `${id} listed: ${why}`);
     assert.equal((await (await app.request(`/api/runs/${id}`)).json()).status, status, `${id} in full: ${why}`);
+  }
+});
+
+test('a run moves while the engine holds a task of it, or a tick would still file one — whatever `assess` calls it', async () => {
+  const gone = path.join(os.tmpdir(), 'hkb-api-no-such-workflow');
+
+  // The review's case: one root's check refused while its sibling's session still runs, and what waits on both
+  // never will be filed. `assess` calls it failed; it is not finished.
+  settledTask('t-24-a', done);
+  checkTask('r-24-a-check', { settled: 'failed', exitCode: 1 });
+  journal('t-24-b', [filed('t-24-b'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+  writeRun({
+    ...r2, id: 'r-24', workflowDir: gone,
+    workflow: [{ name: 'a', after: [], body: 'A.', check: 'npm test' }, { name: 'b', after: [], body: 'B.' }, { name: 'c', after: ['a', 'b'], body: 'C.' }],
+    steps: { a: { taskId: 't-24-a', check: { taskId: 'r-24-a-check' } }, b: { taskId: 't-24-b' }, c: { taskId: null } },
+  });
+  assert.deepEqual((await listed('r-24')).steps.map((s: Said) => [s.name, s.status]), [['a', 'failed ✗ check (exit 1)'], ['b', 'starting'], ['c', 'waiting']]);
+
+  // One branch failed, nothing is running, and a step waiting only on the other branch is still to be filed.
+  journal('t-25-a', [
+    filed('t-25-a'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: 'ae/t-25-a/1', observed: 'failed', reason: 'harness' },
+    { kind: 'settled', at, outcome: 'failed' },
+  ]);
+  settledTask('t-25-b', done);
+  writeRun({
+    ...r2, id: 'r-25', workflowDir: gone,
+    workflow: [{ name: 'a', after: [], body: 'A.' }, { name: 'b', after: [], body: 'B.' }, { name: 'c', after: ['b'], body: 'C.' }, { name: 'd', after: ['a'], body: 'D.' }],
+    steps: { a: { taskId: 't-25-a' }, b: { taskId: 't-25-b' }, c: { taskId: null }, d: { taskId: null } },
+  });
+
+  // Called off, with a session the stop has not reached yet.
+  writeRun({ ...r2, id: 'r-23', steps: { implement: { taskId: 't-7', branch: 'wf/r-23/implement' }, review: { taskId: null } } });
+  fs.writeFileSync(path.join(root, 'runs', 'r-23.cancelled'), '2026-09-12T03:00:00.000Z');
+
+  // From before runs froze their workflow, its folder gone and nobody calling it off: its bare `review` would
+  // read as ready, and the tick, which cannot read its steps, files nothing.
+  writeRun({ ...r2, id: 'r-26', workflowDir: gone });
+
+  const cases: Array<[id: string, status: string, moving: boolean, why: string]> = [
+    ['r-24', 'failed', true, "a check refused while a sibling's session still runs"],
+    ['r-25', 'failed', true, 'a step failed, and a step waiting only on its sibling is still to file'],
+    ['r-20', 'failed', true, 'a check refused, and another check and a session still run'],
+    ['r-23', 'cancelled', true, 'called off, its session not stopped yet'],
+    ['r-5', 'running', true, 'a step queued for a slot'],
+    ['r-6', 'running', true, 'a step the folder gained, which the tick would file'],
+    ['r-8', 'failed', false, 'a step signed off blocked, and its follower will never be filed'],
+    ['r-26', 'failed', false, 'a record the tick cannot read'],
+    ['r-21', 'succeeded', false, 'verified, then done on its own word'],
+    ['r-2', 'cancelled', false, 'called off, nothing left running'],
+    // `assess` reads a task nobody can find as still running; it holds nothing, and nothing waits for it to be filed.
+    ['r-4', 'running', false, 'a step the engine has lost'],
+  ];
+  for (const [id, status, moving, why] of cases) {
+    const summary = await listed(id);
+    const detail = await (await app.request(`/api/runs/${id}`)).json();
+    assert.deepEqual([summary.status, summary.moving], [status, moving], `${id} listed: ${why}`);
+    assert.deepEqual([detail.status, detail.moving], [status, moving], `${id} in full: ${why}`);
   }
 });
 

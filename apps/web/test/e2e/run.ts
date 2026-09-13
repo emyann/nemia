@@ -90,7 +90,9 @@ const PAGES: PageSpec[] = [
       await expectVisible(floor, 'the Factory canvas');
       const { card, steps, run, step } = onTheFloor(page);
       const beside = page.locator(`.react-flow__node[data-id="${NEIGHBOUR.id}"]`);
-      await expectVisible(beside, `the run in flight has its card on the Factory (${NEIGHBOUR.id})`);
+      // The review's case: a run `assess` calls failed, with a session of it still running, is in flight.
+      await expectVisible(beside, `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`);
+      await expectVisible(beside.getByText(/since it started$/), 'its card counts the time since it started, as a card in flight does');
       await settled(page);
 
       // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight.

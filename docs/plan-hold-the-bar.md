@@ -611,6 +611,15 @@ owner is not mid-run.
   read-only by prose, and the permission classifier refused `node --test`, so it reviewed by reading. The check
   had run the suite, so nothing was lost; but a reviewer that can run tests finds more. → I: `tools:` on the
   review step naming Bash for `npm test`, and read-only for the rest.
+- **a login refresh race blocks concurrent sessions (2026-09-13, B3 and I):** both `implement` sessions
+  stopped within two minutes of each other on *"Could not refresh your login because another Claude Code
+  process is refreshing it (or exited mid-refresh) · Try again in a minute"* — an OAuth refresh raced between
+  the operator's session, two `--bg` steps and the monitor's `claude agents` calls. The engine read them as
+  `blocked` (`needs-human`), which is right for the harness and wrong for the work: nothing was asked of a
+  person. Nudged by cross-session message (no trace on the run, as noted above); `wf retry` cannot help, the
+  step is not final. A tick that recognises this one message on a `blocked` session and resumes it is the
+  fix in the run; the harness's is a shared refresh lock across processes. → agent-workflows, small; and
+  a Claude Code report.
 
 ## 5. What the plan does not do
 

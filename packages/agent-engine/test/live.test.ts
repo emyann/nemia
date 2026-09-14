@@ -6,6 +6,14 @@
  * `--bg` session told to write a file with no tool that can, beside a control identical but for
  * `tools` — without the control, a session that never ran would pass the first assertion too.
  *
+ * `--disallowedTools` gets the same, on `--bg` and not only `-p`: a session told to run `npm run build` and
+ * `npm run e2e`, beside a control identical but for `disallowedTools`. The control must run both, or the fenced
+ * one running neither proves nothing — and the first version's did not. Both were in `dontAsk` in a temporary
+ * directory whose `.claude/settings.json` allowed the two commands, and the control was refused with dontAsk's
+ * own message: the directory's settings were not applied to a `--bg` session there (the directory is not
+ * trusted, which is the likely reason and not a measured one). So both run in `bypassPermissions`, the widest
+ * mode, where the control needs no settings; a deny that holds there holds against any allow.
+ *
  * The MCP fence gets the same: a session filed with no `mcp`, in an empty directory, on a machine
  * whose operator has servers, claude.ai connectors and Claude in Chrome, must report no MCP server and
  * no MCP tool — beside a control given one server, which must report that server and its tool.
@@ -89,6 +97,51 @@ test('a --bg session with tools: Read, Grep, Glob cannot write a file; the same 
     assert.equal(fs.existsSync(path.join(fenced, 'PROOF.txt')), false, 'the fence held: no tool, no file');
     // `--tools` must not take away the tool a closing statement is made with.
     assert.notEqual(views.fenced?.state.attempts.at(-1)?.closeout, undefined, 'the fenced session still gave its closeout');
+  });
+});
+
+const DENY_BRIEF = [
+  'Run these two commands with your Bash tool, one call each, in this order: `npm run build`, then `npm run e2e`.',
+  'Write each exactly as given, adding nothing to it, and run nothing else. If one is denied, do not look for another way to run it.',
+  'Then give your closing statement: in denied, each of the two commands that was denied, or an empty list.',
+].join(' ');
+const DENY_CLOSEOUT = {
+  type: 'object',
+  properties: { denied: { type: 'array', items: { type: 'string' } } },
+  required: ['denied'],
+  additionalProperties: false,
+};
+const WRITTEN = ['BUILT', 'E2E'];
+
+/** A directory whose two commands each write a file into it. */
+const scripted = (label: string) => {
+  const dir = tmp(label);
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'probe', private: true, scripts: { build: 'touch BUILT', e2e: 'touch E2E' } }));
+  return dir;
+};
+
+test('a --bg session in bypassPermissions runs neither npm run build nor npm run e2e when disallowedTools names both; the same session without it runs both', {
+  skip,
+  timeout: 12 * 60_000,
+}, async () => {
+  const engine = createEngine({ root: tmp('deny-board') });
+  const fenced = scripted('deny-fenced');
+  const open = scripted('deny-open');
+  // Bash only, in the mode that allows everything: nothing but the deny stands between the session and the commands.
+  const common = { brief: DENY_BRIEF, closeoutSchema: DENY_CLOSEOUT, deadlineSeconds: 480, model: 'haiku', permissionMode: 'bypassPermissions', tools: ['Bash'] };
+  const ids = {
+    fenced: await engine.file({ ...common, cwd: fenced, disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'] }),
+    open: await engine.file({ ...common, cwd: open }),
+  };
+
+  await settleThenCheck(engine, ids, (views) => {
+    const said = (k: string) => JSON.stringify(views[k]?.state.attempts.at(-1)?.closeout);
+    assert.equal(views.open?.state.settled, 'succeeded', `control settled: ${views.open?.phase}`);
+    assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(open, f))), WRITTEN, `control: nothing denied, and both ran; it said ${said('open')}`);
+
+    assert.equal(views.fenced?.state.settled, 'succeeded', `fenced settled: ${views.fenced?.phase}`);
+    assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(fenced, f))), [], `the deny held in the widest mode: neither ran; it said ${said('fenced')}`);
+    assert.notEqual(views.fenced?.state.attempts.at(-1)?.closeout, undefined, 'and the fenced session still gave its closeout');
   });
 });
 

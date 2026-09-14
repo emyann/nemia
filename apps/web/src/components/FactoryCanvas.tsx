@@ -39,15 +39,16 @@ import {
 } from '@/lib/factory';
 import { extentOf, layout, stepsOf, type Point } from '@/lib/layout';
 import { stepState } from '@/lib/status';
-import { LoopEdge } from './LoopEdge';
+import { CanvasLegend } from './CanvasLegend';
 import { RunNode, type RunFlowNode } from './RunNode';
+import { StateEdge } from './StateEdge';
 import { StepInspector } from './StepInspector';
 import { StepNode, type StepFlowNode } from './StepNode';
 import { cardEdges, stepData, stepEdges, stepMinimapFill } from './stepGraph';
 
 // Declared once: a new object per render makes React Flow warn and mount every node afresh.
 const nodeTypes = { run: RunNode, step: StepNode };
-const edgeTypes = { loop: LoopEdge };
+const edgeTypes = { state: StateEdge };
 
 type FloorNode = RunFlowNode | StepFlowNode;
 
@@ -286,7 +287,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
       [...graphs].flatMap(([runId, graph]): Edge[] =>
         graph && 'run' in graph
           ? [
-              // The card is the run's head: one dashed edge into each of the roots the api's graph names, and no other.
+              // The card is the run's head: one edge into each of the roots the api's graph names, and no other.
               ...cardEdges(graph.run, runId, `${runId}/`),
               ...stepEdges(graph.run, `${runId}/`),
             ]
@@ -474,6 +475,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
               </Panel>
               <Background variant={BackgroundVariant.Dots} gap={16} />
               <Controls showInteractive={false} showFitView={false} />
+              {/* Wrapped short of the minimap, when there is one. */}
+              <CanvasLegend className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />
               {cells > HANDFUL && <MiniMap<FloorNode> pannable zoomable style={{ width: 128, height: 88 }} nodeColor={minimapFill} />}
             </ReactFlow>
           </div>

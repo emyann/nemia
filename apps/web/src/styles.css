@@ -55,6 +55,11 @@
     --xy-attribution-background-color: transparent;
     --xy-edge-label-background-color: var(--color-white);
     --xy-edge-label-color: var(--color-neutral-700);
+    /* An edge by what it says (`edgeStroke`): its line, its arrow and its travelling dot. The running colour is the running step's. */
+    --edge-to-come: var(--color-neutral-400);
+    --edge-done: var(--color-neutral-500);
+    --edge-running: var(--color-sky-500);
+    --edge-loop: var(--color-violet-500);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -82,27 +87,12 @@
       --xy-controls-button-border-color: var(--color-neutral-800);
       --xy-edge-label-background-color: var(--color-neutral-900);
       --xy-edge-label-color: var(--color-neutral-300);
+      --edge-to-come: var(--color-neutral-600);
+      --edge-done: var(--color-neutral-400);
+      --edge-running: var(--color-sky-400);
+      --edge-loop: var(--color-violet-400);
     }
   }
-  /*
-   * An edge work is moving along now (`CanvasEdge.pulsing`): into a step at work, or back round a loop whose next round is
-   * due. Without motion, drawn heavier instead.
-   */
-  @keyframes edge-pulse {
-    50% {
-      stroke-opacity: 0.3;
-    }
-  }
-  .react-flow__edge.pulsing .react-flow__edge-path {
-    animation: edge-pulse 1.4s ease-in-out infinite;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .react-flow__edge.pulsing .react-flow__edge-path {
-      animation: none;
-      stroke-width: 2.5;
-    }
-  }
-
   * {
     @apply border-border outline-ring/50;
   }

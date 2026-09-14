@@ -86,7 +86,7 @@ export function StepNode({
 
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
       {/*
-        Under the node, where the edge back that `loop:` makes leaves its looping step and comes into its target (`LoopEdge`).
+        Under the node, where the edge back that `loop:` makes leaves its looping step and comes into its target (`StateEdge`).
         Last, so an edge that names no handle takes the one on the side: React Flow takes the first of a type.
       */}
       <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />

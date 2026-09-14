@@ -41,17 +41,33 @@ export function attemptLine(attempts: StepAttempts, live: boolean, now: number):
 }
 
 /**
- * An edge as the canvases draw it. `complete`: the work at both ends is done — never, on a `loop` edge, which stands for a
- * round that may yet come. `pulsing`: work is moving along it now — into a step at work, or back round a loop whose next
- * round is due. `label`: on a `loop` edge past its first round, the round it is on.
+ * What an edge says, which is how the canvases draw it (`StateEdge`): `done`, the work at both its ends is done — solid;
+ * `running`, work is moving along it now — in the running colour, a dot travelling it; `to-come`, what it stands for is
+ * still to happen — dashed, and still.
+ */
+export type EdgeState = 'to-come' | 'running' | 'done';
+
+/**
+ * Work is moving into a step: its session is at work, or its check is running. Not a step asking a person, a human gate, a
+ * refused check or a step not filed: nothing is moving there.
+ */
+export const movingInto = (state: StepState): boolean => state === 'working' || state === 'checking';
+
+/** An edge into `target`: done once the work at both ends is, running while work moves into the target, and to come otherwise. */
+export const edgeState = (sourceDone: boolean, target: StepState): EdgeState =>
+  sourceDone && satisfiesAfter(target) ? 'done' : movingInto(target) ? 'running' : 'to-come';
+
+/**
+ * An edge as the canvases draw it. `state`: what it says — on a `loop` edge never `done`, since it stands for a round that
+ * may yet come: `running` while its next round is due, and `to-come` otherwise. `label`: on a `loop` edge past its first
+ * round, the round it is on.
  */
 export type CanvasEdge = {
   id: string;
   source: string;
   target: string;
   kind: GraphEdge['kind'];
-  complete: boolean;
-  pulsing: boolean;
+  state: EdgeState;
   label: string | null;
 };
 
@@ -59,8 +75,8 @@ export type CanvasEdge = {
 export type EdgeStep = { name: string; state: StepState; note: string | null };
 
 /**
- * The run's graph as the api gives it, between the steps the run has: an `after` edge complete when the work at both ends
- * is done — verified, or on its own word — and a `loop` edge from the looping step back to its target.
+ * The run's graph as the api gives it, between the steps the run has: an `after` edge done when the work at both ends is
+ * done — verified, or on its own word — and a `loop` edge from the looping step back to its target.
  */
 export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge[] {
   const of = new Map(steps.map((s) => [s.name, s]));
@@ -72,12 +88,11 @@ export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge
     if (!source || !target || seen.has(id)) return [];
     seen.add(id);
     if (edge.kind === 'after') {
-      const complete = satisfiesAfter(source.state) && satisfiesAfter(target.state);
-      return [{ id, source: edge.from, target: edge.to, kind: 'after', complete, pulsing: target.state === 'working', label: null }];
+      return [{ id, source: edge.from, target: edge.to, kind: 'after', state: edgeState(satisfiesAfter(source.state), target.state), label: null }];
     }
     return [{
-      id, source: edge.from, target: edge.to, kind: 'loop', complete: false,
-      pulsing: roundDue(source.note),
+      id, source: edge.from, target: edge.to, kind: 'loop',
+      state: roundDue(source.note) ? 'running' : 'to-come',
       label: loopLabel([source.note, target.note], edge.rounds),
     }];
   });
@@ -106,8 +121,27 @@ export const roundDue = (note: string | null): boolean => note !== null && /^rou
 export const LOOP_SOURCE = 'loop-out';
 export const LOOP_TARGET = 'loop-in';
 
-/** A `loop` edge's colour, its arrow's too: apart from the greys an `after` edge is drawn in, and readable in either theme. */
-export const LOOP_STROKE = 'var(--color-violet-500)';
+/**
+ * An edge's colour, its arrow's and its travelling dot's too, each theme's in styles.css: the running colour while work moves
+ * along it — a loop's edge back too, while its round is due — else violet for a loop, and the greys for work done and to come.
+ */
+export function edgeStroke(state: EdgeState, loop: boolean): string {
+  if (state === 'running') return 'var(--edge-running)';
+  if (loop) return 'var(--edge-loop)';
+  return state === 'done' ? 'var(--edge-done)' : 'var(--edge-to-come)';
+}
+
+/**
+ * An edge's line, on the canvas and in its legend alike: dashed while what it stands for is still to happen — work to come,
+ * and a loop's edge back, always — and a little heavier while work moves along it.
+ */
+export const edgeLine = (state: EdgeState, loop: boolean): { strokeWidth: number; strokeDasharray?: string } => ({
+  strokeWidth: state === 'running' ? 2 : 1.5,
+  ...(loop || state === 'to-come' ? { strokeDasharray: '5 4' } : {}),
+});
+
+/** How long the dot takes along a moving edge, and along the legend's: one animation, at one pace, wherever it is. */
+export const TRAVEL_SECONDS = 1.8;
 
 /** How far below the lower of its ends a `loop` edge dips: under the row, and clear of the node's own border. */
 export const LOOP_DEPTH = 44;

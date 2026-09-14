@@ -3,6 +3,7 @@
  * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are `wf decide`'s.
  */
 import type { Decidable, Group, RunDecision, RunSummary, Touched } from './api';
+import { stepState } from './status.ts';
 
 /**
  * Whether a run has something to decide, as its page and the list read it: `assess` says it finished, or a step waits
@@ -14,9 +15,27 @@ export const decidableRun = (run: Pick<RunSummary, 'status' | 'cancelledAt' | 'w
 /** Whether the api's answer is a decision to show, rather than `running` or `nothing`. */
 export const isDecidable = (decision: RunDecision | undefined): decision is Decidable => Boolean(decision && 'touched' in decision);
 
-/** The run's state for the decision's cache: each step's task and word. A decision is read again only when one moves. */
-export const decisionStamp = (run: Pick<RunSummary, 'status' | 'steps'>): string =>
-  JSON.stringify([run.status, run.steps.map((s) => [s.name, s.taskId, s.status])]);
+/**
+ * The run's state for the decision's cache: where the run stands, who it waits on, and each step's task and settled word. A
+ * decision is read again only when one of those moves.
+ *
+ * A filed step still in flight is one word, whatever the engine calls it: `running (working)`, `working (quiescent)`,
+ * `starting`, `between attempts`, `needs-human` and `pending` flip between polls while nothing the decision says has moved,
+ * and each flip would ask the api — an observation per task, and `git diff` — again. A step that signs off, a check that
+ * settles, a try filed (a new task) all move it.
+ */
+export const decisionStamp = (
+  run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'status'>> },
+): string =>
+  JSON.stringify([
+    run.status,
+    run.waitingOnYou,
+    run.steps.map((s) => {
+      const state = stepState(s.status, run.cancelledAt !== null);
+      const inFlight = s.taskId !== null && (state === 'working' || state === 'needs-human' || state === 'waiting');
+      return [s.name, s.taskId, inFlight ? 'in flight' : s.status];
+    }),
+  ]);
 
 /**
  * The Factory card's line for a run waiting on you: `touched 2 packages · +979 −12`. Every group the branches it reads

@@ -1,4 +1,4 @@
-import { queryOptions } from '@tanstack/react-query';
+import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 
 /** Mirrors `RunStatus` in apps/api/src/app.ts: where `assess` puts the run. */
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
@@ -141,12 +141,14 @@ export type RunDecision = { running: true } | { nothing: string } | Decidable;
 /**
  * What `wf decide` shows a person about a run. Read once for each state of the run, never on the page's beat: the api
  * runs `git diff` for it. `stamp` is the run's state (`decisionStamp`), so a step that moves — a retry filed and settled,
- * a round gone — reads it again, once.
+ * a round gone — reads it again, once; and while it does, the decision last read stays on the page, rather than the
+ * section going blank and the canvas under it jumping up and back.
  */
 export const decisionQuery = (id: string, stamp: string) =>
   queryOptions({
     queryKey: ['runs', id, 'decision', stamp],
     queryFn: () => get<RunDecision>(`/api/runs/${encodeURIComponent(id)}/decision`),
+    placeholderData: keepPreviousData,
     staleTime: Infinity,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,

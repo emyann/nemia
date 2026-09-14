@@ -64,14 +64,37 @@ test("only the api's decision is shown: not `running`, not `nothing`, not an ans
   assert.equal(isDecidable(undefined), false);
 });
 
-test("a decision is read again only when a step's task or word moves, and the list and the detail stamp a run alike", () => {
-  const steps = [{ name: 'implement', taskId: 't-1', branch: 'wf/r/implement', status: 'succeeded · BLOCKED', note: null }];
-  const stamp = decisionStamp({ status: 'failed', steps });
+/** A fan-out as the api gives it: implement signed off blocked, and tokens in `tokens`' word. The run `assess` calls failed. */
+const fanOut = (tokens: string, over: { status?: string; waitingOnYou?: string[]; tokensTask?: string | null } = {}) => ({
+  status: over.status ?? 'failed', cancelledAt: null, waitingOnYou: over.waitingOnYou ?? ['implement'],
+  steps: [
+    { name: 'implement', taskId: 't-1', branch: 'wf/r/implement', status: 'succeeded · BLOCKED', note: null },
+    { name: 'tokens', taskId: over.tokensTask === undefined ? 't-2' : over.tokensTask, branch: 'wf/r/tokens', status: tokens, note: null },
+  ],
+});
+
+test("a decision is read again when a step settles, a try is filed, or the run moves — and the list and the detail stamp a run alike", () => {
+  const stamp = decisionStamp(fanOut('running (working)'));
   // The detail's steps carry more; the stamp reads what both have.
-  assert.equal(decisionStamp({ status: 'failed', steps: steps.map((s) => ({ ...s, closeout: null, used: null })) }), stamp);
-  assert.notEqual(decisionStamp({ status: 'failed', steps: [{ ...steps[0]!, taskId: 't-2' }] }), stamp, 'a try filed');
-  assert.notEqual(decisionStamp({ status: 'failed', steps: [{ ...steps[0]!, status: 'unverified · done' }] }), stamp, 'a word moved');
-  assert.notEqual(decisionStamp({ status: 'succeeded', steps }), stamp, 'the run moved');
+  const detail = fanOut('running (working)');
+  assert.equal(decisionStamp({ ...detail, steps: detail.steps.map((s) => ({ ...s, closeout: null, used: null })) }), stamp);
+  for (const settled of ['checking', 'unverified · done', 'succeeded · BLOCKED', 'failed', 'unsigned']) {
+    assert.notEqual(decisionStamp(fanOut(settled)), stamp, `tokens signed off or ended: ${settled}`);
+  }
+  assert.notEqual(decisionStamp(fanOut('checking')), decisionStamp(fanOut('verified ✓')), 'a check settled');
+  assert.notEqual(decisionStamp(fanOut('failed ✗ check (unfinished)')), decisionStamp(fanOut('failed ✗ check (exit 1)')), 'a refusal is not a check that did not finish');
+  assert.notEqual(decisionStamp(fanOut('running (working)', { tokensTask: 't-3' })), stamp, 'a try filed');
+  assert.notEqual(decisionStamp(fanOut('running (working)', { status: 'running', waitingOnYou: [] })), stamp, 'a person asked for a try');
+  assert.notEqual(decisionStamp(fanOut('succeeded · BLOCKED', { status: 'succeeded' })), decisionStamp(fanOut('succeeded · BLOCKED')), 'the run moved');
+  // A step not filed is not in flight, and one filed is: the task moves it.
+  assert.notEqual(decisionStamp(fanOut('waiting', { tokensTask: null })), decisionStamp(fanOut('pending')), 'a step filed');
+});
+
+test("a decision is not read again while a live step's engine word moves and nothing it says has", () => {
+  const stamp = decisionStamp(fanOut('running (working)'));
+  for (const word of ['working (quiescent)', 'starting', 'between attempts', 'needs-human', 'pending', 'running (working)']) {
+    assert.equal(decisionStamp(fanOut(word)), stamp, `tokens' engine word: ${word}`);
+  }
 });
 
 test("a diff's lines, told apart for their colour: a file's header, a hunk's, added, removed and context", () => {

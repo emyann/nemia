@@ -15,8 +15,8 @@ has no tool that writes and a command `.claude/settings.json` does not allow is 
 The settings allow `npm run build` and `npm run e2e` for implement's sake, and both write into the
 workspace, so review is denied those two by name — `disallow: Bash(npm run build), Bash(npm run e2e)`,
 passed as `--disallowedTools`, which beats the settings' allow. `implement` is denied `SendMessage`,
-`CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs. Its findings are its closeout
-(`review.schema.json`), and `again: true` sends the change round again: implement's own session is
+`CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs. `review`'s findings are its closeout
+(`review.schema.json`), and its `again: true` sends the change round again: implement's own session is
 continued with the findings, then a new review. After the third round, a person decides.
 
 `review.md` is the package's reviewer (`packages/agent-workflows/workflows/review.md`) moved onto

@@ -2,10 +2,14 @@
 harness: claude
 model: opus
 after: implement
-# Fenced by machinery for most of what it could do: only these tools — no Edit, no Write — and in dontAsk every Bash command
-# .claude/settings.json does not allow is denied without a prompt. The suite and git reads are allowed.
+# Fenced by machinery: only these tools — no Edit, no Write — and in dontAsk every Bash command .claude/settings.json does
+# not allow is denied without a prompt. The suite and git reads are allowed.
 tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
 permissionMode: dontAsk
+# The settings allow `npm run build` and `npm run e2e` too, for implement's check, and both write into the workspace — the
+# route tree, `.e2e/`. Denied here by name (`--disallowedTools`), which beats the settings' allow: the fence keeps review
+# from them, not its brief.
+disallow: Bash(npm run build), Bash(npm run e2e)
 # The review travels as this step's closeout — `findings` and `again`, in the shape review.schema.json declares.
 output: review.schema.json
 # `again: true` sends the change round again (`loop: implement`): implement's own session is continued and handed

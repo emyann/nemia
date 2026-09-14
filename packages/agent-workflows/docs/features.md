@@ -4,11 +4,11 @@ The features agent-workflows is still missing, in the order I would take them. E
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
-State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
+State as of 2026-09-14: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
-`rounds:` and `wf round` (§4 R), a step's `tools:` and `effort:` (§4 I), the decider screen
+`rounds:` and `wf round` (§4 R), a step's `tools:` and `effort:` (§4 I) and its `disallow:` (§4b), the decider screen
 (§4 G), and looking as a skill with `workflows/ui/` as implement ⇄ review (§4 U2) have shipped.
 
 ## Shipped: the check
@@ -248,6 +248,33 @@ What it leaves:
 - **Nothing measures a reviewer that asks again for nits.** The cap and the person are the guard. The
   looping step is told that a finding worth a person's attention and not another round can go with
   `again: false`, and that is prose.
+
+## Shipped: what a step may not have — `disallow:`
+
+Plan §4b, "the reviewer's fence has two holes the brief covers". A step names the permission rules its session is
+denied, `disallow: Bash(npm run build), SendMessage`. The engine carries them on the task as `disallowedTools`, beside
+`tools`, and both Claude runners pass them as `--disallowedTools`. They reach `e.file` on the first filing, each try
+and each round, as `tools:` does.
+
+- `disallow:` is refused at load when it names no rule, when a comma is inside an entry (in a rule's parentheses, in
+  brackets or in quotes: the list is split on every comma), when an entry is not one rule, and on codex, whose message
+  names `permissionMode`. The engine's `file()` refuses a `disallowedTools` that is not a list of rules, and codex
+  refuses one that denies anything rather than drop it.
+- The shipped Claude reviewers (`workflows/dev`, `dev-build` and `ui`, and the package's `workflows/ui`) are denied
+  `Bash(npm run build)` and `Bash(npm run e2e)`: `.claude/settings.json` allows both for implement's check, and both
+  write into the workspace. Their brief still says not to run them; the fence is what keeps them from it.
+- Every shipped `implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which an
+  unattended session had (measured, plan §4b) and no step needs.
+- `wf decide` prints a finding's `where` as a place (`file:line`, `page · theme`, a string as it is, another object as
+  its keys and values), where it printed a ui review's nested `where` as JSON. `placeText` in run.ts.
+
+What it leaves:
+
+- **A Bash rule matches as Claude Code matches it.** `Bash(npm run build)` is the settings' allow, word for word. A
+  variation the deny does not match is one that allow does not match either, so `dontAsk` denies it all the same. A
+  step outside `dontAsk`, or settings with a looser allow such as `Bash(npm run build:*)`, would need the looser rule.
+- **The board does not show it.** The api's step spec and the inspector name `tools` and not `disallow`. → apps.
+- **`ae` briefs have no `disallowedTools` key.** The engine's task has the field, and its CLI does not read one.
 
 ## Shipped: what a step may have — `tools:` and `effort:`
 

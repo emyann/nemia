@@ -78,7 +78,7 @@ A repository carries its workflows checked in, one folder each under `<repo>/wor
 `GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `effort`,
-`permissionMode`, `tools`, `deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`,
+`permissionMode`, `tools`, `disallow`, `deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
 
@@ -125,6 +125,34 @@ not know, and runs at its default.
 
 Both go to the engine on every filing of the step: the first, each try and each round. Without them, the
 step has the harness's own tools at its own effort.
+
+### What a step may not have: `disallow:`
+
+```md
+---
+after: implement
+tools: Read, Grep, Glob, Bash
+permissionMode: dontAsk
+# The settings allow both for implement's check, and both write into the workspace. A deny beats an allow.
+disallow: Bash(npm run build), Bash(npm run e2e)
+---
+Review the change in this workspace as a second engineer would.
+```
+
+`disallow:` is Claude Code's permission rules, comma-separated: a tool, `SendMessage`, or a tool and what
+it may not run, `Bash(npm run build)`. The engine gives Claude Code the list as `--disallowedTools` on every
+filing of the step (the first, each try and each round), and a deny beats every allow: the checkout's
+`.claude/settings.json`, and the permission mode. `tools:` says which tools a session has; `disallow:`
+takes back what it may not do with them. So a step in `dontAsk` is kept from a command the settings allow
+for another step's sake by machinery, not by a sentence in its brief. This repository's reviewers are denied
+`npm run build` and `npm run e2e`, which implement's check needs and which write into the workspace. Every
+`implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs.
+
+Refused at load: a line that names no rule; an entry with a comma inside it (`Bash(git push, git reset)`
+would reach the harness as two halves of a rule, so write two rules); an entry that is not one rule
+(`SendMessage CronCreate`, a quoted name, an unclosed parenthesis); and any `disallow:` on codex, which has
+no tool list, so its fence is `permissionMode`. A Bash rule matches as Claude Code matches it:
+`Bash(npm run build)` is that command, as the settings' allow of the same words is.
 
 **The engine is the source of these words.** The permission modes and efforts `src/workflow.ts` refuses
 are copies of agent-engine's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and
@@ -174,6 +202,7 @@ after: implement
 input: implement
 tools: Read, Grep, Glob, Bash
 permissionMode: dontAsk
+disallow: Bash(npm run build), Bash(npm run e2e)
 output: review.schema.json      # findings, and again: boolean
 loop: implement
 rounds: 3

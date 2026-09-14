@@ -11,8 +11,11 @@ implement ⇄ review
 `implement` carries `check: npm test && npm run typecheck && npm run build && npm run e2e`, uses the look
 skill (`.claude/skills/look/SKILL.md`) on every page it changed before it signs off, and declares the
 screenshots it read and the pages they show (`implement.schema.json`). `review` runs on Claude with
-`tools: Read, Grep, Glob, Bash` in `permissionMode: dontAsk`, so it has no tool that writes and a command
-`.claude/settings.json` does not allow is denied without a prompt. It is handed implement's screenshots
+`tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch` in `permissionMode: dontAsk`, so it has no tool that
+writes and a command `.claude/settings.json` does not allow is denied without a prompt; and with `disallow:
+Bash(npm run build), Bash(npm run e2e)`, the two commands the settings allow for implement's check, so it
+cannot write the route tree or `.e2e/` into the workspace either. `implement` is denied `SendMessage`,
+`CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs. It is handed implement's screenshots
 and pages and nothing else of implement (`input: implement`), reads the diff, and uses the look skill on
 the screenshots and the pages side by side. At this repository's settings it looks through the
 screenshots: in `dontAsk` a `browser_*` call is denied, because `.claude/settings.json` allows none

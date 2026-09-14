@@ -10,6 +10,10 @@ input: implement
 # are not on this line. Skill is, so the step can invoke the look skill; the body names its file too, for Read.
 tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
 permissionMode: dontAsk
+# The settings allow `npm run build` and `npm run e2e` too, for implement's check, and both write into the workspace — the
+# route tree, `.e2e/`. Denied here by name (`--disallowedTools`), which beats the settings' allow: the fence keeps review
+# from them, not its brief.
+disallow: Bash(npm run build), Bash(npm run e2e)
 # The review travels as this step's closeout — `findings` and `again`, in the shape review.schema.json declares. A
 # finding names where it is: a file and a line, or a page and a theme.
 output: review.schema.json

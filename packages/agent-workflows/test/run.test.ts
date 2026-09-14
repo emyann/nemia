@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, type Closeout, type EarlierTry, type RetryAsk, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, type Closeout, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -844,6 +844,106 @@ test('a step tried again is told what became of the last try: continued, that an
   assert.match(stopped, /was stopped before it signed off/);
   assert.match(stopped, /`wf retry --nudge`/);
   assert.doesNotMatch(stopped, /What the check said/, 'no check, nothing it said');
+});
+
+// ─── a step that asks, answered ─────────────────────────────────────────────
+
+test('REFUSED: `wf retry --message` with an empty answer, or on --recheck — by name, before anything about the run; a message to a step that did not sign off blocked is not', () => {
+  const p = { t1: 'succeeded', c1: 'stopped' } as const;
+  const refusal = (how: RetryHow, r: Run = onTry()) => retryRefusal(RETRIED, r, 'implement', how, phases(p), signedDone, asked, () => 'unfinished');
+  for (const message of ['', '   ', '\n\t']) {
+    assert.match(refusal({ mode: 'nudge', message })!, /^--message is empty, and an empty answer tells the step nothing\. .*wf retry r-1 implement --message "<answer>"/, JSON.stringify(message));
+  }
+  assert.match(refusal({ mode: 'recheck', message: 'the suite is fixed on main' })!,
+    /^--message carries your answer into the try's brief, and --recheck files no session to read it .*\(wf retry r-1 implement --recheck\)/);
+  // Before anything about the run: a cancelled run and a step it does not have would each be refused for something else.
+  assert.match(refusal({ mode: 'fresh', message: '' }, onTry([], 'c1', CANCELLED))!, /^--message is empty/);
+  assert.match(retryRefusal(RETRIED, onTry(), 'deploy', { mode: 'recheck', message: 'x' }, phases(p), signedDone, asked)!, /^--message carries your answer/);
+  // The word the CLI refuses with, before it reads a run.
+  assert.equal(messageRefusal({ mode: 'recheck' }), null);
+  assert.match(messageRefusal({ mode: 'recheck', message: 'x' })!, /\(wf retry <runId> <step> --recheck\)/);
+
+  // A check that did not finish is no blocked sign-off, and a person may still have something to say to the step: each way that files a session takes it.
+  for (const how of [{ mode: 'nudge' }, { mode: 'fresh' }, { mode: 'fresh', model: 'opus' }] as const) {
+    assert.equal(refusal({ ...how, message: 'main has the fix for the flake' }), null, JSON.stringify(how));
+  }
+});
+
+test("a person's answer rides on the ask to the try it files: due with it, and said beside the step while it waits", () => {
+  const p = phases({ t1: 'succeeded', c1: 'stopped' });
+  const answered: RetryAsk = { ...askFor(2), message: 'the second reading' };
+  assert.deepEqual(assess(RETRIED, onTry(), p, signedDone, asked, () => undefined, [answered]).retry,
+    [{ step: 'implement', try: 2, mode: 'nudge', message: 'the second reading', by: 'ask' }]);
+  assert.deepEqual(assess(RETRIED, onTry(), p, signedDone, asked, () => undefined, [askFor(2)]).retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }], 'no message, no key');
+  const l = listing(RETRIED, onTry(), shown({ t1: 'succeeded', c1: 'stopped' }), signedOff({ implement: said('done') }), asked, () => 'unfinished', [answered]);
+  assert.equal(l.steps[0]!.note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
+});
+
+test("`## Your answer` is the person's text, inside `## Try <n>` after on whose word and before the check's refusal, with nothing added — and a try without one is told exactly what it was", () => {
+  const implement: Workflow = { ...step('implement'), check: 'npm test' };
+  const refusal = { command: 'npm test', verdict: 1 as Verdict, stdout: 'not ok 1 - parses a trailing comma', stderr: '' };
+  const text = 'Take the second reading: keep `--flag` as it is.\n\nAnd say so in the README.';
+  const brief = (told: RetryBriefing) => composeBrief(implement, run({ implement: 't1' }), [implement], undefined, undefined, undefined, told);
+
+  for (const [mode, resumed, status, refused] of [['nudge', true, 'failed (check)', refusal], ['fresh', false, 'failed (check)', refusal], ['nudge', true, 'blocked', undefined]] as const) {
+    const told: RetryBriefing = { try: 2, by: 'ask', mode, resumed, status, ...(refused ? { refusal: refused } : {}) };
+    const before = brief(told);
+    const after = brief({ ...told, message: text });
+    const why = `${mode}, ${status}`;
+    assert.doesNotMatch(before, /Your answer|--message/, `${why}: no empty section`);
+
+    const who = `A person asked for this try: \`wf retry --${mode}\`.`;
+    const where = resumed ? "This is the last try's session, continued. Finish the work, then sign off again." : 'read the change, not an account of it.';
+    // The one sentence that says whose word it is names the message, and the section sits after where the step is — nothing else changes.
+    const expected = before
+      .replace(who, `A person asked for this try: \`wf retry --${mode} --message\`, with what they said below.`)
+      .replace(where, `${where}\n\n## Your answer\n\n${text}`);
+    assert.notEqual(expected, before, why);
+    assert.equal(after, expected, why);
+
+    const at = (h: string) => after.indexOf(h);
+    assert.ok(at('## Try 2') < at('--message`, with what they said below') && at('--message`, with what they said below') < at('## Your answer'), why);
+    if (refused) assert.ok(at(text) < at('## What the check said'), `${why}: before the evidence`);
+    assert.ok(at(text) < at('## When you are finished'), `${why}: the contracts stay last`);
+  }
+});
+
+test("a try a person answered says so on `wf ls` — read off the ask, never the record — and only for the try it asked for, filed the way it asked", () => {
+  const nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, then: 'nudge' }], 'c1');
+  const answer: RetryAsk = { ...askFor(2), message: 'the second reading' };
+  assert.equal(answerOf(nudged, 'implement', [askFor(3), answer]), answer);
+  const listed = (answers: RetryAsk[] = []) =>
+    listing(RETRIED, nudged, shown({ t1: 'succeeded', c1: 'running' }), signedOff({ implement: said('done') }), asked, () => undefined, [], [], answers).steps[0]!.note;
+  assert.equal(listed([answer]), 'try 2, nudged on your word, answered');
+  assert.equal(listed(), 'try 2, nudged on your word', 'no ask read, nothing said');
+
+  // Not answered: an ask for another try, one filed another way, one without a message, a try `retries:` filed, a first try.
+  assert.equal(answerOf(nudged, 'implement', [{ ...answer, try: 3 }]), undefined, 'the next try');
+  assert.equal(answerOf(nudged, 'implement', [{ ...answer, mode: 'fresh' }]), undefined, 'asked fresh, and the record says nudge');
+  assert.equal(answerOf(nudged, 'implement', [askFor(2)]), undefined, 'asked without a message');
+  assert.equal(answerOf(onTry([{ taskId: 't0', then: 'retries' }]), 'implement', [answer]), undefined, 'filed by retries:');
+  assert.equal(answerOf(onTry(), 'implement', [answer]), undefined, 'a first try');
+  const onOpus = onTry([{ taskId: 't0', then: 'fresh', model: 'opus' }]);
+  assert.equal(answerOf(onOpus, 'implement', [{ ...askFor(2, 'fresh'), message: 'm' }]), undefined, 'asked fresh on the default model');
+  assert.equal(tryNote(RETRIED[0]!, onOpus.steps.implement, RETRIED, Boolean(answerOf(onOpus, 'implement', [{ ...askFor(2, 'fresh', 'opus'), message: 'm' }]))),
+    'try 2, fresh on opus, on your word, answered');
+});
+
+test('REFUSED where it would not be honoured: `wf decide` gives a blocked step that has settled the `wf retry --message` that answers its needs, and the offers the board reads stay as they were', () => {
+  const blocked = () => said('blocked');
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  const d = decision(STEPS, r, p, nothingShipped, blocked, asked);
+  assert.deepEqual(answerLines(STEPS, r, d, p, blocked, asked), { implement: 'to answer it:  wf retry r-1 implement --message "<answer>"' });
+  assert.deepEqual(retryLines(STEPS, r, d, p, blocked, asked),
+    ['implement: blocked. Continue its session, told what happened:  wf retry r-1 implement  (--fresh, or --model <m>, for a new session)'], 'the offer as it was');
+
+  // None: a blocked step whose session has not settled, which a try would run beside; a step that stopped, which asked nothing; a run still going.
+  const live = phases({ t1: 'running' });
+  assert.deepEqual(answerLines(STEPS, r, decision(STEPS, r, live, nothingShipped, blocked, asked), live, blocked, asked), {});
+  const stopped = phases({ t1: 'stopped' });
+  assert.deepEqual(answerLines(STEPS, r, decision(STEPS, r, stopped, nothingShipped), stopped), {});
+  assert.deepEqual(answerLines(STEPS, r, { kind: 'running', waiting: ['implement'] }, p, blocked, asked), {});
 });
 
 // ─── what a step declares, and what it reads ────────────────────────────────

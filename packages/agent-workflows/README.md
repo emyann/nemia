@@ -11,6 +11,7 @@ wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
 wf decide r-xyz      # what it produced, and the choice it leaves you
 wf retry r-xyz implement --recheck   # its check was killed before it finished: run it again
+wf retry r-xyz plan --message "the second reading"   # it signed off blocked with a question: answer it
 wf round r-xyz       # the review still asks for more after the last round it allows: once more
 ```
 
@@ -544,7 +545,7 @@ retries: 1
   `failed` without an exit code (stopped at its deadline, or lost), said nothing about the work. `retries`
   spends no try on it. `wf ls` already says `failed ✗ check (unfinished)`, and `wf decide` says its check did
   not finish and offers `wf retry <run> <step> --recheck`.
-- **`wf retry <run> <step> [--nudge | --fresh | --model <m> | --recheck]`** is a person's word for one more
+- **`wf retry <run> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"]`** is a person's word for one more
   try. `--nudge`, the default, continues the step's last session and tells it what happened. `--fresh` starts
   a new session on the same branch, with the whole brief. `--model <m>` does that on `m`. `--recheck` runs the
   check again on the work as it stands, and files no session. A step may be tried again when it waits on you
@@ -558,14 +559,26 @@ retries: 1
   (`<run>-<step>-try<n>`, `<run>-<step>-try<n>-check`). So a pass that dies after filing a try is adopted by
   the next, and a pass that dies before consuming the ask leaves the try on the record, where the ask is
   spent and files nothing.
+- **A step that asks gets an answer: `--message "<answer>"`.** A session nobody sits beside has no
+  AskUserQuestion and no plan mode (plan §4 Q), so a step that needs a person asks the run's way: it signs off
+  `blocked`, with the question in `needs`, which ends its session and puts the question on the record. The
+  answer rides on the ask — `message`, in the person's own file — beside `--nudge`, `--fresh` or `--model <m>`,
+  and the next tick carries it into the try's brief inside `## Try <n>`, as `## Your answer`: the text as it was
+  written, after on whose word the try is and before what the check said. A step that did not sign off blocked
+  may be told something too. Refused before anything is written: an empty message, and `--message` with
+  `--recheck`, which files no session to read it. A hand-written ask file is held to the same word by the tick,
+  and one from before messages reads as it did. The record keeps no message: what `wf ls` and `wf decide` say
+  of an answered try is read off the ask file, waiting or in `done/`.
 - **The record keeps the current try where it always was.** `steps[name].taskId` and `steps[name].check` are
   the current try's, so everything that reads them reads the try that decides the step. The tries before it
   go under `steps[name].tries`, in order, each with what replaced it: `retries`, `nudge`, `fresh` (and its
   model) or `recheck`. A person's tries do not spend the step's `retries`.
 - **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
-  0 spent`, `try 2 asked (--recheck) — the next tick files it`, and once filed `try 2, by retries: 1`. A step
-  with a try due is not waiting on you. **`wf decide`** names the try each closeout and check belong to, and
-  under *try again* gives the `wf retry` for each step that can take one.
+  0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`, and
+  once filed `try 2, by retries: 1` or `try 2, nudged on your word, answered`. A step with a try due is not
+  waiting on you. **`wf decide`** names the try each closeout and check belong to — for a try you answered,
+  with what the try before it needed and your answer under it — and under *try again* gives the `wf retry` for
+  each step that can take one; under a blocked step's `needs`, the `wf retry --message` that answers it.
 
 This repository's workflows declare no `retries:`. A flaky suite would spend a whole session on a nudge, so
 whether a refusal is the agent's to answer or a person's is left to each workflow's author.

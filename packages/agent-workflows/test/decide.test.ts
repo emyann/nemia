@@ -17,7 +17,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { AGENT_FACING, CHECK_AFFECTING, LESSON, advance, consumption, lessonLine, readRun, sensitiveDiff, start, touchedBy } = await import('../src/runner.ts');
+const { AGENT_FACING, CHECK_AFFECTING, LESSON, advance, consumption, lessonLine, readRun, retry, sensitiveDiff, start, touchedBy } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const git = (repo: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8' });
@@ -268,4 +268,32 @@ test('what a step consumed is summed over its attempts — one that never starte
     implement: { turns: 3, toolCalls: 4, inputTokens: 15, outputTokens: 2 },
     review: undefined,
   });
+});
+
+test("`wf decide` on a try a person answered: its line says so, and under it what the try before needed and your answer, read off the ask; a blocked step is told the wf retry --message that answers it", async (t) => {
+  const run = start({ brief: 'add sub', repo: aRepo(), workflowDir: folder(), isolate: false });
+  const { e, settle } = board();
+  const blocked = (needs: string) => ({ outcome: 'blocked', summary: 'two readings', artifacts: [], needs });
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', blocked('Rename --flag, or keep it?'));
+  await advance(e, readRun(run.id));
+
+  const asking = await screen(t, e, run.id);
+  const needs = indexOf(asking, '    needs: Rename --flag, or keep it?');
+  assert.equal(asking[needs + 1], `    to answer it:  wf retry ${run.id} implement --message "<answer>"`, 'the question, then the command that answers it');
+  indexOf(asking, `    implement: blocked. Continue its session, told what happened:  wf retry ${run.id} implement  (--fresh, or --model <m>, for a new session)`);
+  assert.ok(!asking.some((l) => /^ {4}your answer: |^ {4}try \d+ needs: |answered\)$/.test(l)), 'nothing answered yet');
+
+  await retry(e, run.id, 'implement', { mode: 'nudge', message: 'Keep it.\nThe flag is public.' });
+  indexOf(await screen(t, e, run.id), '  implement: try 2 asked (--nudge, with your answer) — the next tick files it');
+
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-try2`, 'succeeded', blocked('And the README, too?'));
+  await advance(e, readRun(run.id));
+  const lines = await screen(t, e, run.id);
+  const head = indexOf(lines, '  implement  BLOCKED  (try 2, nudged on your word, answered)');
+  const question = indexOf(lines, '    try 1 needs: Rename --flag, or keep it?');
+  assert.deepEqual(lines.slice(question + 1, question + 3), ['    your answer: Keep it.', '    The flag is public.']);
+  assert.ok(head < question && question < indexOf(lines, '    needs: And the README, too?'), 'the question and its answer, then what the try made of them');
+  assert.ok(!fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8').includes('The flag is public'), 'composed on read: the record keeps no message');
 });

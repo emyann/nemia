@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, phaseOfView, readRun, retry, round, start } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, phaseOfView, readAnswers, readAsks, readRun, retry, round, start } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -1365,4 +1365,85 @@ test("`phaseOfView` and `closeoutAsked` say what `wf ls` says: `unknown` for a t
   const { e: old } = engineWith({ 't-before': 'succeeded' });
   const oldViews = await viewsOf(old, before);
   assert.deepEqual([phaseOfView(oldViews.get('t-before')), closeoutAsked(oldViews)('t-before'), (await list(old, before)).steps[0]!.status], ['succeeded', false, 'unverified']);
+});
+
+test("`wf retry --message` writes the answer on the person's ask and nothing else; the tick carries it into the try's brief as `## Your answer`, once, and `wf ls` says the try was answered", async () => {
+  const run = started(folder());
+  const { e, tasks, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag, or keep it?' });
+  await advance(e, readRun(run.id));
+
+  const answer = 'Keep it.\nThe flag is public: say so in the README.';
+  const record = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
+  const { ask, file } = await retry(e, run.id, 'implement', { mode: 'nudge', message: answer });
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { step: 'implement', try: 2, mode: 'nudge', message: answer, at: ask.at });
+  assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8'), record, 'the verb writes no record');
+  assert.equal((await list(e, readRun(run.id))).steps[0]!.note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
+
+  const pass = await advance(e, readRun(run.id));
+  const try2 = `${run.id}-implement-try2`;
+  assert.deepEqual(pass.tried, ['implement']);
+  assert.ok(pass.notes.includes('implement: try 2 — wf retry --nudge, with your answer'), pass.notes.join('\n'));
+  const brief = tasks.get(try2)!.spec.brief;
+  assert.match(brief, /^## Try 2\n\nThe last try signed off `blocked`\./, 'its session continued, told why it is back');
+  assert.ok(brief.includes(`\n\n## Your answer\n\n${answer}`), brief);
+  assert.equal(readRun(run.id).steps.implement?.tries?.[0]?.then, 'nudge');
+  assert.ok(!fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8').includes('say so in the README'), 'the record keeps no message');
+  assert.deepEqual(asksOf(run.id), [], 'consumed');
+
+  settle(try2, 'running');
+  assert.equal((await list(e, readRun(run.id))).steps[0]!.note, 'try 2, nudged on your word, answered', 'read off the consumed ask');
+  assert.deepEqual(readAnswers(run.id), [{ ...ask }]);
+  await advance(e, readRun(run.id));
+  assert.equal(filings.filter((f) => f === try2).length, 1, 'honoured once');
+});
+
+test('REFUSED: `wf retry` with an empty --message, or --message on --recheck — exit 2, by name, and no ask written; the CLI refuses before it reads a run', async () => {
+  const { run, e } = await throughCheck('check: npm test', 'stopped');
+  await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge', message: ' \n' }), refusedWith(/^--message is empty/));
+  await assert.rejects(retry(e, run.id, 'implement', { mode: 'recheck', message: 'the suite is fixed' }),
+    refusedWith(/^--message carries your answer into the try's brief, and --recheck files no session to read it/));
+  assert.deepEqual(asksOf(run.id), []);
+  // Not refused: a message to a step whose check did not finish. It did not sign off blocked, and a person may still have something to say.
+  await retry(e, run.id, 'implement', { mode: 'fresh', message: 'main has the fix for the flake' });
+  assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
+
+  const { main } = await import('../src/cli.ts');
+  for (const [flags, pattern] of [
+    [['--message', ''], /^--message is empty/],
+    [['--recheck', '--message', 'the second reading'], /^--message carries your answer into the try's brief, and --recheck files no session/],
+    [['--message'], /^--message takes what to tell the step/],
+    [['--message', '--fresh'], /^--message takes what to tell the step/],
+    [['--message', 'a', '--message', 'b'], /^wf retry takes --message once/],
+  ] as const) {
+    await assert.rejects(main(['retry', 'no-such-run', 'implement', ...flags]), refusedWith(pattern), flags.join(' '));
+  }
+});
+
+test('REFUSED at read: an ask file whose message is not text, is empty, or rides on a recheck is not honoured — and one written before messages reads as it always did', async () => {
+  const { run, e, filings } = await throughCheck('check: npm test', 'stopped');
+  const at = '2026-09-13T10:00:00.000Z';
+  fs.mkdirSync(asksDir(run.id), { recursive: true });
+  const refused = {
+    'retry-implement-2': [{ mode: 'nudge', message: 42, at }, 'its message is not text'],
+    'retry-implement-3': [{ mode: 'fresh', message: ' ', at }, 'its message is empty'],
+    'retry-review-2': [{ mode: 'recheck', message: 'the suite is fixed', at }, 'it carries a message and asks for a recheck, which files no session to read it'],
+  } as const;
+  for (const [name, [held]] of Object.entries(refused)) fs.writeFileSync(path.join(asksDir(run.id), name), JSON.stringify(held));
+  const pass = await advance(e, readRun(run.id));
+  assert.deepEqual(pass.tried, []);
+  for (const [name, [, why]] of Object.entries(refused)) {
+    assert.ok(pass.notes.some((n) => n.endsWith(`${name}: ${why}, so it is not honoured — remove it, and ask with wf retry`)), pass.notes.join('\n'));
+  }
+  assert.deepEqual([readAsks(run.id).asks, readAnswers(run.id)], [[], []]);
+  assert.equal(filings.length, 2);
+
+  // The shape `wf retry` wrote before --message: read with no message, and honoured.
+  for (const name of Object.keys(refused)) fs.rmSync(path.join(asksDir(run.id), name));
+  const legacy = { step: 'implement', try: 2, mode: 'recheck', at };
+  fs.writeFileSync(path.join(asksDir(run.id), 'retry-implement-2'), `${JSON.stringify(legacy, null, 2)}\n`);
+  assert.deepEqual(readAsks(run.id), { asks: [legacy], rounds: [], notes: [] });
+  assert.deepEqual(readAnswers(run.id), []);
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
 });

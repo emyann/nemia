@@ -1156,6 +1156,59 @@ What it leaves:
 - **A file rewritten at the same size within a millisecond of its copy is not copied again.** Collection runs once the step has
   finished, so only something else writing the workspace could do that.
 
+### A stale ask on a harness-blocked step is honoured
+
+From W4's review. `wf retry` on a step whose session the harness had blocked writes the ask, and the tick stopped that session
+only while the engine said `needs-human`. A session can work again before a tick stops it, told something by a peer with no
+`wf up` running. The ask was then neither due nor spent, and `wf ls` said nothing of it. When the step later failed or stopped,
+it filed try 2 at once, ahead of `retries:`.
+
+What was built:
+
+- `retriesDue` reads the engine's record of the task, not what the harness said when the ask was written. An unspent `--nudge`
+  or `--fresh` ask for a step whose task has not settled (`pending` or `running`) is due with `stopFirst`, whether or not the
+  harness still says blocked, and `runsOn` marks a session the harness no longer calls blocked. The tick then does what W4
+  built: it asks the engine to stop the session once, since a task with `stopRequested` is not asked again, and files the try
+  once the task has settled.
+- `wf ls` notes it: `try 2 asked (--nudge) — stopping its session, then the tick files it`. While the harness still says blocked,
+  the words stay `stopping its blocked session`, which apps/api and apps/web pin. The pass's note says the session runs on.
+- `listing` now reads `unknown`, a task the engine has no record of, as that and not as running: the tick stops nothing of such a
+  task, and `wf ls` does not say it would.
+- `wf retry` is unchanged, and `retryable` still refuses a working step at the verb. A `--recheck` ask on a working step is not
+  honoured, since no session could have been asked for one.
+
+What was measured:
+
+- `test/run.test.ts` (1 new):
+  - Due, with `stopFirst` and `runsOn`: an ask for a step whose task runs, whether the harness's word is left out or given as
+    no, for `--nudge` and for `--fresh --model`; and likewise a task still `pending`, and one signed off and running on.
+  - Still blocked by its harness, the ask is due exactly as before, without `runsOn`, and `decision` names the step once.
+    `listing` gives each wording, beside `running (working)` and beside `needs-human`.
+  - Not due: an ask on a task the engine has no record of, a `--recheck` ask, and an ask for a try past the next.
+  - Settled `stopped`, the ask is due as any stopped step's.
+  - `retryRefusal` still refuses a working step, with the harness's word and without it. With no asks, nothing is due of a
+    working step, and a refused check `retries:` covers is due as before.
+- W4's test had held the old behaviour in two assertions: "without the harness's word, nothing is due", and nothing said beside
+  `running (working)`. Both now expect the ask due and noted.
+- `test/store.test.ts` (1 new), with `main` and `advance` run for real. `wf retry` on a `needs-human` step, then the task reads
+  `running`, and `wf ls` says `stopping its session`. The first pass stops the task once, files nothing, leaves the record byte
+  for byte, and keeps the ask. Two more passes, one on a board read afresh, stop nothing more. Once settled `stopped`, the next
+  pass files try 2, continuing the session, and consumes the ask; a later pass files nothing more.
+- Each rule was broken on purpose and the tests rerun:
+  - the old rule, due only while the harness says blocked, fails 3 tests;
+  - the note always saying `blocked` fails 3;
+  - `wf ls` reading an unknown task as running fails 1.
+- agent-workflows: 366 tests, 365 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 366 (365 passed, 1 skipped), api 114 and web 158, all passing.
+
+What it leaves:
+
+- **A session that works again and settles with no tick in between still leaves its ask.** The ask is not due while the step
+  is verified, and it files try 2 the moment the step waits on a person. Nothing in `wf ls` says an ask is waiting on a verified
+  step.
+- **The web's own words say `stopping its blocked session` for both.** The api's `note` is `listing`'s and tells them apart, but
+  the web words a try asked from `stopFirst` alone.
+
 ## 1. Forgetting a run (`wf rm`)
 
 **Why.** Runs, worktrees and branches accumulate, and clearing them is manual: `git worktree

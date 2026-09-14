@@ -2494,3 +2494,44 @@ test("REFUSED at shipped defaults: a copy is never written through a link a step
   assert.equal(execFileSync('git', ['cat-file', '-t', `${run.branch}:report.md`], { cwd: run.repo, encoding: 'utf8' }).trim(), 'blob');
   assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), [{ path: 'shots/shot.png', why: 'not collected' }, { path: 'report.md', why: 'not collected' }]);
 });
+
+// ─── a stale ask ────────────────────────────────────────────────────────────
+
+test("REFUSED before, now honoured at shipped defaults: `wf retry` on a step whose harness blocked its session, and the session works again before any tick — the tick stops it once, files nothing while it stops, and files the try once it has; `wf ls` says so meanwhile", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.settle(taskId, 'needs-human' as TaskPhase);
+  const e = recordingStops(b);
+  t.mock.method(console, 'log', () => {});
+  const { main } = await import('../src/cli.ts');
+  await main(['retry', run.id, 'implement'], e);
+  assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
+
+  // A peer's message, and the session works again: no tick ran in between.
+  b.settle(taskId, 'running');
+  assert.deepEqual((await list(e, readRun(run.id))).steps[0], { name: 'implement', status: 'running', branch: run.branch, note: 'try 2 asked (--nudge) — stopping its session, then the tick files it' });
+
+  const record = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
+  const first = await advance(e, readRun(run.id));
+  assert.deepEqual([b.stopped, first.tried, first.filed, first.status], [[taskId], [], [], 'running'], 'the session asked to stop, and nothing filed');
+  assert.ok(first.notes.includes(`implement: try 2 — wf retry --nudge; its session runs on, asked for while its harness had blocked it, so the engine is asked to stop it, and the try is filed once it has`), first.notes.join('\n'));
+  assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8'), record, 'the record untouched');
+  assert.deepEqual(asksOf(run.id), ['retry-implement-2'], 'the ask waits for its try');
+
+  // Passes while the engine stops it — the second on a board read afresh, as after a restart: no second stop, nothing filed.
+  for (const engineOf of [() => e, () => recordingStops(b)]) {
+    const again = await advance(engineOf(), readRun(run.id));
+    assert.deepEqual([b.stopped, again.tried, again.filed, again.notes], [[taskId], [], [], []]);
+  }
+
+  // Settled stopped: the next pass files try 2, a nudge that continues the session, once.
+  b.settle(taskId, 'stopped');
+  const try2 = `${run.id}-implement-try2`;
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  assert.equal(b.tasks.get(try2)!.spec.resumeFrom, `native-${taskId}`);
+  assert.deepEqual(asksOf(run.id), [], 'consumed');
+  await advance(e, readRun(run.id));
+  assert.deepEqual([b.stopped, b.filings.filter((f) => f === try2).length], [[taskId], 1], 'once');
+});

@@ -884,11 +884,14 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
   // The tick's reading: the ask is due, to stop the session first, and the run is still going, waiting on nobody.
   const a = assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman);
   assert.deepEqual([a.retry, a.ready, a.blocked, a.status], [[{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }], [], [], 'running']);
-  assert.deepEqual(assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)]).retry, [], "without the harness's word, nothing is due");
+  // Without the harness's word, due all the same: the task has not settled, so its session is stopped first (plan §6 item 24).
+  assert.deepEqual(assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)]).retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true, runsOn: true }],
+    "without the harness's word, due as a session that runs on");
   assert.deepEqual(decision(STEPS, r, p, nothingShipped, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman), { kind: 'running', waiting: ['implement'] }, 'live and due, named once');
   const l = listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]);
   assert.deepEqual([l.steps[0], l.waitingOnYou], [{ name: 'implement', status: 'needs-human', branch: null, note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' }, []]);
-  assert.equal(listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, undefined, 'a session still working: nothing due, nothing said');
+  assert.equal(listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note,
+    'try 2 asked (--nudge) — stopping its session, then the tick files it', 'a session working again: stopped first, and said so');
 
   // Once the session has settled, the same ask is due as any stopped step's, and filed.
   assert.deepEqual(assess(STEPS, r, phases({ t1: 'stopped' }), nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman).retry,
@@ -1887,4 +1890,48 @@ test("`wf decide` names a run's inputs under its line, and a run given none says
   assert.equal(inputsNote('/wf/runs/r-1/inputs', ['mock.png', 'brief notes.md']), 'inputs  mock.png, brief notes.md  —  in /wf/runs/r-1/inputs');
   assert.equal(inputsNote('/wf/runs/r-1/inputs', []), undefined);
   assert.equal(inputsNote('/wf/runs/r-1/inputs', undefined), undefined);
+});
+
+// ─── a stale ask ────────────────────────────────────────────────────────────
+
+test("REFUSED before, now honoured: an ask written while the harness blocked a step's session, whose session then works again, is due all the same — stopped first, and said so by `wf ls` — and filed as a stopped step's once the task settles; the verb still refuses a working step, and `retries:` and a run without asks are as they were", () => {
+  const r = run({ implement: 't1', review: null });
+  const nothingSigned = () => undefined;
+  const working = phases({ t1: 'running' });
+  const stale = (extra: Partial<RetryAsk> = {}) => ({ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true, runsOn: true, ...extra });
+
+  // The harness no longer says blocked, whether its word is left out or given as no: due, the session stopped first.
+  const a = assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2)]);
+  assert.deepEqual([a.retry, a.ready, a.blocked, a.status], [[stale()], [], [], 'running']);
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2, 'fresh', 'opus')], [], () => false).retry, [stale({ mode: 'fresh', model: 'opus' })]);
+  // Filed and waiting for a slot, and signed off and running on: the same — the ask was written before either.
+  assert.deepEqual(assess(STEPS, r, phases({ t1: 'pending' }), nothingSigned, asked, () => undefined, [askFor(2)]).retry, [stale()]);
+  assert.deepEqual(assess(STEPS, r, working, signedDone, asked, () => undefined, [askFor(2)]).retry, [stale()]);
+  // Still blocked by its harness: exactly as before, no `runsOn`.
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2)], [], (id) => id === 't1').retry,
+    [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }]);
+  assert.deepEqual(decision(STEPS, r, working, nothingShipped, nothingSigned, asked, () => undefined, [askFor(2)]), { kind: 'running', waiting: ['implement'] }, 'live and due, named once');
+
+  // `wf ls` says so, in words of its own beside a session that works, and in the harness-blocked words beside `needs-human`.
+  const l = listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]);
+  assert.deepEqual([l.steps[0], l.waitingOnYou], [{ name: 'implement', status: 'running (working)', branch: null, note: 'try 2 asked (--nudge) — stopping its session, then the tick files it' }, []]);
+  assert.equal(listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it');
+
+  // Refused as before: a task the engine has no record of is stopped for no ask, and `wf ls` says nothing of one; a recheck, which no
+  // session could have been asked for, is not honoured on a working step.
+  assert.deepEqual(assess(STEPS, r, phases({}), nothingSigned, asked, () => undefined, [askFor(2)]).retry, []);
+  assert.equal(listing(STEPS, r, shown({}), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, undefined);
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2, 'recheck')]).retry, []);
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(3)]).retry, [], 'an ask for another try than the next');
+
+  // Once the task has settled, the same ask is due as any stopped step's, and filed.
+  assert.deepEqual(assess(STEPS, r, phases({ t1: 'stopped' }), nothingSigned, asked, () => undefined, [askFor(2)]).retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }]);
+
+  // The verb is unchanged: a working step is refused, with the harness's word or without it.
+  for (const blockedOf of [undefined, () => false]) {
+    assert.match(retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, working, nothingSigned, asked, () => undefined, [], blockedOf)!, /^implement is still running, so there is nothing to try again until it ends/);
+  }
+  // Without asks, nothing is due of a working step; and a refused check `retries:` covers is due as it was, with no stop.
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked).retry, []);
+  assert.deepEqual(assess(RETRIED, withCheck('c1'), phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked, () => 1).retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'retries' }]);
 });

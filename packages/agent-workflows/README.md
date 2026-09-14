@@ -623,6 +623,9 @@ retries: 1
   stopped step: a nudge continues the session. A step whose session is still working is refused as before. A
   caller takes the harness's word by passing it (`retry(…, { stopBlocked: true })`): `wf retry` does, and so does
   the board's `POST …/retry` (its banner's Continue); a caller that leaves it out is refused as before.
+  The session can work again before a tick stops it, told something by a peer with no `wf up` running. The ask
+  stands all the same: while the step's task has not settled, the tick stops its session, once, and files the try
+  when it has, whatever the harness says by then. `wf retry` itself still refuses a step whose session works.
 - **An ask is a file, like a cancellation.** `wf retry` writes `runs/<id>.asks/retry-<step>-<n>`, whole and
   exclusively, and never writes the run's json. Every pass reads the directory. The next pass files try `n`,
   writes the record, then moves the ask into `done/`. The ask names its try, and a try's ids are derived
@@ -650,7 +653,8 @@ retries: 1
   model) or `recheck`. A person's tries do not spend the step's `retries`.
 - **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
   0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`,
-  `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human`, and
+  `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
+  `stopping its session` beside a session that works again since it was asked), and
   once filed `try 2, by retries: 1` or `try 2, nudged on your word, answered`. A step with a try due is not
   waiting on you. **`wf decide`** names the try each closeout and check belong to — for a try you answered,
   with what the try before it needed and your answer under it — and under *try again* gives the `wf retry` for

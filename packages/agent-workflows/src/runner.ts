@@ -950,13 +950,15 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   for (const r of retry) {
     const step = steps.find((s) => s.name === r.step)!;
     const record = run.steps[r.step]!;
-    // A try of a step whose session its harness blocked: the session is stopped first, and nothing is filed. Asked once — a task the engine
-    // already holds the request for is not asked again — and a later pass, once the task has settled, reads the try due as one of a stopped
-    // step, and files it. Nothing is carried between the two: a pass after a restart reads the same engine record, and does the same.
+    // A try of a step whose task has not settled — its session blocked by its harness, or asked for while it was and working again since: the
+    // session is stopped first, and nothing is filed. Asked once — a task the engine already holds the request for is not asked again — and a
+    // later pass, once the task has settled, reads the try due as one of a stopped step, and files it. Nothing is carried between the two: a
+    // pass after a restart reads the same engine record, and does the same.
     if (r.stopFirst) {
       if (!views.get(record.taskId!)?.state.stopRequested) {
         await e.stop(record.taskId!);
-        notes.push(`${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; its harness blocked its session, so the engine is asked to stop it, and the try is filed once it has`);
+        const why = r.runsOn ? 'its session runs on, asked for while its harness had blocked it' : 'its harness blocked its session';
+        notes.push(`${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, so the engine is asked to stop it, and the try is filed once it has`);
       }
       continue;
     }

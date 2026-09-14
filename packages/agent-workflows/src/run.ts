@@ -494,10 +494,12 @@ export type RetryHow = { mode: RetryMode; model?: string; message?: string };
 /**
  * A try to file on this pass: of which step, its number, how, on whose word — and, for a person's, what they said with it.
  *
- * `stopFirst` on a person's try of a step whose session its harness blocked (`retryable`): the pass asks the engine to stop that session
- * and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped step, and files it.
+ * `stopFirst` on a person's try of a step whose task has not settled (`retriesDue`): the pass asks the engine to stop that session — once,
+ * as the engine's `stopRequested` says — and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped
+ * step, and files it. `runsOn` beside it when the harness no longer says the session is blocked: asked for while it was, the session has
+ * worked again since.
  */
-export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; by: 'retries' | 'ask'; stopFirst?: true };
+export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; by: 'retries' | 'ask'; stopFirst?: true; runsOn?: true };
 
 /**
  * Why a message cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the
@@ -587,10 +589,15 @@ export function retryable(
  * The tries due now. Pure, and blind to cancellation on purpose: `assess` answers for a cancelled run, and
  * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
  *
- * A person's ask for a step's next try, when the step may be tried again that way — with `stopFirst` for a step
- * whose session its harness blocked (`retryable`), since that session is still there to stop. Otherwise a check that
- * REFUSED (`refusedCheck`), while `retries:` has tries left: the step re-filed as a nudge. Past them, or for a
- * check that did not finish, nothing is due — the step waits on the person, as it always has.
+ * A person's ask for a step's next try, when the step may be tried again that way. For a step whose task has not settled, with
+ * `stopFirst`, since its session is still there to stop — `--nudge` or `--fresh`, the ways `wf retry` takes for a session its harness
+ * blocked (`retryable`), whether or not the harness still says so. An ask can only be written for such a step while its harness blocks
+ * the session, and the session can work again before a tick stops it, told something by a peer with no `wf up` running. Left for its
+ * task to settle, that ask was neither due nor spent, `wf ls` said nothing of it, and the step's next failure filed it at once, ahead of
+ * `retries:`. So the engine's record of the task decides, as it does everywhere here, not what the harness said when the ask was written;
+ * `runsOn` marks a session the harness no longer calls blocked. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has
+ * tries left: the step re-filed as a nudge. Past them, or for a check that did not finish, nothing is due — the step waits on the
+ * person, as it always has.
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
@@ -610,13 +617,17 @@ export function retriesDue(
   for (const step of steps) {
     const record = run.steps[step.name];
     const { status, modes, blockedByHarness } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked);
-    if (!record?.taskId || !modes.length) continue;
+    if (!record?.taskId) continue;
+    const phase = phaseOf(record.taskId);
+    const unsettled = phase === 'pending' || phase === 'running';
+    const ways = unsettled ? STOPPED_FIRST : modes;
+    if (!ways.length) continue;
     const next = tryOf(run, step.name) + 1;
-    const ask = asks.find((a) => a.step === step.name && a.try === next && modes.includes(a.mode));
+    const ask = asks.find((a) => a.step === step.name && a.try === next && ways.includes(a.mode));
     if (ask) {
       due.push({
         step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), ...(ask.message !== undefined ? { message: ask.message } : {}), by: 'ask',
-        ...(blockedByHarness ? { stopFirst: true as const } : {}),
+        ...(unsettled ? { stopFirst: true as const, ...(blockedByHarness ? {} : { runsOn: true as const }) } : {}),
       });
     } else if (status === 'failed (check)' && record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name))
       && retriesSpent(record) < (step.retries ?? 0)) {
@@ -625,6 +636,9 @@ export function retriesDue(
   }
   return due;
 }
+
+/** The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked. */
+const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
 
 /**
  * A step's record once a try is filed: the current try moved behind, with what replaced it, and the new one in
@@ -724,9 +738,12 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   return [inRound, `try ${record!.tries!.length + 1}, ${how}`, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
 
-/** A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session its harness blocked, that the session is stopped first. */
+/**
+ * A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session the tick stops first, that it does: `its blocked session`
+ * while its harness says so, and `its session` once it works again (`runsOn`).
+ */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => (r.by === 'ask'
-  ? `try ${r.try} asked (${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? 'stopping its blocked session, then the tick files it' : 'the next tick files it'}`
+  ? `try ${r.try} asked (${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
   : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`);
 
 /**
@@ -1667,10 +1684,11 @@ export function listing(
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run.
   const waiting = gated(run) ? [...waits] : [];
-  // The engine's word for a settled task IS its outcome; any other word is a task still going.
+  // The engine's word for a settled task IS its outcome, and `unknown` a task it has no record of, which the tick stops nothing of; any other
+  // word is a task still going.
   const settledOf = (taskId: string): TaskPhase => {
     const word = phaseOf(taskId);
-    return word === 'succeeded' || word === 'failed' || word === 'stopped' ? word : 'running';
+    return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
   };
   const readable = (name: string): Closeout | undefined => {
     const c = closeoutOf(name);

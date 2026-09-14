@@ -96,7 +96,7 @@ export type RunDetail = {
    * `graphOf`. A step the page shows and that workflow does not have waits on nothing, so it is a root.
    */
   graph: RunGraph;
-  /** The recorded steps in the order the run started with them, then any the folder has gained. */
+  /** The recorded steps in the order the run started with them, then — on a record from before runs froze their workflow — any the folder has gained. */
   steps: Array<{
     name: string;
     /** From the workflow the run froze at `wf start`; for a record from before runs froze one, the folder. */
@@ -208,12 +208,14 @@ function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { steps: 
  *
  * Every step on the record, in the record's order — the workflow's order when the run started —
  * because the record is the truth about what ran, whatever the folder says now; `wf decide` reads
- * the record too. Then any step the folder has and the record does not: `wf start` records every
- * step it finds, so those were added since. The tick files them only on a record from before runs
- * froze their workflow, which it reads from the folder; on a run that froze one they stay `waiting`.
+ * the record too. Then any step the workflow the tick reads (`stepsOf` in runner.ts) has and the record
+ * does not. On a run that froze its workflow that is the frozen one, so a step the folder gained since is
+ * not shown: the tick never files it, and drawn, it would wait for ever and make a root of the graph the
+ * run froze — `driftOf` names it instead. On a record from before runs froze one, the folder, whose added
+ * steps the tick does file.
  */
 function stepNames(run: Run, workflows: readonly Workflow[] | null): string[] {
-  const added = (workflows ?? []).map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
+  const added = (run.workflow ?? workflows ?? []).map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
   return [...Object.keys(run.steps), ...added];
 }
 
@@ -225,7 +227,7 @@ function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
   const shown = run.workflow ? 'shown as the run froze it' : 'shown from the run record without spec or prose';
   const said = [
     ...(removed.length ? [`it no longer has ${removed.join(', ')}, ${shown}`] : []),
-    ...(added.length ? [`it has ${added.join(', ')}, which the run did not start with`] : []),
+    ...(added.length ? [`it has ${added.join(', ')}, which the run did not start with${run.workflow ? ' and will never file, so it is not shown' : ''}`] : []),
   ];
   return said.length ? `The workflow folder ${run.workflowDir} has changed since this run started: ${said.join('; ')}.` : null;
 }
@@ -270,9 +272,8 @@ type Judged = {
  *
  * Given what people asked for with `wf retry` and `wf round`, read once, as the tick reads them (`readAsks`): without them a
  * step a person asked to try again, or a loop out of rounds a person sent round once more, reads as waiting on them, and the
- * run as not moving, for as long as the tick takes to file what they asked for. A step the page shows and the tick does not judge — one the folder gained after the run froze
- * its workflow, or one a pre-freeze record has and its folder lost — is worded as a `bare` step, and has no
- * say in the run's status. Everything is read off the views the request already has: calling `list` would
+ * run as not moving, for as long as the tick takes to file what they asked for. A step the page shows and the tick does not judge — one a pre-freeze record has and its folder
+ * lost — is worded as a `bare` step, and has no say in the run's status. Everything is read off the views the request already has: calling `list` would
  * read every task again, and word only the steps the tick judges. The api test holds these words to `list`'s.
  */
 function judge(run: Run, names: readonly string[], folder: readonly Workflow[] | null, views: Views): Judged {

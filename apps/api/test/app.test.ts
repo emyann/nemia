@@ -358,6 +358,26 @@ test('a run that froze its workflow is drawn from it, not from a folder that rea
   assert.ok(run.steps[1].told?.startsWith('Review it, as frozen.'), run.steps[1].told);
 });
 
+test('a run that froze its workflow shows only its steps: one its folder gained since is named in the warning, and neither listed nor drawn', async () => {
+  // A step added to the folder after `wf start`. The tick reads the frozen workflow, so it never files it.
+  const grown = workflowFolder({
+    'implement.md': 'Implement it.\n',
+    'review.md': '---\nafter: implement\n---\nReview it.\n',
+    'docs.md': 'Write it down.\n',
+  });
+  writeRun({ ...r2, id: 'r-43', workflowDir: grown, workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+
+  const run = await (await app.request('/api/runs/r-43')).json();
+  assert.match(run.warning, /has changed since this run started: it has docs, which the run did not start with and will never file, so it is not shown\./);
+  assert.deepEqual(run.steps.map((s: { name: string }) => s.name), ['implement', 'review']);
+  // Not a root beside implement: the graph is the one the run froze.
+  assert.deepEqual(run.graph, frozenGraph);
+  assert.deepEqual((await listed('r-43')).steps.map((s: { name: string }) => s.name), ['implement', 'review']);
+  // The steps `wf ls` lists, and no other.
+  assert.deepEqual((await list(engine(), readRun('r-43'))).steps.map((s: { name: string }) => s.name), ['implement', 'review']);
+  assert.equal((await app.request('/api/runs/r-43/steps/docs/log')).status, 404);
+});
+
 test('an unknown run is refused with a 404 that says where to look', async () => {
   const res = await app.request('/api/runs/no-such-run');
   assert.equal(res.status, 404);

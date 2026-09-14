@@ -1456,10 +1456,11 @@ export function missingArtifacts(run: Run, stepName: string, closeout: Closeout 
 
 /**
  * Why a file named from the workspace root is not one the run has — or undefined when it is: collected into `dir`, which answers first,
- * whatever the workspace holds since. Otherwise the workspace says why, where the record names one: a link that leads out of it, a
- * directory, or a file the run did not collect — its step has not handed off, or the copy was refused. Named even when the file is on the
- * branch too: the run reads a step's files from its directory, and one it refused to copy is not passed over. Only with nothing in the
- * workspace is the branch asked: a file there is one a run from before collection left, whose worktree is gone.
+ * whatever the workspace holds since. Otherwise the workspace says why, where the record names one: a link that leads out of it, or a
+ * directory. A file in the workspace whose copy something a step made in `dir` refuses (`copyBlocked`) is `not collected`, even when it is
+ * on the branch too: the run does not pass over a copy it refused. Any other file is the branch's to answer, as it was before collection —
+ * so a run from before it, whose worktree is still there and whose steps are past hand-off, reads as it did — and one on no branch either,
+ * a file git ignores that its step has not handed off yet, is `not collected`. With nothing in the workspace, the branch answers too.
  */
 function workspaceArtifact(run: Run, stepName: string, file: string, dir: string): MissingArtifact['why'] | undefined {
   const rel = path.normalize(file);
@@ -1468,8 +1469,9 @@ function workspaceArtifact(run: Run, stepName: string, file: string, dir: string
   const at = workspace ? inWorkspace(workspace, rel) : { kind: 'absent' as const };
   if (at.kind === 'outside') return 'escapes';
   if (at.kind === 'directory') return 'directory';
-  if (at.kind === 'file') return 'not collected';
+  if (at.kind === 'file' && copyBlocked(dir, rel)) return 'not collected';
   const onBranch = branch ? gitSays(run.repo, 'cat-file', '-t', `${branch}:${rel}`)?.trim() : undefined;
+  if (at.kind === 'file') return onBranch === 'blob' ? undefined : 'not collected';
   return onBranch === 'blob' ? undefined : onBranch === 'tree' ? 'directory' : 'not there';
 }
 
@@ -1511,12 +1513,13 @@ function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undef
     const at = inWorkspace(workspace, rel);
     if (at.kind !== 'file') continue;
     try {
-      if (!plainDirectoriesTo(dir, rel)) continue;
+      if (copyBlocked(dir, rel)) continue;
       const to = path.join(dir, rel);
+      fs.mkdirSync(path.dirname(to), { recursive: true });
       const from = fs.statSync(at.real);
       const there = lstatOf(to);
       // Within a millisecond: the time a copy is given goes through a `Date` and a float of seconds, and reads back a hair off the source's.
-      if (there && (!there.isFile() || (there.size === from.size && Math.abs(there.mtimeMs - from.mtimeMs) < 1))) continue;
+      if (there && there.size === from.size && Math.abs(there.mtimeMs - from.mtimeMs) < 1) continue;
       fs.copyFileSync(at.real, to);
       fs.utimesSync(to, from.atime, from.mtime);
       copied.push(rel);
@@ -1525,19 +1528,22 @@ function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undef
   return copied.length ? [`${stepName}: collected ${copied.join(', ')} into ${dir}`] : [];
 }
 
-/** Make the directories from `dir` down to the one `rel` is in — false, and nothing made below, where one is already there and is not a plain directory. */
-function plainDirectoriesTo(dir: string, rel: string): boolean {
-  const top = lstatOf(dir);
-  if (top && !top.isDirectory()) return false;
-  if (!top) fs.mkdirSync(dir, { recursive: true });
+/**
+ * Whether a copy of `rel` into `dir` would go through something a step may have made there: `dir`, or a directory on the way to the copy,
+ * that is there and is not a plain directory — a link, a file — or something in the copy's place that is not a regular file. Looks, and
+ * makes nothing: what `collectArtifacts` refuses to write through, and what `missingArtifacts` names as the copy refused.
+ */
+function copyBlocked(dir: string, rel: string): boolean {
   let at = dir;
-  for (const part of path.dirname(rel).split(path.sep).filter((p) => p && p !== '.')) {
+  for (const part of ['.', ...path.dirname(rel).split(path.sep).filter((p) => p && p !== '.')]) {
     at = path.join(at, part);
     const st = lstatOf(at);
-    if (!st) fs.mkdirSync(at);
-    else if (!st.isDirectory()) return false;
+    // Nothing there yet: made as a plain directory, and nothing below it can be in the way.
+    if (!st) return false;
+    if (!st.isDirectory()) return true;
   }
-  return true;
+  const there = lstatOf(path.join(dir, rel));
+  return Boolean(there && !there.isFile());
 }
 
 /** Whether `file` is a regular file inside `dir`, with every link on the way to either followed. */

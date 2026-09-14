@@ -1110,9 +1110,10 @@ What was built:
   - a directory, or a file that is not there.
 
   Nor is a copy ever written through a link a step made in its files directory, whether on the way to it or in its place.
-- `missingArtifacts` now says why, as `MissingArtifact`. A file named from the workspace is read from the directory, and the
-  workspace says why when it is not there. Only when the workspace has nothing does the branch count, for a run from before
-  collection whose worktree is gone. `artifactLines` gives each reason its own line on `wf decide`'s screen: not in the
+- `missingArtifacts` now says why, as `MissingArtifact`. A file named from the workspace is read from the directory first. Where
+  it is not there, the workspace names a link that leads out of it and a directory, and names `not collected` for a file whose
+  copy something the step made in its files directory refused (`copyBlocked`), even when the file is on the branch. Any other
+  file is the branch's to answer, as before collection, so a run from before it reads as it did. `artifactLines` gives each reason its own line on `wf decide`'s screen: not in the
   workspace, a directory, not collected, not in the directory, outside the workspace, outside the directory.
 - `artifactsContract`, on every brief, says both ways. Put a file in the directory and name it by absolute path, or leave it in
   the workspace and name it by its path from the root.
@@ -1123,7 +1124,7 @@ What was measured:
   - `artifactPlace` on workspace paths, `docs/../RESPONSE.md` and `..notes.md` among them, and on five spellings of climbing out;
   - `artifactLines` with every reason, compared whole;
   - the contract's two ways and its refusals.
-- `test/store.test.ts` (3 new), on a real repository with `start`, `advance` and `main`:
+- `test/store.test.ts` (4 new), on a real repository with `start`, `advance` and `main`:
   - A step names `RESPONSE.md`, `./.e2e/shot.png` (which git ignores) and an absolute path in its directory. A pass hands off,
     collects both workspace files, and dies filing the check. `RESPONSE.md` is then amended, and the next pass copies only it,
     files the check, and `missingArtifacts` is empty. Once the check is filed, a change in the workspace is not collected.
@@ -1132,6 +1133,9 @@ What was measured:
     the three lines under the step.
   - A link in the files directory on the way to a copy, and another in a copy's place. What they lead to is left as it was, and
     `wf decide` names both files not collected, though both are on the branch.
+  - A run from before collection, its step past hand-off with its check on the record, its worktree still there, `docs/RESPONSE.md`
+    committed on the branch and nothing in its files directory: `missingArtifacts` names only a file git ignores, which is on no
+    branch, as `not collected`, and a pass collects nothing.
   - The earlier tests of absolute paths inside and outside the directory now expect a reason, `missing` or `outside`, and are
     otherwise unchanged.
 - Each guard was broken on purpose and the tests rerun:
@@ -1144,8 +1148,17 @@ What was measured:
 - The collection test at first failed intermittently. A copy's time, set through a `Date`, read back a fraction of a millisecond
   off its source's, so an unchanged file was copied again, and its pass's note named it. The comparison is now within a
   millisecond, and the store tests passed five runs in a row.
-- An earlier version counted a file as present whenever it was on the branch. The link test showed that hid a file the run had
-  refused to copy, so the branch is now asked only when the workspace has nothing at that path.
+- The first version counted a file as present whenever it was on the branch, and the link test showed that hid a file the run
+  had refused to copy. The second asked the branch only when the workspace had nothing at the path, and round 2's review found
+  what that broke: no code removes a worktree, so every run from before collection would print `not collected`, for good, for
+  each file its steps named from the workspace root. Those steps are past hand-off, and nothing collects for them. The branch
+  now answers unless the copy was refused. The reviewer proposed asking the branch only once hand-off is past. I left that
+  condition out: a step whose engine task is gone never hands off, and would still read `not collected` for good.
+- Round 2's guards, each broken on purpose: round 1's rule back fails the new legacy test; passing over a refused copy that is on
+  the branch fails the link test; a link on the way to a copy, or in its place, written through each fail the link test; copying
+  on every pass fails the collection test.
+- After round 2, `npm test && npm run typecheck` from the root exited 0: agent-engine 267 (262 passed, 5 live tests skipped),
+  agent-workflows 369 (368 passed, 1 skipped), api 114 and web 158, all passing. The log is `root-check-round2.txt` in the step's artifacts.
 - agent-workflows: 364 tests, 363 passed, 1 skipped. Typecheck clean.
 - `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 364 (363 passed, 1 skipped), api 114 and web 158, all passing.
 
@@ -1155,6 +1168,8 @@ What it leaves:
   `artifactPlace(...) === 'files'`, so a collected file named from the workspace shows as a bare path on the Output tab. The api
   would look for it at `path.join(dir, file)`.
 - **A directory is not collected.** A step names each file in it, and a directory named whole is named on the screen.
+- **A copy that fails for another reason is not named when the file is on the branch.** `collectArtifacts` swallows the error
+  (a full disk, a permission), and the branch then answers. The file is there to read, on the branch.
 - **A file rewritten at the same size within a millisecond of its copy is not copied again.** Collection runs once the step has
   finished, so only something else writing the workspace could do that.
 

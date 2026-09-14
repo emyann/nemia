@@ -2577,3 +2577,31 @@ test("`wf start <card>.md` starts the card's body — its id from the body, its 
   fs.writeFileSync(brief, '---\nA brief that opens with a rule.\n');
   assert.equal((await startedBy(brief, '--repo', repo, '--workflows', dev)).brief, '---\nA brief that opens with a rule.');
 });
+
+test("REFUSED before, now read as it was: a run from before collection — its step past hand-off, its worktree still there, its files on the branch and none in its files directory — has nothing missing, and no pass collects it; a file on no branch still reads not collected", async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  fs.writeFileSync(path.join(run.repo, '.gitignore'), '.e2e/\n');
+  fs.mkdirSync(path.join(run.repo, '.e2e'));
+  fs.writeFileSync(path.join(run.repo, '.e2e', 'shot.png'), 'png');
+  fs.mkdirSync(path.join(run.repo, 'docs'));
+  fs.writeFileSync(path.join(run.repo, 'docs', 'RESPONSE.md'), '# response\n');
+  gitIn(run.repo, 'add', '-A');
+  gitIn(run.repo, 'commit', '-q', '-m', 'the step, handed off');
+  // As a run from before collection left it: its check filed, and nothing in its files directory.
+  const record = readRun(run.id);
+  record.steps.implement = { ...record.steps.implement!, check: { taskId: `${run.id}-implement-check` } };
+  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(['docs/RESPONSE.md', '.e2e/shot.png']));
+  fs.rmSync(files, { recursive: true, force: true });
+
+  assert.equal(execFileSync('git', ['cat-file', '-t', `${run.branch}:docs/RESPONSE.md`], { cwd: run.repo, encoding: 'utf8' }).trim(), 'blob');
+  assert.ok(fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'the worktree is still there');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
+    [{ path: '.e2e/shot.png', why: 'not collected' }], 'the branch has RESPONSE.md; a file git ignores is on no branch');
+  // Past hand-off, so no pass collects it: the branch is where the run reads it.
+  assert.deepEqual((await advance(b.e, readRun(run.id))).notes, []);
+  assert.deepEqual(artifactFiles(run, 'implement'), []);
+});

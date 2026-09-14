@@ -1467,7 +1467,8 @@ export type ArtifactFile = { path: string; bytes: number };
  *
  *   not there      a path from the workspace root with nothing at it, nor on the branch
  *   directory      a path from the workspace root that is a directory: not collected, since a step names each file
- *   not collected  a file in the workspace that is not in the step's files directory: its step has not handed off, or the copy was refused
+ *   not collected  a file in the workspace that is not in the step's files directory, and whose copy something in that directory refused
+ *                  — or that is on no branch either: git ignores it, and its step has not handed off
  *   missing        an absolute path in the step's files directory that is not a file there
  *   escapes        a path that climbs out of the workspace, as written or through a link in it: refused, and not read
  *   outside        an absolute path outside the step's files directory: refused, and not read

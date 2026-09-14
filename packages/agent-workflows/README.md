@@ -802,8 +802,9 @@ it files the step.
   its directory.
 - **The step's check is given it** as `WF_ARTIFACTS`.
 - **A declared artifact is looked for where its path says** (`artifactPlace`). A path from the workspace
-  root is read from `<dir>`, where it was collected, or, for a run from before collection whose workspace no
-  longer has it, from the branch. An absolute path is looked for in the step's own directory, on disk, with
+  root is read from `<dir>`, where it was collected, or else from the branch, as before collection — so a run
+  from before it reads as it did, worktree or not. A file whose copy something the step made in `<dir>` refused
+  is named, even when it is on the branch. An absolute path is looked for in the step's own directory, on disk, with
   links followed. Any other absolute path — another step's directory, a `..` that climbs out, a link inside
   that leads out, `/etc/passwd` — is reported and never opened, stat-ed or resolved: a closeout is an
   agent's text. So is a path from the workspace root that climbs out of it, as written or through a link.

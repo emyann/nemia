@@ -636,6 +636,26 @@ who describes a plan in prose.
 cards), but it makes a whole run "one workload on one harness", which stretches the engine's rule, and
 the diamond does not need it. Run-level `after` with *shipped* as the edge is the small, honest version.
 
+### U2 — Looking is a capability, not a step: `ui` becomes implement ⇄ review · after R, W3
+
+**The ask (operator, 2026-09-13, from the Workflows page):** the `ui` workflow forks implement into
+`look`, `review` and `respond`, which reads as three kinds of work when it is one loop; `review` should
+be able to look, and so should `implement`; and a node listing every tool gets long.
+
+**Why `look` was a step.** When `ui` was designed the reviewer ran on Codex, which cannot read a PNG and
+gets no browser, so looking had to be a Claude step of its own; `respond` existed because there was no
+loop. Both reasons are gone: the reviewer runs on Claude, every Claude step gets the checkout's
+`.mcp.json` (E4 — the Playwright server, which `tools:` does not touch), and R gave the edge back.
+
+**The shape.** A **`look` skill** in the repository (`.claude/skills/look/SKILL.md`): photograph every
+page in both themes with the browser tools, read the e2e's screenshots in the run's artifacts
+directory, compare, name what is off — what the Capabilities page lists, and what any step may invoke.
+`ui` becomes implement ⇄ review (`loop: implement`, `rounds: 3`): `implement` looks before it signs
+off; `review` looks at the screenshots and the diff side by side, and its schema keeps the look's
+per-page findings as findings; `respond` and `look` go, in the repository's `workflows/ui/` and in the
+package's shipped `workflows/ui/` alike. A node shows `tools · 4` with the list on hover; the inspector
+(B7) shows the list.
+
 ## 4b. Findings from wave 1, for the packages that own them
 
 Recorded here at merge time so they are not lost; fold each into its ledger when that package's

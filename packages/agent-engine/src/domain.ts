@@ -179,11 +179,21 @@ export type Event =
   /** The operator asked for it to stop. */
   | { kind: 'stop-requested'; at: string }
   /**
+   * A person's words, handed to the session of the attempt in flight through its harness (`say`). Written
+   * once the harness took them, so it means they were handed over — not that the session read them, or
+   * did what they asked. `decide` never reads it: what was said to a session is a fact for whoever
+   * reviews the work, not a judgement on it.
+   */
+  | ({ kind: 'said' } & Said)
+  /**
    * Terminal. Nothing moves after this. `nativeId` is the session of an attempt it left open —
    * stopped by a person, or past its deadline, with no `ended` to carry it — as the harness still
    * listed it: what `logs` reads once that session has been let go. `decide` never reads it.
    */
   | { kind: 'settled'; at: string; outcome: Outcome; note?: string; nativeId?: string };
+
+/** Words said to a running attempt's session, and when the engine wrote them down. See the `said` event. */
+export type Said = { at: string; attempt: number; text: string };
 
 export type Attempt = {
   n: number;
@@ -233,6 +243,8 @@ export type State = {
   effort?: string;
   mcp?: Record<string, McpServer>;
   attempts: Attempt[];
+  /** What a person said to the task's sessions while they ran, in the order it was said. Carried, never read. */
+  said: Said[];
   stopRequested: boolean;
   settled: Outcome | null;
 };
@@ -241,7 +253,7 @@ export type State = {
 export function fold(taskId: string, events: readonly Event[]): State {
   const s: State = {
     taskId, brief: '', cwd: '', maxAttempts: 1, resume: 'interrupted',
-    attempts: [], stopRequested: false, settled: null,
+    attempts: [], said: [], stopRequested: false, settled: null,
   };
   for (const e of events) {
     switch (e.kind) {
@@ -267,6 +279,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;
+      case 'said': s.said.push({ at: e.at, attempt: e.attempt, text: e.text }); break;
       case 'settled': {
         s.settled = e.outcome;
         const open = s.attempts.at(-1);

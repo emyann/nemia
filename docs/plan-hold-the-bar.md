@@ -792,6 +792,15 @@ owner is not mid-run.
   machine in `.claude/settings.local.json` (`Read(//home/…/.agent-workflows/**)`, a path that is nobody
   else's); the portable fix is an artifacts directory the step is told, carried on the task (§4b, the
   `look` note). → I's follow-up, small.
+- **where a run's hour goes is not on the board (operator, 2026-09-13):** measured off the engine journals
+  for B4 (two rounds, 40 min wall): implement 19m42s + 5m35s, its checks 58s + 57s, reviews 6m10s + 3m24s;
+  sessions and checks 36m47s, slot waits 1m13s, ticks and worktrees 1m56s. S2's implement alone 39m11s
+  (54 turns, 146 tool calls, 17M tokens in), and its review waited 8m51s for a slot behind three other
+  runs. Nothing shows this: the run page has `#n · took` per node and `wf decide` has `used`, but no
+  per-try timeline with queue time, no check durations, no round totals; and the spec rows show neither
+  `effort` nor `tools`, so a person cannot see the effort a step runs at (none set here → the harness
+  default). A **timeline** on the run page and in `wf decide` — per try and per check: filed, spawned,
+  ended, queue and run time, `used` — and `effort`/`tools` in the spec rows. → apps + `wf decide`, small.
 
 ## 5. What the plan does not do
 

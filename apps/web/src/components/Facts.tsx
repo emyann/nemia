@@ -18,18 +18,19 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
 /**
  * A step's frontmatter, as rows for `Facts` — and, given what the engine filed its current try with, what it runs with. A field
  * its workflow leaves unset reads as the value the engine filed the task with, marked `default`: `1 · default`, `no limit ·
- * default`. One the try was filed with other than the workflow's word — a `wf retry --model` — reads as the try's, marked `this
- * try`. For a step not filed, what the workflow says, or a dash.
+ * default`. The permission mode reads as the session runs in it, its harness's choice where none was filed: `auto · default`,
+ * `read-only · by tools`. One the try was filed with other than the workflow's word — a `wf retry --model` — reads as the try's,
+ * marked `this try`. For a step not filed, what the workflow says, or a dash.
  */
 export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> => [
   ['harness', code(spec.harness)],
-  ['model', ranWith(spec.model, filed, (f) => f.model)],
+  ['model', modelRow(spec.model, filed)],
   ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
   ['after', spec.after.length ? code(spec.after.join(', ')) : null],
   // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
   ...(spec.loop === null ? [] : ([['loop', code(spec.loop)], ['rounds', spec.rounds]] satisfies Array<[string, ReactNode]>)),
   ['resume', code(spec.resume)],
-  ['permission mode', ranWith(spec.permissionMode, filed, (f) => f.permissionMode)],
+  ['permission mode', modeRow(spec.permissionMode, filed)],
   ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
   ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
   ['max attempts', ranWith(spec.maxAttempts === null ? null : String(spec.maxAttempts), filed, (f) => String(f.maxAttempts))],
@@ -48,6 +49,32 @@ function ranWith(workflow: string | null, filed: StepFiled | null, pick: (filed:
   return workflow === null
     ? <Marked value={engine ?? unset} mark="default" word={engine === null} />
     : <Marked value={engine!} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${engine}.`} />;
+}
+
+/** The model, as `ranWith` reads it — and the model a person's `wf retry --model` asked this try for, marked `this try`, whatever the workflow says. */
+function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
+  if (!filed?.askedModel) return ranWith(workflow, filed, (f) => f.model);
+  const says = workflow === null ? 'names no model' : `says ${workflow}`;
+  return <Marked value={filed.model ?? filed.askedModel} mark="this try" title={`Asked for with wf retry --model ${filed.askedModel}; the workflow ${says}.`} />;
+}
+
+/**
+ * The permission mode, as the session runs in it (`runsIn`): its harness's choice where none was filed, marked `default` — `auto` for
+ * Claude Code, not the prompting mode Claude Code has of its own — and a Codex sandbox the step's tools narrowed, marked `by tools`.
+ * Where the api could not ask the harness, as `ranWith` reads it.
+ */
+function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
+  const runs = filed?.runsIn;
+  if (!filed || !runs) return ranWith(workflow, filed, (f) => f.permissionMode);
+  if (runs.by === 'tools') {
+    const named = workflow === null ? '' : `, though the workflow says ${workflow}`;
+    return <Marked value={runs.mode} mark="by tools" title={`Its tools have none that writes, so its harness runs it ${runs.mode}${named}.`} />;
+  }
+  if (workflow === null) return <Marked value={runs.mode} mark="default" />;
+  if (filed.permissionMode !== workflow) {
+    return <Marked value={runs.mode} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${filed.permissionMode ?? 'none'}.`} />;
+  }
+  return runs.mode === workflow ? code(workflow) : <Marked value={runs.mode} mark="as run" title={`The workflow says ${workflow}, which its harness runs as ${runs.mode}.`} />;
 }
 
 function Marked({ value, mark, word = false, title }: { value: string; mark: string; word?: boolean; title?: string }) {

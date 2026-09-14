@@ -786,18 +786,35 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   const ranWith = (rows: Record<string, string>) => [rows.model, rows.effort, rows['permission mode'], rows.tools, rows.deadline, rows['max attempts']];
   const unset: StepSpec = { harness: 'claude', model: null, effort: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null };
 
-  // Filed as a step that sets none of them is: one attempt, the engine's default, and nothing else said.
-  const bare: StepFiled = { model: null, effort: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: 1 };
+  // Filed as a step that sets none of them is, on a harness the api could not ask: one attempt, the engine's default, and nothing else said.
+  const bare: StepFiled = { model: null, askedModel: null, effort: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, maxAttempts: 1 };
   assert.deepEqual(ranWith(rowsOf(unset, bare)), ["harness's own · default", "harness's own · default", "harness's own · default", "harness's own · default", 'no limit · default', '1 · default']);
-  const given: StepFiled = { model: 'opus', effort: 'high', permissionMode: 'auto', tools: ['Read', 'Grep'], deadlineSeconds: 3600, maxAttempts: 3 };
+  const given: StepFiled = {
+    model: 'opus', askedModel: null, effort: 'high', permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600, maxAttempts: 3,
+  };
   assert.deepEqual(ranWith(rowsOf(unset, given)), ['opus · default', 'high · default', 'auto · default', 'Read, Grep · default', '3600 s · default', '3 · default']);
+
+  // The mode the session runs in, as its harness decides it: Claude Code's `auto` for a task filed with none — never "the harness's own",
+  // which reads as Claude Code's prompting default — Codex's `workspace-write`, and a Codex sandbox its tools narrowed, whatever was named.
+  assert.equal(rowsOf(unset, { ...bare, runsIn: { mode: 'auto', by: 'default' } })['permission mode'], 'auto · default');
+  assert.equal(rowsOf(unset, { ...bare, runsIn: { mode: 'workspace-write', by: 'default' } })['permission mode'], 'workspace-write · default');
+  const reviewer: StepSpec = { ...unset, harness: 'codex', permissionMode: 'workspace-write', tools: ['Read', 'Grep'] };
+  const narrowed: StepFiled = { ...bare, permissionMode: 'workspace-write', tools: ['Read', 'Grep'], runsIn: { mode: 'read-only', by: 'tools' } };
+  assert.equal(rowsOf(reviewer, narrowed)['permission mode'], 'read-only · by tools');
+  assert.equal(rowsOf({ ...reviewer, permissionMode: null }, { ...narrowed, permissionMode: null })['permission mode'], 'read-only · by tools');
+
+  // A model a person's `wf retry --model` asked for is this try's, and not a default, where the workflow names none.
+  assert.equal(rowsOf(unset, { ...bare, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
 
   // The workflow's words, unmarked; and a try filed on another model than the workflow's says so.
   const set: StepSpec = { ...unset, model: 'opus', effort: 'high', permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600, maxAttempts: 2 };
-  const asSet: StepFiled = { model: 'opus', effort: 'high', permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600, maxAttempts: 2 };
+  const asSet: StepFiled = {
+    model: 'opus', askedModel: null, effort: 'high', permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600, maxAttempts: 2,
+  };
   assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s', '2']);
   assert.doesNotMatch(renderToStaticMarkup(createElement(Facts, { rows: specRows(set, asSet) })), /data-mark/);
   assert.equal(rowsOf(set, { ...asSet, model: 'sonnet' }).model, 'sonnet · this try');
+  assert.equal(rowsOf(set, { ...asSet, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
 
   // Not filed: the workflow's words, or a dash.
   assert.deepEqual(ranWith(rowsOf(unset, null)), ['—', '—', '—', '—', '—', '—']);

@@ -385,9 +385,9 @@ export function seed(root: string, now = Date.now()): void {
    * A step's task as the engine journals one that ran once, from `began` to `ended` minutes ago, and signed off with `closeout`.
    * `nativeId` is the session's own id, which the engine records with the end for a harness that has one, and reads a transcript by; `usage` is what the engine read of the attempt, when it read one.
    */
-  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string, usage?: object): void =>
+  const signedOff = (task: string, harness: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string, usage?: object): void =>
     write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
-      { kind: 'filed', at: ago(began), brief, cwd, maxAttempts: 1 },
+      { kind: 'filed', at: ago(began), brief, cwd, maxAttempts: 1, harness },
       { kind: 'starting', at: ago(began - 1), attempt: 1 },
       { kind: 'spawned', at: ago(began - 1), attempt: 1 },
       { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, ...(nativeId ? { nativeId } : {}), observed: 'done', reason: 'harness', closeout, ...(usage ? { usage } : {}) },
@@ -396,7 +396,7 @@ export function seed(root: string, now = Date.now()): void {
 
   // implement signed off blocked, and its session's conversation is on disk (SESSION). review's task has no journal at all,
   // which is what makes it `unknown`.
-  signedOff(`${id}-implement`, workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
+  signedOff(`${id}-implement`, 'claude', workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SESSION.sessionId}.jsonl`), lines(conversation(SESSION, ago)));
   // tokens' files, where the run keeps a step's: in its files directory beside the run's record. Named by absolute path in its
   // closeout, as a step is told to name them, with a path on its branch beside them.
@@ -407,10 +407,10 @@ export function seed(root: string, now = Date.now()): void {
     outcome: 'done', summary: 'Picked the colour tokens.', needs: null,
     artifacts: [path.join(files, FAKE.artifacts.image), path.join(files, FAKE.artifacts.text), FAKE.artifacts.path],
   };
-  signedOff(`${id}-tokens`, lane, 'Pick the colour tokens.', 40, 30, tokensCloseout, undefined, {
+  signedOff(`${id}-tokens`, 'codex', lane, 'Pick the colour tokens.', 40, 30, tokensCloseout, undefined, {
     turns: 14, toolCalls: 31, inputTokens: 112_000, outputTokens: 6_350,
   });
-  signedOff(`${id}-theme`, lane, 'Apply them to every page.', 30, 10, { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] });
+  signedOff(`${id}-theme`, 'claude', lane, 'Apply them to every page.', 30, 10, { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] });
 
   // theme's check, as the run files one on the check harness: its process exited 1, and the engine wrote the
   // code down with the end of the attempt.
@@ -451,7 +451,7 @@ export function seed(root: string, now = Date.now()): void {
     },
   }, null, 2));
   // plan signed off with no check; draft's session started after it and has not ended; sketch's failed.
-  signedOff(`${NEIGHBOUR.id}-plan`, '/code/hkb-v2', 'Plan it.', 5, 3, { outcome: 'done', summary: 'Planned it.', needs: null, artifacts: [] });
+  signedOff(`${NEIGHBOUR.id}-plan`, 'claude', '/code/hkb-v2', 'Plan it.', 5, 3, { outcome: 'done', summary: 'Planned it.', needs: null, artifacts: [] });
   write(path.join(root, 'engine', 'tasks', `${NEIGHBOUR.id}-draft.jsonl`), lines([
     { kind: 'filed', at: ago(3), brief: 'Draft it.', cwd: '/code/hkb-v2', maxAttempts: 1 },
     { kind: 'starting', at: ago(2.5), attempt: 1 },
@@ -495,18 +495,18 @@ export function seed(root: string, now = Date.now()): void {
   }, null, 2));
   // A declared field is a field of the closeout, beside the four every closeout has: implement answers the findings it
   // was handed, as a loop's target owes from round 2, and review asks for another round.
-  signedOff(roundTask('implement', 3), loopWorkspace, 'Implement it.', 3.9, 2.5, {
+  signedOff(roundTask('implement', 3), 'claude', loopWorkspace, 'Implement it.', 3.9, 2.5, {
     outcome: 'done', summary: 'Answered the second review.', needs: null, artifacts: [],
     replies: [{ finding: 'apps/web/src/lib/status.ts — a word it does not know reads as working', answer: "won't fix", why: 'On purpose, and a test says so.' }],
   });
-  signedOff(roundTask('review', 3), loopWorkspace, 'Review it, and say whether it needs another round.', 2.4, 0.5, {
+  signedOff(roundTask('review', 3), 'codex', loopWorkspace, 'Review it, and say whether it needs another round.', 2.4, 0.5, {
     outcome: 'done', summary: 'One finding is still open.', needs: null, artifacts: [], again: true,
   });
   // The rounds before, each step's try in each a task the engine ran once: implement's second answered the first review, and
   // each review asked for another round.
-  const ranOnce = (task: string, brief: string, began: number, ended: number, closeout: object): void =>
+  const ranOnce = (task: string, harness: string, brief: string, began: number, ended: number, closeout: object): void =>
     write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
-      { kind: 'filed', at: ago(began), brief, cwd: loopWorkspace, maxAttempts: 1 },
+      { kind: 'filed', at: ago(began), brief, cwd: loopWorkspace, maxAttempts: 1, harness },
       { kind: 'starting', at: ago(began), attempt: 1 },
       { kind: 'spawned', at: ago(began), attempt: 1 },
       { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, observed: 'done', reason: 'harness', closeout },
@@ -514,8 +514,8 @@ export function seed(root: string, now = Date.now()): void {
     ]));
   const said = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], ...more });
   const [first, second] = LOOPING.earlier;
-  ranOnce(roundTask('implement', 1), 'Implement it.', 3.99, 3.7, said(first.implement));
-  ranOnce(roundTask('review', 1), 'Review it, and say whether it needs another round.', 3.69, 3.5, said(first.review, { again: true }));
-  ranOnce(roundTask('implement', 2), 'Implement it.', 3.49, 3.2, said(second.implement, { replies: LOOPING.replies }));
-  ranOnce(roundTask('review', 2), 'Review it, and say whether it needs another round.', 3.19, 3.0, said(second.review, { again: true }));
+  ranOnce(roundTask('implement', 1), 'claude', 'Implement it.', 3.99, 3.7, said(first.implement));
+  ranOnce(roundTask('review', 1), 'codex', 'Review it, and say whether it needs another round.', 3.69, 3.5, said(first.review, { again: true }));
+  ranOnce(roundTask('implement', 2), 'claude', 'Implement it.', 3.49, 3.2, said(second.implement, { replies: LOOPING.replies }));
+  ranOnce(roundTask('review', 2), 'codex', 'Review it, and say whether it needs another round.', 3.19, 3.0, said(second.review, { again: true }));
 }

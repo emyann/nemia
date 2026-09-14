@@ -300,6 +300,13 @@ const PAGES: PageSpec[] = [
       // What a step consumed, in its section and in the inspector's Details, in `wf decide`'s words.
       const tokens = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.unverified, exact: true }) });
       await expectVisible(tokens.locator('dd', { hasText: FAKE.used }), `${FAKE.unverified}'s section says what its session used (${FAKE.used})`);
+      // The mode each session runs in, filed with none: its harness's choice, marked default — never "the harness's own".
+      await expectVisible(
+        tokens.locator('[data-mark="default"]', { hasText: 'workspace-write · default' }),
+        `${FAKE.unverified}'s spec says the sandbox its Codex session runs in (workspace-write · default)`,
+      );
+      const blocked = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });
+      await expectVisible(blocked.locator('[data-mark="default"]', { hasText: 'auto · default' }), `${FAKE.blocked}'s spec says the mode its Claude Code session runs in (auto · default)`);
       await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
       const inspected = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
       await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);

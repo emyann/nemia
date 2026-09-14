@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, hasStarted, runReady, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -1524,6 +1524,7 @@ test('a run that has started is never gated again: its parents are not read, so 
   assert.equal(runReady(between, shipped), true);
   assert.deepEqual(asked, []);
   assert.equal(hasStarted(run({ implement: null, review: null }, { after: ['a-1'] })), false);
+  assert.deepEqual([gated(between), gated(run({ implement: null, review: null }, { after: ['a-1'] })), gated(run({ implement: null }))], [false, true, false]);
 });
 
 test('a cancelled run waits on nothing, and reads no parent: it files nothing anyway', () => {
@@ -1546,9 +1547,8 @@ test('`waitsOf` says why a parent may never ship — no such run, cancelled, a r
   assert.equal(waitAdvice(child, waits),
     `b-2 was cancelled at ${at}, and a cancelled run never ships; the store has no run x-9; wf/g-3/implement is gone, so whether g-3 shipped cannot be read`
     + ' — yours to resolve: wf cancel c-1, or start the work again without --after b-2 --after x-9 --after g-3');
-  assert.equal(waitAdvice(child, [{ run: 'a-1' }]), 'nothing of c-1 is filed until a-1 is on main; nothing to decide yet');
-  // Git's word outranks the mark: a parent that shipped before it was called off has shipped.
-  assert.deepEqual(waitsOf(run({ implement: null }, { after: ['b-2'] }), () => ({ record: record('b-2', { cancelledAt: at }), shipped: true })), []);
+  assert.equal(waitAdvice(child, [{ run: 'a-1' }]), 'nothing of c-1 is filed until wf decide says a-1 has shipped onto main; nothing to decide yet');
+  assert.equal(waitAdvice(child, [{ run: 'a-1' }, { run: 'b-2' }]), 'nothing of c-1 is filed until wf decide says a-1 and b-2 have shipped onto main; nothing to decide yet');
 });
 
 test("`wf ls` puts `waiting on <run>` on each root of a waiting run, where `waiting` would be — what waits on a root still says `waiting`", () => {
@@ -1569,16 +1569,16 @@ test("`wf ls` puts `waiting on <run>` on each root of a waiting run, where `wait
 
 test('REFUSED by name at `wf start --after`: a run given twice, one the store does not have, one on another repository or base branch, one run --no-worktree, a cancelled one, one whose result branch is gone', () => {
   const at = '2026-09-14T10:00:00Z';
-  const parents: Record<string, ParentRun> = {
-    'a-1': { record: record('a-1'), shipped: false },
-    'r-2': { record: record('r-2', { repo: '/elsewhere' }), shipped: false },
-    'd-3': { record: record('d-3', { isolate: false }), shipped: false },
-    'f-4': { record: record('f-4', { branch: 'feature' }), shipped: false },
-    'c-5': { record: record('c-5', { cancelledAt: at }), shipped: false },
-    'g-6': { record: record('g-6'), shipped: false, gone: ['wf/g-6/implement'] },
-    's-7': { record: record('s-7', { cancelledAt: at }), shipped: true },
+  // What the record and git say, and nothing of whether a run shipped: a cancelled run never does, as its `wf decide` says.
+  const parents: Record<string, Pick<ParentRun, 'record' | 'gone'>> = {
+    'a-1': { record: record('a-1') },
+    'r-2': { record: record('r-2', { repo: '/elsewhere' }) },
+    'd-3': { record: record('d-3', { isolate: false }) },
+    'f-4': { record: record('f-4', { branch: 'feature' }) },
+    'c-5': { record: record('c-5', { cancelledAt: at }) },
+    'g-6': { record: record('g-6'), gone: ['wf/g-6/implement'] },
   };
-  const parentOf = (id: string): ParentRun => parents[id] ?? { shipped: false };
+  const parentOf = (id: string): Pick<ParentRun, 'record' | 'gone'> => parents[id] ?? {};
   const refusal = (...after: string[]) => afterRefusal(after, { repo: '/repo', branch: 'main' }, parentOf);
   assert.match(refusal('a-1', 'a-1')!, /^--after a-1 is given twice, and a run waits on another once\./);
   assert.match(refusal('a-1', 'x-9')!, /^--after x-9: the store has no run x-9\. .*wf ls lists them\.$/);
@@ -1587,8 +1587,8 @@ test('REFUSED by name at `wf start --after`: a run given twice, one the store do
   assert.match(refusal('f-4')!, /^--after f-4: f-4 ships onto feature, and this run would start from main, a base without f-4's work\. Check out feature/);
   assert.equal(refusal('c-5'), `--after c-5: c-5 was cancelled at ${at}, and a cancelled run never ships, so this run would wait for ever. Start it without --after c-5.`);
   assert.match(refusal('g-6')!, /^--after g-6: wf\/g-6\/implement is gone, so the run cannot read whether g-6 shipped, and this run would wait for ever\. If g-6's work is on main, there is nothing to wait for/);
-  // Allowed: no parent, a parent still to ship, and one that shipped before it was called off — on the same repository, however it is spelled.
+  // Allowed: no parent, and a parent still to ship — on the same repository, however it is spelled.
   assert.equal(refusal(), null);
-  assert.equal(refusal('a-1', 's-7'), null);
+  assert.equal(refusal('a-1'), null);
   assert.equal(afterRefusal(['a-1'], { repo: '/repo/', branch: 'main' }, parentOf), null);
 });

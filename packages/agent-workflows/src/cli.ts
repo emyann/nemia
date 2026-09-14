@@ -8,9 +8,9 @@ import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, ar
 const HELP = `wf — run a workflow of agent steps
 
   wf start <brief.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...]
-                               --after <runId>: file nothing of this run until that run has
-                               shipped — its result branch on the base branch — and start from
-                               the base as it is then; give it once per run to wait on
+                               --after <runId>: file nothing of this run until wf decide says that
+                               run has shipped — finished, and its result branch on the base
+                               branch — and start from the base as it is then; once per run
   wf tick                      one pass: tick the engine, file what became ready
   wf up [ms]                   the same, on a timer
   wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>
@@ -176,7 +176,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const steps = stepsOf(run);
       console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.name).join(' → ')}`);
       console.log(`workspace: ${run.workspace}`);
-      if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until each is on ${run.branch}`);
+      if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
       console.log(`run 'wf tick' (or 'wf up') to start it`);
       return;
     }

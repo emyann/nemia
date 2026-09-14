@@ -20,7 +20,7 @@ import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './r
 export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { ParentRun, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Wait } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { afterRefusal, artifactPlace, hasStarted, runReady, waitsOf, type ArtifactFile, type ParentRun, type Wait } from './run.ts';
+import { afterRefusal, artifactPlace, gated, hasStarted, runReady, waitsOf, type ArtifactFile, type ParentRun, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -706,7 +706,7 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
   const id = runId(opts.brief);
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
   const after = opts.after ?? [];
-  const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentReader());
+  const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentRecord);
   if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
 
   const run: Run = {
@@ -806,9 +806,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
 
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks);
   const { check, retry, round, blocked, status } = assessed;
-  // A run that waits on runs (`--after`) files its roots once every one of them has shipped, read off git on this pass. Only a run
-  // with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`runReady`).
-  const parent = parentReader();
+  // A run that waits on runs (`--after`) files its roots once every one of them has shipped, as its `wf decide` says, read on this pass.
+  // Only a run with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`gated`).
+  const parent = await parentsOf(e, run);
   const starting = !hasStarted(run);
   const ready = runReady(run, (id) => parent(id).shipped) ? assessed.ready : [];
   const waiting = waitsOf(run, parent);
@@ -1082,7 +1082,7 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
     const v = views.get(taskId);
     return v?.state.brief ? v.phase : 'unknown';
   };
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, parentReader()));
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)));
 }
 
 export type Asked = { run: Run; ask: RetryAsk; file: string };
@@ -1275,48 +1275,60 @@ export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactF
  * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
  */
 export function isShipped(run: Run, branch: string): boolean {
-  return isAncestor(run.repo, branch, run.branch);
-}
-
-/** Whether git says commit `a` is reachable from `b` in `repo`. No, too, when either cannot be read. */
-function isAncestor(repo: string, a: string, b: string): boolean {
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', a, b], { cwd: repo, stdio: 'ignore' });
+    execFileSync('git', ['merge-base', '--is-ancestor', branch, run.branch], { cwd: run.repo, stdio: 'ignore' });
     return true;
   } catch { return false; }
 }
 
 /**
- * A run another waits on (`--after`), read off its record and git by the pass that asks, and carried nowhere — what `runReady`, `waitsOf`
- * and `afterRefusal` are handed. A run the store does not have has no record, and has not shipped.
- *
- * Shipped as `wf decide` reads it — every result branch on the run's base branch (`isShipped`) — and, which `wf decide` does not ask,
- * with work of its own on it. A result branch is cut at the run's base, which is on the base branch, so a branch nobody has committed to
- * reads as landed: without this, a run waiting on a one-step run would start the moment that step was filed. A run that worked on its
- * base branch itself (`--no-worktree`) has no result branch, and never ships.
- *
- * A result branch the record names and git no longer has is `gone`, and not shipped. Git keeps no trace of the commits a deleted branch
- * named — this repository's merges carry their own messages, and `git branch -d` needs the worktree removed first — so whether they are
- * on the base cannot be read. A run that started before the branch was deleted never asks (`waitingOn`).
+ * A run another waits on, as its record and git say it without the engine: the record, when the store has one, and the result branches
+ * it names that git no longer has. What `wf start --after` refuses an edge by (`afterRefusal`), and where `parentOf` starts.
  */
-export function parentOf(id: string): ParentRun {
+export function parentRecord(id: string): Pick<ParentRun, 'record' | 'gone'> {
   let record: Run;
-  try { record = readRun(id); } catch { return { shipped: false }; }
+  try { record = readRun(id); } catch { return {}; }
   let branches: string[];
   try { branches = resultBranches(record); } catch { branches = []; }   // a pre-freeze record whose folder is gone names no steps
   const gone = branches.filter((b) => gitSays(record.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`) === undefined);
-  const shipped = record.isolate && branches.length > 0 && !gone.length && !branches.includes(record.branch)
-    && branches.every((b) => isShipped(record, b) && !isAncestor(record.repo, b, record.baseRef));
-  return { record, shipped, ...(gone.length ? { gone } : {}) };
+  return { record, ...(gone.length ? { gone } : {}) };
 }
 
-/** `parentOf`, read at most once per run for whoever holds the reader: a pass, a listing, a start. */
-export function parentReader(): (id: string) => ParentRun {
+/**
+ * A run another waits on (`--after`), read by the pass that asks and carried nowhere — what `runReady` and `waitsOf` are handed.
+ *
+ * Shipped is the run's own `wf decide`'s word, and nothing stricter or looser: `decision` says `shipped` — the run is not running, it was
+ * not cancelled, and every result branch is on its base branch (`isShipped`). A child starts when its parent's `wf decide` says shipped,
+ * and a child waits exactly while it does not. A result branch is cut at its run's base, which is on the base branch, so a branch nobody
+ * has committed to is on it from the moment it is cut: a parent still running has not shipped for that, and one that finished with nothing
+ * to commit has, as its `wf decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
+ *
+ * Git first, which costs no harness observe: a result branch not on the base branch has not shipped, whatever the run's steps say. The
+ * engine's view of the parent's tasks is read only once every one is.
+ *
+ * A result branch the record names and git no longer has is `gone`, and not shipped. Git keeps no trace of the commits a deleted branch
+ * named — this repository's merges carry their own messages, and `git branch -d` needs the worktree removed first — so whether they are
+ * on the base cannot be read. A run that started before the branch was deleted never asks (`gated`).
+ */
+export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
+  const known = parentRecord(id);
+  const { record } = known;
+  if (!record || record.cancelledAt || known.gone) return { ...known, shipped: false };
+  let steps: Workflow[];
+  try { steps = stepsOf(record); } catch { return { ...known, shipped: false }; }
+  const branches = terminalSteps(steps).map((s) => record.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+  if (!branches.length || !branches.every((b) => isShipped(record, b))) return { ...known, shipped: false };
+  const { views, phaseOf } = await taskPhases(e, record);
+  const { asks, rounds } = readAsks(id);
+  const said = decision(steps, record, phaseOf, (b) => isShipped(record, b), closeoutReader(views, record), closeoutAsked(views), exitVerdicts(views, record), asks, rounds);
+  return { ...known, shipped: said.kind === 'shipped' };
+}
+
+/** The runs this run waits on, each read once (`parentOf`) — and none, without a look, for a run the gate no longer applies to (`gated`). */
+async function parentsOf(e: Engine, run: Run): Promise<(id: string) => ParentRun> {
   const read = new Map<string, ParentRun>();
-  return (id) => {
-    if (!read.has(id)) read.set(id, parentOf(id));
-    return read.get(id)!;
-  };
+  if (gated(run)) for (const id of new Set(run.after)) read.set(id, await parentOf(e, id));
+  return (id) => read.get(id) ?? { shipped: false };
 }
 
 /**
@@ -1460,7 +1472,7 @@ export async function decide(e: Engine, id: string): Promise<{
     used: consumption(views, run),
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked),
-    waiting: waitsOf(run, parentReader()),
+    waiting: waitsOf(run, await parentsOf(e, run)),
   };
 }
 

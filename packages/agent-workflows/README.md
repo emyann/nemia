@@ -808,16 +808,19 @@ wf start ./d.md --repo ~/code/myapp --after b-3z4w --after c-5v6u
 
 This is the sequencing a person used to do by hand, starting B once A is on main, held by the run as a
 fact. `--after <runId>`, given once for each run to wait on, is frozen on the record as `after`. The tick
-files none of the run's steps until every one of those runs has **shipped**, meaning its result branch is
-on the base branch, as `wf decide` reads it. Steps saying they are done does not count. The run boundary
+files none of the run's steps until every one of those runs has **shipped**, meaning its own `wf decide`
+says so: finished, and its result branch on the base branch. Steps saying they are done does not count. The run boundary
 is where a person decides what ships, so every run stays a decision. The diamond above is today's flow,
 with the tick doing the waiting: A ships, B and C start from a main that has A, and D starts once both
 have shipped. A conflict between B and C is still a person's to resolve, at the second merge.
 
-- **Shipped is read from git on every pass**, and nothing is carried between passes. A result branch
-  nobody has committed to sits at its base, and the base is on the base branch. So the run also asks for
-  work beyond the base; otherwise a run waiting on a one-step run would start the moment that step was
-  filed. `runReady(run, shipped)` is the pure half, beside `assess`.
+- **Shipped is what the parent's `wf decide` says, read on every pass**, and nothing is carried between
+  passes: the parent is not running, it was not cancelled, and every result branch is on the base branch.
+  Git is asked first, and the engine's view of the parent's tasks only once its branches are on the base.
+  A result branch is cut at its run's base, so a branch nobody has committed to is on the base branch from
+  the start. A parent still running has not shipped for that; one that finished with nothing to commit
+  has, as its `wf decide` says, and its child starts. A branch merged while its run still runs waits for
+  the run to finish. `runReady(run, shipped)` is the pure half, beside `assess`.
 - **The base is read when the roots are filed.** A run that waited starts from its base branch as it is on
   that pass, with its parents' work on it, not as it was at `wf start`. Every worktree, check and diff of
   the run is cut from that commit. A run without `--after` keeps the base `wf start` recorded.
@@ -843,7 +846,7 @@ a waiting run says the same and offers nothing else, and `wf tick` adds the wait
 - a run on another repository, or one that ships onto another base branch; the child would never start
   from a base that has its work
 - a run started `--no-worktree`, which has no result branch to ship
-- a cancelled run, or one whose result branch is gone, unless it has already shipped
+- a cancelled run, which `wf decide` never calls shipped, or one whose result branch is gone
 
 A record written before `after` existed waits on nothing.
 

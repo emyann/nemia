@@ -220,12 +220,21 @@ export const workflowNameOf = (workflowDir: string): string => workflowDir.repla
 
 /**
  * Start a run of a workflow, as `wf start` does: the api writes the run's record and files nothing. Resolves with the new
- * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s, or the api's own about the brief.
+ * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s, or the api's own about the request.
+ *
+ * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */
 export async function startRun(start: { workflow: string; from: WorkflowListing['from']; brief: string }): Promise<{ id: string }> {
   const res = await fetch('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(start) });
   const body = (await res.json().catch(() => undefined)) as { id?: unknown; error?: unknown } | undefined;
   if (res.ok && typeof body?.id === 'string') return { id: body.id };
+  if (res.ok) {
+    // Written, it may well be: look before starting it again.
+    throw new Error(
+      `POST /api/runs answered ${res.status} ${res.statusText} without the new run's id, so the api and this board disagree about what a start answers. ` +
+        'The run may have started: look on the Runs page before starting it again, and restart the api (`npm run dev`).',
+    );
+  }
   throw new Error(typeof body?.error === 'string' ? body.error : `POST /api/runs answered ${res.status} ${res.statusText}`);
 }
 

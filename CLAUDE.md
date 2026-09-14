@@ -33,6 +33,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
+- **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
+  `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
+  paths instead (learned by the run that animated the edges).
 - **A guard is not proven by a test that asks whether it allows.** Every new refusal — a parser
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's

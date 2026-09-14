@@ -261,10 +261,11 @@ and each round, as `tools:` does.
   names `permissionMode`. A quote inside the parentheses is legal, `Bash(git commit -m 'wip')`, so unlike `tools:` the
   comma check does not look in quotes: `tools:`'s check refused such a rule whenever another entry followed it. The engine's `file()` refuses a `disallowedTools` that is not a list of rules, and codex
   refuses one that denies anything rather than drop it.
-- **Measured, not only passed** (2026-09-14, Claude Code 2.1.270, `claude -p` in `dontAsk`). Given `--allowedTools`
-  for `npm run build` and `npm run e2e`, a session told to run both ran both. Given
-  `--disallowedTools "Bash(npm run build),Bash(npm run e2e)"` as well, it ran neither. The implement list took
-  `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger` from the session's tools (30 → 26).
+- **Measured on `claude --bg`, the harness the reviewers run on** (`agent-engine/test/live.test.ts`, `AE_LIVE=1`,
+  Claude Code 2.1.270). Two sessions in `dontAsk` with `tools: Bash`, each in a checkout whose settings allow
+  `npm run build` and `npm run e2e`: the control ran both, and the one filed with `disallowedTools` naming them ran
+  neither, refused by the deny's own message. By hand on `claude -p`, the implement list took `SendMessage`,
+  `CronCreate`, `CronDelete` and `RemoteTrigger` from the session's tools (30 → 26).
 - The shipped Claude reviewers (`workflows/dev`, `dev-build` and `ui`, and the package's `workflows/ui`) are denied
   `Bash(npm run build)` and `Bash(npm run e2e)`: `.claude/settings.json` allows both for implement's check, and both
   write into the workspace. Their brief still says not to run them; the fence is what keeps them from it.
@@ -280,8 +281,12 @@ What it leaves:
   step outside `dontAsk`, or settings with a looser allow such as `Bash(npm run build:*)`, would need the looser rule.
 - **The board does not show it.** The api's step spec and the inspector name `tools` and not `disallow`. → apps.
 - **`ae` briefs have no `disallowedTools` key.** The engine's task has the field, and its CLI does not read one.
-- **No live test holds the deny.** The measurement above was made by hand. `agent-engine/test/live.test.ts`
-  (`AE_LIVE=1`) holds `--tools`, and not `--disallowedTools`.
+- **The live test needs a checkout Claude Code trusts.** Its first form made the checkouts in `os.tmpdir()`, and there
+  a `--bg` session was not given the directory's settings: the control was refused with dontAsk's own message, so
+  the fenced session's refusal proved nothing. The checkouts are now made inside the package. Run from this run's
+  implement worktree, they were given their settings, and review works in that worktree, so the fence measured is
+  the one review has. From a directory Claude Code does not trust, the control is refused, and its message says so.
+- **The four tools implement is denied are measured by hand only**, on `claude -p`.
 
 ## Shipped: what a step may have — `tools:` and `effort:`
 

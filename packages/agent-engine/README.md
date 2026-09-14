@@ -300,12 +300,16 @@ a space or a comma outside the parentheses is two rules to the harness. An empty
 and passes no flag. Codex refuses a list that denies anything: it has no tool to take away, and the list
 would be dropped without a word.
 
-**Measured, as `--tools` was** (2026-09-14, Claude Code 2.1.270, `claude -p` in `dontAsk`, by hand): a
-session given `--allowedTools "Bash(npm run build)" "Bash(npm run e2e)"` and told to run both ran both. The
-same session given `--disallowedTools "Bash(npm run build),Bash(npm run e2e)"` as well ran neither, so one
-argument with a space inside each rule reads as two rules, and the deny beat the allow. A session given
-`--disallowedTools "SendMessage,CronCreate,CronDelete,RemoteTrigger"` started with 26 tools and none of
-those four; without it, 30. No `AE_LIVE` test holds this yet.
+**Measured on `claude --bg` in `dontAsk`, beside a control** (`test/live.test.ts`, `AE_LIVE=1`, Claude Code
+2.1.270): two sessions with `tools: Bash`, each in a checkout whose `.claude/settings.json` allows
+`npm run build` and `npm run e2e`, told to run both. The control ran both. The one filed with
+`disallowedTools` naming the two ran neither, refused by the deny's own message ("Permission to use Bash
+with command npm run build has been denied"), and still gave its closeout. So the engine's one argument
+reads as two rules, and the deny beat the settings' allow. **Run it from a checkout Claude Code trusts:**
+the test makes its checkouts inside this package, because in a temporary directory a `--bg` session was
+not given the directory's settings, and the control was refused too (the directory is untrusted, the
+likely reason). By hand on `claude -p`, `--disallowedTools "SendMessage,CronCreate,CronDelete,RemoteTrigger"`
+took those four from a session's tools, 30 to 26; no test holds that.
 
 ### MCP servers: `mcp`, and never the operator's
 
@@ -776,7 +780,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, and each refusal at shipped defaults |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence, `--strict-mcp-config`, and what a released session still has, against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, and what a released session still has, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 

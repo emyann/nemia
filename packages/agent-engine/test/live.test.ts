@@ -8,11 +8,11 @@
  *
  * `--disallowedTools` gets the same, on `--bg` and not only `-p`: a session told to run `npm run build` and
  * `npm run e2e`, beside a control identical but for `disallowedTools`. The control must run both, or the fenced
- * one running neither proves nothing — and the first version's did not. Both were in `dontAsk` in a temporary
- * directory whose `.claude/settings.json` allowed the two commands, and the control was refused with dontAsk's
- * own message: the directory's settings were not applied to a `--bg` session there (the directory is not
- * trusted, which is the likely reason and not a measured one). So both run in `bypassPermissions`, the widest
- * mode, where the control needs no settings; a deny that holds there holds against any allow.
+ * one running neither proves nothing — and the first version's did not. Both ran in `dontAsk` in a checkout whose
+ * `.claude/settings.json` allows the two commands, as this repository's does for implement's check; the checkout
+ * was a temporary directory, and the control was refused with dontAsk's own message: a `--bg` session there was
+ * not given the directory's settings (the directory is untrusted, the likely reason). So the checkouts are made
+ * inside this package, and the test is run from a checkout Claude Code trusts.
  *
  * The MCP fence gets the same: a session filed with no `mcp`, in an empty directory, on a machine
  * whose operator has servers, claude.ai connectors and Claude in Chrome, must report no MCP server and
@@ -113,36 +113,46 @@ const DENY_CLOSEOUT = {
 };
 const WRITTEN = ['BUILT', 'E2E'];
 
-/** A directory whose two commands each write a file into it. */
-const scripted = (label: string) => {
-  const dir = tmp(label);
+/**
+ * A checkout as this repository's review has one: its settings allow both commands, and each writes a file into it.
+ * Made inside this package, not in `os.tmpdir()`, whose directories Claude Code does not trust.
+ */
+const allowingCheckout = (label: string) => {
+  const dir = fs.mkdtempSync(path.join(import.meta.dirname, '..', `.ae-live-${label}-`));
   fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'probe', private: true, scripts: { build: 'touch BUILT', e2e: 'touch E2E' } }));
+  fs.mkdirSync(path.join(dir, '.claude'));
+  fs.writeFileSync(path.join(dir, '.claude', 'settings.json'), JSON.stringify({ permissions: { allow: ['Bash(npm run build)', 'Bash(npm run e2e)'] } }));
   return dir;
 };
 
-test('a --bg session in bypassPermissions runs neither npm run build nor npm run e2e when disallowedTools names both; the same session without it runs both', {
+test('a --bg session in dontAsk, in a checkout whose settings allow npm run build and npm run e2e, runs neither when disallowedTools names both; the same session without it runs both', {
   skip,
   timeout: 12 * 60_000,
 }, async () => {
   const engine = createEngine({ root: tmp('deny-board') });
-  const fenced = scripted('deny-fenced');
-  const open = scripted('deny-open');
-  // Bash only, in the mode that allows everything: nothing but the deny stands between the session and the commands.
-  const common = { brief: DENY_BRIEF, closeoutSchema: DENY_CLOSEOUT, deadlineSeconds: 480, model: 'haiku', permissionMode: 'bypassPermissions', tools: ['Bash'] };
-  const ids = {
-    fenced: await engine.file({ ...common, cwd: fenced, disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'] }),
-    open: await engine.file({ ...common, cwd: open }),
-  };
+  const fenced = allowingCheckout('deny-fenced');
+  const open = allowingCheckout('deny-open');
+  // The shipped reviewer's fence, less what this does not need: Bash only, in dontAsk.
+  const common = { brief: DENY_BRIEF, closeoutSchema: DENY_CLOSEOUT, deadlineSeconds: 480, model: 'haiku', permissionMode: 'dontAsk', tools: ['Bash'] };
+  try {
+    const ids = {
+      fenced: await engine.file({ ...common, cwd: fenced, disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)'] }),
+      open: await engine.file({ ...common, cwd: open }),
+    };
 
-  await settleThenCheck(engine, ids, (views) => {
-    const said = (k: string) => JSON.stringify(views[k]?.state.attempts.at(-1)?.closeout);
-    assert.equal(views.open?.state.settled, 'succeeded', `control settled: ${views.open?.phase}`);
-    assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(open, f))), WRITTEN, `control: nothing denied, and both ran; it said ${said('open')}`);
+    await settleThenCheck(engine, ids, (views) => {
+      const said = (k: string) => JSON.stringify(views[k]?.state.attempts.at(-1)?.closeout);
+      assert.equal(views.open?.state.settled, 'succeeded', `control settled: ${views.open?.phase}`);
+      assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(open, f))), WRITTEN,
+        `control: the settings allow both, and both ran — refused, the checkout's settings were not applied: run this from a checkout Claude Code trusts. It said ${said('open')}`);
 
-    assert.equal(views.fenced?.state.settled, 'succeeded', `fenced settled: ${views.fenced?.phase}`);
-    assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(fenced, f))), [], `the deny held in the widest mode: neither ran; it said ${said('fenced')}`);
-    assert.notEqual(views.fenced?.state.attempts.at(-1)?.closeout, undefined, 'and the fenced session still gave its closeout');
-  });
+      assert.equal(views.fenced?.state.settled, 'succeeded', `fenced settled: ${views.fenced?.phase}`);
+      assert.deepEqual(WRITTEN.filter((f) => fs.existsSync(path.join(fenced, f))), [], `the deny beat the allow: neither ran; it said ${said('fenced')}`);
+      assert.notEqual(views.fenced?.state.attempts.at(-1)?.closeout, undefined, 'and the fenced session still gave its closeout');
+    });
+  } finally {
+    for (const dir of [fenced, open]) fs.rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 const MCP_BRIEF = [

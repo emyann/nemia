@@ -763,6 +763,13 @@ owner is not mid-run.
 
 Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
 
+- **workers could not search the web (S3's plan step, 2026-09-14):** its risks said WebSearch and `claude agents
+  --help` were denied to it. Measured with `claude -p` from this checkout: `WebSearch` denied in `dontAsk` and in
+  `auto` without an allow rule, `WebFetch` of code.claude.com allowed in both. `.claude/settings.json` now allows
+  `WebSearch` and `WebFetch` (a bare rule each); re-measured allowed in `dontAsk`. The operator's own facts about
+  the attach primitive and the inbox socket went to S3's implement by message (no trace on the run — `say` is
+  what S3 builds). → settings, done by hand (§6 item 26).
+
 - **`decision` says shipped for a branch with nothing past its base (P1's round-3 review, 2026-09-14):** a
   result branch is cut at the run's base, so a terminal step that ended failed, blocked or unsigned with nothing
   committed leaves its branch on the base, and `decision` calls the run shipped — `wf decide` hides the failure, and
@@ -999,6 +1006,10 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 19. The ledger reordered: open first, settled below. *Done, `55acbde`.*
 
 **Settings, a decision by hand**
+26. Workers could not search the web: measured 2026-09-14 from this checkout, `WebSearch` was denied in `dontAsk`
+    ("running in don't ask mode") and in `auto` ("you haven't granted it yet"), while `WebFetch` of the docs worked in
+    both — S3's plan step said so in its risks. *Done by hand: `.claude/settings.json` allows `WebSearch` and
+    `WebFetch`; re-measured allowed in `dontAsk`.* A worktree cut before the change keeps the old settings.
 20. `.claude/settings.json`'s `Bash(npx turbo run test:*)` and `Bash(node --test:*)` reach the build and the e2e by other
     names (`npx turbo run test build`, `node --test apps/web/test/e2e/run.ts`), and no deny closes a prefix allow that
     runs any task or any file (D1's round-2 review). The reviewers' briefs name both; narrowing the allows — or

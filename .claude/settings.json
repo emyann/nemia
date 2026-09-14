@@ -24,7 +24,9 @@
       "Bash(git status:*)",
       "Bash(git branch)",
       "Bash(git branch --list:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "WebSearch",
+      "WebFetch"
     ]
   }
 }

@@ -631,7 +631,8 @@ store, visits every page in headless Chromium in a light and a dark theme, asser
 have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told to run it into its
 own directory and read the PNGs, and to use the look skill on every page it changed. It declares
 `screenshots` and `pages` (`implement.schema.json`). `review` reads the diff, is handed those and nothing
-else of implement, and uses the look skill on the screenshots and the pages side by side. Its schema is
+else of implement, and uses the look skill on the screenshots and the pages side by side — read by its
+file, `.claude/skills/look/SKILL.md`, because its `tools:` leave out `Skill` and with it the Skill tool. Its schema is
 `workflows/review.md`'s, `again` and all, with one difference: a finding says where it is as
 `where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that
 names neither does not fit the closeout the step is filed with. `again: true` sends the change round

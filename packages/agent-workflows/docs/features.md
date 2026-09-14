@@ -311,6 +311,10 @@ Claude step has the checkout's `.mcp.json`, and §4 R gave the edge back.
 - **`review`** is `input: implement`, `tools: Read, Grep, Glob, Bash`, `permissionMode: dontAsk`,
   `loop: implement`, `rounds: 3`: the old review's prose, then the old look's. Its schema is
   `workflows/review.schema.json` with a finding's place as `where: { file, line } | { page, theme }`, strict.
+- **Both bodies name the skill's file**, `.claude/skills/look/SKILL.md`, for Read. A `tools:` line without `Skill`
+  gives a session no Skill tool — measured with 2.1.270, whose session still lists the repository's skills — so
+  `review`, told only "the look skill", could not load it (round 1's review found that). The test refuses a body
+  that names a skill its step cannot reach: no Skill tool and not told the file, or told a file that is not there.
 - **`look.md`, `look.schema.json` and `respond.md` are gone**, from this folder and the repository's copy.
   `test/ui-workflow.test.ts` loads the two steps and the loop; makes the closeout schema refuse a finding that
   names neither a file nor a page, half of one, or both, with `ajv` (now a dev dependency); and holds the
@@ -334,6 +338,11 @@ What it leaves:
   path, so a step's own photographs reach its files directory by a copy, which a `dontAsk` step cannot make.
   They stay in `/tmp/playwright-mcp`, one directory for every step on the machine (plan §4b); the skill names a
   folder per run and step inside it.
+- **`wf decide` prints a ui finding's place as JSON.** `itemLines` (`src/run.ts`) heads a finding with
+  `file:line` only when `file` is at its top level, so a `where` finding prints
+  `- where: {"file":"…","line":12}` and then `what:`, and a page finding `where: {"page":"/workflows","theme":"dark"}`.
+  Reading `where.file`/`where.line` and `where.page`/`where.theme` there is a few lines and a case in
+  `test/run.test.ts`, outside this change's files. The board reads no finding's place, so it needs nothing.
 - **The pictures `review` reads are the check's.** `implement`'s check runs `npm run e2e` into the directory its
   `screenshots` name, after it signs off and before `review` is filed, so each round's reviewer reads the
   change as it stands under the same paths. A photograph `implement` takes with the browser is not among them.

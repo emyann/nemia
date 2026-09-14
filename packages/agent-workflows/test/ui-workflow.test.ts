@@ -25,6 +25,25 @@ const steps = Object.fromEntries(ui.map((s) => [s.name, s]));
 /** A step's prose with its line breaks as spaces, so a sentence is found wherever the file wraps it. */
 const said = (text: string) => text.replace(/\s+/g, ' ');
 
+/**
+ * The skills a step's body tells it to use and it could not reach: one named by a file the repository does not have, and one named
+ * only as `the <name> skill` on a step with no Skill tool, which the body is all it is told. A `tools:` line without `Skill` gives a
+ * session no Skill tool — measured with Claude Code 2.1.270, whose session still lists the repository's skills beside it — so
+ * such a step must be told the skill's file, which Read opens.
+ */
+function unreachableSkills(step: { body: string; tools?: string[] }): string[] {
+  const text = said(step.body);
+  const problems = new Set<string>();
+  for (const [, file] of text.matchAll(/`(\.claude\/skills\/[^`/]+\/SKILL\.md)`/g)) {
+    if (!fs.existsSync(path.join(REPO, file!))) problems.add(`${file} is not in the repository`);
+  }
+  const loads = !step.tools || step.tools.includes('Skill');
+  for (const [, name] of text.matchAll(/\bthe ([\w-]+) skill\b/g)) {
+    if (!loads && !text.includes(`\`.claude/skills/${name}/SKILL.md\``)) problems.add(`the ${name} skill is named, and this step has no Skill tool and is not told its file`);
+  }
+  return [...problems];
+}
+
 test('the ui workflow loads as two steps and the loop between them — every declared schema strict, or it would not', () => {
   assert.deepEqual(ui.map((s) => s.name), ['implement', 'review']);
   assert.deepEqual(ui.filter((s) => s.output).map((s) => [s.name, s.output!.schema.additionalProperties]), [['implement', false], ['review', false]]);
@@ -37,9 +56,9 @@ test('the ui workflow loads as two steps and the loop between them — every dec
 
 test('look and respond are gone: both steps use the look skill, which the repository carries, and the loop answers the review', () => {
   for (const gone of ['look.md', 'look.schema.json', 'respond.md']) assert.equal(fs.existsSync(path.join(WORKFLOWS, 'ui', gone)), false, `${gone} is gone`);
-  assert.ok(said(steps.implement!.body).includes('Before you sign off, use the look skill on every page you changed.'), steps.implement!.body);
+  assert.ok(said(steps.implement!.body).includes('Before you sign off, use the look skill on every page you changed'), steps.implement!.body);
   assert.ok(said(steps.review!.body).includes("Read the diff."), steps.review!.body);
-  assert.ok(said(steps.review!.body).includes("Use the look skill on implement's screenshots and on the pages, side by side"), steps.review!.body);
+  assert.ok(said(steps.review!.body).includes("use the look skill on implement's screenshots and on the pages, side by side"), steps.review!.body);
 
   // The skill the two briefs name is there, under that name, and the one browser tool it forbids is refused by the settings too.
   const skill = fs.readFileSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md'), 'utf8');
@@ -47,6 +66,26 @@ test('look and respond are gone: both steps use the look skill, which the reposi
   assert.match(skill, /never `browser_run_code_unsafe`/i);
   const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { deny: string[] } };
   assert.ok(settings.permissions.deny.includes('mcp__playwright__browser_run_code_unsafe'), 'denied by name');
+});
+
+test('REFUSED: a step told to use the look skill that could not reach it — no Skill tool and not told its file, or told a file that is not there', () => {
+  // review's tools leave out Skill, so its body is the only way it learns where the skill is.
+  assert.equal(steps.review?.tools?.includes('Skill'), false);
+  for (const step of ui) {
+    assert.match(said(step.body), /`\.claude\/skills\/look\/SKILL\.md`/, `${step.name} is told the skill's file`);
+    assert.deepEqual(unreachableSkills(step), [], step.name);
+  }
+
+  const review = steps.review!;
+  const told = '`.claude/skills/look/SKILL.md`';
+  assert.deepEqual(unreachableSkills({ ...review, body: review.body.replaceAll(told, 'the skill') }), [
+    'the look skill is named, and this step has no Skill tool and is not told its file',
+  ]);
+  assert.ok(unreachableSkills({ ...review, body: review.body.replaceAll(told, '`.claude/skills/looking/SKILL.md`') }).includes(
+    '.claude/skills/looking/SKILL.md is not in the repository',
+  ), 'a renamed skill');
+  // The rule is the Skill tool's: a step that has it loads the skill by name.
+  assert.deepEqual(unreachableSkills({ ...review, tools: [...review.tools!, 'Skill'], body: review.body.replaceAll(told, 'the skill') }), []);
 });
 
 test('implement is checked in a browser; review, which writes nothing, declares no check', () => {

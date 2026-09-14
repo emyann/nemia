@@ -752,16 +752,25 @@ owner is not mid-run.
   (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
   and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
 
+- **a stale ask on a harness-blocked step that resumes by itself (W4's review, 2026-09-14):** `wf retry` on a step
+  whose session the harness blocked is due only while the engine says `needs-human`; if the session starts working
+  again before a tick stops it (a cross-session nudge, no `wf up`), the ask is neither due nor spent — `wf ls` shows
+  nothing — and files try 2 at once if the step later fails, stops or is unsigned, ahead of `retries:`. A task with
+  no `stopRequested` tells it apart. Stop the session anyway, or name it in `wf ls`/`wf decide`. → agent-workflows,
+  small (§6 item 24).
+
+### Settled
+
+Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+
 - **`decision` says shipped for a branch with nothing past its base (P1's round-3 review, 2026-09-14):** a
   result branch is cut at the run's base, so a terminal step that ended failed, blocked or unsigned with nothing
   committed leaves its branch on the base, and `decision` calls the run shipped — `wf decide` hides the failure, and
   a run waiting on it starts. Rare in the repo's workflows (implement must succeed with no commits and review
   fail). Shipped only when the outcome would be `succeeded`, unless the branch has commits that are on the base.
   → agent-workflows, W4 (§6 item 21).
-
-### Settled
-
-Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+  *W4, `406a510`: `isShipped` says which yes it is (`Shipped`), and `decision` takes `'unchanged'` only for a run whose
+  steps all succeeded.*
 
 - **`needs-human` on the board says nothing about what is needed (operator, 2026-09-14, on Q1):** the card and the
   node show the chip and nothing else. Two cases hide behind it. A step that signed off `blocked` has its question in
@@ -919,7 +928,7 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — the order to file was 4–5 (D1), then Q (Q1, Q2), then P (P1) — all done; P2 and W4 run side by side now.
+Everything left, in one list, as of 2026-09-14 — the order to file was 4–5 (D1), then Q (Q1, Q2), then P (P1) — all done; W4 done; P2 in flight; then P3 and 23.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -947,15 +956,23 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 9. The artifacts directory carried on the task (reviewer reads screenshots portably; Codex's unwritable dir).
 10. The login-refresh race: `wf retry` on a step whose session the harness marked blocked with no closeout — the
     tick stops the task, then files the nudge (Q2 measured that the package reads such a step as running and refuses
-    every try). *W4, filed 2026-09-14 as `three-small-correctness-item-lz3w`, with 21 and 22.* A Claude Code report
-    for the race itself is still to write.
+    every try). *Done, W4, `406a510` — the CLI passes `stopBlocked`; the board's POST does not yet (item 23).* A Claude
+    Code report for the race itself is still to write.
 
 21. `decision` calls a run shipped when its terminal step failed or blocked with nothing committed: the result
     branch sits at the base, so it is trivially "on the base", `wf decide` hides the failure and a child `--after`
     it starts (P1's last review). Shipped only when the outcome is `succeeded`, unless the branch has commits on
-    the base. *W4.*
+    the base. *Done, W4, `406a510`.*
 22. An ask file that is not an ask (`{}` at `runs/<id>.asks/retry-<step>-<n>`) is honoured by nobody, yet `retry()`
-    refuses to write over it with "already asked for. Wait for it" (Q2's e2e found it). Name the file. *W4.*
+    refuses to write over it with "already asked for. Wait for it" (Q2's e2e found it). Name the file. *Done, W4,
+    `406a510`; Q2's e2e now expects the new sentence.*
+23. The board's `POST …/retry` passes `{ stopBlocked: true }` to `retry()` as the CLI does, flips the api test that
+    pins the 409, and the run page's banner offers Continue again for a harness-blocked step (with "stopping its
+    session" as `wf ls` words it). apps, small — after P2.
+24. A stale ask: `wf retry` on a harness-blocked step, then the session resumes by itself before a tick stops it
+    (a cross-session nudge, or no `wf up`). The ask is neither due nor spent, `wf ls` shows nothing, and it files
+    try 2 at once if the step later fails (W4's review). Stop the session anyway, or name it in `wf ls`. agent-
+    workflows, small.
 
 **apps, small**
 11. The timeline — per try and per check, on the run page and in `wf decide`; `effort`/`tools` on the Workflows page's node.

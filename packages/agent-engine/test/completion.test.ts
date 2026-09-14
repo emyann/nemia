@@ -243,6 +243,7 @@ const argvOf = async (r: Partial<SpawnRequest>) => {
 test('at shipped defaults Claude Code is given neither --tools nor --effort', async () => {
   const args = await argvOf({});
   assert.equal(args.includes('--tools'), false, 'no list: every tool the harness has');
+  assert.equal(args.includes('--disallowedTools'), false, 'no deny list: nothing denied beyond the settings');
   assert.equal(args.includes('--effort'), false, "no effort: the harness's own");
 });
 
@@ -260,6 +261,18 @@ test('tools reach Claude Code as --tools, and a flag ends the list before the pr
 test('an empty tool list reaches Claude Code as no tools at all, not as every tool', async () => {
   const args = await argvOf({ tools: [] });
   assert.equal(args[args.indexOf('--tools') + 1], '');
+});
+
+test('disallowedTools reach Claude Code as --disallowedTools, the rules in one argument, and a flag ends the list before the prompt', async () => {
+  // Variadic, as `--tools` is: directly before the prompt it would take the prompt as a rule to deny.
+  const args = await argvOf({ tools: ['Read', 'Bash'], disallowedTools: ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'] });
+  const i = args.indexOf('--disallowedTools');
+  assert.notEqual(i, -1, args.join(' '));
+  assert.equal(args[i + 1], 'Bash(npm run build),Bash(npm run e2e),SendMessage', 'a space inside a rule stays inside it');
+  assert.equal(args[i + 2], '--permission-mode');
+  assert.equal(args[args.indexOf('--tools') + 1], 'Read,Bash', 'beside the tool list, not in its place');
+  assert.equal(args.at(-1), 'the prompt');
+  assert.equal((await argvOf({ disallowedTools: [] })).includes('--disallowedTools'), false, 'an empty list denies nothing, and is not passed');
 });
 
 test('effort reaches Claude Code as --effort', async () => {

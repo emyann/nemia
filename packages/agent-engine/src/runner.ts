@@ -49,6 +49,8 @@ export type SpawnRequest = {
   closeoutSchema?: object;
   /** The only tools the session may have, in this harness's names. Absent: the harness's own set. */
   tools?: string[];
+  /** What the session may not have, in this harness's permission rules, one per entry. Absent or empty: nothing denied. */
+  disallowedTools?: string[];
   /** How hard the harness should think, in its own words. */
   effort?: string;
   /** MCP servers the session may have, by name, beside its checkout's `.mcp.json`. Absent: only those. */
@@ -618,6 +620,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // it would take the prompt as a tool name, the `--worktree` trap — so it goes here, and the
       // `--permission-mode` that always comes next ends the list. An empty list is no tools at all.
       ...(r.tools ? ['--tools', r.tools.join(',')] : []),
+      // The deny list, the other half of the fence: a tool the session has, or a command it may run, that it
+      // must not use — `Bash(npm run build)`, which the checkout's settings allow for another step's sake. A deny
+      // beats every allow. Variadic as `--tools` is, and ended the same way. Claude Code splits it on commas and
+      // spaces outside a rule's parentheses (its help's own example is "Bash(git *) Edit"), so one argument holds them.
+      ...(r.disallowedTools?.length ? ['--disallowedTools', r.disallowedTools.join(',')] : []),
       // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
       // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first
       // session that wants to run its own tests stops and waits for a person who is not there.

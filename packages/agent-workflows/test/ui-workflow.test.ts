@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Ajv } from 'ajv';
-import { closeoutSchemaOf, composeBrief, workspacePlan, type Closeout, type Run } from '../src/run.ts';
+import { closeoutSchemaOf, composeBrief, outputLines, workspacePlan, type Closeout, type Run } from '../src/run.ts';
 import { loadWorkflows, loopSpan, terminalSteps } from '../src/workflow.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
@@ -103,14 +103,52 @@ test('implement declares the screenshots it looked at and the pages they show, a
   assert.deepEqual(ui.filter((s) => s.input?.includes('implement')).map((s) => s.name), ['review']);
 });
 
-test('review writes nothing by machinery: on Claude, tools that read and Bash, in dontAsk — and implement has every tool', () => {
-  const { harness, after, input, tools, permissionMode, output, loop, rounds } = steps.review!;
-  assert.deepEqual({ harness, after, input, tools, permissionMode, output: output?.file, loop, rounds }, {
-    harness: 'claude', after: ['implement'], input: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], permissionMode: 'dontAsk',
-    output: 'review.schema.json', loop: 'implement', rounds: 3,
+test('review writes nothing by machinery: on Claude, tools that read and Bash, in dontAsk, denied build and e2e — and implement has every tool', () => {
+  const { harness, after, input, tools, disallow, permissionMode, output, loop, rounds } = steps.review!;
+  assert.deepEqual({ harness, after, input, tools, disallow, permissionMode, output: output?.file, loop, rounds }, {
+    harness: 'claude', after: ['implement'], input: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'],
+    disallow: REVIEW_DENIED, permissionMode: 'dontAsk', output: 'review.schema.json', loop: 'implement', rounds: 3,
   });
   assert.deepEqual(tools?.filter((t) => ['Edit', 'Write', 'NotebookEdit'].includes(t)), [], 'nothing that edits');
   assert.equal(steps.implement?.tools, undefined);
+  assert.deepEqual(steps.implement?.disallow, IMPLEMENT_DENIED);
+});
+
+/** What the settings allow for implement's check, and write into the workspace: a reviewer is denied both by name. */
+const REVIEW_DENIED = ['Bash(npm run build)', 'Bash(npm run e2e)'];
+/** What an unattended session has and no step needs (plan §4b, "what a worker gets, measured"). */
+const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
+
+test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`, which the settings allow for implement's sake, and every implement what no step needs", () => {
+  // The deny is what keeps review from them: the settings allow both, so in dontAsk nothing else would.
+  const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { allow: string[] } };
+  for (const rule of REVIEW_DENIED) assert.ok(settings.permissions.allow.includes(rule), `${rule} is allowed by the settings, word for word`);
+
+  const folders = [WORKFLOWS, path.join(WORKFLOWS, 'ui'), ...['dev', 'dev-build', 'ui'].map((d) => path.join(REPO, 'workflows', d))];
+  for (const dir of folders) {
+    const byName = Object.fromEntries(loadWorkflows(dir).map((s) => [s.name, s]));
+    assert.deepEqual(byName.implement?.disallow, IMPLEMENT_DENIED, `${dir}: implement`);
+    const review = byName.review!;
+    if (review.harness === 'codex') {
+      assert.deepEqual([review.permissionMode, review.disallow], ['read-only', undefined], `${dir}: codex has no tool list, and its sandbox writes nothing`);
+    } else {
+      assert.deepEqual([review.permissionMode, review.disallow], ['dontAsk', REVIEW_DENIED], `${dir}: review`);
+    }
+  }
+});
+
+test('`wf decide` on a ui review reads each finding as a place — the file and line, or the page and theme — never as JSON', () => {
+  const what = 'The legend covers the last row of nodes.';
+  const said: Closeout = {
+    outcome: 'done', summary: 'Read and looked.', artifacts: [], needs: null,
+    output: { findings: [{ where: { file: 'apps/web/src/components/StepNode.tsx', line: 12 }, what }, { where: { page: '/workflows', theme: 'dark' }, what }], again: true },
+  };
+  assert.deepEqual(outputLines(steps.review!, said), [
+    'findings:',
+    '  - apps/web/src/components/StepNode.tsx:12', `    what: ${what}`,
+    '  - /workflows · dark', `    what: ${what}`,
+    'again: true',
+  ]);
 });
 
 type Branch = { type: string; properties: Record<string, unknown>; required: string[]; additionalProperties: boolean };

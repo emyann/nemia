@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, nextTry, outputLines, parseCloseout, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, type Closeout, type EarlierTry, type RetryAsk, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, type Closeout, type EarlierTry, type RetryAsk, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -990,6 +990,33 @@ test('`wf decide` prints a declared output readably: a list as a list, anything 
   ]);
   assert.deepEqual(outputLines(more, reviewSaid()).at(-1), '!! declared and not given: verdict, score');
   assert.deepEqual(outputLines(step('implement'), reviewSaid()), [], 'a step that declares nothing prints nothing of what else it said');
+});
+
+test("`wf decide` prints a finding's `where` as a place, never as JSON: file:line, page · theme, a string as it is, any other object as its keys and values", () => {
+  const findings = [
+    { where: { file: 'apps/web/src/components/StepNode.tsx', line: 12 }, what: 'the legend covers a node' },
+    { where: { file: 'apps/web/test/components.test.ts', line: null }, what: 'nothing tests it' },
+    { where: { page: '/workflows', theme: 'dark' }, what: 'the label cannot be read' },
+    { where: { url: 'http://localhost:5173/runs', selector: '.legend' }, what: 'off the screen' },
+    { where: 'src/run.ts:958', what: 'as it is' },
+  ];
+  const lines = outputLines(REVIEW, reviewSaid({ findings }));
+  assert.deepEqual(lines, [
+    'findings:',
+    '  - apps/web/src/components/StepNode.tsx:12', '    what: the legend covers a node',
+    '  - apps/web/test/components.test.ts', '    what: nothing tests it',
+    '  - /workflows · dark', '    what: the label cannot be read',
+    '  - url: http://localhost:5173/runs · selector: .legend', '    what: off the screen',
+    '  - src/run.ts:958', '    what: as it is',
+  ]);
+  assert.equal(lines.some((l) => /[{}"]/.test(l)), false, 'no JSON anywhere');
+
+  // What a place holds beside its lead follows it, and a place inside a place reads the same.
+  assert.equal(placeText({ page: '/runs/r-1', theme: 'both', width: 400 }), '/runs/r-1 · both · width: 400');
+  assert.equal(placeText({ file: 'a.ts', line: 3, column: 7 }), 'a.ts:3 · column: 7');
+  assert.equal(placeText({ page: '/', viewport: { width: 400, height: 800 } }), '/ · viewport: width: 400 · height: 800');
+  assert.equal(placeText('line one\nline two'), 'line one\nline two', 'a string as it is');
+  assert.deepEqual(outputLines(REVIEW, reviewSaid({ findings: [{ where: 'line one\nline two', what: 'x' }] })), ['findings:', '  - line one', '    line two', '    what: x']);
 });
 
 test('a declared field named `__proto__` travels like any other — into the brief, into `wf decide`, and into the unsigned rule', () => {

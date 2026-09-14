@@ -819,6 +819,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         permissionMode: step.permissionMode,
         // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
         tools: step.tools,
+        disallowedTools: step.disallow,
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
         resumeFrom,
@@ -858,6 +859,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         effort: target.effort,
         permissionMode: target.permissionMode,
         tools: target.tools,
+        disallowedTools: target.disallow,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
         resumeFrom,
@@ -938,6 +940,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       permissionMode: step.permissionMode,
       // The only tools the session has, when the step names them — from the workflow this run froze, like the rest.
       tools: step.tools,
+      // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
+      disallowedTools: step.disallow,
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,

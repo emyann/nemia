@@ -365,6 +365,7 @@ test('at shipped defaults neither detached harness is given a tool list or an ef
   assert.equal(c[c.indexOf('-s') + 1], 'workspace-write');
   const d = claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args;
   assert.equal(d.includes('--tools'), false);
+  assert.equal(d.includes('--disallowedTools'), false);
   assert.equal(d.includes('--effort'), false);
 });
 
@@ -599,6 +600,42 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
     assert.equal(argv[argv.indexOf('--output-format') + 1], 'json');
     assert.deepEqual(fs.readdirSync(cwd), [], 'nothing in the workspace');
   } finally { process.env.PATH = prev; }
+});
+
+test('claude-detached, filed through the engine with disallowedTools, spawns claude with --disallowedTools and the rules', async () => {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-fake-claude-'));
+  fs.writeFileSync(path.join(bin, 'claude'), [
+    '#!/bin/sh',
+    `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
+    `printf '%s\\n' "$@" > '${bin}/argv'`,
+    `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`,
+  ].join('\n'), { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${bin}:${prev}`;
+  try {
+    const engine = createEngine({ root: root() });
+    const rules = ['Bash(npm run build)', 'Bash(npm run e2e)'];
+    const id = await engine.file({ brief: 'the prompt', cwd: root(), harness: 'claude-detached', tools: ['Read', 'Bash'], disallowedTools: rules });
+    const until = Date.now() + 15_000;
+    while (!(await engine.view(id)).state.settled && Date.now() < until) {
+      await engine.tick();
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.deepEqual((await engine.view(id)).state.disallowedTools, rules, 'on the record');
+    const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
+    const i = argv.indexOf('--disallowedTools');
+    assert.notEqual(i, -1, argv.join(' '));
+    assert.equal(argv[i + 1], 'Bash(npm run build),Bash(npm run e2e)');
+    assert.equal(argv[i + 2], '--permission-mode', 'a flag ends the variadic list');
+  } finally { process.env.PATH = prev; }
+});
+
+test('REFUSED: a deny list on codex, which has no tool list to take from — in its own words, naming the sandbox', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  assert.match(codex.refuses!({ brief: 'b', cwd: '/r', disallowedTools: ['Bash(git push)'] }) ?? '', /is a deny list, and Codex has no tool list to take from.*`permissionMode`/);
+  assert.equal(codex.refuses!({ brief: 'b', cwd: '/r', disallowedTools: [] }), undefined, 'an empty list denies nothing');
+  const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', disallowedTools: ['SendMessage'] }).args;
+  assert.equal(args.some((a) => a.includes('SendMessage')), false, 'a direct caller is given no flag codex does not have');
 });
 
 // ─── codex: what it consumed, from its stream ───────────────────────────────

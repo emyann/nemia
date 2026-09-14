@@ -587,6 +587,10 @@ export const codex: HarnessSpec = {
     if (task.effort !== undefined && !CODEX_EFFORTS.includes(task.effort)) {
       return `\`effort: ${task.effort}\` is not a reasoning effort Codex has. Its efforts are: ${CODEX_EFFORTS.join(', ')}.`;
     }
+    // A deny list would be dropped without a word: Codex has no tool to take away, only a sandbox.
+    if (task.disallowedTools?.length) {
+      return `\`disallowedTools: ${JSON.stringify(task.disallowedTools)}\` is a deny list, and Codex has no tool list to take from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` runs commands and writes nothing. Leave \`disallowedTools\` off a Codex task, and name the sandbox.`;
+    }
     const sse = Object.entries(task.mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
     if (sse) {
       return `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`;
@@ -662,6 +666,7 @@ export const claudeDetached: HarnessSpec = {
       '--output-format', 'json',
       // Variadic, and ended by the flag after it, as for `claude --bg`.
       ...(r.tools ? ['--tools', r.tools.join(',')] : []),
+      ...(r.disallowedTools?.length ? ['--disallowedTools', r.disallowedTools.join(',')] : []),
       '--permission-mode', r.permissionMode ?? 'auto',
       // Strict on every spawn, as for `claude --bg`: the checkout's `.mcp.json` and the task's own.
       ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),

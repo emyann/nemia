@@ -11,7 +11,8 @@ The same two steps as `dev`, and one difference: `implement`'s `check:` is
 `npm test && npm run typecheck && npm run build && npm run e2e`. The build regenerates the web app's
 route tree, which a new route needs before it typechecks, and the e2e builds the app, serves it
 against a seeded store and visits every page in a light and a dark theme. `review` is `dev`'s, and
-does not run either: both write into the workspace.
+is denied both by name by its `disallow:` line: both write into the workspace. By those names only — `dev`'s
+README says which of the settings' allows still reach them.
 
 ```bash
 wf start "<what to do>" --workflows workflows/dev-build

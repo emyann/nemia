@@ -150,6 +150,11 @@ export type Event =
        * a tool is. Absent means the harness's own set.
        */
       tools?: string[];
+      /**
+       * What the session may not have, in its harness's permission rules. Carried, never read here, as
+       * `tools` is: a runner hands it to its harness, and `decide` never learns what a rule is.
+       */
+      disallowedTools?: string[];
       /** How hard the harness should think, in its own words. Carried, never read here. */
       effort?: string;
       /**
@@ -222,8 +227,9 @@ export type State = {
   worktree?: string | boolean;
   /** The shape of the workload's closing statement. See the `filed` event. */
   closeoutSchema?: object;
-  /** The session's tools, effort and MCP servers. See the `filed` event. `decide` never reads any of them. */
+  /** The session's tools, what it may not have, effort and MCP servers. See the `filed` event. `decide` never reads any of them. */
   tools?: string[];
+  disallowedTools?: string[];
   effort?: string;
   mcp?: Record<string, McpServer>;
   attempts: Attempt[];
@@ -245,7 +251,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
         s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
-        s.tools = e.tools; s.effort = e.effort; s.mcp = e.mcp;
+        s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.effort = e.effort; s.mcp = e.mcp;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, usage: null, exitCode: null });

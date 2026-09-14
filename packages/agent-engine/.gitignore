@@ -1,1 +1,3 @@
 node_modules
+# The checkouts test/live.test.ts makes inside this package, removed when it ends; left behind only by a killed run.
+.ae-live-*/

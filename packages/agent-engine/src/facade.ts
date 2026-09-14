@@ -111,6 +111,14 @@ export type TaskSpec = {
    */
   tools?: string[];
   /**
+   * What the session may not have, in Claude Code's permission rules — `['SendMessage', 'Bash(npm run build)']`,
+   * one rule per entry: a tool, or a tool and what it may not run. Claude Code is given the list as
+   * `--disallowedTools`, and a deny beats an allow — the checkout's settings, `--allowedTools`, any permission
+   * mode. Absent or empty: nothing denied beyond the harness's own settings. Codex has no tool list, and refuses
+   * a task whose list denies anything. Carried on the task; `decide` never reads it.
+   */
+  disallowedTools?: string[];
+  /**
    * How hard the harness should think, in its own words: `--effort` for Claude Code,
    * `model_reasoning_effort` for Codex. Carried on the task; `decide` never reads it.
    */
@@ -136,7 +144,8 @@ export type Engine = {
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing journalled — when the task
    * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
    * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model,
-   * resumeFrom or effort; a `cwd` that is not absolute; a `tools` that is not a list of names; an
+   * resumeFrom or effort; a `cwd` that is not absolute; a `tools` that is not a list of names; a
+   * `disallowedTools` that is not a list of permission rules; an
    * `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
    * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists).
    * A harness brought as a `PromiseRunner` is asked nothing.
@@ -236,6 +245,13 @@ const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
 const RESUME_POLICIES: Record<ResumePolicy, true> = { interrupted: true, always: true, never: true };
 
 /**
+ * One permission rule as Claude Code writes one: a tool's name, and what it may not run in parentheses —
+ * `SendMessage`, `Bash(npm run build)`. A space or a comma outside the parentheses separates two rules on
+ * the harness's side, so an entry that has one is not one rule.
+ */
+const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
+
+/**
  * Why a task cannot be filed, as a sentence that says what to write instead — or `undefined`.
  *
  * Checked at the API, so the CLI is not the only door that checks. A journalled task is a promise
@@ -270,6 +286,9 @@ const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
   // One name per entry: a comma inside one would split into two names on the way to the harness.
   if (spec.tools !== undefined && !(Array.isArray(spec.tools) && spec.tools.every((t) => typeof t === 'string' && t !== '' && t.trim() === t && !t.includes(',')))) {
     return `\`tools: ${JSON.stringify(spec.tools)}\` is not a list of tool names. Give one name per entry, like ["Read", "Grep", "Glob"].`;
+  }
+  if (spec.disallowedTools !== undefined && !(Array.isArray(spec.disallowedTools) && spec.disallowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
+    return `\`disallowedTools: ${JSON.stringify(spec.disallowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may not run, like ["SendMessage", "Bash(npm run build)"].`;
   }
   const mcp = spec.mcp === undefined ? undefined : mcpRefuses(spec.mcp);
   if (mcp) return mcp;

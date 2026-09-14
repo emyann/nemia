@@ -271,7 +271,7 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 test('every key a step has is read — none is accepted and then dropped', () => {
   const values: Record<StepKey, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
-    tools: 'Read, Grep, Glob, Bash', deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
+    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -282,11 +282,11 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual(w.input, ['implement']);
   assert.deepEqual(w.output, { file: 'review.schema.json', schema: LOOPING });
   assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
-  assert.deepEqual([w.effort, w.tools], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash']]);
+  assert.deepEqual([w.effort, w.tools, w.disallow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage']]);
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, deadlineSeconds, maxAttempts, check, retries, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, disallow, deadlineSeconds, maxAttempts, check, retries, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -346,6 +346,45 @@ test('REFUSED: tools: on a codex step, naming the sandbox permissionMode sets in
     refusedWith(/^review: `tools: Read, Grep, Glob` is a tool list, and codex has none: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — `read-only` reads and runs commands and writes nothing.*`permissionMode: read-only` for a step that must not write\./));
   assert.throws(() => fm('review', 'tools: Read\nharness: codex\npermissionMode: read-only'), refusedWith(/codex has none/), 'wherever the harness line is, and beside the sandbox too');
   for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('review', `harness: ${h}\ntools: Read`).tools, ['Read'], h);
+});
+
+test('disallow: is the rules the harness is given to deny, one rule per entry, trimmed — and absent, nothing is denied', () => {
+  const w = fm('review', 'tools: Read, Bash\ndisallow: Bash(npm run build) ,  Bash(npm run e2e), SendMessage,');
+  assert.deepEqual(w.disallow, ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'], 'a space inside a rule stays in it; a trailing comma adds none');
+  assert.deepEqual(fm('review', 'disallow: mcp__playwright__browser_run_code_unsafe, Read(//home/**)').disallow, ['mcp__playwright__browser_run_code_unsafe', 'Read(//home/**)']);
+  // A quote is legal inside a rule, whichever entry comes after it: `tools:`'s quote check refused the first order and took the second.
+  for (const q of [`'`, `"`]) {
+    const rule = `Bash(git commit -m ${q}wip${q})`;
+    assert.deepEqual(fm('review', `disallow: ${rule}, SendMessage`).disallow, [rule, 'SendMessage'], `${q}: a quoted rule, then another`);
+    assert.deepEqual(fm('review', `disallow: SendMessage, ${rule}`).disallow, ['SendMessage', rule], `${q}: another, then a quoted rule`);
+  }
+  assert.equal(fm('review', 'harness: claude').disallow, undefined, 'absent: nothing denied beyond the settings');
+  for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('review', `harness: ${h}\ndisallow: SendMessage`).disallow, ['SendMessage'], h);
+});
+
+test('REFUSED: an empty disallow: — blank, or only commas — which denies nothing and reads as a fence', () => {
+  assert.throws(() => fm('review', 'disallow:'), refusedWith(/^review: `disallow` has no value, which denies nothing and reads as a fence\. Name what the session may not have — `disallow: Bash\(npm run build\), SendMessage` — or delete the line/));
+  assert.throws(() => fm('review', 'disallow: ,'), refusedWith(/^review: `disallow: ,` names no rule\. .*Without the line, the step is denied nothing beyond the checkout's settings\./));
+  assert.throws(() => fm('review', 'disallow:  , ,'), refusedWith(/names no rule/));
+});
+
+test('REFUSED: a disallow: entry that is not one rule — a comma inside its parentheses, a space outside them, a list in brackets or quotes', () => {
+  assert.throws(() => fm('review', 'disallow: Bash(git push, git reset)'),
+    refusedWith(/^review: `disallow: Bash\(git push, git reset\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(git push`, `git reset\)` as rules\. .*Two commands are two rules: `Bash\(git push\), Bash\(git reset\)`\./));
+  assert.throws(() => fm('review', "disallow: Bash(git commit -m 'a, b'), SendMessage"), refusedWith(/has a comma inside an entry/), 'a comma in quotes inside the parentheses is still inside them');
+  assert.throws(() => fm('review', 'disallow: [SendMessage, CronCreate]'), refusedWith(/has `\[SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('review', 'disallow: "SendMessage, CronCreate"'), refusedWith(/has `"SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('review', 'disallow: SendMessage CronCreate'),
+    refusedWith(/^review: `disallow: SendMessage CronCreate` has `SendMessage CronCreate`, which is not one rule: a space outside the parentheses separates two rules, to the harness\. Each entry is one rule/));
+  assert.throws(() => fm('review', 'disallow: "SendMessage"'), refusedWith(/has `"SendMessage"`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('review', 'disallow: Bash(npm run build'), refusedWith(/has `Bash\(npm run build`, which is not one rule: a rule has one pair of parentheses, right after the name, closed/));
+  assert.throws(() => fm('review', 'disallow: Bash (npm run build)'), refusedWith(/which is not one rule: a rule has one pair of parentheses, right after the name/));
+});
+
+test('REFUSED: disallow: on a codex step, naming the sandbox permissionMode sets instead', () => {
+  assert.throws(() => fm('review', 'harness: codex\ndisallow: Bash(npm run build)'),
+    refusedWith(/^review: `disallow: Bash\(npm run build\)` is a deny list, and codex has no tool list to deny from: one shell, fenced by its sandbox\. The sandbox is `permissionMode` — .*`permissionMode: read-only` for a step that must not write\./));
+  assert.throws(() => fm('review', 'disallow: SendMessage\nharness: codex\npermissionMode: read-only'), refusedWith(/codex has no tool list to deny from/), 'wherever the harness line is, and beside the sandbox too');
 });
 
 test("REFUSED: an effort the step's harness does not take, by name, with the efforts it does", () => {

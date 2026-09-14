@@ -6,6 +6,9 @@ harness: claude
 check: npm test && npm run typecheck && npm run build && npm run e2e
 # `screenshots` and `pages` travel to review as data (`input: implement`), every round. The summary does not.
 output: implement.schema.json
+# Denied by name what no step needs and an unattended session otherwise has: messaging other sessions, scheduling cron
+# jobs, firing remote triggers (measured, docs/plan-hold-the-bar.md §4b, "what a worker gets"). `--disallowedTools`.
+disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger
 ---
 Implement what was asked, in this repository. It changes what a person sees in the web app.
 

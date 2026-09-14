@@ -857,7 +857,8 @@ function needing(status: string, needs: Partial<Pick<RunDetail['steps'][number],
 test("a step's node says what it needs: a gate's question after `waiting on you`, and a session the harness blocked, with what it said last — whole on hover", () => {
   const question = 'Should a finished run keep its card on the Factory?';
   const gate = nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: ['review'] }));
-  const footer = /<p title="([^"]*)" class="line-clamp-2[^"]*">([\s\S]*?)<\/p>/.exec(gate);
+  // One line, as the node's others: a second would make it taller than the layering's row.
+  const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(gate);
   assert.ok(footer, gate);
   assert.equal(footer[1], `asks: ${question}`);
   assert.equal(footer[2], `<span class="font-semibold">waiting on you</span><span data-need="asks"> · asks: ${question}</span>`);
@@ -867,7 +868,7 @@ test("a step's node says what it needs: a gate's question after `waiting on you`
 
   const held = nodeMarkup(needing('needs-human', { blockedByHarness: { lastLine: LOGIN } }, { waitingOnYou: [] }));
   assert.equal(gateDrawn(held), false, 'blocked by the harness is no gate: the step asked nothing');
-  assert.ok(held.includes(`<p data-need="harness" title="blocked by the harness: ${LOGIN}"`), held);
+  assert.ok(held.includes(`<p data-need="harness" title="blocked by the harness: ${LOGIN}" class="truncate `), held);
   assert.ok(held.includes(`>blocked by the harness: ${LOGIN}</p>`), held);
   assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: { lastLine: null } }, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
   assert.doesNotMatch(nodeMarkup(needing('running (working)', {}, { waitingOnYou: [] })), /data-need/);

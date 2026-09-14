@@ -81,11 +81,14 @@ export function StepNode({
         </span>
       </div>
 
-      {/* The gate, and what it waits for when the step said: two lines at most, and whole on hover. */}
+      {/*
+        The gate, and what it waits for when the step said: one line, as the node's others, and whole on hover — a second would
+        make the node taller than the layering's row, and the card and the run's banner say it whole.
+      */}
       {gate && (
         <p
           title={need ? needText(need) : undefined}
-          className="line-clamp-2 border-t border-amber-200 bg-amber-50 px-3 py-1 text-xs break-words text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+          className="truncate border-t border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
         >
           <span className="font-semibold">waiting on you</span>
           {need && (
@@ -101,7 +104,7 @@ export function StepNode({
         <p
           data-need={need.kind}
           title={needText(need)}
-          className="line-clamp-2 border-t border-orange-200 bg-orange-50 px-3 py-1 text-xs break-words text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300"
+          className="truncate border-t border-orange-200 bg-orange-50 px-3 py-1 text-xs text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300"
         >
           {needText(need)}
         </p>

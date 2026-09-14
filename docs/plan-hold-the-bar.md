@@ -843,6 +843,11 @@ owner is not mid-run.
   appear once per result branch; `wf decide` prints each branch on its own line and never sums. Count each
   file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
   last value only (`indexOf` on parsed objects is −1). → apps, with B7.
+- **`wf decide` prints a nested `where` as JSON (U2's review):** `itemLines` in run.ts formats a finding as
+  `file:line` only when `file` is top-level; U2's ui review declares `where: { file, line } | { page, theme }`,
+  which prints as `- where: {"file":…}`. Teach `itemLines` a `where` object: `file:line` or `page · theme`.
+  Also learned: `tools:` names Claude Code's built-in tools and `Skill` is one, so a step that should
+  invoke a skill lists `Skill` — the review fence becomes `Read, Grep, Glob, Bash, Skill`. → agent-workflows, small.
 
 ## 5. What the plan does not do
 

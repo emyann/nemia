@@ -1,5 +1,5 @@
 /**
- * The store `npm run e2e` serves: three fake runs, written the way `wf` and the engine write theirs.
+ * The store `npm run e2e` serves: four fake runs, written the way `wf` and the engine write theirs.
  *
  * FAKE has five steps in two lanes, frozen on the record as `wf start` freezes them, with the folder beside
  * it. `implement` signed off blocked, with its session's conversation on disk for the engine to read (SESSION),
@@ -13,6 +13,8 @@
  * FAKE's repository is a real one, beside the store (`seedRepo`): `theme`'s branch, the run's result, is committed on it,
  * so its page has something to decide. The other two runs name a repository that is not on the machine, which reads as a
  * branch git could not read.
+ *
+ * Beside the store, the sessions the fake `claude` lists (REGISTRY): HELD's, which the harness marked blocked.
  *
  * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
  * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS.
@@ -126,7 +128,7 @@ function conversation(session: typeof SESSION, ago: (minutes: number) => string)
 /**
  * A second run, started after FAKE: `plan` signed off and `draft`, which waits on it, has its session running, so work moves
  * along the edge between them. `sketch` failed and `ship`, which waits on it, will never be filed, so `assess` has the run
- * failed — while draft's session still runs. It still moves, so it is in flight: the only card on the floor until finished
+ * failed — while draft's session still runs. It still moves, so it is in flight: on the floor, with HELD's, until finished
  * runs are shown. Laid out oldest first, its card takes the cell beside FAKE's — the cell FAKE's graph unfolds over, which
  * the Factory must move this card out of.
  */
@@ -170,6 +172,41 @@ export const LOOPING = {
   replies: [{ finding: 'apps/web/src/lib/status.ts — an unknown word reads as working', answer: 'fixed', why: 'It reads as unknown now.' }],
   replied: 'apps/web/src/lib/status.ts — an unknown word reads as working → fixed (It reads as unknown now.)',
 } as const;
+
+/**
+ * A fourth run, started last: `implement`'s session is one the harness marked blocked, and it gave no closeout — Q1's round-2
+ * implement on 2026-09-14, stopped by the login refresh race — and `review` waits on it. The engine reads it `needs-human`, so the
+ * run is running and moves, and in the package's words nobody is waiting on you: the step asked nothing. On the floor by default,
+ * in the cell after NEIGHBOUR's. The board names the harness, and what the session said last (`line`).
+ */
+export const HELD = {
+  id: 'blocked-by-the-harness-e2e3',
+  title: 'Blocked by the harness',
+  steps: ['implement', 'review'],
+  blocked: 'implement',
+  sessionId: '9c3e1d2a-7b4f-4e8a-b6d5-1f0a2c3b4d5e',
+  /** What the harness wrote into the session last, word for word as Claude Code 2.1.270 wrote it that day. */
+  line: 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute; if it keeps happening, close other Claude Code windows or sign in again with /login',
+} as const;
+
+/** Where in the store the sessions `claude agents --all --json` lists are kept, for the fake `claude` run.ts puts on the api's PATH. */
+export const REGISTRY = 'claude-agents.json';
+
+/** HELD's `implement`, as its session said it before the harness stopped it: the prompt, words, a call and its result, and the harness's line. */
+function heldConversation(ago: (minutes: number) => string): object[] {
+  const line = { sessionId: HELD.sessionId, isSidechain: false, userType: 'external', cwd: '/code/hkb-v2', version: '2.1.270', gitBranch: `wf/${HELD.id}/implement` };
+  const said = (type: 'user' | 'assistant', uuid: string, minutes: number, content: unknown, more: object = {}) =>
+    ({ ...line, type, uuid, timestamp: ago(minutes), message: { role: type, content }, ...more });
+  return [
+    { type: 'custom-title', customTitle: `ae/${HELD.id}-implement/1`, sessionId: HELD.sessionId },
+    said('user', 'held-user-1', 2.8, 'Implement what was asked.\n\n## What was asked for\n\nBlocked by the harness.'),
+    said('assistant', 'held-assistant-1', 2.7, [{ type: 'text', text: 'Reading the tests first.' }]),
+    said('assistant', 'held-assistant-2', 2.6, [{ type: 'tool_use', id: 'toolu_held_test', name: 'Bash', input: { command: 'npm test' } }]),
+    said('user', 'held-user-2', 2.5, [{ type: 'tool_result', tool_use_id: 'toolu_held_test', content: '# tests 33\n# pass 33\n# fail 0' }]),
+    // The harness's own line, as an assistant message it made up: no model wrote it.
+    said('assistant', 'held-assistant-3', 2.4, [{ type: 'text', text: HELD.line }], { isApiErrorMessage: true, error: 'server_error' }),
+  ];
+}
 
 const STEPS = [
   {
@@ -518,4 +555,31 @@ export function seed(root: string, now = Date.now()): void {
   ranOnce(roundTask('review', 1), 'codex', 'Review it, and say whether it needs another round.', 3.69, 3.5, said(first.review, { again: true }));
   ranOnce(roundTask('implement', 2), 'claude', 'Implement it.', 3.49, 3.2, said(second.implement, { replies: LOOPING.replies }));
   ranOnce(roundTask('review', 2), 'codex', 'Review it, and say whether it needs another round.', 3.19, 3.0, said(second.review, { again: true }));
+
+  // HELD: implement's attempt was spawned and never ended, and `claude agents` lists its session blocked (REGISTRY); its conversation
+  // ends on the harness's line. review waits on it, not filed.
+  const heldDir = path.join(root, 'workflow-held');
+  write(path.join(heldDir, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
+  write(path.join(heldDir, 'review.md'), '---\nharness: claude\nafter: implement\n---\nReview it.\n');
+  const heldTask = `${HELD.id}-implement`;
+  write(path.join(root, 'runs', `${HELD.id}.json`), JSON.stringify({
+    id: HELD.id, repo: '/code/hkb-v2', workspace: '/code/hkb-v2', baseRef: '19c9365', branch: 'main', isolate: true,
+    brief: `${HELD.title}\n\nA fourth run seeded by npm run e2e: implement's session is blocked by the harness, on the login refresh race, and gave no closeout.`,
+    workflowDir: heldDir,
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.', harness: 'claude' },
+      { name: 'review', after: ['implement'], body: 'Review it.', harness: 'claude' },
+    ],
+    createdAt: ago(3),
+    steps: { implement: { taskId: heldTask, workspace: '/code/hkb-v2', branch: `wf/${HELD.id}/implement` }, review: { taskId: null } },
+  }, null, 2));
+  write(path.join(root, 'engine', 'tasks', `${heldTask}.jsonl`), lines([
+    { kind: 'filed', at: ago(3), brief: 'Implement it.', cwd: '/code/hkb-v2', maxAttempts: 1, harness: 'claude' },
+    { kind: 'starting', at: ago(2.9), attempt: 1 },
+    { kind: 'spawned', at: ago(2.9), attempt: 1 },
+  ]));
+  write(path.join(root, REGISTRY), JSON.stringify([
+    { name: `ae/${heldTask}/1`, sessionId: HELD.sessionId, kind: 'background', state: 'blocked', status: 'idle', startedAt: now - 2.9 * 60_000 },
+  ]));
+  write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${HELD.sessionId}.jsonl`), lines(heldConversation(ago)));
 }

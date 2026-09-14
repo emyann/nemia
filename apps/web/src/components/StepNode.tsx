@@ -1,5 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { RunDetail, WorkflowStepSpec } from '../lib/api';
+import { needOf, needText } from '../lib/asks';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { isGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
@@ -32,6 +33,8 @@ export function StepNode({
   // person has sent round (`wf round`) or asked to retry (`wf retry`) keeps its word until the tick files what they asked
   // for, and is no gate from the moment they ask: the page's banner reads the api, and so does the drawing.
   const gate = waitingOnYou && isGate(state, runCancelled);
+  // What a person has to know to act on it: the question of a step that asks, or that the harness blocked its session.
+  const need = needOf(step, waitingOnYou, runCancelled);
   const { spec } = step;
 
   return (
@@ -78,9 +81,29 @@ export function StepNode({
         </span>
       </div>
 
+      {/* The gate, and what it waits for when the step said: two lines at most, and whole on hover. */}
       {gate && (
-        <p className="border-t border-amber-200 bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
-          waiting on you
+        <p
+          title={need ? needText(need) : undefined}
+          className="line-clamp-2 border-t border-amber-200 bg-amber-50 px-3 py-1 text-xs break-words text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
+        >
+          <span className="font-semibold">waiting on you</span>
+          {need && (
+            <span data-need={need.kind}>
+              {' · '}
+              {needText(need)}
+            </span>
+          )}
+        </p>
+      )}
+      {/* A session the harness blocked is no gate: the step asked nothing. It says so, with what the session said last. */}
+      {!gate && need && (
+        <p
+          data-need={need.kind}
+          title={needText(need)}
+          className="line-clamp-2 border-t border-orange-200 bg-orange-50 px-3 py-1 text-xs break-words text-orange-800 dark:border-orange-900 dark:bg-orange-950 dark:text-orange-300"
+        >
+          {needText(need)}
         </p>
       )}
 

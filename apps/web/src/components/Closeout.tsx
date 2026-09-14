@@ -72,6 +72,12 @@ export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[
                   </span>
                 )}
               </p>
+              {t.answer && (
+                <p data-your-answer title={t.answer} className="line-clamp-2 break-words">
+                  <span className="text-neutral-500">your answer </span>
+                  {t.answer}
+                </p>
+              )}
             </li>
           );
         })}
@@ -94,6 +100,7 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTr
           {selected.current && ' · current'}
         </p>
       )}
+      {selected.answer && <YourAnswer answer={selected.answer} />}
       {selected.closeout ? <CloseoutView closeout={selected.closeout} /> : <p className="text-neutral-500">{none}</p>}
       {others.length > 0 && (
         <section aria-label="Other tries" className="space-y-1">
@@ -104,6 +111,7 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTr
                 {t.current && ' · current'} — {t.closeout ? t.closeout.outcome : 'no closeout'}
               </summary>
               <div className="space-y-3 border-t border-neutral-200 p-2 dark:border-neutral-800">
+                {t.answer && <YourAnswer answer={t.answer} />}
                 {t.closeout ? <CloseoutView closeout={t.closeout} /> : <p className="text-neutral-500">No closeout on the engine's record of this try.</p>}
               </div>
             </details>
@@ -111,6 +119,15 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTr
         </section>
       )}
     </>
+  );
+}
+
+/** What a person said to a try when they asked for it, as `wf decide` prints it under the question of the try before: `your answer`. */
+function YourAnswer({ answer }: { answer: string }) {
+  return (
+    <p data-your-answer className="whitespace-pre-wrap break-words">
+      <span className="font-medium text-neutral-500">your answer:</span> {answer}
+    </p>
   );
 }
 

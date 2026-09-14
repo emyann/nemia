@@ -16,7 +16,8 @@ import type { RunDetail } from '../lib/api';
 import { forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
 import { layout, stepsOf, type Point } from '../lib/layout';
 import { stepState } from '../lib/status';
-import { LoopEdge } from './LoopEdge';
+import { CanvasLegend } from './CanvasLegend';
+import { StateEdge } from './StateEdge';
 import { stepData, stepEdges, stepMinimapFill } from './stepGraph';
 import { StepNode, type StepFlowNode } from './StepNode';
 
@@ -24,7 +25,7 @@ type Props = { run: RunDetail; selected: string | null; onSelect: (step: string 
 
 // Declared once: a new object per render makes React Flow warn and mount every node afresh.
 const nodeTypes = { step: StepNode };
-const edgeTypes = { loop: LoopEdge };
+const edgeTypes = { state: StateEdge };
 
 const FIT = { padding: 0.2, maxZoom: 1.25 };
 
@@ -205,7 +206,8 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
         </Panel>
         <Background variant={BackgroundVariant.Dots} gap={16} />
         <Controls showInteractive={false} />
-        <Legend />
+        {/* Wrapped short of the minimap, which would cover its last words. */}
+        <CanvasLegend className="mr-40 ml-14" />
         {/* Smaller than React Flow's 200 × 150, which covers a node on a canvas this size. */}
         <MiniMap<StepFlowNode>
           pannable
@@ -215,43 +217,5 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
         />
       </ReactFlow>
     </div>
-  );
-}
-
-/** Beside the zoom controls: what the drawing means. Wrapped short of the minimap, which would cover its last words. */
-function Legend() {
-  return (
-    <Panel
-      position="bottom-left"
-      className="mr-40 ml-14 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500 dark:text-neutral-400"
-    >
-      <span className="flex items-center gap-1">
-        <span className="size-2.5 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
-        running
-      </span>
-      <span className="flex items-center gap-1">
-        <span className="size-2.5 rounded-sm border-2 border-amber-500" />
-        human gate
-      </span>
-      <span className="flex items-center gap-1">
-        <svg width="18" height="6" aria-hidden className="stroke-neutral-400 dark:stroke-neutral-600">
-          <line x1="0" y1="3" x2="18" y2="3" strokeWidth="1.5" />
-        </svg>
-        done
-      </span>
-      <span className="flex items-center gap-1">
-        <svg width="18" height="6" aria-hidden className="stroke-neutral-400 dark:stroke-neutral-600">
-          <line x1="0" y1="3" x2="18" y2="3" strokeWidth="1.5" strokeDasharray="4 3" />
-        </svg>
-        to come
-      </span>
-      <span className="flex items-center gap-1">
-        <svg width="18" height="10" aria-hidden className="fill-none stroke-violet-500">
-          <path d="M 16,1 C 16,12 2,12 2,2.5" strokeWidth="1.5" strokeDasharray="3 2" />
-          <path d="M 0,4.5 L 2,1.5 L 4,4.5" strokeWidth="1.5" />
-        </svg>
-        loops back
-      </span>
-    </Panel>
   );
 }

@@ -17,14 +17,14 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Shipped, Wait } from './run.ts';
+export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Wait } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -953,6 +953,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         id: taskId,
         brief: composeBrief(step, run, steps, reads, files, undefined, {
           try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), ...(r.message !== undefined ? { message: r.message } : {}), resumed: Boolean(resumeFrom),
+          // What was said to the session a nudge continues: it may never have read it (agent-engine open issue 16).
+          ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
           status: stepStatus(step, run, phaseOf, signedOff, asked, steps), ...(refusal ? { refusal } : {}),
         }),
         cwd: record.workspace ?? run.workspace,
@@ -995,6 +997,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         // Read off the closeout that asked for the round, before the record moves it behind.
         brief: composeBrief(target, run, steps, signedOff, files, undefined, undefined, {
           loop: r.step, round: r.round, rounds: capOf(looping), by: r.by, resumed: Boolean(resumeFrom),
+          ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
         }),
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
@@ -1190,8 +1193,20 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
     const v = views.get(taskId);
     return v?.state.brief ? v.phase : 'unknown';
   };
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)));
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run));
 }
+
+/**
+ * How many times a person said something to each step's current try while it ran (`wf say`): the engine's `said` on the try's task, off
+ * views already read. Exported, log-free, for a consumer that words a step as `wf ls` does.
+ */
+export const saidCount = (views: ReadonlyMap<string, TaskView>, run: Run) => (stepName: string): number => {
+  const taskId = run.steps[stepName]?.taskId;
+  return (taskId ? views.get(taskId)?.state.said?.length : undefined) ?? 0;
+};
+
+/** What was said to a task's sessions while they ran (`wf say`), off its view: none for a task with no view, or one from before `said`. */
+const saidIn = (view: TaskView | undefined): readonly Said[] => view?.state.said ?? [];
 
 /** A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files the try. */
 export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean };
@@ -1231,6 +1246,31 @@ export async function retry(e: Engine, id: string, stepName: string, how: RetryH
   }
   const step = steps.find((s) => s.name === stepName)!;
   return { run, ask, file, stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked).blockedByHarness };
+}
+
+/** What `wf say` did: the step's task the words were said to, the try that task is, and the engine's `said` entry, as it journalled it. */
+export type Told = { run: Run; taskId: string; try: number; said: Said };
+
+/**
+ * Tell a step's running session something — `wf say` — through the engine's `say`, on the step's current try's task: the one `retry` would
+ * replace, as `run.steps[step].taskId` names it. The engine hands the words to the session through its harness, then journals them as a
+ * `said` entry on the task, which is the record: this verb writes nothing of its own, and `wf ls` and `wf decide` read the words back off
+ * the engine's view of the task.
+ *
+ * Refused before the engine is asked, with what to do instead (`sayRefusal`): a step the run does not have, a cancelled run, a step with no
+ * task filed, and one whose task has settled. Then the engine's refusals pass through as it words them, exit code 2 and all — empty words,
+ * an attempt not started, a harness with no way in, a session its harness does not list running — and so does a failure to deliver, which
+ * journals nothing and has no exit code: ask again.
+ */
+export async function say(e: Engine, id: string, stepName: string, text: string): Promise<Told> {
+  const run = readRun(id);
+  const steps = stepsOf(run);
+  // Only the step's own task is read: the engine's `say` observes its harness again, and a run's other tasks have no say in it.
+  const taskId = run.steps[stepName]?.taskId;
+  const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
+  const refused = sayRefusal(steps, run, stepName, () => phase);
+  if (refused) throw Object.assign(new Error(refused), { exitCode: 2 });
+  return { run, taskId: taskId!, try: tryOf(run, stepName), said: await e.say(taskId!, text) };
 }
 
 /**
@@ -1661,6 +1701,8 @@ export async function decide(e: Engine, id: string): Promise<{
   answering: Record<string, string>;
   /** The runs this run's roots wait on (`waitsOf`): while there are any, that is the whole of what there is to say. */
   waiting: Wait[];
+  /** For each step, what a person said to its sessions while they ran (`wf say`), try by try, off the engine's view of each try's task (`saidLines`). */
+  said: Record<string, SaidTo[]>;
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
@@ -1676,15 +1718,29 @@ export async function decide(e: Engine, id: string): Promise<{
   const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds, blocked);
   // What a person said to a step's current try, off their ask file, and what the try before it needed, off the engine's record of that
   // try: the run's record keeps neither.
-  const said = readAnswers(id);
+  const given = readAnswers(id);
   const answers: Record<string, Answered> = {};
   for (const name of Object.keys(run.steps)) {
-    const answer = answerOf(run, name, said);
+    const answer = answerOf(run, name, given);
     if (!answer) continue;
     const before = run.steps[name]!.tries!.at(-1)!.taskId;
     const closeout = (views.get(before) ?? await e.view(before)).state.attempts.at(-1)?.closeout;
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
     answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
+  }
+  // What a person said to each try's sessions while they ran, off the engine's journal of the try's task: every try, since words said to a try
+  // that was replaced still bear on the work the step hands on. An earlier try's task is read once more, as the answers above read one.
+  const said: Record<string, SaidTo[]> = {};
+  for (const [name, record] of Object.entries(run.steps)) {
+    const tasks = [...(record.tries ?? []).map((t) => t.taskId), ...(record.taskId ? [record.taskId] : [])];
+    const told: SaidTo[] = [];
+    for (const [i, taskId] of tasks.entries()) {
+      // A recheck replaced only a check: the try after it has the same task, whose words are the try's that ran its session, said once.
+      if (tasks.indexOf(taskId) !== i) continue;
+      const view = views.get(taskId) ?? await e.view(taskId);
+      for (const s of saidIn(view)) told.push({ ...s, try: i + 1 });
+    }
+    if (told.length) said[name] = told;
   }
   return {
     run, decision: d, closeouts, checks,
@@ -1695,6 +1751,7 @@ export async function decide(e: Engine, id: string): Promise<{
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked),
     waiting: waitsOf(run, await parentsOf(e, run)),
+    said,
   };
 }
 

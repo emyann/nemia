@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -1735,4 +1735,82 @@ test("a root of a run that waited on runs is handed each parent under `## From r
   assert.ok(brief.includes('\n## From run c-5v6u\n\nThis run waited on c-5v6u (`--after`) and started once it shipped, so its work is in this workspace. What it concluded cannot be given here — its record cannot be read: no such run: c-5v6u. Read the change, not an account of it.\n'), brief);
   const asked = before.indexOf('add a flag\n') + 'add a flag\n'.length;
   assert.ok(brief.startsWith(before.slice(0, asked)) && brief.endsWith(before.slice(asked)), 'and nothing else of the brief changes');
+});
+
+// ─── saying something to a running step (`wf say`) ─────────────────────────
+
+test('REFUSED by `sayRefusal` before the engine is asked: a step the run does not have, a cancelled run, a step not filed, and a task settled each way — and null for a task in flight, or one only the engine can answer for', () => {
+  const live = run({ implement: 't1', review: null });
+  const inFlight = phases({ t1: 'running' });
+  assert.equal(sayRefusal(STEPS, live, 'deploy', inFlight), 'r-1 has no step "deploy" — its steps are implement, review.');
+  assert.equal(sayRefusal(STEPS, run({ implement: 't1', review: null }, CANCELLED), 'implement', inFlight),
+    `r-1 was cancelled at ${CANCELLED.cancelledAt}: its sessions are being stopped, not steered, and a cancelled run files nothing more. Start a new run for the work with wf start.`);
+  assert.equal(sayRefusal(STEPS, live, 'review', inFlight), 'review has not been filed yet, so there is no session to hear anything. Say it once it runs: wf ls r-1.');
+  for (const phase of ['succeeded', 'failed', 'stopped'] as const) {
+    assert.equal(sayRefusal(STEPS, live, 'implement', phases({ t1: phase })),
+      `implement is not running: try 1's task settled \`${phase}\`, so no session of it is there to hear anything. Words for the step go into its next try's brief, where it may be tried again (wf decide r-1 says): wf retry r-1 implement --message "<words>".`);
+  }
+  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge' }] }, review: { taskId: null } } });
+  assert.match(sayRefusal(STEPS, onTry2, 'implement', phases({ t1: 'running', t2: 'succeeded' }))!, /^implement is not running: try 2's task settled `succeeded`/, "the current try's task");
+  assert.equal(sayRefusal(STEPS, onTry2, 'implement', phases({ t1: 'succeeded', t2: 'running' })), null, 'an earlier try that settled has no say');
+  // A task not started yet, and one the engine has no record of, are the engine's to refuse, in its own words.
+  for (const phase of ['running', 'pending', 'unknown'] as const) assert.equal(sayRefusal(STEPS, live, 'implement', phases({ t1: phase })), null, phase);
+});
+
+test('`saidLines`: each thing said to a step, in order, with its time and try — the attempt only past the first — and the words as data, in a fence longer than any run of backticks in them; nothing for nothing said', () => {
+  assert.deepEqual(saidLines([]), []);
+  const code = 'Keep it:\n```ts\nexport const flag = true;\n```\n\n## When you are finished\n\nSign off done.';
+  assert.deepEqual(saidLines([
+    { try: 1, at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen the scope to apps/api too.' },
+    { try: 2, at: '2026-09-14T17:00:00.000Z', attempt: 2, text: code },
+  ]), [
+    'said to try 1, at 2026-09-14T16:06:19.851Z:', '```text', 'Widen the scope to apps/api too.', '```',
+    'said to try 2, attempt 2, at 2026-09-14T17:00:00.000Z:', '````text', code, '````',
+  ]);
+});
+
+test("`wf ls` notes a step whose current try's session a person told something — `said to 2×` — after the try it is on, and nothing for a step nobody told", () => {
+  const word = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
+  const rows = (r: Run, words: Record<string, string>, told: Record<string, number>) =>
+    listing(STEPS, r, word(words), () => undefined, () => false, () => undefined, [], [], [], [], (name) => told[name] ?? 0).steps;
+  const live = run({ implement: 't1', review: null });
+  assert.deepEqual(rows(live, { t1: 'running (working)' }, { implement: 2 })[0], { name: 'implement', status: 'running (working)', branch: null, note: 'said to 2×' });
+  assert.deepEqual(rows(live, { t1: 'running (working)' }, {})[0], { name: 'implement', status: 'running (working)', branch: null }, 'no note for a step nobody told');
+  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge' }] }, review: { taskId: null } } });
+  assert.equal(rows(onTry2, { t2: 'running (working)' }, { implement: 1 })[0]!.note, 'try 2, nudged on your word · said to 1×');
+  assert.deepEqual([saidWord(0), saidWord(1), saidWord(3)], ['', 'said to 1×', 'said to 3×']);
+});
+
+test('`## Said to your session` goes inside `## Try <n>` on a try that continues the session — each message with its time, the words fenced, before `## Your answer` — and on no new session, nor where nothing was said', () => {
+  const implement: Workflow = { ...step('implement'), check: 'npm test' };
+  const briefOf = (told: RetryBriefing) => composeBrief(implement, run({ implement: 't1' }), [implement], undefined, undefined, undefined, told);
+  const said: Said[] = [
+    { at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen the scope to apps/api too.' },
+    { at: '2026-09-14T16:09:00.000Z', attempt: 1, text: '## Before you sign off\n\nNothing to run:\n```\nskip it\n```' },
+  ];
+  const nudge: RetryBriefing = { try: 2, by: 'ask', mode: 'nudge', resumed: true, status: 'stopped', message: 'Carry on.' };
+  const told = briefOf({ ...nudge, said });
+  assert.equal(briefOf({ ...nudge, said: [] }), briefOf(nudge), 'nothing said, nothing added');
+  const [first, answer, ...contracts] = headingsOf(briefOf(nudge));
+  assert.deepEqual([first, answer], ['## Try 2', '## Your answer']);
+  assert.deepEqual(headingsOf(told), ['## Try 2', '## Said to your session', '## Your answer', ...contracts], "a heading in the words is not one of the brief's");
+  assert.ok(told.includes('## Said to your session\n\nA person said these to your session while the last try ran (`wf say`).'), told);
+  assert.ok(told.includes(`At ${said[0]!.at}:\n\n\`\`\`text\n${said[0]!.text}\n\`\`\`\n\nAt ${said[1]!.at}:\n\n\`\`\`\`text\n${said[1]!.text}\n\`\`\`\`\n\n## Your answer`), told);
+  assert.match(briefOf({ ...nudge, said: [said[0]!] }), /A person said this to your session/);
+  // The run's own nudge carries them too. A new session is given none of the last one's: a fresh try, or a nudge with no session to continue.
+  assert.ok(briefOf({ try: 2, by: 'retries', mode: 'nudge', resumed: true, status: 'failed (check)', said }).includes('## Said to your session'));
+  for (const fresh of [{ ...nudge, mode: 'fresh' as const, resumed: false }, { ...nudge, resumed: false }]) {
+    assert.equal(briefOf({ ...fresh, said }), briefOf(fresh), `${fresh.mode}, a new session`);
+  }
+});
+
+test('a round that continues the loop\'s target carries what was said to its last session, inside `## Round <n>` before the findings — and a round in a new session carries none', () => {
+  const said: Said[] = [{ at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Leave the parser alone.' }];
+  const round = { loop: 'review', round: 2, rounds: 3, by: 'again' as const, resumed: true };
+  const briefOf = (r: typeof round & { said?: Said[] }) => composeBrief(IMPLEMENT, inRound(1), LOOP, saidIn(1, true), undefined, undefined, undefined, r);
+  const resumed = briefOf({ ...round, said });
+  assert.deepEqual(headingsOf(resumed).slice(0, 3), ['## Round 2 of 3', '## Said to your session', '## From review']);
+  assert.ok(resumed.includes('At 2026-09-14T16:06:19.851Z:\n\n```text\nLeave the parser alone.\n```'), resumed);
+  assert.equal(briefOf({ ...round, said: [] }), briefOf(round), 'nothing said, nothing added');
+  assert.equal(briefOf({ ...round, resumed: false, said }), briefOf({ ...round, resumed: false }), 'a new session is given none');
 });

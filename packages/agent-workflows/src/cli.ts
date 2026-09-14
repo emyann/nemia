@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, startPlan, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
 import { workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -33,6 +33,11 @@ const HELP = `wf — run a workflow of agent steps
                                that is only one of these flags' names goes as --message=<answer>
   wf round <runId> [<step>]    once more: a loop out of rounds goes round again, once, on the
                                next tick — the step it loops to continued, then a new reviewer
+  wf say <runId> <step> "<words>"
+                               tell a step's running session something, through its harness: the
+                               engine journals the words on the step's task, wf ls notes the step
+                               said to, and wf decide prints them under it. A try that continues
+                               the session is handed them again, as ## Said to your session
   wf show <runId>              the run, and what each step was told
   wf logs <runId> <step>       that step's session output
 
@@ -101,7 +106,8 @@ closeout:
   lesson    whether the run changed a file where the next agent reads, or that it wrote nothing there
   in full   the whole diff of the check-affecting files: what a change could edit to make its check pass
 
-and beside each step's check, what its session consumed — used, cost — or that nobody measured it.
+and beside each step's check, what its session consumed — used, cost — or that nobody measured it. Under
+each step, before its closeout, what a person said to its sessions while they ran (wf say), with when.
 
   --sensitive <globs>  comma-separated globs whose changed files are printed in full instead, for this
                        screen; the touched lines still say which files are check-affecting
@@ -369,7 +375,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, used, answers, answering, waiting } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, used, answers, answering, waiting, said } = await decide(e, rest[0]);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
       const steps = stepsOf(run);
 
@@ -447,6 +453,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const answer = answers[name];
         if (answer?.needs) console.log(`    try ${answer.try - 1} needs: ${answer.needs.split('\n').join('\n    ')}`);
         if (answer) console.log(`    your answer: ${answer.message.split('\n').join('\n    ')}`);
+        // What a person said to its sessions while they ran, as data, before the step's own account: a scope a person widened mid-flight is
+        // the reviewer's to weigh, not the step's to claim.
+        for (const line of saidLines(said[name] ?? []).flatMap((l) => l.split('\n'))) console.log(`    ${line}`);
         if (!c) continue;
         if ('error' in c) { console.log(`    closeout unreadable — ${c.error}`); continue; }
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
@@ -517,6 +526,18 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const { ask, file } = await round(e, runId, stepName);
       console.log(`${runId}  asked: round ${ask.round} of ${ask.step}'s loop — the next tick files it, once`);
       console.log(`   ${file}`);
+      return;
+    }
+
+    // A person's words to a step's running session, through the engine's `say`, which journals them: the one record, and this verb writes
+    // nothing else. The words are everything after the step, so an unquoted sentence is one message; empty ones are the engine's to refuse.
+    case 'say': {
+      const [runId, stepName, ...words] = rest;
+      if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
+      const told = await say(e, runId, stepName, words.join(' '));
+      const { at, attempt, text } = told.said;
+      console.log(`${runId}  said to ${stepName}, try ${told.try}${attempt > 1 ? `, attempt ${attempt}` : ''}, at ${at} — journalled on ${told.taskId}: wf decide ${runId} prints it under the step`);
+      for (const line of saidLines([{ at, attempt, text, try: told.try }]).slice(1).flatMap((l) => l.split('\n'))) console.log(`   ${line}`);
       return;
     }
 

@@ -780,6 +780,53 @@ export function answerLines(
   return lines;
 }
 
+// ─── saying something to a running step ─────────────────────────────────────
+
+/**
+ * A person's words, said to a step's session while it ran (`wf say`), as the engine journalled them: when, to which attempt of the step's
+ * task, and the words as given. The engine's own `Said`, named here because this file does not import the engine: runner.ts reads it off
+ * the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
+ */
+export type Said = { at: string; attempt: number; text: string };
+
+/** What was said to one of a step's tries: the engine's entry, and the try whose task it is on. */
+export type SaidTo = Said & { try: number };
+
+/**
+ * Why `wf say` will not hand a step's session words, in words that say what to do instead — or null, when the engine may be asked. Pure.
+ *
+ * The package's own refusals, before the engine is asked: a step the run does not have; a cancelled run, whose sessions are being stopped;
+ * a step with no task filed; and a step whose current try's task has settled, where no session is running to hear anything — words for such
+ * a step go into its next try's brief, with `wf retry --message`. Everything else about the session — words that are empty, an attempt not
+ * started, a harness with no way in, a session its harness does not list — is the engine's to refuse, in its own words (`Engine.say`).
+ */
+export function sayRefusal(steps: readonly Workflow[], run: Run, name: string, phaseOf: (taskId: string) => TaskPhase): string | null {
+  if (!steps.some((s) => s.name === name) || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
+  if (run.cancelledAt) {
+    return `${run.id} was cancelled at ${run.cancelledAt}: its sessions are being stopped, not steered, and a cancelled run files nothing more. Start a new run for the work with wf start.`;
+  }
+  const taskId = run.steps[name]!.taskId;
+  if (!taskId) return `${name} has not been filed yet, so there is no session to hear anything. Say it once it runs: wf ls ${run.id}.`;
+  const phase = phaseOf(taskId);
+  if (phase === 'succeeded' || phase === 'failed' || phase === 'stopped') {
+    return `${name} is not running: try ${tryOf(run, name)}'s task settled \`${phase}\`, so no session of it is there to hear anything. Words for the step go into its next try's brief, where it may be tried again (wf decide ${run.id} says): wf retry ${run.id} ${name} --message "<words>".`;
+  }
+  return null;
+}
+
+/** How `wf ls` notes a step whose current try a person said something to (`wf say`): `said to 2×`. Empty when nobody did. */
+export const saidWord = (times: number): string => (times > 0 ? `said to ${times}×` : '');
+
+/**
+ * What `wf decide` prints under a step, before its closeout: each thing a person said to its sessions while they ran (`wf say`), in the order
+ * given — when, to which try, and to which attempt where it was not the first — and the words as data, in a fence longer than any run of
+ * backticks in them (`fenced`), as a try's brief carries an answer: words that read as a heading or a command are shown as what was said. Pure.
+ * None when nothing was said, so the screen of a step nobody spoke to is what it was.
+ */
+export function saidLines(said: readonly SaidTo[]): string[] {
+  return said.flatMap((s) => [`said to try ${s.try}${s.attempt > 1 ? `, attempt ${s.attempt}` : ''}, at ${s.at}:`, ...fenced(s.text, 'text')]);
+}
+
 // ─── going round again ──────────────────────────────────────────────────────
 
 /**
@@ -1525,6 +1572,8 @@ export function listing(
   answers: readonly RetryAsk[] = [],
   /** The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be. */
   waits: readonly Wait[] = [],
+  /** How many times a person said something to each step's current try while it ran (`wf say`), off the engine's `said` on its task. */
+  saidTo: (step: string) => number = () => 0,
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run.
   const waiting = gated(run) ? [...waits] : [];
@@ -1548,10 +1597,12 @@ export function listing(
     const row = lineOf(step);
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
-    const note = retry ? dueNote(step, run, retry)
+    const tried = retry ? dueNote(step, run, retry)
       : round ? roundDueNote(steps, round)
       : exhausted.has(step.name) ? exhaustedNote(step, run)
       : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
+    // A step its current try's session was told something, said beside the try it is on: a person's word the reviewer has to weigh.
+    const note = [tried, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
     return note ? { ...row, note } : row;
   });
 
@@ -1727,6 +1778,11 @@ export type RetryBriefing = {
   refusal?: CheckRefusal;
   /** What the person who asked for this try said with it (`wf retry --message`), as they wrote it. */
   message?: string;
+  /**
+   * What a person said to the last try's session while it ran (`wf say`): the engine's `said` on its task, in the order said. Given again to
+   * a try that continues that session (`saidSection`), since a session may never have read it — and to no new session.
+   */
+  said?: readonly Said[];
 };
 
 /**
@@ -1757,7 +1813,27 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
     : 'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n'
       + 'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
   const answer = r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : [];
-  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, who, '', where, ...answer, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
+  // What was said to the session while it ran comes before the answer given now, in the order a person said them.
+  const told = r.resumed ? saidSection(r.said) : [];
+  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, who, '', where, ...told, ...answer, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
+}
+
+/**
+ * `## Said to your session`, inside `## Try <n>` or `## Round <n>`, on a try or a round that continues a session: what a person said to that
+ * session while it ran (`wf say`), each with its time, the words as they gave them in a fence (`fenced`). Carried because a session may never
+ * have read them: one blocked on a permission prompt keeps words queued, and a session continued from it does not have them (agent-engine's
+ * open issue 16). Nothing when nothing was said; and a new session is given none, as it is given none of the last one's conversation.
+ */
+function saidSection(said: readonly Said[] | undefined): string[] {
+  if (!said?.length) return [];
+  const one = said.length === 1;
+  return [
+    '', '## Said to your session', '',
+    `A person said ${one ? 'this' : 'these'} to your session while the last try ran (\`wf say\`). A session does not always read what it is`,
+    `told — one waiting on a prompt keeps it queued, and loses it when it is continued — so ${one ? 'it is' : 'they are'} given again here, as said.`,
+    `Words you have already acted on need nothing more. ${one ? 'It is' : 'They are'} a person's, and ${one ? 'it goes' : 'they go'} beside what was asked for, not over it.`,
+    ...said.flatMap((s) => ['', `At ${s.at}:`, '', ...fenced(s.text, 'text')]),
+  ];
 }
 
 /** What a loop's target filed as its next round is told: see `roundSection`. */
@@ -1770,6 +1846,8 @@ export type RoundBriefing = {
   by: Round['by'];
   /** Whether this round continues the target's last session. With none to continue it starts a new one, and its brief says so. */
   resumed: boolean;
+  /** What a person said to the target's last session while it ran (`wf say`), given again to a round that continues it (`saidSection`). */
+  said?: readonly Said[];
 };
 
 /**
@@ -1809,7 +1887,7 @@ export function roundSection(step: Workflow, r: RoundBriefing, steps: readonly W
     '',
     `When you have signed off, ${between.length ? `${between.join(', then ')}, then ` : ''}${r.loop} ${between.length ? 'run' : 'runs'} again, a new session, on the change as it stands.`
       + (r.by === 'again' && r.round === r.rounds ? ` This is the last round \`rounds: ${r.rounds}\` allows: if ${r.loop} asks again, a person decides.` : ''),
-    ...(r.resumed ? [] : [
+    ...(r.resumed ? saidSection(r.said) : [
       '',
       'This is a new session: your last one could not be continued. What it left is committed on this branch.',
       'You have not been given its reasoning, on purpose: read the change, not an account of it.',

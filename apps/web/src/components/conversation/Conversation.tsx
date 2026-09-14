@@ -7,7 +7,7 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from '@/components/ui/message-scroller';
-import type { Turn } from '@/lib/transcript';
+import { tailStart, type Turn } from '@/lib/transcript';
 import { cn } from '@/lib/utils';
 import { TurnView } from './Turns';
 
@@ -25,6 +25,8 @@ type Props = {
  * added while the reader is at the bottom; a reader who scrolls up is left where they are, with a button back down.
  */
 export function Conversation({ turns, live, density = 'page', className }: Props) {
+  // Where nothing has been said since: a call there with no result is still running while the session is live.
+  const tail = tailStart(turns);
   return (
     <MessageScrollerProvider autoScroll defaultScrollPosition="end">
       <MessageScroller className={className}>
@@ -34,7 +36,7 @@ export function Conversation({ turns, live, density = 'page', className }: Props
           >
             {turns.map((turn, i) => (
               <MessageScrollerItem key={turn.key} messageId={turn.key}>
-                <TurnView turn={turn} live={live} last={i === turns.length - 1} />
+                <TurnView turn={turn} live={live} last={i === turns.length - 1} tail={i >= tail} />
               </MessageScrollerItem>
             ))}
             {live && (

@@ -155,8 +155,8 @@ test('a step a person has sent round or asked to retry is no gate from the momen
     assert.equal(gateDrawn(nodeMarkup(runOf(status, { note, waitingOnYou: ['review'] }))), true, `${status}, nothing asked`);
   }
 });
-const { ToolCallView, TurnView } = await import('../src/components/conversation/Turns.tsx');
-const { foldTranscript } = await import('../src/lib/transcript.ts');
+const { ToolCallView, ToolRun, TurnView } = await import('../src/components/conversation/Turns.tsx');
+const { foldTranscript, tailStart } = await import('../src/lib/transcript.ts');
 type TranscriptEvent = import('../src/lib/api.ts').TranscriptEvent;
 
 test("a thought is drawn folded: a line that says it thought, and its text only once it is opened", () => {
@@ -165,7 +165,7 @@ test("a thought is drawn folded: a line that says it thought, and its text only 
     { id: 'a-2:0', at, role: 'assistant', kind: 'thinking' },
     { id: 'a-3:0', at, role: 'assistant', kind: 'text', text: 'Writing it.' },
   ];
-  const [withText, without] = foldTranscript(thoughts).map((turn) => renderToStaticMarkup(createElement(TurnView, { turn, live: false, last: false })));
+  const [withText, without] = foldTranscript(thoughts).map((turn) => renderToStaticMarkup(createElement(TurnView, { turn, live: false, last: false, tail: false })));
   assert.match(withText!, /data-turn="thinking"/);
   assert.match(withText!, /aria-expanded="false"/);
   assert.match(withText!, /data-state="closed"/);
@@ -180,8 +180,8 @@ test('a tool call is drawn with its result: folded, how its result says it went;
     { id: 'toolu_bash', at, role: 'user', kind: 'tool_result', result: { text: 'WORD.txt: Permission denied', isError: true } },
   ]);
   assert.ok(turn?.kind === 'tool');
-  // Live and last, as a call still running would be: its result says how it went, not the session.
-  const folded = renderToStaticMarkup(createElement(TurnView, { turn, live: true, last: true }));
+  // Live, and in the tail, as a call still running would be: its result says how it went, not the session.
+  const folded = renderToStaticMarkup(createElement(TurnView, { turn, live: true, last: true, tail: true }));
   assert.match(folded, /data-tool-state="error"/);
   assert.match(folded, /data-tool="Bash"/);
   assert.match(folded, /echo word &gt; WORD\.txt/, 'what it ran, on its line');
@@ -203,10 +203,28 @@ test('a StructuredOutput call is drawn as the closeout, named, with its outcome 
   const [turn] = foldTranscript([
     { id: 'toolu_closeout', at, role: 'assistant', kind: 'tool_use', tool: { name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable', needs: 'A writable WORD.txt', artifacts: [] } } },
   ]);
-  const html = renderToStaticMarkup(createElement(TurnView, { turn: turn!, live: false, last: true }));
+  const html = renderToStaticMarkup(createElement(TurnView, { turn: turn!, live: false, last: true, tail: true }));
   assert.match(html, /aria-label="Closeout"/);
   assert.match(html, />Closeout<\/h3>/);
   assert.match(html, /data-outcome="blocked"/);
   assert.match(html, /A writable WORD\.txt/);
   assert.doesNotMatch(html, /data-turn="tool"/);
+});
+
+test('in a live fold with nothing said after it, every call still waiting is running — a batch is answered after all of it', () => {
+  const pending: TranscriptEvent[] = [
+    { id: 'u-1:0', at, role: 'user', kind: 'text', text: 'Run the checks.' },
+    { id: 'toolu_test', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm test' } } },
+    { id: 'toolu_types', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm run typecheck' } } },
+  ];
+  const turns = foldTranscript(pending);
+  const fold = turns[1]!;
+  assert.ok(fold.kind === 'tools');
+  assert.equal(tailStart(turns), 1, 'the fold is in the tail');
+  const states = (live: boolean, tail: boolean) =>
+    [...renderToStaticMarkup(createElement(ToolRun, { turn: fold, live, tail, defaultOpen: true })).matchAll(/data-tool-state="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(states(true, true), ['running', 'running']);
+  // And refused: once the session is not live, or has said something since, a call with no result had none.
+  assert.deepEqual(states(false, true), ['no-result', 'no-result']);
+  assert.deepEqual(states(true, false), ['no-result', 'no-result']);
 });

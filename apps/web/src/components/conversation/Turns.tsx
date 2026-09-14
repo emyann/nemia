@@ -12,10 +12,11 @@ import { closeoutOf, CLOSEOUT_TOOL, detailOf, type CloseoutTurn, type ThinkingTu
 import { cn } from '@/lib/utils';
 
 /**
- * One turn of a step's conversation, as `foldTranscript` gives it. `live` is whether the session may still add to it, and
- * `last` whether nothing has come after it: a call with no result is running only then, and a thought is still being had.
+ * One turn of a step's conversation, as `foldTranscript` gives it. `live` is whether the session may still add to it; `last`,
+ * whether nothing at all has come after it, which is when a thought is still being had; and `tail`, whether nothing has been
+ * said after it (`tailStart`), which is when a call with no result may still be answered — and so is running.
  */
-export function TurnView({ turn, live, last }: { turn: Turn; live: boolean; last: boolean }) {
+export function TurnView({ turn, live, last, tail }: { turn: Turn; live: boolean; last: boolean; tail: boolean }) {
   switch (turn.kind) {
     case 'said':
       return turn.role === 'user' ? (
@@ -42,9 +43,9 @@ export function TurnView({ turn, live, last }: { turn: Turn; live: boolean; last
     case 'thinking':
       return <Thinking turn={turn} streaming={live && last} />;
     case 'tool':
-      return <ToolCallView call={turn.call} running={live && last} />;
+      return <ToolCallView call={turn.call} running={live && tail} />;
     case 'tools':
-      return <ToolRun turn={turn} live={live} last={last} />;
+      return <ToolRun turn={turn} live={live} tail={tail} />;
     case 'closeout':
       return <Closeout turn={turn} />;
     case 'system':
@@ -92,14 +93,16 @@ export function ToolCallView({ call, running, defaultOpen = false }: { call: Too
   );
 }
 
-/** Calls with nothing said between them, as one line — "Ran 3 commands, read 3 files" — that opens to them. */
-function ToolRun({ turn, live, last }: { turn: ToolsTurn; live: boolean; last: boolean }) {
-  const lastCall = turn.turns.filter((t) => t.kind === 'tool').at(-1);
+/**
+ * Calls with nothing said between them, as one line — "Ran 3 commands, read 3 files" — that opens to them. Every call in it
+ * waits on the same thing: in the tail of a live session, each without a result is running, as a batch of parallel calls is.
+ */
+export function ToolRun({ turn, live, tail, defaultOpen = false }: { turn: ToolsTurn; live: boolean; tail: boolean; defaultOpen?: boolean }) {
   return (
-    <Collapsible data-turn="tools" className="group/tools">
+    <Collapsible data-turn="tools" className="group/tools" defaultOpen={defaultOpen}>
       <CollapsibleTrigger className="flex w-full items-center gap-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground">
         <ListTreeIcon className="size-4 shrink-0" />
-        {live && last && turn.waiting > 0 ? <Shimmer as="span">{turn.summary}</Shimmer> : <span>{turn.summary}</span>}
+        {live && tail && turn.waiting > 0 ? <Shimmer as="span">{turn.summary}</Shimmer> : <span>{turn.summary}</span>}
         {turn.failed > 0 && (
           <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{turn.failed} failed</span>
         )}
@@ -107,7 +110,8 @@ function ToolRun({ turn, live, last }: { turn: ToolsTurn; live: boolean; last: b
       </CollapsibleTrigger>
       <CollapsibleContent className="mt-2 space-y-2 border-l pl-4">
         {turn.turns.map((inner) => (
-          <TurnView key={inner.key} turn={inner} live={live} last={last && inner === lastCall} />
+          // A thought in a fold is followed by a call, so it is never the one being had now.
+          <TurnView key={inner.key} turn={inner} live={live} last={false} tail={tail} />
         ))}
       </CollapsibleContent>
     </Collapsible>

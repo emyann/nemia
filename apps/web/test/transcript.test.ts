@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { closeoutOf, detailOf, foldTranscript, mergeEvents, summaryOf, type ToolCall, type ToolsTurn, type Turn } from '../src/lib/transcript.ts';
+import { closeoutOf, detailOf, foldTranscript, mergeEvents, summaryOf, tailStart, type ToolCall, type ToolsTurn, type Turn } from '../src/lib/transcript.ts';
 import type { TranscriptEvent } from '../src/lib/api.ts';
 
 let clock = Date.parse('2026-09-13T08:00:00.000Z');
@@ -138,4 +138,12 @@ test('merged, an event sent again is kept once where it stood — a call and its
   assert.deepEqual(mergeEvents(merged, [edited]).map((e) => (e.kind === 'text' ? e.text : e.kind)), ['Go on.', 'tool_use', 'tool_result'], 'replaced in place');
   const known = [u!];
   assert.notEqual(mergeEvents(known, []), known, 'a new list each time, so React sees a change only when there is one to see');
+});
+
+test('the tail begins after the last thing said: a call in it may still be answered, one before it had its chance', () => {
+  const turns = foldTranscript([said('u', 'Go.', 'user'), ...call('b1', 'Bash'), said('a', 'Ran it.'), use('b2', 'Bash'), use('b3', 'Bash'), quiet('s', 'Hook ran')]);
+  assert.deepEqual(kinds(turns), ['said', 'tool', 'said', 'tools', 'system']);
+  assert.equal(tailStart(turns), 3, 'the batch after the words, and the quiet line after it');
+  assert.equal(tailStart(foldTranscript([use('x', 'Bash'), use('y', 'Read')])), 0, 'nothing said yet: all of it is the tail');
+  assert.equal(tailStart(foldTranscript([use('b', 'Bash'), use('c', 'StructuredOutput', {})])), 2, 'after the closeout, nothing waits');
 });

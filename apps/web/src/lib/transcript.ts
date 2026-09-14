@@ -114,6 +114,20 @@ export function foldTranscript(events: readonly TranscriptEvent[]): Turn[] {
   return turns;
 }
 
+/**
+ * Where the conversation's tail begins: the first turn after the last thing said — words, or the closeout — and 0 when nothing
+ * has been. A call in the tail with no result may still be answered while the session is live: Claude Code writes a batch of
+ * parallel calls a line each, and their results after all of them, so every call of a batch waits at once. Before the tail,
+ * the session has moved on, and a call with no result had none.
+ */
+export function tailStart(turns: readonly Turn[]): number {
+  for (let i = turns.length - 1; i >= 0; i--) {
+    const { kind } = turns[i]!;
+    if (kind === 'said' || kind === 'closeout') return i + 1;
+  }
+  return 0;
+}
+
 /** A stretch as it is drawn: what comes before its first call and after its last on its own, and between them one fold — or the call itself, when there is one. */
 function drawn(stretch: FoldedTurn[]): Turn[] {
   let first = -1;

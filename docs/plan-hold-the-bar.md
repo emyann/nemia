@@ -757,6 +757,12 @@ owner is not mid-run.
   `./packages/*/docs/` never counts a lesson; `packages/**` would count `packages/x/src/docs/` again. This
   repo uses `packages/*` and `apps/*`, so unaffected. Strip a leading `./` when the workspaces are read,
   refuse or note `**`, and a radius test with `['./packages/*']`. → agent-workflows, small.
+- **the fenced reviewer cannot read the run's artifacts (B4's review, 2026-09-13):** under `dontAsk`, a
+  `Read` outside the worktree — `~/.agent-workflows/runs/<id>/artifacts/…`, where the implement step's
+  screenshots are — is denied, so no reviewer has looked at a screenshot since the fence. Allowed on this
+  machine in `.claude/settings.local.json` (`Read(//home/…/.agent-workflows/**)`, a path that is nobody
+  else's); the portable fix is an artifacts directory the step is told, carried on the task (§4b, the
+  `look` note). → I's follow-up, small.
 
 ## 5. What the plan does not do
 

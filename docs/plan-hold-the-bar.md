@@ -936,7 +936,7 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8 all done; S3 (item 3, engine half) in flight; then the small items.
+Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3 all done; S4 (item 3, upper half) in flight; then the small items.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -956,8 +956,12 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 3. **The steering channel** (deferred from §4 S): a prompt box on the session page that sends into a
    running session, the message recorded on the run. api + engine (a `say` op). *S3 (engine: `Engine.say`,
    a `said` journal event, `ae say`; the harness's delivery measured by a plan step first) filed 2026-09-14 as
-   `the-steering-channel-engine-ff6b`, from `./workflows/dev-planned` — the first real run of the plan step.
-   S4 (agent-workflows `wf say` + the run record, api route, the session page's prompt box) after it.*
+   `the-steering-channel-engine-ff6b`, from `./workflows/dev-planned` — the first real run of the plan step, which
+   measured the harness and asked which channel; answered A, the session's inbox socket, through `wf retry
+   --message`. Done, `7762c46`: `Engine.say`, the `said` event, `ae say`; verified live twice; issue 16 (a session
+   blocked on a permission prompt loses the words when continued). S4 (agent-workflows `wf say` + `saidLines` in `wf
+   decide` + `## Said to your session` in a nudge's brief; api `POST …/say`; the session page's prompt box) filed
+   2026-09-14 as `the-steering-channel-upper-h-d7es`, from `./workflows/dev-build`.*
 
 **agent-workflows, small**
 4. Per-step `disallow:` → `--disallowedTools`, a field on the task. *Done, D1, `825be29`.*

@@ -17,11 +17,11 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, dueNote, outputLines, owedFields, roundDueNote, tryNote } from './run.ts';
-export type { Retry, RetryAsk, RetryMode, Round, RoundAsk } from './run.ts';
+export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote } from './run.ts';
+export type { Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
 import { artifactPlace, type ArtifactFile } from './run.ts';
-import { askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryMode, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -131,14 +131,42 @@ function roundAskIn(file: string, step: string, round: number): RoundAsk | strin
   return { step, round, at: typeof at === 'string' ? at : '' };
 }
 
-/** One ask file, read: the step and the try from its name, how and when from what it holds — or why it cannot be read. */
+/**
+ * One ask file, read: the step and the try from its name, how, when and what was said from what it holds — or why it cannot be read.
+ * A file from before asks carried a message has none, and reads as it did. What `wf retry` refuses to write is refused here too, so a
+ * file written by hand is held to the verb's word: a message that is not text or is empty, and a message on a recheck.
+ */
 function askIn(file: string, step: string, n: number): RetryAsk | string {
   let held: unknown;
   try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
-  const { mode, model, at } = (held && typeof held === 'object' ? held : {}) as Record<string, unknown>;
+  const { mode, model, message, at } = (held && typeof held === 'object' ? held : {}) as Record<string, unknown>;
   if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') return `it asks for no mode wf retry knows (${JSON.stringify(mode)})`;
   if (model !== undefined && (typeof model !== 'string' || !model)) return 'its model is not a name';
-  return { step, try: n, mode, ...(model ? { model: model as string } : {}), at: typeof at === 'string' ? at : '' };
+  if (message !== undefined && typeof message !== 'string') return 'its message is not text';
+  if (typeof message === 'string' && !message.trim()) return 'its message is empty';
+  if (message !== undefined && mode === 'recheck') return 'it carries a message and asks for a recheck, which files no session to read it';
+  return { step, try: n, mode, ...(model ? { model: model as string } : {}), ...(typeof message === 'string' ? { message } : {}), at: typeof at === 'string' ? at : '' };
+}
+
+/**
+ * Every ask that carried a message — still waiting, or consumed into `done/` — for what `wf ls` and `wf decide` say of a try that was
+ * answered (`answerOf`). Composed on read, as the ask itself is: the run's record keeps no message. A file that cannot be read as an ask
+ * is left out; the tick's own read (`readAsks`) says why.
+ */
+export function readAnswers(id: string): RetryAsk[] {
+  const answers: RetryAsk[] = [];
+  for (const dir of [asksDir(id), path.join(asksDir(id), 'done')]) {
+    let names: string[];
+    try {
+      names = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile()).map((d) => d.name).sort();
+    } catch { continue; }
+    for (const name of names) {
+      const tried = /^retry-(.+)-(\d+)$/.exec(name);
+      const ask = tried ? askIn(path.join(dir, name), tried[1]!, Number(tried[2])) : undefined;
+      if (ask && typeof ask !== 'string' && ask.message !== undefined) answers.push(ask);
+    }
+  }
+  return answers;
 }
 
 /**
@@ -780,7 +808,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     const step = steps.find((s) => s.name === r.step)!;
     const record = run.steps[r.step]!;
     tried.push(r.step);
-    notes.push(`${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : `wf retry ${modeWord(r)}`}`);
+    notes.push(`${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : `wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}`}`);
     // A recheck files no session. Its check is filed below with the others, under the new try's id.
     if (r.mode === 'recheck') {
       run.steps[r.step] = nextTry(record, r);
@@ -809,7 +837,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       await e.file({
         id: taskId,
         brief: composeBrief(step, run, steps, reads, files, undefined, {
-          try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), resumed: Boolean(resumeFrom),
+          try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), ...(r.message !== undefined ? { message: r.message } : {}), resumed: Boolean(resumeFrom),
           status: stepStatus(step, run, phaseOf, signedOff, asked, steps), ...(refusal ? { refusal } : {}),
         }),
         cwd: record.workspace ?? run.workspace,
@@ -1034,7 +1062,7 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
     const v = views.get(taskId);
     return v?.state.brief ? v.phase : 'unknown';
   };
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds);
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id));
 }
 
 export type Asked = { run: Run; ask: RetryAsk; file: string };
@@ -1042,11 +1070,12 @@ export type Asked = { run: Run; ask: RetryAsk; file: string };
 /**
  * Ask for another try of a step — `wf retry` — by writing the ask, and nothing else. The next tick honours it once.
  *
- * Refused before anything is written, with what to do instead (`retryRefusal`): a step that is not waiting on a
- * person, a cancelled run, an ask for that try already there. Like a cancellation, the ask is the person's own
- * file, and the verb never writes the run's json, which the tick owns.
+ * Refused before anything is written, with what to do instead (`retryRefusal`): a message that is empty or rides on
+ * `--recheck`, a step that is not waiting on a person, a cancelled run, an ask for that try already there. Like a
+ * cancellation, the ask is the person's own file, and the verb never writes the run's json, which the tick owns. What
+ * the person said goes in the ask, `message`, and nowhere else: the tick carries it into the try's brief.
  */
-export async function retry(e: Engine, id: string, stepName: string, how: { mode: RetryMode; model?: string }): Promise<Asked> {
+export async function retry(e: Engine, id: string, stepName: string, how: RetryHow): Promise<Asked> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
@@ -1056,7 +1085,10 @@ export async function retry(e: Engine, id: string, stepName: string, how: { mode
 
   const refused = refusal(readAsks(id).asks);
   if (refused) refuse(refused);
-  const ask: RetryAsk = { step: stepName, try: tryOf(run, stepName) + 1, mode: how.mode, ...(how.model ? { model: how.model } : {}), at: new Date().toISOString() };
+  const ask: RetryAsk = {
+    step: stepName, try: tryOf(run, stepName) + 1, mode: how.mode, ...(how.model ? { model: how.model } : {}),
+    ...(how.message !== undefined ? { message: how.message } : {}), at: new Date().toISOString(),
+  };
   // Someone asked in the moment since the look above: said as the look would have said it.
   if (!writeAsk(askFile(id, stepName, ask.try), ask)) refuse(refusal(readAsks(id).asks) ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
   return { run, ask, file: askFile(id, stepName, ask.try) };
@@ -1314,6 +1346,9 @@ export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Rec
   return used;
 }
 
+/** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
+export type Answered = { try: number; message: string; needs?: string };
+
 /** What is left for a person to do — the pure call, with git asked the one question it owns. */
 export async function decide(e: Engine, id: string): Promise<{
   run: Run;
@@ -1329,6 +1364,10 @@ export async function decide(e: Engine, id: string): Promise<{
   offers: string[];
   /** What each filed step's current try consumed (`consumption`), off the views read for the rest. */
   used: Record<string, Usage | undefined>;
+  /** For each step whose current try a person answered, the answer beside the `needs` it answers (`Answered`). */
+  answers: Record<string, Answered>;
+  /** For each step that signed off blocked and may be tried again, the `wf retry --message` that answers it (`answerLines`). */
+  answering: Record<string, string>;
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
@@ -1341,12 +1380,26 @@ export async function decide(e: Engine, id: string): Promise<{
   // The verdict the screen prints, off the log: a refusal and a check that did not finish, told apart by it.
   const verdictOf = (name: string) => checks[name]?.verdict;
   const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds);
+  // What a person said to a step's current try, off their ask file, and what the try before it needed, off the engine's record of that
+  // try: the run's record keeps neither.
+  const said = readAnswers(id);
+  const answers: Record<string, Answered> = {};
+  for (const name of Object.keys(run.steps)) {
+    const answer = answerOf(run, name, said);
+    if (!answer) continue;
+    const before = run.steps[name]!.tries!.at(-1)!.taskId;
+    const closeout = (views.get(before) ?? await e.view(before)).state.attempts.at(-1)?.closeout;
+    const c = closeout === undefined ? undefined : parseCloseout(closeout);
+    answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
+  }
   return {
     run, decision: d, closeouts, checks,
     retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks),
     rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds),
     offers: [...roundLines(steps, run, d), ...retryLines(steps, run, d, phaseOf, reader, asked)],
     used: consumption(views, run),
+    answers,
+    answering: answerLines(steps, run, d, phaseOf, reader, asked),
   };
 }
 

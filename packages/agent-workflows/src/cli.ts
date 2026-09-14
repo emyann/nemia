@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, missingArtifacts, outputLines, owedFields, parseGlobs, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, outputLines, owedFields, parseGlobs, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, type RetryHow, type RetryMode } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -14,11 +14,16 @@ const HELP = `wf — run a workflow of agent steps
   wf cancel <runId>            stop what it has in flight; file nothing more
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
-  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck]
+  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"]
                                try a step waiting on you again, once, on the next tick:
                                --nudge (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
-                               --recheck runs its check again, and files no session
+                               --recheck runs its check again, and files no session;
+                               --message "<answer>" goes into the try's brief, as ## Your answer:
+                               for a step that signed off blocked, the answer to its needs — or
+                               what you have to say to any step you try again; not with --recheck.
+                               The next argument is the answer, whatever it starts with; an answer
+                               that is only one of these flags' names goes as --message=<answer>
   wf round <runId> [<step>]    once more: a loop out of rounds goes round again, once, on the
                                next tick — the step it loops to continued, then a new reviewer
   wf show <runId>              the run, and what each step was told
@@ -100,9 +105,16 @@ function decideHow(argv: string[]): { sensitive?: string[] } {
   return { sensitive };
 }
 
-/** `wf retry`'s one choice of how, read off its flags: at most one, and `--model` with a name. */
-function retryHow(argv: string[]): { mode: RetryMode; model?: string } {
+/** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
+const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--model', '--message'];
+
+/**
+ * `wf retry`'s one choice of how, read off its flags: at most one way, `--model` with a name, and `--message` at most once, with what
+ * to tell the step — refused, before a run is read, when it is empty or rides on `--recheck` (`messageRefusal`).
+ */
+function retryHow(argv: string[]): RetryHow {
   const given: Array<{ mode: RetryMode; model?: string }> = [];
+  let message: string | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === '--nudge' || arg === '--fresh' || arg === '--recheck') given.push({ mode: arg.slice(2) as RetryMode });
@@ -110,10 +122,23 @@ function retryHow(argv: string[]): { mode: RetryMode; model?: string } {
       const model = argv[++i];
       if (!model || model.startsWith('--')) usage('--model takes the model to run the new session on: wf retry <runId> <step> --model <m>');
       given.push({ mode: 'fresh', model });
-    } else usage(`wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck.`);
+    } else if (arg === '--message' || arg.startsWith('--message=')) {
+      if (message !== undefined) usage('wf retry takes --message once: put the whole answer in it, quoted — wf retry <runId> <step> --message "<answer>".');
+      // The next argument is the answer, whatever it starts with: an answer about a flag names it ("--flag stays"). Only one of this verb's own
+      // flags, alone, is read as the answer left out — and `--message=<answer>` carries even that.
+      const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
+      if (text === undefined) return usage('--message takes what to tell the step, quoted: wf retry <runId> <step> --message "<answer>"');
+      if (arg === '--message' && RETRY_FLAGS.includes(text)) {
+        usage(`--message takes what to tell the step, and ${text} is one of wf retry's own flags, so the answer was left out: wf retry <runId> <step> --message "<answer>". If ${text} is the whole answer, give it as --message=${text}.`);
+      }
+      message = text;
+    } else usage(`wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>".`);
   }
   if (given.length > 1) usage('wf retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.');
-  return given[0] ?? { mode: 'nudge' };
+  const how: RetryHow = { ...(given[0] ?? { mode: 'nudge' }), ...(message !== undefined ? { message } : {}) };
+  const wrong = messageRefusal(how);
+  if (wrong) usage(wrong);
+  return how;
 }
 
 /** `e` is the engine the verbs talk to: the board under `WF_ROOT`, unless a test hands it one of its own. */
@@ -217,7 +242,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, used } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, used, answers, answering } = await decide(e, rest[0]);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
       const steps = stepsOf(run);
 
@@ -276,8 +301,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         if (!c && !check && !run.steps[name]?.taskId) continue;
         const blocked = c && !('error' in c) && c.outcome === 'blocked';
         const step = steps.find((s) => s.name === name);
-        // The try — and the round — whose closeout and check these are, when it is not the first.
-        const tried = step ? tryNote(step, run.steps[name], steps) : '';
+        // The try — and the round — whose closeout and check these are, when it is not the first, and whether a person answered it.
+        const tried = step ? tryNote(step, run.steps[name], steps, Boolean(answers[name])) : '';
         console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}${tried ? `  (${tried})` : ''}`);
         if (check) {
           console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
@@ -289,12 +314,18 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         }
         // What its session consumed, beside the check's word on it — or that nobody measured it.
         for (const line of usedLines(used[name])) console.log(`    ${line}`);
+        // What a person said to this try, beside what the try before it needed: the question and its answer, before what the try made of them.
+        const answer = answers[name];
+        if (answer?.needs) console.log(`    try ${answer.try - 1} needs: ${answer.needs.split('\n').join('\n    ')}`);
+        if (answer) console.log(`    your answer: ${answer.message.split('\n').join('\n    ')}`);
         if (!c) continue;
         if ('error' in c) { console.log(`    closeout unreadable — ${c.error}`); continue; }
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);
         // What it declared — and, for a loop's target past its first round, its replies to the findings.
         for (const line of step ? outputLines(step, c, owedFields(step, run, steps)) : []) console.log(`    ${line}`);
         if (c.needs) console.log(`    needs: ${c.needs}`);
+        // The question, then the command that answers it.
+        if (answering[name]) console.log(`    ${answering[name]}`);
         // What it declared that is not where it says, then what is in the directory the run made for its
         // files: the screenshots a UI step's check took, say, which are on no branch.
         const files = artifactLines(artifactsDir(run, name), missingArtifacts(run, name, c), artifactFiles(run, name));
@@ -340,7 +371,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
       const { ask, file } = await retry(e, runId, stepName, retryHow(rest.slice(2)));
       const how = ask.model ? `--model ${ask.model}` : `--${ask.mode}`;
-      console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how}) — the next tick files it, once`);
+      console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — the next tick files it, once`);
       console.log(`   ${file}`);
       return;
     }

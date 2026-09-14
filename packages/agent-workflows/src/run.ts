@@ -308,11 +308,33 @@ export type EarlierTry = { taskId: string; check?: { taskId: string }; then: 're
 /** One step on the run's record: its current try's task and check, where it works, and the tries before (`Run.steps`). */
 export type StepRecord = { taskId: string | null; workspace?: string; branch?: string; check?: { taskId: string }; tries?: EarlierTry[] };
 
-/** A person's `wf retry`, as its ask file says it: the step, the try it asks for, how, and when. */
-export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: string; at: string };
+/**
+ * A person's `wf retry`, as its ask file says it: the step, the try it asks for, how, and when — and `message`, what they said
+ * with it (`--message`): the answer to the `needs` of a step that signed off blocked, or anything else they have to say to the
+ * step. The try's brief carries it as `## Your answer` (`retrySection`). Absent on an ask without one, and on every ask file
+ * written before there were messages.
+ */
+export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: string; message?: string; at: string };
 
-/** A try to file on this pass: of which step, its number, how, and on whose word. */
-export type Retry = { step: string; try: number; mode: RetryMode; model?: string; by: 'retries' | 'ask' };
+/** How a person asks for a try with `wf retry`: one way, the model a `--model` names, and what they said with it. */
+export type RetryHow = { mode: RetryMode; model?: string; message?: string };
+
+/** A try to file on this pass: of which step, its number, how, on whose word — and, for a person's, what they said with it. */
+export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; by: 'retries' | 'ask' };
+
+/**
+ * Why a message cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the
+ * run: an empty message, which would put an empty answer in the brief; and a message on `--recheck`, which files no session to read it.
+ * A message on a step that did not sign off blocked is not refused: a person may have something to say to a step whose check refused.
+ */
+export function messageRefusal(how: RetryHow, command = 'wf retry <runId> <step>'): string | null {
+  if (how.message === undefined) return null;
+  if (how.mode === 'recheck') {
+    return `--message carries your answer into the try's brief, and --recheck files no session to read it — it runs the check again, and nothing else. Recheck without a message (${command} --recheck), or give the answer to a session: ${command} --message "<answer>".`;
+  }
+  if (!how.message.trim()) return `--message is empty, and an empty answer tells the step nothing. Say what the step needs to hear — ${command} --message "<answer>" — or leave --message out.`;
+  return null;
+}
 
 /** The try a step is on: the first, and one more for each try its record keeps behind it. */
 export const tryOf = (run: Run, step: string): number => (run.steps[step]?.tries?.length ?? 0) + 1;
@@ -401,7 +423,7 @@ export function retriesDue(
     const next = tryOf(run, step.name) + 1;
     const ask = asks.find((a) => a.step === step.name && a.try === next && modes.includes(a.mode));
     if (ask) {
-      due.push({ step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), by: 'ask' });
+      due.push({ step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), ...(ask.message !== undefined ? { message: ask.message } : {}), by: 'ask' });
     } else if (status === 'failed (check)' && record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name))
       && retriesSpent(record) < (step.retries ?? 0)) {
       due.push({ step: step.name, try: next, mode: 'nudge', by: 'retries' });
@@ -431,8 +453,8 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
 /**
  * Why `wf retry` will not ask for this, in words that say what to do instead — or null, when it may. Pure.
  *
- * Refused: a step the run does not have; a cancelled run, which files nothing, so the ask would never be
- * honoured; an ask for the same try already waiting; a step whose last try is not over, or that let what
+ * Refused: a message that cannot ride on the ask (`messageRefusal`); a step the run does not have; a cancelled
+ * run, which files nothing, so the ask would never be honoured; an ask for the same try already waiting; a step whose last try is not over, or that let what
  * waits on it run (`retryable`); `--recheck` where no check failed; and a step the run is about to try again
  * itself, because `retries:` still covers its refusal — that step is not waiting on a person.
  */
@@ -440,13 +462,15 @@ export function retryRefusal(
   steps: readonly Workflow[],
   run: Run,
   name: string,
-  how: { mode: RetryMode; model?: string },
+  how: RetryHow,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => boolean = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
 ): string | null {
+  const wrong = messageRefusal(how, `wf retry ${run.id} ${name}`);
+  if (wrong) return wrong;
   const step = steps.find((s) => s.name === name);
   if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
   if (run.cancelledAt) {
@@ -483,8 +507,10 @@ export function retryRefusal(
 /**
  * How a step's record reached the try it is on, for `wf ls` and `wf decide`: `try 2, by retries: 2` — and for a step of a loop past its
  * first round, the round, before any try within it: `round 2 of 3`, `round 2 of 3, try 3, by retries: 1`. Empty on a first try.
+ * A try a person asked for with a message says so, last: `try 2, nudged on your word, answered` — `answered` is the caller's
+ * reading of the ask files (`answerOf`), since the record keeps no message.
  */
-export function tryNote(step: Workflow, record: StepRecord | undefined, steps: readonly Workflow[] = []): string {
+export function tryNote(step: Workflow, record: StepRecord | undefined, steps: readonly Workflow[] = [], answered = false): string {
   const last = record?.tries?.at(-1);
   if (!last) return '';
   const looping = loopOf(steps, step.name);
@@ -495,19 +521,34 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
     : last.then === 'recheck' ? 'rechecked on your word'
     : last.then === 'fresh' ? `fresh${last.model ? ` on ${last.model}` : ''}, on your word`
     : 'nudged on your word';
-  return [inRound, `try ${record!.tries!.length + 1}, ${how}`].filter(Boolean).join(', ');
+  return [inRound, `try ${record!.tries!.length + 1}, ${how}`, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
 
 /** A try due now, as `wf ls` and `wf decide` say it. */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => (r.by === 'ask'
-  ? `try ${r.try} asked (${modeWord(r)}) — the next tick files it`
+  ? `try ${r.try} asked (${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}) — the next tick files it`
   : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`);
+
+/**
+ * The ask a step's current try answers: a person's ask for exactly that try, with a message, honoured the way it asked — the try
+ * before it replaced by that mode, on that model. Pure. Read off the ask files, waiting and consumed (`readAnswers` in runner.ts),
+ * because the record keeps no message: the run's json stays the tick's, and what a person said stays in their own file.
+ */
+export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]): RetryAsk | undefined {
+  const last = run.steps[step]?.tries?.at(-1);
+  if (!last) return undefined;
+  const n = tryOf(run, step);
+  return answers.find((a) => a.step === step && a.try === n && a.message !== undefined && a.mode === last.then && a.model === last.model);
+}
 
 /**
  * What `wf decide` offers for each step a person may try again: the command, and what it does. Pure.
  *
  * A check that did not finish is said so, with `--recheck` first: the run spent no retry on it, and the work
  * may pass as it stands. For anything else, `wf retry` continues the step's session, told what happened.
+ *
+ * The board reads these lines too: `apps/api` cuts the command out of each (`ONCE_MORE`), and its tests pin the shape
+ * `<step>: …:  wf retry <run> <step>  (--fresh…`. The answer to a blocked step is `answerLines`', beside its question.
  */
 export function retryLines(
   steps: readonly Workflow[],
@@ -529,6 +570,28 @@ export function retryLines(
     } else {
       lines.push(`${step.name}: ${status}. Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
     }
+  }
+  return lines;
+}
+
+/**
+ * For each step that signed off blocked and may be tried again, the `wf retry` that answers its `needs`, as `wf decide` prints it under the
+ * question. Pure. Not among `retryLines`' offers, whose shape the board reads. None for a blocked step whose session has not settled, which a
+ * try would run beside, and none on a run that is not waiting on a person.
+ */
+export function answerLines(
+  steps: readonly Workflow[],
+  run: Run,
+  d: Decision,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  askedCloseout: (taskId: string) => boolean = () => false,
+): Record<string, string> {
+  if (d.kind !== 'awaiting') return {};
+  const lines: Record<string, string> = {};
+  for (const step of steps) {
+    const { status, modes } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps);
+    if (status === 'blocked' && modes.length) lines[step.name] = `to answer it:  wf retry ${run.id} ${step.name} --message "<answer>"`;
   }
   return lines;
 }
@@ -1242,6 +1305,8 @@ export function listing(
   asks: readonly RetryAsk[] = [],
   /** What people asked for with `wf round`, and the run has not consumed yet. */
   roundAsks: readonly RoundAsk[] = [],
+  /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
+  answers: readonly RetryAsk[] = [],
 ): Listing {
   // The engine's word for a settled task IS its outcome; any other word is a task still going.
   const settledOf = (taskId: string): TaskPhase => {
@@ -1265,7 +1330,7 @@ export function listing(
     const note = retry ? dueNote(step, run, retry)
       : round ? roundDueNote(steps, round)
       : exhausted.has(step.name) ? exhaustedNote(step, run)
-      : tryNote(step, run.steps[step.name], steps);
+      : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
     return note ? { ...row, note } : row;
   });
 
@@ -1428,11 +1493,17 @@ export type RetryBriefing = {
   status: StepStatus;
   /** What the last try's check said, when it did not pass. */
   refusal?: CheckRefusal;
+  /** What the person who asked for this try said with it (`wf retry --message`), as they wrote it. */
+  message?: string;
 };
 
 /**
- * `## Try <n>`: why the step is being tried again, and on whose word — then, for a check that did not pass,
- * what the check said, as data (`refusalSection`).
+ * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who
+ * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
+ * then, for a check that did not pass, what the check said, as data (`refusalSection`). The fence is what keeps the
+ * brief's structure the run's: a pasted snippet that leaves a fence open, or a line that reads as a heading, would
+ * otherwise swallow or split the sections after it, and on a nudge those are the only instructions left. The answer is beside why the step is back, and before the evidence: a step that signed
+ * off blocked reads the answer to its `needs` first. A try without a message is told exactly what it was before.
  *
  * A try that continues its session is told only this, since it has the rest. A new session is told it is new
  * and that the work on the branch is an earlier session's — and, like any step after another, is not given
@@ -1448,12 +1519,13 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
   };
   const who = r.by === 'retries'
     ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
-    : `A person asked for this try: \`wf retry ${modeWord(r)}\`.`;
+    : `A person asked for this try: \`wf retry ${modeWord(r)}${r.message !== undefined ? ' --message' : ''}\`${r.message !== undefined ? ', with what they said below' : ''}.`;
   const where = r.resumed
     ? "This is the last try's session, continued. Finish the work, then sign off again."
     : 'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n'
       + 'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
-  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, who, '', where, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
+  const answer = r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : [];
+  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, who, '', where, ...answer, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
 }
 
 /** What a loop's target filed as its next round is told: see `roundSection`. */
@@ -1565,11 +1637,15 @@ function repliesSection(target: string, closeoutOf: (step: string) => Closeout |
   ].join('\n');
 }
 
-/** JSON in a fence longer than any run of backticks inside it, so what it quotes cannot close it. */
+/** Text in a fence longer than any run of backticks inside it, so what it quotes cannot close the fence, nor open a section of the brief's. */
+function fenced(text: string, info = ''): string[] {
+  const fence = '`'.repeat(Math.max(3, ...(text.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
+  return [`${fence}${info}`, text, fence];
+}
+
+/** JSON in a fence longer than any run of backticks inside it (`fenced`). */
 function dataBlock(value: unknown): string[] {
-  const json = JSON.stringify(value, null, 2);
-  const fence = '`'.repeat(Math.max(3, ...(json.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
-  return [`${fence}json`, json, fence];
+  return fenced(JSON.stringify(value, null, 2), 'json');
 }
 
 /**

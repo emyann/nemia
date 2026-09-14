@@ -9,7 +9,8 @@ outputs (package J), a step's files directory with `workflows/ui/` (U1), a brows
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
 `rounds:` and `wf round` (§4 R), a step's `tools:` and `effort:` (§4 I) and its `disallow:` (§4b), the decider screen
-(§4 G), and looking as a skill with `workflows/ui/` as implement ⇄ review (§4 U2) have shipped.
+(§4 G), looking as a skill with `workflows/ui/` as implement ⇄ review (§4 U2), and an answer for a step
+that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planned/`, §4 Q) have shipped.
 
 ## Shipped: the check
 
@@ -188,7 +189,8 @@ What it leaves:
   `judge`, plus a verb on the board if a person should be able to ask from there.
 - **An ask carries no message.** A nudge tells the step what happened, not what the person wants done
   differently. That is plan §4b's *steering by message*: the same file shape, with text the tick composes into
-  the brief.
+  the brief. Built for a step waiting on a person, as `--message` (§4 Q, below); a step still running has no
+  channel yet.
 - **The refused check's litter is in the workspace when the next try starts.** The new try's hand-off commits
   whatever the suite left that git does not ignore, under the step's name. A clean-up would be destructive,
   so nothing does one.
@@ -244,7 +246,7 @@ What it leaves:
   `workflows/ui/` had two, and loops now because looking became a skill and its reviewers one (§4 U2).
 - **`wf logs <run> <step>`** on a step of the loop waiting for its round says it has not run: it reads the
   current try, which is not filed yet. The earlier tries are under their own ids, for `ae logs`.
-- **An ask carries no message**, as `wf retry`'s does not: `wf round` says once more, not what to look at.
+- **An ask carries no message**, as `wf retry`'s did not before `--message`: `wf round` says once more, not what to look at.
 - **Nothing measures a reviewer that asks again for nits.** The cap and the person are the guard. The
   looping step is told that a finding worth a person's attention and not another round can go with
   `again: false`, and that is prose.
@@ -433,6 +435,88 @@ What it leaves:
   a person reads whether that is a lesson.
 - **Steps are still listed in file order** (plan §4b sends a topological order in `workflow.ts` to G). The
   screen's steps read in `run.steps` order as before. Sorting at `wf start` is `workflow.ts`'s, not this screen's.
+
+## Shipped: a step that asks gets an answer, and a step that plans
+
+Plan §4 Q. A step that needs a person already asked the right way: it signs off `outcome: blocked` with the
+question in `needs`, which ends its session, puts the question on the record, and is drawn on the board.
+Nothing carried the answer back. A person answered by cross-session message, which left no trace on the run
+(§4b, *steering by message*), or with `wf retry --nudge`, which told the step what happened and not what they
+said.
+
+- `wf retry <run> <step> [--nudge | --fresh | --model <m>] --message "<answer>"` puts `message` on the ask
+  file, beside the mode, and writes nothing else. Refused before anything is written (`messageRefusal`, from
+  the CLI's parse and from `retryRefusal`): an empty or blank message, and `--message` with `--recheck`, which
+  files no session to read it; in the CLI also a `--message` with no text, one followed by nothing but one of
+  the verb's own flags (the answer left out; `--message=<answer>` gives such an answer), or one given twice.
+  Any other next argument is the answer, `--flag stays` included. A message to a step
+  that did not sign off blocked is allowed, and the usage text says what the flag is for.
+- The tick honours the ask once, as before, and carries the message through `Retry` and `RetryBriefing` into
+  the brief: `## Your answer` inside `## Try <n>`, the text as written in a fence longer than any run of
+  backticks in it (`fenced`, which `## From <step>` data now uses too), after the paragraph that says where
+  the step is and before `## What the check said`. The sentence saying whose word the try is names
+  `--message`. A try without one is briefed exactly as before. The engine is untouched: the answer travels
+  in the brief, and needed no field on the task.
+- The tick holds a hand-written ask file to the verb's word: a message that is not text, is blank, or rides on
+  a recheck is noted and not honoured. An ask file without `message`, as every one before this was, reads as
+  it did.
+- The record keeps no message. `wf ls` and `wf decide` read it off the ask files, waiting and in `done/`
+  (`readAnswers`), and `answerOf` counts one only for the try it names, filed the way it asked. `wf ls` says
+  `try 2 asked (--nudge, with your answer)`, then `try 2, nudged on your word, answered`. `wf decide` says the
+  same on the step's line and prints `try 1 needs:` and `your answer:` under it; under a blocked step's
+  `needs` it prints `to answer it:  wf retry <run> <step> --message "<answer>"` (`answerLines`). The offers
+  under *once more* are unchanged.
+- `workflows/dev-planned/` is `plan → implement ⇄ review`. `plan` is on review's fence (read-only tools and
+  Bash in `dontAsk`, the build and the e2e denied by name), with `output: plan.schema.json`: `approach`,
+  `files` with a line each, `steps`, `risks`. It signs off `done` with the plan when the brief reads one way,
+  and `blocked` with the question in `needs` when it reads two materially different ways, or asks for
+  approval. `implement` is dev's with `after: plan` and `input: plan`; `review` is dev's. `workflows/dev`
+  stays the default.
+
+What was measured:
+
+- The suite, at shipped defaults: a refusal test for each refusal above, at the verb, the CLI and the tick; the
+  brief with an answer compared whole against the brief without one; `readAsks` on an ask file written before
+  `message`; the decide screen end to end, from the blocked sign-off to the answered try; and `dev-planned`
+  loaded from the repository, its graph and plan's fence asserted, with a guard shown to refuse a plan given a
+  tool that writes.
+- The first run of the whole check from the root failed one api test. The offer for a blocked step had carried
+  `--message "<answer>"` after its command, and `apps/api/test/decision.test.ts` pins the offer's shape
+  (`:  wf retry <run> <step>  (--fresh`), because the board cuts its command out of the line. The package's
+  suite cannot see that test. The offer went back to what it was, and the command moved under the question.
+- Round 2's review found `--message` refusing any answer that started with `--`, so the brief's own example
+  question ("Rename --flag, or keep it?") could not be answered by naming the flag. The next argument is now
+  the answer, and a test gives four such answers through the CLI and reads them off the ask file.
+- Round 2's review also found the answer composed raw. A snippet that left a fence open made one code block of
+  everything after it, up to the brief's next fence. Measured on a step that signed off blocked, that was both
+  contracts, the check's and the closeout's, which on a nudge are the only instructions left; on a refused check,
+  the check's own fence closed it, and what the check said was hidden. It is fenced now, and a test reads the
+  brief's headings outside fences in both cases, with the answer fenced and raw.
+- No session has run `dev-planned`. Whether `plan` asks at the right moments is its brief's prose until a run
+  shows it.
+- One observation against §4 Q's measurement: this step's own session, filed by `wf` on Claude Code, listed
+  `AskUserQuestion` among its tools and `EnterPlanMode` among its deferred ones. Neither was called, since
+  nobody sits beside a step to answer, so whether either works headless is still unmeasured. Nothing here
+  depends on it: `blocked` ends the session rather than holding one open for nobody.
+
+What it leaves:
+
+- **The plan's paragraph is `approach`, not `summary`.** The brief asked for `summary`, and every closeout
+  already has one, written for the person who decides; the parser refuses a declared field that reuses it.
+- **The board's answer box.** `retry(e, id, step, { mode, model, message })` and the ask file are what it builds
+  on: a box on a blocked step in the Decide section, posting to a route guarded as `POST /api/runs` is. The api
+  reads no answers yet. Its `listing` and `tryNote` calls pass none, so the board's note never says `answered`,
+  and its once-more command, cut from the offer by `ONCE_MORE`, is `wf retry <run> <step>` without `--message`.
+- **The steering channel.** A message reaches a step that is over and waiting, not one still running. An
+  instruction mid-flight, the case §4b found sent by cross-session message, still has no ask file. It would take
+  the same shape, composed on read and printed by `wf decide`, plus a way to reach a live session that `wf`
+  does not have.
+- **`wf round` carries no message.** A person's once more still says nothing about what to look at.
+- **The question beside the answer is read from the engine.** `wf decide` views the task of the try before the
+  answered one for its `needs`: one more view per answered step, and no question printed if the engine has lost
+  that task.
+- **A plan is not steps.** `plan`'s `steps` are prose for one `implement`; a run that files steps from a plan
+  is still §2 below.
 
 ## 1. Forgetting a run (`wf rm`)
 

@@ -2323,3 +2323,73 @@ test("`wf decide` prints each step in the order the steps run — on a record ke
   assert.deepEqual(Object.keys(readRun(run.id).steps), folderOrder);
   assert.deepEqual(await sections(), ['plan', 'implement', 'review']);
 });
+
+// ─── files for a run: wf start --input ──────────────────────────────────────
+
+test("`wf start --input` copies each file into the run's own inputs/, freezes their names on the record and names them on every step's brief, under what was asked for — nothing in the workspace; `wf decide` names them under the run's line", async (t) => {
+  const repo = aRepo();
+  const given = fs.mkdtempSync(path.join(ROOT, 'given-'));
+  fs.writeFileSync(path.join(given, 'mock.png'), 'png bytes');
+  fs.mkdirSync(path.join(given, 'notes'));
+  fs.writeFileSync(path.join(given, 'notes', 'brief notes.md'), '# what the person meant\n');
+  const b = board();
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['start', 'add a flag', '--workflows', folder(), '--repo', repo, '--no-worktree', '--input', path.join(given, 'mock.png'), `--input=${path.join(given, 'notes', 'brief notes.md')}`], b.e);
+  const id = printed[0]!.split(' ')[0]!;
+  const dir = path.join(ROOT, 'runs', id, 'inputs');
+  assert.deepEqual(readRun(id).inputs, ['mock.png', 'brief notes.md'], 'by name, in the order given');
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['brief notes.md', 'mock.png']);
+  assert.equal(fs.readFileSync(path.join(dir, 'mock.png'), 'utf8'), 'png bytes');
+  assert.ok(printed.includes(`inputs: mock.png, brief notes.md — copied into ${dir}`), printed.join('\n'));
+  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }), '', 'nothing written into the workspace');
+
+  const line = `Files given with it (\`wf start --input\`), in \`${dir}\`: \`mock.png\`, \`brief notes.md\`.`;
+  await advance(b.e, readRun(id));
+  b.settle(`${id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(id));
+  for (const name of ['implement', 'review']) {
+    const brief = b.tasks.get(`${id}-${name}`)!.spec.brief;
+    assert.ok(brief.includes(`## What was asked for\n\nadd a flag\n\n${line}\n`), `${name}:\n${brief}`);
+  }
+  printed.length = 0;
+  await main(['decide', id], b.e);
+  assert.deepEqual(printed[0]!.split('\n').slice(0, 2), [`${id}  add a flag`, `  inputs  mock.png, brief notes.md  —  in ${dir}`]);
+
+  // A run given none: no directory, no key on the record, and a brief without the line.
+  const plain = start({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false });
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${plain.id}.json`), 'utf8')), 'inputs'), false);
+  assert.equal(fs.existsSync(path.join(ROOT, 'runs', plain.id)), false);
+  await advance(b.e, readRun(plain.id));
+  assert.doesNotMatch(b.tasks.get(`${plain.id}-implement`)!.spec.brief, /wf start --input/);
+});
+
+test('REFUSED at `wf start`, before a run is written: an --input that is not there, a directory, two of one name and one file given twice — and the CLI refuses --input with no file and a misspelt --input; `wf plan --input` is refused by name', async () => {
+  const repo = aRepo();
+  const given = fs.mkdtempSync(path.join(ROOT, 'given-'));
+  for (const d of ['a', 'b']) {
+    fs.mkdirSync(path.join(given, d));
+    fs.writeFileSync(path.join(given, d, 'notes.md'), `${d}\n`);
+  }
+  const before = runsWritten();
+  const starting = (...inputs: string[]) => () => start({ brief: 'a run with files', repo, workflowDir: folder(), isolate: false, inputs });
+  assert.throws(starting(path.join(given, 'a', 'notes.md'), path.join(given, 'nope.png')),
+    refusedWith(new RegExp(`^--input ${escaped(path.join(given, 'nope.png'))}: there is no file at ${escaped(path.join(given, 'nope.png'))}\\.`)));
+  assert.throws(starting(path.join(given, 'a')), refusedWith(new RegExp(`^--input ${escaped(path.join(given, 'a'))}: ${escaped(path.join(given, 'a'))} is a directory, and --input copies one file\\.`)));
+  assert.throws(starting(path.join(given, 'a', 'notes.md'), path.join(given, 'b', 'notes.md')),
+    refusedWith(new RegExp(`^--input ${escaped(path.join(given, 'a', 'notes.md'))} and --input ${escaped(path.join(given, 'b', 'notes.md'))} are both named notes\\.md`)));
+  assert.throws(starting(path.join(given, 'a', 'notes.md'), `${given}/b/../a/notes.md`), refusedWith(/is given twice\. Each file is copied once: give it one --input\.$/));
+  assert.equal(runsWritten(), before, 'no run written, and no inputs directory');
+
+  const { main } = await import('../src/cli.ts');
+  const typed = (...flags: string[]) => main(['start', 'a run with files', '--workflows', folder(), '--repo', repo, '--no-worktree', ...flags]);
+  await assert.rejects(typed('--input'), refusedWith(/^--input takes a file to hand the run's steps: wf start <brief> --input <file>/));
+  await assert.rejects(typed('--input='), refusedWith(/^--input takes a file to hand the run's steps/));
+  await assert.rejects(typed('--input', '--after', 'r-xyz'), refusedWith(/^--input takes a file to hand the run's steps/));
+  await assert.rejects(typed('--input', path.join(given, 'a')), refusedWith(/ is a directory, and --input copies one file\./));
+  await assert.rejects(typed('--inputs', path.join(given, 'a', 'notes.md')), refusedWith(/^wf start does not take --inputs\. .*; --input <file> once per file to hand its steps\.$/));
+  const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
+  await assert.rejects(main(['plan', plan, '--repo', repo, '--input', path.join(given, 'a', 'notes.md')]), refusedWith(/^wf plan does not take --input: a card's inputs are not a thing yet\./));
+  assert.equal(runsWritten(), before, 'nor by the CLI');
+});

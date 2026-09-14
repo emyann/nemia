@@ -50,6 +50,12 @@ export type Run = {
    */
   after?: string[];
   /**
+   * The files `wf start --input` copied into the run's own `inputs/` directory (`inputsDir` in runner.ts), by name, in the order given.
+   * Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `wf decide`. Absent on a run
+   * given none, and on every record from before there were inputs.
+   */
+  inputs?: string[];
+  /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (`isShipped` in runner.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished, and on
@@ -1339,6 +1345,49 @@ export const closeoutContract = (step?: Workflow, replies = false): string => {
   ].join('\n');
 };
 
+// ─── files a person gave the run ────────────────────────────────────────────
+
+/**
+ * A file `wf start --input` was given, as runner.ts found it: the path as typed, where it resolves, and what is there. What `inputRefusal`
+ * judges; runner.ts looks, and this file does not.
+ */
+export type InputFile = { given: string; resolved: string; kind: 'file' | 'directory' | 'missing' | 'other' };
+
+/**
+ * Why `wf start --input` will not copy these files into the run, in words that name the fix — or null. Pure, and asked before anything is
+ * written: a file that is not there, a directory, anything else that is not a regular file, and two inputs that would take one name in the
+ * run's `inputs/` — one file given twice, or two files of the same name.
+ */
+export function inputRefusal(inputs: readonly InputFile[]): string | null {
+  for (const f of inputs) {
+    if (f.kind === 'missing') return `--input ${f.given}: there is no file at ${f.resolved}. Give the path to a file to hand the run's steps, from where wf start is typed or absolute.`;
+    if (f.kind === 'directory') return `--input ${f.given}: ${f.resolved} is a directory, and --input copies one file. Give each file its own --input.`;
+    if (f.kind === 'other') return `--input ${f.given}: ${f.resolved} is not a regular file, so there is nothing to copy. Give the path to a file.`;
+  }
+  const named = new Map<string, InputFile>();
+  for (const f of inputs) {
+    const name = path.basename(f.resolved);
+    const other = named.get(name);
+    if (other?.resolved === f.resolved) return `--input ${f.given} is given twice. Each file is copied once: give it one --input.`;
+    if (other) {
+      return `--input ${other.given} and --input ${f.given} are both named ${name}, and the run keeps its inputs by name, in one directory. Rename one of them, or give only one.`;
+    }
+    named.set(name, f);
+  }
+  return null;
+}
+
+/**
+ * The line a step's brief carries under what was asked for when `wf start --input` gave the run files: the directory the run copied them
+ * into, and each by name. Undefined for a run given none, or with no directory to name.
+ */
+export const inputsLine = (dir: string | undefined, names: readonly string[] | undefined): string | undefined =>
+  (dir && names?.length ? `Files given with it (\`wf start --input\`), in \`${dir}\`: ${names.map((n) => `\`${n}\``).join(', ')}.` : undefined);
+
+/** What `wf decide` says under a run's line when `wf start --input` gave it files: each by name, and where they are. Undefined for a run given none. */
+export const inputsNote = (dir: string, names: readonly string[] | undefined): string | undefined =>
+  (names?.length ? `inputs  ${names.join(', ')}  —  in ${dir}` : undefined);
+
 // ─── files for the steps after it ───────────────────────────────────────────
 
 /**
@@ -1689,6 +1738,8 @@ export function composeBrief(
    * gathered by runner.ts. Given to no other step: a run without `after`, and every step after a root, is composed as it always was.
    */
   parents?: readonly ParentCloseout[],
+  /** The directory the run copied `wf start --input` files into (`inputsDir` in runner.ts): named, with `run.inputs`, under what was asked for. */
+  inputsDir?: string,
 ): string {
   // What finishing means, on every brief: the command this step will be judged by, when it has one,
   // where its files for the steps after it go, and then the closeout — last, because it says to give it
@@ -1722,11 +1773,14 @@ export function composeBrief(
     ? step.after
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
-  const parts = [step.body, '', '## What was asked for', '', run.brief, ...handed];
+  // What was asked for, and the files that came with it: one line, only when there are any, so a run given none composes as it always did.
+  const inputs = inputsLine(inputsDir, run.inputs);
+  const request = [run.brief, ...(inputs ? ['', inputs] : [])];
+  const parts = [step.body, '', '## What was asked for', '', ...request, ...handed];
 
   if (step.after.length > 1) {
     return [
-      step.body, '', '## What was asked for', '', run.brief, ...handed, '',
+      step.body, '', '## What was asked for', '', ...request, ...handed, '',
       '## What is in this workspace', '',
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',

@@ -1030,6 +1030,62 @@ What it leaves:
 - **`wf cancel` names what it asked to stop in the record's order.** `inFlight` has no workflow to order by, and `wf show`
   prints the record as it was written.
 
+### `wf start --input`: files a person gives the run
+
+§4b's *inputs for a step*: a brief is text, and nothing told a step where a file for it was. For one run, reference
+screenshots were copied by hand, and their paths sent to the running session.
+
+What was built:
+
+- `wf start --input <file>`, once per file, also as `--input=<file>`. `start()` takes `inputs`, paths from where `wf start`
+  is typed. Before anything is written, it looks at each and asks the pure `inputRefusal` in `run.ts`, which refuses by name,
+  with the fix:
+  - a file that is not there;
+  - a directory, or anything else that is not a regular file;
+  - two inputs with the same name, which would share `inputs/`;
+  - one file given twice.
+
+  `readFlags` already refuses `--input` with no value, as it does every value flag.
+- The files are copied into `runs/<id>/inputs/` (`inputsDir`), the run's own directory beside `artifacts/`. The copy happens
+  before the record is written, so a record never names a file that is not there. The names are frozen on the record as
+  `inputs`, in the order given. A run given none has no key and no directory.
+- `composeBrief` takes the directory as its last argument. Every brief that carries *What was asked for* gains one line under
+  the request (`inputsLine`), and the tick passes it on every filing: a step, a try, a round. A brief that continues a session
+  carries neither the request nor the line, since that session was handed both. A run given none composes byte for byte as
+  before.
+- `wf start` prints where the inputs went, and `wf decide` names them under the run's line on every screen (`inputsNote`).
+- `wf plan` refuses `--input` by name: a card's inputs are later.
+
+What was measured:
+
+- `test/run.test.ts` (3):
+  - `inputRefusal`'s refusals, compared whole, and a missing file named before a clash of names; files that are there, each
+    of its own name, pass.
+  - `composeBrief` with no `inputs`, with `[]`, and with inputs but no directory: exactly the plain brief. With both, the
+    plain brief with the one line under the request. A step after another, a fan-in and a fresh try carry the line once; a
+    `resume:` step and a nudge do not.
+  - `inputsNote`, with names and without.
+- `test/store.test.ts` (2), on a real repository through `main`:
+  - `--input` and `--input=`, one name holding a space: both copied byte for byte, the names on the record in order, and
+    `git status` in the workspace empty. The `implement` and `review` briefs carry the line under the request, and
+    `wf decide` prints it under the run's line. A run with none has no `inputs` key, no run directory and no line.
+  - Refused by `start()` with nothing written to the store: a missing file named after a good one, a directory, two
+    `notes.md` from two folders, and one file given twice as `b/../a/notes.md`. Through `main`: `--input` with no value,
+    `--input=`, `--input` followed by a flag, a directory, `--inputs`, and `wf plan --input`.
+- Each guard was broken on purpose and the tests rerun: `inputRefusal` refusing nothing fails 2 tests, `composeBrief` ignoring
+  inputs fails 2, `--input` taken only once fails 1, and `wf plan` without its own refusal of `--input` fails 1.
+- agent-workflows: 361 tests, 360 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 361 (360 passed, 1 skipped), api 114 and web 158, all passing.
+
+What it leaves:
+
+- **The board neither starts a run with files nor shows them.** Its start form takes none, and for a step not yet filed the
+  api previews `composeBrief(step, run, workflows)`, with no directory, so the preview has no line. The api would pass
+  `inputsDir(run)`.
+- **The files are copied once, whole, and kept.** A file changed after `wf start` is not seen, nothing limits a file's size,
+  and nothing removes `runs/<id>/`, as nothing removes a run's artifacts.
+- **A card has no inputs** (`wf plan`), as §6 left it.
+
 ## 1. Forgetting a run (`wf rm`)
 
 **Why.** Runs, worktrees and branches accumulate, and clearing them is manual: `git worktree

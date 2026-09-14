@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -1821,4 +1821,60 @@ test('a round that continues the loop\'s target carries what was said to its las
   assert.ok(resumed.includes('At 2026-09-14T16:06:19.851Z:\n\n```text\nLeave the parser alone.\n```'), resumed);
   assert.equal(briefOf({ ...round, said: [] }), briefOf(round), 'nothing said, nothing added');
   assert.equal(briefOf({ ...round, resumed: false, said }), briefOf({ ...round, resumed: false }), 'a new session is given none');
+});
+
+// ─── files a person gave the run ────────────────────────────────────────────
+
+test('REFUSED by name: an --input that is not there, a directory, not a regular file, two of one name and one file given twice — and files that are there, each of its own name, are not', () => {
+  const f = (given: string, kind: InputFile['kind'] = 'file', resolved = `/work/${given}`): InputFile => ({ given, resolved, kind });
+  assert.equal(inputRefusal([]), null);
+  assert.equal(inputRefusal([f('mock.png'), f('notes/brief.md'), f('notes/mock.png.md')]), null);
+  assert.equal(inputRefusal([f('mock.png'), f('gone.png', 'missing')]),
+    "--input gone.png: there is no file at /work/gone.png. Give the path to a file to hand the run's steps, from where wf start is typed or absolute.");
+  assert.equal(inputRefusal([f('shots', 'directory')]), '--input shots: /work/shots is a directory, and --input copies one file. Give each file its own --input.');
+  assert.equal(inputRefusal([f('pipe', 'other')]), '--input pipe: /work/pipe is not a regular file, so there is nothing to copy. Give the path to a file.');
+  assert.equal(inputRefusal([f('a/notes.md'), f('b/notes.md')]),
+    '--input a/notes.md and --input b/notes.md are both named notes.md, and the run keeps its inputs by name, in one directory. Rename one of them, or give only one.');
+  assert.equal(inputRefusal([f('notes.md'), f('./notes.md', 'file', '/work/notes.md')]), '--input ./notes.md is given twice. Each file is copied once: give it one --input.');
+  // A file that is not there is named before a clash of names, whatever order they were given in.
+  assert.match(inputRefusal([f('a/notes.md'), f('b/notes.md'), f('gone.png', 'missing')])!, /^--input gone\.png: there is no file/);
+});
+
+test('a run given inputs names them once, under what was asked for, on every brief that carries it — and a run given none composes exactly as before', () => {
+  const DIR = '/wf/runs/r-1/inputs';
+  const line = 'Files given with it (`wf start --input`), in `/wf/runs/r-1/inputs`: `mock.png`, `brief notes.md`.';
+  const inputs = ['mock.png', 'brief notes.md'];
+  const brief = (s: Workflow, r: Run, steps: readonly Workflow[], retry?: RetryBriefing, dir: string | undefined = DIR) =>
+    composeBrief(s, r, steps, undefined, undefined, undefined, retry, undefined, undefined, dir);
+  const r = run({ implement: null, review: null });
+  const plain = composeBrief(step('implement'), r, STEPS);
+  for (const [why, given] of [['no inputs on the record', r], ['an empty list', { ...r, inputs: [] }]] as const) {
+    assert.equal(brief(step('implement'), given, STEPS), plain, why);
+  }
+  // `undefined` would not skip `brief`'s default directory: composed with none at all.
+  assert.equal(composeBrief(step('implement'), { ...r, inputs }, STEPS), plain, 'no directory to name: nothing said');
+  assert.equal(brief(step('implement'), { ...r, inputs }, STEPS), plain.replace('\n\nadd a flag\n', `\n\nadd a flag\n\n${line}\n`));
+  assert.equal(inputsLine(DIR, inputs), line);
+
+  // A step after another, a fan-in, and a new session tried again carry it; each exactly once.
+  const fanIn = step('integrate', ['a', 'b']);
+  const carried = [
+    brief(step('review', ['implement']), run({ implement: 't1', review: null }, { inputs }), STEPS),
+    brief(fanIn, run({ a: 't1', b: 't2', integrate: null }, { inputs }), [step('a'), step('b'), fanIn]),
+    brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], { try: 2, by: 'ask', mode: 'fresh', resumed: false, status: 'stopped' }),
+  ];
+  for (const b of carried) {
+    assert.equal(b.split(line).length, 2, b);
+    assert.ok(b.indexOf('## What was asked for') < b.indexOf(line), 'under the request');
+  }
+  // What continues a session was handed the request and its files already: a nudge, and a step that resumes another.
+  const resumed: Workflow = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer it' };
+  assert.doesNotMatch(brief(resumed, run({ implement: 't1', respond: null }, { inputs }), [step('implement'), resumed]), /wf start --input/);
+  assert.doesNotMatch(brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], { try: 2, by: 'ask', mode: 'nudge', resumed: true, status: 'stopped' }), /wf start --input/);
+});
+
+test("`wf decide` names a run's inputs under its line, and a run given none says nothing of them", () => {
+  assert.equal(inputsNote('/wf/runs/r-1/inputs', ['mock.png', 'brief notes.md']), 'inputs  mock.png, brief notes.md  —  in /wf/runs/r-1/inputs');
+  assert.equal(inputsNote('/wf/runs/r-1/inputs', []), undefined);
+  assert.equal(inputsNote('/wf/runs/r-1/inputs', undefined), undefined);
 });

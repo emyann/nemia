@@ -7,6 +7,7 @@ package uses `createEngine`, `file`, `tick`, `view`, `stop`, `logs` and nothing 
 ```bash
 wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it until r-xyz has shipped
+wf start ./ui.md --repo ~/code/myapp --input ./mock.png   # copied into the run's inputs/, named on every step's brief
 wf plan ./plans/flag --repo ~/code/myapp               # a folder of cards: a run each, parents first, with their edges
 wf up
 wf ls
@@ -187,7 +188,8 @@ A run cuts one git worktree and every step works in it, so the handoff is the wo
 it is between two engineers. A later step is told:
 
 - its own prose
-- **the original request** (the spec — you cannot judge completeness without it)
+- **the original request** (the spec — you cannot judge completeness without it), and the files a person gave
+  the run with it (`wf start --input`), by name, in one line under it
 - where to look: `git diff <baseRef>`, and who was there before it
 - what a step it waits on declared in its closeout — **only if it asks**, with `input:` (below)
 - in a round of a loop, what the loop hands on: the reviewer's findings to the step it loops back to,
@@ -750,6 +752,30 @@ round: a round is new work, and its check may refuse it afresh.
 
 This repository's `workflows/` is implement ⇄ review: `review.md` loops back to `implement` with
 `rounds: 3`. `respond.md` is gone, and its three answers are the loop contract.
+
+## Files a person gives the run: `wf start --input`
+
+A brief is text, and a step can read a screenshot or a spec from disk, but nothing told it where one was. For one run the
+reference screenshots were copied by hand and their paths sent to the running session (plan §4b, *inputs for a step*).
+
+```bash
+wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
+```
+
+- **Each file is copied into `runs/<id>/inputs/`**: the run's own directory, beside its artifacts, never the workspace, so no
+  file rides a branch. The names are frozen on the record as `inputs`, in the order given.
+- **Every step's brief names them, in one line under *What was asked for***:
+
+  ```text
+  Files given with it (`wf start --input`), in `/home/you/.agent-workflows/runs/give-the-factory-a-leg-x1y2/inputs`: `mock.png`, `api.md`.
+  ```
+
+  A brief that continues a session is not told again, as it is not told the request again: a step that `resume:`s
+  another, a nudge, a round that continues its target. A run given none composes exactly as before.
+- **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.
+- **Refused before anything is written**, by name and with the fix: a file that is not there, a directory, anything else
+  that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.
+- **`wf plan` refuses `--input`.** A card's inputs are not a thing yet; start that card by hand with its files.
 
 ## A step's files: `runs/<id>/artifacts/<step>/`
 

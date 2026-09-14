@@ -17,14 +17,14 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, dueNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export { artifactLines, dueNote, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Wait } from './run.ts';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -428,6 +428,12 @@ export const checkStderr = (taskId: string): string => path.join(HOME, 'checks',
  */
 export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'artifacts', step);
 
+/**
+ * The directory `wf start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file a
+ * person gave the run reaches each step without riding a branch. Named on each brief (`inputsLine`) with the names on the record.
+ */
+export const inputsDir = (run: Pick<Run, 'id'>): string => path.join(runsDir(), run.id, 'inputs');
+
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;
 
@@ -723,11 +729,22 @@ function refuseInclude(repo: string, isolate: boolean): void {
 /**
  * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
  * this run's base (`afterRefusal`), and frozen on the record. Left out, the record is what it was before there was an `after`.
+ *
+ * `inputs` are files to hand every step (`wf start --input`), by path from where `wf start` is typed: refused before anything is written
+ * when one is not a file or two would take one name (`inputRefusal`), then copied into the run's own `inputs/` (`inputsDir`), and their
+ * names frozen on the record. Left out, no directory is made, and the record is what it was before there were inputs.
  */
-export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[] }): Run {
+export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[]; inputs?: readonly string[] }): Run {
   const isolate = opts.isolate ?? true;
   const steps = stepsToStart(opts.workflowDir, isolate);
   refuseInclude(opts.repo, isolate);
+  const inputs = (opts.inputs ?? []).map((given): InputFile => {
+    const resolved = path.resolve(given);
+    const at = fs.statSync(resolved, { throwIfNoEntry: false });
+    return { given, resolved, kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other' };
+  });
+  const refusedInputs = inputRefusal(inputs);
+  if (refusedInputs) throw Object.assign(new Error(refusedInputs), { exitCode: 2 });
   const id = runId(opts.brief);
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
   const after = opts.after ?? [];
@@ -744,11 +761,23 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
     workflowDir: path.resolve(opts.workflowDir),
     workflow: steps,
     ...(after.length ? { after: [...after] } : {}),
+    ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
     branch,
     // Keyed in the order the steps run, as `loadWorkflows` gives them: what `wf ls`, `wf decide` and the board list a run's steps in.
     steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
     createdAt: new Date().toISOString(),
   };
+  // Copied before the record is written, so a record never names a file that is not there. A copy that fails takes the directory back with it.
+  if (inputs.length) {
+    const dir = inputsDir(run);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
+    } catch (err) {
+      fs.rmSync(path.dirname(dir), { recursive: true, force: true });
+      throw Object.assign(new Error(`--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`), { exitCode: 1 });
+    }
+  }
   writeRun(run);
   return run;
 }
@@ -959,7 +988,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
           // What was said to the session a nudge continues: it may never have read it (agent-engine open issue 16).
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
           status: stepStatus(step, run, phaseOf, signedOff, asked, steps), ...(refusal ? { refusal } : {}),
-        }),
+        }, undefined, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
         model: r.model ?? step.model,
@@ -1001,7 +1030,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         brief: composeBrief(target, run, steps, signedOff, files, undefined, undefined, {
           loop: r.step, round: r.round, rounds: capOf(looping), by: r.by, resumed: Boolean(resumeFrom),
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-        }),
+        }, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
         model: target.model,
@@ -1087,7 +1116,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       // assessment that made it ready just read, so it is handed what it was filed on.
       // And, when the run installed its `node_modules` or could not, why its start was slow or what to run. And, on a root of a run
       // that waited on runs, what they concluded.
-      brief: composeBrief(step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents),
+      brief: composeBrief(step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents, inputsDir(run)),
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,

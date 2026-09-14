@@ -504,7 +504,7 @@ another repository and change that line.
 |---|---|---|
 | `waiting` | not filed yet | — |
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
-| the engine's word: `running (working)`, `needs-human` | still going | waits |
+| the engine's word: `running (working)`, `needs-human` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
 | `unsigned` | it succeeded without the closeout it was asked for, or without a field its `output:` declares | **never runs** |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
@@ -555,12 +555,22 @@ retries: 1
   its own session failed or was stopped. `--recheck` only applies where a check did not pass. Each refusal
   says what to do instead: a step still running or checking, a verified step, a cancelled run, a try already
   asked for, a step the run is about to try again itself.
+- **A session its harness blocked is tried again the same way.** A `--bg` session can stop on the harness's own
+  trouble, such as "Could not refresh your login because another Claude Code process is refreshing it". The
+  engine then says `needs-human`, and the step has no closeout. `wf retry` takes such a step with `--nudge` or
+  `--fresh`, and refuses `--recheck`. The ask is written as any other. The next tick asks the engine to stop the
+  session and files nothing, and a later pass, once the session has stopped, files the try as it files one for a
+  stopped step: a nudge continues the session. A step whose session is still working is refused as before. Only
+  the verb takes the harness's word (`retry(…, { stopBlocked: true })`): the board's `POST …/retry` still refuses
+  such a step as running.
 - **An ask is a file, like a cancellation.** `wf retry` writes `runs/<id>.asks/retry-<step>-<n>`, whole and
   exclusively, and never writes the run's json. Every pass reads the directory. The next pass files try `n`,
   writes the record, then moves the ask into `done/`. The ask names its try, and a try's ids are derived
   (`<run>-<step>-try<n>`, `<run>-<step>-try<n>-check`). So a pass that dies after filing a try is adopted by
   the next, and a pass that dies before consuming the ask leaves the try on the record, where the ask is
-  spent and files nothing.
+  spent and files nothing. A file at an ask's name that does not read as one (`{}`, a hand edit) is honoured by
+  no pass, and `wf ls` shows nothing asked. So `wf retry` refuses to write over it, and the refusal names the
+  file and says to delete it. `wf round` does the same.
 - **A step that asks gets an answer: `--message "<answer>"`.** A session nobody sits beside has no
   AskUserQuestion and no plan mode (plan §4 Q), so a step that needs a person asks the run's way: it signs off
   `blocked`, with the question in `needs`, which ends its session and puts the question on the record. The
@@ -579,7 +589,8 @@ retries: 1
   go under `steps[name].tries`, in order, each with what replaced it: `retries`, `nudge`, `fresh` (and its
   model) or `recheck`. A person's tries do not spend the step's `retries`.
 - **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
-  0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`, and
+  0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`,
+  `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human`, and
   once filed `try 2, by retries: 1` or `try 2, nudged on your word, answered`. A step with a try due is not
   waiting on you. **`wf decide`** names the try each closeout and check belong to — for a try you answered,
   with what the try before it needed and your answer under it — and under *try again* gives the `wf retry` for
@@ -736,6 +747,12 @@ somebody merges by hand. A run still holds no status of its own; cancellation st
 exception, and only because nothing else can know it. A fan-out is shipped when *every* terminal
 branch has landed, not when one has.
 
+Git's yes needs one more question. A result branch is cut at the run's base, so a branch nobody
+committed to is on the base branch from the start. Such a branch ships only a run whose steps all
+succeeded, with nothing to merge. A run whose step failed, signed off blocked or ended unsigned with
+nothing committed is decided, not shipped. Work past the base that is on the base branch ships whatever
+the steps said, since a person merged it (`isShipped` says which: `true`, or `'unchanged'`).
+
 A failed run is decided too. The first run this was pointed at had been sitting for hours marked
 `failed`, and its branch held a real fix plus a design question addressed to a person — none of
 which anything in this tool had ever shown anyone.
@@ -818,8 +835,9 @@ have shipped. A conflict between B and C is still a person's to resolve, at the 
   passes: the parent is not running, it was not cancelled, and every result branch is on the base branch.
   Git is asked first, and the engine's view of the parent's tasks only once its branches are on the base.
   A result branch is cut at its run's base, so a branch nobody has committed to is on the base branch from
-  the start. A parent still running has not shipped for that; one that finished with nothing to commit
-  has, as its `wf decide` says, and its child starts. A branch merged while its run still runs waits for
+  the start. A parent still running has not shipped for that, nor one that ended failed, blocked or unsigned
+  with nothing committed; one whose steps all signed off with nothing to commit has, as its `wf decide`
+  says, and its child starts. A branch merged while its run still runs waits for
   the run to finish. `runReady(run, shipped)` is the pure half, beside `assess`.
 - **The base is read when the roots are filed.** A run that waited starts from its base branch as it is on
   that pass, with its parents' work on it, not as it was at `wf start`. Every worktree, check and diff of

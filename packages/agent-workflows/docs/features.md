@@ -14,7 +14,9 @@ that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planne
 that waits on a run (`wf start --after`, the first half of §4 P), and three guards made to hold (a session
 the harness blocked tried again, `shipped` with nothing past the base, an ask file that is not an ask), and a plan as a folder of cards whose waiting runs are handed their parents'
 closeouts (`wf plan`, the rest of §4 P), and telling a running step something (`wf say`, with its route and the session page's
-prompt box: the steering channel's upper half) have shipped.
+prompt box: the steering channel's upper half), and six small items — `radius` reading workspace globs as npm does, a run's steps
+in the order they run, `wf start --input`, artifacts collected from the workspace, a stale ask honoured, and `wf start` on a card
+file (§6 items 6–9, 24, 25) — have shipped.
 
 ## Shipped: the check
 
@@ -924,8 +926,8 @@ What it leaves:
 - **The Factory's graph is P2's** (apps): the api does not carry `after` yet (the `--after` section above says what it
   needs), and a plan is drawn only once it does. **A plan's own page on the board** is later: today a plan is its runs,
   and nothing groups them.
-- **A card started by hand carries its frontmatter.** After a part-way stop, the commands `wf plan` prints give the card
-  file to `wf start`, which reads a file's whole text as the brief, the `workflow:` and `after:` lines included.
+- ~~**A card started by hand carries its frontmatter.**~~ Done by the six small items (§6 item 25, below): `wf start` on a card
+  file starts its body, and `planStopped` quotes the paths it prints.
 - **A card cannot wait on a run outside its folder.** `after:` names cards; to wait on a run already started, start that
   card by hand with `--after`, as the refusal of `wf plan --after` says.
 - **The parents' closeouts reach only each root's first try.** A try `wf retry --fresh` files later, or a new session a
@@ -1208,6 +1210,57 @@ What it leaves:
   step.
 - **The web's own words say `stopping its blocked session` for both.** The api's `note` is `listing`'s and tells them apart, but
   the web words a try asked from `stopFirst` alone.
+
+### `wf start` on a card file
+
+From P3's review, and recorded as left in the plan section above. A plan that stops part-way prints `wf start <plan>/<card>.md
+--workflows … --after …` for each card left, and `wf start` took the file's whole text as the brief. The run's id, and every
+step's brief, then carried the card's `workflow:` line.
+
+What was built:
+
+- `cardToStart(file, text, after)` in `plan.ts`, pure. A file is a card when every line of its frontmatter, comments aside, is
+  `workflow:` or `after:`. It is held to what `wf plan` holds a card to, through checks `parseCard` now shares (`bodyOf`,
+  `afterOf`): a key set twice or to nothing, an empty body, an `after:` naming no card or one twice. A card whose `after:` names
+  cards is refused when `wf start` was given no `--after`, and the refusal gives an `--after <card's run id>` per card, from
+  `wf ls`.
+- Any other file gives null, and its whole text stays the brief: no frontmatter; one with any other key, or a line of prose; an
+  empty block; and a `---` that never closes, which `splitFrontmatter` refuses for a step or a card but a brief may start with.
+- `wf start` uses a card's body as the brief, so the run's id comes from the body. `--workflows` comes from the flag or else from
+  the card's `workflow:`, found from the card's folder as `wf plan` finds it. The `--after` ids given are checked as any
+  `--after` is.
+- `planStopped` quotes each path it prints for the shell, with a quote inside closed, escaped and opened again.
+
+What was measured:
+
+- `test/plan.test.ts`:
+  - `cardToStart` reads three cards: one with both keys and a body of two paragraphs, one saved on Windows with a comment, and
+    one with only `after:`.
+  - It gives null for six briefs that are not cards.
+  - It refuses by name an `after:` with no `--after`, naming one card, two and three, and each thing `wf plan` refuses of a card.
+  - `planStopped` compared whole with quoted paths, and with a space and a quote in them.
+- `test/store.test.ts` (1 new), through `main` on a real repository with a `workflows/dev`:
+  - A card naming `workflow: dev` starts its body, its id from the body, on `<repo>/workflows/dev`. One naming a path from its
+    plan folder starts on that folder, and `--workflows` wins over a card.
+  - A card with `after: a, b` and no `--after` is refused by name and writes no run; with both `--after`s, it starts.
+  - A brief whose frontmatter has `title:` beside `workflow:` is taken whole, and so is one that opens with a `---` it never
+    closes.
+- Each guard was broken on purpose and the tests rerun:
+  - starting a card with `after:` and no `--after` fails 2 tests;
+  - reading any frontmatter as a card's fails 2;
+  - refusing a `---` that never closes fails 2;
+  - `wf start` taking a card's whole text fails 1;
+  - ignoring the card's `workflow:` fails 1;
+  - printing the paths bare fails 1.
+- agent-workflows: 368 tests, 367 passed, 1 skipped. Typecheck clean.
+
+What it leaves:
+
+- **Which runs `--after` names is not checked against the card.** `wf start` refuses a card with `after:` and no `--after`, but
+  given ids, it checks each as any `--after` is, not whether they are the runs of the cards the card names.
+- **A card's `workflow:` is read from the folder the card is in.** A card copied out of its plan folder reads a relative
+  `workflow:` from where it is now.
+- **The board's start form takes no card.** `wf plan` and `wf start` are how a card is started.
 
 ## 1. Forgetting a run (`wf rm`)
 

@@ -20,7 +20,7 @@ import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './r
 export { artifactLines, dueNote, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Wait } from './run.ts';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
-export { planLines, planStopped } from './plan.ts';
+export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';

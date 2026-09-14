@@ -3,16 +3,18 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
 import { workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
-  wf start <brief.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...]
+  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...]
                                --after <runId>: file nothing of this run until wf decide says that
                                run has shipped — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
                                --workflows takes a folder, or a name under <repo>/workflows/: dev
+                               a card of a plan (wf plan --help) starts its body: --workflows is its
+                               workflow: unless given, and its after: needs an --after for each
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
   wf plan <folder> [--repo .]  start a plan: one run per card in the folder, parents first, each
@@ -269,13 +271,18 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const arg = rest[0];
       if (!arg || arg.startsWith('--')) return console.log(HELP);
       const how = startHow(rest.slice(1));
-      const brief = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8').trim() : arg;
+      const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
+      // A card of a plan — what `wf plan` prints `wf start <card>` for — starts its body. Any other file is the brief whole, frontmatter and all.
+      const card = text === undefined ? null : cardToStart(arg, text, how.after);
       const repo = path.resolve(how.repo ?? '.');
       const run = start({
-        brief,
+        brief: card ? card.body : text?.trim() ?? arg,
         repo,
-        // A folder from here, or one of the repository's by name: `--workflows dev` is <repo>/workflows/dev.
-        workflowDir: workflowFolder(how.workflows ?? './workflows', process.cwd(), repo),
+        // A folder from here, or one of the repository's by name: `--workflows dev` is <repo>/workflows/dev. Without the flag, a card's
+        // `workflow:`, found from its plan folder as `wf plan` finds it.
+        workflowDir: how.workflows === undefined && card?.workflow !== undefined
+          ? workflowFolder(card.workflow, path.dirname(path.resolve(arg)), repo)
+          : workflowFolder(how.workflows ?? './workflows', process.cwd(), repo),
         isolate: how.isolate,
         after: how.after,
         inputs: how.inputs,

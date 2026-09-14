@@ -2535,3 +2535,45 @@ test("REFUSED before, now honoured at shipped defaults: `wf retry` on a step who
   await advance(e, readRun(run.id));
   assert.deepEqual([b.stopped, b.filings.filter((f) => f === try2).length], [[taskId], 1], 'once');
 });
+
+// ─── wf start on a card file ────────────────────────────────────────────────
+
+test("`wf start <card>.md` starts the card's body — its id from the body, its `workflow:` found from its plan folder, --workflows over it — and a card whose `after:` names cards starts only with --after; a brief whose frontmatter is not a card's is taken whole, as before", async (t) => {
+  const { repo, dir: dev } = aRepoWith('dev');
+  const other = oneStep();
+  const b = board();
+  const plan = aPlan((d) => ({
+    'a.md': cardText('workflow: dev', 'Parse the flag option in cli'),
+    'b.md': cardText(`# by a path from the plan folder\nworkflow: ${path.relative(d, other)}`, 'Document the flag'),
+    'd.md': cardText('workflow: dev\nafter: a, b', 'Show the flag'),
+  }));
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  const startedBy = async (...argv: string[]) => {
+    printed.length = 0;
+    await main(['start', ...argv], b.e);
+    return readRun(printed[0]!.split(' ')[0]!);
+  };
+
+  const a = await startedBy(path.join(plan, 'a.md'), '--repo', repo);
+  assert.deepEqual([a.brief, a.workflowDir], ['Parse the flag option in cli', dev], 'the body, and workflow: dev found as wf plan finds it');
+  assert.match(a.id, /^parse-the-flag-option-in-cli-[a-z0-9]{4}$/);
+  const second = await startedBy(path.join(plan, 'b.md'), '--repo', repo);
+  assert.deepEqual([second.brief, second.workflowDir], ['Document the flag', other], 'a path from the plan folder, not from where wf start is typed');
+  assert.equal((await startedBy(path.join(plan, 'a.md'), '--repo', repo, '--workflows', other)).workflowDir, other, '--workflows over the card');
+
+  const before = runsWritten();
+  await assert.rejects(main(['start', path.join(plan, 'd.md'), '--repo', repo], b.e),
+    refusedWith(new RegExp(`^${escaped(path.join(plan, 'd.md'))}: \`after: a, b\` — this card waits on the runs of a and b, and wf start was given no --after, so it would start at once`)));
+  assert.equal(runsWritten(), before, 'no run written');
+  const d = await startedBy(path.join(plan, 'd.md'), '--workflows', dev, '--repo', repo, '--after', a.id, '--after', second.id);
+  assert.deepEqual([d.brief, d.after], ['Show the flag', [a.id, second.id]]);
+
+  // Not a card: a brief whose frontmatter has a key a card does not have is taken whole, and so is one that opens with a rule and never closes it.
+  const brief = path.join(fs.mkdtempSync(path.join(ROOT, 'brief-')), 'brief.md');
+  fs.writeFileSync(brief, '---\ntitle: the flag\nworkflow: dev\n---\nParse the flag.\n');
+  assert.equal((await startedBy(brief, '--repo', repo, '--workflows', dev)).brief, '---\ntitle: the flag\nworkflow: dev\n---\nParse the flag.');
+  fs.writeFileSync(brief, '---\nA brief that opens with a rule.\n');
+  assert.equal((await startedBy(brief, '--repo', repo, '--workflows', dev)).brief, '---\nA brief that opens with a rule.');
+});

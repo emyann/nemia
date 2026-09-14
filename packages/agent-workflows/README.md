@@ -9,6 +9,7 @@ wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it until r-xyz has shipped
 wf start ./ui.md --repo ~/code/myapp --input ./mock.png   # copied into the run's inputs/, named on every step's brief
 wf plan ./plans/flag --repo ~/code/myapp               # a folder of cards: a run each, parents first, with their edges
+wf start ./plans/flag/d.md --repo ~/code/myapp --after r-b --after r-c   # one card by hand: its body is the brief
 wf up
 wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
@@ -1063,7 +1064,14 @@ run 'wf tick' (or 'wf up') to start them
   says each, and anything else is refused as `wf start` refuses it.
 - **A `wf start` that refuses part-way stops the plan.** Every card was checked first, so this is something that
   changed underneath, or git. The runs it started stand, and it names them. Then it prints a `wf start --after` for
-  each card left, parents first, with the run ids it has and `<c's run id>` for a parent not started yet.
+  each card left, parents first, with the run ids it has and `<c's run id>` for a parent not started yet, each path
+  quoted for the shell.
+- **`wf start` on a card file starts the card**, as the stopped plan's commands do. The brief is the card's body, below its
+  frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
+  card's `workflow:`, found from its plan folder as `wf plan` finds it. A card whose `after:` names cards is refused
+  without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
+  A file is a card only when every line of its frontmatter is `workflow:` or `after:`. A brief with any other key, or one
+  that opens with a `---` it never closes, is taken whole, as before.
 
 ## Calling a run off
 

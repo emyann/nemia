@@ -17,10 +17,10 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote } from './run.ts';
-export type { Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk } from './run.ts';
+export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote, waitAdvice, waitWord } from './run.ts';
+export type { ParentRun, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Wait } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { artifactPlace, type ArtifactFile } from './run.ts';
+import { afterRefusal, artifactPlace, hasStarted, runReady, waitsOf, type ArtifactFile, type ParentRun, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -666,7 +666,11 @@ export const runId = (brief: string): string => {
   return `${slug || 'run'}-${Math.random().toString(36).slice(2, 6)}`;
 };
 
-export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean }): Run {
+/**
+ * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
+ * this run's base (`afterRefusal`), and frozen on the record. Left out, the record is what it was before there was an `after`.
+ */
+export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[] }): Run {
   const steps = loadWorkflows(opts.workflowDir);   // validated before anything is spent
   if (opts.isolate === false && fansOut(steps)) {
     throw new Error(
@@ -701,6 +705,9 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
   }
   const id = runId(opts.brief);
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
+  const after = opts.after ?? [];
+  const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentReader());
+  if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
 
   const run: Run = {
     id,
@@ -711,6 +718,7 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
     brief: opts.brief,
     workflowDir: path.resolve(opts.workflowDir),
     workflow: steps,
+    ...(after.length ? { after: [...after] } : {}),
     branch,
     steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
     createdAt: new Date().toISOString(),
@@ -742,9 +750,9 @@ function handOff(workspace: string, step: string): void {
  * run stands — and `notes`, each line starting with its step: what cutting a worktree had to say (a path
  * `.worktreeinclude` lists that the main checkout does not have, a line it refused, an `npm ci` that ran or
  * failed), each try and each round filed and on whose word, and an ask file that cannot be read. `looped` names the
- * looping steps whose loop this pass took round again.
+ * looping steps whose loop this pass took round again. `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`).
  */
-export type Advanced = { run: Run; filed: string[]; checked: string[]; tried: string[]; looped: string[]; status: Assessment['status']; blocked: string[]; notes: string[] };
+export type Advanced = { run: Run; filed: string[]; checked: string[]; tried: string[]; looped: string[]; status: Assessment['status']; blocked: string[]; notes: string[]; waiting: Wait[] };
 
 /**
  * One pass over one run: tick the engine, then file whatever became ready.
@@ -796,7 +804,14 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // work in progress — is committed under this step's name (`handOffDue`).
   for (const name of handOffDue(steps, run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
 
-  const { ready, check, retry, round, blocked, status } = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks);
+  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks);
+  const { check, retry, round, blocked, status } = assessed;
+  // A run that waits on runs (`--after`) files its roots once every one of them has shipped, read off git on this pass. Only a run
+  // with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`runReady`).
+  const parent = parentReader();
+  const starting = !hasStarted(run);
+  const ready = runReady(run, (id) => parent(id).shipped) ? assessed.ready : [];
+  const waiting = waitsOf(run, parent);
 
   // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
   // workspace and on the branch it had, under its next try's derived id, and the try it replaces moves behind
@@ -940,6 +955,11 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     return attempts?.at(-1)?.nativeId ?? undefined;
   };
 
+  // A run that waited on runs starts from its base branch as it stands now, with their work on it — not as it stood at `wf start`,
+  // before they shipped. Read once, in the pass that files its roots, and written with them; every worktree and diff of the run is cut
+  // from it. A run with no `after` keeps the base `wf start` recorded, as before.
+  if (ready.length && starting && run.after?.length) run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
+
   const filed: string[] = [];
   for (const name of ready) {
     const step = steps.find((s) => s.name === name)!;
@@ -987,7 +1007,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // pass's, or one a pass that died before consuming it wrote down.
   consumeAsks(run, asks, roundAsks);
 
-  return { run, filed, checked, tried, looped, status, blocked, notes };
+  return { run, filed, checked, tried, looped, status, blocked, notes, waiting };
 }
 
 export type Cancelled = { run: Run; plan: CancelPlan };
@@ -1062,7 +1082,7 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
     const v = views.get(taskId);
     return v?.state.brief ? v.phase : 'unknown';
   };
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id));
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, parentReader()));
 }
 
 export type Asked = { run: Run; ask: RetryAsk; file: string };
@@ -1255,10 +1275,48 @@ export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactF
  * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
  */
 export function isShipped(run: Run, branch: string): boolean {
+  return isAncestor(run.repo, branch, run.branch);
+}
+
+/** Whether git says commit `a` is reachable from `b` in `repo`. No, too, when either cannot be read. */
+function isAncestor(repo: string, a: string, b: string): boolean {
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', branch, run.branch], { cwd: run.repo, stdio: 'ignore' });
+    execFileSync('git', ['merge-base', '--is-ancestor', a, b], { cwd: repo, stdio: 'ignore' });
     return true;
   } catch { return false; }
+}
+
+/**
+ * A run another waits on (`--after`), read off its record and git by the pass that asks, and carried nowhere — what `runReady`, `waitsOf`
+ * and `afterRefusal` are handed. A run the store does not have has no record, and has not shipped.
+ *
+ * Shipped as `wf decide` reads it — every result branch on the run's base branch (`isShipped`) — and, which `wf decide` does not ask,
+ * with work of its own on it. A result branch is cut at the run's base, which is on the base branch, so a branch nobody has committed to
+ * reads as landed: without this, a run waiting on a one-step run would start the moment that step was filed. A run that worked on its
+ * base branch itself (`--no-worktree`) has no result branch, and never ships.
+ *
+ * A result branch the record names and git no longer has is `gone`, and not shipped. Git keeps no trace of the commits a deleted branch
+ * named — this repository's merges carry their own messages, and `git branch -d` needs the worktree removed first — so whether they are
+ * on the base cannot be read. A run that started before the branch was deleted never asks (`waitingOn`).
+ */
+export function parentOf(id: string): ParentRun {
+  let record: Run;
+  try { record = readRun(id); } catch { return { shipped: false }; }
+  let branches: string[];
+  try { branches = resultBranches(record); } catch { branches = []; }   // a pre-freeze record whose folder is gone names no steps
+  const gone = branches.filter((b) => gitSays(record.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`) === undefined);
+  const shipped = record.isolate && branches.length > 0 && !gone.length && !branches.includes(record.branch)
+    && branches.every((b) => isShipped(record, b) && !isAncestor(record.repo, b, record.baseRef));
+  return { record, shipped, ...(gone.length ? { gone } : {}) };
+}
+
+/** `parentOf`, read at most once per run for whoever holds the reader: a pass, a listing, a start. */
+export function parentReader(): (id: string) => ParentRun {
+  const read = new Map<string, ParentRun>();
+  return (id) => {
+    if (!read.has(id)) read.set(id, parentOf(id));
+    return read.get(id)!;
+  };
 }
 
 /**
@@ -1368,6 +1426,8 @@ export async function decide(e: Engine, id: string): Promise<{
   answers: Record<string, Answered>;
   /** For each step that signed off blocked and may be tried again, the `wf retry --message` that answers it (`answerLines`). */
   answering: Record<string, string>;
+  /** The runs this run's roots wait on (`waitsOf`): while there are any, that is the whole of what there is to say. */
+  waiting: Wait[];
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
@@ -1400,6 +1460,7 @@ export async function decide(e: Engine, id: string): Promise<{
     used: consumption(views, run),
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked),
+    waiting: waitsOf(run, parentReader()),
   };
 }
 

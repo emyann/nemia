@@ -44,6 +44,12 @@ export type Run = {
    */
   workflow?: Workflow[];
   /**
+   * The runs this one waits on (`wf start --after`), frozen at start like the workflow: none of its steps is filed until
+   * every one of them has shipped (`runReady`). Absent on a run that waits on none, and on every record from before there was
+   * an `after`, which reads as waiting on none.
+   */
+  after?: string[];
+  /**
    * When somebody called the run off, if they did.
    *
    * On the run rather than on a step, because that is what it is about: stopping the step in
@@ -172,6 +178,116 @@ export function assess(
     : 'running';
 
   return { ready, check, retry, round, blocked, status: overall };
+}
+
+// ─── waiting on a run ───────────────────────────────────────────────────────
+
+/**
+ * Whether any step of the run has been filed, on any try — a step a round moved behind still has its tries. A run that has
+ * started never waits on a run again.
+ */
+export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((s) => Boolean(s.taskId) || Boolean(s.tries?.length));
+
+/**
+ * The runs in `after` that have not shipped, in the order they were given. Pure, and asked only of a run the gate still applies
+ * to: none for a run with no `after` (every record from before there was one), for a cancelled run, which files nothing anyway,
+ * and for a run that has started — whose parents are never read again, so a parent's branch deleted after the merge (`wf decide`'s
+ * "drop it", a `git branch -d` after shipping) cannot un-ready it. `shipped` is not called for any of those.
+ */
+export function waitingOn(run: Run, shipped: (runId: string) => boolean): string[] {
+  if (!run.after?.length || run.cancelledAt || hasStarted(run)) return [];
+  return run.after.filter((id) => !shipped(id));
+}
+
+/**
+ * Whether the tick may file this run's roots: true when every run in its `after` is shipped — its result branch on the base branch,
+ * as `wf decide` reads it, never its steps saying they are done, because the run boundary is the human gate. Pure. True for a run
+ * that has started, without asking (`waitingOn`).
+ */
+export const runReady = (run: Run, shipped: (runId: string) => boolean): boolean => waitingOn(run, shipped).length === 0;
+
+/**
+ * A run another waits on, as the tick reads it on the pass that asks (`parentOf` in runner.ts): its record, when the store has one;
+ * whether it shipped; and the result branches it recorded that git no longer has, when there are any.
+ */
+export type ParentRun = { record?: Run; shipped: boolean; gone?: string[] };
+
+/**
+ * A run this one waits on, as `wf ls` and `wf decide` name it: its id and, when it may never ship without a person, why — the store has
+ * no such run, it was cancelled, or a result branch it recorded is gone, and git cannot say whether what it named is on the base.
+ */
+export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[] };
+
+/** Each run this one waits on that has not shipped (`waitingOn`), and why it may never. Pure. */
+export function waitsOf(run: Run, parentOf: (runId: string) => ParentRun): Wait[] {
+  return waitingOn(run, (id) => parentOf(id).shipped).map((id) => {
+    const { record, gone } = parentOf(id);
+    if (!record) return { run: id, missing: true };
+    if (record.cancelledAt) return { run: id, cancelledAt: record.cancelledAt };
+    return gone?.length ? { run: id, gone } : { run: id };
+  });
+}
+
+/** Whether a person has to act for this run to ship: nothing the tick can read will change on its own. */
+const neverShips = (w: Wait): boolean => Boolean(w.missing || w.cancelledAt || w.gone?.length);
+
+/** A run's roots, waiting, as `wf ls` says it in the status column: `waiting on a-1x2y (cancelled), b-3z4w`. */
+export const waitWord = (waits: readonly Wait[]): string =>
+  `waiting on ${waits.map((w) => `${w.run}${w.missing ? ' (no such run)' : w.cancelledAt ? ' (cancelled)' : w.gone?.length ? ` (${w.gone.join(', ')} gone)` : ''}`).join(', ')}`;
+
+/**
+ * What a run waiting on runs leaves a person to do, in one line, for `wf decide` and for `wf ls`'s `→ waiting on you`. Pure. Nothing, while
+ * each parent may still ship: the tick files the roots when it does. For a parent that never will without a person — no such run, a
+ * cancelled one, a result branch gone — why, and the two ways out: cancel this run, or start the work again without that edge.
+ */
+export function waitAdvice(run: Run, waits: readonly Wait[]): string {
+  const never = waits.filter(neverShips);
+  if (!never.length) {
+    return `nothing of ${run.id} is filed until ${waits.map((w) => w.run).join(' and ')} ${waits.length > 1 ? 'are' : 'is'} on ${run.branch}; nothing to decide yet`;
+  }
+  const why = never.map((w) => (w.missing ? `the store has no run ${w.run}`
+    : w.cancelledAt ? `${w.run} was cancelled at ${w.cancelledAt}, and a cancelled run never ships`
+    : `${w.gone!.join(', ')} ${w.gone!.length > 1 ? 'are' : 'is'} gone, so whether ${w.run} shipped cannot be read`));
+  return `${why.join('; ')} — yours to resolve: wf cancel ${run.id}, or start the work again without ${never.map((w) => `--after ${w.run}`).join(' ')}`;
+}
+
+/**
+ * Why `wf start --after` will not start this run, in words that name the fix — or null. Pure: handed each parent as `parentOf` reads it,
+ * and asked before anything is written.
+ *
+ * Refused: an id given twice; a run the store does not have; a run on another repository, or shipping onto another base branch — it would
+ * never ship onto this run's, or this run would never start from a base with its work; a run that worked on its base branch itself
+ * (`--no-worktree`), which has no result branch to ship; and, unless it has shipped already, a cancelled run, or one whose result branch is
+ * gone — neither will ever read as shipped, and this run would wait for ever. The run itself cannot be named: it has no id yet.
+ */
+export function afterRefusal(
+  after: readonly string[],
+  child: Pick<Run, 'repo' | 'branch'>,
+  parentOf: (runId: string) => ParentRun,
+): string | null {
+  const seen = new Set<string>();
+  for (const id of after) {
+    const without = `start it without --after ${id}`;
+    if (seen.has(id)) return `--after ${id} is given twice, and a run waits on another once. Give each run one --after.`;
+    seen.add(id);
+    const { record, shipped, gone } = parentOf(id);
+    if (!record) return `--after ${id}: the store has no run ${id}. --after takes a run this one waits on, by its id — wf ls lists them.`;
+    if (path.resolve(record.repo) !== path.resolve(child.repo)) {
+      return `--after ${id}: ${id} works on ${record.repo}, and this run on ${child.repo}. A run waits for another to ship onto its own base branch, which a run on another repository never does: start it with --repo ${record.repo}, or ${without}.`;
+    }
+    if (!record.isolate) {
+      return `--after ${id}: ${id} worked on ${record.branch} itself (--no-worktree), so it has no result branch to ship, and this run would wait for ever. When ${id}'s work is done, ${without}.`;
+    }
+    if (record.branch !== child.branch) {
+      return `--after ${id}: ${id} ships onto ${record.branch}, and this run would start from ${child.branch}, a base without ${id}'s work. Check out ${record.branch} in ${child.repo} and start it again, or ${without}.`;
+    }
+    if (shipped) continue;
+    if (record.cancelledAt) return `--after ${id}: ${id} was cancelled at ${record.cancelledAt}, and a cancelled run never ships, so this run would wait for ever. Start it without --after ${id}.`;
+    if (gone?.length) {
+      return `--after ${id}: ${gone.join(', ')} ${gone.length > 1 ? 'are' : 'is'} gone, so the run cannot read whether ${id} shipped, and this run would wait for ever. If ${id}'s work is on ${record.branch}, there is nothing to wait for: ${without}.`;
+    }
+  }
+  return null;
 }
 
 /**
@@ -1273,6 +1389,8 @@ export type Listing = {
   steps: Array<{ name: string; status: string; branch: string | null; note?: string }>;
   /** Steps a person has to act on — blocked, unsigned, or refused by their check, with no try due — on a run nobody has called off. */
   waitingOnYou: string[];
+  /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
+  waiting: Wait[];
 };
 
 /**
@@ -1307,7 +1425,11 @@ export function listing(
   roundAsks: readonly RoundAsk[] = [],
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
   answers: readonly RetryAsk[] = [],
+  /** The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be. */
+  waits: readonly Wait[] = [],
 ): Listing {
+  // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run.
+  const waiting = run.cancelledAt || hasStarted(run) ? [] : [...waits];
   // The engine's word for a settled task IS its outcome; any other word is a task still going.
   const settledOf = (taskId: string): TaskPhase => {
     const word = phaseOf(taskId);
@@ -1338,7 +1460,8 @@ export function listing(
     const { name } = step;
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
-    if (!taskId) return { name, status: 'waiting', branch };
+    // A root of a run waiting on runs names them, where the engine's `pending` would be once it is filed: what waits on a root still says `waiting`.
+    if (!taskId) return { name, status: waiting.length && !step.after.length ? waitWord(waiting) : 'waiting', branch };
 
     const status = stepStatus(step, run, settledOf, readable, askedCloseout, steps);
     const onYou = status === 'blocked' || status === 'unsigned' || status === 'failed (check)' || status === 'exhausted';
@@ -1363,7 +1486,7 @@ export function listing(
 
   // A run somebody called off is waiting on nobody — `wf decide` says there is nothing to decide —
   // though each step still signed off the way it did, and its line still says so.
-  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou };
+  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting };
 }
 
 /**

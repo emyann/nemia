@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, phaseOfView, readAnswers, readAsks, readRun, retry, round, start } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, start } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -1464,4 +1464,170 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
   assert.deepEqual(readAsks(run.id), { asks: [legacy], rounds: [], notes: [] });
   assert.deepEqual(readAnswers(run.id), []);
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+});
+
+// ─── a run that waits on a run, at shipped defaults ─────────────────────────
+
+/** Git in a checkout, as a person types it there. */
+const gitIn = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+/** A workflow of one step, `implement`: its branch is the run's result. */
+const oneStep = () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'one-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  return dir;
+};
+
+/** A run another will wait on: started for real, with worktrees, and its step filed — with `work` committed on its branch when given, and signed off. */
+const aParent = async (repo: string, work?: string) => {
+  const run = start({ brief: 'the parent', repo, workflowDir: oneStep() });
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const wt = readRun(run.id).steps.implement!.workspace!;
+  if (work) {
+    fs.writeFileSync(path.join(wt, work), `${work}\n`);
+    gitIn(wt, 'add', '-A');
+    gitIn(wt, 'commit', '-q', '-m', `add ${work}`);
+    b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  }
+  return { run, wt, branch: `wf/${run.id}/implement` };
+};
+
+const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
+const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+
+test("REFUSED at shipped defaults: a run whose parent has not shipped files nothing, tick after tick, and says `waiting on <parent>` — merged onto the base, the next tick files its roots, from a base with the parent's work", async () => {
+  const repo = aRepo();
+  // Filed and not yet committed to, the parent's branch sits at its base, which is on the base branch: that is not shipped.
+  const p = await aParent(repo);
+  const child = start({ brief: 'the child', repo, workflowDir: folder(), after: [p.run.id] });
+  assert.deepEqual(readRun(child.id).after, [p.run.id], 'frozen on the record');
+  const c = board();
+  for (let pass = 0; pass < 3; pass++) {
+    const r = await advance(c.e, readRun(child.id));
+    assert.deepEqual([r.filed, c.filings, r.waiting], [[], [], [{ run: p.run.id }]], `pass ${pass + 1}`);
+  }
+  // The step does its work on its branch, and signs off: done by its own word, and still not on the base branch.
+  fs.writeFileSync(path.join(p.wt, 'parent.txt'), 'parent.txt\n');
+  gitIn(p.wt, 'add', '-A');
+  gitIn(p.wt, 'commit', '-q', '-m', 'add parent.txt');
+  assert.deepEqual((await advance(c.e, readRun(child.id))).filed, []);
+  assert.equal(parentOf(p.run.id).shipped, false);
+
+  assert.deepEqual((await list(c.e, readRun(child.id))).steps.map((s) => s.status), [`waiting on ${p.run.id}`, 'waiting']);
+  const d = await decide(c.e, child.id);
+  assert.deepEqual([d.waiting, d.offers, d.retrying, d.rounding], [[{ run: p.run.id }], [], [], []], '`wf decide` says the same, and offers nothing else');
+
+  // A person ships it.
+  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the parent', p.branch);
+  const tip = gitIn(repo, 'rev-parse', 'HEAD');
+  const r = await advance(c.e, readRun(child.id));
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+  const now = readRun(child.id);
+  assert.notEqual(child.baseRef, tip);
+  assert.equal(now.baseRef, tip, 'the base as it stands now, and not as it stood at `wf start`');
+  assert.equal(fs.readFileSync(path.join(now.steps.implement!.workspace!, 'parent.txt'), 'utf8'), 'parent.txt\n', "so the child's worktree has the parent's work");
+  assert.equal(gitIn(now.steps.implement!.workspace!, 'rev-parse', 'HEAD'), tip);
+});
+
+test('a parent merged and then its branch deleted: a run that started on the merge still files what follows — one that had not started cannot read the branch, says so, and is refused at `wf start`', async () => {
+  const repo = aRepo();
+  const p = await aParent(repo, 'parent.txt');
+  const early = start({ brief: 'the early child', repo, workflowDir: folder(), after: [p.run.id] });
+  const late = start({ brief: 'the late child', repo, workflowDir: folder(), after: [p.run.id] });
+  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the parent', p.branch);
+  const c = board();
+  assert.deepEqual((await advance(c.e, readRun(early.id))).filed, ['implement']);
+
+  // The merge stays, and the branch goes: `git branch -d` refuses a branch a worktree uses, so the worktree goes first.
+  gitIn(repo, 'worktree', 'remove', '--force', p.wt);
+  gitIn(repo, 'branch', '-q', '-d', p.branch);
+  assert.deepEqual(parentOf(p.run.id), { record: readRun(p.run.id), shipped: false, gone: [p.branch] });
+
+  c.settle(`${early.id}-implement`, 'succeeded', SIGNED);
+  const next = await advance(c.e, readRun(early.id));
+  assert.deepEqual([next.filed, next.waiting], [['review'], []], 'on the base is shipped, and a run that has started is never gated again');
+
+  // Git keeps no trace of the commits a deleted branch named, so a run with nothing filed cannot read whether they shipped.
+  const r = await advance(c.e, readRun(late.id));
+  assert.deepEqual([r.filed, r.waiting], [[], [{ run: p.run.id, gone: [p.branch] }]]);
+  assert.deepEqual((await list(c.e, readRun(late.id))).steps.map((s) => s.status), [`waiting on ${p.run.id} (${p.branch} gone)`, 'waiting']);
+  const before = runsWritten();
+  assert.throws(() => start({ brief: 'the latest child', repo, workflowDir: folder(), after: [p.run.id] }),
+    refusedWith(new RegExp(`^--after ${escaped(p.run.id)}: ${escaped(p.branch)} is gone, so the run cannot read whether`)));
+  assert.equal(runsWritten(), before);
+});
+
+test('REFUSED at shipped defaults: a run whose parent was cancelled files nothing, and `wf ls` and `wf decide` say `waiting on <parent> (cancelled)` and how to resolve it — which `wf cancel` does', async (t) => {
+  const repo = aRepo();
+  const p = await aParent(repo, 'parent.txt');
+  const child = start({ brief: 'the child of a cancelled run', repo, workflowDir: folder(), after: [p.run.id] });
+  const at = markCancelled(p.run.id);
+  const c = board();
+  for (let pass = 0; pass < 2; pass++) {
+    const r = await advance(c.e, readRun(child.id));
+    assert.deepEqual([r.filed, c.filings, r.waiting], [[], [], [{ run: p.run.id, cancelledAt: at }]]);
+  }
+
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['ls', child.id], c.e);
+  const ls = printed.join('\n');
+  assert.match(ls, new RegExp(`^   implement +waiting on ${escaped(p.run.id)} \\(cancelled\\) *$`, 'm'));
+  assert.match(ls, /^   review +waiting *$/m);
+  assert.match(ls, new RegExp(`→ waiting on you: ${escaped(p.run.id)} was cancelled at ${escaped(at)}, and a cancelled run never ships — yours to resolve: wf cancel ${escaped(child.id)}, or start the work again without --after ${escaped(p.run.id)}$`, 'm'));
+
+  printed.length = 0;
+  await main(['decide', child.id], c.e);
+  assert.deepEqual(printed.join('\n').split('\n').slice(1), [
+    '',
+    `  waiting on ${p.run.id} (cancelled)`,
+    `  ${p.run.id} was cancelled at ${at}, and a cancelled run never ships — yours to resolve: wf cancel ${child.id}, or start the work again without --after ${p.run.id}`,
+  ]);
+
+  // A person resolves it: the child called off waits on nothing, and files nothing.
+  assert.equal((await cancel(c.e, child.id)).plan.kind, 'cancel');
+  assert.deepEqual((await list(c.e, readRun(child.id))).steps.map((s) => s.status), ['waiting', 'waiting']);
+  assert.deepEqual([(await advance(c.e, readRun(child.id))).filed, c.filings], [[], []]);
+});
+
+test('REFUSED at `wf start`, before a run is written: --after an unknown run, a run given twice, another repository\'s run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run', async (t) => {
+  const repo = aRepo();
+  const p = await aParent(repo, 'parent.txt');
+  const other = await aParent(aRepo(), 'other.txt');
+  const called = await aParent(repo, 'called.txt');
+  markCancelled(called.run.id);
+  const direct = start({ brief: 'the direct parent', repo, workflowDir: oneStep(), isolate: false });
+  const before = runsWritten();
+  const starting = (...after: string[]) => () => start({ brief: 'a child', repo, workflowDir: folder(), after });
+
+  assert.throws(starting('no-such-run-zz9z'), refusedWith(/^--after no-such-run-zz9z: the store has no run no-such-run-zz9z\./));
+  assert.throws(starting(p.run.id, p.run.id), refusedWith(new RegExp(`^--after ${escaped(p.run.id)} is given twice`)));
+  assert.throws(starting(other.run.id), refusedWith(new RegExp(`^--after ${escaped(other.run.id)}: ${escaped(other.run.id)} works on ${escaped(other.run.repo)}, and this run on ${escaped(repo)}\\.`)));
+  assert.throws(starting(called.run.id), refusedWith(/was cancelled at .*, and a cancelled run never ships, so this run would wait for ever\./));
+  assert.throws(starting(direct.id), refusedWith(/\(--no-worktree\), so it has no result branch to ship/));
+  gitIn(repo, 'checkout', '-q', '-b', 'elsewhere');
+  assert.throws(starting(p.run.id), refusedWith(new RegExp(`ships onto ${escaped(p.run.branch)}, and this run would start from elsewhere`)));
+  gitIn(repo, 'checkout', '-q', p.run.branch);
+  assert.equal(runsWritten(), before, 'no run written');
+
+  const { main } = await import('../src/cli.ts');
+  const typed = (...flags: string[]) => main(['start', 'a child', '--workflows', folder(), '--repo', repo, ...flags]);
+  await assert.rejects(typed('--after'), refusedWith(/^--after takes the run this one waits on, by its id/));
+  await assert.rejects(typed('--after', '--no-worktree'), refusedWith(/^--after takes the run this one waits on/));
+  await assert.rejects(typed('--after', p.run.id, '--after', p.run.id), refusedWith(/is given twice/));
+  assert.equal(runsWritten(), before, 'nor by the CLI');
+
+  // Allowed: as often as there are runs to wait on; and without --after the record is what it was.
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const second = await aParent(repo, 'second.txt');
+  await typed('--after', p.run.id, '--after', second.run.id);
+  const id = printed[0]!.split(' ')[0]!;
+  assert.deepEqual(readRun(id).after, [p.run.id, second.run.id]);
+  assert.match(printed.join('\n'), new RegExp(`^waits on: ${escaped(p.run.id)}, ${escaped(second.run.id)} — nothing is filed until each is on ${escaped(p.run.branch)}$`, 'm'));
+  printed.length = 0;
+  await typed();
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${printed[0]!.split(' ')[0]}.json`), 'utf8')), 'after'), false);
 });

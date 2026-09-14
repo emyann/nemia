@@ -445,3 +445,59 @@ test('in a live fold with nothing said after it, every call still waiting is run
   assert.deepEqual(states(false, true), ['no-result', 'no-result']);
   assert.deepEqual(states(true, false), ['no-result', 'no-result']);
 });
+
+type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
+
+/** A step of a workflow no run has started, as the Workflows page draws it: in the step node's spec mode. */
+async function specMarkup(spec: WorkflowStepSpec): Promise<string> {
+  const { SpecNode } = await import('../src/components/StepNode.tsx');
+  const props = {
+    id: 'review', type: 'spec' as const, data: { name: 'review', index: 1, spec }, selected: false, dragging: false, zIndex: 0,
+    isConnectable: false, positionAbsoluteX: 0, positionAbsoluteY: 0, selectable: false, deletable: false, draggable: false,
+  };
+  return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(SpecNode, props)));
+}
+
+const unset: WorkflowStepSpec = {
+  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null,
+  deadlineSeconds: null, maxAttempts: null, check: null, retries: null, output: null, loop: null, rounds: null,
+};
+
+const unescaped = (text: string) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
+
+test("a workflow's step is drawn in the spec mode: what it runs on, its check, tools, mode and loop — and no status chip, no attempt", async () => {
+  const html = await specMarkup({
+    ...unset, harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash'], permissionMode: 'dontAsk',
+    check: 'npm test && npm run typecheck', output: 'review.schema.json', loop: 'implement', rounds: 3,
+  });
+  assert.match(html, />step 02</);
+  assert.match(html, /title="review">review</);
+  assert.match(html, />claude · opus</);
+  const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2]!)]);
+  assert.deepEqual(lines, [
+    ['check', 'npm test && npm run typecheck'],
+    ['tools', 'Read, Grep, Glob, Bash'],
+    ['mode', 'dontAsk'],
+    ['loop', 'implement · 3 rounds'],
+  ], html);
+
+  // Nothing has happened to it: no chip, no attempt, no gate, no spinner — none of what a run's step shows below its head.
+  assert.doesNotMatch(html, /data-state=/, html);
+  assert.doesNotMatch(html, /no attempt yet|>#\d/, html);
+  assert.equal(gateDrawn(html), false, html);
+  assert.doesNotMatch(html, /running now/, html);
+
+  // Its handles are a run's step's, in the same order, so an edge meets it where it meets a run's step.
+  const handles = [...html.matchAll(/<div (?:data-handleid="([^"]*)" )?data-handlepos="(\w+)"[^>]*class="[^"]*\b(source|target)\b/g)].map((m) => [m[3], m[2], m[1] ?? null]);
+  assert.deepEqual(handles, [['target', 'left', null], ['source', 'right', null], ['source', 'bottom', LOOP_SOURCE], ['target', 'bottom', LOOP_TARGET]], html);
+});
+
+test('a step that sets nothing is drawn on the defaults, with no lines under its head', async () => {
+  const html = await specMarkup(unset);
+  assert.match(html, />default harness · default model</);
+  assert.doesNotMatch(html, /<dl/, html);
+  assert.doesNotMatch(html, /data-state=/, html);
+
+  const { specLines } = await import('../src/components/StepNode.tsx');
+  assert.deepEqual(specLines({ ...unset, loop: 'implement', rounds: 1 }), [['loop', 'implement · 1 round']]);
+});

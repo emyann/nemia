@@ -5,7 +5,8 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 
 // Where `/api` goes, for `vite` and `vite preview` alike: the api `npm run dev` starts, unless
 // `HKB_API_URL` names another — `npm run e2e` starts one on a free port, beside whatever a person runs.
-const api = process.env.HKB_API_URL ?? 'http://localhost:8787';
+// By number, as the api listens (apps/api/src/port.ts): `localhost` can be ::1 first, where nothing does.
+const api = process.env.HKB_API_URL ?? 'http://127.0.0.1:8787';
 
 export default defineConfig({
   // The router plugin generates src/routeTree.gen.ts, so it runs before React's.

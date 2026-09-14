@@ -1,5 +1,5 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
-import type { RunDetail } from '../lib/api';
+import type { RunDetail, WorkflowStepSpec } from '../lib/api';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { isGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
@@ -53,7 +53,7 @@ export function StepNode({
           <span
             className={`font-mono text-[10px] uppercase tracking-wider ${gate ? 'text-amber-700 dark:text-amber-400' : 'text-neutral-500'}`}
           >
-            {gate ? 'human gate' : `step ${String(index + 1).padStart(2, '0')}`}
+            {gate ? 'human gate' : stepLabel(index)}
           </span>
           {running && (
             <span
@@ -67,7 +67,7 @@ export function StepNode({
           {step.name}
         </p>
         <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
-          {spec ? `${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}` : 'no spec'}
+          {spec ? runsOn(spec) : 'no spec'}
         </p>
       </div>
 
@@ -89,6 +89,73 @@ export function StepNode({
         Under the node, where the edge back that `loop:` makes leaves its looping step and comes into its target (`StateEdge`).
         Last, so an edge that names no handle takes the one on the side: React Flow takes the first of a type.
       */}
+      <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
+      <Handle id={LOOP_TARGET} type="target" position={Position.Bottom} isConnectable={false} className="opacity-0" />
+    </div>
+  );
+}
+
+/** A step's place in its workflow's order, as its node heads it: `step 01`. */
+const stepLabel = (index: number): string => `step ${String(index + 1).padStart(2, '0')}`;
+
+/** What a step runs on, as its node says it: the harness and the model, or that it takes the default. */
+const runsOn = (spec: { harness: string | null; model: string | null }): string =>
+  `${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}`;
+
+/** A step of a workflow no run has started: `index` is its place in the workflow's order, `spec` what its frontmatter sets. */
+export type SpecNodeData = { name: string; index: number; spec: WorkflowStepSpec };
+export type SpecFlowNode = Node<SpecNodeData, 'spec'>;
+
+/**
+ * What a step is set to do beyond what it runs on, as its node lists it: its check, its tools, its permission mode and its
+ * loop, each only when the step sets it. The rest of its keys are on the step's file.
+ */
+export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: string]> {
+  const lines: Array<[string, string]> = [];
+  if (spec.check) lines.push(['check', spec.check]);
+  if (spec.tools) lines.push(['tools', spec.tools.join(', ')]);
+  if (spec.permissionMode) lines.push(['mode', spec.permissionMode]);
+  if (spec.loop) lines.push(['loop', `${spec.loop} · ${spec.rounds} ${spec.rounds === 1 ? 'round' : 'rounds'}`]);
+  return lines;
+}
+
+/**
+ * The step node in its spec mode, for a workflow before any run of it: the frame, the head and the handles a run's step has,
+ * and where a run's step has its status and its attempt, what the step is set to do (`specLines`). No status and no
+ * attempt: nothing has happened to it.
+ */
+export function SpecNode({ data: { name, index, spec }, sourcePosition = Position.Right, targetPosition = Position.Left }: NodeProps<SpecFlowNode>) {
+  const lines = specLines(spec);
+
+  return (
+    <div
+      data-spec
+      className="w-56 overflow-hidden rounded-md border border-neutral-300 bg-white text-neutral-900 shadow-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-100"
+    >
+      <Handle type="target" position={targetPosition} isConnectable={false} className="opacity-0" />
+
+      <div className="px-3 pt-2 pb-2">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-neutral-500">{stepLabel(index)}</span>
+        <p className="mt-0.5 truncate text-sm font-semibold" title={name}>
+          {name}
+        </p>
+        <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">{runsOn(spec)}</p>
+      </div>
+
+      {lines.length > 0 && (
+        <dl className="space-y-0.5 border-t border-neutral-200 px-3 py-1.5 text-[11px] dark:border-neutral-800">
+          {lines.map(([label, value]) => (
+            <div key={label} className="flex min-w-0 gap-1.5">
+              <dt className="shrink-0 text-neutral-500">{label}</dt>
+              {/* Wrapped rather than cut to one line: a check is a command a person reads whole. Three lines, then the title. */}
+              <dd className="line-clamp-3 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={value}>{value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+
+      {/* The handles a run's step has, in its order (`StepNode`), so an edge meets a step here where it meets it on a run. */}
+      <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
       <Handle id={LOOP_TARGET} type="target" position={Position.Bottom} isConnectable={false} className="opacity-0" />
     </div>

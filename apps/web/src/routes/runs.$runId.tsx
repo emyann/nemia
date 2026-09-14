@@ -5,6 +5,7 @@ import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
+import { WorkflowLink } from '../components/WorkflowLink';
 import { runQuery, type RunDetail } from '../lib/api';
 
 export const Route = createFileRoute('/runs/$runId')({
@@ -53,7 +54,10 @@ function Run({ run }: { run: RunDetail }) {
         </p>
       )}
 
-      <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
+      <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
+        <WorkflowLink dir={run.workflowDir} />
+      </header>
 
       <section aria-label="The run's steps as a graph" className="flex flex-col gap-4 md:flex-row">
         <div className="min-w-0 flex-1">

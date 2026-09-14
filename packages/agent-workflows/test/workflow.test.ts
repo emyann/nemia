@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fansOut, loadWorkflows, terminalSteps, parseWorkflow, validate, WorkflowError, type Workflow } from '../src/workflow.ts';
+import { fansOut, loadWorkflows, terminalSteps, parseWorkflow, validate, workflowDescription, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
@@ -90,6 +90,69 @@ test('an empty or missing folder says so', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-'));
   assert.throws(() => loadWorkflows(dir), /no \.md steps/);
   assert.throws(() => loadWorkflows(path.join(dir, 'nope')), /no workflow folder/);
+});
+
+/** A folder holding `files`, by name. */
+const folder = (files: Record<string, string>): string => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-readme-'));
+  for (const [name, text] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+    fs.writeFileSync(path.join(dir, name), text);
+  }
+  return dir;
+};
+
+/** What `loadWorkflows` refused `dir` with; fails the test if it loaded. */
+const folderRefusal = (dir: string): WorkflowError => {
+  try { loadWorkflows(dir); } catch (e) {
+    assert.ok(e instanceof WorkflowError, String(e));
+    return e;
+  }
+  return assert.fail(`${dir} loaded, and should have been refused`);
+};
+
+test("a README in a workflow folder is not a step, and its first paragraph is the workflow's description", () => {
+  const dir = folder({
+    // A title, then the paragraph, then more.
+    'README.md': '# dev\n\nImplement what was asked,\nthen review it.\n\nA second paragraph.\n',
+    'implement.md': '---\nharness: claude\n---\nImplement it.\n',
+    'review.md': '---\nafter: implement\n---\nReview it.\n',
+  });
+  assert.deepEqual(loadWorkflows(dir).map((s) => s.name), ['implement', 'review']);
+  assert.equal(workflowDescription(dir), 'Implement what was asked, then review it.');
+
+  // Any case, and with frontmatter a step would be refused for (`title` is not a key a step has): skipped, not parsed,
+  // and the frontmatter is not the description.
+  const lower = folder({ 'readme.md': '---\ntitle: ui\n---\nA change a person will see.\n', 'implement.md': 'Implement it.\n' });
+  assert.deepEqual(loadWorkflows(lower).map((s) => s.name), ['implement']);
+  assert.equal(workflowDescription(lower), 'A change a person will see.');
+
+  // No README, or one with only a title: no description.
+  assert.equal(workflowDescription(folder({ 'implement.md': 'Implement it.\n' })), null);
+  assert.equal(workflowDescription(folder({ 'README.md': '# dev\n', 'implement.md': 'Implement it.\n' })), null);
+  assert.equal(workflowDescription(path.join(os.tmpdir(), 'wf-no-such-folder')), null);
+});
+
+test('REFUSED: a folder with a README and no step, as a folder with no step is — saying the README is not one', () => {
+  for (const readme of ['README.md', 'Readme.md']) {
+    const e = folderRefusal(folder({ [readme]: '# dev\n\nImplement, then review.\n' }));
+    assert.equal(e.exitCode, 2);
+    assert.match(e.message, /has no \.md steps in it/);
+    assert.ok(e.message.includes(`${readme} describes the workflow, and is not a step`), e.message);
+  }
+});
+
+test('REFUSED: a folder of workflows is not a workflow, and the refusal names the ones in it', () => {
+  const dir = folder({
+    'dev/README.md': '# dev\n',
+    'dev/implement.md': 'Implement it.\n',
+    'ui/implement.md': 'Implement it.\n',
+    // A folder with only a README holds no workflow to name.
+    'notes/README.md': '# notes\n',
+  });
+  const e = folderRefusal(dir);
+  assert.equal(e.exitCode, 2);
+  assert.ok(e.message.includes(`it holds workflows, each a folder of steps: dev, ui. Name one of them: ${path.join(dir, 'dev')}.`), e.message);
 });
 
 test('resume implies after — you cannot continue a session that has not run', () => {

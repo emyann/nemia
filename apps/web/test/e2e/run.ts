@@ -3,7 +3,7 @@
  *
  *  1. Builds the web app.
  *  2. Seeds a store in a temporary WF_ROOT with three fake runs, and beside it a checkout for the api to serve
- *     (`HKB_REPO`) on the Capabilities page (seed.ts).
+ *     (`HKB_REPO`) on the Capabilities page, and workflows in both for the Workflows page (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
  *     as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers and beside
@@ -24,7 +24,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectBeneath, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout, SESSION } from './seed.ts';
+import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -40,6 +40,7 @@ async function sidebar(page: Page): Promise<void> {
   const menu = page.locator('[data-sidebar="sidebar"]');
   await expectVisible(menu.getByRole('link', { name: 'Factory' }), 'the sidebar has Factory');
   await expectVisible(menu.getByRole('link', { name: 'Runs' }), 'the sidebar has Runs');
+  await expectVisible(menu.getByRole('link', { name: 'Workflows' }), 'the sidebar has Workflows');
   await expectVisible(menu.getByRole('link', { name: 'Capabilities' }), 'the sidebar has Capabilities');
 }
 
@@ -227,6 +228,12 @@ const PAGES: PageSpec[] = [
       await expectVisible(row, `the runs list has a row for ${FAKE.id}`);
       await expectVisible(row.getByText(`waiting on you: ${FAKE.waitingOnYou.join(', ')}`), `the row says ${FAKE.waitingOnYou.join(' and ')} are waiting on you`);
       await expectVisible(row.locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }), `the row shows ${FAKE.refused}'s refused check as a red chip`);
+      // Beside the run's link, not inside it: a link inside a link is not HTML.
+      await expectVisible(
+        page.locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) }).locator(`a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
+        `the row names the workflow the run was started from (${FAKE.workflow}), linked to the Workflows page`,
+      );
+      await expectCount(row.locator('a'), 0, "the run's link has no link inside it");
       const loop = page.locator(`li a[href="/runs/${LOOPING.id}"]`);
       await expectVisible(loop.getByText(`waiting on you: ${LOOPING.exhausted}`), `the runs list says ${LOOPING.exhausted}, out of rounds, is waiting on you`);
       await expectVisible(
@@ -240,6 +247,10 @@ const PAGES: PageSpec[] = [
     route: `/runs/${FAKE.id}`,
     expect: async (page) => {
       await sidebar(page);
+      await expectVisible(
+        page.locator(`article header a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
+        `the run's header names its workflow (${FAKE.workflow}), linked to the Workflows page`,
+      );
       const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
       await expectCount(graph.locator('.react-flow__node'), FAKE.steps.length, `the run's graph has a node per step (${FAKE.steps.join(', ')})`);
       for (const step of FAKE.steps) await expectVisible(graph.locator(`.react-flow__node[data-id="${step}"]`), `the graph has ${step}`);
@@ -391,6 +402,54 @@ const PAGES: PageSpec[] = [
     },
   },
   {
+    name: 'workflows',
+    route: '/workflows',
+    expect: async (page) => {
+      await sidebar(page);
+      await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Workflows' }), 'the sidebar lights Workflows on its page');
+      const { good, broken, yours } = WORKFLOWS;
+      const card = (name: string) => page.locator(`section[aria-label="Workflow ${name}"]`);
+      await expectCount(page.locator('section[aria-label^="Workflow "]'), 3, "a card per workflow: the checkout's two, and yours");
+
+      const dev = card(good.name);
+      await expectVisible(dev.getByText(good.description, { exact: true }), `${good.name} with its README's first paragraph`);
+      await expectVisible(dev.getByText('this repository', { exact: true }), `${good.name} is marked as the repository's`);
+      const graph = dev.locator('.react-flow');
+      const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);
+      await expectCount(graph.locator('.react-flow__node'), good.steps.length, `${good.name}'s graph has a node per step (${good.steps.join(', ')})`);
+      for (const step of good.steps) await expectVisible(node(step).getByText(good.runsOn, { exact: true }), `${step}'s node says what it runs on (${good.runsOn})`);
+      await expectVisible(node('implement').getByText(good.check, { exact: true }), `implement's node shows its check (${good.check})`);
+      await expectVisible(node('review').getByText(good.tools, { exact: true }), `review's node shows its tools (${good.tools})`);
+      await expectVisible(node('review').getByText(good.loop, { exact: true }), `review's node shows its loop and its rounds (${good.loop})`);
+      // Chips only: since B5 an edge's path carries `data-state` too, so the count is taken inside the nodes.
+      await expectCount(graph.locator('.react-flow__node [data-state]'), 0, 'a step no run has started has no status chip');
+      await expectCount(graph.getByText(/no attempt yet|^#\d/), 0, 'nor an attempt');
+      await expectCount(graph.locator('.react-flow__edge'), 2, "the graph's two edges: implement → review, and the edge back");
+      await expectVisible(graph.locator('.react-flow__edge[data-id="loop:review->implement"] .react-flow__edge-path'), "the edge back that review's loop makes");
+      await settled(page);
+      await expectInside(graph.locator('.react-flow__node'), graph, "every step is inside its card's graph");
+
+      // Start is not pressed: a run started here would be on every page visited after this one, and a refusal is an answer
+      // of 422, which the visit counts against the page. The api's tests start a run of a workflow, and refuse one.
+      const brief = dev.getByRole('textbox', { name: 'Start a run' });
+      const start = dev.getByRole('button', { name: 'Start' });
+      await expectVisible(brief, `${good.name} has a box for the brief`);
+      await expectVisible(start, `${good.name} has a Start button`);
+      if (await start.isEnabled()) throw new Refused('Start is disabled while there is no brief — it was enabled with none');
+      await brief.fill('Give the board a legend');
+      if (!(await start.isEnabled())) throw new Refused('Start is enabled once a brief is written — it stayed disabled');
+
+      const bad = card(broken.name);
+      await expectVisible(bad.getByText(broken.error), `a folder the loader refuses shows the refusal (${broken.error})`);
+      await expectCount(bad.getByRole('button', { name: 'Start' }), 0, 'a folder the loader refuses cannot start');
+      await expectCount(bad.locator('textarea, .react-flow'), 0, 'and has no brief box and no graph');
+
+      const mine = card(yours.name);
+      await expectVisible(mine.getByText('yours', { exact: true }), `${yours.name}, under workflows/ in the store, is marked as yours`);
+      await expectCount(mine.locator('.react-flow__node'), yours.steps.length, `${yours.name}'s graph has its one step`);
+    },
+  },
+  {
     name: 'capabilities',
     route: '/capabilities',
     expect: async (page) => {
@@ -510,6 +569,7 @@ async function main(): Promise<void> {
   seed(store);
   const checkout = path.join(store, 'checkout');
   seedCheckout(checkout, path.join(API, 'test', 'fixtures', 'mcp-server.ts'));
+  seedWorkflows(checkout, store);
   // A `claude` that sees no sessions, first on the api's PATH. The engine observes `claude agents` on every
   // list; the pages are about the store, not about the sessions on this machine. And where Claude Code keeps its
   // transcripts, in the store (CLAUDE_CONFIG_DIR): the engine reads a session's conversation from there, never from this machine's.
@@ -518,11 +578,11 @@ async function main(): Promise<void> {
   fs.writeFileSync(path.join(bin, 'claude'), "#!/bin/sh\necho '[]'\n", { mode: 0o755 });
 
   const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API,
-    {
+{
       ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
       PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
     },
-    /api listening on http:\/\/localhost:(\d+)/);
+    /api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   const base = await startServer('vite preview', [vite, 'preview', '--port', '0', '--host', '127.0.0.1'], WEB,
     { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },
     /Local:\s+(http:\/\/[^\s/]+)/);

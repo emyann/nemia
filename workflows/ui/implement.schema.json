@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "properties": {
+    "screenshots": {
+      "type": "array",
+      "description": "The absolute paths of the PNGs you looked at, in the directory named under Files for the steps after you: each page, in a light and a dark theme.",
+      "items": { "type": "string" }
+    },
+    "pages": {
+      "type": "array",
+      "description": "The routes the screenshots show, such as / and /runs.",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["screenshots", "pages"],
+  "additionalProperties": false
+}

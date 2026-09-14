@@ -68,6 +68,15 @@ output: review.schema.json # what its closeout declares for a later step: a JSON
 Review the changes on this branch. Be specific about correctness, not style.
 ```
 
+Every `.md` in the folder is a step but its `README.md` (in any case), which says what the workflow is
+for: its first paragraph, past a heading, is the description the board lists the workflow with
+(`workflowDescription`). A folder with a README and no step is refused as a folder with no step is.
+A repository carries its workflows checked in, one folder each under `<repo>/workflows/`, as
+`.github/workflows/` holds a repository's CI — this one has `dev`, `dev-build` and `ui` there — and
+`wf start <brief> --workflows workflows/dev` picks one. The board lists them, and the folders under
+`~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
+`GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
+
 A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `effort`,
 `permissionMode`, `tools`, `deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value

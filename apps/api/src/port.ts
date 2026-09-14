@@ -2,6 +2,13 @@
 export const DEFAULT_PORT = 8787;
 
 /**
+ * The address the api listens on: this machine's loopback, and nothing else. On every interface — `serve`'s default — anyone
+ * on the network could start a run (`POST /api/runs`), whose brief an agent acts on in the repository once `wf up` files it.
+ * The board reaches the api through vite's proxy, which runs on this machine too (vite.config.ts).
+ */
+export const HOST = '127.0.0.1';
+
+/**
  * `PORT`, read. Unset or empty is 8787. `0` is any free port, and main.ts prints the one it got — which
  * is how `npm run e2e` starts an api beside a person's `npm run dev`, and beside another worktree's e2e.
  *

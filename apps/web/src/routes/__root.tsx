@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { createRootRouteWithContext, Link, Outlet, useMatches, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
-import { Blocks, Factory, List, Workflow } from 'lucide-react';
+import { Blocks, Factory, List, Waypoints, Workflow } from 'lucide-react';
 import {
   Sidebar,
   SidebarContent,
@@ -24,10 +24,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   component: Root,
 });
 
-/** The menu. Runs is lit on a run's page too: the list is where a run is reached from. */
+/** The menu. Runs is lit on a run's page too: the list is where a run is reached from. Workflows, after it, is where one starts. */
 const NAV = [
   { to: '/', label: 'Factory', icon: Factory, active: (path: string) => path === '/' },
   { to: '/runs', label: 'Runs', icon: List, active: (path: string) => path === '/runs' || path.startsWith('/runs/') },
+  { to: '/workflows', label: 'Workflows', icon: Waypoints, active: (path: string) => path === '/workflows' },
   { to: '/capabilities', label: 'Capabilities', icon: Blocks, active: (path: string) => path === '/capabilities' },
 ] as const;
 

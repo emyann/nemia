@@ -255,3 +255,44 @@ test("a diff is cut a file at a time: named by its header, a rename as both ends
   ]);
   assert.equal(files[2]!.lines.at(-1), long[DIFF_LINES - 6]);
 });
+
+test("a run `assess` calls running while a step waits on a person is decided on: its terminal steps' branches read, and no command yet", async () => {
+  // The one way there: a record from before runs froze their workflow, whose folder has since lost implement. The tick judges
+  // the folder, whose tokens still runs; implement, on the record and signed off blocked, waits on you all the same.
+  const folder = fs.mkdtempSync(path.join(root, 'workflow-'));
+  fs.writeFileSync(path.join(folder, 'tokens.md'), '---\nharness: codex\n---\nPick the colour tokens.\n');
+  branchOff(repo, 'wf/r-d6/implement', () => write(repo, 'package.json', `${JSON.stringify({ name: 'app', workspaces: ['packages/*'] })}\n`));
+  branchOff(repo, 'wf/r-d6/tokens', () => write(repo, 'packages/x/docs/notes.md', 'what is left\n'));
+  settledTask('t-d6-implement', blocked);
+  journal('t-d6-tokens', [filed('t-d6-tokens'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
+  writeRun({
+    id: 'r-d6', repo, baseRef: base, workflowDir: folder, workflow: undefined,
+    steps: { implement: { taskId: 't-d6-implement', branch: 'wf/r-d6/implement' }, tokens: { taskId: 't-d6-tokens', branch: 'wf/r-d6/tokens' } },
+  });
+  const detail = await (await app.request('/api/runs/r-d6')).json();
+  assert.deepEqual([detail.status, detail.waitingOnYou], ['running', ['implement']], detail.warning);
+
+  const { status, body } = await decisionOf('r-d6');
+  assert.equal(status, 200);
+  assert.ok(!('running' in body), 'waiting on you is decidable, whatever `assess` calls the run');
+  // The branch of the terminal step the tick judges, as `wf decide` reads a run once it stops — not implement's.
+  assert.deepEqual(body.touched.map((t: { branch: string }) => t.branch), ['wf/r-d6/tokens']);
+  assert.deepEqual(body.touched[0].radius.groups, [{ name: 'packages/x', files: 1, added: 1, removed: 0, binary: 0 }]);
+  assert.deepEqual(body.lesson, { said: 'packages/x/docs/notes.md +1 −0', state: 'written' });
+  assert.deepEqual(body.sensitive, [{ branch: 'wf/r-d6/tokens', files: [], error: null }]);
+  // `decision` is still `running`: no ship, drop or once more is offered while its steps move.
+  assert.deepEqual(body.commands, []);
+
+  // The fan-out the same steps make when the run froze them is not this: implement blocked with tokens still spawned is
+  // `failed` to `assess`, so the decision is `wf decide`'s own, its result branches both roots'.
+  writeRun({
+    id: 'r-d7', repo, baseRef: base,
+    workflow: [{ name: 'implement', after: [], body: 'Implement it.' }, { name: 'tokens', after: [], body: 'Pick the colour tokens.' }],
+    steps: { implement: { taskId: 't-d6-implement', branch: 'wf/r-d6/implement' }, tokens: { taskId: 't-d6-tokens', branch: 'wf/r-d6/tokens' } },
+  });
+  const fanOut = await (await app.request('/api/runs/r-d7')).json();
+  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['failed', true, ['implement']]);
+  const decided = (await decisionOf('r-d7')).body;
+  assert.deepEqual(decided.touched.map((t: { branch: string }) => t.branch), ['wf/r-d6/implement', 'wf/r-d6/tokens']);
+  assert.deepEqual(decided.commands.map((c: { label: string }) => c.label), ['once more', 'ship it', 'drop it']);
+});

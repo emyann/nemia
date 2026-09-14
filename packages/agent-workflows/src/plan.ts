@@ -1,0 +1,203 @@
+/**
+ * A plan is a folder of cards. That is the whole format, one level up from a workflow.
+ *
+ * Each file is one card, and a card is one run: its frontmatter says which workflow runs it and which cards' runs must ship before
+ * it starts, and its body is the run's brief — in prose, as a person describing the plan would say it.
+ *
+ *     ---
+ *     workflow: dev
+ *     after: b, c
+ *     ---
+ *     Put the flag on the settings page, now that it is parsed and stored.
+ *
+ * `wf plan <folder>` starts every card, parents first (`planOrder`), each `--after` the runs its `after:` names. The waiting is the
+ * tick's, and every card is still a decision at its own `wf decide`. Nothing records the plan: the runs and their `after` are the plan.
+ * A `README.md` beside the cards says what the plan is for, and is not a card.
+ *
+ * **The keys are a closed list**, as a step's are, and for the same reason: `afer: a` read as no `after` would start the card at once,
+ * beside the run it was written to wait for. Refused by name, with the fix, before anything is started.
+ *
+ * Pure: handed the folder's files, never reading one (`readPlan` in runner.ts reads them).
+ */
+import { isReadme, splitFrontmatter, WorkflowError } from './workflow.ts';
+
+/** One entry of a plan folder: its name there — a folder inside it with a trailing `/` — and, for a `.md` file, its text. */
+export type PlanFile = { file: string; text: string };
+
+export type Card = {
+  /** The card's name — its file's, minus `.md`. What another card's `after:` names. */
+  name: string;
+  /** Its file's name in the plan folder, as a refusal names it. */
+  file: string;
+  /** The workflow its run is started on, as written: a name under `<repo>/workflows/`, or a path relative to the plan folder. */
+  workflow: string;
+  /** The cards whose runs must ship before this one's roots are filed, as written. `[]` starts at once. */
+  after: string[];
+  /** Everything below the frontmatter: the run's brief. */
+  body: string;
+};
+
+/** Every key a card may set. Anything else is refused by name: how a card's steps run is its workflow's to say. */
+export const CARD_KEYS = ['workflow', 'after'] as const;
+type CardKey = (typeof CARD_KEYS)[number];
+
+function refuse(why: string): never {
+  throw new WorkflowError(why);
+}
+
+const isCardKey = (key: string): key is CardKey => (CARD_KEYS as readonly string[]).includes(key);
+
+/**
+ * A plan folder's cards, sorted by name, from its files — or refused, naming the file and the fix: a file that is not markdown, a folder with
+ * no card, a key a card does not have (or set twice, or to nothing), a card with no `workflow:` or an empty body, and an `after:` naming a
+ * card twice. Edges are `planOrder`'s: an `after:` naming a card the folder does not have, or the card itself, and a cycle. `where` is what a
+ * refusal calls the folder.
+ *
+ * Whether each card's workflow loads is not read here, since that is a folder on disk: `startPlan` in runner.ts asks, card by card, before
+ * the first run is started.
+ */
+export function parsePlan(files: readonly PlanFile[], where = 'the plan folder'): Card[] {
+  const stray = files.map((f) => f.file).filter((f) => !f.endsWith('.md') && !isReadme(f)).sort();
+  if (stray.length) {
+    const one = stray.length === 1;
+    refuse(`${stray.join(', ')} in ${where}: ${one ? 'not a card' : 'not cards'}. A plan folder holds one markdown file per card, <card>.md, and a README.md that says what the plan is for. Move ${one ? 'it' : 'them'} out of the folder, or, for a card, name it <card>.md.`);
+  }
+  const cardFiles = files.filter((f) => !isReadme(f.file)).sort((a, b) => a.file.localeCompare(b.file));
+  if (!cardFiles.length) {
+    const readme = files.find((f) => isReadme(f.file));
+    refuse(`${where} has no cards in it${readme ? ` — ${readme.file} says what the plan is for, and is not a card` : ''}. A card is one markdown file, <card>.md: \`workflow:\` in its frontmatter, and its run's brief below. Write the first: a.md, say.`);
+  }
+  const cards = cardFiles.map((f) => parseCard(f.file, f.text));
+  planOrder(cards);
+  return cards;
+}
+
+/** One card, from its file's text. */
+function parseCard(file: string, text: string): Card {
+  const { block, body } = splitFrontmatter(file, text);
+  const keys = block === null ? {} : readCardKeys(file, block);
+  if (keys.workflow === undefined) {
+    refuse(`${file}: no \`workflow:\`, so nothing says what runs this card. Name it in the frontmatter: \`workflow: dev\`, a folder under the repository's workflows/, or a path to a workflow folder, relative to the plan folder.`);
+  }
+  if (!body) refuse(`${file}: the body is empty. A card's body is its run's brief — what the run is asked to do — and a card with nothing to ask is not a card. Write it below the frontmatter.`);
+  const after = keys.after === undefined ? [] : keys.after.split(',').map((s) => s.trim()).filter(Boolean);
+  if (keys.after !== undefined && !after.length) {
+    refuse(`${file}: \`after: ${keys.after}\` names no card. List the cards whose runs ship first, comma-separated — \`after: a, b\` — or delete the line, and the card starts at once.`);
+  }
+  const twice = after.find((a, i) => after.indexOf(a) !== i);
+  if (twice) refuse(`${file}: \`after: ${keys.after}\` names ${twice} twice. A card waits on another once: name each card once.`);
+  return { name: file.slice(0, -'.md'.length), file, workflow: keys.workflow!, after, body };
+}
+
+/** A card's frontmatter as key → value: every line a key a card has, set once, to something. */
+function readCardKeys(file: string, block: string): Partial<Record<CardKey, string>> {
+  const keys: Partial<Record<CardKey, string>> = {};
+  for (const raw of block.split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const i = line.indexOf(':');
+    if (i <= 0) refuse(`${file}: \`${line}\` is not \`key: value\`. Each frontmatter line is a key, a colon and its value, and a list stays on one line: \`after: a, b\`.`);
+    const key = line.slice(0, i).trim();
+    const value = line.slice(i + 1).trim();
+    if (!isCardKey(key)) {
+      refuse(`${file}: \`${key}\` is not a key a card has. A card's keys are: ${CARD_KEYS.join(', ')} — what runs it, and what ships first; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`);
+    }
+    if (Object.hasOwn(keys, key)) {
+      refuse(`${file}: \`${key}\` is set twice, and a card that says two things says nothing. Keep one line${key === 'after' ? ' and list every card on it: `after: a, b`' : ''}.`);
+    }
+    if (!value) refuse(`${file}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
+    keys[key] = value;
+  }
+  return keys;
+}
+
+/**
+ * The cards in the order `wf plan` starts them: every card after each card its `after:` names, and among the cards that may go next, by
+ * name. Refused when that order cannot be: an `after:` naming a card the plan does not have, or the card itself, and cards that wait on
+ * each other, named round the cycle — none of them could ever start.
+ */
+export function planOrder(cards: readonly Card[]): Card[] {
+  const names = new Set(cards.map((c) => c.name));
+  for (const card of cards) {
+    for (const a of card.after) {
+      if (a === card.name) refuse(`${card.file}: \`after: ${card.after.join(', ')}\` names this card. A card waits on other cards' runs to ship: delete ${a} from the line.`);
+      if (!names.has(a)) {
+        const bare = a.endsWith('.md') && names.has(a.slice(0, -'.md'.length)) ? ` A card is named without its .md: \`${a.slice(0, -'.md'.length)}\`.` : '';
+        refuse(`${card.file}: \`after: ${card.after.join(', ')}\` names ${a}, and the plan has no card ${a}.${bare} Its cards are: ${[...names].sort().join(', ')}. Correct the name, or delete it from the line.`);
+      }
+    }
+  }
+  const order: Card[] = [];
+  const placed = new Set<string>();
+  const pending = [...cards].sort((a, b) => a.name.localeCompare(b.name));
+  while (pending.length) {
+    const next = pending.findIndex((c) => c.after.every((a) => placed.has(a)));
+    if (next < 0) {
+      const cycle = cycleIn(pending);
+      refuse(`${cycle.map((c) => c.file).join(', ')} wait on each other — ${cycle.map((c, i) => `${c.name} after ${cycle[(i + 1) % cycle.length]!.name}`).join(', ')} — so none of them could ever start. Take one of those cards out of the other's \`after:\`.`);
+    }
+    const [card] = pending.splice(next, 1);
+    order.push(card!);
+    placed.add(card!.name);
+  }
+  return order;
+}
+
+/**
+ * A cycle among cards none of which can go next. Each waits on a card still among them — the plan has every card named, and none names
+ * itself — so following the first such parent from any card comes back round.
+ */
+function cycleIn(pending: readonly Card[]): Card[] {
+  const byName = new Map(pending.map((c) => [c.name, c]));
+  const walked: Card[] = [];
+  let at = pending[0]!;
+  while (!walked.includes(at)) {
+    walked.push(at);
+    at = byName.get(at.after.find((a) => byName.has(a))!)!;
+  }
+  return walked.slice(walked.indexOf(at));
+}
+
+/** A card `wf plan` started: the card, the id of its run, and the workflow folder that run froze. */
+export type Planned = { card: Card; runId: string; workflowDir: string };
+
+/**
+ * What `wf plan` prints, one line per card started, in the order it started them: the card, its run, its workflow as the card names it,
+ * and what it waits on — each card by name, with the run `wf ls` will name.
+ */
+export function planLines(started: readonly Planned[]): string[] {
+  const idOf = new Map(started.map((p) => [p.card.name, p.runId]));
+  const cardWidth = Math.max(...started.map((p) => p.card.name.length));
+  const runWidth = Math.max(...started.map((p) => p.runId.length));
+  const workflowWidth = Math.max(...started.map((p) => p.card.workflow.length));
+  return started.map(({ card, runId }) => {
+    const waits = card.after.length ? `waits on ${card.after.map((a) => `${a} (${idOf.get(a) ?? 'not started'})`).join(', ')}` : 'waits on nothing';
+    return `${card.name.padEnd(cardWidth)}  ${runId.padEnd(runWidth)}  ${card.workflow.padEnd(workflowWidth)}  ${waits}`;
+  });
+}
+
+/**
+ * Why `wf plan` stopped part-way, and what to do: the card whose `wf start` refused and its refusal, the runs already started — which
+ * stand, and the tick files as their edges allow — and a `wf start` for each card not started, parents first, with `--after` the runs its
+ * parents have or will have. `folderOf` is the workflow folder each card's `workflow:` was found at; `dir` is the plan folder.
+ */
+export function planStopped(
+  stopped: { card: Card; why: string; rest: readonly Card[] },
+  started: readonly Planned[],
+  opts: { dir: string; repo: string; folderOf: (card: Card) => string },
+): string {
+  const idOf = new Map(started.map((p) => [p.card.name, p.runId]));
+  const ran = started.length
+    ? `The runs it started stand, and the tick files each as its edges allow: ${started.map((p) => `${p.card.name} (${p.runId})`).join(', ')}. Cancel one with wf cancel <runId>.`
+    : 'It started no run.';
+  const commands = [stopped.card, ...stopped.rest].map((card) => {
+    const after = card.after.map((a) => ` --after ${idOf.get(a) ?? `<${a}'s run id>`}`).join('');
+    return `  wf start ${opts.dir.replace(/\/$/, '')}/${card.file} --workflows ${opts.folderOf(card)} --repo ${opts.repo}${after}`;
+  });
+  return [
+    `wf plan stopped at ${stopped.card.file}: ${stopped.why}`,
+    ran,
+    `Start the rest by hand, parents first, once what stopped ${stopped.card.file} is fixed — each --after the run of a card it waits on:`,
+    ...commands,
+  ].join('\n');
+}

@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, start } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, start, startPlan } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -1482,8 +1482,12 @@ const oneStep = () => {
  * A run another will wait on, on the board its child is ticked on — one engine, as in life: started for real, with worktrees, and its
  * step filed. With `work`, a file committed on its branch; with `signed` — by default, when there is work — its step signed off.
  */
-const aParent = async (repo: string, b: ReturnType<typeof board>, { work, signed = Boolean(work) }: { work?: string; signed?: boolean } = {}) => {
-  const run = start({ brief: 'the parent', repo, workflowDir: oneStep() });
+const aParent = async (
+  repo: string,
+  b: ReturnType<typeof board>,
+  { work, signed = Boolean(work), workflowDir, brief = 'the parent' }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
+) => {
+  const run = start({ brief, repo, workflowDir: workflowDir ?? oneStep() });
   await advance(b.e, readRun(run.id));
   const wt = readRun(run.id).steps.implement!.workspace!;
   if (work) {
@@ -1866,4 +1870,202 @@ test("REFUSED at shipped defaults: `wf retry` on a step whose session still work
   b.settle(`${run.id}-implement`, 'needs-human' as TaskPhase, SIGNED);
   await assert.rejects(main(['retry', run.id, 'implement'], b.e), refusedWith(/^implement is still running/));
   assert.deepEqual([asksOf(run.id), b.stopped], [[], []]);
+});
+
+// ─── a plan as a folder of cards ────────────────────────────────────────────
+
+/** A card's text: its frontmatter keys, and its body. */
+const cardText = (keys: string, body: string) => `---\n${keys}\n---\n${body}\n`;
+
+/** A plan folder holding these files, by name — a function of the folder, so a card can name a workflow by a path from it. */
+const aPlan = (files: (dir: string) => Record<string, string>): string => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'plan-'));
+  for (const [file, text] of Object.entries(files(dir))) fs.writeFileSync(path.join(dir, file), text);
+  return dir;
+};
+
+/** A repository with a workflow of one step under its workflows/, by name. */
+const aRepoWith = (name: string): { repo: string; dir: string } => {
+  const repo = aRepo();
+  const dir = path.join(repo, 'workflows', name);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'implement.md'), 'implement it\n');
+  return { repo, dir };
+};
+
+test("`wf plan` on the diamond starts four runs, parents first, each `after` the runs of the cards it names — the record `wf start --after` writes, and nothing else — prints a line per card, and `wf ls` says D waits on B and C", async (t) => {
+  const { repo, dir: dev } = aRepoWith('dev');
+  const other = oneStep();
+  const b = board();
+  const plan = aPlan((dir) => ({
+    'README.md': '# The flag\n\nParse it, then document and store it, then show it.\n',
+    'd.md': cardText('workflow: dev\nafter: b, c', 'Show the flag on the settings page'),
+    'c.md': cardText('workflow: dev\nafter: a', 'Store the flag'),
+    'b.md': cardText(`# a workflow by a path from the plan folder\nworkflow: ${path.relative(dir, other)}\nafter: a`, 'Document the flag'),
+    'a.md': cardText('workflow: dev', 'Parse the flag'),
+  }));
+  const before = runsWritten();
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['plan', plan, '--repo', repo], b.e);
+
+  assert.equal(runsWritten(), before + 4, 'four runs, and no file of the plan');
+  const ids: Record<string, string> = Object.fromEntries(printed.slice(0, 4).map((line) => line.split(/ +/).slice(0, 2)));
+  assert.deepEqual(Object.keys(ids), ['a', 'b', 'c', 'd'], 'parents first');
+  const record = (card: string) => readRun(ids[card]!);
+  assert.deepEqual(['a', 'b', 'c', 'd'].map((card) => record(card).after), [undefined, [ids.a], [ids.a], [ids.b, ids.c]]);
+  assert.deepEqual(['a', 'b', 'c', 'd'].map((card) => record(card).brief), ['Parse the flag', 'Document the flag', 'Store the flag', 'Show the flag on the settings page']);
+  assert.deepEqual(['a', 'b', 'c', 'd'].map((card) => record(card).workflowDir), [dev, other, dev, dev]);
+  assert.match(printed[0]!, new RegExp(`^a  ${escaped(ids.a!)} +dev +waits on nothing$`));
+  assert.match(printed[1]!, new RegExp(`^b  ${escaped(ids.b!)} +${escaped(path.relative(plan, other))}  waits on a \\(${escaped(ids.a!)}\\)$`));
+  assert.match(printed[3]!, new RegExp(`^d  ${escaped(ids.d!)} +dev +waits on b \\(${escaped(ids.b!)}\\), c \\(${escaped(ids.c!)}\\)$`));
+  assert.deepEqual(printed.slice(4), ["run 'wf tick' (or 'wf up') to start them"]);
+
+  assert.deepEqual((await list(b.e, record('d'))).steps.map((s) => s.status), [`waiting on ${ids.b}, ${ids.c}`]);
+  printed.length = 0;
+  await main(['ls', ids.d!], b.e);
+  assert.match(printed.join('\n'), new RegExp(`^   implement +waiting on ${escaped(ids.b!)}, ${escaped(ids.c!)} *$`, 'm'));
+
+  // The tick does the waiting: a is filed, and nothing that waits on it.
+  assert.deepEqual((await advance(b.e, record('a'))).filed, ['implement']);
+  for (const card of ['b', 'c', 'd']) assert.deepEqual((await advance(b.e, record(card))).filed, [], `${card} waits`);
+});
+
+test("REFUSED at shipped defaults, before the first `start()`: `wf plan` on a folder whose second card's workflow does not load starts nothing — the workflow's own refusal, behind the card — nor on a workflow that is not there, a cycle, a folder inside the plan, a folder with no card, or no folder", async () => {
+  const repo = aRepo();
+  const b = board();
+  const broken = fs.mkdtempSync(path.join(ROOT, 'broken-'));
+  fs.writeFileSync(path.join(broken, 'implement.md'), '---\nafer: plan\n---\nimplement it\n');
+  const first = oneStep();
+  const plan = aPlan(() => ({
+    'a.md': cardText(`workflow: ${first}`, 'the first card'),
+    'b.md': cardText(`workflow: ${broken}\nafter: a`, 'the second card'),
+  }));
+  const before = runsWritten();
+  const { main } = await import('../src/cli.ts');
+  const planned = () => main(['plan', plan, '--repo', repo], b.e);
+  await assert.rejects(planned(), refusedWith(new RegExp(`^b\\.md: \`workflow: ${escaped(broken)}\` — implement: \`afer\` is not a key a step has\\.`)));
+  assert.equal(runsWritten(), before, 'not even the first card');
+
+  fs.writeFileSync(path.join(plan, 'b.md'), cardText('workflow: nope\nafter: a', 'the second card'));
+  await assert.rejects(planned(), refusedWith(new RegExp(`^b\\.md: \`workflow: nope\` — no workflow folder at ${escaped(path.join(plan, 'nope'))}, nor a workflow named nope in ${escaped(path.join(repo, 'workflows'))}\\.`)));
+  fs.writeFileSync(path.join(plan, 'b.md'), cardText(`workflow: ${first}\nafter: c`, 'the second card'));
+  fs.writeFileSync(path.join(plan, 'c.md'), cardText(`workflow: ${first}\nafter: b`, 'the third card'));
+  await assert.rejects(planned(), refusedWith(/^b\.md, c\.md wait on each other — b after c, c after b — so none of them could ever start\./));
+  fs.rmSync(path.join(plan, 'c.md'));
+  fs.writeFileSync(path.join(plan, 'b.md'), cardText(`workflow: ${first}\nafter: a`, 'the second card'));
+  fs.mkdirSync(path.join(plan, 'drafts'));
+  await assert.rejects(planned(), refusedWith(new RegExp(`^drafts/ in ${escaped(plan)}: not a card\\.`)));
+  const empty = aPlan(() => ({ 'README.md': '# Nothing yet\n' }));
+  await assert.rejects(main(['plan', empty, '--repo', repo], b.e), refusedWith(new RegExp(`^${escaped(empty)} has no cards in it — README\\.md says what the plan is for, and is not a card\\.`)));
+  await assert.rejects(main(['plan', path.join(ROOT, 'no-such-plan'), '--repo', repo], b.e), refusedWith(/^no plan folder at .*no-such-plan\./));
+  assert.equal(runsWritten(), before, 'no run written');
+});
+
+test('REFUSED by name: `wf plan` with --after, --workflows or --no-worktree — the folder says each — an unknown flag, --repo twice or with no value, and a second folder; nothing is started', async () => {
+  const repo = aRepo();
+  const b = board();
+  const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
+  const before = runsWritten();
+  const { main } = await import('../src/cli.ts');
+  const typed = (...flags: string[]) => main(['plan', plan, ...flags], b.e);
+  await assert.rejects(typed('--repo', repo, '--after', 'r-xyz'), refusedWith(/^wf plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan\./));
+  await assert.rejects(typed('--after=r-xyz', '--repo', repo), refusedWith(/^wf plan does not take --after:/));
+  await assert.rejects(typed('--workflows', 'dev', '--repo', repo), refusedWith(/^wf plan does not take --workflows: each card names its own, in its workflow:/));
+  await assert.rejects(typed('--no-worktree', '--repo', repo), refusedWith(/^wf plan does not take --no-worktree:/));
+  await assert.rejects(typed('--repos', repo), refusedWith(/^wf plan does not take --repos\. It takes the plan folder, then --repo <r>\.$/));
+  await assert.rejects(typed('--repo', repo, '--repo', repo), refusedWith(/^wf plan takes --repo once: a plan works on one repository\.$/));
+  await assert.rejects(typed('--repo'), refusedWith(/^--repo takes the repository the plan works on: wf plan <folder> --repo <r>$/));
+  await assert.rejects(typed('--repo='), refusedWith(/^--repo takes the repository the plan works on/));
+  await assert.rejects(typed(plan, '--repo', repo), refusedWith(new RegExp(`^wf plan takes one folder, and ${escaped(plan)} is a second\\.`)));
+  assert.equal(runsWritten(), before, 'no run written');
+});
+
+test("`wf start --workflows <name>` starts the repository's workflow of that name when no folder of that name is where it is typed — and refuses a name it does not have, naming both places and the workflows it has", async (t) => {
+  const { repo, dir } = aRepoWith('flagship');
+  const b = board();
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['start', 'a brief', '--workflows', 'flagship', '--repo', repo], b.e);
+  assert.equal(readRun(printed[0]!.split(' ')[0]!).workflowDir, dir);
+  const before = runsWritten();
+  await assert.rejects(main(['start', 'a brief', '--workflows', 'flagshp', '--repo', repo], b.e),
+    refusedWith(new RegExp(`^no workflow folder at ${escaped(path.resolve('flagshp'))}, nor a workflow named flagshp in ${escaped(path.join(repo, 'workflows'))}\\. The repository's workflows are: flagship — name one, or give the path to a workflow folder\\.$`)));
+  assert.equal(runsWritten(), before);
+});
+
+test('a `start()` that refuses part-way stops the plan: the runs already started stand, with their edges, and it says which card refused and which are left', () => {
+  const repo = aRepo();
+  const flow = oneStep();
+  const plan = aPlan(() => ({
+    'a.md': cardText(`workflow: ${flow}`, 'the root'),
+    'b.md': cardText(`workflow: ${flow}\nafter: a`, 'the left'),
+    'c.md': cardText(`workflow: ${flow}\nafter: a`, 'the right'),
+    'd.md': cardText(`workflow: ${flow}\nafter: b, c`, 'the join'),
+  }));
+  const before = runsWritten();
+  let calls = 0;
+  const startRun: typeof start = (opts) => {
+    if (++calls === 3) throw Object.assign(new Error('the disk is full'), { exitCode: 1 });
+    return start(opts);
+  };
+  const { started, stopped, folderOf } = startPlan({ dir: plan, repo, startRun });
+  assert.deepEqual([started.map((p) => p.card.name), stopped?.card.name, stopped?.error.message, stopped?.rest.map((c) => c.name)], [['a', 'b'], 'c', 'the disk is full', ['d']]);
+  assert.equal(runsWritten(), before + 2, 'the runs it started stand');
+  assert.deepEqual(started.map((p) => readRun(p.runId).after), [undefined, [started[0]!.runId]]);
+  assert.equal(folderOf(stopped!.card), flow);
+});
+
+test("a run that waited on runs has its roots filed with `## From run <parent>` for each — the first line of the parent's brief, its terminal step's summary and declared fields, as data — and neither a run without `after` nor a step after a root is given one", async () => {
+  const repo = aRepo();
+  const c = board();
+  const declaring = fs.mkdtempSync(path.join(ROOT, 'declaring-'));
+  fs.writeFileSync(path.join(declaring, 'implement.md'), '---\noutput: implement.schema.json\n---\nimplement it\n');
+  fs.writeFileSync(path.join(declaring, 'implement.schema.json'), JSON.stringify(FINDINGS));
+  const p = await aParent(repo, c, { work: 'parent.txt', signed: false, workflowDir: declaring, brief: 'Parse the flag\n\nIn cli.ts, before anything reads it.' });
+  c.settle(`${p.run.id}-implement`, 'succeeded', { ...SIGNED, summary: 'PARENT-SUMMARY: the flag is parsed first', findings: FOUND });
+  const q = await aParent(repo, c, { work: 'second.txt', brief: 'Store the flag' });
+  assert.doesNotMatch(c.tasks.get(`${p.run.id}-implement`)!.spec.brief, /## From run/, 'a run without `after` is given none');
+
+  const child = start({ brief: 'Show the flag', repo, workflowDir: folder(), after: [p.run.id, q.run.id] });
+  for (const parent of [p, q]) gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${parent.run.id}`, parent.branch);
+  const r = await advance(c.e, readRun(child.id));
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+  const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
+  assert.ok(brief.includes(`## What was asked for\n\nShow the flag\n\n## From run ${p.run.id}\n`), brief);
+  const fromP = brief.slice(brief.indexOf(`## From run ${p.run.id}\n`), brief.indexOf(`## From run ${q.run.id}\n`));
+  assert.ok(fromP.includes('What it was asked, the first line:\n\n```text\nParse the flag\n```'), fromP);
+  assert.ok(fromP.includes('What implement said when it signed off, its `summary`:\n\n```text\nPARENT-SUMMARY: the flag is parsed first\n```'), fromP);
+  assert.deepEqual(dataUnder(fromP, 'What implement declared in its closeout — `findings`:'), { findings: FOUND });
+  const qAt = brief.indexOf(`## From run ${q.run.id}\n`);
+  const fromQ = brief.slice(qAt, brief.indexOf('\n## ', qAt));
+  assert.ok(fromQ.includes('What it was asked, the first line:\n\n```text\nStore the flag\n```'), fromQ);
+  assert.ok(fromQ.includes('What implement said when it signed off, its `summary`:\n\n```text\ndid it\n```'), fromQ);
+  assert.doesNotMatch(fromQ, /declared in its closeout/, 'a step that declares nothing hands on its summary alone');
+
+  c.settle(`${child.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(c.e, readRun(child.id))).filed, ['review']);
+  assert.doesNotMatch(c.tasks.get(`${child.id}-review`)!.spec.brief, /## From run/, 'only its roots');
+});
+
+test('REFUSED to fail the filing: a parent whose closeout cannot be read — a failed step whose work a person merged, and one whose closeout does not parse — is handed on as a section that says so, and the roots are filed all the same', async () => {
+  const repo = aRepo();
+  const c = board();
+  const lost = await aParent(repo, c, { work: 'lost.txt', signed: false });
+  c.settle(`${lost.run.id}-implement`, 'failed');
+  const garbled = await aParent(repo, c, { work: 'garbled.txt', signed: false });
+  c.settle(`${garbled.run.id}-implement`, 'failed', 'not json {');
+  for (const parent of [lost, garbled]) {
+    gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${parent.run.id}`, parent.branch);
+    assert.deepEqual((await decide(c.e, parent.run.id)).decision, { kind: 'shipped', branches: [parent.branch] });
+  }
+  const child = start({ brief: 'the child of work merged without a word', repo, workflowDir: folder(), after: [lost.run.id, garbled.run.id] });
+  const r = await advance(c.e, readRun(child.id));
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []], 'filed all the same');
+  const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
+  assert.ok(brief.includes(`## From run ${lost.run.id}\n`) && brief.includes(`## From run ${garbled.run.id}\n`), brief);
+  assert.ok(brief.includes(`\nWhat implement said when it signed off cannot be given here — the engine holds no closeout for its task ${lost.run.id}-implement, which is failed.\n`), brief);
+  assert.match(brief, /\nWhat implement said when it signed off cannot be given here — its closeout cannot be read: unparseable: .*\.\n/);
 });

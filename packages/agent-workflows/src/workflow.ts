@@ -221,12 +221,10 @@ const isStepKey = (key: string): key is StepKey => (STEP_KEYS as readonly string
 const FRONTMATTER = /^---[ \t]*\n([\s\S]*?\n)?---[ \t]*(?:\n|$)/;
 
 /**
- * One step, from its file's text.
- *
- * `read` answers for a file beside the step — the folder's, relative to it — or `undefined` when there
- * is none. Only `output:` names one, and a step parsed without a folder cannot have it read.
+ * A markdown file's frontmatter and its body, trimmed: how a step is written, and a plan's card (`plan.ts`). `block` is the lines
+ * between the two `---`, or null for a file with none. `name` is what a refusal calls the file.
  */
-export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined): Workflow {
+export function splitFrontmatter(name: string, text: string): { block: string | null; body: string } {
   // A file saved with a byte-order mark or `\r\n` is the same file. Left in, either one hides the
   // frontmatter in the body, and every key in it is dropped without a word.
   text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
@@ -234,8 +232,18 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
   if (!m && /^---[ \t]*\n/.test(text)) {
     refuse(`${name}: the frontmatter opened on the first line never closes, so every key in it would be read as prose. End it with a line that is just \`---\`.`);
   }
-  const meta: Partial<Record<StepKey, string>> = m ? readKeys(name, m[1] ?? '') : {};
-  const body = (m ? text.slice(m[0].length) : text).trim();
+  return { block: m ? m[1] ?? '' : null, body: (m ? text.slice(m[0].length) : text).trim() };
+}
+
+/**
+ * One step, from its file's text.
+ *
+ * `read` answers for a file beside the step — the folder's, relative to it — or `undefined` when there
+ * is none. Only `output:` names one, and a step parsed without a folder cannot have it read.
+ */
+export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined): Workflow {
+  const { block, body } = splitFrontmatter(name, text);
+  const meta: Partial<Record<StepKey, string>> = block === null ? {} : readKeys(name, block);
   if (!body) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
 
   const after = (meta.after ?? '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -582,16 +590,46 @@ export function loadWorkflows(dir: string): Workflow[] {
 function noStepsBecause(dir: string, entries: readonly string[]): string {
   const readme = entries.find(isReadme);
   if (readme) return ` — ${readme} describes the workflow, and is not a step. Write the first step beside it: implement.md, say.`;
-  const workflows = entries.filter((name) => {
+  const workflows = workflowsIn(dir, entries);
+  return workflows.length
+    ? ` — it holds workflows, each a folder of steps: ${workflows.join(', ')}. Name one of them: ${path.join(dir, workflows[0]!)}.`
+    : '';
+}
+
+/** The folders in `dir` that hold steps, sorted: the workflows a folder of workflows has. None for a folder that is not there. */
+function workflowsIn(dir: string, entries?: readonly string[]): string[] {
+  let names: readonly string[];
+  try { names = entries ?? fs.readdirSync(dir); } catch { return []; }
+  return names.filter((name) => {
     try {
       return stepFiles(fs.readdirSync(path.join(dir, name))).length > 0;
     } catch {
       return false;
     }
   }).sort();
-  return workflows.length
-    ? ` — it holds workflows, each a folder of steps: ${workflows.join(', ')}. Name one of them: ${path.join(dir, workflows[0]!)}.`
-    : '';
+}
+
+const isFolder = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
+
+/**
+ * The workflow folder a person names: a path, relative to where it is written — the directory `wf start` is typed in, the plan folder a
+ * card is in — or, when no folder is there and it is a bare name, the repository's workflow of that name: `dev` is `<repo>/workflows/dev`.
+ * The path is looked at first, so a folder a person points at is never shadowed by one of the repository's.
+ *
+ * Refused when neither is a folder, naming where it looked and the workflows the repository has. Whether the folder is a workflow is
+ * `loadWorkflows`' to say.
+ */
+export function workflowFolder(given: string, from: string, repo: string): string {
+  const at = path.resolve(from, given);
+  if (isFolder(at)) return at;
+  const bare = !/[\\/]/.test(given) && given !== '.' && given !== '..';
+  const workflows = path.join(repo, 'workflows');
+  if (bare && isFolder(path.join(workflows, given))) return path.join(workflows, given);
+  const theirs = workflowsIn(workflows);
+  return refuse(`no workflow folder at ${at}${bare ? `, nor a workflow named ${given} in ${workflows}` : ''}. `
+    + (theirs.length
+      ? `The repository's workflows are: ${theirs.join(', ')} — name one, or give the path to a workflow folder.`
+      : `Give the path to a workflow folder, or the name of a folder of steps under ${workflows}.`));
 }
 
 /**

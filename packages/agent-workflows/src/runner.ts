@@ -18,10 +18,13 @@ export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { ParentRun, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Shipped, Wait } from './run.ts';
-import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
+export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Shipped, Wait } from './run.ts';
+import { fansOut, loadWorkflows, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
+export { planLines, planStopped } from './plan.ts';
+export type { Card, Planned } from './plan.ts';
+import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -674,12 +677,13 @@ export const runId = (brief: string): string => {
 };
 
 /**
- * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
- * this run's base (`afterRefusal`), and frozen on the record. Left out, the record is what it was before there was an `after`.
+ * A workflow folder's steps, refused as `start` refuses them before a run is written, with the fix: a folder that is not a workflow
+ * (`loadWorkflows`), one that can run two steps at once where they would share a directory (`isolate: false`), and a step named for another
+ * step's check or try. What `startPlan` asks of every card before the first run is started.
  */
-export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[] }): Run {
-  const steps = loadWorkflows(opts.workflowDir);   // validated before anything is spent
-  if (opts.isolate === false && fansOut(steps)) {
+function stepsToStart(workflowDir: string, isolate: boolean): Workflow[] {
+  const steps = loadWorkflows(workflowDir);   // validated before anything is spent
+  if (!isolate && fansOut(steps)) {
     throw new Error(
       'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
       'Either drop --no-worktree, or make the steps a chain.',
@@ -701,15 +705,27 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
       `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
     ), { exitCode: 2 });
   }
-  const isolate = opts.isolate ?? true;
-  // Refused here, where a person is looking, rather than line by line in a daemon's log. Only a run that
-  // cuts worktrees reads the file.
-  const refused = isolate ? readInclude(opts.repo)?.refused ?? [] : [];
+  return steps;
+}
+
+/** A `.worktreeinclude` with lines `start` refuses, refused where a person is looking, rather than line by line in a daemon's log. Only a run that cuts worktrees reads the file. */
+function refuseInclude(repo: string, isolate: boolean): void {
+  const refused = isolate ? readInclude(repo)?.refused ?? [] : [];
   if (refused.length) {
     throw Object.assign(new Error(
-      `${path.join(opts.repo, '.worktreeinclude')}: ${refusalLines(refused).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${refused.length === 1 ? 'that line' : 'those lines'}.`,
+      `${path.join(repo, '.worktreeinclude')}: ${refusalLines(refused).join('; ')}. Each line is a gitignored path inside the repository, relative to its root — fix or remove ${refused.length === 1 ? 'that line' : 'those lines'}.`,
     ), { exitCode: 2 });
   }
+}
+
+/**
+ * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
+ * this run's base (`afterRefusal`), and frozen on the record. Left out, the record is what it was before there was an `after`.
+ */
+export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[] }): Run {
+  const isolate = opts.isolate ?? true;
+  const steps = stepsToStart(opts.workflowDir, isolate);
+  refuseInclude(opts.repo, isolate);
   const id = runId(opts.brief);
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
   const after = opts.after ?? [];
@@ -732,6 +748,71 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
   };
   writeRun(run);
   return run;
+}
+
+/**
+ * A plan folder's cards, parents first (`parsePlan`, `planOrder`): every entry of the folder handed to the pure parser — a folder inside it
+ * by its name and a trailing `/`, a markdown file with its text.
+ */
+export function readPlan(dir: string): Card[] {
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(dir);
+  } catch {
+    throw new WorkflowError(`no plan folder at ${dir}. A plan is a folder of cards, one <card>.md each: wf plan <folder> --repo <r>.`);
+  }
+  const files = entries.map((name) => {
+    const at = path.join(dir, name);
+    if (fs.statSync(at, { throwIfNoEntry: false })?.isDirectory()) return { file: `${name}/`, text: '' };
+    return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' };
+  });
+  return planOrder(parsePlan(files, dir));
+}
+
+/** What `startPlan` did: the cards it started, in order; the workflow folder each card's `workflow:` was found at; and, when a `start()` refused part-way, which card, why, and the cards after it. */
+export type PlanStarted = {
+  started: Planned[];
+  folderOf: (card: Card) => string;
+  stopped?: { card: Card; error: Error & { exitCode?: number }; rest: Card[] };
+};
+
+/**
+ * `wf plan`: every card of a plan folder started, parents first, each with `start()` and `after` the runs of the cards its `after:` names —
+ * the record `wf start --after` writes, so the tick, `wf ls`, `wf decide` and the board need nothing new. Nothing else is written: no plan
+ * record, and no file of its own. The runs and their `after` are the plan.
+ *
+ * Refused before the first run is started, naming the card and the fix: a folder `parsePlan` refuses; a card whose `workflow:` names no
+ * workflow folder (`workflowFolder`, from the plan folder), or one `start` would refuse — that refusal, behind the card; and a
+ * `.worktreeinclude` `start` would refuse. A `start()` that refuses after that, part-way, stops the plan: the runs already started stand,
+ * and `stopped` says which card refused and which are left. `startRun` is `start`, unless a test hands it one of its own.
+ */
+export function startPlan(opts: { dir: string; repo: string; startRun?: typeof start }): PlanStarted {
+  const cards = readPlan(opts.dir);
+  refuseInclude(opts.repo, true);
+  const folders = new Map<string, string>();
+  for (const card of cards) {
+    try {
+      const folder = workflowFolder(card.workflow, opts.dir, opts.repo);
+      stepsToStart(folder, true);
+      folders.set(card.name, folder);
+    } catch (err) {
+      throw Object.assign(new Error(`${card.file}: \`workflow: ${card.workflow}\` — ${(err as Error).message}`), { exitCode: 2 });
+    }
+  }
+  const folderOf = (card: Card): string => folders.get(card.name)!;
+  const startRun = opts.startRun ?? start;
+  const started: Planned[] = [];
+  for (const [i, card] of cards.entries()) {
+    const runOf = new Map(started.map((p) => [p.card.name, p.runId]));
+    try {
+      // Parents first, so every card it names has a run by now.
+      const run = startRun({ brief: card.body, repo: opts.repo, workflowDir: folderOf(card), after: card.after.map((a) => runOf.get(a)!) });
+      started.push({ card, runId: run.id, workflowDir: run.workflowDir });
+    } catch (err) {
+      return { started, folderOf, stopped: { card, error: err as Error, rest: cards.slice(i + 1) } };
+    }
+  }
+  return { started, folderOf };
 }
 
 /**
@@ -978,6 +1059,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // before they shipped. Read once, in the pass that files its roots, and written with them; every worktree and diff of the run is cut
   // from it. A run with no `after` keeps the base `wf start` recorded, as before.
   if (ready.length && starting && run.after?.length) run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
+  // What those runs concluded, for the roots' briefs (`## From run <id>`): read on the same pass, and never again.
+  const parents = ready.length && starting && run.after?.length ? await parentCloseouts(e, run.after) : undefined;
 
   const filed: string[] = [];
   for (const name of ready) {
@@ -996,8 +1079,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       id: stepTaskId(run, name, tryOf(run, name)),
       // What the steps it reads declared, if it names any in `input:` — read off the same closeouts the
       // assessment that made it ready just read, so it is handed what it was filed on.
-      // And, when the run installed its `node_modules` or could not, why its start was slow or what to run.
-      brief: composeBrief(step, run, steps, signedOff, files, place.deps),
+      // And, when the run installed its `node_modules` or could not, why its start was slow or what to run. And, on a root of a run
+      // that waited on runs, what they concluded.
+      brief: composeBrief(step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents),
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,
@@ -1411,6 +1495,49 @@ async function parentsOf(e: Engine, run: Run): Promise<(id: string) => ParentRun
   const read = new Map<string, ParentRun>();
   if (gated(run)) for (const id of new Set(run.after)) read.set(id, await parentOf(e, id));
   return (id) => read.get(id) ?? { shipped: false };
+}
+
+/**
+ * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief, and
+ * each terminal step's closeout on the engine's record of its current try, read as `wf decide` reads one (`closeoutOf`). Read once, on the
+ * pass that files the roots. It never throws: a parent whose record or workflow no longer reads, a step never filed, a task the engine holds
+ * no closeout for — a failed step whose work a person merged all the same — and a closeout that does not parse each say so in the section,
+ * and the roots are filed all the same.
+ */
+async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<ParentCloseout[]> {
+  const out: ParentCloseout[] = [];
+  for (const id of new Set(ids)) {
+    let record: Run;
+    let steps: Workflow[];
+    try {
+      record = readRun(id);
+      steps = stepsOf(record);
+    } catch (err) {
+      out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}` });
+      continue;
+    }
+    const said: ParentStep[] = [];
+    for (const step of terminalSteps(steps)) {
+      const taskId = record.steps[step.name]?.taskId;
+      if (!taskId) {
+        said.push({ name: step.name, unreadable: 'it was never filed' });
+        continue;
+      }
+      let view: TaskView;
+      try {
+        view = await e.view(taskId);
+      } catch (err) {
+        said.push({ name: step.name, unreadable: `the engine could not be asked for its task ${taskId}: ${(err as Error).message}` });
+        continue;
+      }
+      const c = closeoutOf(new Map([[taskId, view]]), record, step.name);
+      if (!c) said.push({ name: step.name, unreadable: `the engine holds no closeout for its task ${taskId}, which is ${phaseOfView(view)}` });
+      else if ('error' in c) said.push({ name: step.name, unreadable: `its closeout cannot be read: ${c.error}` });
+      else said.push({ step, said: c });
+    }
+    out.push({ run: id, asked: record.brief.split('\n')[0]!, steps: said });
+  }
+  return out;
 }
 
 /** Each of these branches git has, and the commit it is at, in one `for-each-ref`. A branch git does not have is left out. */

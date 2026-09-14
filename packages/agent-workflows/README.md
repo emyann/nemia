@@ -664,6 +664,56 @@ A run started with `--no-worktree` worked on the base branch itself, where git's
 landed" is always yes. `wf decide` never asks it for such a run: it says the run worked directly on its
 branch, classifies its steps like any other, and prints the diff against the base instead of a merge.
 
+### What the screen puts in front of you
+
+A summary is the agent's word and a green check is the suite's, and neither says what the branch did
+to get there. So on a run waiting on you, between the run's verdicts and the steps' closeouts, the
+screen shows what the branch touched, read out of git:
+
+```
+  touched  wf/add-sub-3j75
+    (root)      2 files  +2 −0 · 1 binary
+    packages/x  2 files  +2 −1
+    agent-facing     CLAUDE.md
+    check-affecting  packages/x/test/add.test.ts
+  lesson  CLAUDE.md +2 −0
+
+  ── in full: the check-affecting files — what a change could edit to make its check pass ───
+  diff --git a/packages/x/test/add.test.ts b/packages/x/test/add.test.ts
+  …
+  -assert.equal(add(1, 1), 2);
+  +assert.ok(true);
+
+  implement
+    check  npm test  →  exit 0 ✓
+    used  29 turns · 93 tool calls · 6.35M in · 112k out
+    cost  not measured
+```
+
+- **touched** is `git diff --numstat` against the run's base, grouped by workspace package (the base's
+  own `workspaces`, which no step could edit) or else by top-level directory. A move counts in both
+  places it touched, a binary file as a file with no lines. Then, each only when true, the
+  *agent-facing* files — what an agent reads as instructions: `CLAUDE.md`, `AGENTS.md`, `.claude/`,
+  `.codex/`, `.mcp.json`, a `README.md` — and the *check-affecting* ones: every `package.json`, the
+  lockfile, `tsconfig*.json`, `turbo.json`, `*.test.*`, anything under `test/` or `.e2e/`. Before a
+  terminal step has a branch — the first step's check refused it — the screen reads every branch a
+  step worked on.
+- **in full** is the whole diff of the check-affecting files, because a check that passed says
+  nothing about a check that was changed to pass. `wf decide <run> --sensitive <globs>` prints other
+  files in full, for one screen; the touched lines still say which files are check-affecting. The
+  heading with `none` under it means nothing on the list changed, not that nobody looked.
+- **lesson** says whether the run changed a file where the next agent reads — `CLAUDE.md`,
+  `AGENTS.md`, the root's `docs/` or a workspace package's — or that it wrote nothing there. Not any
+  `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. CLAUDE.md's *When you miss* is a rule, and
+  this line holds a person to it.
+- **used** and **cost** are the engine's `usage` for the step's current try, summed over its attempts.
+  A count nobody measured says `not measured`, never `0`. So does cost, which none of the runners `wf`
+  files on reports.
+
+The three lists are globs, written once in `src/radius.ts` and printed by `wf decide --help`. A branch
+git cannot diff says it was not read, and the lesson line says it does not know. Neither reads it as a
+branch that changed nothing.
+
 ## Calling a run off
 
 A run could be started and watched but never stopped: the only recourse was killing the session by
@@ -795,6 +845,7 @@ holding a concurrency slot forever.
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — and what a step is told, `## From <step>`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
+| `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
 | `src/runner.ts` | the I/O: run store, git worktree and what it is given, and the engine — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/cli.ts` | the verbs |
 

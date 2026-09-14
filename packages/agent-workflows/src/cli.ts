@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { artifactFiles, artifactLines, artifacts, artifactsDir, cancel, decide, diffStat, dueNote, engine, list, listRuns, missingArtifacts, outputLines, owedFields, readArtifact, readRun, resultBranches, retry, round, roundDueNote, start, stepsOf, tick, tryNote, verdictWord, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, missingArtifacts, outputLines, owedFields, parseGlobs, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, type RetryMode } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -12,7 +12,8 @@ const HELP = `wf — run a workflow of agent steps
   wf up [ms]                   the same, on a timer
   wf ls [runId]                runs and their steps
   wf cancel <runId>            stop what it has in flight; file nothing more
-  wf decide <runId>            what the run produced, and the choice it leaves you
+  wf decide <runId> [--sensitive <globs>]
+                               what the run produced, and the choice it leaves you (wf decide --help)
   wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck]
                                try a step waiting on you again, once, on the next tick:
                                --nudge (default) continues its session, told what happened;
@@ -59,6 +60,46 @@ const flag = (argv: string[], name: string, fallback?: string) => {
 
 const usage = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
 
+const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
+
+What the run produced, and the choice it leaves you. It prints the commands — ship it, drop it, once
+more — and runs none of them. On a run waiting on you, after the run's verdicts and before each step's
+closeout:
+
+  touched   what each result branch changed against the run's base: files and lines by workspace
+            package or top-level directory, then, each only when true, the agent-facing files and
+            the check-affecting ones
+  lesson    whether the run changed a file where the next agent reads, or that it wrote nothing there
+  in full   the whole diff of the check-affecting files: what a change could edit to make its check pass
+
+and beside each step's check, what its session consumed — used, cost — or that nobody measured it.
+
+  --sensitive <globs>  comma-separated globs whose changed files are printed in full instead, for this
+                       screen; the touched lines still say which files are check-affecting
+
+  check-affecting, the default --sensitive:  ${CHECK_AFFECTING.join(', ')}
+  agent-facing:                              ${AGENT_FACING.join(', ')}
+  where the next agent reads:                ${LESSON.join(', ')}, and <workspace>/docs/ for each
+                                             npm workspace in the base's package.json — not any docs/
+
+A glob is a path from the repository root: * and ? stay within a directory, ** crosses any number of
+them (a leading **/ crosses none as well), and a trailing / takes everything below.`;
+
+/** `wf decide`'s one flag: `--sensitive`, once, with at least one glob. Anything else is refused before a run is read. */
+function decideHow(argv: string[]): { sensitive?: string[] } {
+  let sensitive: string[] | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg !== '--sensitive') usage(`wf decide does not take ${arg}. It takes the run and, at most once, --sensitive <globs> (wf decide --help).`);
+    if (sensitive) usage('wf decide takes --sensitive once: put every glob in it, comma-separated, as in --sensitive "src/**,*.json".');
+    const value = argv[++i];
+    const globs = value === undefined || value.startsWith('--') ? [] : parseGlobs(value);
+    if (!globs.length) usage('--sensitive takes the globs whose changed files to print in full, comma-separated: wf decide <runId> --sensitive "src/**,*.json".');
+    sensitive = globs;
+  }
+  return { sensitive };
+}
+
 /** `wf retry`'s one choice of how, read off its flags: at most one, and `--model` with a name. */
 function retryHow(argv: string[]): { mode: RetryMode; model?: string } {
   const given: Array<{ mode: RetryMode; model?: string }> = [];
@@ -75,9 +116,9 @@ function retryHow(argv: string[]): { mode: RetryMode; model?: string } {
   return given[0] ?? { mode: 'nudge' };
 }
 
-export async function main(argv: string[]): Promise<void> {
+/** `e` is the engine the verbs talk to: the board under `WF_ROOT`, unless a test hands it one of its own. */
+export async function main(argv: string[], e: ReturnType<typeof engine> = engine()): Promise<void> {
   const [verb, ...rest] = argv;
-  const e = engine();
 
   switch (verb) {
     case 'start': {
@@ -170,8 +211,13 @@ export async function main(argv: string[]): Promise<void> {
     // material in front of one. Read-only on purpose: it shows the choice and the exact commands,
     // and does not decide anything itself.
     case 'decide': {
+      if (rest.includes('--help')) return console.log(DECIDE_HELP);
       if (!rest[0]) return console.log(HELP);
-      const { run, decision, closeouts, checks, retrying, rounding, offers } = await decide(e, rest[0]);
+      // Read before the run is: a mistyped flag is refused, not a screen quietly printed without it — and
+      // so is a flag before the run, which would otherwise be the general help and exit 0.
+      if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
+      const { sensitive } = decideHow(rest.slice(1));
+      const { run, decision, closeouts, checks, retrying, rounding, offers, used } = await decide(e, rest[0]);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
       const steps = stepsOf(run);
 
@@ -202,6 +248,22 @@ export async function main(argv: string[]): Promise<void> {
       // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.
       if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
 
+      // What the branch touched, before any step's account of it: which parts of the repository, and
+      // whether among them are the files an agent reads as instructions or those that decide what its
+      // check means. Then the lesson — CLAUDE.md's "When you miss", held to — and those check files in
+      // full, because a check that passed says nothing about a check that was changed to pass.
+      const touched = branchesToRead(decision.branches, Object.values(run.steps).map((s) => s.branch))
+        .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
+      if (touched.length) {
+        console.log();
+        for (const line of touchedLines(touched)) console.log(`  ${line}`);
+        console.log(`  ${lessonLine(touched)}`);
+        for (const t of touched) {
+          console.log();
+          for (const line of inFullLines(t, sensitive, sensitiveDiff(run, t, sensitive ?? CHECK_AFFECTING), touched.length > 1)) console.log(`  ${line}`);
+        }
+      }
+
       // Each step's own closeout: the summary is written FOR this moment. The reviewer never saw
       // it — that is the point of the field — and you are the audience it was addressed to. Above it,
       // what the run's check of the step said: the machine's word before the agent's. Below it, what the
@@ -210,7 +272,8 @@ export async function main(argv: string[]): Promise<void> {
       for (const name of Object.keys(run.steps)) {
         const c = closeouts[name];
         const check = checks[name];
-        if (!c && !check) continue;
+        // A step the run filed consumed something, closeout or not; one never filed has nothing to say.
+        if (!c && !check && !run.steps[name]?.taskId) continue;
         const blocked = c && !('error' in c) && c.outcome === 'blocked';
         const step = steps.find((s) => s.name === name);
         // The try — and the round — whose closeout and check these are, when it is not the first.
@@ -224,6 +287,8 @@ export async function main(argv: string[]): Promise<void> {
             if (!check.passed && text) console.log(`      ${stream}:\n        ${text.split('\n').join('\n        ')}`);
           }
         }
+        // What its session consumed, beside the check's word on it — or that nobody measured it.
+        for (const line of usedLines(used[name])) console.log(`    ${line}`);
         if (!c) continue;
         if ('error' in c) { console.log(`    closeout unreadable — ${c.error}`); continue; }
         if (c.summary) console.log(`    ${c.summary.split('\n').join('\n    ')}`);

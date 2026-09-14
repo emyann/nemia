@@ -10,11 +10,13 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { claudeDetached, codex, createEngine, type Engine, type TaskView } from 'agent-engine';
+import { claudeDetached, codex, createEngine, type Engine, type TaskView, type Usage } from 'agent-engine';
 import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check.ts';
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 
 export { verdictWord } from './check.ts';
+export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
+import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { artifactLines, dueNote, outputLines, owedFields, roundDueNote, tryNote } from './run.ts';
 export type { Retry, RetryAsk, RetryMode, Round, RoundAsk } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
@@ -1250,6 +1252,64 @@ export function diffStat(run: Run, branch: string): string {
   try { return git(run.repo, 'diff', '--shortstat', `${run.baseRef}...${branch}`); } catch { return ''; }
 }
 
+/**
+ * Git's output, or undefined when it cannot answer — quietly, since a person reads the screen this
+ * feeds, and untrimmed, since a name may end in a space. A lockfile's diff is large, so is the buffer.
+ */
+const gitSays = (repo: string, ...args: string[]): string | undefined => {
+  try { return execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 }); } catch { return undefined; }
+};
+
+/**
+ * What a branch touched (`radius`), off `git diff --numstat` against the run's base, renames found
+ * whatever the repository's config says. An error when git cannot say, or says what `radius` cannot
+ * read: a branch that is gone is not a branch that changed nothing.
+ */
+export function touchedBy(run: Run, branch: string): Radius | { error: string } {
+  const numstat = gitSays(run.repo, '-c', 'core.quotePath=false', 'diff', '--numstat', '--find-renames', `${run.baseRef}...${branch}`);
+  if (numstat === undefined) return { error: `git could not diff ${run.baseRef.slice(0, 12)}...${branch}` };
+  try { return radius(numstat, workspacesOf(run)); } catch (err) { return { error: (err as Error).message }; }
+}
+
+/** The base's npm `workspaces`, which `radius` groups a change by — read at the base, where no step could have edited them. */
+function workspacesOf(run: Run): string[] {
+  try {
+    const { workspaces } = JSON.parse(gitSays(run.repo, 'show', `${run.baseRef}:package.json`) ?? '{}');
+    const globs: unknown = Array.isArray(workspaces) ? workspaces : workspaces?.packages;
+    return Array.isArray(globs) ? globs.filter((g): g is string => typeof g === 'string') : [];
+  } catch { return []; }
+}
+
+/**
+ * The whole diff, base to branch, of the changed files these globs name — by default the ones that decide
+ * what a check means. Both ends of a rename are asked for, so git shows it as one. Empty when no changed
+ * file is named; undefined when the branch could not be read, or git cannot say.
+ */
+export function sensitiveDiff(run: Run, t: Touched, globs: readonly string[]): string | undefined {
+  if ('error' in t.radius) return undefined;
+  const paths = sensitivePaths(t.radius.changes, globs);
+  if (!paths.length) return '';
+  return gitSays(run.repo, '-c', 'core.quotePath=false', '--literal-pathspecs', 'diff', '--no-color', '--no-ext-diff', '--find-renames', `${run.baseRef}...${t.branch}`, '--', ...paths);
+}
+
+/**
+ * What each step's current task consumed, summed over its attempts (`sumUsage`): the try whose closeout
+ * and check `wf decide` prints beside it. A settled attempt's usage is on the engine's record, the one in
+ * flight on the view; an attempt that never started consumed nothing, and is left out.
+ *
+ * Off views already read, not a view of its own: each `e.view` is a harness observe (~300 ms, plan §4b),
+ * so `decide` reads each task once and hands its views here.
+ */
+export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Record<string, Usage | undefined> {
+  const used: Record<string, Usage | undefined> = {};
+  for (const [name, { taskId }] of Object.entries(run.steps)) {
+    const v = taskId ? views.get(taskId) : undefined;
+    if (!v) continue;
+    used[name] = sumUsage(v.state.attempts.filter((a) => a.reason !== 'unstartable').map((a) => (a.endedAt ? a.usage : v.usage)));
+  }
+  return used;
+}
+
 /** What is left for a person to do — the pure call, with git asked the one question it owns. */
 export async function decide(e: Engine, id: string): Promise<{
   run: Run;
@@ -1263,6 +1323,8 @@ export async function decide(e: Engine, id: string): Promise<{
   rounding: Round[];
   /** For each loop out of rounds, the `wf round` that goes once more (`roundLines`); for each step a person may try again, the `wf retry` (`retryLines`). */
   offers: string[];
+  /** What each filed step's current try consumed (`consumption`), off the views read for the rest. */
+  used: Record<string, Usage | undefined>;
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
@@ -1280,6 +1342,7 @@ export async function decide(e: Engine, id: string): Promise<{
     retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks),
     rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds),
     offers: [...roundLines(steps, run, d), ...retryLines(steps, run, d, phaseOf, reader, asked)],
+    used: consumption(views, run),
   };
 }
 

@@ -932,8 +932,10 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * script to post into a session, and the one another session's `SendMessage` reaches. No token: on macOS
      * and Linux the inbox takes a connection without one (it requires one only on native Windows, whose inbox
      * is a named pipe and is refused as not a socket), and the token beside the registration is another
-     * session's credential, not this engine's to read. Measured on 2.1.270 (`test/live.test.ts`): a busy
-     * session reads the words between tool calls; an idle one starts a turn with them.
+     * session's credential, not this engine's to read. Measured on 2.1.270, by hand on a busy session and an idle
+     * one, and end to end by `test/live.test.ts` (`docs/open-issues.md`, verified live): a busy session reads the
+     * words between tool calls; an idle one starts a turn with them. One blocked on a permission prompt queues them
+     * and never reads them (open issue 16).
      *
      * The inbox writes nothing back, so this resolves on the words being taken, not on their being read: a
      * `crossSessionInbound` of `hold` or `refuse` in the operator's settings, a rate limit, or an identical

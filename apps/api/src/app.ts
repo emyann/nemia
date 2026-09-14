@@ -1,8 +1,11 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
-import { checkStderr, closeoutAsked, closeoutOf, closeoutReader, engine, exitVerdicts, listRuns, phaseOfView, readAsks, verdictWord } from 'agent-workflows';
-import { assess, composeBrief, inFlight, listing, type Assessment, type Run } from 'agent-workflows/run';
-import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
+import {
+  branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, isShipped, lessonLine,
+  listRuns, phaseOfView, readAsks, sensitiveDiff, touchedBy, usedLines, verdictWord,
+} from 'agent-workflows';
+import { assess, composeBrief, decision, inFlight, listing, retryLines, roundLines, type Assessment, type Decision, type Run } from 'agent-workflows/run';
+import { loadWorkflows, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
 
@@ -114,8 +117,61 @@ export type RunDetail = {
     /** Null for a step with no `check:` in the workflow the run froze. */
     check: StepCheck | null;
     attempts: StepAttempts;
+    /** What its current try consumed, in `wf decide`'s words; null for a step not filed, which consumed nothing. */
+    used: StepUsed | null;
   }>;
 };
+
+/** What a session consumed as the engine's `Usage` carries it: a count nobody measured is absent, never 0. */
+export type Usage = NonNullable<ReturnType<typeof consumption>[string]>;
+
+/**
+ * What a step consumed, summed over the attempts of its current try (`consumption`), and in the words `wf decide`
+ * prints beside its check (`usedLines`) — `used` and `cost`, each `not measured` where nobody counted, never `0`.
+ */
+export type StepUsed = { usage: Usage | null; used: string; cost: string };
+
+/** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
+export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
+
+/** One file of a branch's check-affecting diff: its unified diff, at most `DIFF_LINES` lines, and how many more it had. */
+export type DiffFile = { path: string; lines: string[]; cut: number };
+
+/** The check-affecting files' diff on one branch, a file each; none when no changed file is on the list; `error` when git could not say. */
+export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string | null };
+
+/**
+ * The lesson line as `wf decide` words it (`lessonLine`), without its label, and which of its three it is: a file where
+ * the next agent reads was changed, nothing was, or a branch could not be read, so nobody knows.
+ */
+export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
+
+/**
+ * A command `wf decide` prints, and runs none of: ship it, drop it, read it for a run worked on its base branch, and each
+ * once-more (`wf retry`, `wf round`) with the line it prints it in. `said` is null where the label is all it says.
+ */
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more'; command: string; said: string | null };
+
+/**
+ * What `wf decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
+ * diffs in full, what each step consumed and the run's total, and the commands.
+ */
+export type Decidable = {
+  touched: Touched[];
+  lesson: Lesson;
+  sensitive: SensitiveDiff[];
+  used: Record<string, StepUsed>;
+  /** Every filed step's `used` summed: a count only where every one of them measured it. */
+  total: StepUsed;
+  commands: DecideCommand[];
+};
+
+/**
+ * A run's decision. `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no
+ * git asked. `nothing`, in `wf decide`'s words, for a run called off or whose branches are already on its base. Else
+ * what there is to decide.
+ */
+export type RunDecision = { running: true } | { nothing: string } | Decidable;
 
 /** A step's attempts as the engine's view has them: how many, and when and how the latest went. */
 export type StepAttempts = {
@@ -371,6 +427,8 @@ async function detail(run: Run): Promise<RunDetail> {
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
   const source = shownWorkflow(run, workflows);
+  // Off the views already read: no observation of its own.
+  const used = consumption(views, run);
   return {
     id: run.id,
     brief: run.brief,
@@ -406,8 +464,149 @@ async function detail(run: Run): Promise<RunDetail> {
           : null,
         check: checks.get(name) ?? null,
         attempts: attemptsOf(run, name, views),
+        used: run.steps[name]?.taskId ? usedOf(used[name]) : null,
       };
     }),
+  };
+}
+
+/** A usage in `wf decide`'s words: `usedLines`, each line without the label it starts with. */
+function usedOf(usage: Usage | undefined): StepUsed {
+  const [used = '', cost = ''] = usedLines(usage);
+  return { usage: usage ?? null, used: used.replace(/^used\s+/, ''), cost: cost.replace(/^cost\s+/, '') };
+}
+
+const USAGE_FIELDS = ['turns', 'toolCalls', 'inputTokens', 'outputTokens', 'costUsd'] as const;
+
+/**
+ * Several usages as one, by `sumUsage`'s rule in agent-workflows' radius.ts, which the package does not export: a count is
+ * the sum only when every usage measured it, since a sum over the ones that happened to be counted reads as the whole.
+ */
+function sumUsages(usages: ReadonlyArray<Usage | undefined>): Usage | undefined {
+  if (!usages.length) return undefined;
+  const sum: Usage = {};
+  for (const field of USAGE_FIELDS) {
+    if (usages.every((u) => u?.[field] !== undefined)) sum[field] = usages.reduce((n, u) => n + u![field]!, 0);
+  }
+  return Object.keys(sum).length ? sum : undefined;
+}
+
+/** How many lines of one file's check-affecting diff the board is given. `wf decide` prints them all. */
+export const DIFF_LINES = 400;
+
+/**
+ * A diff `git diff` gave for several files, one entry per file, each cut to `DIFF_LINES`. Named for a person — `from → to`
+ * for a rename — off the file's own header lines, before its first hunk.
+ */
+export function diffFiles(diff: string): DiffFile[] {
+  const files: string[][] = [];
+  for (const line of diff.replace(/\n$/, '').split('\n')) {
+    if (line.startsWith('diff --git ') || !files.length) files.push([]);
+    files.at(-1)!.push(line);
+  }
+  return files.map((lines) => ({ path: diffPath(lines), lines: lines.slice(0, DIFF_LINES), cut: Math.max(0, lines.length - DIFF_LINES) }));
+}
+
+function diffPath(lines: readonly string[]): string {
+  const hunk = lines.findIndex((line) => line.startsWith('@@'));
+  const head = hunk < 0 ? lines : lines.slice(0, hunk);
+  const after = (prefix: string) => head.find((line) => line.startsWith(prefix))?.slice(prefix.length).replace(/\t$/, '');
+  const [from, to] = [after('rename from '), after('rename to ')];
+  if (from && to) return `${from} → ${to}`;
+  for (const [prefix, side] of [['+++ ', 'b/'], ['--- ', 'a/']] as const) {
+    const named = after(prefix);
+    if (named && named !== '/dev/null') return named.startsWith(side) ? named.slice(side.length) : named;
+  }
+  // No `---`/`+++` for a binary file or a mode change: `diff --git a/<path> b/<path>`, whose two halves are the same path.
+  const both = (head[0] ?? '').slice('diff --git '.length);
+  const half = (both.length - 1) / 2;
+  return Number.isInteger(half) && both.slice(2, half) === both.slice(half + 3) ? both.slice(2, half) : both;
+}
+
+/** A branch's check-affecting diff, as `inFullLines` reads what `sensitiveDiff` gave: an error, none, or the files. */
+function sensitiveOf(run: Run, t: Touched): SensitiveDiff {
+  if ('error' in t.radius) return { branch: t.branch, files: [], error: t.radius.error };
+  const diff = sensitiveDiff(run, t, CHECK_AFFECTING);
+  if (diff === undefined) return { branch: t.branch, files: [], error: `git could not diff ${t.branch}` };
+  return { branch: t.branch, files: diff.trim() ? diffFiles(diff) : [], error: null };
+}
+
+/** The line `lessonLine` prints, and which of its three it is. */
+function lessonOf(touched: readonly Touched[]): Lesson {
+  const said = lessonLine(touched).replace(/^lesson\s+/, '');
+  if (touched.some((t) => 'error' in t.radius)) return { said, state: 'unknown' };
+  return { said, state: touched.some((t) => !('error' in t.radius) && t.radius.lessons.length) ? 'written' : 'nothing' };
+}
+
+/** A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, or `wf round <run> <step>`, after the colon and two spaces. */
+const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck)?)/;
+
+/**
+ * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, then ship it and drop it
+ * for the branches, or read it for a run worked on its base branch — which has nothing to merge, nor a branch to delete.
+ */
+function commandsOf(run: Run, d: Decision, offers: readonly string[]): DecideCommand[] {
+  if (d.kind !== 'awaiting') return [];
+  const once = offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said }));
+  if (d.direct) {
+    const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
+    return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
+  }
+  const first = d.branches[0];
+  return [
+    ...once,
+    ...(first
+      ? [
+          { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null },
+          { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null },
+        ] satisfies DecideCommand[]
+      : []),
+  ];
+}
+
+/**
+ * What `wf decide` shows a person about a run, read off one read of its tasks.
+ *
+ * A run still running with nobody waited on is `running`, and git is not asked a thing: the page asks while a run is
+ * decidable, and the Factory's card only for a run waiting on you, but a request is a request. Otherwise judged as the
+ * CLI judges it (`decision`): called off, or already shipped, is `nothing`. Then the branches the CLI reads
+ * (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one — each
+ * read with `touchedBy`, and with `sensitiveDiff` over the default check-affecting list. A branch git cannot read is
+ * an `error` on its entry, never a failed request. A few `git` calls a branch, so read once, never on a poll.
+ */
+async function decisionOf(run: Run): Promise<RunDecision> {
+  const folder = workflowsOf(run).steps;
+  const names = stepNames(run, folder);
+  const views = await viewsOf(run);
+  const judged = judge(run, names, folder, views);
+  if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
+  if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true };
+
+  const steps = judgedSteps(run, folder);
+  const phase = (taskId: string) => phaseOfView(views.get(taskId));
+  const reader = closeoutReader(views, run);
+  const asked = closeoutAsked(views);
+  const { asks, rounds } = readAsks(run.id);
+  const d = decision(steps, run, phase, (branch) => isShipped(run, branch), reader, asked, exitVerdicts(views, run), asks, rounds);
+  if (d.kind === 'cancelled') return { nothing: `cancelled at ${d.at} — nothing to decide` };
+  if (d.kind === 'shipped') return { nothing: `shipped — ${d.branches.join(', ')} is already on ${run.branch}` };
+
+  // Still running with a step waiting on you: the terminal steps' branches, as `decision` reads them once it is not.
+  const result = d.kind === 'awaiting'
+    ? d.branches
+    : terminalSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+  const touched: Touched[] = branchesToRead(result, Object.values(run.steps).map((s) => s.branch))
+    .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
+  const consumed = consumption(views, run);
+  const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
+  const offers = [...roundLines(steps, run, d), ...retryLines(steps, run, d, phase, reader, asked)];
+  return {
+    touched,
+    lesson: lessonOf(touched),
+    sensitive: touched.map((t) => sensitiveOf(run, t)),
+    used: Object.fromEntries(filed.map((name) => [name, usedOf(consumed[name])])),
+    total: usedOf(sumUsages(filed.map((name) => consumed[name]))),
+    commands: commandsOf(run, d, offers),
   };
 }
 
@@ -515,6 +714,13 @@ export const app = new Hono()
     const run = findRun(id);
     if (!run) return c.json({ error: noSuchRun(id) }, 404);
     return c.json(await detail(run));
+  })
+  // What `wf decide` shows a person (`decisionOf`): not on the page's poll, since it runs `git diff`.
+  .get('/api/runs/:id/decision', async (c) => {
+    const id = c.req.param('id');
+    const run = findRun(id);
+    if (!run) return c.json({ error: noSuchRun(id) }, 404);
+    return c.json(await decisionOf(run));
   })
   .get('/api/runs/:id/steps/:step/log', async (c) => {
     const id = c.req.param('id');

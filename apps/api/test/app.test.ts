@@ -155,6 +155,8 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
     check: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+    // Its journal carries no usage: nobody measured it, which is not 0.
+    used: { usage: null, used: 'not measured', cost: 'not measured' },
   });
 
   assert.deepEqual({ ...review, told: undefined }, {
@@ -168,6 +170,8 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     closeout: null,
     check: null,
     attempts: { count: 0, latest: null },
+    // Not filed: it consumed nothing.
+    used: null,
   });
   // Not filed, so what it would be given now: implement has run in this workspace, so look there.
   assert.ok(review.told.startsWith('Review what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.'), review.told);
@@ -231,10 +235,11 @@ test('a run whose workflow folder is gone still answers, from its record', async
       closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
       check: null,
       attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+      used: { usage: null, used: 'not measured', cost: 'not measured' },
     },
     {
       name: 'review', spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', note: null, closeout: null,
-      check: null, attempts: { count: 0, latest: null },
+      check: null, attempts: { count: 0, latest: null }, used: null,
     },
   ]);
 
@@ -281,6 +286,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
     check: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+    used: { usage: null, used: 'not measured', cost: 'not measured' },
   });
   assert.deepEqual([review.body, review.spec.after, review.status], ['Review it.', ['replacement'], 'waiting']);
   assert.deepEqual([replacement.body, replacement.taskId, replacement.status, replacement.closeout], ['Do the original thing.', null, 'waiting', null]);

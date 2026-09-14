@@ -547,6 +547,32 @@ tool call (the closeout is not hidden). **S2 (api + web):** the two routes, the 
 the fold, the link if there is one; e2e page in `PAGES` with a seeded transcript; a test that the SSE
 route closes when the task settles. S2 after S1 merges.
 
+### D — The decision on the board: G's screen where the run page is · after G, B4 · api + web
+
+**The ask (operator, 2026-09-13):** G put the blast radius, the sensitive diffs, the usage and the
+lesson line in `wf decide`. The board has none of it. Where should it show, and how?
+
+**Where.** The run page is the board's decider screen — it carries the "Waiting on you" banner, the
+checks and the closeouts — so the decision material is one **Decide** section there, between the
+banner and the canvas, shown when the run is waiting on a person or finished and never while it runs.
+The Factory card gets one line, for triage among the runs waiting on you: `touched 2 packages · +979 −12`.
+
+**How.** *Touched*: one row per group with a proportional +/− bar, then, only when true, chips for the
+**agent-facing** files (amber, "the next agent reads this") and the **check-affecting** ones (red
+outline, "could make its check pass") — G's words, so the CLI and the board cannot disagree. *Lesson*:
+one chip, `lesson · CLAUDE.md +2 −0` (green) or `nothing written where the next agent reads` (amber).
+*In full*: the check-affecting diffs collapsed per file, a coloured unified diff inside, a long one
+capped with "N more lines — `wf decide` prints all". *Used / cost*: beside each step's check in the
+inspector's Details and the step sections, and a run total in the section; `not measured`, never 0.
+*The commands*: ship it, drop it, once more — copyable lines, never buttons: the board shows the
+choice and runs nothing, the CLI's rule. A merge from the board is its own question (a trial merge
+runs the suite first), not this package's.
+
+**Layers.** `GET /api/runs/:id/decision` → `{ touched: Touched[], lesson, sensitive: [{ branch, files,
+diff }], used: Record<step, Usage>, commands }`, built from what G exports (`touchedBy`,
+`sensitiveDiff`, `lessonLine`, `consumption`, `branchesToRead`) and read once when the run is
+decidable — not on the page's 5 s poll, since it runs `git diff`. Nothing in packages/.
+
 ## 4b. Findings from wave 1, for the packages that own them
 
 Recorded here at merge time so they are not lost; fold each into its ledger when that package's

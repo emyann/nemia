@@ -452,7 +452,8 @@ said.
   Any other next argument is the answer, `--flag stays` included. A message to a step
   that did not sign off blocked is allowed, and the usage text says what the flag is for.
 - The tick honours the ask once, as before, and carries the message through `Retry` and `RetryBriefing` into
-  the brief: `## Your answer` inside `## Try <n>`, the text as written, after the paragraph that says where
+  the brief: `## Your answer` inside `## Try <n>`, the text as written in a fence longer than any run of
+  backticks in it (`fenced`, which `## From <step>` data now uses too), after the paragraph that says where
   the step is and before `## What the check said`. The sentence saying whose word the try is names
   `--message`. A try without one is briefed exactly as before. The engine is untouched: the answer travels
   in the brief, and needed no field on the task.
@@ -486,6 +487,11 @@ What was measured:
 - Round 2's review found `--message` refusing any answer that started with `--`, so the brief's own example
   question ("Rename --flag, or keep it?") could not be answered by naming the flag. The next argument is now
   the answer, and a test gives four such answers through the CLI and reads them off the ask file.
+- Round 2's review also found the answer composed raw. A snippet that left a fence open made one code block of
+  everything after it, up to the brief's next fence. Measured on a step that signed off blocked, that was both
+  contracts, the check's and the closeout's, which on a nudge are the only instructions left; on a refused check,
+  the check's own fence closed it, and what the check said was hidden. It is fenced now, and a test reads the
+  brief's headings outside fences in both cases, with the answer fenced and raw.
 - No session has run `dev-planned`. Whether `plan` asks at the right moments is its brief's prose until a run
   shows it.
 - One observation against §4 Q's measurement: this step's own session, filed by `wf` on Claude Code, listed

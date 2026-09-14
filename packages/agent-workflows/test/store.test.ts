@@ -1387,7 +1387,7 @@ test("`wf retry --message` writes the answer on the person's ask and nothing els
   assert.ok(pass.notes.includes('implement: try 2 — wf retry --nudge, with your answer'), pass.notes.join('\n'));
   const brief = tasks.get(try2)!.spec.brief;
   assert.match(brief, /^## Try 2\n\nThe last try signed off `blocked`\./, 'its session continued, told why it is back');
-  assert.ok(brief.includes(`\n\n## Your answer\n\n${answer}`), brief);
+  assert.ok(brief.includes(`\n\n## Your answer\n\n\`\`\`text\n${answer}\n\`\`\``), brief);
   assert.equal(readRun(run.id).steps.implement?.tries?.[0]?.then, 'nudge');
   assert.ok(!fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8').includes('say so in the README'), 'the record keeps no message');
   assert.deepEqual(asksOf(run.id), [], 'consumed');

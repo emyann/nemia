@@ -1499,8 +1499,10 @@ export type RetryBriefing = {
 
 /**
  * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who
- * asked for the try said with it, as they wrote it — then, for a check that did not pass, what the check said, as
- * data (`refusalSection`). The answer is beside why the step is back, and before the evidence: a step that signed
+ * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
+ * then, for a check that did not pass, what the check said, as data (`refusalSection`). The fence is what keeps the
+ * brief's structure the run's: a pasted snippet that leaves a fence open, or a line that reads as a heading, would
+ * otherwise swallow or split the sections after it, and on a nudge those are the only instructions left. The answer is beside why the step is back, and before the evidence: a step that signed
  * off blocked reads the answer to its `needs` first. A try without a message is told exactly what it was before.
  *
  * A try that continues its session is told only this, since it has the rest. A new session is told it is new
@@ -1522,7 +1524,7 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
     ? "This is the last try's session, continued. Finish the work, then sign off again."
     : 'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n'
       + 'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
-  const answer = r.message !== undefined ? ['', '## Your answer', '', r.message] : [];
+  const answer = r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : [];
   return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, who, '', where, ...answer, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
 }
 
@@ -1635,11 +1637,15 @@ function repliesSection(target: string, closeoutOf: (step: string) => Closeout |
   ].join('\n');
 }
 
-/** JSON in a fence longer than any run of backticks inside it, so what it quotes cannot close it. */
+/** Text in a fence longer than any run of backticks inside it, so what it quotes cannot close the fence, nor open a section of the brief's. */
+function fenced(text: string, info = ''): string[] {
+  const fence = '`'.repeat(Math.max(3, ...(text.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
+  return [`${fence}${info}`, text, fence];
+}
+
+/** JSON in a fence longer than any run of backticks inside it (`fenced`). */
 function dataBlock(value: unknown): string[] {
-  const json = JSON.stringify(value, null, 2);
-  const fence = '`'.repeat(Math.max(3, ...(json.match(/`+/g) ?? []).map((ticks) => ticks.length + 1)));
-  return [`${fence}json`, json, fence];
+  return fenced(JSON.stringify(value, null, 2), 'json');
 }
 
 /**

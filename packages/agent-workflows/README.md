@@ -564,7 +564,8 @@ retries: 1
   `blocked`, with the question in `needs`, which ends its session and puts the question on the record. The
   answer rides on the ask — `message`, in the person's own file — beside `--nudge`, `--fresh` or `--model <m>`,
   and the next tick carries it into the try's brief inside `## Try <n>`, as `## Your answer`: the text as it was
-  written, after on whose word the try is and before what the check said. A step that did not sign off blocked
+  written, in a fence longer than any run of backticks in it, so a pasted snippet cannot close the section or
+  swallow the contract after it — after on whose word the try is and before what the check said. A step that did not sign off blocked
   may be told something too. `--message` takes the next argument as the answer, whatever it starts with, so
   an answer about a flag names it; `--message=<answer>` carries one that is only one of the verb's own flags.
   Refused before anything is written: an empty message, and `--message` with `--recheck`, which files no

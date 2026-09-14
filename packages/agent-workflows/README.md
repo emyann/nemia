@@ -703,7 +703,8 @@ screen shows what the branch touched, read out of git:
   files in full, for one screen; the touched lines still say which files are check-affecting. The
   heading with `none` under it means nothing on the list changed, not that nobody looked.
 - **lesson** says whether the run changed a file where the next agent reads — `CLAUDE.md`,
-  `AGENTS.md`, a `docs/` — or that it wrote nothing there. CLAUDE.md's *When you miss* is a rule, and
+  `AGENTS.md`, the root's `docs/` or a workspace package's — or that it wrote nothing there. Not any
+  `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. CLAUDE.md's *When you miss* is a rule, and
   this line holds a person to it.
 - **used** and **cost** are the engine's `usage` for the step's current try, summed over its attempts.
   A count nobody measured says `not measured`, never `0`. So does cost, which none of the runners `wf`

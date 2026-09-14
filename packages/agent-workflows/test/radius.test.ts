@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  AGENT_FACING, CHECK_AFFECTING, LESSON, ROOT_GROUP, branchesToRead, count, groupOf, inFullLines, lessonLine, matches,
+  AGENT_FACING, CHECK_AFFECTING, LESSON, ROOT_GROUP, branchesToRead, count, groupOf, inFullLines, lessonGlobs, lessonLine, matches,
   parseGlobs, parseNumstat, radius, radiusLines, sensitiveHeading, sensitivePaths, sumUsage, touchedLines, usedLines,
 } from '../src/radius.ts';
 
@@ -103,8 +103,14 @@ test('the shipped lists name what the brief names, and refuse what they do not',
   for (const f of inAgent) assert.ok(matches(f, AGENT_FACING), `agent-facing: ${f}`);
   for (const f of notInAgent) assert.ok(!matches(f, AGENT_FACING), `not agent-facing: ${f}`);
 
-  for (const f of ['CLAUDE.md', 'AGENTS.md', 'docs/plan.md', 'packages/x/docs/features.md']) assert.ok(matches(f, LESSON), `lesson: ${f}`);
-  for (const f of ['README.md', 'src/docs.ts', 'packages/x/documents/a.md', '.claude/settings.json']) assert.ok(!matches(f, LESSON), `not a lesson: ${f}`);
+  const lesson = lessonGlobs(WORKSPACES);
+  for (const f of ['CLAUDE.md', 'AGENTS.md', 'apps/web/CLAUDE.md', 'docs/plan.md', 'packages/x/docs/features.md', 'apps/web/docs/a/b.md']) assert.ok(matches(f, lesson), `lesson: ${f}`);
+  // A `docs/` that is not the root's or a workspace package's is product code, not where the next agent reads.
+  for (const f of ['README.md', 'src/docs.ts', 'packages/x/documents/a.md', '.claude/settings.json', 'apps/web/src/routes/docs/index.tsx',
+    'src/docs/strings.ts', 'packages/x/src/docs/a.md', 'packages/docs/a.md', 'vendor/lib/docs/a.md']) assert.ok(!matches(f, lesson), `not a lesson: ${f}`);
+  // With no workspaces, only the root's docs/ is a package's.
+  assert.ok(matches('docs/a.md', lessonGlobs([])) && !matches('packages/x/docs/features.md', lessonGlobs([])));
+  assert.deepEqual(lessonGlobs(['packages/*/', 'apps/*']), [...LESSON, 'packages/*/docs/', 'apps/*/docs/']);
 });
 
 test('--sensitive with a glob that matches nothing names no path, and the heading says whose list it is', () => {
@@ -126,6 +132,9 @@ test("the lesson line: a branch that touched only a package's docs says so, and 
   // README.md is agent-facing, but it is not where a lesson goes.
   assert.equal(lessonLine([on('wf/a', '9\t9\tsrc/a.ts', '1\t0\tREADME.md', '1\t0\tsrc/a.test.ts')]), 'lesson  nothing written where the next agent reads');
   assert.equal(lessonLine([on('wf/a')]), 'lesson  nothing written where the next agent reads');
+  // A docs page in an app, or a `docs/` in a package's source, is not a lesson.
+  assert.equal(lessonLine([on('wf/a', '40\t0\tapps/web/src/routes/docs/index.tsx', '3\t0\tsrc/docs/strings.ts', '2\t0\tpackages/x/src/docs/a.md')]), 'lesson  nothing written where the next agent reads');
+  assert.equal(lessonLine([on('wf/a', '40\t0\tapps/web/src/routes/docs/index.tsx', '1\t0\tapps/web/docs/notes.md')]), 'lesson  apps/web/docs/notes.md +1 −0');
   // A branch that could not be read is not a branch that wrote nothing.
   assert.equal(lessonLine([on('wf/a'), gone('wf/gone')]), 'lesson  not known — wf/gone could not be read');
   assert.equal(lessonLine([on('wf/a', '1\t0\tAGENTS.md'), on('wf/b', '2\t0\tdocs/x.md')]), 'lesson  AGENTS.md +1 −0 (wf/a) · docs/x.md +2 −0 (wf/b)');

@@ -20,7 +20,11 @@ export type Change = { path: string; from?: string; added: number | null; remove
 /** A part of the repository a change touched: a workspace package, a top-level directory, or the root. */
 export type Group = { name: string; files: number; added: number; removed: number; binary: number };
 
-export type Radius = { changes: Change[]; groups: Group[]; agentFacing: string[]; checkAffecting: string[] };
+export type Radius = {
+  changes: Change[]; groups: Group[]; agentFacing: string[]; checkAffecting: string[];
+  /** The changes to a file where the next agent reads (`lessonGlobs`), for the lesson line. */
+  lessons: Change[];
+};
 
 /** A branch the screen read, and what it touched — or why that could not be read. */
 export type Touched = { branch: string; radius: Radius | { error: string } };
@@ -35,8 +39,16 @@ export const AGENT_FACING: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', 
  */
 export const CHECK_AFFECTING: readonly string[] = ['**/package.json', '**/package-lock.json', '**/tsconfig*.json', '**/turbo.json', '**/*.test.*', '**/test/', '**/.e2e/'];
 
-/** Where the next agent reads what this one learned (CLAUDE.md's "When you miss"). */
-export const LESSON: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', '**/docs/'];
+/**
+ * Where the next agent reads what this one learned (CLAUDE.md's "When you miss"): these, and the `docs/` of
+ * each workspace package (`lessonGlobs`). Not any `docs/`: an app's `src/routes/docs/` is product code, and a
+ * lesson line that counts it says a lesson was written when none was — the one wrong answer the line is for.
+ */
+export const LESSON: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', 'docs/'];
+
+/** The lesson list for a repository: `LESSON`, and `<workspace>/docs/` for each of its npm `workspaces` globs. */
+export const lessonGlobs = (workspaces: readonly string[]): string[] =>
+  [...LESSON, ...workspaces.map((w) => `${w.replace(/\/+$/, '')}/docs/`)];
 
 /** The group of a file in no directory. */
 export const ROOT_GROUP = '(root)';
@@ -140,12 +152,13 @@ export function radius(numstat: string, workspaces: readonly string[] = []): Rad
       groups.set(name, g);
     }
   }
-  const touching = (globs: readonly string[]) => changes.filter((c) => pathsOf(c).some((p) => matches(p, globs))).map(nameOf);
+  const touching = (globs: readonly string[]) => changes.filter((c) => pathsOf(c).some((p) => matches(p, globs)));
   return {
     changes,
     groups: [...groups.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
-    agentFacing: touching(AGENT_FACING),
-    checkAffecting: touching(CHECK_AFFECTING),
+    agentFacing: touching(AGENT_FACING).map(nameOf),
+    checkAffecting: touching(CHECK_AFFECTING).map(nameOf),
+    lessons: touching(lessonGlobs(workspaces)),
   };
 }
 
@@ -214,8 +227,7 @@ export function inFullLines(t: Touched, globs: readonly string[] | undefined, di
 export function lessonLine(touched: readonly Touched[]): string {
   const unread = touched.filter((t) => 'error' in t.radius).map((t) => t.branch);
   if (unread.length) return `lesson  not known — ${unread.join(', ')} could not be read`;
-  const written = touched.flatMap(({ branch, radius: r }) => (r as Radius).changes
-    .filter((c) => pathsOf(c).some((p) => matches(p, LESSON)))
+  const written = touched.flatMap(({ branch, radius: r }) => (r as Radius).lessons
     .map((c) => `${nameOf(c)} ${linesOf(c)}${touched.length > 1 ? ` (${branch})` : ''}`));
   return `lesson  ${written.length ? written.join(' · ') : 'nothing written where the next agent reads'}`;
 }

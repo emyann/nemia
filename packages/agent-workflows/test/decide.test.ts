@@ -52,8 +52,11 @@ const board = () => {
   type Filed = { id: string; closeoutSchema?: object };
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object }>();
   const logs = new Map<string, string>();
+  /** How many times each task was viewed: every view is a harness observe. */
+  const viewed = new Map<string, number>();
   const e = {
     view: async (id: string) => {
+      viewed.set(id, (viewed.get(id) ?? 0) + 1);
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
       return {
@@ -72,7 +75,7 @@ const board = () => {
     logs: async (id: string) => logs.get(id) ?? '(no output yet)',
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, usage });
-  return { e, settle, logs };
+  return { e, settle, logs, viewed };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -101,7 +104,7 @@ const awaiting = async () => {
     write(repo, 'logo.png', new Uint8Array([0, 1, 2, 0, 255]));
   });
 
-  const { e, settle, logs } = board();
+  const { e, settle, logs, viewed } = board();
   await advance(e, readRun(run.id));
   settle(`${run.id}-implement`, 'succeeded', SIGNED, USAGE);
   await advance(e, readRun(run.id));
@@ -114,7 +117,7 @@ const awaiting = async () => {
   const record = readRun(run.id);
   for (const s of Object.values(record.steps)) s.branch = branch;
   fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
-  return { run: record, repo, branch, e };
+  return { run: record, repo, branch, e, viewed };
 };
 
 /** What `wf decide` prints, line by line. */
@@ -132,8 +135,11 @@ const indexOf = (lines: string[], want: string | RegExp): number => {
 };
 
 test('the awaiting screen: what the branch touched, the lesson, and the check files in full — between the verdicts and the closeouts', async (t) => {
-  const { run, repo, branch, e } = await awaiting();
+  const { run, repo, branch, e, viewed } = await awaiting();
+  viewed.clear();
   const lines = await screen(t, e, run.id);
+  // Each task viewed once for the whole screen, usage included: every view is a harness observe (plan §4b).
+  assert.deepEqual(Object.fromEntries(viewed), { [`${run.id}-implement`]: 1, [`${run.id}-implement-check`]: 1, [`${run.id}-review`]: 1 });
 
   const verdict = indexOf(lines, /^  UNVERIFIED: review/);
   const touched = indexOf(lines, `  touched  ${branch}`);
@@ -185,6 +191,10 @@ test('`wf decide` refuses a flag it does not take, and --sensitive without globs
   ] as const) {
     await assert.rejects(main(['decide', 'no-such-run', ...flags]), refused(pattern), flags.join(' '));
   }
+  // A flag before the run is refused too — not the general help, which exits 0 and says nothing of the order.
+  for (const argv of [['--sensitive', 'src/**', 'no-such-run'], ['--sensitive']]) {
+    await assert.rejects(main(['decide', ...argv]), refused(/^wf decide takes the run first: wf decide <runId> \[--sensitive <globs>\]/), argv.join(' '));
+  }
   // The flag it takes gets as far as reading the run, which is not there.
   await assert.rejects(main(['decide', 'no-such-run', '--sensitive', 'src/**']), (err: Error) => !/sensitive/.test(err.message));
 });
@@ -227,7 +237,20 @@ test('what a branch touched is read out of git: a rename at both ends, a binary 
   assert.equal(lessonLine([gone]), 'lesson  not known — wf/never could not be read');
 });
 
-test('what a step consumed is summed over its attempts — one that never started left out, the one in flight read off the view', async () => {
+test("the lesson line reads the base's workspaces: a package's docs/ is a lesson, a docs/ in its source is not", () => {
+  const repo = aRepo();
+  const run = start({ brief: 'document it', repo, workflowDir: folder(), isolate: false });
+  branchOff(repo, 'wf/source-docs', () => write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n'));
+  branchOff(repo, 'wf/package-docs', () => {
+    write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n');
+    write(repo, 'packages/x/docs/features.md', 'what is left\n');
+  });
+  const read = (branch: string) => lessonLine([{ branch, radius: touchedBy(run, branch) }]);
+  assert.equal(read('wf/source-docs'), 'lesson  nothing written where the next agent reads');
+  assert.equal(read('wf/package-docs'), 'lesson  packages/x/docs/features.md +1 −0');
+});
+
+test('what a step consumed is summed over its attempts — one that never started left out, the one in flight read off the view', () => {
   const views: Record<string, unknown> = {
     t1: {
       usage: { turns: 1, toolCalls: 1, inputTokens: 5, outputTokens: 1 },
@@ -240,9 +263,8 @@ test('what a step consumed is summed over its attempts — one that never starte
     // A session lost before its runner measured anything: nobody counted, so nothing is summed.
     t2: { state: { attempts: [{ reason: 'lost', endedAt: '2026-09-13T00:00:00Z', usage: null }] } },
   };
-  const e = { view: async (id: string) => views[id] } as unknown as Engine;
   const run = { steps: { implement: { taskId: 't1' }, review: { taskId: 't2' }, respond: {} } } as unknown as Run;
-  assert.deepEqual(await consumption(e, run), {
+  assert.deepEqual(consumption(new Map(Object.entries(views)) as unknown as Parameters<typeof consumption>[0], run), {
     implement: { turns: 3, toolCalls: 4, inputTokens: 15, outputTokens: 2 },
     review: undefined,
   });

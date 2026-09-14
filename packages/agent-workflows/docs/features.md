@@ -299,13 +299,16 @@ What it leaves:
 Plan §4 G. On a run waiting on you, `wf decide` prints three things between the verdicts and the closeouts:
 what the result branch touched, the lesson line, and the whole diff of the check-affecting files. Beside
 each step's check it prints what the step's session consumed. `src/radius.ts` is the pure part. `touchedBy`,
-`sensitiveDiff` and `consumption` in `src/runner.ts` ask git and the engine. The README section *What the
+`sensitiveDiff` and `consumption` in `src/runner.ts` ask git and the engine. `decide` returns `used` off the
+views it already read, so the screen still reads each task once (each view is a harness observe, plan §4b). The README section *What the
 screen puts in front of you* is the account.
 
 - `radius` reads `git diff --numstat <base>...<branch>`: a rename in its brace or plain form, a binary file's
   `-` counts as no lines, and a quoted path as its name. It refuses a line it cannot read, and the screen says
   that branch was not read. Groups are the base's npm `workspaces`, else top-level directories, else `(root)`.
 - The agent-facing, check-affecting and lesson lists are globs written once and printed by `wf decide --help`.
+  A lesson is `CLAUDE.md` or `AGENTS.md` at any depth, or a file in the root's `docs/` or a workspace
+  package's. It is not any `docs/`, so an app's `src/routes/docs/` does not count. A flag before the run is refused.
   `--sensitive <globs>` replaces the check-affecting list for the files printed in full. It is refused when
   mistyped, when it has no glob, and when given twice.
 - `used` sums the current task's attempts, a count only when every attempt measured it. It leaves out an

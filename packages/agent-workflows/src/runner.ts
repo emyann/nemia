@@ -1296,12 +1296,15 @@ export function sensitiveDiff(run: Run, t: Touched, globs: readonly string[]): s
  * What each step's current task consumed, summed over its attempts (`sumUsage`): the try whose closeout
  * and check `wf decide` prints beside it. A settled attempt's usage is on the engine's record, the one in
  * flight on the view; an attempt that never started consumed nothing, and is left out.
+ *
+ * Off views already read, not a view of its own: each `e.view` is a harness observe (~300 ms, plan §4b),
+ * so `decide` reads each task once and hands its views here.
  */
-export async function consumption(e: Engine, run: Run): Promise<Record<string, Usage | undefined>> {
+export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Record<string, Usage | undefined> {
   const used: Record<string, Usage | undefined> = {};
   for (const [name, { taskId }] of Object.entries(run.steps)) {
-    if (!taskId) continue;
-    const v = await e.view(taskId);
+    const v = taskId ? views.get(taskId) : undefined;
+    if (!v) continue;
     used[name] = sumUsage(v.state.attempts.filter((a) => a.reason !== 'unstartable').map((a) => (a.endedAt ? a.usage : v.usage)));
   }
   return used;
@@ -1320,6 +1323,8 @@ export async function decide(e: Engine, id: string): Promise<{
   rounding: Round[];
   /** For each loop out of rounds, the `wf round` that goes once more (`roundLines`); for each step a person may try again, the `wf retry` (`retryLines`). */
   offers: string[];
+  /** What each filed step's current try consumed (`consumption`), off the views read for the rest. */
+  used: Record<string, Usage | undefined>;
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
@@ -1337,6 +1342,7 @@ export async function decide(e: Engine, id: string): Promise<{
     retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks),
     rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds),
     offers: [...roundLines(steps, run, d), ...retryLines(steps, run, d, phaseOf, reader, asked)],
+    used: consumption(views, run),
   };
 }
 

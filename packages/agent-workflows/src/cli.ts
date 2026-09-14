@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, consumption, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, missingArtifacts, outputLines, owedFields, parseGlobs, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, missingArtifacts, outputLines, owedFields, parseGlobs, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, type RetryMode } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -79,7 +79,8 @@ and beside each step's check, what its session consumed — used, cost — or th
 
   check-affecting, the default --sensitive:  ${CHECK_AFFECTING.join(', ')}
   agent-facing:                              ${AGENT_FACING.join(', ')}
-  where the next agent reads:                ${LESSON.join(', ')}
+  where the next agent reads:                ${LESSON.join(', ')}, and <workspace>/docs/ for each
+                                             npm workspace in the base's package.json — not any docs/
 
 A glob is a path from the repository root: * and ? stay within a directory, ** crosses any number of
 them (a leading **/ crosses none as well), and a trailing / takes everything below.`;
@@ -211,10 +212,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     // and does not decide anything itself.
     case 'decide': {
       if (rest.includes('--help')) return console.log(DECIDE_HELP);
-      if (!rest[0] || rest[0].startsWith('--')) return console.log(HELP);
-      // Read before the run is: a mistyped flag is refused, not a screen quietly printed without it.
+      if (!rest[0]) return console.log(HELP);
+      // Read before the run is: a mistyped flag is refused, not a screen quietly printed without it — and
+      // so is a flag before the run, which would otherwise be the general help and exit 0.
+      if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, used } = await decide(e, rest[0]);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
       const steps = stepsOf(run);
 
@@ -260,7 +263,6 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           for (const line of inFullLines(t, sensitive, sensitiveDiff(run, t, sensitive ?? CHECK_AFFECTING), touched.length > 1)) console.log(`  ${line}`);
         }
       }
-      const used = await consumption(e, run);
 
       // Each step's own closeout: the summary is written FOR this moment. The reviewer never saw
       // it — that is the point of the field — and you are the audience it was addressed to. Above it,

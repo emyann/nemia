@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { needLine, needOf, needsOf, needText, offersOf, unblockCommands, type Need } from '../src/lib/asks.ts';
+import { answersOf, askedSaid, needLine, needOf, needsOf, needText, offersOf, type Need } from '../src/lib/asks.ts';
 import type { RunDetail } from '../src/lib/api.ts';
 
 const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
@@ -83,13 +83,35 @@ test('what the Decide section offers: an answer to a step that asks, Try again f
   assert.deepEqual(kinds(needsOf(run(steps, waiting))), ['asks'], 'the banner names the step that asks');
 });
 
-test("REFUSED: a session the harness blocked is offered no try, since the package refuses every one — only the commands that can move it: stop its task in wf's engine store, then wf retry", () => {
+test('a session the harness blocked is offered Continue, whether or not the api names it as waiting on you — and once asked, the note of its try, in the Decide section too; Continue itself is the banner\'s', () => {
   const held = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN });
-  // Whether or not the api names it as waiting on you: it asked nothing, and no try of it is taken.
-  assert.deepEqual(offersOf(run([held], [])), []);
-  assert.deepEqual(offersOf(run([held], ['held'])), []);
-  assert.deepEqual(unblockCommands('r-1', 'held', 'r-1-held'), [
-    'AE_ROOT="${WF_ROOT:-$HOME/.agent-workflows}/engine" ae stop r-1-held',
-    'wf retry r-1 held',
+  const implement = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
+  // It asked nothing, so the package's `waitingOnYou` does not name it; the package takes a try of it all the same.
+  assert.deepEqual(offersOf(run([held], [])), [{ step: 'held', kind: 'continue' }]);
+  assert.deepEqual(offersOf(run([held], ['held'])), [{ step: 'held', kind: 'continue' }]);
+  assert.deepEqual(offersOf(run([implement, held], ['implement'])), [
+    { step: 'implement', kind: 'answer', needs: 'Which database?' },
+    { step: 'held', kind: 'continue' },
   ]);
+  assert.deepEqual(answersOf(run([implement, held], ['implement'])), [{ step: 'implement', kind: 'answer', needs: 'Which database?' }]);
+  assert.deepEqual(answersOf(run([held], [])), [], 'no Decide section for it until its try is asked');
+
+  const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';
+  const asked = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN, note, asked: { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true } });
+  assert.deepEqual(offersOf(run([asked], [])), [{ step: 'held', kind: 'asked', try: 2, note }]);
+  assert.deepEqual(answersOf(run([asked], [])), [{ step: 'held', kind: 'asked', try: 2, note }], 'the Decide section is drawn for it, as for any try asked');
+  // The need stays for as long as the harness keeps the session blocked: no tick has stopped it yet.
+  assert.deepEqual(needsOf(run([asked], [])), [{ step: 'held', kind: 'harness', lastLine: LOGIN }]);
+});
+
+test('REFUSED: no Continue for a session still at work, which the harness did not block, nor for one it blocked on a run called off', () => {
+  assert.deepEqual(offersOf(run([step('working', 'running (working)')], [])), []);
+  assert.deepEqual(offersOf(run([step('working', 'running (working)')], ['working'])), []);
+  const held = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN });
+  assert.deepEqual(offersOf(run([held], [], '2026-09-14T07:00:00.000Z')), []);
+});
+
+test('a try the api has just taken, as the board says it until the run is read again: what the tick does next — stopping a blocked session first, where the package says so', () => {
+  assert.equal(askedSaid({ try: 2, stopFirst: false }), 'try 2 asked — the next tick files it');
+  assert.equal(askedSaid({ try: 3, stopFirst: true }), 'try 3 asked — stopping its blocked session, then the tick files it');
 });

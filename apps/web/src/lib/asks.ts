@@ -41,39 +41,35 @@ export const needText = (need: Need): string =>
 export const needLine = (need: Need): string => `${need.step} ${need.kind === 'asks' ? '' : 'is '}${needText(need)}`;
 
 /**
- * What a person can do today about a session the harness blocked, from a terminal: stop its task — against the engine store `wf` keeps,
- * as `wf`'s own help points `ae` at it — and once `wf ls` says the step stopped, try it again, which continues the session told what
- * happened. The board offers no button for it: the package refuses a try of a step whose session has not ended, which reads running, and
- * nothing in the run resumes a session the harness blocked yet (plan §6 item 10).
- */
-export const unblockCommands = (runId: string, step: string, taskId: string): [stop: string, retry: string] => [
-  `AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae stop ${taskId}`,
-  `wf retry ${runId} ${step}`,
-];
-
-/**
- * What the Decide section offers for a step, each a `wf retry` the api asks for (`askTry`):
+ * What a run's page offers for a step, each a `wf retry` the api asks for (`askTry`):
  *
  *   answer     it signed off blocked: an answer to its `needs`, carried into a nudge, or a fresh session
  *   try-again  its check refused it, or it ended without its closeout: another session, with something to say if you like — and
  *              where a check did not pass, the check run again; first, when it did not finish
+ *   continue   the harness blocked its session, with nothing signed: a nudge, with something to say if you like, which the package takes
+ *              as `wf retry` does — the tick stops the session, then files the try. The banner offers it, beside what the session said last
  *   asked      a person asked for its next try, which the next tick files: `wf ls`'s note says so
- *
- * Nothing for a session the harness blocked: every try of it is refused (`unblockCommands`).
  */
 export type Offer =
   | { step: string; kind: 'answer'; needs: string | null }
   | { step: string; kind: 'try-again'; recheck: boolean; unfinished: boolean }
+  | { step: string; kind: 'continue' }
   | { step: string; kind: 'asked'; try: number; note: string | null };
 
+/** What the Decide section offers: every offer but `continue`, which the banner makes beside the need it answers. */
+export type Answer = Exclude<Offer, { kind: 'continue' }>;
+
 /**
- * The offers of a run's page, in the run's order: one per step waiting on you that a try can answer, and each step a person asked for a
- * try of. A loop out of rounds goes round with `wf round`, among the Decide section's commands, and has none. Nothing on a run called off.
+ * The offers of a run's page, in the run's order: one per step waiting on you that a try can answer, one per session the harness blocked,
+ * and each step a person asked for a try of. A session the harness blocked is not waiting on you in the package's words — it asked
+ * nothing — and is offered Continue all the same. A loop out of rounds goes round with `wf round`, among the Decide section's commands, and
+ * has none. Nothing on a run called off.
  */
 export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'>): Offer[] {
   if (run.cancelledAt !== null) return [];
   return run.steps.flatMap((step): Offer[] => {
     if (step.asked) return [{ step: step.name, kind: 'asked', try: step.asked.try, note: step.note }];
+    if (step.blockedByHarness) return [{ step: step.name, kind: 'continue' }];
     if (!run.waitingOnYou.includes(step.name)) return [];
     const state = stepState(step.status, false);
     if (state === 'blocked') return [{ step: step.name, kind: 'answer', needs: step.needs }];
@@ -82,3 +78,14 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
     return [];
   });
 }
+
+/** What the Decide section offers, in the run's order: every offer but Continue, which the banner makes (`Answer`). */
+export const answersOf = (run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'>): Answer[] =>
+  offersOf(run).filter((offer): offer is Answer => offer.kind !== 'continue');
+
+/**
+ * A try the api has just taken, as the board says it until the run is read again and the step's note says it in `wf ls`'s words: what the
+ * tick does with it — for a step whose session the harness blocked (`stopFirst`, the package's), stop that session first.
+ */
+export const askedSaid = (asked: { try: number; stopFirst: boolean }): string =>
+  `try ${asked.try} asked — ${asked.stopFirst ? 'stopping its blocked session, then the tick files it' : 'the next tick files it'}`;

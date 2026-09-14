@@ -50,8 +50,11 @@ export type RunWaiting = {
  */
 export type StepNeeds = { needs: string | null; blockedByHarness: boolean };
 
-/** Mirrors `StepAsked` in apps/api/src/app.ts: a try a person asked for, which the next tick files. */
-export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null };
+/**
+ * Mirrors `StepAsked` in apps/api/src/app.ts: a try a person asked for, which the next tick files — once it has stopped the step's session
+ * where `stopFirst`, because the harness blocked it.
+ */
+export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null; stopFirst: boolean };
 
 /** How `wf retry` tries a step again: continue its session, a new one, or its check run again and no session. */
 export type RetryMode = 'nudge' | 'fresh' | 'recheck';
@@ -427,16 +430,17 @@ export async function startRun(start: { workflow: string; from: WorkflowListing[
 
 /**
  * Ask for another try of a step, as `wf retry` does: the api calls the package's `retry()`, which writes the ask and nothing else, and the
- * next tick files the try. Resolves with the try asked for and its ask file; rejects with the api's refusal in full — the package's words
- * for a message that cannot ride on the ask or a step that may not be tried again that way, or the api's own about the request.
+ * next tick files the try. Resolves with the try asked for, its ask file, and the package's `stopFirst` — the tick stops the step's blocked
+ * session before it files the try; rejects with the api's refusal in full — the package's words for a message that cannot ride on the ask
+ * or a step that may not be tried again that way, or the api's own about the request.
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
-export async function askTry(runId: string, step: string, how: { mode: RetryMode; model?: string; message?: string }): Promise<{ try: number; file: string }> {
+export async function askTry(runId: string, step: string, how: { mode: RetryMode; model?: string; message?: string }): Promise<{ try: number; file: string; stopFirst: boolean }> {
   const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
-  const body = (await res.json().catch(() => undefined)) as { try?: unknown; file?: unknown; error?: unknown } | undefined;
-  if (res.ok && typeof body?.try === 'number') return { try: body.try, file: String(body.file) };
+  const body = (await res.json().catch(() => undefined)) as { try?: unknown; file?: unknown; stopFirst?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.try === 'number') return { try: body.try, file: String(body.file), stopFirst: body.stopFirst === true };
   if (res.ok) {
     // Written, it may well be: look before asking again.
     throw new Error(

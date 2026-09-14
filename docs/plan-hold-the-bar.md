@@ -752,6 +752,17 @@ owner is not mid-run.
   (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
   and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
 
+- **`decision` says shipped for a branch with nothing past its base (P1's round-3 review, 2026-09-14):** a
+  result branch is cut at the run's base, so a terminal step that ended failed, blocked or unsigned with nothing
+  committed leaves its branch on the base, and `decision` calls the run shipped — `wf decide` hides the failure, and
+  a run waiting on it starts. Rare in the repo's workflows (implement must succeed with no commits and review
+  fail). Shipped only when the outcome would be `succeeded`, unless the branch has commits that are on the base.
+  → agent-workflows, W4 (§6 item 21).
+
+### Settled
+
+Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+
 - **`needs-human` on the board says nothing about what is needed (operator, 2026-09-14, on Q1):** the card and the
   node show the chip and nothing else. Two cases hide behind it. A step that signed off `blocked` has its question in
   `needs`, which only the inspector's closeout shows (`Needs:`), two clicks away — the card, the node and a banner on
@@ -760,10 +771,8 @@ owner is not mid-run.
   the board should say that: *blocked by the harness*, with the session's last line from the transcript, and that a
   nudge (`wf retry --nudge`, or the board's answer box with no text) is the remedy. The tick that recognises that one
   message and resumes the session is §6 item 10. → apps, with Q2 (the answer box); agent-workflows for item 10.
-
-### Settled
-
-Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+  *Q2, `1e471b7`: the question is on the card, the node and a banner; a harness-blocked session is named with its
+  last line and the two commands that continue it; the answer box posts to the package's `retry()`.*
 
 - **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
   mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
@@ -910,20 +919,22 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — the order to file is 4–5 (D1, done), then Q (Q1 done, Q2 filed), then P (P1 filed beside Q2).
+Everything left, in one list, as of 2026-09-14 — the order to file was 4–5 (D1), then Q (Q1, Q2), then P (P1) — all done; P2 and W4 run side by side now.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
 1. **P — Cards with edges** (§4 P): `after: [runId]` on the record, `wf start --after`, a pure
    `runReady(run, shipped)` gating roots on shipped parents, `wf ls` saying `waiting on <run>`; the Factory
    as a graph of cards; then `wf plan <folder>`. workflows + board. *P1 (agent-workflows: `--after`, `runReady`,
-   `waiting on <run>`) filed 2026-09-14 as `a-run-that-waits-on-a-run-wf-vaka`, from `./workflows/dev`, beside Q2;
-   P2 (the Factory as a graph of cards, the start form's "after"; then `wf plan <folder>`) after both land.*
+   `waiting on <run>`, branch tips recorded) done, `35920da`. P2 (apps: the Factory as a graph of cards, `after`
+   and `waiting` on the api, the start form's "after") filed 2026-09-14 as `the-factory-as-a-graph-of-ca-x2xs`,
+   from `./workflows/dev-build`. P3 (`wf plan <folder>`, a dependent run handed its parents' closeouts) after.*
 2. **Q — A step that asks, and a step that plans** (§4 Q): `wf retry --nudge --message`, the answer box
    on a blocked step (the board's second write), a `plan` step and a `dev-planned` variant. *Q1 (agent-workflows:
    `--message`, `## Your answer`, `dev-planned`) done, `ed702d7`. Q2 (apps: the answer box, a guarded `POST` that
    calls `retry()`, and the `needs` text — or the harness's last line — on the card, the node and the run page)
-   filed 2026-09-14 as `the-board-says-what-a-step-n-e26v`, from `./workflows/dev-build`.*
+   done, `1e471b7`. Left by Q2 for agent-workflows: the board cannot continue a harness-blocked session, because
+   the package reads it as running — item 10, in W4.*
 3. **The steering channel** (deferred from §4 S): a prompt box on the session page that sends into a
    running session, the message recorded on the run. api + engine (a `say` op).
 
@@ -934,7 +945,17 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 7. Step order: `run.steps` alphabetical; order by `after` at `wf start`.
 8. `wf start --input <file>` into `runs/<id>/inputs/`, named in every brief.
 9. The artifacts directory carried on the task (reviewer reads screenshots portably; Codex's unwritable dir).
-10. The login-refresh race: a tick that resumes a session blocked on that one harness message; a Claude Code report.
+10. The login-refresh race: `wf retry` on a step whose session the harness marked blocked with no closeout — the
+    tick stops the task, then files the nudge (Q2 measured that the package reads such a step as running and refuses
+    every try). *W4, filed 2026-09-14 as `three-small-correctness-item-lz3w`, with 21 and 22.* A Claude Code report
+    for the race itself is still to write.
+
+21. `decision` calls a run shipped when its terminal step failed or blocked with nothing committed: the result
+    branch sits at the base, so it is trivially "on the base", `wf decide` hides the failure and a child `--after`
+    it starts (P1's last review). Shipped only when the outcome is `succeeded`, unless the branch has commits on
+    the base. *W4.*
+22. An ask file that is not an ask (`{}` at `runs/<id>.asks/retry-<step>-<n>`) is honoured by nobody, yet `retry()`
+    refuses to write over it with "already asked for. Wait for it" (Q2's e2e found it). Name the file. *W4.*
 
 **apps, small**
 11. The timeline — per try and per check, on the run page and in `wf decide`; `effort`/`tools` on the Workflows page's node.

@@ -152,6 +152,9 @@ const PAGES: PageSpec[] = [
       await expectCount(cardOf(page, bottom.id).getByText('waiting on you', { exact: true }), 0, 'and does not wait on you: the side it waits on may still ship');
       for (const run of [top, shipped, running]) await expectCount(cardOf(page, run.id).locator('[data-waiting]'), 0, `${run.id} waits on no run`);
       await expectCount(page.locator('.react-flow__panel[aria-label="Legend"] [data-sample="cards"]'), 1, "the Factory's legend draws the edge between two cards");
+      // Photographed as a person first finds it: the page's own photograph is taken at the end, after a graph unfolded over the diamond.
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `factory-diamond-${await themeOf(page)}.png`), fullPage: true });
 
       // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight.
       // Its followers read `waiting`, and will for ever; they do not keep it on the floor.

@@ -18,6 +18,7 @@ import {
   repoName,
   runEdges,
   spanOf,
+  standingOf,
   titleOf,
   toggleOpen,
   waitsOnYou,
@@ -472,4 +473,68 @@ test('an open run is placed on its own, and the cards that wait on it layered ri
 test('runs whose `after` goes round, as only a record edited by hand could, are placed a card at a time, and the layout ends', () => {
   const at = placeRuns(['a', 'b'], new Map(), null, new Map(), new Map([['a', ['b']], ['b', ['a']]]));
   assert.deepEqual(Object.fromEntries(at), { a: { x: 0, y: 0 }, b: { x: CELL_WIDTH, y: 0 } });
+});
+
+// ─── what the second review found ────────────────────────────────────────────
+
+/** Each `after` edge between placed cards whose parent does not stand a column or more left of its child, as `parent->child`. */
+function backwards(at: ReadonlyMap<string, Point>, after: ReadonlyMap<string, readonly string[]>): string[] {
+  const column = (id: string) => Math.round(at.get(id)!.x / CELL_WIDTH);
+  return [...after].flatMap(([child, parents]) => parents.filter((p) => at.has(p) && at.has(child) && column(p) >= column(child)).map((p) => `${p}->${child}`));
+}
+
+test("a graph unfolding over the diamond's top, one side and its bottom, and not the other side, moves the whole diamond: it still reads as one", () => {
+  const ids = ['a', 'b', 'c', 'd'];
+  const fresh = placeRuns(ids, new Map(), null, new Map(), DIAMOND);
+  // An open run across the first row's first three cells: over a (halfway down it), b and d (halfway down), and not c, in the row below.
+  const spans = new Map([['x', { columns: 3, rows: 1 }]]);
+  const onFloor = new Map([...fresh, ['x', { x: 0, y: 0 }]]);
+  const at = placeRuns(['x', ...ids], onFloor, null, spans, DIAMOND);
+  assert.deepEqual(backwards(at, DIAMOND), [], 'every run left of each run that waits on it');
+  assert.deepEqual(overlapping(at, spans), []);
+  // Laid out together, as the diamond it was: the top and bottom level with the middle of the sides.
+  const [a, b, c, d] = ids.map((id) => at.get(id)!);
+  assert.deepEqual([a!.y, d!.y], [(b!.y + c!.y) / 2, (b!.y + c!.y) / 2]);
+  assert.deepEqual(placeRuns(['x', ...ids], at, null, spans, DIAMOND), at, 'and the pass after moves nothing');
+});
+
+test("one card of the diamond moved aside by a graph takes the rest of the diamond with it, rather than landing right of the run that waits on it", () => {
+  const ids = ['a', 'b', 'c', 'd'];
+  const fresh = placeRuns(ids, new Map(), null, new Map(), DIAMOND);
+  // Over c alone: the second row's second cell.
+  const spans = new Map([['x', { columns: 1, rows: 1 }]]);
+  const at = placeRuns(['x', ...ids], new Map([...fresh, ['x', fresh.get('c')!]]), null, spans, DIAMOND);
+  assert.deepEqual(backwards(at, DIAMOND), []);
+  assert.deepEqual(overlapping(at, spans), []);
+});
+
+test('a card coming onto the floor goes left of a card on the floor that waits on it — below, when the cell left of it is taken — never right', () => {
+  // b waits on a and is on the floor in the second column; x has the first. a comes back with nowhere saved.
+  const onFloor = new Map([['x', { x: 0, y: 0 }], ['b', { x: CELL_WIDTH, y: 0 }]]);
+  const at = placeRuns(['x', 'a', 'b'], onFloor, null, new Map(), new Map([['b', ['a']]]));
+  assert.deepEqual(Object.fromEntries(at), { x: { x: 0, y: 0 }, a: { x: 0, y: CELL_HEIGHT }, b: { x: CELL_WIDTH, y: 0 } });
+});
+
+test('a card with no column between a card it waits on and one that waits on it: the cards `after` joins are laid out again, together', () => {
+  // m comes onto the floor between p, in the first column, and k, in the second, which waits on m.
+  const onFloor = new Map([['p', { x: 0, y: 0 }], ['k', { x: CELL_WIDTH, y: 0 }]]);
+  const after = new Map([['m', ['p']], ['k', ['m']]]);
+  const at = placeRuns(['p', 'm', 'k'], onFloor, null, new Map(), after);
+  assert.deepEqual(backwards(at, after), []);
+  assert.deepEqual(Object.fromEntries(at), { p: { x: 0, y: 0 }, m: { x: CELL_WIDTH, y: 0 }, k: { x: 2 * CELL_WIDTH, y: 0 } });
+});
+
+test("cards a person left where the layering would not have put them stay, when none of them has to move: a person's arrangement", () => {
+  const onFloor = new Map([['a', { x: 2 * CELL_WIDTH, y: 0 }], ['b', { x: 0, y: CELL_HEIGHT }]]);
+  const after = new Map([['b', ['a']]]);
+  assert.deepEqual(placeRuns(['a', 'b'], onFloor, null, new Map(), after), onFloor);
+});
+
+test("where a run stands, in the start form's word: called off, waiting on you — a step, or a run it waits on that never ships — in flight, or finished", () => {
+  assert.equal(standingOf(run([], { status: 'cancelled', cancelledAt })), 'cancelled');
+  // Never filed a step, and never will without a person: not finished, whatever `inFlight` says.
+  assert.equal(standingOf(run(['waiting on p (cancelled)'], { after: ['p'], waiting: waitingOn(true) })), 'waiting on you');
+  assert.equal(standingOf(run(['succeeded · BLOCKED'], { status: 'failed', waitingOnYou: ['step-0'] })), 'waiting on you');
+  assert.equal(standingOf(run(['waiting on p'], { moving: true, after: ['p'], waiting: waitingOn(false) })), 'in flight');
+  assert.equal(standingOf(run(['verified ✓'], { status: 'succeeded' })), 'finished');
 });

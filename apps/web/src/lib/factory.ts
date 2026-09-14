@@ -30,6 +30,13 @@ export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & { waiting?
 export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou'> & { waiting?: RunSummary['waiting'] }): boolean =>
   run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou);
 
+/**
+ * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
+ * a run that never ships is one, though it has filed nothing and is not in flight; in flight; or finished.
+ */
+export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
+  run.cancelledAt ? 'cancelled' : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
+
 type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after'>;
 
 /**
@@ -172,14 +179,25 @@ export function placeRuns(
   // Every cell a placed card is in; and the cells of the open runs, which a card on the floor yields to.
   const taken = new Set<string>();
   const unfolded = new Set<string>();
-  const put = (id: string, point: Point) => {
-    at.set(id, point);
+  const mark = (id: string, point: Point) => {
     for (const cell of cellsOf(point, spanOfId(id))) {
       taken.add(cell);
       if (spans.has(id)) unfolded.add(cell);
     }
   };
+  const put = (id: string, point: Point) => {
+    at.set(id, point);
+    mark(id, point);
+  };
+  /** Cards given up, to be placed again: the cells are worked out afresh, since cards may share one. */
+  const unput = (gone: readonly string[]) => {
+    for (const id of gone) at.delete(id);
+    taken.clear();
+    unfolded.clear();
+    for (const [id, point] of at) mark(id, point);
+  };
   const free = (point: Point, span: Span, of: ReadonlySet<string>) => cellsOf(point, span).every((cell) => !of.has(cell));
+  const columnOf = (id: string) => Math.round(at.get(id)!.x / CELL_WIDTH);
 
   for (const id of order) {
     const here = onFloor.get(id);
@@ -189,51 +207,73 @@ export function placeRuns(
     const left = saved?.get(id);
     if (!at.has(id) && left && free(left, spanOfId(id), taken)) put(id, left);
   }
-  /** The closed cards still to place that `after` joins to `id`, oldest first; `id` alone when it is open. */
-  const joined = (id: string): string[] => {
+  /**
+   * The closed cards `after` joins to `id`, placed or not, oldest first. `id` alone when it is open, and when what joins it goes round in
+   * a cycle, which a record edited by hand could have: each of those cards is then placed on its own turn.
+   */
+  const groupOf = (id: string): string[] => {
     if (spans.has(id)) return [id];
     const found = new Set([id]);
     for (const one of found) {
-      for (const other of [...parents.get(one)!, ...children.get(one)!]) if (!at.has(other) && !spans.has(other)) found.add(other);
+      for (const other of [...parents.get(one)!, ...children.get(one)!]) if (!spans.has(other)) found.add(other);
     }
-    return ids.filter((other) => found.has(other));
+    const group = ids.filter((other) => found.has(other));
+    try {
+      layers(group.map((name) => ({ name, after: parents.get(name)!.filter((p) => found.has(p)) })));
+    } catch {
+      return [id];
+    }
+    return group;
   };
   /**
    * Where each of `members` goes, in cells from the corner of the room they take: their layering's columns, each centred on the
-   * tallest — so a column a card short of it sits half a row down. The first alone, on a cycle, which a record edited by hand could
-   * have: the rest are placed on their own turns.
+   * tallest — so a column a card short of it sits half a row down. Asked only of cards `groupOf` found in no cycle.
    */
   const shapeOf = (members: readonly string[]): Map<string, Point> => {
-    let columns: string[][];
-    try {
-      columns = layers(members.map((name) => ({ name, after: parents.get(name)!.filter((p) => members.includes(p)) })));
-    } catch {
-      return new Map([[members[0]!, { x: 0, y: 0 }]]);
-    }
+    const columns = layers(members.map((name) => ({ name, after: parents.get(name)!.filter((p) => members.includes(p)) })));
     const cells = columns.flatMap((column, c) => column.map((name, i) => [name, { x: c, y: i - (column.length - 1) / 2 }] as const));
     const top = Math.min(...cells.map(([, p]) => p.y));
     return new Map(cells.map(([name, p]) => [name, { x: p.x, y: p.y - top }]));
   };
-
-  for (const id of order) {
-    if (at.has(id)) continue;
-    const shape = shapeOf(joined(id));
-    const members = [...shape.keys()];
+  /**
+   * `members` put down in their shape at the first free place, row by row, where each is right of every card already down that it waits
+   * on and left of every one that waits on it. When no column keeps both, `strict` puts nothing and says so; otherwise the second gives
+   * way, and the first holds.
+   */
+  const placeTogether = (members: readonly string[], strict: boolean): boolean => {
+    const shape = shapeOf(members);
     const cell = (name: string) => shape.get(name)!;
-    // Right of every card already down that one of them waits on.
-    const first = Math.max(0, ...members.flatMap((m) => parents.get(m)!.filter((p) => at.has(p)).map((p) => Math.round(at.get(p)!.x / CELL_WIDTH) + 1 - cell(m).x)));
+    const first = Math.max(0, ...members.flatMap((m) => parents.get(m)!.filter((p) => at.has(p)).map((p) => columnOf(p) + 1 - cell(m).x)));
+    const cap = Math.min(Infinity, ...members.flatMap((m) => children.get(m)!.filter((c) => at.has(c)).map((c) => columnOf(c) - 1 - cell(m).x)));
+    if (cap < first && strict) return false;
     const width = Math.max(...members.map((m) => cell(m).x + spanOfId(m).columns));
-    // The last column an anchor can take and keep the whole in the row, or the first for one wider than the grid.
-    const last = Math.max(first, GRID_COLUMNS - Math.min(width, GRID_COLUMNS));
-    search: for (let row = 0; ; row++) {
+    // The last column an anchor can take and keep the whole in the row, or the first for one wider than the grid — and no further right
+    // than the cards that wait on them allow, when they allow a column at all.
+    const last = Math.min(Math.max(first, GRID_COLUMNS - Math.min(width, GRID_COLUMNS)), cap < first ? Infinity : cap);
+    for (let row = 0; ; row++) {
       for (let column = first; column <= last; column++) {
         const points = members.map((m) => [m, { x: (column + cell(m).x) * CELL_WIDTH, y: (row + cell(m).y) * CELL_HEIGHT }] as const);
         if (points.every(([m, point]) => free(point, spanOfId(m), taken))) {
           for (const [m, point] of points) put(m, point);
-          break search;
+          return true;
         }
       }
     }
+  };
+
+  for (const id of order) {
+    if (at.has(id)) continue;
+    const group = groupOf(id);
+    const loose = group.filter((m) => !at.has(m));
+    const down = group.filter((m) => at.has(m));
+    // A card of the group that was on the floor and has lost its place — a graph unfolded over it — takes the rest of its group with it,
+    // laid out again together: moved a card at a time, the group would be layered over the cards that moved alone, and read backwards.
+    const movedAside = loose.some((m) => onFloor.has(m));
+    // Otherwise the cards coming onto the floor go in among the ones down, if there is a column for each between what it waits on and
+    // what waits on it; and if there is not, the whole group is laid out again.
+    if (down.length && !movedAside && placeTogether(loose, true)) continue;
+    if (down.length) unput(down);
+    placeTogether(group, false);
   }
   return new Map(ids.map((id) => [id, at.get(id)!]));
 }

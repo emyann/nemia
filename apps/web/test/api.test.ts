@@ -39,6 +39,16 @@ test("a run's detail with its graph is read as the api gave it", async (t) => {
   assert.doesNotThrow(() => withGraph('r-1', detail({ graph: { roots: [], edges: [] } })));
 });
 
+test("a run's detail whose steps come without their tries is refused, naming the step and the fix — an api started before the board showed rounds", async (t) => {
+  const stale = detail({ graph, steps: [{ name: 'implement', tries: [] }, { name: 'review' }] });
+  const refusesTries = (err: Error) =>
+    /^The api answered run 'r-1' without the tries of its step 'review', so it is older than this board/.test(err.message) && /Restart the api/.test(err.message);
+  assert.throws(() => withGraph('r-1', stale), refusesTries);
+  answering(t, stale);
+  await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesTries);
+  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [] }] })));
+});
+
 const { workflowNameOf } = await import('../src/lib/api.ts');
 
 test("a run's workflow is named by the last segment of its folder, as the Workflows page names it", () => {

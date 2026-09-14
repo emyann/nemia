@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import type { RunDetail } from '../lib/api';
+import type { RunDetail, StepTry } from '../lib/api';
 import { duration, isLive } from '../lib/canvas';
 import { stepState, type StepState } from '../lib/status';
 import { foldTranscript } from '../lib/transcript';
 import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
+import { Rounds, TryCloseouts, tryLabel } from './Closeout';
 import { Check, code, Facts, specRows, Told, when } from './Facts';
 
 // Loaded when the Activity tab is first opened: markdown and the scroller weigh more than the canvas the inspector sits beside.
@@ -30,8 +31,16 @@ type Props = {
 /** What is going on in one step, beside the canvas, for the node that was clicked. */
 export function StepInspector({ run, step, onClose, runTitle, className }: Props) {
   const [tab, setTab] = useState<Tab>('Details');
+  // The try a Rounds row selected, and of which step: the panel stays mounted as another step is clicked, and that one's current try is shown.
+  const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
   const runCancelled = run.cancelledAt !== null;
   const state = stepState(step.status, runCancelled);
+  const current = step.tries.find((t) => t.current) ?? step.tries.at(-1)!;
+  const selected = (chosen?.step === step.name && step.tries.find((t) => t.try === chosen.try)) || current;
+  const select = (n: number) => {
+    setChosen({ step: step.name, try: n });
+    setTab('Output');
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -91,8 +100,8 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
       </div>
 
       <div role="tabpanel" className={`min-h-0 flex-1 p-3 ${tab === 'Activity' ? 'flex flex-col gap-2' : 'space-y-4 overflow-auto'}`}>
-        {tab === 'Details' && <Details step={step} state={state} runCancelled={runCancelled} />}
-        {tab === 'Output' && <Output step={step} state={state} />}
+        {tab === 'Details' && <Details step={step} state={state} runCancelled={runCancelled} current={current} selected={selected} onSelect={select} />}
+        {tab === 'Output' && <Output step={step} state={state} selected={selected} />}
         {/* Keyed by run and step, so a conversation never stands in for another step's while that one is read. */}
         {tab === 'Activity' && <Activity key={`${run.id}/${step.name}`} run={run} step={step} />}
       </div>
@@ -100,8 +109,10 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
   );
 }
 
-function Details({ step, state, runCancelled }: { step: Step; state: StepState; runCancelled: boolean }) {
-  const { spec, attempts } = step;
+type DetailsProps = { step: Step; state: StepState; runCancelled: boolean; current: StepTry; selected: StepTry; onSelect: (n: number) => void };
+
+function Details({ step, state, runCancelled, current, selected, onSelect }: DetailsProps) {
+  const { spec, attempts, tries } = step;
   const latest = attempts.latest;
 
   return (
@@ -112,6 +123,8 @@ function Details({ step, state, runCancelled }: { step: Step; state: StepState; 
       </div>
       <Facts
         rows={[
+          // Which try the attempts are of, once there is more than one: each round, and each try within one, is a task of its own.
+          ...(tries.length > 1 ? ([['try', tryLabel(current, tries)]] satisfies Array<[string, string]>) : []),
           ['attempts', attempts.count],
           ['latest began', latest && when(latest.startedAt)],
           ['latest ended', latest && (latest.ended ? <Ended at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
@@ -124,11 +137,12 @@ function Details({ step, state, runCancelled }: { step: Step; state: StepState; 
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
         ]}
       />
+      {tries.length > 1 && <Rounds tries={tries} selected={selected.try} onSelect={onSelect} />}
       {step.check && <Check check={step.check} />}
       {spec ? (
         <section className="space-y-1">
           <h3 className="text-xs font-medium text-neutral-500">Spec</h3>
-          <Facts rows={specRows(spec)} />
+          <Facts rows={specRows(spec, step.filed)} />
         </section>
       ) : (
         <p className="text-neutral-500">
@@ -151,47 +165,17 @@ function Ended({ at, how }: { at: string | null; how: string }) {
   );
 }
 
-function Output({ step, state }: { step: Step; state: StepState }) {
-  const { closeout } = step;
-  if (!closeout) {
-    const why = step.status.endsWith('closeout unreadable')
+/** The selected try's closeout, and every other try's folded beneath it. */
+function Output({ step, state, selected }: { step: Step; state: StepState; selected: StepTry }) {
+  // What is said of a try with no closeout: the current try's in the step's own words, an earlier one's off the engine's record.
+  const none = !selected.current
+    ? "No closeout on the engine's record of this try."
+    : step.status.endsWith('closeout unreadable')
       ? 'It gave a closeout that could not be read.'
       : isLive(state) || state === 'waiting'
         ? 'No closeout yet: the step has not signed off.'
         : 'No closeout: the step ended without one.';
-    return <p className="text-neutral-500">{why}</p>;
-  }
-
-  return (
-    <>
-      <p>
-        <span className="text-neutral-500">outcome </span>
-        <span className={closeout.outcome === 'blocked' ? 'font-semibold text-amber-700 dark:text-amber-400' : 'font-medium'}>
-          {closeout.outcome}
-        </span>
-      </p>
-      <p className="whitespace-pre-wrap">{closeout.summary}</p>
-      {closeout.needs && (
-        <p className="whitespace-pre-wrap text-amber-700 dark:text-amber-400">
-          <span className="font-medium">Needs:</span> {closeout.needs}
-        </p>
-      )}
-      <div>
-        <p className="text-neutral-500">artifacts</p>
-        {closeout.artifacts.length ? (
-          <ul className="mt-1 space-y-0.5 font-mono text-xs">
-            {closeout.artifacts.map((name) => (
-              <li key={name} className="break-all">
-                {name}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-xs text-neutral-500">none named</p>
-        )}
-      </div>
-    </>
-  );
+  return <TryCloseouts tries={step.tries} selected={selected} none={none} />;
 }
 
 /** How many of the conversation's last turns the tab draws: its tail, with the whole of it a click away. */

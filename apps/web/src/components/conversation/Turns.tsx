@@ -1,4 +1,4 @@
-import { ChevronDownIcon, FlagIcon, InfoIcon, ListTreeIcon } from 'lucide-react';
+import { ChevronDownIcon, FlagIcon, InfoIcon, ListTreeIcon, SendIcon } from 'lucide-react';
 import { CodeBlock } from '@/components/ai-elements/code-block';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-elements/reasoning';
 import { Response } from '@/components/ai-elements/response';
@@ -8,7 +8,7 @@ import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker';
 import { Message, MessageContent } from '@/components/ui/message';
-import { closeoutOf, CLOSEOUT_TOOL, detailOf, type CloseoutTurn, type ThinkingTurn, type ToolCall, type ToolsTurn, type Turn } from '@/lib/transcript';
+import { closeoutOf, CLOSEOUT_TOOL, detailOf, type CloseoutTurn, type ThinkingTurn, type ToldTurn, type ToolCall, type ToolsTurn, type Turn } from '@/lib/transcript';
 import { cn } from '@/lib/utils';
 
 /**
@@ -40,6 +40,8 @@ export function TurnView({ turn, live, last, tail }: { turn: Turn; live: boolean
           </MessageContent>
         </Message>
       );
+    case 'told':
+      return <Told turn={turn} />;
     case 'thinking':
       return <Thinking turn={turn} streaming={live && last} />;
     case 'tool':
@@ -58,6 +60,30 @@ export function TurnView({ turn, live, last, tail }: { turn: Turn; live: boolean
         </Marker>
       );
   }
+}
+
+/**
+ * What a person said to the session, off the engine's journal: on the reader's side, as their words, marked as said to the session while it
+ * ran, with when. The words as given, not as markdown: they are on the record as typed.
+ */
+function Told({ turn }: { turn: ToldTurn }) {
+  return (
+    <Message align="end" data-turn="told" data-attempt={turn.attempt}>
+      <MessageContent>
+        <p className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground">
+          <SendIcon className="size-3" />
+          <span>You said, while it ran</span>
+          <span aria-hidden>·</span>
+          <time dateTime={turn.at} title={turn.at}>
+            {new Date(turn.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </time>
+        </p>
+        <Bubble variant="tinted" align="end">
+          <BubbleContent className="max-h-72 overflow-y-auto whitespace-pre-wrap scroll-fade-b">{turn.text}</BubbleContent>
+        </Bubble>
+      </MessageContent>
+    </Message>
+  );
 }
 
 /** A thought, folded: its text once opened, or a word that the harness kept none. */

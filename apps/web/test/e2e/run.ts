@@ -21,11 +21,12 @@
  */
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { CHECKOUT, DIAMOND, DIAMOND_RUNS, FAKE, HELD, LOOPING, NEIGHBOUR, REGISTRY, seed, seedCheckout, seedDiamond, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { CHECKOUT, DIAMOND, DIAMOND_RUNS, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -681,9 +682,15 @@ const PAGES: PageSpec[] = [
 
       const talk = page.getByRole('region', { name: "The step's conversation" });
       await expectVisible(talk, 'the conversation');
-      const [box, window] = [await talk.boundingBox(), page.viewportSize()];
-      if (!box || !window || Math.abs(box.y + box.height - window.height) > 2) {
-        throw new Refused(`the conversation takes the page's height — it ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, the window at ${window?.height} px`);
+      // The conversation takes the page's height down to the prompt box, and the box ends the window.
+      const prompt = page.locator(`section[aria-label="Say something to ${SESSION.step}"]`);
+      await expectVisible(prompt, 'a prompt box below the conversation');
+      const [box, below, window] = [await talk.boundingBox(), await prompt.boundingBox(), page.viewportSize()];
+      if (!box || !below || !window || Math.abs(box.y + box.height - below.y) > 2 || Math.abs(below.y + below.height - window.height) > 2) {
+        throw new Refused(
+          `the conversation takes the page's height down to the prompt box, which ends the window — the conversation ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, ` +
+            `the box spans ${below ? `${Math.round(below.y)}–${Math.round(below.y + below.height)}` : 'nothing'} px, the window ends at ${window?.height} px`,
+        );
       }
       await expectVisible(talk.locator('[data-turn="said"][data-role="user"]', { hasText: 'Implement what was asked.' }), 'the prompt, said by the user');
 
@@ -709,7 +716,17 @@ const PAGES: PageSpec[] = [
       await expectVisible(closeout.locator('[data-outcome="blocked"]'), 'the closeout, named, with its outcome');
       await expectVisible(closeout.getByText(SESSION.closeout.needs), 'and what it needs');
       await expectCount(page.getByRole('link', { name: /Claude Code web/ }), 0, 'no link to Claude Code web: nothing the engine reads carries a URL for a session');
-      await expectCount(page.locator('main textarea, main input'), 0, 'read-only: nothing to type into');
+      // Its session has ended: the box is closed, with the reason and where to go instead, and nobody said anything to it.
+      const field = prompt.getByRole('textbox', { name: `What to say to ${SESSION.step}'s session` });
+      await expectVisible(field, 'the prompt box, closed');
+      if (await field.isEnabled()) throw new Refused(`the prompt box is disabled for a step whose session has ended (${SESSION.step} settled)`);
+      if (await prompt.getByRole('button', { name: 'Send' }).isEnabled()) throw new Refused('and so is Send');
+      await expectVisible(
+        prompt.locator('[data-closed]', { hasText: `${SESSION.step}'s session has ended, so there is nobody to say anything to. To tell the step something, answer it or try it again from the run page` }),
+        'with why, and where to go instead',
+      );
+      await expectCount(talk.locator('[data-turn="told"]'), 0, 'nobody said anything to it: no turn of yours');
+      await expectCount(page.locator('main input, main textarea:not([disabled])'), 0, 'nothing else to type into');
 
       // Photographed from its start, as a reader scrolls up to it: the prompt, the thought opened, and the fold's line opened
       // over its calls. The scroller opens at the end, so a photograph taken where the checks left it shows only the closeout.
@@ -720,6 +737,119 @@ const PAGES: PageSpec[] = [
       if ((await scrolled()) > 0) throw new Refused(`the conversation scrolls up to its start for the photograph — it stopped ${await scrolled()} px down`);
       await expectInside(talk.locator('[data-turn="said"][data-role="user"]'), talk, 'the prompt is in view for the photograph');
       await expectInside(line, talk, `the fold's line (${SESSION.folded}) is in view for the photograph`);
+    },
+  },
+  {
+    // The steering channel: words said to draft's running session from its page, through the api, to the session's inbox and onto its record,
+    // where the step's detail and `wf decide` read them back. Then, in a page of its own whose one refusal is the point, words sent after the
+    // session ended while the page still showed it running: refused in the package's words under the box, and nothing said or journalled. The
+    // page follows a live session, whose stream never finishes (`follows`). The writes are taken back — the engine's journal of draft's task as
+    // seeded — so every page after this one, in either theme, reads the store as it was.
+    name: 'say',
+    route: `/runs/${SAYING.run}/steps/${SAYING.step}`,
+    follows: true,
+    expect: async (page) => {
+      await sidebar(page);
+      const journal = path.join(store!, 'engine', 'tasks', `${SAYING.run}-${SAYING.step}.jsonl`);
+      const seeded = fs.readFileSync(journal, 'utf8');
+      const sayRoute = `/api/runs/${SAYING.run}/steps/${SAYING.step}/say`;
+      const said = (r: { request: () => { method: () => string }; url: () => string }) => r.request().method() === 'POST' && new URL(r.url()).pathname === sayRoute;
+      const boxOf = (p: Page, state = '') => p.locator(`section${state ? `[data-say="${state}"]` : ''}[aria-label="Say something to ${SAYING.step}"]`);
+      const fieldOf = (p: Page) => boxOf(p).getByRole('textbox', { name: `What to say to ${SAYING.step}'s session` });
+      const sendOf = (p: Page) => boxOf(p).getByRole('button', { name: 'Send' });
+      try {
+        const top = page.locator('header[aria-label="The step"]');
+        await expectVisible(top.getByRole('heading', { level: 1, name: SAYING.step, exact: true }), 'the page is headed by the step');
+        await expectVisible(top.locator('[data-following]'), 'a session in flight is followed live');
+        const talk = page.getByRole('region', { name: "The step's conversation" });
+        await expectVisible(talk.locator('[data-turn="said"][data-role="assistant"]', { hasText: SAYING.line }), "the session's words so far");
+
+        // Open, with nothing to send; then the words, sent.
+        await expectVisible(boxOf(page, 'open'), 'the prompt box is open for a session in flight');
+        if (await sendOf(page).isEnabled()) throw new Refused('Send is disabled while there is nothing to send');
+        await fieldOf(page).fill(SAYING.words);
+        const before = heard.length;
+        const [response] = await Promise.all([page.waitForResponse(said, { timeout: WAIT_MS }), sendOf(page).click()]);
+        if (response.status() !== 202) throw new Refused(`the api takes the words, through the board's proxy — it answered ${response.status()}: ${await response.text()}`);
+        const entry = (await response.json()) as { at?: unknown; attempt?: unknown; text?: unknown };
+        if (typeof entry.at !== 'string' || entry.attempt !== 1 || entry.text !== SAYING.words || Object.keys(entry).length !== 3) {
+          throw new Refused(`the api answers with the engine's entry, { at, attempt, text } — it answered ${JSON.stringify(entry)}`);
+        }
+        const inbox = JSON.stringify({ type: 'user', session_id: SAYING.sessionId, message: { role: 'user', content: SAYING.words } });
+        for (const until = Date.now() + WAIT_MS; heard.length === before && Date.now() < until; ) await new Promise((resolve) => setTimeout(resolve, 50));
+        if (heard.length !== before + 1 || JSON.stringify(heard.at(-1)) !== inbox) {
+          throw new Refused(`the words reached the session's inbox once, as given — it heard ${JSON.stringify(heard.slice(before))}`);
+        }
+        const detail = (await (await page.request.get(new URL(`/api/runs/${SAYING.run}`, page.url()).href)).json()) as { steps: Array<{ name: string; said?: unknown }> };
+        const onRecord = detail.steps.find((s) => s.name === SAYING.step)?.said;
+        if (JSON.stringify(onRecord) !== JSON.stringify([entry])) {
+          throw new Refused(`the step's detail carries what was said, off the engine's journal — it carries ${JSON.stringify(onRecord)}`);
+        }
+        const told = talk.locator('[data-turn="told"]', { hasText: SAYING.words });
+        await expectVisible(told, 'the words, a turn of their own in the conversation');
+        await expectVisible(told.getByText('You said, while it ran'), 'marked as yours, said while the session ran');
+        if ((await fieldOf(page).inputValue()) !== '') throw new Refused('the box is emptied once the words are said');
+        await expectVisible(top.locator('[data-note]', { hasText: 'said to 1×' }), "the step's note says it was said to, in wf ls's words");
+
+        // `wf decide`, on the same store: the words under the step, with when they were said, as data.
+        let decided: string;
+        try {
+          decided = execFileSync(process.execPath, [path.join(REPO, 'packages', 'agent-workflows', 'bin', 'wf.ts'), 'decide', SAYING.run], { encoding: 'utf8', env: apiEnv, stdio: 'pipe' });
+        } catch (err) {
+          const { stdout, stderr } = err as { stdout?: string; stderr?: string };
+          throw new Refused(`wf decide ${SAYING.run} runs on the e2e's store — it failed:\n${stdout ?? ''}${stderr ?? ''}`);
+        }
+        const lines = [`    said to try 1, at ${entry.at}:`, '    ```text', `    ${SAYING.words}`, '    ```'].join('\n');
+        if (!decided.includes(`\n  ${SAYING.step}\n`) || !decided.includes(lines)) throw new Refused(`wf decide prints what was said under ${SAYING.step}, fenced — it printed:\n${decided}`);
+        await settled(page);
+        await page.screenshot({ path: path.join(OUT, `say-said-${await themeOf(page)}.png`), fullPage: true });
+
+        // Refused, in a page of its own: draft's session ends while the page still shows it running — the run as the page read it is held, as a
+        // read a moment before the end would be — and the words sent then are refused in the package's words, under the box, verbatim.
+        const refused = await page.context().newPage();
+        try {
+          const { problems } = watch(refused);
+          await refused.goto(page.url(), { waitUntil: 'load' });
+          await expectVisible(boxOf(refused, 'open'), 'the prompt box, open, on a page of its own');
+          const detailPath = `/api/runs/${SAYING.run}`;
+          const read = await (await refused.request.get(new URL(detailPath, refused.url()).href)).text();
+          await refused.route((url) => url.pathname === detailPath, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: read }));
+          const end = new Date().toISOString();
+          fs.appendFileSync(journal, [
+            { kind: 'ended', at: end, attempt: 1, sessionId: `ae/${SAYING.run}-${SAYING.step}/1`, nativeId: SAYING.sessionId, observed: 'done', reason: 'harness' },
+            { kind: 'settled', at: end, outcome: 'succeeded' },
+          ].map((event) => `${JSON.stringify(event)}\n`).join(''));
+          const journalled = fs.readFileSync(journal, 'utf8');
+          const heardBefore = heard.length;
+          await fieldOf(refused).fill(SAYING.words);
+          const [answered] = await Promise.all([refused.waitForResponse(said, { timeout: WAIT_MS }), sendOf(refused).click()]);
+          const { error } = (await answered.json()) as { error?: string };
+          const sentence = `${SAYING.step} is not running: try 1's task settled \`succeeded\`, so no session of it is there to hear anything.`;
+          if (answered.status() !== 409 || !error?.startsWith(sentence)) {
+            throw new Refused(`the package refuses words for a step whose session ended — the api answered ${answered.status()}: ${JSON.stringify(error)}`);
+          }
+          await expectVisible(boxOf(refused).locator('[data-refused]'), 'the refusal is shown under the box, not swallowed');
+          const shown = await boxOf(refused).locator('[data-refused] p.font-mono').textContent();
+          if (shown !== error) throw new Refused(`the refusal under the box is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+          if ((await fieldOf(refused).inputValue()) !== SAYING.words) throw new Refused('the words stay in the box after a refusal, to send again');
+          if (heard.length !== heardBefore) throw new Refused(`nothing reaches the inbox on a refusal — it heard ${JSON.stringify(heard.slice(heardBefore))}`);
+          if (fs.readFileSync(journal, 'utf8') !== journalled) throw new Refused(`nothing is journalled on a refusal — ${journal} changed`);
+          await settled(refused);
+          await refused.screenshot({ path: path.join(OUT, `say-refused-${await themeOf(refused)}.png`), fullPage: true });
+          // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
+          const expected = `request answered 409: POST ${answered.url()}`;
+          const seen = problems();
+          const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+          if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        } finally {
+          await refused.close();
+        }
+      } finally {
+        // Taken back: draft's task as seeded — at work, and told nothing.
+        fs.writeFileSync(journal, seeded);
+      }
+      // Read again, the run has draft at work once more, and the box is open.
+      await expectVisible(boxOf(page, 'open'), 'with the writes taken back, the box is open again once the run is read again');
     },
   },
   {
@@ -988,6 +1118,39 @@ const PAGES: PageSpec[] = [
 
 const servers: Array<{ name: string; child: ChildProcess; output: () => string }> = [];
 let store: string | undefined;
+/** The environment the api runs in — its store, its `claude`, where sessions register — for a `wf` a page runs on the same store. */
+let apiEnv: NodeJS.ProcessEnv = {};
+/** Every line draft's stand-in inbox (SAYING, INBOX) has been sent, in order: what the `say` page holds its words to. */
+const heard: unknown[] = [];
+
+/**
+ * A Unix socket standing in for a session's inbox, as Claude Code's reads one: each connection's lines kept, as JSON where they parse, nothing
+ * answered, and its end closed once the sender's is. Unreferenced, so it keeps nothing alive; it goes with the store.
+ */
+function listen(socket: string): Promise<void> {
+  const server = net.createServer({ allowHalfOpen: true }, (connection) => {
+    let got = '';
+    connection.setEncoding('utf8');
+    connection.on('data', (chunk) => (got += chunk));
+    connection.on('end', () => {
+      for (const line of got.split('\n').filter((l) => l.trim())) {
+        try {
+          heard.push(JSON.parse(line));
+        } catch {
+          heard.push(line);
+        }
+      }
+      connection.end();
+    });
+  });
+  return new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(socket, () => {
+      server.unref();
+      resolve();
+    });
+  });
+}
 
 /** Stop both servers and remove the store. Idempotent: `exit` runs it again after a signal did. */
 function cleanUp(): void {
@@ -1072,12 +1235,13 @@ async function main(): Promise<void> {
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then cat "${path.join(store, REGISTRY)}"; else echo '[]'; fi\n`, { mode: 0o755 });
 
-  const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API,
-{
-      ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
-      PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
-    },
-    /api listening on http:\/\/127\.0\.0\.1:(\d+)/);
+  // draft's inbox (SAYING): the socket its registration names, listening before the api can be asked to say anything into it.
+  await listen(path.join(store, INBOX));
+  apiEnv = {
+    ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
+    PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+  };
+  const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API, apiEnv, /api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   const base = await startServer('vite preview', [vite, 'preview', '--port', '0', '--host', '127.0.0.1'], WEB,
     { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },
     /Local:\s+(http:\/\/[^\s/]+)/);

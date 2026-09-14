@@ -12,8 +12,12 @@ import { expectTheme, Refused, settled, watch } from './checks.ts';
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = (typeof THEMES)[number];
 
-/** A page the e2e visits: its name, for the screenshots and the failure; where it is; and what it must have. */
-export type PageSpec = { name: string; route: string; expect: (page: Page) => Promise<void> };
+/**
+ * A page the e2e visits: its name, for the screenshots and the failure; where it is; and what it must have. `follows` for a page that follows a
+ * live session over server-sent events: its stream never finishes, so the network never idles, and the page is visited once it has loaded and
+ * photographed once its canvases have settled, without waiting on the network.
+ */
+export type PageSpec = { name: string; route: string; expect: (page: Page) => Promise<void>; follows?: true };
 
 const where = (spec: PageSpec, theme: Theme) => `the ${spec.name} page (${spec.route}) in the ${theme} theme`;
 
@@ -29,11 +33,11 @@ async function visit(context: BrowserContext, base: string, spec: PageSpec, them
   const { problems } = watch(page);
   const shot = path.join(out, `${spec.name}-${theme}.png`);
   try {
-    await page.goto(base + spec.route, { waitUntil: 'networkidle' });
+    await page.goto(base + spec.route, { waitUntil: spec.follows ? 'load' : 'networkidle' });
     await expectTheme(page, theme);
     await spec.expect(page);
     // What a person would see, once whatever the last assertion started has settled.
-    await page.waitForLoadState('networkidle');
+    if (!spec.follows) await page.waitForLoadState('networkidle');
     await settled(page);
     await page.screenshot({ path: shot, fullPage: true });
     const seen = problems();

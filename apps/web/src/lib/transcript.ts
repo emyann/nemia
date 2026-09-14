@@ -10,7 +10,7 @@
  * one before the first call or after the last is drawn on its own. A lone call is drawn as itself. The closeout — the
  * `StructuredOutput` call — is never folded: it is named, on its own, and it ends a fold as words do.
  */
-import type { TranscriptEvent } from './api';
+import type { Said, TranscriptEvent } from './api';
 
 /** The tool a Claude Code session gives its closeout with. Codex gives its closeout as its last words, which are said. */
 export const CLOSEOUT_TOOL = 'StructuredOutput';
@@ -30,13 +30,15 @@ export type ThinkingTurn = { kind: 'thinking'; key: string; at: string; text: st
 export type ToolTurn = { kind: 'tool'; key: string; call: ToolCall };
 export type SystemTurn = { kind: 'system'; key: string; at: string; text: string };
 export type CloseoutTurn = { kind: 'closeout'; key: string; call: ToolCall };
+/** Words a person said to the session (`wf say`, or the session page's prompt box), off the engine's journal of the step's task: "you said". */
+export type ToldTurn = { kind: 'told'; key: string; at: string; attempt: number; text: string };
 /** What a fold holds, in order: its calls, and the thoughts and system lines between them. */
 export type FoldedTurn = ToolTurn | ThinkingTurn | SystemTurn;
 /** Two or more calls with nothing said between them. `failed` counts results that are errors; `waiting`, calls with no result yet. */
 export type ToolsTurn = { kind: 'tools'; key: string; summary: string; turns: FoldedTurn[]; calls: number; failed: number; waiting: number };
 
 /** One thing the page draws. `key` stays the same while the conversation grows, so React keeps what a reader opened. */
-export type Turn = SaidTurn | ThinkingTurn | ToolTurn | ToolsTurn | CloseoutTurn | SystemTurn;
+export type Turn = SaidTurn | ThinkingTurn | ToolTurn | ToolsTurn | CloseoutTurn | SystemTurn | ToldTurn;
 
 /** An event is unique by its `id` and `kind` together: a tool result carries its call's id. */
 const keyOf = (event: TranscriptEvent) => `${event.kind}:${event.id}`;
@@ -126,6 +128,39 @@ export function tailStart(turns: readonly Turn[]): number {
     if (kind === 'said' || kind === 'closeout') return i + 1;
   }
   return 0;
+}
+
+/** When a turn happened: its own time, its call's, or its fold's first. `NaN` for a time that does not parse. */
+const timeOf = (turn: Turn): number => {
+  switch (turn.kind) {
+    case 'tool':
+    case 'closeout':
+      return Date.parse(turn.call.at);
+    case 'tools':
+      return timeOf(turn.turns[0]!);
+    default:
+      return Date.parse(turn.at);
+  }
+};
+
+/**
+ * The turns, with what a person said to the session laid in among them (`said`, off the engine's journal of the step's task): each a turn of
+ * its own, "you said", before the first turn that came after it, in the order said — after a fold that began before it, since a fold is one
+ * line. Words said after everything the transcript has are last. The session writes their arrival too, as a `system` line once its harness
+ * hands them over, and that line stays where it is: it is the session's word that the words arrived, and this is the record's that a person
+ * said them. Nothing said leaves the turns as they were.
+ */
+export function withSaid(turns: readonly Turn[], said: readonly Said[]): Turn[] {
+  const told: ToldTurn[] = [...said]
+    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
+    .map((s) => ({ kind: 'told', key: `told:${s.attempt}:${s.at}`, at: s.at, attempt: s.attempt, text: s.text }));
+  const out: Turn[] = [];
+  let next = 0;
+  for (const turn of turns) {
+    while (next < told.length && Date.parse(told[next]!.at) < timeOf(turn)) out.push(told[next++]!);
+    out.push(turn);
+  }
+  return [...out, ...told.slice(next)];
 }
 
 /** A stretch as it is drawn: what comes before its first call and after its last on its own, and between them one fold — or the call itself, when there is one. */

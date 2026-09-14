@@ -14,7 +14,8 @@
  * so its page has something to decide. The other two runs name a repository that is not on the machine, which reads as a
  * branch git could not read.
  *
- * Beside the store, the sessions the fake `claude` lists (REGISTRY): HELD's, which the harness marked blocked.
+ * Beside the store, the sessions the fake `claude` lists (REGISTRY): HELD's, which the harness marked blocked, and NEIGHBOUR's `draft`, at
+ * work, registered as Claude Code registers a session, with an inbox run.ts listens on (SAYING).
  *
  * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
  * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS.
@@ -141,6 +142,26 @@ export const NEIGHBOUR = {
   /** Into ship, which will never be filed behind the failed sketch: to come, and still. */
   still: 'sketch->ship',
 } as const;
+
+/**
+ * NEIGHBOUR's `draft`, the session in flight the `say` page speaks to: `claude agents` lists it at work, with the pid Claude Code registers it
+ * under — `claude/sessions/<pid>.json` in the store, the e2e's CLAUDE_CONFIG_DIR, whose `messagingSocketPath` is INBOX — and its conversation so
+ * far is on disk: the prompt, words, and a call still waiting on its result. run.ts listens on INBOX, standing in for the session's inbox.
+ */
+export const SAYING = {
+  run: NEIGHBOUR.id,
+  step: 'draft',
+  sessionId: '3f6a2c1d-8e4b-4c7a-9d2f-5b1e0a7c6d84',
+  pid: 424_242,
+  prompt: 'Draft it.',
+  /** What the session said so far, before its call. */
+  line: 'Drafting the outline, one section at a time.',
+  /** What the `say` page tells it. */
+  words: 'Widen the draft to the api section too, and keep the outline short.',
+} as const;
+
+/** Where in the store the stand-in for draft's inbox listens: a Unix socket run.ts opens before the api starts. */
+export const INBOX = 'inbox.sock';
 
 /**
  * A third run, started last: `review` loops back to `implement`, the loop is on round 3 of the 3 a loop runs when it
@@ -480,6 +501,19 @@ function seedRepo(repo: string, branch: string): string {
 }
 
 /** Events as the engine journals them: a line of JSON each. */
+/** SAYING's session so far, as Claude Code 2.1.270 writes it: the prompt, words, and a Read with no result yet. */
+function draftConversation(ago: (minutes: number) => string): object[] {
+  const line = { sessionId: SAYING.sessionId, isSidechain: false, userType: 'external', cwd: '/code/hkb-v2', version: '2.1.270', gitBranch: 'main' };
+  const said = (type: 'user' | 'assistant', uuid: string, minutes: number, content: unknown) =>
+    ({ ...line, type, uuid, timestamp: ago(minutes), message: { role: type, content } });
+  return [
+    { type: 'custom-title', customTitle: `ae/${SAYING.run}-${SAYING.step}/1`, sessionId: SAYING.sessionId },
+    said('user', 'draft-user-1', 2.4, SAYING.prompt),
+    said('assistant', 'draft-assistant-1', 2.3, [{ type: 'text', text: SAYING.line }]),
+    said('assistant', 'draft-assistant-2', 2.2, [{ type: 'tool_use', id: 'toolu_draft_read', name: 'Read', input: { file_path: '/code/hkb-v2/README.md' } }]),
+  ];
+}
+
 const lines = (events: object[]): string => events.map((event) => `${JSON.stringify(event)}\n`).join('');
 
 /** Write the fake run into `root`, which becomes the api's WF_ROOT. Times are minutes before `now`. */
@@ -590,6 +624,12 @@ export function seed(root: string, now = Date.now()): void {
     { kind: 'starting', at: ago(2.5), attempt: 1 },
     { kind: 'spawned', at: ago(2.5), attempt: 1 },
   ]));
+  // draft's session at work (SAYING): registered as Claude Code registers one, its inbox the socket run.ts listens on, and its conversation so
+  // far on disk. `claude agents` lists it, with its pid, below (REGISTRY).
+  write(path.join(root, 'claude', 'sessions', `${SAYING.pid}.json`), JSON.stringify({
+    pid: SAYING.pid, sessionId: SAYING.sessionId, name: `ae/${SAYING.run}-${SAYING.step}/1`, kind: 'bg', messagingSocketPath: path.join(root, INBOX),
+  }));
+  write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SAYING.sessionId}.jsonl`), lines(draftConversation(ago)));
   write(path.join(root, 'engine', 'tasks', `${NEIGHBOUR.id}-sketch.jsonl`), lines([
     { kind: 'filed', at: ago(5), brief: 'Sketch it.', cwd: '/code/hkb-v2', maxAttempts: 1 },
     { kind: 'starting', at: ago(4), attempt: 1 },
@@ -676,6 +716,7 @@ export function seed(root: string, now = Date.now()): void {
   ]));
   write(path.join(root, REGISTRY), JSON.stringify([
     { name: `ae/${heldTask}/1`, sessionId: HELD.sessionId, kind: 'background', state: 'blocked', status: 'idle', startedAt: now - 2.9 * 60_000 },
+    { name: `ae/${SAYING.run}-${SAYING.step}/1`, sessionId: SAYING.sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: now - 2.5 * 60_000, pid: SAYING.pid },
   ]));
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${HELD.sessionId}.jsonl`), lines(heldConversation(ago)));
 }

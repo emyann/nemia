@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
-import { decisionQuery, runQuery, withGraph, type RunDetail } from '../src/lib/api.ts';
+import { decisionQuery, runQuery, sayToStep, withGraph, type RunDetail } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
 
 /** GET /api/runs/:id answering `body`, for the length of the test. */
@@ -46,7 +46,38 @@ test("a run's detail whose steps come without their tries is refused, naming the
   assert.throws(() => withGraph('r-1', stale), refusesTries);
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesTries);
-  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [] }] })));
+  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [], said: [] }] })));
+});
+
+test("a run's detail whose steps come without what was said to them is refused, naming the step and the fix — an api started before the session page showed it", async (t) => {
+  const stale = detail({ graph, steps: [{ name: 'implement', tries: [], said: [] }, { name: 'review', tries: [] }] });
+  const refusesSaid = (err: Error) =>
+    /^The api answered run 'r-1' without what was said to its step 'review', so it is older than this board/.test(err.message) && /Restart the api/.test(err.message);
+  assert.throws(() => withGraph('r-1', stale), refusesSaid);
+  answering(t, stale);
+  await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesSaid);
+});
+
+test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async (t) => {
+  const before = globalThis.fetch;
+  const sent: Array<{ url: string; init: RequestInit }> = [];
+  let answer = () => new Response(JSON.stringify({ at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen it.' }), { status: 202 });
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    sent.push({ url, init });
+    return answer();
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+  assert.deepEqual(await sayToStep('r 1', 'implement', 'Widen it.'), { at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen it.' });
+  const [{ url, init }] = sent as [{ url: string; init: RequestInit }];
+  assert.deepEqual([url, init.method, (init.headers as Record<string, string>)['content-type'], init.body], ['/api/runs/r%201/steps/implement/say', 'POST', 'application/json', '{"text":"Widen it."}']);
+
+  const refusal = "implement is not running: try 1's task settled `succeeded`, so no session of it is there to hear anything.";
+  answer = () => new Response(JSON.stringify({ error: refusal }), { status: 409 });
+  await assert.rejects(sayToStep('r-1', 'implement', 'Widen it.'), (err: Error) => err.message === refusal);
+  answer = () => new Response('{}', { status: 202 });
+  await assert.rejects(sayToStep('r-1', 'implement', 'Widen it.'), (err: Error) => /^POST \/api\/runs\/r-1\/steps\/implement\/say answered 202 +without what it journalled/.test(err.message));
 });
 
 const { workflowNameOf } = await import('../src/lib/api.ts');

@@ -692,6 +692,11 @@ owner is not mid-run.
   because `cd` matched no allow rule — every segment must. `git log … && git status && git diff …` passed
   for that reason. `Bash(cd:*)` is now allowed (it does nothing on its own), and the operator folders'
   review body says how to run the suite. Verified, not guessed: the denial is in the session transcript.
+- **`radius` takes the base's `workspaces` globs as written (G's round-2 review):** `./packages/*` yields a
+  regexp that never matches `packages/x`, so every package's changes fall into one `packages` group and
+  `./packages/*/docs/` never counts a lesson; `packages/**` would count `packages/x/src/docs/` again. This
+  repo uses `packages/*` and `apps/*`, so unaffected. Strip a leading `./` when the workspaces are read,
+  refuse or note `**`, and a radius test with `['./packages/*']`. → agent-workflows, small.
 
 ## 5. What the plan does not do
 

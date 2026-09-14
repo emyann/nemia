@@ -4,8 +4,8 @@
  * `retry()`, refused in the package's words.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, reading transcripts where Claude Code keeps them
- * (CLAUDE_CONFIG_DIR). A fake `claude` is first on PATH, listing the sessions this file says are running, so the registry of the
- * sessions on this machine is never asked.
+ * (CLAUDE_CONFIG_DIR). A fake `claude` is first on PATH, listing the sessions this file says are running and noting every call, so the
+ * registry of the sessions on this machine is never asked, and a test can count what a request costs.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,11 +24,17 @@ process.env.CLAUDE_CONFIG_DIR = config;
 
 const bin = tmp('bin');
 const registry = path.join(bin, 'registry.json');
+const calls = path.join(bin, 'calls');
 fs.writeFileSync(registry, '[]');
+fs.writeFileSync(calls, '');
 fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
 const fs = require('node:fs');
+fs.appendFileSync(${JSON.stringify(calls)}, process.argv.slice(2).join(' ') + '\\n');
 if (process.argv[2] === 'agents') process.stdout.write(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
 `, { mode: 0o755 });
+
+/** How many times `claude agents` has been run: an observation of the harness each. */
+const observations = () => fs.readFileSync(calls, 'utf8').split('\n').filter((line) => line.startsWith('agents')).length;
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 
 const { app } = await import('../src/app.ts');
@@ -164,42 +170,63 @@ const retryRefuses = async (step: string, how: RetryHow): Promise<string> => {
   return assert.fail(`retry() asked for ${step} (${JSON.stringify(how)}), and should have refused`);
 };
 
-type Needs = { name: string; needs: string | null; blockedByHarness: { lastLine: string | null } | null };
-const needsIn = (steps: Needs[]) => steps.map(({ name, needs, blockedByHarness }) => ({ name, needs, blockedByHarness }));
+type Needs = { name: string; needs: string | null; blockedByHarness: boolean; lastLine?: string | null };
 const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json();
 const summary = async (id = R) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
+const lastLineOf = async (step: string): Promise<string | null> => (await detail()).steps.find((s: Needs) => s.name === step).lastLine;
 
-test('a step says what a person has to know to act: the question of one signed off blocked, and of a session the harness blocked, that it was the harness, with what the session said last — on both endpoints', async () => {
+test("a step says what a person has to know to act — the question of one signed off blocked, and that the harness blocked a session — on both endpoints, and on the run's detail what the session said last", async () => {
   const expected = [
-    { name: 'implement', needs: blocked.needs, blockedByHarness: null },
-    { name: 'theme', needs: null, blockedByHarness: null },
-    { name: 'tokens', needs: null, blockedByHarness: null },
-    // Its last `text` event, not the call before it nor the prompt: what the harness wrote into the conversation.
-    { name: 'held', needs: null, blockedByHarness: { lastLine: LOGIN } },
-    // Its last `system` event, trimmed, past the call after it.
-    { name: 'idle', needs: null, blockedByHarness: { lastLine: 'Background session idle' } },
-    // No conversation to read: blocked by the harness all the same, with nothing to quote.
-    { name: 'silent', needs: null, blockedByHarness: { lastLine: null } },
-    { name: 'review', needs: null, blockedByHarness: null },
+    { name: 'implement', needs: blocked.needs, blockedByHarness: false },
+    { name: 'theme', needs: null, blockedByHarness: false },
+    { name: 'tokens', needs: null, blockedByHarness: false },
+    { name: 'held', needs: null, blockedByHarness: true },
+    { name: 'idle', needs: null, blockedByHarness: true },
+    // No conversation to read: blocked by the harness all the same.
+    { name: 'silent', needs: null, blockedByHarness: true },
+    { name: 'review', needs: null, blockedByHarness: false },
   ];
+  const lines: Record<string, string | null> = {
+    // Its last `text` event, not the call before it nor the prompt: what the harness wrote into the conversation.
+    held: LOGIN,
+    // Its last `system` event, trimmed, past the call after it.
+    idle: 'Background session idle',
+    // Nothing to quote.
+    silent: null,
+  };
   const run = await detail();
-  assert.deepEqual(needsIn(run.steps), expected);
-  assert.deepEqual(needsIn((await summary()).steps), expected);
+  assert.deepEqual(
+    run.steps.map(({ name, needs, blockedByHarness, lastLine }: Needs) => ({ name, needs, blockedByHarness, lastLine })),
+    expected.map((step) => ({ ...step, lastLine: lines[step.name] ?? null })),
+  );
+  const listed = (await summary()).steps;
+  assert.deepEqual(listed.map(({ name, needs, blockedByHarness }: Needs) => ({ name, needs, blockedByHarness })), expected);
+  assert.equal(listed.some((step: object) => Object.hasOwn(step, 'lastLine')), false, 'the list carries no last line: it reads no conversation');
   // The engine's word, which is all the board had before: `needs-human`, and waiting on nobody the package names.
   assert.deepEqual(run.steps.filter((s: Needs) => s.blockedByHarness).map((s: { status: string }) => s.status), ['needs-human', 'needs-human', 'needs-human']);
   assert.deepEqual(run.waitingOnYou, ['implement', 'theme']);
   assert.deepEqual(run.steps.map((s: { asked: unknown }) => s.asked), [null, null, null, null, null, null, null]);
 });
 
+test('REFUSED at shipped defaults: the list observes the harness once however many sessions it blocked — only a run\'s detail reads their last lines, an observation each', async () => {
+  let before = observations();
+  await summary();
+  assert.equal(observations() - before, 1, 'GET /api/runs, with three sessions the harness blocked: one `claude agents`, for every task at once');
+  before = observations();
+  await detail();
+  // One for every task at once, one for theme's refused check's output (`checksOf`), and one for each blocked session's last line.
+  assert.equal(observations() - before, 1 + 1 + 3, 'GET /api/runs/:id');
+});
+
 test("a blocked session's last line follows its conversation: words written since are read from where the last read stopped, and a call alone moves nothing", async () => {
   await detail();
   fs.appendFileSync(transcriptFile(held), jsonl([said(held, 'assistant', 'a-4', 7, [{ type: 'tool_use', id: 'toolu_3', name: 'Bash', input: { command: 'git status' } }])]));
-  assert.deepEqual((await detail()).steps.find((s: Needs) => s.name === 'held').blockedByHarness, { lastLine: LOGIN });
+  assert.equal(await lastLineOf('held'), LOGIN);
   fs.appendFileSync(transcriptFile(held), jsonl([said(held, 'assistant', 'a-5', 8, [{ type: 'text', text: 'Logged in again; carrying on.' }])]));
-  assert.deepEqual((await summary()).steps.find((s: Needs) => s.name === 'held').blockedByHarness, { lastLine: 'Logged in again; carrying on.' });
+  assert.equal(await lastLineOf('held'), 'Logged in again; carrying on.');
   // Replaced by a shorter conversation, which no cursor of the last read fits: read from its start.
   write(transcriptFile(held), jsonl([said(held, 'assistant', 'a-1', 3, [{ type: 'text', text: LOGIN }])]));
-  assert.deepEqual((await detail()).steps.find((s: Needs) => s.name === 'held').blockedByHarness, { lastLine: LOGIN });
+  assert.equal(await lastLineOf('held'), LOGIN);
 });
 
 test('REFUSED at shipped defaults: an ask another site could make — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and nothing is written', async () => {

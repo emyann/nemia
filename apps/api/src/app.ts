@@ -44,12 +44,12 @@ export type RunSummary = {
  *
  * `needs` is the closeout's, for a step whose current try signed off blocked: its question. Null for any other step.
  *
- * `blockedByHarness` is set for a step whose session the harness marked blocked and that gave no closeout — the engine's
+ * `blockedByHarness` is whether the harness marked the step's session blocked while it gave no closeout — the engine's
  * `needs-human` — which is no question of the step's: measured on "Could not refresh your login because another Claude Code
- * process is refreshing it". `lastLine` is what the session said last, as the engine's `transcript` reads it: its last `text`
- * or `system` event, or null when it said none or its conversation cannot be read.
+ * process is refreshing it". What the session said last is on the run's detail alone (`lastLine`): reading it observes the
+ * harness again, and the list is read on every poll of the Factory for one observation.
  */
-export type StepNeeds = { needs: string | null; blockedByHarness: { lastLine: string | null } | null };
+export type StepNeeds = { needs: string | null; blockedByHarness: boolean };
 
 /**
  * A try a person asked for — with `wf retry`, or the board's answer box — that the next tick files: `assess`'s, off their ask
@@ -218,7 +218,12 @@ export type RunDetail = {
     note: string | null;
     /** As on `RunSummary` (`StepNeeds`). */
     needs: string | null;
-    blockedByHarness: StepNeeds['blockedByHarness'];
+    blockedByHarness: boolean;
+    /**
+     * For a step the harness blocked, what its session said last, as the engine's `transcript` reads it: its last `text` or `system`
+     * event, trimmed. Null for any other step, and for one whose session said none or whose conversation cannot be read.
+     */
+    lastLine: string | null;
     /** The try a person asked for, which the next tick files (`StepAsked`); null when none is asked. */
     asked: StepAsked | null;
     closeout: StepCloseout | null;
@@ -498,7 +503,7 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
   return step && workflows ? composeBrief(step, run, workflows) : null;
 }
 
-async function summarize(run: Run, views: Views): Promise<RunSummary> {
+function summarize(run: Run, views: Views): RunSummary {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const judged = judge(run, names, folder, views);
@@ -511,28 +516,28 @@ async function summarize(run: Run, views: Views): Promise<RunSummary> {
     cancelledAt: run.cancelledAt ?? null,
     status: judged.status,
     moving: judged.moving,
-    steps: await Promise.all(names.map(async (name) => ({
+    steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
       branch: run.steps[name]?.branch ?? null,
       status: judged.words.get(name)!,
       note: judged.notes.get(name) ?? null,
-      ...(await needsOf(run, name, views)),
-    }))),
+      ...needsOf(run, name, views),
+    })),
     waitingOnYou: judged.waitingOnYou,
   };
 }
 
 /**
- * What a person has to know to act on a step (`StepNeeds`), off the views the request already read: its current try's closeout, and
- * the engine's word for its task. The session's last line costs a read of its conversation, and only for a step the harness blocked.
+ * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its
+ * current try's closeout, and the engine's word for its task.
  */
-async function needsOf(run: Run, name: string, views: Views): Promise<StepNeeds> {
+function needsOf(run: Run, name: string, views: Views): StepNeeds {
   const view = run.steps[name]?.taskId ? views.get(run.steps[name]!.taskId!) : undefined;
   const said = view ? closeoutOf(views, run, name) : undefined;
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
-    blockedByHarness: view?.phase === 'needs-human' && said === undefined ? { lastLine: await lastLineOf(view) } : null,
+    blockedByHarness: view?.phase === 'needs-human' && said === undefined,
   };
 }
 
@@ -542,6 +547,10 @@ const lastSaid = new Map<string, { cursor: string; line: string | null }>();
 /**
  * What a session said last — its last `text` or `system` event, trimmed — through the engine's `transcript`, or null when it has said
  * none or its conversation cannot be read.
+ *
+ * Each read costs an observation of the task's harness: the attempt of a session the harness blocked has not ended, so its session's id
+ * is on no record, and the engine asks the registry for it (one `claude agents` call). Read on a run's detail, as a refused check's output
+ * is, and never on the list.
  *
  * Read from where the last read of the same attempt stopped, so a page polled every five seconds reads what the session wrote since,
  * not its whole conversation again; a cursor the engine refuses, of a transcript replaced since, is read again from the start. A read's
@@ -594,6 +603,8 @@ async function detail(run: Run): Promise<RunDetail> {
   // Every task in the store over one observation, as the list reads them, rather than a `view` — an observation, ~0.3 s here — for
   // each task of each try, one after another, on a page polled every five seconds: a loop's later rounds made that seconds a poll.
   // Folding every journal cost about what one observation does (163 journals, 2026-09-13). The record is read first, as the list reads it.
+  // One more observation for each refused check's output (`checksOf`) and each blocked session's last line (`lastLineOf`), which only a
+  // run's own detail reads.
   const views = await everyView();
   const judged = judge(run, names, workflows, views);
   const steps = judgedSteps(run, workflows);
@@ -620,6 +631,7 @@ async function detail(run: Run): Promise<RunDetail> {
     steps: await Promise.all(names.map(async (name) => {
       const step = source?.find((s) => s.name === name);
       const taskId = run.steps[name]?.taskId ?? null;
+      const needs = needsOf(run, name, views);
       const current = {
         status: judged.words.get(name)!,
         check: checks.get(name) ?? null,
@@ -637,7 +649,8 @@ async function detail(run: Run): Promise<RunDetail> {
         workspace: run.steps[name]?.workspace ?? null,
         branch: run.steps[name]?.branch ?? null,
         note: judged.notes.get(name) ?? null,
-        ...(await needsOf(run, name, views)),
+        ...needs,
+        lastLine: needs.blockedByHarness ? await lastLineOf(views.get(taskId!)!) : null,
         asked: askedOf(judged.asked.get(name)),
         ...current,
         used: taskId ? usedOf(used[name]) : null,
@@ -1173,9 +1186,7 @@ export const app = new Hono()
     // the two reads would show as `unknown` until the next poll.
     const runs = listRuns();
     const views = await everyView();
-    const summaries: RunSummary[] = [];
-    for (const run of runs) summaries.push(await summarize(run, views));
-    return c.json(summaries);
+    return c.json(runs.map((run) => summarize(run, views)));
   })
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');

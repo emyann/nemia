@@ -1482,8 +1482,12 @@ const oneStep = () => {
  * A run another will wait on, on the board its child is ticked on — one engine, as in life: started for real, with worktrees, and its
  * step filed. With `work`, a file committed on its branch; with `signed` — by default, when there is work — its step signed off.
  */
-const aParent = async (repo: string, b: ReturnType<typeof board>, { work, signed = Boolean(work) }: { work?: string; signed?: boolean } = {}) => {
-  const run = start({ brief: 'the parent', repo, workflowDir: oneStep() });
+const aParent = async (
+  repo: string,
+  b: ReturnType<typeof board>,
+  { work, signed = Boolean(work), workflowDir, brief = 'the parent' }: { work?: string; signed?: boolean; workflowDir?: string; brief?: string } = {},
+) => {
+  const run = start({ brief, repo, workflowDir: workflowDir ?? oneStep() });
   await advance(b.e, readRun(run.id));
   const wt = readRun(run.id).steps.implement!.workspace!;
   if (work) {
@@ -2012,4 +2016,56 @@ test('a `start()` that refuses part-way stops the plan: the runs already started
   assert.equal(runsWritten(), before + 2, 'the runs it started stand');
   assert.deepEqual(started.map((p) => readRun(p.runId).after), [undefined, [started[0]!.runId]]);
   assert.equal(folderOf(stopped!.card), flow);
+});
+
+test("a run that waited on runs has its roots filed with `## From run <parent>` for each — the first line of the parent's brief, its terminal step's summary and declared fields, as data — and neither a run without `after` nor a step after a root is given one", async () => {
+  const repo = aRepo();
+  const c = board();
+  const declaring = fs.mkdtempSync(path.join(ROOT, 'declaring-'));
+  fs.writeFileSync(path.join(declaring, 'implement.md'), '---\noutput: implement.schema.json\n---\nimplement it\n');
+  fs.writeFileSync(path.join(declaring, 'implement.schema.json'), JSON.stringify(FINDINGS));
+  const p = await aParent(repo, c, { work: 'parent.txt', signed: false, workflowDir: declaring, brief: 'Parse the flag\n\nIn cli.ts, before anything reads it.' });
+  c.settle(`${p.run.id}-implement`, 'succeeded', { ...SIGNED, summary: 'PARENT-SUMMARY: the flag is parsed first', findings: FOUND });
+  const q = await aParent(repo, c, { work: 'second.txt', brief: 'Store the flag' });
+  assert.doesNotMatch(c.tasks.get(`${p.run.id}-implement`)!.spec.brief, /## From run/, 'a run without `after` is given none');
+
+  const child = start({ brief: 'Show the flag', repo, workflowDir: folder(), after: [p.run.id, q.run.id] });
+  for (const parent of [p, q]) gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${parent.run.id}`, parent.branch);
+  const r = await advance(c.e, readRun(child.id));
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+  const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
+  assert.ok(brief.includes(`## What was asked for\n\nShow the flag\n\n## From run ${p.run.id}\n`), brief);
+  const fromP = brief.slice(brief.indexOf(`## From run ${p.run.id}\n`), brief.indexOf(`## From run ${q.run.id}\n`));
+  assert.ok(fromP.includes('What it was asked, the first line:\n\n```text\nParse the flag\n```'), fromP);
+  assert.ok(fromP.includes('What implement said when it signed off, its `summary`:\n\n```text\nPARENT-SUMMARY: the flag is parsed first\n```'), fromP);
+  assert.deepEqual(dataUnder(fromP, 'What implement declared in its closeout — `findings`:'), { findings: FOUND });
+  const qAt = brief.indexOf(`## From run ${q.run.id}\n`);
+  const fromQ = brief.slice(qAt, brief.indexOf('\n## ', qAt));
+  assert.ok(fromQ.includes('What it was asked, the first line:\n\n```text\nStore the flag\n```'), fromQ);
+  assert.ok(fromQ.includes('What implement said when it signed off, its `summary`:\n\n```text\ndid it\n```'), fromQ);
+  assert.doesNotMatch(fromQ, /declared in its closeout/, 'a step that declares nothing hands on its summary alone');
+
+  c.settle(`${child.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(c.e, readRun(child.id))).filed, ['review']);
+  assert.doesNotMatch(c.tasks.get(`${child.id}-review`)!.spec.brief, /## From run/, 'only its roots');
+});
+
+test('REFUSED to fail the filing: a parent whose closeout cannot be read — a failed step whose work a person merged, and one whose closeout does not parse — is handed on as a section that says so, and the roots are filed all the same', async () => {
+  const repo = aRepo();
+  const c = board();
+  const lost = await aParent(repo, c, { work: 'lost.txt', signed: false });
+  c.settle(`${lost.run.id}-implement`, 'failed');
+  const garbled = await aParent(repo, c, { work: 'garbled.txt', signed: false });
+  c.settle(`${garbled.run.id}-implement`, 'failed', 'not json {');
+  for (const parent of [lost, garbled]) {
+    gitIn(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${parent.run.id}`, parent.branch);
+    assert.deepEqual((await decide(c.e, parent.run.id)).decision, { kind: 'shipped', branches: [parent.branch] });
+  }
+  const child = start({ brief: 'the child of work merged without a word', repo, workflowDir: folder(), after: [lost.run.id, garbled.run.id] });
+  const r = await advance(c.e, readRun(child.id));
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []], 'filed all the same');
+  const brief = c.tasks.get(`${child.id}-implement`)!.spec.brief;
+  assert.ok(brief.includes(`## From run ${lost.run.id}\n`) && brief.includes(`## From run ${garbled.run.id}\n`), brief);
+  assert.ok(brief.includes(`\nWhat implement said when it signed off cannot be given here — the engine holds no closeout for its task ${lost.run.id}-implement, which is failed.\n`), brief);
+  assert.match(brief, /\nWhat implement said when it signed off cannot be given here — its closeout cannot be read: unparseable: .*\.\n/);
 });

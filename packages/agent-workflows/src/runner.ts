@@ -18,13 +18,13 @@ export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { ParentRun, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Shipped, Wait } from './run.ts';
+export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Shipped, Wait } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -1059,6 +1059,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // before they shipped. Read once, in the pass that files its roots, and written with them; every worktree and diff of the run is cut
   // from it. A run with no `after` keeps the base `wf start` recorded, as before.
   if (ready.length && starting && run.after?.length) run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
+  // What those runs concluded, for the roots' briefs (`## From run <id>`): read on the same pass, and never again.
+  const parents = ready.length && starting && run.after?.length ? await parentCloseouts(e, run.after) : undefined;
 
   const filed: string[] = [];
   for (const name of ready) {
@@ -1077,8 +1079,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       id: stepTaskId(run, name, tryOf(run, name)),
       // What the steps it reads declared, if it names any in `input:` — read off the same closeouts the
       // assessment that made it ready just read, so it is handed what it was filed on.
-      // And, when the run installed its `node_modules` or could not, why its start was slow or what to run.
-      brief: composeBrief(step, run, steps, signedOff, files, place.deps),
+      // And, when the run installed its `node_modules` or could not, why its start was slow or what to run. And, on a root of a run
+      // that waited on runs, what they concluded.
+      brief: composeBrief(step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents),
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,
@@ -1492,6 +1495,49 @@ async function parentsOf(e: Engine, run: Run): Promise<(id: string) => ParentRun
   const read = new Map<string, ParentRun>();
   if (gated(run)) for (const id of new Set(run.after)) read.set(id, await parentOf(e, id));
   return (id) => read.get(id) ?? { shipped: false };
+}
+
+/**
+ * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief, and
+ * each terminal step's closeout on the engine's record of its current try, read as `wf decide` reads one (`closeoutOf`). Read once, on the
+ * pass that files the roots. It never throws: a parent whose record or workflow no longer reads, a step never filed, a task the engine holds
+ * no closeout for — a failed step whose work a person merged all the same — and a closeout that does not parse each say so in the section,
+ * and the roots are filed all the same.
+ */
+async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<ParentCloseout[]> {
+  const out: ParentCloseout[] = [];
+  for (const id of new Set(ids)) {
+    let record: Run;
+    let steps: Workflow[];
+    try {
+      record = readRun(id);
+      steps = stepsOf(record);
+    } catch (err) {
+      out.push({ run: id, unreadable: `its record cannot be read: ${(err as Error).message}` });
+      continue;
+    }
+    const said: ParentStep[] = [];
+    for (const step of terminalSteps(steps)) {
+      const taskId = record.steps[step.name]?.taskId;
+      if (!taskId) {
+        said.push({ name: step.name, unreadable: 'it was never filed' });
+        continue;
+      }
+      let view: TaskView;
+      try {
+        view = await e.view(taskId);
+      } catch (err) {
+        said.push({ name: step.name, unreadable: `the engine could not be asked for its task ${taskId}: ${(err as Error).message}` });
+        continue;
+      }
+      const c = closeoutOf(new Map([[taskId, view]]), record, step.name);
+      if (!c) said.push({ name: step.name, unreadable: `the engine holds no closeout for its task ${taskId}, which is ${phaseOfView(view)}` });
+      else if ('error' in c) said.push({ name: step.name, unreadable: `its closeout cannot be read: ${c.error}` });
+      else said.push({ step, said: c });
+    }
+    out.push({ run: id, asked: record.brief.split('\n')[0]!, steps: said });
+  }
+  return out;
 }
 
 /** Each of these branches git has, and the commit it is at, in one `for-each-ref`. A branch git does not have is left out. */

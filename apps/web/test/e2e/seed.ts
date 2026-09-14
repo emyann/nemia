@@ -189,6 +189,101 @@ export const HELD = {
   line: 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute; if it keeps happening, close other Claude Code windows or sign in again with /login',
 } as const;
 
+/**
+ * Runs that wait on runs (`wf start --after`), on the checkout's repository — a real one (`seedDiamond`), and the one a start from the
+ * Workflows page runs in, so the start form offers them. The diamond: `top` shipped first; `shipped` and `running` started from a main
+ * that had it, and `shipped` was merged while `running`'s session still works; `bottom` waits on both, so on `running` alone. Beside it,
+ * `cancelled` was called off before anything of it was filed, and `orphan` waits on it: for ever, so on you.
+ *
+ * Newer than every other run, so the Factory's oldest-first floor still starts with FAKE's card and NEIGHBOUR's beside it.
+ */
+export const DIAMOND = {
+  top: { id: 'lay-the-diamond-top-e2e4', title: 'Lay the diamond top', after: [] },
+  shipped: { id: 'one-side-shipped-e2e5', title: 'One side, shipped', after: ['lay-the-diamond-top-e2e4'] },
+  running: { id: 'the-other-side-runs-e2e6', title: 'The other side, still running', after: ['lay-the-diamond-top-e2e4'] },
+  bottom: { id: 'the-diamond-bottom-e2e7', title: 'The diamond bottom', after: ['one-side-shipped-e2e5', 'the-other-side-runs-e2e6'] },
+  cancelled: { id: 'called-off-e2e8', title: 'Called off', after: [] },
+  orphan: { id: 'waits-on-a-called-off-run-e2e9', title: 'Waits on a called-off run', after: ['called-off-e2e8'] },
+  /** What `wf ls` says of each waiting run's root, and the card with it. */
+  words: {
+    bottom: 'waiting on the-other-side-runs-e2e6',
+    orphan: 'waiting on called-off-e2e8 (cancelled)',
+  },
+} as const;
+
+/** The diamond's runs, oldest first. */
+export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.shipped, DIAMOND.running, DIAMOND.bottom, DIAMOND.cancelled, DIAMOND.orphan] as const;
+
+/**
+ * Write DIAMOND into the checkout at `repo` — made a git repository here, its files the base on `main` — and the store at `root`. `top`'s
+ * and `shipped`'s result branches are merged into main with `--no-ff`, one after the other, and their steps signed off: each one's own
+ * `wf decide` says shipped. `running`'s branch has its work and is not merged, and its session has not ended. `cancelled` is marked as
+ * `wf cancel` marks a run, in a file beside its record. Times are minutes before `now`.
+ */
+export function seedDiamond(repo: string, root: string, now = Date.now()): void {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const git = (...args: string[]): string =>
+    execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
+      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  git('init', '-q', '-b', 'main');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  const base = git('rev-parse', 'HEAD').trim();
+  const branchOf = (id: string) => `wf/${id}/implement`;
+  /** A result branch off main with the run's work on it, merged back when it shipped. */
+  const work = (id: string, merge: boolean) => {
+    git('checkout', '-q', '-b', branchOf(id));
+    write(path.join(repo, 'src', `${id}.ts`), `export const done = '${id}';\n`);
+    git('add', '-A');
+    git('commit', '-q', '-m', `The work of ${id}`);
+    git('checkout', '-q', 'main');
+    if (merge) git('merge', '-q', '--no-ff', '-m', `Merge ${id}`, branchOf(id));
+  };
+
+  const workflowDir = path.join(root, 'workflow-diamond');
+  write(path.join(workflowDir, 'implement.md'), '---\nharness: claude\n---\nImplement it.\n');
+  const workflow = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }];
+  const record = (run: (typeof DIAMOND_RUNS)[number], minutes: number, implement: object) =>
+    write(path.join(root, 'runs', `${run.id}.json`), JSON.stringify({
+      id: run.id, repo, workspace: repo, baseRef: base, branch: 'main', isolate: true,
+      brief: `${run.title}\n\nA run seeded by npm run e2e, in the diamond: ${run.after.length ? `after ${run.after.join(' and ')}` : 'waiting on no run'}.`,
+      workflowDir, workflow, ...(run.after.length ? { after: run.after } : {}),
+      createdAt: ago(minutes),
+      steps: { implement },
+    }, null, 2));
+  const task = (run: (typeof DIAMOND_RUNS)[number]) => `${run.id}-implement`;
+  const filed = (run: (typeof DIAMOND_RUNS)[number], minutes: number) => ({ kind: 'filed', at: ago(minutes), brief: 'Implement it.', cwd: repo, maxAttempts: 1 });
+  const signedOff = (run: (typeof DIAMOND_RUNS)[number], began: number, ended: number) =>
+    write(path.join(root, 'engine', 'tasks', `${task(run)}.jsonl`), lines([
+      filed(run, began),
+      { kind: 'starting', at: ago(began), attempt: 1 },
+      { kind: 'spawned', at: ago(began), attempt: 1 },
+      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task(run)}/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: `Did ${run.title}.`, needs: null, artifacts: [] } },
+      { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
+    ]));
+
+  const { top, shipped, running, bottom, cancelled, orphan } = DIAMOND;
+  work(top.id, true);
+  signedOff(top, 2.6, 2.5);
+  record(top, 2.6, { taskId: task(top), workspace: repo, branch: branchOf(top.id) });
+  work(shipped.id, true);
+  signedOff(shipped, 2.4, 2.3);
+  record(shipped, 2.4, { taskId: task(shipped), workspace: repo, branch: branchOf(shipped.id) });
+  // Its session started and has not ended, as NEIGHBOUR's draft: the engine reads it running.
+  work(running.id, false);
+  write(path.join(root, 'engine', 'tasks', `${task(running)}.jsonl`), lines([
+    filed(running, 2.2),
+    { kind: 'starting', at: ago(2.1), attempt: 1 },
+    { kind: 'spawned', at: ago(2.1), attempt: 1 },
+  ]));
+  record(running, 2.2, { taskId: task(running), workspace: repo, branch: branchOf(running.id) });
+  record(bottom, 2.0, { taskId: null });
+  record(cancelled, 1.8, { taskId: null });
+  write(path.join(root, 'runs', `${cancelled.id}.cancelled`), ago(1.7));
+  record(orphan, 1.6, { taskId: null });
+}
+
 /** Where in the store the sessions `claude agents --all --json` lists are kept, for the fake `claude` run.ts puts on the api's PATH. */
 export const REGISTRY = 'claude-agents.json';
 

@@ -6,7 +6,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
-import { expectApart, expectBeneath, expectCount, expectDrawn, expectInside, expectMovedWith, expectTheme, expectVisible, Refused, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTheme, expectVisible, Refused, watch } from './checks.ts';
 
 let browser: Browser;
 before(async () => {
@@ -148,4 +148,33 @@ test("an edge back that runs beside its steps, or over them, is refused, naming 
     (err: Error) => err instanceof Refused && err.message === 'the edge back runs beneath the row — over rises above the middle of implement, over rises above the middle of review');
   await assert.rejects(expectBeneath(page.locator('.gone'), page.locator('.step'), 'the edge back runs beneath the row'),
     (err: Error) => err instanceof Refused && err.message === 'the edge back runs beneath the row — nothing to compare: 0 and 2 found');
+});
+
+test('a card that does not end left of one that waits on it is refused, naming both — and so is nothing to compare', async () => {
+  const { page } = await pageWith(`<div class="parent" data-id="a" style="position:absolute;left:0;top:0;width:100px;height:50px"></div>
+    <div class="child" data-id="b" style="position:absolute;left:150px;top:0;width:100px;height:50px"></div>
+    <div class="under" data-id="c" style="position:absolute;left:80px;top:60px;width:100px;height:50px"></div>`);
+  await expectLeftOf(page.locator('.parent'), page.locator('.child'), 'a is left of b');
+  // Begun before a ends, a row down: not left of it, though not over it either.
+  await assert.rejects(expectLeftOf(page.locator('.parent'), page.locator('.under'), 'a is left of c', 300),
+    (err: Error) => err instanceof Refused && err.message === 'a is left of c — a does not end left of c');
+  await assert.rejects(expectLeftOf(page.locator('.child'), page.locator('.parent'), 'b is left of a', 300),
+    (err: Error) => err instanceof Refused && err.message === 'b is left of a — b does not end left of a');
+  await assert.rejects(expectLeftOf(page.locator('.gone'), page.locator('.child'), 'nothing is left of b', 300),
+    (err: Error) => err instanceof Refused && err.message === 'nothing is left of b — nothing to compare: 0 and 1 found');
+});
+
+test('a card not level with the middle of the two it is joined to is refused, naming it — level with one of them included — and so is nothing to compare', async () => {
+  const { page } = await pageWith(`<div id="b" data-id="b" style="position:absolute;left:100px;top:0;width:100px;height:50px"></div>
+    <div id="c" data-id="c" style="position:absolute;left:100px;top:200px;width:100px;height:50px"></div>
+    <div class="middle" data-id="d" style="position:absolute;left:250px;top:100px;width:100px;height:50px"></div>
+    <div class="level" data-id="e" style="position:absolute;left:250px;top:0;width:100px;height:50px"></div>
+    <div class="below" data-id="f" style="position:absolute;left:250px;top:300px;width:100px;height:50px"></div>`);
+  await expectBetween(page.locator('.middle'), page.locator('#b'), page.locator('#c'), 'd is between b and c');
+  await assert.rejects(expectBetween(page.locator('.level'), page.locator('#b'), page.locator('#c'), 'e is between b and c', 300),
+    (err: Error) => err instanceof Refused && err.message === 'e is between b and c — e is not between b and c');
+  await assert.rejects(expectBetween(page.locator('.middle, .below'), page.locator('#c'), page.locator('#b'), 'd and f are between c and b', 300),
+    (err: Error) => err instanceof Refused && err.message === 'd and f are between c and b — f is not between c and b');
+  await assert.rejects(expectBetween(page.locator('.middle'), page.locator('#gone'), page.locator('#c'), 'd is between', 300),
+    (err: Error) => err instanceof Refused && err.message === 'd is between — nothing to compare: 1, 0 and 1 found');
 });

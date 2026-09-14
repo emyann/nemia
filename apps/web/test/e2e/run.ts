@@ -24,8 +24,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectApart, expectBeneath, expectCount, expectDrawn, expectInside, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { CHECKOUT, FAKE, HELD, LOOPING, NEIGHBOUR, REGISTRY, seed, seedCheckout, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { CHECKOUT, DIAMOND, DIAMOND_RUNS, FAKE, HELD, LOOPING, NEIGHBOUR, REGISTRY, seed, seedCheckout, seedDiamond, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -83,6 +83,14 @@ async function nextVisit(page: Page, check: (again: Page) => Promise<void>): Pro
   }
 }
 
+/** A run's card on the Factory, and the edge from one card into another (`after`). */
+const cardOf = (page: Page, id: string): Locator => page.locator(`.react-flow__node[data-id="${id}"]`);
+const cardsOf = (page: Page, ...ids: string[]): Locator => page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
+const edgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`);
+
+/** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
+const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
+
 /** The theme a page is in, as its browser prefers it: what names a photograph taken beside the visit's own. */
 const themeOf = (page: Page): Promise<string> => page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
 
@@ -111,12 +119,56 @@ const PAGES: PageSpec[] = [
       );
       await settled(page);
 
+      // The diamond, drawn as a graph of cards: an edge from each run a card waits on into it, parents left of children, and the two
+      // sides level about the middle. Its top and its shipped side are finished, and on the floor all the same: a run in flight waits on each.
+      const { top, shipped, running, bottom, cancelled, orphan } = DIAMOND;
+      for (const run of [top, shipped, running, bottom]) await expectVisible(cardOf(page, run.id), `the diamond's card ${run.id} is on the floor by default`);
+      for (const run of [top, shipped]) {
+        await expectVisible(cardOf(page, run.id).getByText(/^started .+ ago$/), `${run.id}, shipped, is drawn finished — on the floor because a run in flight waits on it`);
+      }
+      for (const run of [cancelled, orphan]) {
+        await expectCount(cardOf(page, run.id), 0, `${run.id} is not on the floor by default: ${orphan.id} waits on a run called off, and nothing of either moves`);
+      }
+      // Counted, not seen: an edge whose ends are level is a path with no height, which Playwright takes for hidden.
+      for (const [from, to, state] of [[top, shipped, 'done'], [top, running, 'done'], [shipped, bottom, 'to-come'], [running, bottom, 'to-come']] as const) {
+        await expectCount(
+          edgeOf(page, from.id, to.id).locator(`.react-flow__edge-path[data-state="${state}"]`),
+          1,
+          `an edge from ${from.id} into ${to.id}, ${state === 'done' ? 'solid: that run has started' : 'dashed: that run waits'}`,
+        );
+      }
+      await expectCount(page.locator('.react-flow__edge[data-id^="after:"]'), 4, 'the four edges of the diamond, and no other edge between cards');
+      await settled(page);
+      await expectLeftOf(cardOf(page, top.id), cardsOf(page, shipped.id, running.id), 'the top is left of both sides, which wait on it');
+      await expectLeftOf(cardsOf(page, shipped.id, running.id), cardOf(page, bottom.id), 'both sides are left of the bottom, which waits on them');
+      await expectApart(cardOf(page, shipped.id), cardOf(page, running.id), 'the two sides are laid out apart');
+      await expectBetween(cardOf(page, top.id), cardOf(page, shipped.id), cardOf(page, running.id), 'the top is level with the middle of the two sides');
+      await expectBetween(cardOf(page, bottom.id), cardOf(page, shipped.id), cardOf(page, running.id), 'and so is the bottom: the diamond reads as one');
+      // What each card waits on, in `wf ls`'s word: the bottom on the side still running alone, and not on you.
+      await expectVisible(
+        cardOf(page, bottom.id).locator('[data-waiting="on-runs"]', { hasText: DIAMOND.words.bottom }),
+        `the bottom's card says ${DIAMOND.words.bottom}: the side that shipped is waited on no more`,
+      );
+      await expectCount(cardOf(page, bottom.id).getByText('waiting on you', { exact: true }), 0, 'and does not wait on you: the side it waits on may still ship');
+      for (const run of [top, shipped, running]) await expectCount(cardOf(page, run.id).locator('[data-waiting]'), 0, `${run.id} waits on no run`);
+      await expectCount(page.locator('.react-flow__panel[aria-label="Legend"] [data-sample="cards"]'), 1, "the Factory's legend draws the edge between two cards");
+
       // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight.
       // Its followers read `waiting`, and will for ever; they do not keep it on the floor.
       await expectCount(card, 0, `a run whose check refused is finished, not in flight: no card on the floor by default (${FAKE.id})`);
       // So is the loop out of rounds: it waits on a person, and nothing of it moves.
-      await expectVisible(page.getByText('2 in flight · 2 finished · 2 waiting on you'), 'the Factory counts both finished, and waiting on you');
+      // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. Waiting on you: FAKE, LOOPING, and the run waiting on one called off.
+      await expectVisible(page.getByText('4 in flight · 6 finished · 3 waiting on you'), 'the Factory counts the runs in flight, the finished, and those waiting on you');
       await showFinished(page);
+      // The run called off, and the one that waits on it: for ever, so on you, and its card names the run it waits on and why.
+      await expectVisible(
+        cardOf(page, orphan.id).locator('[data-waiting="on-you"]', { hasText: DIAMOND.words.orphan }),
+        `${orphan.id}'s card says ${DIAMOND.words.orphan}, amber`,
+      );
+      await expectVisible(cardOf(page, orphan.id).getByText('waiting on you', { exact: true }), `${orphan.id} waits on you`);
+      await expectCount(edgeOf(page, cancelled.id, orphan.id).locator('.react-flow__edge-path[data-state="to-come"]'), 1, `a dashed edge from ${cancelled.id} into ${orphan.id}`);
+      await settled(page);
+      await expectLeftOf(cardOf(page, cancelled.id), cardOf(page, orphan.id), `${cancelled.id} is left of ${orphan.id}, which waits on it`);
       await expectVisible(
         page.locator(`.react-flow__node[data-id="${LOOPING.id}"] [data-state="exhausted"][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
         `the loop's card shows ${LOOPING.exhausted} out of rounds as an amber chip, its note after what that means on hover (${LOOPING.id})`,
@@ -156,7 +208,8 @@ const PAGES: PageSpec[] = [
       for (const first of FAKE.first) {
         await expectCount(page.locator(`.react-flow__edge[data-id="${FAKE.id}/->${first}"]`), 1, `one dashed edge from the card into ${first}`);
       }
-      await expectCount(page.locator('.react-flow__edge'), FAKE.edges + FAKE.first.length, "the run's edges, and the card's into each first step");
+      await expectCount(page.locator(`.react-flow__edge[data-id^="${FAKE.id}/"]`), FAKE.edges + FAKE.first.length, "the run's edges, and the card's into each first step");
+      await expectCount(page.locator('.react-flow__edge'), FAKE.edges + FAKE.first.length + 5, 'and beside them only the five edges between cards');
       await expectCount(
         page.locator(`.react-flow__edge[data-id^="${FAKE.id}/"] animateMotion`),
         0,
@@ -253,6 +306,10 @@ const PAGES: PageSpec[] = [
         `the row names the workflow the run was started from (${FAKE.workflow}), linked to the Workflows page`,
       );
       await expectCount(row.locator('a'), 0, "the run's link has no link inside it");
+      await expectVisible(
+        page.locator(`li a[href="/runs/${DIAMOND.bottom.id}"] [data-state="waiting"]`, { hasText: DIAMOND.words.bottom }),
+        `the row of a run waiting on a run says so on its root, as wf ls does (${DIAMOND.words.bottom}), a waiting chip`,
+      );
       const loop = page.locator(`li a[href="/runs/${LOOPING.id}"]`);
       await expectVisible(loop.getByText(`waiting on you: ${LOOPING.exhausted}`), `the runs list says ${LOOPING.exhausted}, out of rounds, is waiting on you`);
       await expectVisible(
@@ -659,6 +716,27 @@ const PAGES: PageSpec[] = [
     },
   },
   {
+    // A run that waits on a run that was called off: its page says what `wf decide` says of it, and offers nothing else.
+    name: 'waits',
+    route: `/runs/${DIAMOND.orphan.id}`,
+    expect: async (page) => {
+      await sidebar(page);
+      const { cancelled, orphan } = DIAMOND;
+      const banner = page.locator('section[aria-label="Waiting on runs"][data-on-you="true"]');
+      await expectVisible(banner.getByText(DIAMOND.words.orphan, { exact: true }), `the page says what wf ls says of ${orphan.id}: ${DIAMOND.words.orphan}`);
+      const advice = `${cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: wf cancel ${orphan.id}, or start the work again without --after ${cancelled.id}`;
+      await expectVisible(banner.locator('[data-advice]', { hasText: advice }), 'and what wf decide leaves you to do, word for word');
+      await expectVisible(banner.locator(`a[href="/runs/${cancelled.id}"]`), `${cancelled.id} is linked to its page`);
+      await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'no Decide section: nothing of the run is filed, and wf decide offers nothing else');
+      const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
+      await expectVisible(
+        graph.locator('.react-flow__node[data-id="implement"] [data-state="waiting"]', { hasText: DIAMOND.words.orphan }),
+        "its root's chip is waiting, in wf ls's words",
+      );
+      await settled(page);
+    },
+  },
+  {
     name: 'workflows',
     route: '/workflows',
     expect: async (page) => {
@@ -696,6 +774,51 @@ const PAGES: PageSpec[] = [
       if (await start.isEnabled()) throw new Refused('Start is disabled while there is no brief — it was enabled with none');
       await brief.fill('Give the board a legend');
       if (!(await start.isEnabled())) throw new Refused('Start is enabled once a brief is written — it stayed disabled');
+
+      // After: every run on the repository a start runs in, and none on another.
+      const offered = dev.locator('ul[aria-label="Runs to wait on"] li');
+      await expectCount(offered, DIAMOND_RUNS.length, `the start form offers the ${DIAMOND_RUNS.length} runs on this repository to wait on`);
+      for (const run of DIAMOND_RUNS) await expectVisible(offered.filter({ hasText: run.title }).locator(`input[type="checkbox"][value="${run.id}"]`), `${run.id} is offered, by its title`);
+      await expectCount(dev.locator(`[data-run="${FAKE.id}"]`), 0, `${FAKE.id}, on another repository, is not offered`);
+
+      // A start that waits on a run the package will not wait on — one called off — through the board: refused in `afterRefusal`'s words,
+      // beside the form, and nothing written. In a page of its own, whose one refusal is the point.
+      const runsDir = path.join(store!, 'runs');
+      const before = fs.readdirSync(runsDir).sort();
+      const refused = await page.context().newPage();
+      try {
+        const { problems } = watch(refused);
+        await refused.goto(page.url(), { waitUntil: 'networkidle' });
+        const form = refused.locator(`section[aria-label="Workflow ${good.name}"]`);
+        await form.getByRole('textbox', { name: 'Start a run' }).fill('Wait on a run that was called off');
+        const pick = form.locator(`input[type="checkbox"][value="${DIAMOND.cancelled.id}"]`);
+        await expectVisible(pick, `${DIAMOND.cancelled.id} is offered to wait on`);
+        await pick.check();
+        const [answered] = await Promise.all([
+          refused.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+          form.getByRole('button', { name: 'Start' }).click(),
+        ]);
+        const { error } = (await answered.json()) as { error?: string };
+        const sentence = `--after ${DIAMOND.cancelled.id}: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships, so this run would wait for ever. Start it without --after ${DIAMOND.cancelled.id}.`;
+        if (answered.status() !== 422 || error !== sentence) {
+          throw new Refused(`the api refuses to wait on a run called off, in afterRefusal's words — it answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        await expectVisible(form.locator('[data-refused]'), 'the refusal is shown beside the form, not swallowed');
+        const shown = await form.locator('[data-refused] p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal beside the form is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        const after = fs.readdirSync(runsDir).sort();
+        if (JSON.stringify(after) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
+        await settled(refused);
+        await refused.screenshot({ path: path.join(OUT, `start-refused-${await themeOf(refused)}.png`), fullPage: true });
+        await refused.waitForLoadState('networkidle');
+        // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
+        const expected = `request answered 422: POST ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 422\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await refused.close();
+      }
 
       const bad = card(broken.name);
       await expectVisible(bad.getByText(broken.error), `a folder the loader refuses shows the refusal (${broken.error})`);
@@ -828,6 +951,8 @@ async function main(): Promise<void> {
   const checkout = path.join(store, 'checkout');
   seedCheckout(checkout, path.join(API, 'test', 'fixtures', 'mcp-server.ts'));
   seedWorkflows(checkout, store);
+  // After the checkout's files, which its base commits.
+  seedDiamond(checkout, store);
   // A `claude` that lists the store's sessions (REGISTRY) — HELD's, blocked — first on the api's PATH. The engine observes `claude
   // agents` on every list; the pages are about the store, not about the sessions on this machine. And where Claude Code keeps its
   // transcripts, in the store (CLAUDE_CONFIG_DIR): the engine reads a session's conversation from there, never from this machine's.

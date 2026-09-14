@@ -151,6 +151,46 @@ export async function expectApart(these: Locator, those: Locator, assertion: str
   if (found) throw new Refused(`${assertion} — ${found}`);
 }
 
+/** Polls `problem` until it says none or `timeout` passes, and refuses with what it said last: for a floor laid out a render after what moved it. */
+async function until(problem: () => Promise<string | null>, assertion: string, timeout: number): Promise<void> {
+  const end = Date.now() + timeout;
+  let found = await problem();
+  while (found && Date.now() < end) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    found = await problem();
+  }
+  if (found) throw new Refused(`${assertion} — ${found}`);
+}
+
+/**
+ * Every element of `left` ends left of where every element of `right` begins, within `timeout`: a card left of each card that waits on
+ * it. Nothing matched on either side is refused too.
+ */
+export async function expectLeftOf(left: Locator, right: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+  await until(async () => {
+    const [a, b] = await Promise.all([boxesOf(left), boxesOf(right)]);
+    if (!a.length || !b.length) return `nothing to compare: ${a.length} and ${b.length} found`;
+    const wrong = a.flatMap((one) => b.filter((other) => !one.box || !other.box || one.box.x + one.box.width > other.box.x).map((other) => `${one.name} does not end left of ${other.name}`));
+    return wrong.length ? wrong.join(', ') : null;
+  }, assertion, timeout);
+}
+
+/**
+ * The vertical middle of every element of `middle` lies strictly between the middles of `one` and `other`, within `timeout`: a card level
+ * with the middle of the two it is joined to, as a diamond's top and bottom are with its sides. Nothing matched is refused too.
+ */
+export async function expectBetween(middle: Locator, one: Locator, other: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+  const centre = (b: Boxed) => (b.box ? b.box.y + b.box.height / 2 : Number.NaN);
+  await until(async () => {
+    const [m, [o] = [], [p] = []] = await Promise.all([boxesOf(middle), boxesOf(one), boxesOf(other)]);
+    const counts = [m.length, o ? 1 : 0, p ? 1 : 0];
+    if (!m.length || !o || !p) return `nothing to compare: ${counts[0]}, ${counts[1]} and ${counts[2]} found`;
+    const [top, bottom] = [Math.min(centre(o), centre(p)), Math.max(centre(o), centre(p))];
+    const wrong = m.filter((b) => !(top < centre(b) && centre(b) < bottom)).map((b) => `${b.name} is not between ${o.name} and ${p.name}`);
+    return wrong.length ? wrong.join(', ') : null;
+  }, assertion, timeout);
+}
+
 /**
  * Every element of `these` runs beneath every element of `row`: it reaches lower than the lowest of them, and rises no
  * higher than the middle of any — a loop's edge back curved under its steps, not over them or through them. Nothing

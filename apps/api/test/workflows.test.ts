@@ -47,10 +47,14 @@ write(path.join(broken, 'review.md'), '---\nafer: implement\n---\nReview it.\n')
 
 // Not a folder, so not a workflow.
 write(path.join(repo, 'workflows', 'NOTES.txt'), 'Ideas for workflows.\n');
+// Hidden, so not a workflow either: an editor's folder, and one that even has a step in it.
+write(path.join(repo, 'workflows', '.vscode', 'settings.json'), '{}\n');
+write(path.join(repo, 'workflows', '.draft', 'implement.md'), 'Implement it.\n');
 
-/** Yours, in the store: one step, and no README. */
+/** Yours, in the store: one step, and no README — kept in git, as a person's own workflows may be. */
 const mine = path.join(root, 'workflows', 'mine');
 write(path.join(mine, 'plan.md'), '---\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n');
+write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields`. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
@@ -140,8 +144,8 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
   const { error } = await unknown.json();
   assert.ok(error.startsWith("No workflow 'nope' in "), error);
   assert.ok(error.includes('The workflows there are: broken (repo), good (repo), mine (yours).'), error);
-  // Found among the folders, never joined onto a path: `..` names none of them.
-  for (const workflow of ['..', 'good/../mine', 'NOTES.txt']) assert.equal((await post({ workflow, brief: 'Do it.' })).status, 404, workflow);
+  // Found among the folders, never joined onto a path: `..` names none of them. Nor does a hidden folder, one with a step in it included.
+  for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode']) assert.equal((await post({ workflow, brief: 'Do it.' })).status, 404, workflow);
 
   for (const brief of [undefined, '', '  \n', 42]) {
     const res = await post({ workflow: 'good', brief });
@@ -157,6 +161,55 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
 
   assert.deepEqual(runFiles(), before);
   assert.deepEqual(filedTasks(), []);
+});
+
+/** A start of the repository's `good`, sent with exactly `headers`. */
+const sentWith = (headers: Record<string, string>) =>
+  app.request('/api/runs', { method: 'POST', headers, body: JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Push main to a new remote.' }) });
+
+test('REFUSED at shipped defaults: a start another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — and nothing is written', async () => {
+  const before = runFiles();
+
+  // What `fetch(url, { method: 'POST', body })` sends from any page, which the browser does not ask the api about first; a form's; and a near miss.
+  for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x', 'application/jsonp']) {
+    const res = await sentWith({ 'content-type': type });
+    assert.equal(res.status, 415, type);
+    const { error } = await res.json();
+    assert.ok(error.startsWith(`POST /api/runs takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``), error);
+  }
+
+  // The browser's word on who made the request, which no page can set: anything but the board's own origin. Another port on localhost is `same-site`.
+  for (const site of ['cross-site', 'same-site', 'none']) {
+    const res = await sentWith({ 'content-type': 'application/json', 'sec-fetch-site': site });
+    assert.equal(res.status, 403, site);
+    const { error } = await res.json();
+    assert.ok(error.startsWith('POST /api/runs refuses a request made by a page on another site') && error.includes(`(Sec-Fetch-Site: ${site})`), error);
+  }
+
+  // A site whose name was pointed at 127.0.0.1 is its own origin to the browser, so same-origin; only its Host says where it thinks it is.
+  for (const host of ['evil.example', 'evil.example:8787', '172.23.196.168:8787', 'localhost.evil.example:8787']) {
+    const res = await sentWith({ 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host });
+    assert.equal(res.status, 403, host);
+    const { error } = await res.json();
+    assert.ok(error.startsWith(`POST /api/runs refuses a request addressed to ${host}:`), error);
+  }
+
+  assert.deepEqual(runFiles(), before);
+  assert.deepEqual(filedTasks(), []);
+});
+
+test("a start as the board sends it is not refused: same-origin through vite's proxy, which rewrites Host to the api's; and one from a client outside a browser, which sends no Sec-Fetch-Site", async () => {
+  const before = runFiles().length;
+  for (const headers of [
+    // vite's `/api` proxy sets changeOrigin: Origin is the board's page, Host the api's.
+    { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' },
+    { 'content-type': 'application/json; charset=utf-8', host: 'localhost:8787' },
+    { 'content-type': 'Application/JSON', host: '[::1]:8787' },
+  ]) {
+    const res = await sentWith(headers);
+    assert.equal(res.status, 201, `${JSON.stringify(headers)}: ${await res.clone().text()}`);
+  }
+  assert.equal(runFiles().length, before + 3);
 });
 
 test("REFUSED at shipped defaults: what `start()` refuses is a 422 carrying its message word for word — a folder the loader refuses, a step named for another's check — and nothing is written", async () => {

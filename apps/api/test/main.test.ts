@@ -45,11 +45,26 @@ function startApi(port: string) {
 test('PORT=0 starts the api on a free port, and it prints the port it got', async (t) => {
   const api = startApi('0');
   t.after(() => api.child.kill());
-  const [, got] = await api.said(/api listening on http:\/\/localhost:(\d+)/);
+  const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   assert.notEqual(Number(got), 0);
   assert.notEqual(Number(got), DEFAULT_PORT);
   const res = await fetch(`http://127.0.0.1:${got}/api/health`);
   assert.deepEqual(await res.json(), { ok: true }, 'and it is listening there');
+});
+
+test("REFUSED: the api listens on 127.0.0.1 alone — nothing answers on this machine's other addresses, where anyone on the network could start a run", async (t) => {
+  // Before it listened on loopback alone, a text/plain POST /api/runs to this address answered 201 and wrote a run.
+  const outward = Object.values(os.networkInterfaces()).flat().find((a) => a?.family === 'IPv4' && !a.internal)?.address;
+  const api = startApi('0');
+  t.after(() => api.child.kill());
+  const [, got] = await api.said(/api listening on http:\/\/127\.0\.0\.1:(\d+)/);
+  assert.deepEqual(await (await fetch(`http://127.0.0.1:${got}/api/health`)).json(), { ok: true }, 'it answers on loopback');
+  if (!outward) return t.skip('this machine has no address but loopback to try');
+  await assert.rejects(
+    fetch(`http://${outward}:${got}/api/health`),
+    (err: Error & { cause?: { code?: string } }) => err.cause?.code === 'ECONNREFUSED',
+    `nothing answers on ${outward}:${got}`,
+  );
 });
 
 test('the api refuses a PORT that is not a port: exit 2, the fix on stderr, nothing listening', async () => {

@@ -472,7 +472,7 @@ async function main(): Promise<void> {
 
   const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API,
     { ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` },
-    /api listening on http:\/\/localhost:(\d+)/);
+    /api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   const base = await startServer('vite preview', [vite, 'preview', '--port', '0', '--host', '127.0.0.1'], WEB,
     { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },
     /Local:\s+(http:\/\/[^\s/]+)/);

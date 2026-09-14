@@ -1558,10 +1558,15 @@ test("REFUSED before review, now shipped: a parent whose step signs off with not
   assert.deepEqual(start({ brief: 'another child', repo, workflowDir: folder(), after: [p.run.id] }).after, [p.run.id]);
 });
 
-test('a parent merged and then its branch deleted: a run that started on the merge still files what follows — one that had not started cannot read the branch, says so, and is refused at `wf start`', async () => {
+test("REFUSED before review, now shipped: a parent merged and then its branch deleted still ships, by the tip its finished run's own pass recorded — a run that started on the merge files what follows, and one that had not files its roots", async () => {
   const repo = aRepo();
   const c = board();
   const p = await aParent(repo, c, { work: 'parent.txt' });
+  assert.equal(readRun(p.run.id).tips, undefined, 'not recorded while it ran');
+  // The parent's own pass, as `wf up` makes one over every run: it has finished, so it records its result branch's tip.
+  await advance(c.e, readRun(p.run.id));
+  const tip = gitIn(repo, 'rev-parse', p.branch);
+  assert.deepEqual(readRun(p.run.id).tips, { [p.branch]: tip });
   const early = start({ brief: 'the early child', repo, workflowDir: folder(), after: [p.run.id] });
   const late = start({ brief: 'the late child', repo, workflowDir: folder(), after: [p.run.id] });
   gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the parent', p.branch);
@@ -1570,19 +1575,70 @@ test('a parent merged and then its branch deleted: a run that started on the mer
   // The merge stays, and the branch goes: `git branch -d` refuses a branch a worktree uses, so the worktree goes first.
   gitIn(repo, 'worktree', 'remove', '--force', p.wt);
   gitIn(repo, 'branch', '-q', '-d', p.branch);
-  assert.deepEqual(await parentOf(c.e, p.run.id), { record: readRun(p.run.id), shipped: false, gone: [p.branch] });
+  assert.deepEqual(await parentOf(c.e, p.run.id), { record: readRun(p.run.id), shipped: true });
+  assert.deepEqual((await decide(c.e, p.run.id)).decision, { kind: 'shipped', branches: [p.branch] }, 'and its own `wf decide` says the same');
+  assert.equal((await advance(c.e, readRun(p.run.id))).run.tips?.[p.branch], tip, 'a branch git no longer has keeps the tip last seen');
 
   c.settle(`${early.id}-implement`, 'succeeded', SIGNED);
   const next = await advance(c.e, readRun(early.id));
-  assert.deepEqual([next.filed, next.waiting], [['review'], []], 'on the base is shipped, and a run that has started is never gated again');
+  assert.deepEqual([next.filed, next.waiting], [['review'], []], 'a run that has started is never gated again');
 
-  // Git keeps no trace of the commits a deleted branch named, so a run with nothing filed cannot read whether they shipped.
   const r = await advance(c.e, readRun(late.id));
-  assert.deepEqual([r.filed, r.waiting], [[], [{ run: p.run.id, gone: [p.branch] }]]);
-  assert.deepEqual((await list(c.e, readRun(late.id))).steps.map((s) => s.status), [`waiting on ${p.run.id} (${p.branch} gone)`, 'waiting']);
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []], 'on the base is shipped');
+  assert.deepEqual(start({ brief: 'the latest child', repo, workflowDir: folder(), after: [p.run.id] }).after, [p.run.id]);
+});
+
+test("the diamond's D, after B and C: B merged and its branch deleted while C is still running — D says `waiting on C` alone, and files its roots on the pass after C ships, from a base with both", async () => {
+  const repo = aRepo();
+  const c = board();
+  const b = await aParent(repo, c, { work: 'b.txt' });
+  const cc = await aParent(repo, c, { work: 'c.txt', signed: false });
+  const d = start({ brief: 'd, after b and c', repo, workflowDir: folder(), after: [b.run.id, cc.run.id] });
+  // `wf up`'s pass over B: finished, its tip recorded. Then a person ships B and cleans up, while C is still in review.
+  await advance(c.e, readRun(b.run.id));
+  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge B', b.branch);
+  gitIn(repo, 'worktree', 'remove', '--force', b.wt);
+  gitIn(repo, 'branch', '-q', '-d', b.branch);
+  const filings = [...c.filings];
+  for (let pass = 0; pass < 2; pass++) {
+    const r = await advance(c.e, readRun(d.id));
+    assert.deepEqual([r.filed, c.filings, r.waiting], [[], filings, [{ run: cc.run.id }]], `pass ${pass + 1}`);
+  }
+  assert.deepEqual((await list(c.e, readRun(d.id))).steps.map((s) => s.status), [`waiting on ${cc.run.id}`, 'waiting']);
+
+  // Hours later, C signs off and a person ships it.
+  c.settle(`${cc.run.id}-implement`, 'succeeded', SIGNED);
+  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge C', cc.branch);
+  const r = await advance(c.e, readRun(d.id));
+  assert.deepEqual([r.filed, r.waiting], [['implement'], []]);
+  const wt = readRun(d.id).steps.implement!.workspace!;
+  assert.deepEqual(['b.txt', 'c.txt'].map((f) => fs.existsSync(path.join(wt, f))), [true, true]);
+});
+
+test('REFUSED at shipped defaults: a parent dropped unmerged after its tip was recorded, and one merged and deleted before any pass saw it finish, read `(<branch> gone)` — the child files nothing, and `wf start --after` either is refused', async () => {
+  const repo = aRepo();
+  const c = board();
+  const dropped = await aParent(repo, c, { work: 'dropped.txt' });
+  await advance(c.e, readRun(dropped.run.id));
+  // No pass over it since it signed off: no tip was recorded, and git keeps no trace of what its branch named.
+  const unseen = await aParent(repo, c, { work: 'unseen.txt' });
+  const child = start({ brief: 'the child of work that is gone', repo, workflowDir: folder(), after: [dropped.run.id, unseen.run.id] });
+  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the unseen parent', unseen.branch);
+  for (const [p, how] of [[dropped, '-D'], [unseen, '-d']] as const) {
+    gitIn(repo, 'worktree', 'remove', '--force', p.wt);
+    gitIn(repo, 'branch', '-q', how, p.branch);
+  }
+  assert.ok(readRun(dropped.run.id).tips?.[dropped.branch], 'the dropped parent had its tip recorded');
+  const filings = [...c.filings];
+  const r = await advance(c.e, readRun(child.id));
+  assert.deepEqual([r.filed, c.filings, r.waiting], [[], filings, [{ run: dropped.run.id, gone: [dropped.branch] }, { run: unseen.run.id, gone: [unseen.branch] }]]);
+  assert.deepEqual((await list(c.e, readRun(child.id))).steps.map((s) => s.status),
+    [`waiting on ${dropped.run.id} (${dropped.branch} gone), ${unseen.run.id} (${unseen.branch} gone)`, 'waiting']);
   const before = runsWritten();
-  assert.throws(() => start({ brief: 'the latest child', repo, workflowDir: folder(), after: [p.run.id] }),
-    refusedWith(new RegExp(`^--after ${escaped(p.run.id)}: ${escaped(p.branch)} is gone, so the run cannot read whether`)));
+  for (const p of [dropped, unseen]) {
+    assert.throws(() => start({ brief: 'another child', repo, workflowDir: folder(), after: [p.run.id] }),
+      refusedWith(new RegExp(`^--after ${escaped(p.run.id)}: ${escaped(p.branch)} is gone, and git cannot find it on ${escaped(p.run.branch)}, so this run would wait for ever\\.`)));
+  }
   assert.equal(runsWritten(), before);
 });
 
@@ -1625,7 +1681,7 @@ test('REFUSED at shipped defaults: a run whose parent was cancelled files nothin
   assert.deepEqual([(await advance(c.e, readRun(child.id))).filed, c.filings], [[], filings]);
 });
 
-test('REFUSED at `wf start`, before a run is written: --after an unknown run, a run given twice, another repository\'s run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run', async (t) => {
+test('REFUSED at `wf start`, before a run is written: --after an unknown run, a run given twice, another repository\'s run, a cancelled one, one run --no-worktree, one on another base branch — and the CLI refuses --after with no run, a misspelt --after, a flag given twice and a second brief, and reads --after=<runId>', async (t) => {
   const repo = aRepo();
   const b = board();
   const p = await aParent(repo, b, { work: 'parent.txt' });
@@ -1651,13 +1707,19 @@ test('REFUSED at `wf start`, before a run is written: --after an unknown run, a 
   await assert.rejects(typed('--after'), refusedWith(/^--after takes the run this one waits on, by its id/));
   await assert.rejects(typed('--after', '--no-worktree'), refusedWith(/^--after takes the run this one waits on/));
   await assert.rejects(typed('--after', p.run.id, '--after', p.run.id), refusedWith(/is given twice/));
+  // Dropped, any of these would start a run that waits on nothing, or on the wrong repository, and the tick would file it at once.
+  await assert.rejects(typed('--after='), refusedWith(/^--after takes the run this one waits on, by its id/));
+  await assert.rejects(typed('--afer', p.run.id), refusedWith(/^wf start does not take --afer\. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId>/));
+  await assert.rejects(typed('-a', p.run.id), refusedWith(/^wf start does not take -a\./));
+  await assert.rejects(typed('--repo', repo), refusedWith(/^wf start takes --repo once/));
+  await assert.rejects(typed('--after', p.run.id, p.run.id), refusedWith(new RegExp(`^wf start takes one brief, and ${escaped(p.run.id)} is a second\\.`)));
   assert.equal(runsWritten(), before, 'nor by the CLI');
 
   // Allowed: as often as there are runs to wait on; and without --after the record is what it was.
   const printed: string[] = [];
   t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
   const second = await aParent(repo, b, { work: 'second.txt' });
-  await typed('--after', p.run.id, '--after', second.run.id);
+  await typed('--after', p.run.id, `--after=${second.run.id}`);
   const id = printed[0]!.split(' ')[0]!;
   assert.deepEqual(readRun(id).after, [p.run.id, second.run.id]);
   assert.match(printed.join('\n'), new RegExp(`^waits on: ${escaped(p.run.id)}, ${escaped(second.run.id)} — nothing is filed until wf decide says each has shipped onto ${escaped(p.run.branch)}$`, 'm'));

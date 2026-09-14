@@ -20,7 +20,7 @@ import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './r
 export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { ParentRun, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Wait } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { afterRefusal, artifactPlace, gated, hasStarted, runReady, waitsOf, type ArtifactFile, type ParentRun, type Wait } from './run.ts';
+import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -1002,7 +1002,12 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
-  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length) writeRun(run);
+  // A finished run's result branches, as git has them now: the commits `wf decide` offers to ship, kept so that git can still be asked
+  // whether they are on the base once a person has deleted the branch after the merge (`isShipped`). Written only when a tip moved.
+  const tipped = tipBranches(run, steps, status);
+  const tips = tipped.length ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
+  if (tips) run.tips = tips;
+  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips) writeRun(run);
   // After the record is written, never before: an ask is consumed once the record holds its try or its round — this
   // pass's, or one a pass that died before consuming it wrote down.
   consumeAsks(run, asks, roundAsks);
@@ -1273,24 +1278,40 @@ export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactF
  *
  * `--is-ancestor` rather than a merge-commit search, so a fast-forward, a squash-merge that was
  * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
+ *
+ * A branch git no longer has — deleted after the merge — is asked by the tip the run's tick recorded
+ * once the run had finished (`tipsSeen`): still git's answer, about the commit the branch named. Git
+ * keeps no trace of it otherwise: a merge carries any message, and `git branch -d` needs the worktree
+ * removed first. With no tip recorded, a branch that is gone has not landed as far as anyone can tell.
  */
 export function isShipped(run: Run, branch: string): boolean {
+  const onBase = (commit: string) => execFileSync('git', ['merge-base', '--is-ancestor', commit, run.branch], { cwd: run.repo, stdio: 'ignore' });
   try {
-    execFileSync('git', ['merge-base', '--is-ancestor', branch, run.branch], { cwd: run.repo, stdio: 'ignore' });
+    onBase(branch);
     return true;
-  } catch { return false; }
+  } catch (err) {
+    // Exit 1 is git's no. Anything else is a name git cannot read, and the tip is asked instead — only then, since a branch that is
+    // still there and not on the base has not landed, whatever an older tip of it says.
+    const tip = run.tips?.[branch];
+    if ((err as { status?: number }).status === 1 || !tip) return false;
+    try {
+      onBase(tip);
+      return true;
+    } catch { return false; }
+  }
 }
 
 /**
  * A run another waits on, as its record and git say it without the engine: the record, when the store has one, and the result branches
- * it names that git no longer has. What `wf start --after` refuses an edge by (`afterRefusal`), and where `parentOf` starts.
+ * it names that git no longer has and cannot find on the base by their recorded tips (`isShipped`). What `wf start --after` refuses an
+ * edge by (`afterRefusal`), and where `parentOf` starts.
  */
 export function parentRecord(id: string): Pick<ParentRun, 'record' | 'gone'> {
   let record: Run;
   try { record = readRun(id); } catch { return {}; }
   let branches: string[];
   try { branches = resultBranches(record); } catch { branches = []; }   // a pre-freeze record whose folder is gone names no steps
-  const gone = branches.filter((b) => gitSays(record.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`) === undefined);
+  const gone = branches.filter((b) => gitSays(record.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`) === undefined && !isShipped(record, b));
   return { record, ...(gone.length ? { gone } : {}) };
 }
 
@@ -1306,9 +1327,10 @@ export function parentRecord(id: string): Pick<ParentRun, 'record' | 'gone'> {
  * Git first, which costs no harness observe: a result branch not on the base branch has not shipped, whatever the run's steps say. The
  * engine's view of the parent's tasks is read only once every one is.
  *
- * A result branch the record names and git no longer has is `gone`, and not shipped. Git keeps no trace of the commits a deleted branch
- * named — this repository's merges carry their own messages, and `git branch -d` needs the worktree removed first — so whether they are
- * on the base cannot be read. A run that started before the branch was deleted never asks (`gated`).
+ * A result branch git no longer has is read by the tip the parent's own tick recorded once it had finished (`tipsSeen`, `isShipped`), so
+ * the diamond's first parent merged and cleaned up while the second is still in review still counts. One whose tip git cannot find on
+ * the base — dropped unmerged, or deleted before any tick saw its run finish — is `gone`, and not shipped. A run that started before the
+ * branch was deleted never asks (`gated`).
  */
 export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
   const known = parentRecord(id);
@@ -1329,6 +1351,18 @@ async function parentsOf(e: Engine, run: Run): Promise<(id: string) => ParentRun
   const read = new Map<string, ParentRun>();
   if (gated(run)) for (const id of new Set(run.after)) read.set(id, await parentOf(e, id));
   return (id) => read.get(id) ?? { shipped: false };
+}
+
+/** Each of these branches git has, and the commit it is at, in one `for-each-ref`. A branch git does not have is left out. */
+function refsOf(repo: string, branches: readonly string[]): Record<string, string> {
+  const listed = gitSays(repo, 'for-each-ref', '--format=%(objectname) %(refname)', ...branches.map((b) => `refs/heads/${b}`)) ?? '';
+  const refs: Record<string, string> = {};
+  for (const line of listed.split('\n')) {
+    const space = line.indexOf(' ');
+    const branch = line.slice(space + 1).replace(/^refs\/heads\//, '');
+    if (space > 0 && branches.includes(branch)) refs[branch] = line.slice(0, space);
+  }
+  return refs;
 }
 
 /**

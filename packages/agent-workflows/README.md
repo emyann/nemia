@@ -827,11 +827,13 @@ have shipped. A conflict between B and C is still a person's to resolve, at the 
 - **Once a step is filed, the parents are never read again.** Deleting a parent's branch after the merge,
   by `git branch -d` or by `wf decide`'s *drop it*, cannot un-ready a run that has started. The gate
   applies only to a run with nothing filed.
-- **A deleted branch cannot be read.** Git keeps no record of which commits a deleted branch named: a merge
-  may carry any message, and `git branch -d` needs the branch's worktree removed first. A parent whose
-  result branch is gone therefore reads as not shipped, even if its work was merged, and `wf ls` says
-  `waiting on a-1x2y (wf/a-1x2y/implement gone)`. With `wf up` running, the child starts on the pass after
-  the merge, well before anyone gets round to deleting the branch.
+- **A branch deleted after its run finished is still read.** Git keeps no record of which commits a deleted
+  branch named: a merge may carry any message, and `git branch -d` needs the branch's worktree removed
+  first. So each run's own tick records its result branches' tips once it has finished (`tips` on its
+  record: what `wf decide` offers to ship), and when a branch is gone, git is asked whether that commit is on
+  the base. D can wait on B and C while B is merged and cleaned up and C is still in review: once C ships,
+  D starts. A branch dropped unmerged reads `waiting on a-1x2y (wf/a-1x2y/implement gone)`, and so does one
+  deleted before any tick saw its run finish (`wf up` not running). Either is a person's to resolve.
 
 `wf ls` shows the wait on each root, where `waiting` would be: `waiting on a-1x2y`, naming every parent
 that has not shipped. A parent that will never ship without a person gets a reason in brackets:
@@ -846,7 +848,12 @@ a waiting run says the same and offers nothing else, and `wf tick` adds the wait
 - a run on another repository, or one that ships onto another base branch; the child would never start
   from a base that has its work
 - a run started `--no-worktree`, which has no result branch to ship
-- a cancelled run, which `wf decide` never calls shipped, or one whose result branch is gone
+- a cancelled run, which `wf decide` never calls shipped, or one whose result branch is gone and not found
+  on the base
+
+It reads `--after=<runId>` as `--after <runId>`, and refuses any argument it does not take: a misspelt
+flag, a value flag with no value or given twice, and a second brief. Dropped, a misspelt `--after` would
+start a run that waits on nothing, and the tick would file it at once.
 
 A record written before `after` existed waits on nothing.
 

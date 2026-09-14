@@ -545,6 +545,14 @@ What was built:
 - `advance` files a run's roots only when `runReady` holds, and nothing else is gated. In the pass that
   files the roots of a run that waited, it reads the tip of the base branch into `baseRef`. Every worktree,
   check and diff of that run is then cut from a base that has its parents' work.
+- A finished run's own tick records its result branches' tips on its record, as `tips` (`tipBranches` and
+  `tipsSeen`, pure): only for a run that succeeded or failed, never one running or cancelled, and written only
+  when a tip moved. A branch git no longer has keeps the tip last seen. When a branch is gone, `isShipped`
+  asks git whether its recorded tip is on the base, so a parent merged and cleaned up still ships. That
+  reading is the same for the parent's own `wf decide`, the board's decide and the gate.
+- `wf start` reads `--after=<runId>`, `--repo=<r>` and `--workflows=<dir>` as well as the spaced forms, and
+  refuses any other argument: a flag it does not take, a misspelt one, a value flag with no value or given
+  twice, and a second brief. Before this, a misspelt `--after` was dropped, and the run waited on nothing.
 - What each command shows for a waiting run:
   - `wf ls` shows `waiting on <run>` on each root, through `listing`'s new `waits` argument; a step that
     waits on a root still says `waiting`. A parent that will never ship without a person gets a reason in
@@ -560,7 +568,8 @@ What was built:
   - a run on another repository;
   - a run started `--no-worktree`, which has no result branch to ship;
   - a run on another base branch, since the child would never start from a base that has its work;
-  - a cancelled run, which `wf decide` never calls shipped, or one whose result branch is gone.
+  - a cancelled run, which `wf decide` never calls shipped, or one whose result branch is gone and whose tip
+    git cannot find on the base.
 
   The CLI also refuses `--after` with no run after it.
 
@@ -573,7 +582,9 @@ What was measured:
   - a cancelled run reads no parent;
   - the words, including `waitAdvice`, compared whole;
   - `listing` on a fan-in's roots, on a cancelled run and on a started one;
-  - each refusal of `afterRefusal`, by name.
+  - each refusal of `afterRefusal`, by name;
+  - which branches a pass records tips for (a finished run's result branches only), that an unchanged tip
+    writes nothing, and that a tip is kept once its branch is gone.
 - Store tests in `test/store.test.ts`, on a real git repository in a temp dir with `start` and `advance`
   run for real against a fake engine board:
   - A child of a parent whose step is still running files nothing, pass after pass, with and without a
@@ -584,9 +595,17 @@ What was measured:
   - A parent whose step signs off with no commit past its base: its `wf decide` says shipped, the child's
     next pass files its roots, and `wf start --after` it is accepted. Parent and child share one board, as
     they share one engine.
-  - A child that started on the merge still files `review` after the parent's worktree is removed and its
-    branch deleted with `git branch -d`. A child that had not started reads `(<branch> gone)`, and
-    `wf start --after` that parent is refused.
+  - A parent merged, its tip recorded by its own pass, then its worktree removed and its branch deleted with
+    `git branch -d`: its `wf decide` still says shipped, a child that started on the merge files `review`, one
+    that had not files its roots, and `wf start --after` it is accepted.
+  - The diamond's D, after B and C: B is merged and its branch deleted while C is still running. D says
+    `waiting on C` alone, pass after pass. Once C signs off and is merged, the next pass files D's roots on a
+    base with both parents' files.
+  - A parent dropped with `git branch -D` after its tip was recorded, and one merged and deleted before any
+    pass saw it finish: both read `(<branch> gone)`, the child files nothing, and `wf start --after` either one
+    is refused.
+  - Through the CLI, `wf start` refuses `--after=` with no run, `--afer`, `-a`, `--repo` twice and a second
+    brief, with nothing written, and writes `--after=<runId>` as `--after <runId>`.
   - A cancelled parent: nothing is filed, and still nothing once its branch is merged. Through `main`,
     `wf ls` and `wf decide` print exactly the lines above. Then `cancel` on the child leaves it waiting on
     nothing.
@@ -596,8 +615,10 @@ What was measured:
   passed, and one was skipped, the live browser test that needs `AE_LIVE=1`. agent-engine ran 239 (235 passed,
   4 live tests skipped), api 89 and web 116, all passing.
 - The CLI itself, in a throwaway `WF_ROOT` over a throwaway repository, with the parent's branch recorded
-  and committed to by hand: `wf start --after`, `wf ls`, `wf decide`, three refusals, the merge, and a
-  cancelled parent. That parent's step was never filed, so after the merge its own `wf decide` says
+  and committed to by hand. It covers `wf start --after=<runId>` with `--workflows=` and `--repo=`, `wf ls`,
+  `wf decide`, six refusals (a duplicate, an unknown run, `--after` with no id, `--afer`, `--after=`, an
+  unquoted brief) that leave no record, the merge, and a cancelled parent. The parent's step was never filed,
+  so after the merge its own `wf decide` says
   `still running: implement` and the child still says `waiting on` it. Kept as `wf-start-after.txt` in the
   step's artifacts. No tick ran there: a real engine would have filed real sessions, so the gate's filing is
   measured on the fake board only.
@@ -614,8 +635,11 @@ What was measured:
   - This repository's merges carry their own messages ("Merge Q1: …"), so neither the merge commit nor main's
     reflog names the branch.
 
-  The request said nothing is carried between passes. So a branch deleted before a child's roots are filed
-  reads not shipped and is named, rather than guessed.
+  Rounds 1 and 2 stopped there: a branch deleted before a child's roots were filed read not shipped. Round 3's
+  review found that strands the diamond's D, whose last parent can take hours in review while the first is
+  cleaned up, and the request's own test said a parent merged and then deleted still files. So each finished
+  run's tick records its tips. That is a fact about the parent, written by the parent's own tick, and the gate
+  still asks git about it on every pass.
 - No real session has run as a child. A real merge has never released a real step.
 
 What it leaves:
@@ -628,10 +652,10 @@ What it leaves:
     over `parentOf`, which reads the parent's tasks off the engine.
 
   The start form on the Workflows page gains *after*: `start({ after })`, with the refusal as its 422.
-- **A deleted branch before the child starts.** One way out keeps the rule: when a run's terminal step signs
-  off, it records its result branch's tip on its own record, as a fact about the parent rather than a guard
-  the child carries. `parentOf` would then fall back to that tip. It is not done, because the request said
-  shipped is read from git.
+- **A tip is recorded only by a tick.** A run whose branch is merged and deleted before any `wf tick` or `wf up`
+  pass saw it finish has no tip, and its children read `(<branch> gone)` until a person starts them again
+  without that `--after`. The same happens to a result branch rewritten after its tip was recorded and then
+  deleted. With `wf up` running, a run is seen within a pass of finishing.
 - **A parent that finished failed with nothing committed has shipped.** That is `wf decide`'s reading, and the gate
   shares it: a run that is not running, whose result branches are on the base branch, says `shipped` whatever its
   steps ended as. It is rare, since a terminal step that never got a branch keeps a run awaiting. A fix belongs in

@@ -61,11 +61,6 @@ so its output already names the work. Point it at this board:
 
     AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae watch`;
 
-const flag = (argv: string[], name: string, fallback?: string) => {
-  const i = argv.indexOf(`--${name}`);
-  return i >= 0 ? argv[i + 1] : fallback;
-};
-
 const usage = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
 
 const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
@@ -108,16 +103,44 @@ function decideHow(argv: string[]): { sensitive?: string[] } {
   return { sensitive };
 }
 
-/** `wf start`'s `--after`, as often as it is given, each with the run it waits on. One with no run after it is refused before anything is read. */
-function afterOf(argv: string[]): string[] {
-  const ids: string[] = [];
+type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[] };
+
+/** What each of `wf start`'s value flags takes, as its refusal says it. */
+const START_TAKES = {
+  '--workflows': 'the workflow folder: wf start <brief> --workflows <dir>',
+  '--repo': 'the repository the run works on: wf start <brief> --repo <r>',
+  '--after': 'the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]',
+} as const;
+
+/**
+ * `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>` and `--after <runId>` — each also as `--flag=<value>`, and
+ * `--after` as often as there are runs to wait on — and `--no-worktree`. Anything else is refused before anything is read: a flag the verb
+ * does not take, a misspelt one, a value flag with no value or given twice, and a second brief. Dropped, a misspelt `--after` started a run
+ * that waited on nothing, and the tick filed it at once.
+ */
+function startHow(argv: string[]): StartHow {
+  const how: StartHow = { isolate: true, after: [] };
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] !== '--after') continue;
-    const id = argv[++i];
-    if (!id || id.startsWith('--')) usage('--after takes the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]');
-    ids.push(id!);
+    const arg = argv[i]!;
+    if (arg === '--no-worktree') { how.isolate = false; continue; }
+    const joined = arg.startsWith('--') && arg.includes('=');
+    const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
+    if (!Object.hasOwn(START_TAKES, name)) {
+      usage(arg.startsWith('-')
+        ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on.`
+        : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`);
+    }
+    const flagName = name as keyof typeof START_TAKES;
+    const value = joined ? arg.slice(arg.indexOf('=') + 1) : argv[++i];
+    if (!value || (!joined && value.startsWith('--'))) usage(`${flagName} takes ${START_TAKES[flagName]}`);
+    if (flagName === '--after') how.after.push(value!);
+    else {
+      const key = flagName === '--repo' ? 'repo' : 'workflows';
+      if (how[key] !== undefined) usage(`wf start takes ${flagName} once: a run works on one ${key === 'repo' ? 'repository' : 'workflow'}.`);
+      how[key] = value;
+    }
   }
-  return ids;
+  return how;
 }
 
 /** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
@@ -164,14 +187,14 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'start': {
       const arg = rest[0];
       if (!arg || arg.startsWith('--')) return console.log(HELP);
-      const after = afterOf(rest);
+      const how = startHow(rest.slice(1));
       const brief = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8').trim() : arg;
       const run = start({
         brief,
-        repo: path.resolve(flag(rest, 'repo', '.')!),
-        workflowDir: path.resolve(flag(rest, 'workflows', './workflows')!),
-        isolate: !rest.includes('--no-worktree'),
-        after,
+        repo: path.resolve(how.repo ?? '.'),
+        workflowDir: path.resolve(how.workflows ?? './workflows'),
+        isolate: how.isolate,
+        after: how.after,
       });
       const steps = stepsOf(run);
       console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.name).join(' → ')}`);

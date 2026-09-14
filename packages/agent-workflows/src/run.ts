@@ -50,6 +50,13 @@ export type Run = {
    */
   after?: string[];
   /**
+   * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
+   * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
+   * (`isShipped` in runner.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished, and on
+   * records from before there were tips.
+   */
+  tips?: Record<string, string>;
+  /**
    * When somebody called the run off, if they did.
    *
    * On the run rather than on a step, because that is what it is about: stopping the step in
@@ -217,7 +224,7 @@ export type ParentRun = { record?: Run; shipped: boolean; gone?: string[] };
 
 /**
  * A run this one waits on, as `wf ls` and `wf decide` name it: its id and, when it may never ship without a person, why — the store has
- * no such run, it was cancelled, or a result branch it recorded is gone, and git cannot say whether what it named is on the base.
+ * no such run, it was cancelled, or a result branch it recorded is gone, and git cannot find it on the base.
  */
 export type Wait = { run: string; missing?: true; cancelledAt?: string; gone?: string[] };
 
@@ -250,7 +257,7 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
   }
   const why = never.map((w) => (w.missing ? `the store has no run ${w.run}`
     : w.cancelledAt ? `${w.run} was cancelled at ${w.cancelledAt}, and a cancelled run never ships`
-    : `${w.gone!.join(', ')} ${w.gone!.length > 1 ? 'are' : 'is'} gone, so whether ${w.run} shipped cannot be read`));
+    : `${w.gone!.join(', ')} ${w.gone!.length > 1 ? 'are gone, and git cannot find them' : 'is gone, and git cannot find it'} on ${run.branch}`));
   return `${why.join('; ')} — yours to resolve: wf cancel ${run.id}, or start the work again without ${never.map((w) => `--after ${w.run}`).join(' ')}`;
 }
 
@@ -261,7 +268,7 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
  * Refused: an id given twice; a run the store does not have; a run on another repository, or shipping onto another base branch — it would
  * never ship onto this run's, or this run would never start from a base with its work; a run that worked on its base branch itself
  * (`--no-worktree`), which has no result branch to ship; a cancelled run, which `wf decide` never calls shipped, whatever git says of its
- * branch; and one whose result branch is gone, which git cannot read as shipped — this run would wait for ever on either. Handed only what
+ * branch; and one whose result branch is gone, and whose commit git cannot find on the base — this run would wait for ever on either. Handed only what
  * the record and git say (`parentRecord` in runner.ts): nothing here needs the engine. The run itself cannot be named: it has no id yet.
  */
 export function afterRefusal(
@@ -287,10 +294,38 @@ export function afterRefusal(
     }
     if (record.cancelledAt) return `--after ${id}: ${id} was cancelled at ${record.cancelledAt}, and a cancelled run never ships, so this run would wait for ever. Start it without --after ${id}.`;
     if (gone?.length) {
-      return `--after ${id}: ${gone.join(', ')} ${gone.length > 1 ? 'are' : 'is'} gone, so the run cannot read whether ${id} shipped, and this run would wait for ever. If ${id}'s work is on ${record.branch}, there is nothing to wait for: ${without}.`;
+      return `--after ${id}: ${gone.join(', ')} ${gone.length > 1 ? 'are gone, and git cannot find them' : 'is gone, and git cannot find it'} on ${record.branch}, so this run would wait for ever. If ${id}'s work is on ${record.branch}, there is nothing to wait for: ${without}.`;
     }
   }
   return null;
+}
+
+/**
+ * The branches whose tips this pass records (`tipsSeen`): a finished run's result branches — succeeded or failed, so neither running nor
+ * cancelled — when it cut worktrees and did not work on its base branch itself. What `wf decide` offers to ship. None for any other run,
+ * so git is not asked about it.
+ */
+export function tipBranches(run: Run, steps: readonly Workflow[], status: Assessment['status']): string[] {
+  if (!run.isolate || (status !== 'succeeded' && status !== 'failed')) return [];
+  const branches = terminalSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+  return branches.includes(run.branch) ? [] : [...new Set(branches)];
+}
+
+/**
+ * The run's `tips` once this pass has seen its branches — `seen` is each branch git has, and the commit it is at — or undefined when
+ * nothing changed, so an unchanged run is not written. Pure. A branch git no longer has keeps the tip last seen: that is what it is for.
+ */
+export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<Record<string, string>>): Record<string, string> | undefined {
+  const tips: Record<string, string> = { ...run.tips };
+  let changed = false;
+  for (const branch of branches) {
+    const at = seen[branch];
+    if (at && at !== tips[branch]) {
+      tips[branch] = at;
+      changed = true;
+    }
+  }
+  return changed ? tips : undefined;
 }
 
 /**

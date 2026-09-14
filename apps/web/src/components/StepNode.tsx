@@ -147,7 +147,8 @@ export function SpecNode({ data: { name, index, spec }, sourcePosition = Positio
           {lines.map(([label, value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-neutral-500">{label}</dt>
-              <dd className="min-w-0 truncate font-mono text-neutral-700 dark:text-neutral-300" title={value}>{value}</dd>
+              {/* Wrapped rather than cut to one line: a check is a command a person reads whole. Three lines, then the title. */}
+              <dd className="line-clamp-3 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={value}>{value}</dd>
             </div>
           ))}
         </dl>

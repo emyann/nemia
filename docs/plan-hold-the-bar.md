@@ -928,7 +928,7 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — the order to file was 4–5 (D1), then Q (Q1, Q2), then P (P1) — all done; W4 done; P2 in flight; then P3 and 23.
+Everything left, in one list, as of 2026-09-14 — the order to file was 4–5 (D1), then Q (Q1, Q2), then P (P1) — all done; W4 done; P2 and P3 in flight; then 23.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -937,7 +937,9 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
    as a graph of cards; then `wf plan <folder>`. workflows + board. *P1 (agent-workflows: `--after`, `runReady`,
    `waiting on <run>`, branch tips recorded) done, `35920da`. P2 (apps: the Factory as a graph of cards, `after`
    and `waiting` on the api, the start form's "after") filed 2026-09-14 as `the-factory-as-a-graph-of-ca-x2xs`,
-   from `./workflows/dev-build`. P3 (`wf plan <folder>`, a dependent run handed its parents' closeouts) after.*
+   from `./workflows/dev-build`. P3 (agent-workflows: `wf plan <folder>` — a folder of card briefs with `workflow:`
+   and `after:` — and `## From run <id>` in a dependent run's brief) filed 2026-09-14 as
+   `a-plan-as-a-folder-of-cards-o4su`, from `./workflows/dev`, beside P2.*
 2. **Q — A step that asks, and a step that plans** (§4 Q): `wf retry --nudge --message`, the answer box
    on a blocked step (the board's second write), a `plan` step and a `dev-planned` variant. *Q1 (agent-workflows:
    `--message`, `## Your answer`, `dev-planned`) done, `ed702d7`. Q2 (apps: the answer box, a guarded `POST` that

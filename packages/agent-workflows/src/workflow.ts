@@ -11,6 +11,8 @@
  *     ---
  *     Review the changes on this branch. Be specific about correctness, not style.
  *
+ * All but one: a `README.md` beside the steps says what the workflow is for, and is not a step.
+ *
  * **No key is control flow.** No conditions, no expressions, and no loop a keyword decides. That is
  * deliberate. The interesting decisions in this kind of work — is this good enough, did it actually do
  * what was asked — are not predicates a workflow language could evaluate. They are judgements, and a
@@ -497,11 +499,24 @@ function looseAt(node: unknown, at: string): { at: string; why: string } | { at:
   return undefined;
 }
 
-/** Read a folder of steps and check that they form a workflow rather than a wish. */
+/**
+ * A folder's README, in any case — `readme.md` is the same file to the person who wrote it. It says what the workflow
+ * is for, and is never a step: read as one, it would be an agent told the folder's documentation.
+ */
+export const isReadme = (file: string): boolean => /^readme\.md$/i.test(file);
+
+/** The files of a folder that are steps: every `.md` but its README, sorted. */
+const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
+
+/**
+ * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
+ * describes the workflow (`workflowDescription`) and is not a step.
+ */
 export function loadWorkflows(dir: string): Workflow[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort();
-  if (!files.length) throw new WorkflowError(`${dir} has no .md steps in it`);
+  const entries = fs.readdirSync(dir);
+  const files = stepFiles(entries);
+  if (!files.length) throw new WorkflowError(`${dir} has no .md steps in it${noStepsBecause(dir, entries)}`);
 
   const read = (file: string): string | undefined => {
     try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
@@ -509,6 +524,49 @@ export function loadWorkflows(dir: string): Workflow[] {
   const steps = files.map((f) => parseWorkflow(path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8'), read));
   validate(steps);
   return steps;
+}
+
+/**
+ * Why a folder has no steps, when the folder can say: a README, which is not one, or folders of steps beside each
+ * other — `<repo>/workflows/`, which holds a repository's workflows, rather than one of them.
+ */
+function noStepsBecause(dir: string, entries: readonly string[]): string {
+  const readme = entries.find(isReadme);
+  if (readme) return ` — ${readme} describes the workflow, and is not a step. Write the first step beside it: implement.md, say.`;
+  const workflows = entries.filter((name) => {
+    try {
+      return stepFiles(fs.readdirSync(path.join(dir, name))).length > 0;
+    } catch {
+      return false;
+    }
+  }).sort();
+  return workflows.length
+    ? ` — it holds workflows, each a folder of steps: ${workflows.join(', ')}. Name one of them: ${path.join(dir, workflows[0]!)}.`
+    : '';
+}
+
+/**
+ * What a workflow is for, in its author's words: the first paragraph of its folder's README, its lines joined into one.
+ *
+ * A heading is the README's title, not a paragraph, and a frontmatter block is not prose, so both are passed over.
+ * Null when the folder has no README, or the README has nothing else. Never throws: a README that cannot be read
+ * describes nothing, and the steps beside it are `loadWorkflows`' to judge.
+ */
+export function workflowDescription(dir: string): string | null {
+  let text: string;
+  try {
+    const readme = fs.readdirSync(dir).filter(isReadme).sort()[0];
+    if (!readme) return null;
+    text = fs.readFileSync(path.join(dir, readme), 'utf8');
+  } catch {
+    return null;
+  }
+  text = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(FRONTMATTER, '');
+  for (const block of text.split(/\n[ \t]*\n/)) {
+    const lines = block.split('\n').map((line) => line.trim()).filter((line) => line && !/^#{1,6}(\s|$)/.test(line));
+    if (lines.length) return lines.join(' ');
+  }
+  return null;
 }
 
 /**

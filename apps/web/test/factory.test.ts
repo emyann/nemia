@@ -538,3 +538,32 @@ test("where a run stands, in the start form's word: called off, waiting on you �
   assert.equal(standingOf(run(['waiting on p'], { moving: true, after: ['p'], waiting: waitingOn(false) })), 'in flight');
   assert.equal(standingOf(run(['verified ✓'], { status: 'succeeded' })), 'finished');
 });
+
+// ─── what the third review found ─────────────────────────────────────────────
+
+/** The triangle: a; then b; then d, after both — `api` after `schema`, `web` after the two. */
+const TRIANGLE = new Map([['b', ['a']], ['d', ['a', 'b']]]);
+
+test("a graph unfolding over a card whose group also waits on the opened run's parent: the card no graph covered stays, and no edge runs backwards", () => {
+  const ids = ['a', 'b', 'd'];
+  const fresh = placeRuns(ids, new Map(), null, new Map(), TRIANGLE);
+  assert.deepEqual([...fresh.values()], [{ x: 0, y: 0 }, { x: CELL_WIDTH, y: 0 }, { x: 2 * CELL_WIDTH, y: 0 }], 'laid out fresh, a row');
+  // b opened across three cells: over d, and not a. Laid out again together, a would have to be left of b and d right of b, one column apart.
+  const spans = new Map([['b', { columns: 3, rows: 1 }]]);
+  const at = placeRuns(ids, fresh, null, spans, TRIANGLE);
+  assert.deepEqual(backwards(at, TRIANGLE), [], 'every run left of each run that waits on it');
+  assert.deepEqual(overlapping(at, spans), []);
+  assert.deepEqual(at.get('a'), { x: 0, y: 0 }, 'a, which no graph covered, stays where it is');
+  assert.deepEqual(placeRuns(ids, at, null, spans, TRIANGLE), at, 'and the pass after moves nothing');
+});
+
+test("a diamond whose bottom also waits on its top, one side opened over the bottom: laid out again where it can be, and no edge runs backwards", () => {
+  const skip = new Map([...DIAMOND, ['d', ['b', 'c', 'a']]]);
+  const ids = ['a', 'b', 'c', 'd'];
+  const fresh = placeRuns(ids, new Map(), null, new Map(), skip);
+  const spans = new Map([['b', { columns: 3, rows: 1 }]]);
+  const at = placeRuns(ids, fresh, null, spans, skip);
+  assert.deepEqual(backwards(at, skip), []);
+  assert.deepEqual(overlapping(at, spans), []);
+  assert.deepEqual(placeRuns(ids, at, null, spans, skip), at);
+});

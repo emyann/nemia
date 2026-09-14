@@ -155,7 +155,11 @@ export const movedOpen = (open: string[], id: string): string[] =>
  *    Closed cards joined by `after` — each run's parents on the floor — are placed together, the first time
  *    one of them comes up: layered as a run's steps are (`layers`), each a column right of every card it
  *    waits on and level with the middle of them, so a diamond reads as one; and the whole at the first free
- *    place right of any card already down that one of them waits on.
+ *    place right of every card already down that one of them waits on, and left of every one that waits on it.
+ *    When some of a group are down and others are not, the group is laid out again together if a graph moved
+ *    one of them aside, and the others go in among the cards down if they are coming onto the floor — each
+ *    only where every edge still points right, the other way if that one cannot, and the cards down kept
+ *    where they are if neither can.
  *
  * A card is in the cell nearest its corner — both rows, for one the layering puts halfway down a row — and
  * an open run in the cells its span covers from there, beyond the grid's edges as well as on the grid, so a
@@ -266,14 +270,27 @@ export function placeRuns(
     const group = groupOf(id);
     const loose = group.filter((m) => !at.has(m));
     const down = group.filter((m) => at.has(m));
+    if (!down.length) {
+      placeTogether(group, false);
+      continue;
+    }
+    /** The cards not yet placed, in among the cards down, which stay where they are. */
+    const amongDown = () => placeTogether(loose, true);
+    /** The whole group laid out again — or, where a card outside it leaves no column for that, the cards down put back. */
+    const again = () => {
+      const were = down.map((m) => [m, at.get(m)!] as const);
+      unput(down);
+      if (placeTogether(group, true)) return true;
+      for (const [m, point] of were) put(m, point);
+      return false;
+    };
     // A card of the group that was on the floor and has lost its place — a graph unfolded over it — takes the rest of its group with it,
-    // laid out again together: moved a card at a time, the group would be layered over the cards that moved alone, and read backwards.
+    // laid out again together: moved a card at a time, the group would be layered over the cards that moved alone. Cards coming onto the
+    // floor go in among the ones down first, which a person is looking at. Either only where every edge still points right: laid out
+    // again, a group that waits on an open run and that the open run waits on too has no column when the two are also joined directly
+    // (a triangle, a chain with a skip). And if neither can, the cards down stay, and only the cards not yet placed give way.
     const movedAside = loose.some((m) => onFloor.has(m));
-    // Otherwise the cards coming onto the floor go in among the ones down, if there is a column for each between what it waits on and
-    // what waits on it; and if there is not, the whole group is laid out again.
-    if (down.length && !movedAside && placeTogether(loose, true)) continue;
-    if (down.length) unput(down);
-    placeTogether(group, false);
+    if (!(movedAside ? again() || amongDown() : amongDown() || again())) placeTogether(loose, false);
   }
   return new Map(ids.map((id) => [id, at.get(id)!]));
 }

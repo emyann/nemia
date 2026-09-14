@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectApart, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, watch } from './checks.ts';
+import { expectApart, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout, SESSION } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
@@ -290,6 +290,16 @@ const PAGES: PageSpec[] = [
       await expectVisible(closeout.getByText(SESSION.closeout.needs), 'and what it needs');
       await expectCount(page.getByRole('link', { name: /Claude Code web/ }), 0, 'no link to Claude Code web: nothing the engine reads carries a URL for a session');
       await expectCount(page.locator('main textarea, main input'), 0, 'read-only: nothing to type into');
+
+      // Photographed from its start, as a reader scrolls up to it: the prompt, the thought opened, and the fold's line opened
+      // over its calls. The scroller opens at the end, so a photograph taken where the checks left it shows only the closeout.
+      await talk.hover();
+      await page.mouse.wheel(0, -100_000);
+      const scrolled = () => talk.evaluate((element) => element.scrollTop);
+      for (const until = Date.now() + WAIT_MS; (await scrolled()) > 0 && Date.now() < until; ) await new Promise((resolve) => setTimeout(resolve, 100));
+      if ((await scrolled()) > 0) throw new Refused(`the conversation scrolls up to its start for the photograph — it stopped ${await scrolled()} px down`);
+      await expectInside(talk.locator('[data-turn="said"][data-role="user"]'), talk, 'the prompt is in view for the photograph');
+      await expectInside(line, talk, `the fold's line (${SESSION.folded}) is in view for the photograph`);
     },
   },
   {

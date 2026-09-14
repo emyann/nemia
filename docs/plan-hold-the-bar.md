@@ -752,6 +752,15 @@ owner is not mid-run.
   (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
   and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
 
+- **`needs-human` on the board says nothing about what is needed (operator, 2026-09-14, on Q1):** the card and the
+  node show the chip and nothing else. Two cases hide behind it. A step that signed off `blocked` has its question in
+  `needs`, which only the inspector's closeout shows (`Needs:`), two clicks away — the card, the node and a banner on
+  the run page should carry it. A session the harness marked blocked with no closeout — Q1's round-2 implement, on
+  *Could not refresh your login because another Claude Code process is refreshing it* — has no `needs` at all, and
+  the board should say that: *blocked by the harness*, with the session's last line from the transcript, and that a
+  nudge (`wf retry --nudge`, or the board's answer box with no text) is the remedy. The tick that recognises that one
+  message and resumes the session is §6 item 10. → apps, with Q2 (the answer box); agent-workflows for item 10.
+
 ### Settled
 
 Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
@@ -911,7 +920,8 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 2. **Q — A step that asks, and a step that plans** (§4 Q): `wf retry --nudge --message`, the answer box
    on a blocked step (the board's second write), a `plan` step and a `dev-planned` variant. *Q1 (agent-workflows:
    `--message`, `## Your answer`, `dev-planned`) filed 2026-09-14 as `a-step-that-asks-gets-an-ans-v5qd`; Q2 (apps: the
-   answer box, a guarded `POST` that calls `retry()`) after it lands.*
+   answer box, a guarded `POST` that calls `retry()`, and the `needs` text — or the harness's last line — on the card,
+   the node and the run page) after it lands.*
 3. **The steering channel** (deferred from §4 S): a prompt box on the session page that sends into a
    running session, the message recorded on the run. api + engine (a `say` op).
 

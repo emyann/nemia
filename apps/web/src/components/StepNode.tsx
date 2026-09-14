@@ -106,14 +106,21 @@ const runsOn = (spec: { harness: string | null; model: string | null }): string 
 export type SpecNodeData = { name: string; index: number; spec: WorkflowStepSpec };
 export type SpecFlowNode = Node<SpecNodeData, 'spec'>;
 
+/** The most tools a node writes out. Past it the node counts them, and the names are the line's title: a list of four runs long. */
+const TOOLS_WRITTEN_OUT = 3;
+
 /**
  * What a step is set to do beyond what it runs on, as its node lists it: its check, its tools, its permission mode and its
- * loop, each only when the step sets it. The rest of its keys are on the step's file.
+ * loop, each only when the step sets it. The rest of its keys are on the step's file. A line's `title`, when it has one, is
+ * what its value stands for — the tools' names, where the value counts them — and is the value itself otherwise.
  */
-export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: string]> {
-  const lines: Array<[string, string]> = [];
+export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: string, title?: string]> {
+  const lines: Array<[string, string, string?]> = [];
   if (spec.check) lines.push(['check', spec.check]);
-  if (spec.tools) lines.push(['tools', spec.tools.join(', ')]);
+  if (spec.tools) {
+    const names = spec.tools.join(', ');
+    lines.push(spec.tools.length > TOOLS_WRITTEN_OUT ? ['tools', String(spec.tools.length), names] : ['tools', names]);
+  }
   if (spec.permissionMode) lines.push(['mode', spec.permissionMode]);
   if (spec.loop) lines.push(['loop', `${spec.loop} · ${spec.rounds} ${spec.rounds === 1 ? 'round' : 'rounds'}`]);
   return lines;
@@ -144,11 +151,11 @@ export function SpecNode({ data: { name, index, spec }, sourcePosition = Positio
 
       {lines.length > 0 && (
         <dl className="space-y-0.5 border-t border-neutral-200 px-3 py-1.5 text-[11px] dark:border-neutral-800">
-          {lines.map(([label, value]) => (
+          {lines.map(([label, value, title = value]) => (
             <div key={label} className="flex min-w-0 gap-1.5">
               <dt className="shrink-0 text-neutral-500">{label}</dt>
               {/* Wrapped rather than cut to one line: a check is a command a person reads whole. Three lines, then the title. */}
-              <dd className="line-clamp-3 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={value}>{value}</dd>
+              <dd className="line-clamp-3 min-w-0 font-mono break-words text-neutral-700 dark:text-neutral-300" title={title}>{value}</dd>
             </div>
           ))}
         </dl>

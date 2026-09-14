@@ -10,6 +10,9 @@ import { stateClass, stateMeaning, stepState } from '../lib/status';
  *
  * `note` is what `wf ls` prints beside the status — `try 2, by retries: 1`, `round 2 of 3` — on its own line after
  * the meaning, on hover: for where there is no room under the chip, on a canvas or in a list. Where there is, `StepNote`.
+ *
+ * No wider than where it is put: a root's `waiting on <run> (cancelled)` names a run by its id, and on a card it is cut short, whole in
+ * the card's own line of what the run waits on.
  */
 export function StatusChip({ status, runCancelled, note = null }: { status: string; runCancelled: boolean; note?: string | null }) {
   const state = stepState(status, runCancelled);
@@ -17,10 +20,10 @@ export function StatusChip({ status, runCancelled, note = null }: { status: stri
     <span
       title={note ? `${stateMeaning[state]}\n${note}` : stateMeaning[state]}
       data-state={state}
-      className={`inline-flex items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-[11px] leading-none ${stateClass[state]}`}
+      className={`inline-flex max-w-full items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-[11px] leading-none ${stateClass[state]}`}
     >
       {state === 'unverified' && <CircleDashed aria-hidden strokeWidth={2.5} className="size-2.5 shrink-0" />}
-      {status}
+      <span className="truncate">{status}</span>
     </span>
   );
 }

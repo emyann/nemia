@@ -7,8 +7,10 @@ import { Travelling } from './StateEdge';
  * Beside a canvas's zoom controls, under its nodes: what the drawing means. An edge in each state it is drawn in, drawn as
  * `StateEdge` draws it — dashed and still, moving into a running step, solid, looping back — and the human gate. The moving
  * sample moves as a running edge does, and is as still as one where the person asked for reduced motion.
+ *
+ * `cards`, on the Factory: the edge between two cards too, from a run to one that waits on it (`afterEdges`).
  */
-export function CanvasLegend({ className = '' }: { className?: string }) {
+export function CanvasLegend({ className = '', cards = false }: { className?: string; cards?: boolean }) {
   return (
     <Panel
       position="bottom-left"
@@ -28,8 +30,23 @@ export function CanvasLegend({ className = '' }: { className?: string }) {
       </Item>
       <Item sample={<Sample state="done" />}>done</Item>
       <Item sample={<Sample state="to-come" loop />}>loops back</Item>
+      {cards && <Item sample={<CardsSample />}>waits on a run</Item>}
       <Item sample={<span className="size-2.5 rounded-sm border-2 border-amber-500" />}>human gate</Item>
     </Panel>
+  );
+}
+
+/** Two cards and the edge from the one into the other, dashed as it is while the second waits: solid once it has started, as any edge is. */
+function CardsSample() {
+  const stroke = edgeStroke('to-come', false);
+  const card = (x: number) => <rect x={x} y={1.75} width={8} height={8.5} rx={1.5} fill="none" stroke="currentColor" strokeWidth={1.5} />;
+  return (
+    <svg width={44} height={12} viewBox="0 0 44 12" aria-hidden data-sample="cards" className="overflow-visible">
+      {card(0.75)}
+      <path d="M 10,6 H 28" fill="none" style={{ stroke, ...edgeLine('to-come', false) }} />
+      <path d="M 28,2.5 L 34,6 L 28,9.5 Z" fill={stroke} />
+      {card(35.25)}
+    </svg>
   );
 }
 

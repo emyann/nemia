@@ -93,3 +93,12 @@ test('a human gate is a step a person decides: signed off blocked, or a loop out
   const notGates = ['failed ✗ check (exit 1)', 'failed ✗ check (unfinished)', 'unsigned', 'verified ✓', 'unverified · done', 'checking', 'running (working)', 'needs-human', 'failed', 'stopped', 'waiting', 'unknown'];
   for (const status of notGates) assert.equal(isGate(stepState(status, false), false), false, status);
 });
+
+test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting — whatever runs it names, and why — and cancelled on a run called off', () => {
+  for (const word of ['waiting on a-1x2y', 'waiting on a-1x2y (cancelled), b-3z4w', 'waiting on a-1x2y (no such run)', 'waiting on a-1x2y (wf/a-1x2y/implement gone)']) {
+    assert.equal(stepState(word, false), 'waiting', word);
+    assert.equal(stepState(word, true), 'cancelled', word);
+  }
+  // Not a word that merely starts like one.
+  assert.equal(stepState('waitingroom', false), 'working');
+});

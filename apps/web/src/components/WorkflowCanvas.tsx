@@ -23,7 +23,7 @@ const LOOP_ROOM = 70;
 export function unstartedRun(workflow: WorkflowListing): RunDetail {
   return {
     id: `${workflow.from}:${workflow.name}`, brief: '', repo: '', workflowDir: workflow.dir, baseRef: '', branch: '', isolate: true,
-    createdAt: '', cancelledAt: null, status: 'running', moving: false, waitingOnYou: [], warning: null,
+    createdAt: '', cancelledAt: null, after: [], waiting: null, status: 'running', moving: false, waitingOnYou: [], warning: null,
     graph: workflow.graph,
     steps: workflow.steps.map(({ name }) => ({
       name, spec: null, filed: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', note: null,

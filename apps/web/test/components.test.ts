@@ -46,7 +46,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { StatusChip, StepNote } = await import('../src/components/StatusChip.tsx');
 const { StepInspector } = await import('../src/components/StepInspector.tsx');
 const { StepNode } = await import('../src/components/StepNode.tsx');
-const { cardEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
+const { afterEdges, cardEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
 const { StateEdge } = await import('../src/components/StateEdge.tsx');
 const { CanvasLegend } = await import('../src/components/CanvasLegend.tsx');
 const { edgeStroke, LOOP_SOURCE, LOOP_TARGET, TRAVEL_SECONDS } = await import('../src/lib/canvas.ts');
@@ -983,4 +983,37 @@ test("REFUSED: the banner offers no try of a session the harness blocked — it 
 
   // Called off: nobody waits for either.
   assert.equal(renderToStaticMarkup(createElement(NeedsBanner, { run: { ...run, cancelledAt: at, waitingOnYou: [] } })), '');
+});
+
+test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits on a run — and a run's page's legend does not", () => {
+  const legendOf = (cards: boolean) => withMotion(false, () => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend, { cards }))));
+  const itemsOf = (html: string) =>
+    new Map(html.split('<span class="flex items-center gap-1">').slice(1).map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]));
+  assert.deepEqual([...itemsOf(legendOf(false)).keys()], ['to come', 'running', 'done', 'loops back', 'human gate']);
+  const items = itemsOf(legendOf(true));
+  assert.deepEqual([...items.keys()], ['to come', 'running', 'done', 'loops back', 'waits on a run', 'human gate']);
+  const cards = items.get('waits on a run')!;
+  assert.match(cards, /data-sample="cards"/);
+  assert.equal((cards.match(/<rect /g) ?? []).length, 2, 'a card at each end');
+  assert.match(cards, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/);
+  assert.equal(travelling(cards).length, 0);
+});
+
+test('the edges between cards are drawn as every edge is: from a run into each card that waits on it, dashed until its run starts, solid once it has, and moving never', () => {
+  const card = (id: string, after: string[], filed: boolean) => ({
+    id, after, steps: [{ name: 'implement', taskId: filed ? `t-${id}` : null, branch: null, status: filed ? 'running (working)' : 'waiting', note: null, needs: null, blockedByHarness: false }],
+  });
+  const edges = afterEdges([card('a', [], true), card('b', ['a'], true), card('d', ['a', 'b'], false)]);
+  const shape = ({ id, source, target, type, sourceHandle, targetHandle, data }: StateFlowEdge) => ({ id, source, target, type, sourceHandle, targetHandle, data });
+  assert.deepEqual(edges.map(shape), [
+    // Out of a card's one source handle, on its right, and into its one target handle, on the left: no handle named.
+    { id: 'after:a->b', source: 'a', target: 'b', type: 'state', sourceHandle: undefined, targetHandle: undefined, data: { state: 'done', loop: false } },
+    { id: 'after:a->d', source: 'a', target: 'd', type: 'state', sourceHandle: undefined, targetHandle: undefined, data: { state: 'to-come', loop: false } },
+    { id: 'after:b->d', source: 'b', target: 'd', type: 'state', sourceHandle: undefined, targetHandle: undefined, data: { state: 'to-come', loop: false } },
+  ]);
+  const [done, toCome] = [edgeMarkup(edges[0]!), edgeMarkup(edges[1]!)];
+  assert.match(toCome, /data-state="to-come"[^>]*stroke-dasharray:5 4|stroke-dasharray:5 4[^>]*data-state="to-come"/);
+  assert.match(done, /data-state="done"/);
+  assert.doesNotMatch(done, /stroke-dasharray/);
+  assert.equal(travelling(done + toCome).length, 0);
 });

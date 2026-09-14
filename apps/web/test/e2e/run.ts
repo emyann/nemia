@@ -23,8 +23,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectApart, expectBeneath, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, watch } from './checks.ts';
-import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout } from './seed.ts';
+import { expectApart, expectBeneath, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout, SESSION } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -252,6 +252,69 @@ const PAGES: PageSpec[] = [
       // The canvas narrows for the inspector and fits itself again; judged once it has.
       await settled(page);
       await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas beside the open inspector');
+
+      // implement's Activity: the tail of its session's conversation, folded as its page folds it, and the way to that page.
+      await graph.locator(`.react-flow__node[data-id="${SESSION.step}"]`).click();
+      const inspector = page.locator(`aside[aria-label="Step ${SESSION.step}"]`);
+      await inspector.getByRole('tab', { name: 'Activity' }).click();
+      await expectVisible(inspector.locator('[data-turn="tools"]', { hasText: SESSION.folded }), `${SESSION.step}'s Activity tab draws its conversation, the calls folded into one line (${SESSION.folded})`);
+      await expectVisible(inspector.locator('section[aria-label="Closeout"]'), `${SESSION.step}'s Activity tab ends with its closeout`);
+      await expectVisible(inspector.locator(`a[href="/runs/${FAKE.id}/steps/${SESSION.step}"]`, { hasText: 'Open the session' }), `${SESSION.step}'s Activity tab links to its session's page`);
+      await settled(page);
+    },
+  },
+  {
+    name: 'session',
+    route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
+    expect: async (page) => {
+      await sidebar(page);
+      const top = page.locator('header[aria-label="The step"]');
+      await expectVisible(top.getByRole('heading', { level: 1, name: SESSION.step, exact: true }), 'the page is headed by the step');
+      await expectVisible(top.locator('[data-state="blocked"]', { hasText: 'succeeded · BLOCKED' }), "the step's chip, at the top");
+      await expectVisible(top.locator(`a[href="/runs/${FAKE.id}"]`, { hasText: FAKE.title }), 'a link back to the run, by what it asked');
+      await expectCount(top.locator('[data-following]'), 0, 'a settled task is read once, not followed');
+
+      const talk = page.getByRole('region', { name: "The step's conversation" });
+      await expectVisible(talk, 'the conversation');
+      const [box, window] = [await talk.boundingBox(), page.viewportSize()];
+      if (!box || !window || Math.abs(box.y + box.height - window.height) > 2) {
+        throw new Refused(`the conversation takes the page's height — it ends at ${box ? Math.round(box.y + box.height) : 'nothing'} px, the window at ${window?.height} px`);
+      }
+      await expectVisible(talk.locator('[data-turn="said"][data-role="user"]', { hasText: 'Implement what was asked.' }), 'the prompt, said by the user');
+
+      const fold = talk.locator('[data-turn="tools"]');
+      await expectCount(fold, 1, 'one fold: the calls with nothing said between them');
+      const line = fold.getByRole('button', { name: SESSION.folded });
+      await expectVisible(line, `folded into one line in Claude Code web's words: ${SESSION.folded}`);
+      await expectVisible(fold.getByText('1 failed', { exact: true }), 'the line says one of its calls failed');
+      await expectCount(fold.locator('[data-turn="tool"]'), 0, 'folded: its calls are behind the line');
+      await line.click();
+      await expectCount(fold.locator('[data-turn="tool"]'), SESSION.calls, `opened: each of its ${SESSION.calls} calls`);
+      await expectVisible(fold.locator('[data-turn="tool"][data-tool="Bash"] [data-tool-state="error"]'), 'the call that failed says so on its line');
+      await expectVisible(fold.locator('[data-turn="thinking"]', { hasText: 'Thought, with no text kept' }), 'a thought between two calls rides in the fold, and says no text was kept');
+      await expectCount(talk.locator('[data-turn="tool"][data-tool="Edit"]'), 1, 'a lone call after words is drawn as itself');
+
+      await expectCount(talk.getByText(SESSION.thought), 0, 'a thought is folded: its text is not drawn');
+      await talk.locator('[data-turn="thinking"]').first().getByRole('button', { name: 'Thought', exact: true }).click();
+      await expectVisible(talk.getByText(SESSION.thought), 'opened, its text is');
+      await expectVisible(talk.locator('[data-turn="said"][data-role="assistant"] li', { hasText: SESSION.listed }), "the session's words, drawn from their markdown");
+      await expectVisible(talk.locator('[data-turn="system"]', { hasText: SESSION.system }), 'a system line, quietly');
+
+      const closeout = talk.locator('section[aria-label="Closeout"]');
+      await expectVisible(closeout.locator('[data-outcome="blocked"]'), 'the closeout, named, with its outcome');
+      await expectVisible(closeout.getByText(SESSION.closeout.needs), 'and what it needs');
+      await expectCount(page.getByRole('link', { name: /Claude Code web/ }), 0, 'no link to Claude Code web: nothing the engine reads carries a URL for a session');
+      await expectCount(page.locator('main textarea, main input'), 0, 'read-only: nothing to type into');
+
+      // Photographed from its start, as a reader scrolls up to it: the prompt, the thought opened, and the fold's line opened
+      // over its calls. The scroller opens at the end, so a photograph taken where the checks left it shows only the closeout.
+      await talk.hover();
+      await page.mouse.wheel(0, -100_000);
+      const scrolled = () => talk.evaluate((element) => element.scrollTop);
+      for (const until = Date.now() + WAIT_MS; (await scrolled()) > 0 && Date.now() < until; ) await new Promise((resolve) => setTimeout(resolve, 100));
+      if ((await scrolled()) > 0) throw new Refused(`the conversation scrolls up to its start for the photograph — it stopped ${await scrolled()} px down`);
+      await expectInside(talk.locator('[data-turn="said"][data-role="user"]'), talk, 'the prompt is in view for the photograph');
+      await expectInside(line, talk, `the fold's line (${SESSION.folded}) is in view for the photograph`);
     },
   },
   {
@@ -448,13 +511,17 @@ async function main(): Promise<void> {
   const checkout = path.join(store, 'checkout');
   seedCheckout(checkout, path.join(API, 'test', 'fixtures', 'mcp-server.ts'));
   // A `claude` that sees no sessions, first on the api's PATH. The engine observes `claude agents` on every
-  // list; the pages are about the store, not about the sessions on this machine.
+  // list; the pages are about the store, not about the sessions on this machine. And where Claude Code keeps its
+  // transcripts, in the store (CLAUDE_CONFIG_DIR): the engine reads a session's conversation from there, never from this machine's.
   const bin = path.join(store, 'bin');
   fs.mkdirSync(bin);
   fs.writeFileSync(path.join(bin, 'claude'), "#!/bin/sh\necho '[]'\n", { mode: 0o755 });
 
   const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API,
-    { ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` },
+    {
+      ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
+      PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
+    },
     /api listening on http:\/\/localhost:(\d+)/);
   const base = await startServer('vite preview', [vite, 'preview', '--port', '0', '--host', '127.0.0.1'], WEB,
     { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },

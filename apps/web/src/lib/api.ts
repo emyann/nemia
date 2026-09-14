@@ -106,20 +106,32 @@ export type StepAttempts = {
 export type StepLog = { lines: string[]; truncated: boolean };
 
 /**
- * A step's output, read on the page's beat while the step runs and left alone once it is not.
- *
- * Whether it runs is in the key, so the output is read once more when a step stops: the last beat
- * before it stopped can miss how it ended.
+ * Mirrors `TranscriptEvent` in packages/agent-engine/src/runner.ts, as the api passes it on: one thing said in a session's
+ * conversation. A `tool_result` carries its call's `id`, so an event is unique by `id` and `kind` together.
  */
-export const stepLogQuery = (runId: string, step: string, running: boolean) =>
-  queryOptions({
-    queryKey: ['runs', runId, 'steps', step, 'log', running ? 'running' : 'not running'],
-    queryFn: () => get<StepLog>(`/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/log`),
-    refetchInterval: running ? 5_000 : false,
-  });
+export type TranscriptEvent = {
+  id: string;
+  at: string;
+  role: 'assistant' | 'user' | 'system';
+  kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system';
+  text?: string;
+  tool?: { name: string; input: unknown };
+  result?: { text: string; isError: boolean };
+};
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(path);
+/** Mirrors `StepTranscript` in apps/api/src/app.ts: the events from a cursor, the cursor to ask again from, and whether more may come. */
+export type StepTranscript = { events: TranscriptEvent[]; cursor: string | null; live: boolean };
+
+/** Where a step's conversation is read, and — with `/stream` after it — followed as server-sent events. */
+export const transcriptPath = (runId: string, step: string) =>
+  `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/transcript`;
+
+/** One read of a step's conversation, from the start. */
+export const readTranscript = (runId: string, step: string, signal?: AbortSignal) =>
+  get<StepTranscript>(transcriptPath(runId, step), { signal });
+
+async function get<T>(path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(path, init);
   if (!res.ok) {
     // The api says what to do next in `error`, which is worth more than the status line.
     const said = await res.json().then((body: { error?: unknown }) => body.error, () => undefined);

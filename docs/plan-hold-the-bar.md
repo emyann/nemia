@@ -781,7 +781,8 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   nudge (`wf retry --nudge`, or the board's answer box with no text) is the remedy. The tick that recognises that one
   message and resumes the session is §6 item 10. → apps, with Q2 (the answer box); agent-workflows for item 10.
   *Q2, `1e471b7`: the question is on the card, the node and a banner; a harness-blocked session is named with its
-  last line and the two commands that continue it; the answer box posts to the package's `retry()`.*
+  last line; the answer box posts to the package's `retry()`. B8, `8871981`: the banner's Continue stops the blocked
+  session and files the nudge, through the package (W4).*
 
 - **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
   mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
@@ -928,7 +929,7 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3 all done; 23 (B8) in flight; what is left is small items and item 3.
+Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8 all done; nothing in flight; what is left is the small items and item 3.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -957,8 +958,8 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 9. The artifacts directory carried on the task (reviewer reads screenshots portably; Codex's unwritable dir).
 10. The login-refresh race: `wf retry` on a step whose session the harness marked blocked with no closeout — the
     tick stops the task, then files the nudge (Q2 measured that the package reads such a step as running and refuses
-    every try). *Done, W4, `406a510` — the CLI passes `stopBlocked`; the board's POST does not yet (item 23).* A Claude
-    Code report for the race itself is still to write.
+    every try). *Done, W4, `406a510`; the board's POST passes `stopBlocked` since B8.* A Claude Code report for the
+    race itself is still to write.
 
 21. `decision` calls a run shipped when its terminal step failed or blocked with nothing committed: the result
     branch sits at the base, so it is trivially "on the base", `wf decide` hides the failure and a child `--after`
@@ -969,8 +970,7 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
     `406a510`; Q2's e2e now expects the new sentence.*
 23. The board's `POST …/retry` passes `{ stopBlocked: true }` to `retry()` as the CLI does, flips the api test that
     pins the 409, and the run page's banner offers Continue again for a harness-blocked step (with "stopping its
-    session" as `wf ls` words it). apps, small. *B8, filed 2026-09-14 as `the-board-continues-a-sessio-xh9x`,
-    from `./workflows/dev-build`.*
+    session" as `wf ls` words it). apps, small. *Done, B8, `8871981`.*
 24. A stale ask: `wf retry` on a harness-blocked step, then the session resumes by itself before a tick stops it
     (a cross-session nudge, or no `wf up`). The ask is neither due nor spent, `wf ls` shows nothing, and it files
     try 2 at once if the step later fails (W4's review). Stop the session anyway, or name it in `wf ls`. agent-

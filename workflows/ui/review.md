@@ -11,8 +11,10 @@ input: implement
 tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
 permissionMode: dontAsk
 # The settings allow `npm run build` and `npm run e2e` too, for implement's check, and both write into the workspace — the
-# route tree, `.e2e/`. Denied here by name (`--disallowedTools`), which beats the settings' allow: the fence keeps review
-# from them, not its brief.
+# route tree, `.e2e/`. Denied here by name (`--disallowedTools`), which beats the settings' allow — those two spellings
+# only. The settings' `Bash(npx turbo run test:*)` and `Bash(node --test:*)` still reach both, as `npx turbo run test build`
+# and `node --test apps/web/test/e2e/run.ts`, and no deny closes an allow that runs any task or any file (`node --test`
+# takes a glob). Narrowing those two allows is the settings' to do; until then the brief keeps review from them.
 disallow: Bash(npm run build), Bash(npm run e2e)
 # The review travels as this step's closeout — `findings` and `again`, in the shape review.schema.json declares. A
 # finding names where it is: a file and a line, or a page and a theme.

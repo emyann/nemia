@@ -145,7 +145,8 @@ filing of the step (the first, each try and each round), and a deny beats every 
 `.claude/settings.json`, and the permission mode. `tools:` says which tools a session has; `disallow:`
 takes back what it may not do with them. So a step in `dontAsk` is kept from a command the settings allow
 for another step's sake by machinery, not by a sentence in its brief. This repository's reviewers are denied
-`npm run build` and `npm run e2e`, which implement's check needs and which write into the workspace. Every
+`npm run build` and `npm run e2e`, which implement's check needs and which write into the workspace — those two
+commands, and not the build and the e2e by another name (below). Every
 `implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs.
 
 Refused at load: a line that names no rule; an entry with a comma inside it (`Bash(git push, git reset)`
@@ -153,6 +154,13 @@ would reach the harness as two halves of a rule, so write two rules); an entry t
 (`SendMessage CronCreate`, a quoted name, an unclosed parenthesis); and any `disallow:` on codex, which has
 no tool list, so its fence is `permissionMode`. A Bash rule matches as Claude Code matches it:
 `Bash(npm run build)` is that command, as the settings' allow of the same words is.
+
+**A deny closes a command, not an allow.** This repository's settings also allow `Bash(npx turbo run test:*)`
+and `Bash(node --test:*)` for the suite, and those run the build and the e2e by other names:
+`npx turbo run test build` and `node --test apps/web/test/e2e/run.ts`. No deny list closes an allow that runs
+any task or any file (`node --test` takes a glob, so a rule on the file's path is walked around). What keeps a
+reviewer from those is the allow narrowed in `.claude/settings.json`, which this package does not own; until
+then, a sentence in the dev and dev-build review briefs.
 
 **The engine is the source of these words.** The permission modes and efforts `src/workflow.ts` refuses
 are copies of agent-engine's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and

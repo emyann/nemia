@@ -268,7 +268,8 @@ and each round, as `tools:` does.
   `CronCreate`, `CronDelete` and `RemoteTrigger` from the session's tools (30 → 26).
 - The shipped Claude reviewers (`workflows/dev`, `dev-build` and `ui`, and the package's `workflows/ui`) are denied
   `Bash(npm run build)` and `Bash(npm run e2e)`: `.claude/settings.json` allows both for implement's check, and both
-  write into the workspace. Their brief still says not to run them; the fence is what keeps them from it.
+  write into the workspace. The fence keeps them from those two commands; from the build and the e2e by another name,
+  only their brief does (below).
 - Every shipped `implement` is denied `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger`, which an
   unattended session had (measured, plan §4b) and no step needs.
 - `wf decide` prints a finding's `where` as a place (`file:line`, `page · theme`, a string as it is, another object as
@@ -276,9 +277,16 @@ and each round, as `tools:` does.
 
 What it leaves:
 
-- **A Bash rule matches as Claude Code matches it.** `Bash(npm run build)` is the settings' allow, word for word. A
-  variation the deny does not match is one that allow does not match either, so `dontAsk` denies it all the same. A
-  step outside `dontAsk`, or settings with a looser allow such as `Bash(npm run build:*)`, would need the looser rule.
+- **The build and the e2e have two other ways in, which no deny closes.** `.claude/settings.json` also allows
+  `Bash(npx turbo run test:*)` and `Bash(node --test:*)`, which the reviewer briefs name for the suite. `npx turbo run
+  test build` runs turbo's `build` task, `apps/web`'s `vite build`, which rewrites `src/routeTree.gen.ts`; and
+  `node --test apps/web/test/e2e/run.ts` runs the e2e, whose `main()` is called at top level, into `.e2e/` without
+  `WF_ARTIFACTS`. Neither matches `Bash(npm run build)` or `Bash(npm run e2e)`, so a `dontAsk` reviewer may run both
+  (read from the settings, `turbo.json` and `run.ts`; neither was run, both write into the workspace). A pattern deny
+  would not close them: `node --test` takes a glob, and on Node 24 `node --test 'apps/web/test/**/run.ts'` ran a stub
+  `run.ts`, a command with no `e2e` in it. The allows are what is loose, and narrowing them is for whoever owns
+  `.claude/settings.json`, outside this change; until then the dev and dev-build briefs name both forms. A step
+  outside `dontAsk` would need the same care.
 - **The board does not show it.** The api's step spec and the inspector name `tools` and not `disallow`. → apps.
 - **`ae` briefs have no `disallowedTools` key.** The engine's task has the field, and its CLI does not read one.
 - **The live test needs a checkout Claude Code trusts.** Its first form made the checkouts in `os.tmpdir()`, and there

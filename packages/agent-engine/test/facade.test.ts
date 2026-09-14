@@ -350,7 +350,7 @@ test('file() refuses a disallowedTools that is not a list of permission rules, a
   await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', disallowedTools: ['SendMessage'] }, /is a deny list, and Codex has no tool list/);
   assert.deepEqual(await journal.list(), [], 'nothing was journalled');
 
-  const rules = ['SendMessage', 'Bash(npm run build)', 'mcp__playwright__browser_run_code_unsafe', 'Read(//home/**)'];
+  const rules = ['SendMessage', 'Bash(npm run build)', 'mcp__playwright__browser_run_code_unsafe', 'Read(//home/**)', `Bash(git commit -m 'wip')`];
   const id = await engine.file({ brief: 'b', cwd: '/r', disallowedTools: rules });
   const [filed] = await journal.read(id);
   assert.deepEqual((filed as { disallowedTools?: string[] }).disallowedTools, rules, 'on the record, for the runner');

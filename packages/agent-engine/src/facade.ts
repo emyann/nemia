@@ -115,7 +115,7 @@ export type TaskSpec = {
    * one rule per entry: a tool, or a tool and what it may not run. Claude Code is given the list as
    * `--disallowedTools`, and a deny beats an allow — the checkout's settings, `--allowedTools`, any permission
    * mode. Absent or empty: nothing denied beyond the harness's own settings. Codex has no tool list, and refuses
-   * a task that names one. Carried on the task; `decide` never reads it.
+   * a task whose list denies anything. Carried on the task; `decide` never reads it.
    */
   disallowedTools?: string[];
   /**

@@ -256,9 +256,10 @@ denied, `disallow: Bash(npm run build), SendMessage`. The engine carries them on
 `tools`, and both Claude runners pass them as `--disallowedTools`. They reach `e.file` on the first filing, each try
 and each round, as `tools:` does.
 
-- `disallow:` is refused at load when it names no rule, when a comma is inside an entry (in a rule's parentheses, in
-  brackets or in quotes: the list is split on every comma), when an entry is not one rule, and on codex, whose message
-  names `permissionMode`. The engine's `file()` refuses a `disallowedTools` that is not a list of rules, and codex
+- `disallow:` is refused at load when it names no rule, when a comma is inside a rule's parentheses (the list is split
+  on every comma), when an entry is not one rule (a list in brackets or quotes among them), and on codex, whose message
+  names `permissionMode`. A quote inside the parentheses is legal, `Bash(git commit -m 'wip')`, so unlike `tools:` the
+  comma check does not look in quotes: `tools:`'s check refused such a rule whenever another entry followed it. The engine's `file()` refuses a `disallowedTools` that is not a list of rules, and codex
   refuses one that denies anything rather than drop it.
 - **Measured, not only passed** (2026-09-14, Claude Code 2.1.270, `claude -p` in `dontAsk`). Given `--allowedTools`
   for `npm run build` and `npm run e2e`, a session told to run both ran both. Given

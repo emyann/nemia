@@ -352,6 +352,12 @@ test('disallow: is the rules the harness is given to deny, one rule per entry, t
   const w = fm('review', 'tools: Read, Bash\ndisallow: Bash(npm run build) ,  Bash(npm run e2e), SendMessage,');
   assert.deepEqual(w.disallow, ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'], 'a space inside a rule stays in it; a trailing comma adds none');
   assert.deepEqual(fm('review', 'disallow: mcp__playwright__browser_run_code_unsafe, Read(//home/**)').disallow, ['mcp__playwright__browser_run_code_unsafe', 'Read(//home/**)']);
+  // A quote is legal inside a rule, whichever entry comes after it: `tools:`'s quote check refused the first order and took the second.
+  for (const q of [`'`, `"`]) {
+    const rule = `Bash(git commit -m ${q}wip${q})`;
+    assert.deepEqual(fm('review', `disallow: ${rule}, SendMessage`).disallow, [rule, 'SendMessage'], `${q}: a quoted rule, then another`);
+    assert.deepEqual(fm('review', `disallow: SendMessage, ${rule}`).disallow, ['SendMessage', rule], `${q}: another, then a quoted rule`);
+  }
   assert.equal(fm('review', 'harness: claude').disallow, undefined, 'absent: nothing denied beyond the settings');
   for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('review', `harness: ${h}\ndisallow: SendMessage`).disallow, ['SendMessage'], h);
 });
@@ -365,8 +371,9 @@ test('REFUSED: an empty disallow: — blank, or only commas — which denies not
 test('REFUSED: a disallow: entry that is not one rule — a comma inside its parentheses, a space outside them, a list in brackets or quotes', () => {
   assert.throws(() => fm('review', 'disallow: Bash(git push, git reset)'),
     refusedWith(/^review: `disallow: Bash\(git push, git reset\)` has a comma inside an entry, and the list is split on every comma, so the harness would be given `Bash\(git push`, `git reset\)` as rules\. .*Two commands are two rules: `Bash\(git push\), Bash\(git reset\)`\./));
-  assert.throws(() => fm('review', 'disallow: [SendMessage, CronCreate]'), refusedWith(/has a comma inside an entry/));
-  assert.throws(() => fm('review', 'disallow: "SendMessage, CronCreate"'), refusedWith(/has a comma inside an entry/));
+  assert.throws(() => fm('review', "disallow: Bash(git commit -m 'a, b'), SendMessage"), refusedWith(/has a comma inside an entry/), 'a comma in quotes inside the parentheses is still inside them');
+  assert.throws(() => fm('review', 'disallow: [SendMessage, CronCreate]'), refusedWith(/has `\[SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/));
+  assert.throws(() => fm('review', 'disallow: "SendMessage, CronCreate"'), refusedWith(/has `"SendMessage`, which is not one rule: a rule is a bare name, without quotes or brackets/));
   assert.throws(() => fm('review', 'disallow: SendMessage CronCreate'),
     refusedWith(/^review: `disallow: SendMessage CronCreate` has `SendMessage CronCreate`, which is not one rule: a space outside the parentheses separates two rules, to the harness\. Each entry is one rule/));
   assert.throws(() => fm('review', 'disallow: "SendMessage"'), refusedWith(/has `"SendMessage"`, which is not one rule: a rule is a bare name, without quotes or brackets/));

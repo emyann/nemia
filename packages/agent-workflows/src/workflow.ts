@@ -405,7 +405,9 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
  * `disallow:` as the rules the harness is given to deny, refused unless each entry is one rule.
  *
  * Split on commas, as `tools:` is, so a comma inside a rule's parentheses would reach the harness as two pieces of it, and is
- * refused as `tools:` refuses one. Refused on codex, which has no tool list to deny from: its fence is the sandbox.
+ * refused as `tools:` refuses one. Only the parentheses are looked in: a quote is legal inside a rule — `Bash(git commit -m 'wip')`
+ * — and `tools:`'s quote check fired on such a rule whenever another entry followed it. A list written in brackets or quotes
+ * splits into entries that are not rules, and is refused for that. Refused on codex, which has no tool list to deny from.
  */
 function disallowOf(step: string, disallow: string | undefined, harness: string | undefined): string[] | undefined {
   if (disallow === undefined) return undefined;
@@ -414,7 +416,7 @@ function disallowOf(step: string, disallow: string | undefined, harness: string 
   if (harness === 'codex') {
     refuse(`${named} is a deny list, and codex has no tool list to deny from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`permissionMode: read-only\` for a step that must not write.`);
   }
-  if (/\([^)]*,|\[[^\]]*,|"[^"]*,|'[^']*,/.test(disallow)) {
+  if (/\([^)]*,/.test(disallow)) {
     const pieces = disallow.split(',').map((s) => `\`${s.trim()}\``).join(', ');
     refuse(`${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as rules. ${written} Two commands are two rules: \`Bash(git push), Bash(git reset)\`.`);
   }

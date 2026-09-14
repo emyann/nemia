@@ -175,6 +175,11 @@ harness exists for comparison.
   does; any rollout item of a type other than the five read; a Codex thread whose reasoning has a
   summary; and how long a command's item waits to be written, since none of the commands in those
   rollouts ran long.
+- **What a poll of a running Claude session costs.** An ended attempt is read by the id on the record,
+  with no registry asked. One in flight is not: each `transcript` call runs `claude agents` (~300 ms), and
+  the Claude runner's second pass reads the closeout and usage of every idle `ae/` session it lists, as
+  every `view` does. Measured by nobody under a board polling once a second (plan §4 S2). If it bites, a
+  runner verb that finds one session by name, not a cache in the engine, is the fix.
 
 - **Releasing a quiet session, or one a person or a deadline stopped** (engine `c2ebd62`, `9c4221e`). A
   fake `claude` that keeps a registry, at shipped defaults. The live run released a session that had

@@ -330,22 +330,40 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
   try { return await f(); } finally { process.env.PATH = prev; }
 };
 
-/** A fake `claude`: `agents` prints its rows, and `--bg --name <n>` adds one, working and idle, under a new session id. */
+/**
+ * A fake `claude`: `agents` prints its rows, and `--bg --name <n>` adds one, working and idle, under a new
+ * session id; anything else succeeds and does nothing. While `<bin>/agents-fails` exists, `agents` fails,
+ * as a registry under contention does. Every call is written down.
+ */
 const fakeClaude = () => {
   const bin = tmp('bin');
   const registry = path.join(bin, 'registry.json');
+  const calls = path.join(bin, 'calls.jsonl');
+  const agentsFails = path.join(bin, 'agents-fails');
   fs.writeFileSync(registry, '[]');
+  fs.writeFileSync(calls, '');
   fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + '\\n');
 const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
+if (args[0] === 'agents' && fs.existsSync(${JSON.stringify(agentsFails)})) { process.stderr.write('registry unavailable\\n'); process.exit(1); }
 if (args[0] === 'agents') { process.stdout.write(JSON.stringify(rows)); process.exit(0); }
 if (args[0] === '--bg') {
   rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'idle', kind: 'background', startedAt: Date.now() });
   fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows));
 }
 `, { mode: 0o755 });
-  return { bin, rows: () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Array<{ name: string; sessionId: string }> };
+  type Row = { name: string; sessionId: string; state: string };
+  const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
+  return {
+    bin,
+    rows,
+    set: (name: string, change: Partial<Row>) => fs.writeFileSync(registry, JSON.stringify(rows().map((r) => (r.name === name ? { ...r, ...change } : r)))),
+    agentsFail: (fails: boolean) => (fails ? fs.writeFileSync(agentsFails, '') : fs.rmSync(agentsFails, { force: true })),
+    /** How many times `claude agents` has been run. */
+    agentsCalls: () => fs.readFileSync(calls, 'utf8').split('\n').filter((l) => l.startsWith('["agents"')).length,
+  };
 };
 
 /** A fake `codex` that prints a thread's first events and exits, beside a `claude` whose registry is empty. */
@@ -419,6 +437,9 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
     const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
     await assert.rejects(engine.transcript(id, 'from-the-top'), refusal(/^transcript: `from-the-top` is not a cursor a transcript read gave\. Pass the `cursor`/));
     assert.deepEqual((await engine.transcript(id)).events, [], 'the same task, asked without one, is read');
+    // A HarnessSpec's reader is the engine's too, and refuses the same.
+    const codexId = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'codex' });
+    await assert.rejects(engine.transcript(codexId, 'page-2'), refusal(/^transcript: `page-2` is not a cursor a transcript read gave\./));
   });
 
   // A harness brought as a PromiseRunner with no `transcript`, and a HarnessSpec with none.
@@ -435,16 +456,66 @@ test('refused, each naming what to do: a task the engine has no record of, a cur
   const sh = createEngine({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } });
   await assert.rejects(sh.transcript(await sh.file({ brief: 'the prompt', cwd: '/repo' })), refusal(/^transcript: the `sh` harness keeps no conversation/));
 
-  // The same PromiseRunner with one is asked for its session, from the cursor given.
+});
+
+test("a PromiseRunner's cursor is its own: passed through as it gave it, and never replaced by the engine's", async () => {
+  const sessions = new Map<string, Sighting>();
   const asked: Array<[string, string | undefined]> = [];
-  const said = { id: 'e-1', at: at(0), role: 'assistant', kind: 'text', text: 'hello' } as const;
-  const talking = createEngine({
-    root: tmp('root'), defaultHarness: 'talking',
-    harnesses: { talking: { ...plain, async transcript(sessionId, after) { asked.push([sessionId, after]); return { events: [said], cursor: '7.0123456789abcdef' }; } } },
+  const said = (n: number) => ({ id: `e-${n}`, at: at(n), role: 'assistant', kind: 'text', text: `line ${n}` } as const);
+  // Pages, in a shape no file reader gives.
+  const talking: PromiseRunner = {
+    async spawn(r) { sessions.set(r.name, { sessionId: 's-1', state: 'working' }); },
+    async observe() { return new Map(sessions); },
+    async stop() {},
+    async logs() { return 'what it printed'; },
+    async transcript(sessionId, after) {
+      asked.push([sessionId, after]);
+      const page = after === undefined ? 1 : Number(after.replace('page-', ''));
+      return { events: [said(page)], cursor: `page-${page + 1}` };
+    },
+  };
+  const engine = createEngine({ root: tmp('root'), harnesses: { talking }, defaultHarness: 'talking' });
+  const id = await engine.file({ brief: 'the prompt', cwd: '/repo' });
+
+  const nothing = await engine.transcript(id);
+  assert.deepEqual(nothing.events, [], 'no session yet: not asked');
+  assert.deepEqual(await engine.transcript(id, 'page-9'), { events: [], cursor: 'page-9' }, 'no session yet, asked with its own cursor: that cursor back');
+
+  await engine.tick();
+  const first = await engine.transcript(id, nothing.cursor);
+  assert.deepEqual(first, { events: [said(1)], cursor: 'page-2' }, "the engine's start is asked as no cursor");
+  const second = await engine.transcript(id, first.cursor);
+  assert.deepEqual(second, { events: [said(2)], cursor: 'page-3' }, 'its own cursor, not refused');
+  assert.deepEqual(asked, [['s-1', undefined], ['s-1', 'page-2']]);
+});
+
+test("a registry that cannot be read: an ended attempt's transcript is read by the id on the record, with no registry asked; one in flight reads as nothing new, from the cursor given", async () => {
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const engine = createEngine({ root: tmp('root') });
+    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd') });
+    await engine.tick();
+    const [row] = claude.rows();
+    assert.equal(row?.name, `ae/${id}/1`, 'spawned');
+    writeClaude(row!.sessionId, jsonl(claudeLines(row!.sessionId)));
+    const first = await engine.transcript(id);
+    assert.deepEqual(first.events, CLAUDE_EVENTS, 'in flight, found by observing its harness');
+
+    claude.agentsFail(true);
+    assert.deepEqual(await engine.transcript(id, first.cursor), { events: [], cursor: first.cursor }, 'in flight, registry unread: nothing new, and the cursor given back — not a rejection');
+    assert.deepEqual((await engine.transcript(id)).events, [], 'and from the start, nothing observed either');
+
+    claude.agentsFail(false);
+    claude.set(row!.name, { state: 'done' });
+    await engine.tick();
+    const ended = (await engine.view(id)).state.attempts[0]!;
+    assert.equal(ended.nativeId, row!.sessionId, "the attempt ended, its session's id on the record");
+
+    claude.agentsFail(true);
+    const before = claude.agentsCalls();
+    assert.deepEqual((await engine.transcript(id)).events, CLAUDE_EVENTS, 'ended, registry unread: read all the same');
+    assert.deepEqual(await engine.transcript(id, first.cursor), { events: [], cursor: first.cursor }, 'from the cursor given');
+    assert.equal(claude.agentsCalls(), before, 'and the registry was not asked');
+    assert.match(await engine.logs(id), /Write the word to WORD\.txt/, 'as logs reads it');
   });
-  const talkingId = await talking.file({ brief: 'the prompt', cwd: '/repo' });
-  assert.deepEqual(await talking.transcript(talkingId), { events: [], cursor: (await claudeRead(randomUUID())).cursor }, 'no session yet: not asked');
-  await talking.tick();
-  assert.deepEqual(await talking.transcript(talkingId, '7.0123456789abcdef'), { events: [said], cursor: '7.0123456789abcdef' });
-  assert.deepEqual(asked, [['s-1', '7.0123456789abcdef']]);
 });

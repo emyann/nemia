@@ -623,10 +623,19 @@ could not say whether a result was an error. What the records do not give, and s
 - **Anything before the worker has the thread id**, and any item of a type not in those rollouts beyond
   a `system` event naming it.
 
-**Refused, with exit code 2** and the fix in the sentence: a task the engine has no record of, a cursor
-no read gave, and a harness that keeps no conversation this engine can read — a `PromiseRunner` or a
-`HarnessSpec` without `transcript` — whose tasks have `logs`. A session not started yet is no events,
-not a refusal: ask again.
+**Which session is read.** An attempt that has ended — or whose task settled with it open — is read by the
+session id the journal recorded, and no registry is asked: a board that re-reads a finished step costs no
+`claude agents`, and a registry that cannot be read does not stop it. An attempt in flight is found by
+observing its task's harness, alone. A registry that cannot be read this time counts as nothing observed,
+as a pass counts it. So does a session not started yet: no events, and the cursor asked with (or one from
+the start). Neither is a refusal: ask again.
+
+**Refused, with exit code 2** and the fix in the sentence: a task the engine has no record of, a harness
+that keeps no conversation this engine can read — a `PromiseRunner` or a `HarnessSpec` without
+`transcript` — whose tasks have `logs`, and, for the engine's own readers (`claude-bg` and a
+`HarnessSpec`), a cursor none of them gave. **A `PromiseRunner`'s cursor is its own**: the engine passes it
+through as the runner gave it, and hands the runner none of its own. The start a read of no session
+returns reaches the runner as no cursor at all.
 
 ## Letting a sandboxed Codex step commit
 

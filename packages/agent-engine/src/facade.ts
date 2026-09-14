@@ -54,9 +54,12 @@ export type PromiseRunner = {
    */
   release?(session: Sighting, task: { worktree?: string | boolean }): Promise<void>;
   /**
-   * Optional. The session's conversation as events from `after` — a cursor this method returned, or
-   * none for the start — and the cursor to ask again with. Without it, `transcript` refuses this
-   * harness's tasks, and `logs` is what they have.
+   * Optional. The session's conversation as events from `after` — a cursor this method returned, in
+   * whatever shape you chose, or none for the start — and the cursor to ask again with. The engine passes
+   * your cursor through as you gave it, and never hands you one of its own. Asked with the session's id as
+   * observed while its attempt runs, and with the `nativeId` recorded once the attempt has ended — as
+   * `logs` is once a session is released. Without it, `transcript` refuses this harness's tasks, and
+   * `logs` is what they have.
    */
   transcript?(sessionId: string, after?: TranscriptCursor): Promise<Transcript>;
 };
@@ -149,11 +152,17 @@ export type Engine = {
   /**
    * The conversation of the task's session — the one `logs` reads, asked of the task's own harness — as
    * events from `after` on, and the `cursor` to ask again from. Pull-only: poll with the cursor the last
-   * read returned; nothing is pushed. No session yet is no events, and a cursor from the start.
+   * read returned; nothing is pushed. No session yet is no events, and the cursor asked with — or one
+   * from the start.
+   *
+   * An attempt that has ended is read by the session id the journal recorded, and no registry is asked.
+   * One in flight is found by observing its harness, and a registry that cannot be read this time is
+   * nothing observed, as a pass reads it: no events, and the cursor given back.
    *
    * Refused — rejected with an `Error` whose `exitCode` is 2 — for a task this engine has no record of;
-   * an `after` that no read gave; and a harness that keeps no conversation this engine can read (a
-   * `HarnessSpec` or `PromiseRunner` without `transcript`).
+   * a harness that keeps no conversation this engine can read (a `HarnessSpec` or `PromiseRunner`
+   * without `transcript`); and, for the engine's own readers (`claude-bg` and a `HarnessSpec`), an
+   * `after` that none of them gave. A `PromiseRunner`'s cursor is its own, and passed through.
    */
   transcript(taskId: string, after?: TranscriptCursor): Promise<Transcript>;
   /** Everything that has happened since `after`, and where to resume. */
@@ -319,20 +328,35 @@ export function createEngine(options: EngineOptions = {}): Engine {
     })),
     transcript: async (taskId, after) => {
       const refuse = (why: string) => Object.assign(new Error(`transcript: ${why}`), { exitCode: 2 });
-      if (after !== undefined && !isTranscriptCursor(after)) {
-        throw refuse(`\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`);
-      }
       const events = await go(Effect.flatMap(Journal, (j) => j.read(taskId)));
       if (!events.length) throw refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+      const state = fold(taskId, events);
       // The task's own harness, as for `logs`, and observed by that harness alone: a board asks this every
       // second while a session runs, and no other harness's registry can name the session.
-      const asked = fold(taskId, events).harness ?? fallback;
+      const asked = state.harness ?? fallback;
       const harness = Object.hasOwn(runners, asked) ? asked : fallback;
       const runner = runners[harness]!;
       const read = runner.transcript;
       if (!read) throw refuse(`the \`${harness}\` harness keeps no conversation this engine can read. \`logs\` gives what its session printed.`);
-      const v = await go(Effect.flatMap(runner.observe, (observed) => view(taskId, observed)));
-      return v.sessionId ? go(read(v.sessionId, after)) : noTranscript();
+      // A cursor is its reader's. The engine's own readers give one shape, and one they did not give is
+      // refused at the door; a PromiseRunner's is passed through as it gave it.
+      const h = harnesses[harness]!;
+      if (after !== undefined && (h === 'claude-bg' || isSpec(h)) && !isTranscriptCursor(after)) {
+        throw refuse(`\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`);
+      }
+      // The start, as a read of no session gives it, is handed to no runner: it is asked from the start.
+      const start = noTranscript().cursor;
+      // An attempt that has ended — or whose task settled with it open — has its session's id on the record,
+      // and no registry is asked for it: what `logs` falls back to. Only an attempt in flight needs one, and a
+      // registry that cannot be read this time is nothing observed, as `composite` reads it for a pass.
+      const sessionId = state.attempts.at(-1)?.nativeId ?? (await go(runner.observe.pipe(
+        Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
+        Effect.flatMap((observed) => view(taskId, observed)),
+      ))).sessionId;
+      // No session to read: nothing new, and the cursor asked with, so a moment the registry could not be
+      // read costs a caller a poll rather than a read from the start.
+      if (!sessionId) return { events: [], cursor: after ?? start };
+      return go(read(sessionId, after === start ? undefined : after));
     },
     feed: (after = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after))),
 

@@ -656,6 +656,24 @@ per-page findings as findings; `respond` and `look` go, in the repository's `wor
 package's shipped `workflows/ui/` alike. A node shows `tools · 4` with the list on hover; the inspector
 (B7) shows the list.
 
+### Q — A step that asks, and a step that plans · small · workflows + board
+
+**The ask (operator, 2026-09-14):** should a worker have AskUserQuestion (it maps to needs-human) or
+plan mode? Measured: a `--bg`/`-p` session has neither — interactive tools, withheld headless.
+
+**Asking is `blocked` + `needs`, already.** A closeout `outcome: blocked, needs: "…"` is the question
+at the run's level, and the better version: it ends the step instead of holding a session open for
+nobody, it is on the record, the board draws the gate with the `Needs:` text, and it is answerable from
+anywhere. Missing: the **answer**. `wf retry --nudge --message "<answer>"`, carried into the try's brief as
+data (`## Your answer`), and an answer box on a blocked step in the board's Decide section → the board's
+second write, guarded as `POST /api/runs` is. The steering channel S deferred composes with it later.
+
+**Planning is a `plan` step.** Plan mode is read-propose-approve inside a session; in a run it is
+`plan.md` on read-only tools with `output: plan.schema.json` (files, steps, risks) and `implement` with
+`input: plan` — the plan on the record and on the board. When a brief warrants approval, `plan` signs off
+`blocked` with the plan in `needs`, and the answer path releases it. A workflow variant (`dev-planned`),
+not the default: for a small brief it repeats the brief.
+
 ## 4b. Findings from wave 1, for the packages that own them
 
 Recorded here at merge time so they are not lost; fold each into its ledger when that package's

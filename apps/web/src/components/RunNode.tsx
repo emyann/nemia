@@ -94,7 +94,8 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
       <ul aria-label="Steps" className="flex flex-wrap gap-x-2.5 gap-y-1 px-3 text-[11px]">
         {run.steps.map((step) => (
           <li key={step.name} className="flex min-w-0 max-w-full items-center gap-1">
-            <span className="truncate text-muted-foreground">{step.name}</span>
+            {/* The name keeps its width: a root's `waiting on <run> (cancelled)` is what is cut short, and whole on the line above. */}
+            <span className="shrink-0 text-muted-foreground">{step.name}</span>
             <StatusChip status={step.status} runCancelled={cancelled} note={step.note} />
           </li>
         ))}

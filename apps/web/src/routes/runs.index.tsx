@@ -3,7 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { StatusChip } from '../components/StatusChip';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runsQuery, type RunSummary } from '../lib/api';
-import { titleOf } from '../lib/factory';
+import { titleOf, waitsOnYou } from '../lib/factory';
 
 export const Route = createFileRoute('/runs/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),
@@ -49,8 +49,11 @@ function RunRow({ run }: { run: RunSummary }) {
           <span className="font-mono">{run.id}</span>
           <span>{run.repo}</span>
           {run.cancelledAt && <span className="text-amber-600">cancelled</span>}
-          {run.waitingOnYou.length > 0 && (
-            <span className="font-medium text-amber-600">waiting on you: {run.waitingOnYou.join(', ')}</span>
+          {/* As `wf ls` prints `→ waiting on you:` — the steps, or for a run waiting on a run that never ships, what is yours to resolve. */}
+          {waitsOnYou(run) && (
+            <span data-waiting-on-you className="font-medium text-amber-600">
+              waiting on you: {run.waitingOnYou.length ? run.waitingOnYou.join(', ') : run.waiting?.advice}
+            </span>
           )}
         </p>
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">

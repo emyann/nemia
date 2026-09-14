@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { repositoryQuery, runsQuery, startRun, workflowsQuery, type RunSummary, type WorkflowListing } from '../lib/api';
-import { inFlight, titleOf } from '../lib/factory';
+import { standingOf, titleOf } from '../lib/factory';
 
 export const Route = createFileRoute('/workflows')({
   loader: ({ context }) => context.queryClient.ensureQueryData(workflowsQuery),
@@ -213,7 +213,9 @@ function AfterPicker({ selected, onChange }: { selected: readonly string[]; onCh
                   {titleOf(run)}
                 </span>
                 <span className="hidden shrink-0 font-mono text-[11px] text-neutral-500 sm:inline">{run.id}</span>
-                <span className="shrink-0 text-[11px] text-neutral-500">{runWord(run)}</span>
+                <span data-standing className="shrink-0 text-[11px] text-neutral-500" title={run.waiting?.advice}>
+                  {standingOf(run)}
+                </span>
               </label>
             </li>
           ))}
@@ -225,6 +227,3 @@ function AfterPicker({ selected, onChange }: { selected: readonly string[]; onCh
 
 const newestFirst = (runs: readonly RunSummary[]): RunSummary[] =>
   [...runs].sort((a, b) => b.createdAt.localeCompare(a.createdAt) || b.id.localeCompare(a.id));
-
-/** Where a run stands, as the Factory has it: called off, in flight, or finished. */
-const runWord = (run: RunSummary): string => (run.cancelledAt ? 'cancelled' : inFlight(run) ? 'in flight' : 'finished');

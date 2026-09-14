@@ -607,6 +607,35 @@ already uses. Later, its own package.
 - *Not now.* A `wf new <name>` scaffold or a "describe your workflow" skill: the keys are a closed
   list refused by name, so an agent already gets told what it wrote wrong.
 
+### P — Cards with edges: a run that waits on a run, and a plan as a folder of cards · later · workflows + board
+
+**The ask (operator, 2026-09-13, talked through, not filed):** the sequencing the operator did by hand
+all day — file B once A is on main, keep concurrent runs off the same files — as a fact the system
+holds: cards on the Factory with edges between them; the diamond (A, then B and C together, then D).
+
+**In the study's terms.** The run boundary is the human gate (REPORT G10), so a card's dependents start
+when the card is **shipped** — its result branch on the base branch, which `isShipped` already reads for
+`wf decide` — never when its steps say they are done. Every card stays a decision. The diamond is then
+today's flow with the waiting done by the tick: A ships; B and C start from a `main` that has A; D starts
+when both are shipped. Conflicts between B and C stay a person's, at the second merge; G's radius makes
+them visible beforehand (two concurrent cards touching the same files is one line the Factory can print).
+
+**By layer.** *Engine:* nothing — a run waiting on a run is the upper layer's fact. *agent-workflows:*
+`after: [runId]` on the run record, written by `wf start --after <id>`; a pure `runReady(run, shipped)`
+beside `assess` — a run's roots are filed only when every run it waits on is shipped; `wf ls` says
+`waiting on <run>`; later, a dependent run's brief handed the parents' closeout summaries as data
+(`input:` one level up). *Board:* the Factory as a graph of cards — edges between them, the steps'
+layering, a card unfolding into its run as today; W3's start form gains "after". *Then the plan:* a
+**folder of card briefs** — one markdown file per card, `workflow: dev` and `after: <card>` in its
+frontmatter, the closed-key parser refusing the rest — and `wf plan <folder>` starts them with their
+edges. The whole graph before it is printed, at the plan level; the shape an agent writes for someone
+who describes a plan in prose.
+
+**Considered and set aside:** nesting — a card as a step whose harness runs a workflow, on the
+`HarnessSpec` seam, with the step-level fork/merge doing the rest. More powerful (a check or a loop over
+cards), but it makes a whole run "one workload on one harness", which stretches the engine's rule, and
+the diamond does not need it. Run-level `after` with *shipped* as the edge is the small, honest version.
+
 ## 4b. Findings from wave 1, for the packages that own them
 
 Recorded here at merge time so they are not lost; fold each into its ledger when that package's

@@ -6,8 +6,8 @@ record of what was fixed, with commits, so the open items have their context. A 
 its number behind rather than renumbering the rest, so "bug 9" means the same thing everywhere.
 
 State as of 2026-09-13: agent-engine after the hold-the-bar engine work (repository
-`docs/plan-hold-the-bar.md` §4 B and E4) and bugs 3, 4, 7 and issue 10 (engine `7200295`),
-agent-workflows `0e7b02a`.
+`docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), and a
+session's conversation read as events (§4 S1); agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -136,6 +136,14 @@ name. Not done: the names would have to come from `config.toml`, a profile, and 
 layers in, and a list that misses one is a fence that looks closed. The machine this was measured on
 has no Codex servers configured.
 
+### 11. A `claude-detached` session's conversation cannot be followed while it runs
+
+`transcript` reads the transcript `claude --bg` would write, by the session id the worker keeps. `claude
+-p --output-format json` prints that id in the one object it prints at exit, so until then there are no
+events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
+(`claudeResultOutput` in `agent-engine/src/runner-detached.ts`). Low priority, like issue 4: this
+harness exists for comparison.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
@@ -157,6 +165,16 @@ has no Codex servers configured.
   released, and so whether `claude stop` came before `rm` on a live session, was not recorded.
 
 ## Verified by tests, not by a live run
+
+- **A session's conversation as events** (plan §4 S1). The Claude reader was written against the line
+  shapes of the 150 transcripts last written on this machine (Claude Code up to 2.1.270), the Codex
+  reader against the 34 rollouts here (codex-cli 0.154.0); each is checked on a file the test writes,
+  and end to end only with a fake `claude` or `codex`. No board has polled a running session with it
+  yet. Not measured: whether `codex exec resume` goes on writing its thread's rollout or starts another
+  — so whether a resumed Codex attempt's transcript holds its parent's conversation, as Claude Code's
+  does; any rollout item of a type other than the five read; a Codex thread whose reasoning has a
+  summary; and how long a command's item waits to be written, since none of the commands in those
+  rollouts ran long.
 
 - **Releasing a quiet session, or one a person or a deadline stopped** (engine `c2ebd62`, `9c4221e`). A
   fake `claude` that keeps a registry, at shipped defaults. The live run released a session that had

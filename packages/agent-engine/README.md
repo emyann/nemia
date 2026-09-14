@@ -27,7 +27,7 @@ Definition of done — a closed list, and it is closed:
 
 - [x] run a workload on a harness: durably, observably, to completion
 - [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`)
-- [x] attempts, stop, logs
+- [x] attempts, stop, logs — as text, and as the conversation to follow (`transcript`)
 - [x] concurrency ceiling, per harness — two subscriptions are two pools
 - [x] the feed — a cursored stream of everything that happened
 - [x] resume — an attempt continues the one before it, by policy
@@ -71,7 +71,7 @@ JOIN KEY  a name we choose        →  claude --name ae/<task>/<attempt>
 ```
 
 That's the whole engine. `decide()` is pure, total, and returns exactly one step; everything
-effectful is the four verbs of `Runner`, and a fifth, optional one that lets a finished session go. Kubernetes' control plane for the loop, durable
+effectful is the four verbs of `Runner`, and two optional ones: one that lets a finished session go, and one that reads its conversation. Kubernetes' control plane for the loop, durable
 execution's journal for the memory, and the local harness as the kubelet.
 
 **The engine never holds a session.** `claude --bg` hands it to the harness, which already owns
@@ -144,7 +144,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 |---|---|
 | `'claude-bg'` | Claude Code's background sessions; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, and an optional fifth, `release`, for anything else at all |
+| a `PromiseRunner` | four async methods, and two optional ones, `release` and `transcript`, for anything else at all |
 
 **`src/cli.ts` imports `createEngine`, and types, and nothing else from the engine.** That is
 deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
@@ -193,7 +193,7 @@ price of running more than one harness. It is a handful of lines, because the en
 journal and a seam.
 
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
-optionally the words it refuses and a reader of what it prints:
+optionally the words it refuses, a reader of what it prints, and where it keeps its conversation:
 
 ```ts
 export const codex: HarnessSpec = {
@@ -559,6 +559,75 @@ count:
 attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  turns not measured · <calls> tool calls · <in> in · <out> out · cost not measured
 ```
 
+## Following a session: `transcript`
+
+`logs` flattens a session to lines of text. `transcript` gives the same session's conversation as
+events a board can draw — messages, thinking, tool calls and their results — in one shape for every
+harness:
+
+```ts
+const { events, cursor } = await engine.transcript(taskId)   // from the start
+const since = await engine.transcript(taskId, cursor)        // only what was written after
+
+type TranscriptEvent = {
+  id: string                                   // the harness's own; a tool_result carries its call's
+  at: string                                   // ISO 8601: the time on the harness's record
+  role: 'assistant' | 'user' | 'system'
+  kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system'
+  text?: string
+  tool?: { name: string; input: unknown }      // on a tool_use
+  result?: { text: string; isError: boolean }  // on a tool_result
+}
+```
+
+**Pull-only, like everything here.** Nothing is pushed and nothing is remembered between reads: the
+caller polls with the cursor the last read returned, and something that streams to a browser does that
+polling itself (the api, in plan §4 S). The cursor is a byte offset after the last whole line read, and
+a hash of the bytes before it. A line still being written waits for the next read. A cursor from a file
+that shrank or was replaced — or from an attempt whose session has since changed — reads again from the
+start, rather than from the middle of something else, or nothing for ever; so a caller keys what it
+holds by `id` and `kind`, and one handed an event it already has has been read from the start.
+
+**A result pairs to its call by `id`**, so the two can fold into one line, and an event is unique by `id`
+and `kind` together. A tool result is `user`, as the model receives it. **The closeout is not hidden:**
+Claude Code's `StructuredOutput` is a `tool_use` like any other, and Codex's final answer is its last
+message. **Times are the record's**, never the read's: a resumed Claude Code session's transcript holds
+its parent's conversation with the parent's times, `at` keeps them, and the caller — which knows when
+the attempt began — decides what to show.
+
+| harness | read from | what it cannot give |
+|---|---|---|
+| `claude` | the session's transcript: the raw JSONL the closeout is read from, not `getSessionMessages`, whose messages carry no time | the text of thinking Claude Code wrote empty — three blocks in four, in the transcripts measured — which is a thinking event with no `text` |
+| `codex` | the thread's rollout, `$CODEX_HOME/sessions/YYYY/MM/DD/rollout-…-<thread id>.jsonl`, found by the thread id the worker reads off `exec --json` | below |
+| `claude-detached` | the same transcript as `claude` | anything before the session exits: its id is in the one object `claude -p --output-format json` prints, last |
+| a `PromiseRunner` | its own `transcript`, when it has one | — |
+
+Claude Code's lines are read as it writes them, measured on the 150 transcripts last written on this
+machine: one event per content block; a `system` line as a `system` event; a line Claude Code put into
+the conversation itself (`isMeta` — "Continue from where you left off.") as `system` too; a subagent's
+lines left to its own transcript, as the SDK leaves them; a block of a type not read named, as `logs`
+names one.
+
+**Codex, as far as its records allow** (codex-cli 0.154.0, read on the 34 rollouts on this machine). A
+rollout says most things twice — as the model was given them, and as the thread items Codex itself
+shows — and the items are read: the prompt without the instructions and context Codex puts around it,
+each command with its exit code, each file change with its status. The model's own call is an `exec`
+script that runs commands, and its output said "Script completed" around a command that exited 2, so it
+could not say whether a result was an error. What the records do not give, and so is not given:
+
+- **Thinking text.** Reasoning is written encrypted, and every summary was empty: a thinking event with no `text`.
+- **When a command began, or one still running.** An item is written once it has completed, so a
+  command's `tool_use` and `tool_result` carry that one time, and a command in flight is not there yet.
+- **A Claude Code tool name.** A call is named for its item, `CommandExecution` or `FileChange`, not
+  `Bash` or `Edit`; its input is the command and its cwd, or the changes.
+- **Anything before the worker has the thread id**, and any item of a type not in those rollouts beyond
+  a `system` event naming it.
+
+**Refused, with exit code 2** and the fix in the sentence: a task the engine has no record of, a cursor
+no read gave, and a harness that keeps no conversation this engine can read — a `PromiseRunner` or a
+`HarnessSpec` without `transcript` — whose tasks have `logs`. A session not started yet is no events,
+not a refusal: ask again.
+
 ## Letting a sandboxed Codex step commit
 
 Codex's `workspace-write` sandbox keeps `.git` read-only on purpose — including the real git
@@ -613,6 +682,7 @@ reason `Runner` is a seam and not an import.
 | usage | turns, tool calls and tokens from the transcript, once the session is idle; no cost | from the SDK's result, cost included |
 | narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session | not wired: it passes only `model` and `permissionMode` |
 | MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json` and the task's `mcp`, never the operator's | not wired |
+| the conversation as events | `transcript`, from the session's transcript | not wired: no `transcript` |
 | good for | the fleet, long work, unattended | one task in the foreground, with a human watching |
 
 The Agent SDK is a typed wrapper around the same CLI, but the wrapping is over **stdio
@@ -661,8 +731,8 @@ selector, and it is why no attempt can ever run twice.
 | `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
 | `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `src/journal.ts` | append-only JSONL per task, plus the board-wide feed |
-| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs` — and Claude Code's runner, words and usage |
-| `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits; the Codex and `claude -p` specs |
+| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `release` and `transcript` — Claude Code's runner, words and usage, and the one transcript reader |
+| `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits; the Codex and `claude -p` specs, and Codex's rollout read as a transcript |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
@@ -678,6 +748,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
+| `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, and each refusal at shipped defaults |
 | `test/readme.test.ts` | this file, held to the code |
 | `test/live.test.ts` | the `--tools` fence, `--strict-mcp-config`, and what a released session still has, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |

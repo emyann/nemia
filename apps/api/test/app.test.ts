@@ -173,7 +173,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
     note: null,
     // Its question, off its closeout; no session the harness blocked, so no last line; nothing asked of it yet.
-    needs: 'Which database?', blockedByHarness: false, lastLine: null, asked: null,
+    needs: 'Which database?', blockedByHarness: false, lastLine: null, said: [], asked: null,
     ...implementTry,
     // Its journal carries no usage: nobody measured it, which is not 0.
     used: { usage: null, used: 'not measured', cost: 'not measured' },
@@ -190,7 +190,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     told: undefined,
     workspace: null, branch: null,
     note: null,
-    needs: null, blockedByHarness: false, lastLine: null, asked: null,
+    needs: null, blockedByHarness: false, lastLine: null, said: [], asked: null,
     ...reviewTry,
     // Not filed: it consumed nothing.
     used: null,
@@ -258,14 +258,14 @@ test('a run whose workflow folder is gone still answers, from its record', async
     {
       name: 'implement', spec: null, filed: filedBare, body: null, told: filedBrief('t-2'),
       workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
-      note: null, needs: 'Which database?', blockedByHarness: false, lastLine: null, asked: null,
+      note: null, needs: 'Which database?', blockedByHarness: false, lastLine: null, said: [], asked: null,
       ...implementTry,
       used: { usage: null, used: 'not measured', cost: 'not measured' },
       tries: firstTry(implementTry),
     },
     {
       name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, note: null,
-      needs: null, blockedByHarness: false, lastLine: null, asked: null,
+      needs: null, blockedByHarness: false, lastLine: null, said: [], asked: null,
       ...reviewTry, used: null, tries: firstTry(reviewTry),
     },
   ]);
@@ -312,7 +312,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
   assert.deepEqual(original, {
     name: 'original', spec: null, filed: filedBare, body: null, told: filedBrief('t-6'),
     workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
-    note: null, needs: 'Which database?', blockedByHarness: false, lastLine: null, asked: null,
+    note: null, needs: 'Which database?', blockedByHarness: false, lastLine: null, said: [], asked: null,
     ...originalTry,
     used: { usage: null, used: 'not measured', cost: 'not measured' },
     tries: firstTry(originalTry),

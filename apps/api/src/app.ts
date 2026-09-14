@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, retry, sensitiveDiff, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Wait } from 'agent-workflows';
+import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, retry, saidCount, say, sensitiveDiff, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Wait } from 'agent-workflows';
 import { answerOf, assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
@@ -251,6 +251,11 @@ export type RunDetail = {
      * event, trimmed. Null for any other step, and for one whose session said none or whose conversation cannot be read.
      */
     lastLine: string | null;
+    /**
+     * What a person said to the session of the step's current try while it ran — with `wf say`, or the session page's prompt box — in the order
+     * said: the engine's `said` entries on its task, off the views the request already read. Empty for a step not filed, and one nobody told.
+     */
+    said: Said[];
     /** The try a person asked for, which the next tick files (`StepAsked`); null when none is asked. */
     asked: StepAsked | null;
     closeout: StepCloseout | null;
@@ -536,7 +541,8 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   const { asks, rounds } = readAsks(run.id);
   // And what people said with them, as `list` reads it: without it a try a person answered reads as one they did not.
   const answers = readAnswers(run.id);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits);
+  // And how many times a person said something to each step's current try (`wf say`), as `list` counts it: the note says so.
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run));
   const waiting = waitingOf(run, said.waiting);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
@@ -732,6 +738,7 @@ async function detail(run: Run): Promise<RunDetail> {
         note: judged.notes.get(name) ?? null,
         ...needs,
         lastLine: needs.blockedByHarness ? await lastLineOf(views.get(taskId!)!) : null,
+        said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
         asked: askedOf(judged.asked.get(name)),
         ...current,
         used: taskId ? usedOf(used[name]) : null,
@@ -1228,6 +1235,20 @@ const retryGuard = (id: string, step: string): Guarded => ({
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
+/** The body `POST …/say` takes: the words, as `wf say` takes them. */
+const SAY_SHAPE = '`{ "text": "<words>" }`';
+
+/** Words for a step's running session, as the guard's refusals word them (guard.ts). */
+const sayGuard = (id: string, step: string): Guarded => ({
+  route: `POST /api/runs/${id}/steps/${step}/say`,
+  does: "hands a person's words to a step's running session",
+  forAnother: 'hand it any',
+  why: "the words go into the session of a step at work in this repository, as a person's, and its agent acts on them",
+  reach: "say it from the step's session page on the board",
+  instead: `Say it from the step's session page on the board, or with \`wf say ${id} ${step} "<words>"\``,
+  shape: SAY_SHAPE,
+});
+
 /**
  * How a try is asked for, off `POST …/retry`'s body — or why the body is not an ask (400): `wf retry`'s one way, the model its
  * `--model` names, which is a new session's, and `--message`. Whether the message may ride on the ask is the package's to say
@@ -1324,6 +1345,39 @@ export const app = new Hono()
       const said = err instanceof Error ? err.message : String(err);
       if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
       return c.json({ error: `Could not ask for another try of step '${step}': ${said}. \`wf retry ${id} ${step}\` asks the same way from the command line.` }, 502);
+    }
+  })
+  // The board's third write: a person's words to a step's running session, through the package's `say()` — `wf say`'s own — which hands them
+  // to the session through the engine, and the engine journals them: the api writes nothing, and the step's detail reads them back (`said`).
+  // Guarded as a start and an ask are (guard.ts). Refused in the package's words, and the engine's, verbatim (409): a step not filed, settled,
+  // or of a cancelled run; empty words; a session its harness does not list running. Words the harness did not take are the engine's error,
+  // verbatim (502): nothing was journalled, and asking again may work.
+  .post('/api/runs/:id/steps/:step/say', async (c) => {
+    const id = c.req.param('id');
+    const step = c.req.param('step');
+    const refused = refusedBeforeReading(sayGuard(id, step), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    const found = taskOfStep(id, step);
+    if ('error' in found) return c.json({ error: found.error }, 404);
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: `POST …/say takes a JSON body: ${SAY_SHAPE}.` }, 400);
+    }
+    if (!isObject(body)) return c.json({ error: `POST …/say takes a JSON object: ${SAY_SHAPE}.` }, 400);
+    if (typeof body.text !== 'string') {
+      return c.json({
+        error: `\`text\` is the words to hand the step's session, as \`wf say ${id} ${step} "<words>"\` takes them: text. This request's was ${JSON.stringify(body.text) ?? 'left out'}: ${SAY_SHAPE}.`,
+      }, 400);
+    }
+    try {
+      const { said } = await say(e, id, step, body.text);
+      // Accepted: the session's harness took the words, and the engine journalled them. Whether the session reads them is the session's.
+      return c.json({ at: said.at, attempt: said.attempt, text: said.text } satisfies Said, 202);
+    } catch (err) {
+      const words = err instanceof Error ? err.message : String(err);
+      return c.json({ error: words }, (err as { exitCode?: unknown }).exitCode === 2 ? 409 : 502);
     }
   })
   // A step's session output as text, for `wf logs` parity. The board reads the conversation from the transcript routes below.

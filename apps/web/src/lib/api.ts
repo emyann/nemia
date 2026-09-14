@@ -56,6 +56,9 @@ export type StepNeeds = { needs: string | null; blockedByHarness: boolean };
  */
 export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null; stopFirst: boolean };
 
+/** Mirrors `Said` in agent-workflows, the engine's `said` entry: words a person said to a step's running session, when, and to which attempt of its task. */
+export type Said = { at: string; attempt: number; text: string };
+
 /** How `wf retry` tries a step again: continue its session, a new one, or its check run again and no session. */
 export type RetryMode = 'nudge' | 'fresh' | 'recheck';
 
@@ -191,6 +194,8 @@ export type RunDetail = {
     blockedByHarness: boolean;
     /** For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read. */
     lastLine: string | null;
+    /** What a person said to its current try's session while it ran (`wf say`, or the session page's prompt box), in the order said. */
+    said: Said[];
     /** The try a person asked for that the next tick files; null when none is. */
     asked: StepAsked | null;
     closeout: StepCloseout | null;
@@ -451,6 +456,30 @@ export async function askTry(runId: string, step: string, how: { mode: RetryMode
   throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
 }
 
+/**
+ * Tell a step's running session something, as `wf say` does: the api calls the package's `say()`, which hands the words to the session through
+ * the engine, and the engine journals them on the step's task. Resolves with that entry; rejects with the api's refusal in full — the package's
+ * words or the engine's, verbatim — or the api's own about the request.
+ *
+ * Sent as `application/json`, which the api requires of it, as of a start and an ask.
+ */
+export async function sayToStep(runId: string, step: string, text: string): Promise<Said> {
+  const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/say`;
+  const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text }) });
+  const body = (await res.json().catch(() => undefined)) as { at?: unknown; attempt?: unknown; text?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.at === 'string' && typeof body.attempt === 'number' && typeof body.text === 'string') {
+    return { at: body.at, attempt: body.attempt, text: body.text };
+  }
+  if (res.ok) {
+    // Said, it may well be: look before saying it twice.
+    throw new Error(
+      `POST ${route} answered ${res.status} ${res.statusText} without what it journalled, so the api and this board disagree about what saying answers. ` +
+        `The words may have been said: read the step's record (\`wf decide ${runId}\`) before saying them again, and restart the api (\`npm run dev\`).`,
+    );
+  }
+  throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
+}
+
 export const runQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
@@ -476,6 +505,10 @@ export function withGraph(id: string, detail: RunDetail): RunDetail {
   const bare = (detail.steps ?? []).find((step) => !Array.isArray((step as { tries?: unknown }).tries));
   if (bare) {
     throw new Error(`The api answered run '${id}' without the tries of its step '${bare.name}', so it is older than this board, which shows every round a step ran. ${restart}`);
+  }
+  const unsaid = detail.steps.find((step) => !Array.isArray((step as { said?: unknown }).said));
+  if (unsaid) {
+    throw new Error(`The api answered run '${id}' without what was said to its step '${unsaid.name}', so it is older than this board, whose session page shows what a person said to a step. ${restart}`);
   }
   return detail;
 }

@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine, TaskView } from 'agent-engine';
-import type { Run, TaskPhase } from '../src/run.ts';
+import type { RetryHow, Run, TaskPhase } from '../src/run.ts';
 import { readCheckBrief, verdictWord } from '../src/check.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-store-'));
@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, start, startPlan } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -222,6 +222,11 @@ const board = () => {
   const filings: string[] = [];
   const stopped: string[] = [];
   const logs = new Map<string, string>();
+  /** What the engine journalled as said to each task (`say`), in order: its view's `state.said`. */
+  const said = new Map<string, Array<{ at: string; attempt: number; text: string }>>();
+  /** Tasks whose session is not given the words: `say` rejects, with no exit code, and journals nothing. */
+  const deaf = new Set<string>();
+  let clock = Date.parse('2026-09-14T16:00:00.000Z');
   const e = {
     view: async (id: string) => {
       const t = tasks.get(id);
@@ -229,7 +234,7 @@ const board = () => {
       return {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
-          brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false,
+          brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: said.get(id) ?? [],
           attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null }],
         },
       };
@@ -237,9 +242,23 @@ const board = () => {
     file: async (spec: Filed) => { filings.push(spec.id); tasks.set(spec.id, { spec, phase: 'pending' }); return spec.id; },
     stop: async (id: string) => { stopped.push(id); },
     logs: async (id: string) => logs.get(id) ?? '(no output yet)',
+    // The engine's `say`, as far as a run can tell it: refused in its words, exit code 2, for empty words, a task it has no record of, one
+    // settled and one not started; rejected with no exit code for a session not given the words; otherwise journalled on the task, and returned.
+    say: async (id: string, text: string) => {
+      const refuse = (why: string) => Object.assign(new Error(`say: ${why}`), { exitCode: 2 });
+      if (!text.trim()) throw refuse('`text` is empty. Give the words the session should hear.');
+      const t = tasks.get(id);
+      if (!t) throw refuse(`\`${id}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+      if (['succeeded', 'failed', 'stopped'].includes(t.phase)) throw refuse(`\`${id}\` has settled (${t.phase}): no session of it is running to hear anything.`);
+      if (t.phase === 'pending') throw refuse(`\`${id}\` has not started an attempt yet, so there is no session to hear anything.`);
+      if (deaf.has(id)) throw new Error(`say: ae/${id}/1 was not given the words (connect ECONNREFUSED). Nothing was journalled.`);
+      const entry = { at: new Date((clock += 60_000)).toISOString(), attempt: 1, text };
+      said.set(id, [...(said.get(id) ?? []), entry]);
+      return entry;
+    },
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
-  return { e, tasks, filings, stopped, settle, logs };
+  return { e, tasks, filings, stopped, settle, logs, said, deaf };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -2068,4 +2087,159 @@ test('REFUSED to fail the filing: a parent whose closeout cannot be read — a f
   assert.ok(brief.includes(`## From run ${lost.run.id}\n`) && brief.includes(`## From run ${garbled.run.id}\n`), brief);
   assert.ok(brief.includes(`\nWhat implement said when it signed off cannot be given here — the engine holds no closeout for its task ${lost.run.id}-implement, which is failed.\n`), brief);
   assert.match(brief, /\nWhat implement said when it signed off cannot be given here — its closeout cannot be read: unparseable: .*\.\n/);
+});
+
+// ─── telling a running step something: `wf say` ─────────────────────────────
+
+test("`wf say` hands the words to the step's current task through the engine's `say` and prints the line it journalled, writing nothing of its own — `wf ls` notes the step said to, and `wf decide` prints each thing said under the step, before its closeout, fenced", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.settle(taskId, 'running');
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  const recordOf = () => fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
+  const record = recordOf();
+  const beside = fs.readdirSync(path.join(ROOT, 'runs')).sort();
+
+  // The words are everything after the step, so an unquoted sentence is one message.
+  await main(['say', run.id, 'implement', 'Widen', 'the', 'scope', 'to', 'apps/api', 'too.'], b.e);
+  const [first] = b.said.get(taskId)!;
+  assert.deepEqual(first, { at: '2026-09-14T16:01:00.000Z', attempt: 1, text: 'Widen the scope to apps/api too.' });
+  assert.deepEqual(printed, [
+    `${run.id}  said to implement, try 1, at ${first!.at} — journalled on ${taskId}: wf decide ${run.id} prints it under the step`,
+    '   ```text', '   Widen the scope to apps/api too.', '   ```',
+  ]);
+  assert.equal(recordOf(), record, "the run's record untouched");
+  assert.deepEqual(fs.readdirSync(path.join(ROOT, 'runs')).sort(), beside, 'and no file of its own beside it: the engine journal is the record');
+  assert.deepEqual((await list(b.e, readRun(run.id))).steps[0], { name: 'implement', status: 'running', branch: run.branch, note: 'said to 1×' });
+
+  const told = await say(b.e, run.id, 'implement', 'And keep `--flag` as it is.');
+  const second = b.said.get(taskId)![1]!;
+  assert.deepEqual([told.taskId, told.try, told.said], [taskId, 1, second]);
+  assert.equal((await list(b.e, readRun(run.id))).steps[0]!.note, 'said to 2×');
+
+  // Signed off blocked, the run waits on a person: `wf decide` prints what was said under the step, before the step's own account of it.
+  b.settle(taskId, 'succeeded', { outcome: 'blocked', summary: 'IMPLEMENTER-SUMMARY', artifacts: [], needs: 'Which reading?' });
+  printed.length = 0;
+  await main(['decide', run.id], b.e);
+  const at = (line: string) => printed.indexOf(line);
+  const under = at(`    said to try 1, at ${first!.at}:`);
+  assert.ok(at('\n  implement  BLOCKED') >= 0 && at('\n  implement  BLOCKED') < under, printed.join('\n'));
+  assert.deepEqual(printed.slice(under, under + 8), [
+    `    said to try 1, at ${first!.at}:`, '    ```text', '    Widen the scope to apps/api too.', '    ```',
+    `    said to try 1, at ${second.at}:`, '    ```text', '    And keep `--flag` as it is.', '    ```',
+  ]);
+  assert.ok(under < at('    IMPLEMENTER-SUMMARY'), 'before the closeout');
+  assert.equal(recordOf(), record, 'and still nothing written');
+});
+
+test("REFUSED: `wf say` on a step the run does not have, a step not filed, a settled step and a cancelled run — exit 2 in the package's words, the engine never asked; the engine's own refusals pass through verbatim, exit 2 — a task not started, empty words — and words not delivered reject in its words with no exit code; nothing said, nothing written", async () => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  const { main } = await import('../src/cli.ts');
+  const asked: string[] = [];
+  const e = { ...b.e, say: async (id: string, text: string) => { asked.push(id); return b.e.say(id, text); } } as Engine;
+  const record = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
+  const verbatim = (message: string, exitCode: number | undefined) => (err: Error & { exitCode?: number }) => err.exitCode === exitCode && err.message === message;
+
+  // The engine's. Filed, with no attempt started:
+  await assert.rejects(say(e, run.id, 'implement', 'Start with the parser.'), verbatim(`say: \`${taskId}\` has not started an attempt yet, so there is no session to hear anything.`, 2));
+  b.settle(taskId, 'running');
+  // empty words, from the verb and from the command line with none at all:
+  for (const words of [[''], [' \n '], []]) {
+    await assert.rejects(main(['say', run.id, 'implement', ...words], e), verbatim('say: `text` is empty. Give the words the session should hear.', 2), JSON.stringify(words));
+  }
+  // and words its harness did not take: no exit code, since asking again may work.
+  b.deaf.add(taskId);
+  await assert.rejects(say(e, run.id, 'implement', 'Widen the scope.'), verbatim(`say: ae/${taskId}/1 was not given the words (connect ECONNREFUSED). Nothing was journalled.`, undefined));
+  b.deaf.delete(taskId);
+  assert.equal(asked.length, 5, "each of those was the engine's to answer");
+  asked.length = 0;
+
+  // The package's, before the engine is asked.
+  await assert.rejects(say(e, run.id, 'deploy', 'Ship it.'), verbatim(`${run.id} has no step "deploy" — its steps are implement, review.`, 2));
+  await assert.rejects(main(['say', run.id, 'review', 'Look at the parser first.'], e), verbatim(`review has not been filed yet, so there is no session to hear anything. Say it once it runs: wf ls ${run.id}.`, 2));
+  for (const phase of ['succeeded', 'failed', 'stopped'] as const) {
+    b.settle(taskId, phase);
+    await assert.rejects(say(e, run.id, 'implement', 'Widen the scope.'), refusedWith(new RegExp(`^implement is not running: try 1's task settled \`${phase}\`, so no session of it is there to hear anything\\. .*: wf retry ${run.id} implement --message "<words>"\\.$`)), phase);
+  }
+  b.settle(taskId, 'running');
+  markCancelled(run.id);
+  await assert.rejects(main(['say', run.id, 'implement', 'Widen the scope.'], e), refusedWith(new RegExp(`^${run.id} was cancelled at [^:]+:\\d\\d:[\\d.]+Z: its sessions are being stopped, not steered`)));
+  assert.deepEqual(asked, [], 'the engine was never asked');
+  assert.equal(b.said.get(taskId), undefined, 'nothing said');
+  assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8'), record, 'nothing written');
+});
+
+test("a nudge that continues a session is handed what was said to it — `wf retry`, `retries:`, and a session its harness blocked, stopped and continued (agent-engine open issue 16) — as `## Said to your session` inside `## Try 2`, each message with its time, fenced; a fresh session is handed none", async () => {
+  // A step told two things while it ran, then signed off blocked: the next try as asked.
+  const toldThenBlocked = async (how: RetryHow) => {
+    const run = started(folder());
+    const b = board();
+    await advance(b.e, readRun(run.id));
+    const taskId = `${run.id}-implement`;
+    b.settle(taskId, 'running');
+    await say(b.e, run.id, 'implement', 'Widen the scope to apps/api too.');
+    await say(b.e, run.id, 'implement', 'Keep:\n```\n--flag\n```');
+    b.settle(taskId, 'succeeded', { outcome: 'blocked', summary: 'two readings', artifacts: [], needs: 'Rename --flag?' });
+    await advance(b.e, readRun(run.id));
+    await retry(b.e, run.id, 'implement', how);
+    assert.deepEqual((await advance(b.e, readRun(run.id))).tried, ['implement']);
+    return { brief: b.tasks.get(`${run.id}-implement-try2`)!.spec.brief, said: b.said.get(taskId)! };
+  };
+
+  const nudged = await toldThenBlocked({ mode: 'nudge', message: 'Keep it.' });
+  const [one, two] = nudged.said;
+  assert.match(nudged.brief, /^## Try 2\n\nThe last try signed off `blocked`\./);
+  assert.ok(nudged.brief.includes(`\n\n## Said to your session\n\nA person said these to your session while the last try ran (\`wf say\`).`), nudged.brief);
+  assert.ok(nudged.brief.includes(`\n\nAt ${one!.at}:\n\n\`\`\`text\n${one!.text}\n\`\`\`\n\nAt ${two!.at}:\n\n\`\`\`\`text\n${two!.text}\n\`\`\`\`\n\n## Your answer\n\n\`\`\`text\nKeep it.\n\`\`\``), nudged.brief);
+  const fresh = await toldThenBlocked({ mode: 'fresh' });
+  assert.doesNotMatch(fresh.brief, /Said to your session|Widen the scope/, 'a new session is handed none of the last one');
+
+  // `retries:` — the run's own nudge — hands them on too, beside what the check said.
+  const { run: checked, e, tasks, said, logs } = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
+  logs.set(`${checked.id}-implement-check`, 'not ok 1 - parses a trailing comma\n\n[wf check] exit 1\n');
+  said.set(`${checked.id}-implement`, [{ at: '2026-09-14T16:05:00.000Z', attempt: 1, text: 'Run the parser tests too.' }]);
+  assert.deepEqual((await advance(e, readRun(checked.id))).tried, ['implement']);
+  const retried = tasks.get(`${checked.id}-implement-try2`)!.spec.brief;
+  assert.ok(retried.includes('## Said to your session\n\nA person said this to your session'), retried);
+  assert.ok(retried.includes('At 2026-09-14T16:05:00.000Z:\n\n```text\nRun the parser tests too.\n```'), retried);
+  assert.ok(retried.indexOf('## Said to your session') < retried.indexOf('## What the check said'), 'before the evidence');
+
+  // The case open issue 16 measured: words said to a session its harness blocked, which the board's Continue stops, then continues.
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const blocked = `${run.id}-implement`;
+  b.settle(blocked, 'needs-human' as TaskPhase);
+  const stops = recordingStops(b);
+  await say(stops, run.id, 'implement', 'Approve nothing; widen the scope instead.');
+  await retry(stops, run.id, 'implement', { mode: 'nudge' }, { stopBlocked: true });
+  await advance(stops, readRun(run.id));
+  assert.deepEqual(b.stopped, [blocked]);
+  b.settle(blocked, 'stopped');
+  assert.deepEqual((await advance(stops, readRun(run.id))).tried, ['implement']);
+  const continued = b.tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.equal(continued.resumeFrom, `native-${blocked}`);
+  assert.match(continued.brief, /^## Try 2\n\nThe last try's session was stopped before it signed off\.[\s\S]*\n\n## Said to your session\n\n[\s\S]*```text\nApprove nothing; widen the scope instead\.\n```/);
+});
+
+test("a round that continues the loop's target hands it what was said to its last session, before the findings", async () => {
+  const run = started(looped());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'running');
+  await say(b.e, run.id, 'implement', 'Leave the parser alone.');
+  await toReview(b, run.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  const brief = b.tasks.get(`${run.id}-implement-try2`)!.spec.brief;
+  assert.match(brief, /^## Round 2 of 3\n/);
+  const at = brief.indexOf('## Said to your session');
+  assert.ok(at > 0 && at < brief.indexOf('## From review'), brief);
+  assert.ok(brief.includes('```text\nLeave the parser alone.\n```'), brief);
 });

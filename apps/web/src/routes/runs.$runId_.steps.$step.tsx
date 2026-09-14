@@ -1,11 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Conversation } from '@/components/conversation/Conversation';
+import { PromptBox } from '@/components/conversation/PromptBox';
 import { StatusChip, StepNote } from '@/components/StatusChip';
-import { runQuery, type RunDetail } from '@/lib/api';
+import { runQuery, type RunDetail, type Said } from '@/lib/api';
 import { titleOf } from '@/lib/factory';
-import { foldTranscript } from '@/lib/transcript';
+import { mergeSaid, sayable } from '@/lib/say';
+import { foldTranscript, heardIn, withSaid } from '@/lib/transcript';
 import { useStepTranscript } from '@/lib/useStepTranscript';
 
 // `$runId_`: at /runs/$runId/steps/$step, and not drawn inside the run's page, which has no outlet for it.
@@ -25,7 +27,10 @@ export const Route = createFileRoute('/runs/$runId_/steps/$step')({
 
 type Step = RunDetail['steps'][number];
 
-/** One step's session, as a conversation: the whole of it, full height, followed while its task is live. Read-only. */
+/**
+ * One step's session, as a conversation: the whole of it, full height, followed while its task is live — with what a person said to it laid
+ * in, and a box below to say something more while it runs.
+ */
 function SessionPage() {
   const { runId, step: name } = Route.useParams();
   const { data: run } = useSuspenseQuery(runQuery(runId));
@@ -46,7 +51,14 @@ function SessionPage() {
 
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const following = useStepTranscript(run.id, step.name, step.taskId);
-  const turns = useMemo(() => foldTranscript(following.events), [following.events]);
+  // What this page said that the run, as last read, does not have yet — kept with the task it was said to, so a later try starts afresh.
+  const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
+  const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);
+  // Words the session's transcript shows reaching it are drawn once, as what was said, where they reached it (`heardIn`).
+  const turns = useMemo(() => {
+    const heard = heardIn(following.events, said);
+    return withSaid(foldTranscript(heard.events), heard.said);
+  }, [following.events, said]);
   const quiet = (text: string) => <p className="p-6 text-sm text-muted-foreground">{text}</p>;
 
   return (
@@ -66,13 +78,21 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
         <StepNote note={step.note} />
         {following.error && <p className="text-sm text-red-600">{following.error}</p>}
       </header>
-      {!step.taskId
-        ? quiet('Not filed yet, so there is no session to show.')
-        : following.loading
-          ? quiet('Reading the conversation…')
-          : turns.length
-            ? <Conversation turns={turns} live={following.live} className="min-h-0 flex-1" />
-            : !following.error && quiet(following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.')}
+      <div className="flex min-h-0 flex-1 flex-col">
+        {!step.taskId
+          ? quiet('Not filed yet, so there is no session to show.')
+          : following.loading
+            ? quiet('Reading the conversation…')
+            : turns.length
+              ? <Conversation turns={turns} live={following.live} className="min-h-0 flex-1" />
+              : !following.error && quiet(following.live ? 'Nothing said yet. The page follows the session as it goes.' : 'Its session said nothing the engine can read.')}
+      </div>
+      <PromptBox
+        runId={run.id}
+        step={step.name}
+        sayable={sayable(run, step)}
+        onSaid={(entry) => setSent((before) => ({ taskId: step.taskId, said: [...(before.taskId === step.taskId ? before.said : []), entry] }))}
+      />
     </div>
   );
 }

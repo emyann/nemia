@@ -15,6 +15,7 @@ wf decide r-xyz      # what it produced, and the choice it leaves you
 wf retry r-xyz implement --recheck   # its check was killed before it finished: run it again
 wf retry r-xyz plan --message "the second reading"   # it signed off blocked with a question: answer it
 wf round r-xyz       # the review still asks for more after the last round it allows: once more
+wf say r-xyz implement "Widen the scope to apps/api too."   # tell a running step something, on its record
 ```
 
 To follow it live, use the engine rather than this package — a run's task ids carry the run and the
@@ -648,6 +649,37 @@ retries: 1
 
 This repository's workflows declare no `retries:`. A flaky suite would spend a whole session on a nudge, so
 whether a refusal is the agent's to answer or a person's is left to each workflow's author.
+
+### Telling a running step something: `wf say`
+
+A step steered mid-flight by a message to its session left nothing on its run, so its reviewer could not tell a scope a
+person widened from a step overstepping (plan §4b). `wf say <run> <step> "<words>"` hands the words to the step's running
+session through the engine's `say`, which journals them on the step's task as a `said` entry — `at`, `attempt`, `text`
+(agent-engine's README, *Telling a running session something*). That journal is the record. The verb writes nothing of
+its own, and everything below reads the words back off the engine's view of the task.
+
+- **Which session.** The step's current try's task, as `wf retry` finds it (`run.steps[step].taskId`). The words are
+  everything after the step, so an unquoted sentence is one message.
+- **Refused**, exit code 2 and nothing said, in the package's words first: a step the run does not have, a cancelled run,
+  a step not filed yet, and one whose task has settled — words for it go into its next try's brief, with
+  `wf retry --message`. Then the engine's own, verbatim (`say: …`): empty words, an attempt not started, a harness with no
+  way in (`codex`, `claude-detached`), a task in `bypassPermissions`, a session its harness does not list running. Words
+  its harness did not take reject with no exit code: nothing was journalled, so say them again.
+- **`wf ls`** notes a step whose current try was told something, after the try it is on: `said to 2×`.
+- **`wf decide`** prints each thing said under the step, before its closeout — `said to try 1, at <time>:`, then the
+  words in a fence, as data — for every try of the step, so the person who ships the work reads what the step was told.
+- **A try that continues the session is handed them again.** Taken is not read: a session blocked on a permission
+  prompt keeps the words queued, and loses them when it is stopped and continued (agent-engine's open issue 16). So a
+  try or a round that continues the session — `wf retry --nudge`, `retries:`, a round, the board's Continue — carries
+  what was said to the last try's task as `## Said to your session`, inside `## Try <n>` or `## Round <n>`: each
+  message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a nudge with nothing to
+  continue) is handed none, as it is handed none of the last one's conversation: say it again with `--message`.
+- **On the board**, the session page (`/runs/<run>/steps/<step>`) has a prompt box under the conversation. It posts to
+  `POST /api/runs/:id/steps/:step/say`, guarded as the retry route is, which calls this verb: a refusal shows under the
+  box as the package or the engine words it, and words typed while a message is being said are kept. The step's detail
+  carries `said`, and the page draws each as a turn of its own, once: where the session's transcript shows the words
+  reaching it, the turn stands in place of that line. The box is closed, with the reason, for a step with no session in
+  flight.
 
 ### Going round again: `loop:` and `rounds:`
 

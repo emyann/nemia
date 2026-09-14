@@ -679,12 +679,8 @@ not the default: for a small brief it repeats the brief.
 Recorded here at merge time so they are not lost; fold each into its ledger when that package's
 owner is not mid-run.
 
-- **agent-workflows (`list`, `runner.ts`):** `wf ls` prints `pending` for a task the engine has no
-  record of; `phaseOfView` already draws the `unknown` line for the DAG, `listing`'s phase word does
-  not. The board (run W) words it `unknown` itself and tests that it matches `list` wherever `list`
-  is right. Fix in `list`, then delete the api's copy of the rule. Also: `list` throws when the
-  workflow folder is gone, so a consumer must catch it; and each `view` is a `claude agents` call
-  (~300 ms), so a consumer reads each task once per request. → F or G, whoever touches `runner.ts` first.
+**Open** — what is still to do, oldest first; each names its owner.
+
 - **agent-workflows and the board (step order):** `run.steps` is keyed in the folder's file order —
   alphabetical — so `wf ls` and the board show `implement · respond · review` for a workflow that
   runs implement → review → respond. Order steps by `after` (a topological sort in `workflow.ts`,
@@ -698,14 +694,78 @@ owner is not mid-run.
   may not import the engine (`runner.ts` is the only importer). Either the run validates modes
   through `e.file()`'s own refusal and the parser stops copying, or a test in agent-workflows pins
   the copy to the engine's exports. → I, with the `tools:`/`effort:` pass-through.
-- **the plan:** count fields need their least value stated (A's review); a "definition of done" that
-  lists several things in one sentence gets read as one rule.
 - **apps/api tests hit the live registry.** Every `e.view` runs `claude agents --json` against this
   machine; under parallel turbo the api test process dies with "Promise resolution is still pending
   but the event loop has already resolved" while other packages' tests run beside it (seen at C's
   merge, twice; serial runs pass every time, ~23 s). The api's `engine()` should take a fake
   harness under test (`createEngine({ harnesses })` accepts a `PromiseRunner`); until then verify
   merges with `npx turbo run test --concurrency=1`. → the next apps package.
+- **the artifacts directory and Codex (U1's review):** every brief now names
+  `runs/<id>/artifacts/<step>/`, and a Codex step in `workspace-write` cannot write there (only the
+  worktree and tmp; the engine passes no `--add-dir`). Latent while the reviewer is Opus. The fix is
+  hkb's `exports`: a step lists a relative path under `artifacts` and the run *collects* it into the
+  directory at hand-off, before the check — then no step needs to write outside its workspace. → with R.
+- **steering by message leaves no trace on the run (F2's review, finding 2):** the operator widened
+  a step's scope and added an ask through cross-session messages; the run's record shows only two
+  commit messages and a closeout, and the reviewer rightly could not tell an authorised change from
+  a step overstepping. A mid-flight instruction to a step should be written on the run — an
+  `asks/` file the tick composes into the record and `wf decide` prints — the same one-writer
+  shape as `.cancelled`. → with F's ask files.
+- **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
+  a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
+  for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running
+  session by hand. A small convention would do: `wf start --input <file>` copies into
+  `runs/<id>/inputs/` and every brief gains one line naming the directory. → with J.
+- **a login refresh race blocks concurrent sessions (2026-09-13, B3 and I):** both `implement` sessions
+  stopped within two minutes of each other on *"Could not refresh your login because another Claude Code
+  process is refreshing it (or exited mid-refresh) · Try again in a minute"* — an OAuth refresh raced between
+  the operator's session, two `--bg` steps and the monitor's `claude agents` calls. The engine read them as
+  `blocked` (`needs-human`), which is right for the harness and wrong for the work: nothing was asked of a
+  person. Nudged by cross-session message (no trace on the run, as noted above); `wf retry` cannot help, the
+  step is not final. A tick that recognises this one message on a `blocked` session and resumes it is the
+  fix in the run; the harness's is a shared refresh lock across processes. → agent-workflows, small; and
+  a Claude Code report.
+- **E6's usage assertion cannot tell the retry's count from the first try's (E6's review):**
+  `packages/agent-engine/test/resume.test.ts:134` expects the same usage the first try recorded, so the
+  refusal rests on the view assertion alone; have the retry write a different number of responses. → the
+  next engine run, with anything else that opens `resume.test.ts`.
+- **`radius` takes the base's `workspaces` globs as written (G's round-2 review):** `./packages/*` yields a
+  regexp that never matches `packages/x`, so every package's changes fall into one `packages` group and
+  `./packages/*/docs/` never counts a lesson; `packages/**` would count `packages/x/src/docs/` again. This
+  repo uses `packages/*` and `apps/*`, so unaffected. Strip a leading `./` when the workspaces are read,
+  refuse or note `**`, and a radius test with `['./packages/*']`. → agent-workflows, small.
+- **where a run's hour goes is not on the board (operator, 2026-09-13):** measured off the engine journals
+  for B4 (two rounds, 40 min wall): implement 19m42s + 5m35s, its checks 58s + 57s, reviews 6m10s + 3m24s;
+  sessions and checks 36m47s, slot waits 1m13s, ticks and worktrees 1m56s. S2's implement alone 39m11s
+  (54 turns, 146 tool calls, 17M tokens in), and its review waited 8m51s for a slot behind three other
+  runs. Nothing shows this: the run page has `#n · took` per node and `wf decide` has `used`, but no
+  per-try timeline with queue time, no check durations, no round totals; and the spec rows show neither
+  `effort` nor `tools`, so a person cannot see the effort a step runs at (none set here → the harness
+  default). A **timeline** on the run page and in `wf decide` — per try and per check: filed, spawned,
+  ended, queue and run time, `used` — and `effort`/`tools` in the spec rows. → apps + `wf decide`, small.
+- **the session stream after a reconnect (S2's round-2 review):** only a `readable` event clears the retry
+  error on the page, and a fresh server stream never sends one, so after an api restart the red "reading
+  again" line stays until the task settles while events flow. Clear it on the EventSource `open`. → apps,
+  with B7. Also from S2, measured: one open stream on a running Claude step is two `claude agents` calls a
+  second (~0.22 s each); the engine's open-issues names the fix (a runner verb that finds one session).
+- **the card's touched line double-counts a fan-out (B6's round-2 review):** `touchedSummary` sums `+a −r` over
+  every result branch, and a follower in its own worktree starts from its parent's branch, so a parent's lines
+  appear once per result branch; `wf decide` prints each branch on its own line and never sums. Count each
+  file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
+  last value only (`indexOf` on parsed objects is −1). → apps, with B7.
+
+### Settled
+
+Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, filed 2026-09-14, closes the last two).
+
+- **agent-workflows (`list`, `runner.ts`):** `wf ls` prints `pending` for a task the engine has no
+  record of; `phaseOfView` already draws the `unknown` line for the DAG, `listing`'s phase word does
+  not. The board (run W) words it `unknown` itself and tests that it matches `list` wherever `list`
+  is right. Fix in `list`, then delete the api's copy of the rule. Also: `list` throws when the
+  workflow folder is gone, so a consumer must catch it; and each `view` is a `claude agents` call
+  (~300 ms), so a consumer reads each task once per request. → F or G, whoever touches `runner.ts` first.
+- **the plan:** count fields need their least value stated (A's review); a "definition of done" that
+  lists several things in one sentence gets read as one rule.
 - **agent-engine (`fold`, the `ended` case):** the `ended` event carries `at` and `fold` drops it, so
   `Attempt` has no end time and the board cannot say how long a finished attempt ran (K's review;
   the responder recommended the engine keep it — `batch/v1` `JobStatus.completionTime`). One line
@@ -713,11 +773,6 @@ owner is not mid-run.
   node. → a small engine run after E2, then an apps follow-up.
 - **the engine, found by C's run:** a session that gives its closeout and is then marked `blocked`
   never ends — `closedOut` handles `working` only. → E2 (`fix-one-gap-in-agent-engine-h35j`).
-- **the artifacts directory and Codex (U1's review):** every brief now names
-  `runs/<id>/artifacts/<step>/`, and a Codex step in `workspace-write` cannot write there (only the
-  worktree and tmp; the engine passes no `--add-dir`). Latent while the reviewer is Opus. The fix is
-  hkb's `exports`: a step lists a relative path under `artifacts` and the run *collects* it into the
-  directory at hand-off, before the check — then no step needs to write outside its workspace. → with R.
 - **the e2e script has no refusal test (U1's review):** nothing proves a page with a console error or a
   failed request makes `npm run e2e` exit non-zero. → F2's brief.
 - **the Factory's "in flight" rule (seen on U1's run):** a run whose step failed its check shows in
@@ -734,12 +789,6 @@ owner is not mid-run.
   cleared with the daemon stopped, so the next tick re-filed it). That is `wf retry <run> <step>
   --recheck`, and it should not need surgery. Also: bug 3 was measured — finished `--bg` sessions
   at ~370 MB each, 22 of them, 7 GB; E5 fixes it.
-- **steering by message leaves no trace on the run (F2's review, finding 2):** the operator widened
-  a step's scope and added an ask through cross-session messages; the run's record shows only two
-  commit messages and a closeout, and the reviewer rightly could not tell an authorised change from
-  a step overstepping. A mid-flight instruction to a step should be written on the run — an
-  `asks/` file the tick composes into the record and `wf decide` prints — the same one-writer
-  shape as `.cancelled`. → with F's ask files.
 - **a branch's new dependency is invisible to its own check (M1, refused three times):** worktrees
   share the main checkout's `node_modules`; a package pinned on a branch is not installed there, and
   every `npm install` at a merge prunes whatever a step unpacked into the shared tree. M1's check
@@ -759,11 +808,6 @@ owner is not mid-run.
   `--extension`; `--output-dir /tmp/playwright-mcp` is one directory for every concurrent step
   (a per-step dir needs an `env` on the task, or per-step `mcp:` — I); the live test takes the
   model's own list of its servers as the evidence. → I, and the next M run.
-- **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
-  a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
-  for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running
-  session by hand. A small convention would do: `wf start --input <file>` copies into
-  `runs/<id>/inputs/` and every brief gains one line naming the directory. → with J.
 - **checks killed by the harness, not by the code (2026-09-13, B2):** three of B2's `respond` checks
   ended `stopped · harness` with 16 GB available and `/proc/pressure/memory` at 0.00 — Claude Code
   2.1.270's "low on memory" rule stopped the `wf up` background task and the check's `claude --bg`
@@ -788,15 +832,6 @@ owner is not mid-run.
   read-only by prose, and the permission classifier refused `node --test`, so it reviewed by reading. The check
   had run the suite, so nothing was lost; but a reviewer that can run tests finds more. → I: `tools:` on the
   review step naming Bash for `npm test`, and read-only for the rest.
-- **a login refresh race blocks concurrent sessions (2026-09-13, B3 and I):** both `implement` sessions
-  stopped within two minutes of each other on *"Could not refresh your login because another Claude Code
-  process is refreshing it (or exited mid-refresh) · Try again in a minute"* — an OAuth refresh raced between
-  the operator's session, two `--bg` steps and the monitor's `claude agents` calls. The engine read them as
-  `blocked` (`needs-human`), which is right for the harness and wrong for the work: nothing was asked of a
-  person. Nudged by cross-session message (no trace on the run, as noted above); `wf retry` cannot help, the
-  step is not final. A tick that recognises this one message on a `blocked` session and resumes it is the
-  fix in the run; the harness's is a shared refresh lock across processes. → agent-workflows, small; and
-  a Claude Code report.
 - **the canvas gate reads the step, the banner reads the api (B3's round-2 review, 2026-09-13):** `isGate`
   in `apps/web/src/lib/status.ts` is decided from the step's state alone, while the api's `waitingOnYou`
   now leaves out a step with a `wf round`/`wf retry` ask pending — so for up to one tick the canvas says
@@ -810,35 +845,17 @@ owner is not mid-run.
   no Edit or Write on the list — so the reviewer is read-only by machinery, not by prose (plan §4 I's aim). The
   shipped `review.md` stays on codex, whose fence is the sandbox. E6 froze the old folder, so the first
   run to test the fence is the next one filed.
-- **E6's usage assertion cannot tell the retry's count from the first try's (E6's review):**
-  `packages/agent-engine/test/resume.test.ts:134` expects the same usage the first try recorded, so the
-  refusal rests on the view assertion alone; have the retry write a different number of responses. → the
-  next engine run, with anything else that opens `resume.test.ts`.
 - **the fence judges a compound command by its segments (G's review, 2026-09-13):** A2's reviewer ran
   `npm test` fine under `dontAsk`; G's ran `cd packages/agent-workflows && node --test …` and was denied,
   because `cd` matched no allow rule — every segment must. `git log … && git status && git diff …` passed
   for that reason. `Bash(cd:*)` is now allowed (it does nothing on its own), and the operator folders'
   review body says how to run the suite. Verified, not guessed: the denial is in the session transcript.
-- **`radius` takes the base's `workspaces` globs as written (G's round-2 review):** `./packages/*` yields a
-  regexp that never matches `packages/x`, so every package's changes fall into one `packages` group and
-  `./packages/*/docs/` never counts a lesson; `packages/**` would count `packages/x/src/docs/` again. This
-  repo uses `packages/*` and `apps/*`, so unaffected. Strip a leading `./` when the workspaces are read,
-  refuse or note `**`, and a radius test with `['./packages/*']`. → agent-workflows, small.
 - **the fenced reviewer cannot read the run's artifacts (B4's review, 2026-09-13):** under `dontAsk`, a
   `Read` outside the worktree — `~/.agent-workflows/runs/<id>/artifacts/…`, where the implement step's
   screenshots are — is denied, so no reviewer has looked at a screenshot since the fence. Allowed on this
   machine in `.claude/settings.local.json` (`Read(//home/…/.agent-workflows/**)`, a path that is nobody
   else's); the portable fix is an artifacts directory the step is told, carried on the task (§4b, the
   `look` note). → I's follow-up, small.
-- **where a run's hour goes is not on the board (operator, 2026-09-13):** measured off the engine journals
-  for B4 (two rounds, 40 min wall): implement 19m42s + 5m35s, its checks 58s + 57s, reviews 6m10s + 3m24s;
-  sessions and checks 36m47s, slot waits 1m13s, ticks and worktrees 1m56s. S2's implement alone 39m11s
-  (54 turns, 146 tool calls, 17M tokens in), and its review waited 8m51s for a slot behind three other
-  runs. Nothing shows this: the run page has `#n · took` per node and `wf decide` has `used`, but no
-  per-try timeline with queue time, no check durations, no round totals; and the spec rows show neither
-  `effort` nor `tools`, so a person cannot see the effort a step runs at (none set here → the harness
-  default). A **timeline** on the run page and in `wf decide` — per try and per check: filed, spawned,
-  ended, queue and run time, `used` — and `effort`/`tools` in the spec rows. → apps + `wf decide`, small.
 - **rounds are invisible in the inspector, defaults read as `—`, artifacts are bare paths (operator,
   2026-09-13):** a step in round 2 shows `attempts 1` (the engine's count for the current try's task)
   beside `round 2 of 3` (the run's tries), and the earlier round's task, closeout, check and replies are
@@ -846,21 +863,11 @@ owner is not mid-run.
   `tools` are not rows; the Output tab's artifacts cannot be opened. B7: `tries` on the api's step, effective
   values marked `default`, a Rounds section and per-try Output, and an artifacts route serving a listed
   file by name (inside the run-owned directory, never a path) with images inline. → apps, filed after B6/S2.
-- **the session stream after a reconnect (S2's round-2 review):** only a `readable` event clears the retry
-  error on the page, and a fresh server stream never sends one, so after an api restart the red "reading
-  again" line stays until the task settles while events flow. Clear it on the EventSource `open`. → apps,
-  with B7. Also from S2, measured: one open stream on a running Claude step is two `claude agents` calls a
-  second (~0.22 s each); the engine's open-issues names the fix (a runner verb that finds one session).
 - **the reviewer's fence has two holes the brief covers (W3's round-2 review):** `.claude/settings.json`
   allows `npm run build` and `npm run e2e` for implement's sake, so a `dontAsk` reviewer with Bash may run
   them and write `routeTree.gen.ts` and `.e2e/` into the workspace; only its brief keeps it from them. A
   per-step deny — `disallow:` on a step, passed as `--disallowedTools "Bash(npm run build)" …` — closes it
   by machinery. → agent-workflows, small (the engine passes what the step names, as `tools:`).
-- **the card's touched line double-counts a fan-out (B6's round-2 review):** `touchedSummary` sums `+a −r` over
-  every result branch, and a follower in its own worktree starts from its parent's branch, so a parent's lines
-  appear once per result branch; `wf decide` prints each branch on its own line and never sums. Count each
-  file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
-  last value only (`indexOf` on parsed objects is −1). → apps, with B7.
 - **`wf decide` prints a nested `where` as JSON (U2's review):** `itemLines` in run.ts formats a finding as
   `file:line` only when `file` is top-level; U2's ui review declares `where: { file, line } | { page, theme }`,
   which prints as `- where: {"file":…}`. Teach `itemLines` a `where` object: `file:line` or `page · theme`.

@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, phaseOfView, readAnswers, readAsks, retry, sensitiveDiff, touchedBy, usedLines, verdictWord, type Retry, type RetryAsk, type RetryHow, type RetryMode } from 'agent-workflows';
-import { answerOf, assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote } from 'agent-workflows/run';
+import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, retry, sensitiveDiff, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Wait } from 'agent-workflows';
+import { answerOf, assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
@@ -22,11 +22,18 @@ export type RunSummary = {
   workflowDir: string;
   createdAt: string;
   cancelledAt: string | null;
+  /** The runs this one waits on (`wf start --after`), as the record froze them at start: none for a run started without. */
+  after: string[];
+  /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
+  waiting: RunWaiting | null;
   status: RunStatus;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
    * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
    * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
+   *
+   * A run waiting on runs moves: the tick files its roots once they ship. Not one waiting on a run that never ships without a
+   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.onYou`): nothing the tick reads will change on its own.
    */
   moving: boolean;
   /**
@@ -37,6 +44,21 @@ export type RunSummary = {
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
   /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds — on a run nobody has called off. */
   waitingOnYou: string[];
+};
+
+/**
+ * What a run started `--after` still waits on, as `wf ls` and `wf decide` say it — never worded here.
+ *
+ * `runs` are the package's `waitsOf`: each run in `after` that has not shipped, as its own `wf decide` says it, and, for one that never
+ * will without a person, why — the store has no such run (`missing`), it was cancelled, or a result branch it recorded is gone. `word` is
+ * what `wf ls` prints on each root (`waitWord`), and `advice` the line `wf decide` prints under it (`waitAdvice`). `onYou` is whether a
+ * person has to act — some run of `runs` never ships on its own — which is when `wf ls` prints `→ waiting on you:` before the advice.
+ */
+export type RunWaiting = {
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
+  word: string;
+  advice: string;
+  onYou: boolean;
 };
 
 /**
@@ -189,6 +211,9 @@ export type RunDetail = {
   isolate: boolean;
   createdAt: string;
   cancelledAt: string | null;
+  /** As on `RunSummary`. */
+  after: string[];
+  waiting: RunWaiting | null;
   status: RunStatus;
   /** As on `RunSummary`. */
   moving: boolean;
@@ -285,11 +310,12 @@ export type Decidable = {
 };
 
 /**
- * A run's decision. `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no
+ * A run's decision. `waiting` for a run whose roots wait on runs that have not shipped: `wf decide` says that, and offers
+ * nothing else. `running` while it runs and nobody is waited on — `wf decide`'s "nothing to decide yet", with no
  * git asked. `nothing`, in `wf decide`'s words, for a run called off or whose branches are already on its base. Else
  * what there is to decide.
  */
-export type RunDecision = { running: true } | { nothing: string } | Decidable;
+export type RunDecision = { waiting: RunWaiting } | { running: true } | { nothing: string } | Decidable;
 
 /** A step's attempts as the engine's view has them: how many, and when and how the latest went. */
 export type StepAttempts = {
@@ -350,6 +376,38 @@ async function viewsOf(run: Run): Promise<Views> {
  */
 async function everyView(): Promise<Views> {
   return new Map((await e.list()).map((view) => [view.id, view]));
+}
+
+/**
+ * The engine as a request that has read `views` sees it: `view` answers from them, and everything else is the engine's own. What the
+ * package's `parentOf` is handed on the list and on a run's detail, so reading the runs a run waits on observes no harness again — the
+ * list is what the Factory polls. A task the read did not see, filed since, is viewed.
+ */
+const seenBy = (views: Views): typeof e => ({ ...e, view: async (taskId) => views.get(taskId) ?? e.view(taskId) });
+
+/**
+ * The runs a run's roots wait on (`waitsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
+ * none, without a look, for a run the gate no longer applies to (`gated`): one started without `--after`, called off, or already started.
+ */
+async function waitsIn(run: Run, reader: typeof e): Promise<Wait[]> {
+  if (!gated(run)) return [];
+  const read = new Map<string, ParentRun>();
+  for (const id of new Set(run.after)) read.set(id, await parentOf(reader, id));
+  return waitsOf(run, (id) => read.get(id) ?? { shipped: false });
+}
+
+/** A run waited on that never ships without a person — no such run, a cancelled one, a result branch gone: what `wf ls` prints `→ waiting on you:` for. */
+const neverShips = (w: Wait): boolean => Boolean(w.missing || w.cancelledAt || w.gone?.length);
+
+/** What a run still waits on (`RunWaiting`), in the package's words; null when it waits on no run. */
+function waitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
+  if (!waits.length) return null;
+  return {
+    runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [] })),
+    word: waitWord(waits),
+    advice: waitAdvice(run, waits),
+    onYou: waits.some(neverShips),
+  };
 }
 
 /**
@@ -434,6 +492,8 @@ type Judged = {
   waitingOnYou: string[];
   status: RunStatus;
   moving: boolean;
+  /** The runs its roots wait on (`waitingOf`). */
+  waiting: RunWaiting | null;
   /** The tries people asked for that the next tick files, by step: `assess`'s, off their ask files. */
   asked: ReadonlyMap<string, Retry>;
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a try was answered (`answerOf`). */
@@ -453,8 +513,11 @@ type Judged = {
  * run as not moving, for as long as the tick takes to file what they asked for. A step the page shows and the tick does not judge — one a pre-freeze record has and its folder
  * lost — is worded as a `bare` step, and has no say in the run's status. Everything is read off the views the request already has: calling `list` would
  * read every task again, and word only the steps the tick judges. The api test holds these words to `list`'s.
+ *
+ * Given the runs its roots wait on, read once (`waitsIn`): a root of a run waiting on runs says `waiting on <run>`, as `list` words it, and
+ * the run moves while each may still ship — the tick files the roots when they do — and not once one never will without a person.
  */
-function judge(run: Run, names: readonly string[], folder: readonly Workflow[] | null, views: Views): Judged {
+function judge(run: Run, names: readonly string[], folder: readonly Workflow[] | null, views: Views, waits: readonly Wait[]): Judged {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const asked = closeoutAsked(views);
@@ -465,7 +528,8 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   const { asks, rounds } = readAsks(run.id);
   // And what people said with them, as `list` reads it: without it a try a person answered reads as one they did not.
   const answers = readAnswers(run.id);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits);
+  const waiting = waitingOf(run, said.waiting);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
   // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
@@ -481,7 +545,10 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
     // The line `cancelPlan` draws for a finished run, which `status` does not: nothing in flight, and nothing a
     // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
     // A round due is filed as a try is: a loop's looping step settled, and nothing of it in flight until the tick files the round.
-    moving: inFlight(run, phase).length > 0 || (tickReads && (ready.length > 0 || check.length > 0 || retry.length > 0 || round.length > 0)),
+    // Roots `assess` makes ready on a run waiting on runs are filed once those ship (`runReady`), which never happens on its own for a
+    // run that never ships: the gate is the tick's, and `assess` does not know it.
+    moving: inFlight(run, phase).length > 0 || (tickReads && ((ready.length > 0 && !waiting?.onYou) || check.length > 0 || retry.length > 0 || round.length > 0)),
+    waiting,
     asked: new Map(retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
     answers,
   };
@@ -503,10 +570,10 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
   return step && workflows ? composeBrief(step, run, workflows) : null;
 }
 
-function summarize(run: Run, views: Views): RunSummary {
+async function summarize(run: Run, views: Views): Promise<RunSummary> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
-  const judged = judge(run, names, folder, views);
+  const judged = judge(run, names, folder, views, await waitsIn(run, seenBy(views)));
   return {
     id: run.id,
     repo: run.repo,
@@ -514,6 +581,8 @@ function summarize(run: Run, views: Views): RunSummary {
     workflowDir: run.workflowDir,
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
+    after: run.after ?? [],
+    waiting: judged.waiting,
     status: judged.status,
     moving: judged.moving,
     steps: names.map((name) => ({
@@ -606,7 +675,7 @@ async function detail(run: Run): Promise<RunDetail> {
   // One more observation for each refused check's output (`checksOf`) and each blocked session's last line (`lastLineOf`), which only a
   // run's own detail reads.
   const views = await everyView();
-  const judged = judge(run, names, workflows, views);
+  const judged = judge(run, names, workflows, views, await waitsIn(run, seenBy(views)));
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
   const source = shownWorkflow(run, workflows);
@@ -622,6 +691,8 @@ async function detail(run: Run): Promise<RunDetail> {
     isolate: run.isolate,
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
+    after: run.after ?? [],
+    waiting: judged.waiting,
     status: judged.status,
     moving: judged.moving,
     waitingOnYou: judged.waitingOnYou,
@@ -906,12 +977,17 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[]): DecideCom
  * (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one — each
  * read with `touchedBy`, and with `sensitiveDiff` over the default check-affecting list. A branch git cannot read is
  * an `error` on its entry, never a failed request. A few `git` calls a branch, so read once, never on a poll.
+ *
+ * First, as `wf decide` asks it first: a run whose roots wait on runs that have not shipped is `waiting`, and nothing else is read.
  */
 async function decisionOf(run: Run): Promise<RunDecision> {
+  const waits = await waitsIn(run, e);
+  const waiting = waitingOf(run, waits);
+  if (waiting) return { waiting };
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const views = await viewsOf(run);
-  const judged = judge(run, names, folder, views);
+  const judged = judge(run, names, folder, views, waits);
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true };
 
@@ -1184,9 +1260,13 @@ export const app = new Hono()
     // The records before the engine: `wf` files a step's task before it writes the id on the run, so
     // every id read here is in the listing that follows. The other way round, a task filed between
     // the two reads would show as `unknown` until the next poll.
+    //
+    // A run that waits on runs reads each of them off the same views (`seenBy`): its record and git, and its tasks as they were listed.
     const runs = listRuns();
     const views = await everyView();
-    return c.json(runs.map((run) => summarize(run, views)));
+    const summaries: RunSummary[] = [];
+    for (const run of runs) summaries.push(await summarize(run, views));
+    return c.json(summaries);
   })
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');

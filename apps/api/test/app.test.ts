@@ -118,6 +118,9 @@ test('runs are read from the workflow store and summarized, with what each step 
   assert.deepEqual(await res.json(), [{
     id: 'r-1', repo: '/code/app', brief: 'Do the thing', workflowDir: '/code/app/workflows', createdAt: '2026-09-12T00:00:00.000Z',
     cancelledAt: '2026-09-12T01:00:00.000Z',
+    // Started without `--after`: it waits on no run.
+    after: [],
+    waiting: null,
     status: 'cancelled',
     moving: false,
     steps: [
@@ -148,7 +151,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   const [implement, review] = run.steps;
   assert.deepEqual({ ...run, steps: undefined }, {
     id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', workflowDir, baseRef: 'def456',
-    branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', cancelledAt: null,
+    branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', cancelledAt: null, after: [], waiting: null,
     // implement signed off blocked, so review can never be filed: the run is over, and failed.
     status: 'failed', moving: false, waitingOnYou: ['implement'], warning: null,
     graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },

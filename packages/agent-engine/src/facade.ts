@@ -13,9 +13,12 @@
 import { Effect, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import type { Event, ResumePolicy, Sighting } from './domain.ts';
+import { fold, type Event, type ResumePolicy, type Sighting } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
-import { claudeOps, claudeRefuses, mcpRefuses, Runner, RunnerError, type McpServer, type RunnerOps, type SpawnRequest } from './runner.ts';
+import {
+  claudeOps, claudeRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
+  type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
+} from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
 import { composite } from './runner-composite.ts';
 import { DEFAULT_MAX_CONCURRENT, file, requestStop, tick, view, type TaskView } from './engine.ts';
@@ -50,6 +53,12 @@ export type PromiseRunner = {
    * idempotent; a rejection is asked again on the next.
    */
   release?(session: Sighting, task: { worktree?: string | boolean }): Promise<void>;
+  /**
+   * Optional. The session's conversation as events from `after` — a cursor this method returned, or
+   * none for the start — and the cursor to ask again with. Without it, `transcript` refuses this
+   * harness's tasks, and `logs` is what they have.
+   */
+  transcript?(sessionId: string, after?: TranscriptCursor): Promise<Transcript>;
 };
 
 /**
@@ -137,6 +146,16 @@ export type Engine = {
   /** Ask a task to stop. Takes effect on the next tick, and confirms on the one after. */
   stop(taskId: string): Promise<void>;
   logs(taskId: string): Promise<string>;
+  /**
+   * The conversation of the task's session — the one `logs` reads, asked of the task's own harness — as
+   * events from `after` on, and the `cursor` to ask again from. Pull-only: poll with the cursor the last
+   * read returned; nothing is pushed. No session yet is no events, and a cursor from the start.
+   *
+   * Refused — rejected with an `Error` whose `exitCode` is 2 — for a task this engine has no record of;
+   * an `after` that no read gave; and a harness that keeps no conversation this engine can read (a
+   * `HarnessSpec` or `PromiseRunner` without `transcript`).
+   */
+  transcript(taskId: string, after?: TranscriptCursor): Promise<Transcript>;
   /** Everything that has happened since `after`, and where to resume. */
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
   /**
@@ -190,6 +209,10 @@ const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Reco
           ...(h.release ? {
             release: (session: Sighting, task: { worktree?: string | boolean }) =>
               wrap(() => h.release!(session, task), (m) => new RunnerError({ verb: 'release', message: m })),
+          } : {}),
+          ...(h.transcript ? {
+            transcript: (id: string, after?: TranscriptCursor) =>
+              wrap(() => h.transcript!(id, after), (m) => new RunnerError({ verb: 'transcript', message: m })),
           } : {}),
         },
   ]));
@@ -294,6 +317,23 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // harness has released is in no observation, and its transcript is still there to read.
       return yield* (runners[v.state.harness ?? fallback] ?? runners[fallback]!).logs(v.sessionId);
     })),
+    transcript: async (taskId, after) => {
+      const refuse = (why: string) => Object.assign(new Error(`transcript: ${why}`), { exitCode: 2 });
+      if (after !== undefined && !isTranscriptCursor(after)) {
+        throw refuse(`\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`);
+      }
+      const events = await go(Effect.flatMap(Journal, (j) => j.read(taskId)));
+      if (!events.length) throw refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+      // The task's own harness, as for `logs`, and observed by that harness alone: a board asks this every
+      // second while a session runs, and no other harness's registry can name the session.
+      const asked = fold(taskId, events).harness ?? fallback;
+      const harness = Object.hasOwn(runners, asked) ? asked : fallback;
+      const runner = runners[harness]!;
+      const read = runner.transcript;
+      if (!read) throw refuse(`the \`${harness}\` harness keeps no conversation this engine can read. \`logs\` gives what its session printed.`);
+      const v = await go(Effect.flatMap(runner.observe, (observed) => view(taskId, observed)));
+      return v.sessionId ? go(read(v.sessionId, after)) : noTranscript();
+    },
     feed: (after = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after))),
 
     watch: ({ onEntry, from = 0, intervalMs = 1_000, onError }) => {
@@ -360,6 +400,6 @@ export { codex, claudeDetached } from './runner-detached.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { nameFor } from './domain.ts';
 export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage } from './domain.ts';
-export type { McpServer, SpawnRequest } from './runner.ts';
+export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { TaskView } from './engine.ts';

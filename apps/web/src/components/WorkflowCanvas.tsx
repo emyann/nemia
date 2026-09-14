@@ -28,6 +28,7 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
     steps: workflow.steps.map(({ name }) => ({
       name, spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', note: null,
       closeout: null, check: null, attempts: { count: 0, latest: null },
+    used: null,
     })),
   };
 }

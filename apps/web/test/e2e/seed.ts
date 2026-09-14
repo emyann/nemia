@@ -10,12 +10,17 @@
  * failed — finished, not in flight, and off the Factory's floor until finished runs are shown. Nothing
  * runs. The pages must render a run as the api reads it, whatever the engine says of its tasks.
  *
- * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT. And the workflows
- * the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS.
+ * FAKE's repository is a real one, beside the store (`seedRepo`): `theme`'s branch, the run's result, is committed on it,
+ * so its page has something to decide. The other two runs name a repository that is not on the machine, which reads as a
+ * branch git could not read.
+ *
+ * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
+ * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS.
  *
  * Written by hand rather than through agent-workflows: the web app imports no package, and a record
  * format that moves under the pages should fail here, where a person would see it.
  */
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -38,6 +43,18 @@ export const FAKE = {
   waitingOnYou: ['implement', 'theme'],
   /** The steps that wait on no other, which the run's card leads into on the Factory. */
   first: ['implement', 'tokens'],
+  /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
+  branch: 'wf/give-the-board-a-look-e2e0/tokens',
+  /** What the Factory's card says that branch touched, once the card is opened: `apps/web` and the root. */
+  touched: 'touched 2 packages · +435 −1',
+  /** The files on it the next agent reads, and those that could make its check pass. */
+  agentFacing: ['CLAUDE.md'],
+  checkAffecting: ['apps/web/test/theme.test.ts', 'package.json'],
+  lesson: 'lesson · CLAUDE.md +2 −0',
+  /** A check-affecting file whose diff is longer than the board shows of one. */
+  capped: 'apps/web/test/theme.test.ts',
+  /** What `tokens`' session consumed, in `wf decide`'s words. */
+  used: '14 turns · 31 tool calls · 112k in · 6.35k out',
   /** One per `after` between its steps: implement → review, review → respond, implement → respond, tokens → theme. */
   edges: 4,
 } as const;
@@ -244,6 +261,38 @@ const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
+/**
+ * FAKE's repository, at `repo`: a base on `main`, and `branch` off it with the work committed — a source file and a test
+ * of 420 lines in the `apps/web` workspace, two lines in CLAUDE.md, a script changed in package.json. The base's sha.
+ */
+function seedRepo(repo: string, branch: string): string {
+  fs.mkdirSync(repo, { recursive: true });
+  const git = (...args: string[]): string =>
+    execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
+      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  const pkg = (test: string) => `${JSON.stringify({ name: 'hkb-v2', private: true, workspaces: ['packages/*', 'apps/*'], scripts: { test } })}\n`;
+  git('init', '-q', '-b', 'main');
+  write(path.join(repo, 'package.json'), pkg('turbo run test'));
+  write(path.join(repo, 'CLAUDE.md'), '# hkb-v2 — contributor guide\n');
+  write(path.join(repo, 'apps', 'web', 'src', 'main.tsx'), "export const app = 'board';\n");
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  const base = git('rev-parse', 'HEAD').trim();
+
+  git('checkout', '-q', '-b', branch);
+  const tokens = ['sky', 'blue', 'emerald', 'amber', 'orange', 'red', 'neutral', 'violet', 'teal', 'rose'];
+  write(path.join(repo, 'apps', 'web', 'src', 'theme.ts'), `export const tokens = {\n${tokens.map((t) => `  ${t}: 'var(--color-${t}-500)',`).join('\n')}\n};\n`);
+  const cases = Array.from({ length: 416 }, (_, i) => `test('token ${i + 1} is a colour', () => assert.ok(Object.values(tokens)[${i % tokens.length}]));`);
+  write(path.join(repo, 'apps', 'web', 'test', 'theme.test.ts'), `import { test } from 'node:test';\nimport assert from 'node:assert/strict';\nimport { tokens } from '../src/theme.ts';\n\n${cases.join('\n')}\n`);
+  write(path.join(repo, 'CLAUDE.md'), '# hkb-v2 — contributor guide\n\n- A page is judged in both themes, or it is judged in neither.\n');
+  write(path.join(repo, 'package.json'), pkg('turbo run test --concurrency=1'));
+  git('add', '-A');
+  git('commit', '-q', '-m', 'Apply the colour tokens to every page');
+  git('checkout', '-q', 'main');
+  return base;
+}
+
 /** Events as the engine journals them: a line of JSON each. */
 const lines = (events: object[]): string => events.map((event) => `${JSON.stringify(event)}\n`).join('');
 
@@ -258,10 +307,13 @@ export function seed(root: string, now = Date.now()): void {
   const branch = `wf/${id}/implement`;
   // tokens runs beside implement, so it has a worktree of its own; theme is its only follower, and works in it.
   const lane = path.join(root, 'worktrees', id, 'tokens');
-  const laneBranch = `wf/${id}/tokens`;
+  const laneBranch = FAKE.branch;
   const check = `${id}-theme-check`;
+  // Named as the other runs' repository is, so the Factory's card reads the same.
+  const repo = path.join(root, 'hkb-v2');
+  const baseRef = seedRepo(repo, laneBranch);
   write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
-    id, repo: '/code/hkb-v2', workspace: '/code/hkb-v2', baseRef: '19c9365', branch: 'main', isolate: true,
+    id, repo, workspace: repo, baseRef, branch: 'main', isolate: true,
     brief: `${FAKE.title}\n\nA run seeded by npm run e2e: implement signed off blocked, the engine has no record of review's task, and respond is not filed; tokens signed off with no check, and theme's check refused.`,
     workflowDir,
     workflow: STEPS.map((step) => step.frozen),
@@ -278,14 +330,14 @@ export function seed(root: string, now = Date.now()): void {
 
   /**
    * A step's task as the engine journals one that ran once, from `began` to `ended` minutes ago, and signed off with `closeout`.
-   * `nativeId` is the session's own id, which the engine records with the end for a harness that has one, and reads a transcript by.
+   * `nativeId` is the session's own id, which the engine records with the end for a harness that has one, and reads a transcript by; `usage` is what the engine read of the attempt, when it read one.
    */
-  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string): void =>
+  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string, usage?: object): void =>
     write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
       { kind: 'filed', at: ago(began), brief, cwd, maxAttempts: 1 },
       { kind: 'starting', at: ago(began - 1), attempt: 1 },
       { kind: 'spawned', at: ago(began - 1), attempt: 1 },
-      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, ...(nativeId ? { nativeId } : {}), observed: 'done', reason: 'harness', closeout },
+      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, ...(nativeId ? { nativeId } : {}), observed: 'done', reason: 'harness', closeout, ...(usage ? { usage } : {}) },
       { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
     ]));
 
@@ -293,7 +345,9 @@ export function seed(root: string, now = Date.now()): void {
   // which is what makes it `unknown`.
   signedOff(`${id}-implement`, workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SESSION.sessionId}.jsonl`), lines(conversation(SESSION, ago)));
-  signedOff(`${id}-tokens`, lane, 'Pick the colour tokens.', 40, 30, { outcome: 'done', summary: 'Picked the colour tokens.', needs: null, artifacts: [] });
+  signedOff(`${id}-tokens`, lane, 'Pick the colour tokens.', 40, 30, { outcome: 'done', summary: 'Picked the colour tokens.', needs: null, artifacts: [] }, undefined, {
+    turns: 14, toolCalls: 31, inputTokens: 112_000, outputTokens: 6_350,
+  });
   signedOff(`${id}-theme`, lane, 'Apply them to every page.', 30, 10, { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] });
 
   // theme's check, as the run files one on the check harness: its process exited 1, and the engine wrote the

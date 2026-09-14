@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fansOut, loadWorkflows, terminalSteps, parseWorkflow, validate, workflowDescription, WorkflowError, type Workflow } from '../src/workflow.ts';
+import { fansOut, loadWorkflows, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
@@ -692,4 +692,45 @@ test('REFUSED at load: a loop a round could not file again as it was — a step 
   const replies = { type: 'object', properties: { replies: { type: 'string' } }, required: ['replies'], additionalProperties: false };
   assert.match(refusal(loopFiles('loop: implement', { 'implement.md': '---\noutput: implement.schema.json\n---\nimplement it\n', 'implement.schema.json': replies })),
     /^implement: `output: implement\.schema\.json` declares `replies`, and review loops back to implement \(`loop: implement`\), so from round 2 the run adds `replies` to its closeout/);
+});
+
+/** A repository whose workflows/ holds `dev` and `ui`, each a folder of one step, and `notes`, a folder of none. */
+const withWorkflows = (): { repo: string; workflows: string } => {
+  const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-named-'));
+  const workflows = path.join(repo, 'workflows');
+  for (const name of ['dev', 'ui']) {
+    fs.mkdirSync(path.join(workflows, name), { recursive: true });
+    fs.writeFileSync(path.join(workflows, name, 'implement.md'), 'implement it\n');
+  }
+  fs.mkdirSync(path.join(workflows, 'notes'));
+  return { repo, workflows };
+};
+
+test("`workflowFolder` finds a workflow by a path from where it is written, or by its name under the repository's workflows/ — the path first, so a folder a person points at is never shadowed", () => {
+  const { repo, workflows } = withWorkflows();
+  const plans = path.join(repo, 'plans');
+  fs.mkdirSync(path.join(plans, 'dev'), { recursive: true });
+  assert.equal(workflowFolder('dev', repo, repo), path.join(workflows, 'dev'), 'a name');
+  assert.equal(workflowFolder('ui', plans, repo), path.join(workflows, 'ui'), 'a name, from anywhere');
+  assert.equal(workflowFolder('workflows/ui', repo, repo), path.join(workflows, 'ui'), 'a path from where it is written');
+  assert.equal(workflowFolder('../workflows/ui', plans, repo), path.join(workflows, 'ui'));
+  assert.equal(workflowFolder(path.join(workflows, 'dev'), plans, repo), path.join(workflows, 'dev'), 'an absolute path');
+  assert.equal(workflowFolder('dev', plans, repo), path.join(plans, 'dev'), "the folder where it is written, before the repository's of that name");
+});
+
+test('REFUSED at shipped defaults: `workflowFolder` on a name the repository does not have, a path that is not there, a path that is not read as a name, and a file — naming where it looked, and the workflows there are', () => {
+  const { repo, workflows } = withWorkflows();
+  const plans = path.join(repo, 'plans');
+  fs.mkdirSync(plans);
+  const refused = (message: string) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message === message;
+  const theirs = "The repository's workflows are: dev, ui — name one, or give the path to a workflow folder.";
+  assert.throws(() => workflowFolder('deb', repo, repo), refused(`no workflow folder at ${path.join(repo, 'deb')}, nor a workflow named deb in ${workflows}. ${theirs}`));
+  assert.throws(() => workflowFolder('./workflows/deb', repo, repo), refused(`no workflow folder at ${path.join(workflows, 'deb')}. ${theirs}`));
+  // From the plan folder, `workflows/dev` is a path that is not there, and never the repository's dev.
+  assert.throws(() => workflowFolder('workflows/dev', plans, repo), refused(`no workflow folder at ${path.join(plans, 'workflows', 'dev')}. ${theirs}`));
+  fs.writeFileSync(path.join(repo, 'brief.md'), 'a brief\n');
+  assert.throws(() => workflowFolder('brief.md', repo, repo), refused(`no workflow folder at ${path.join(repo, 'brief.md')}, nor a workflow named brief.md in ${workflows}. ${theirs}`));
+  const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-bare-'));
+  assert.throws(() => workflowFolder('dev', bare, bare),
+    refused(`no workflow folder at ${path.join(bare, 'dev')}, nor a workflow named dev in ${path.join(bare, 'workflows')}. Give the path to a workflow folder, or the name of a folder of steps under ${path.join(bare, 'workflows')}.`));
 });

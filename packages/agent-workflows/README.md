@@ -6,6 +6,7 @@ package uses `createEngine`, `file`, `tick`, `view`, `stop`, `logs` and nothing 
 
 ```bash
 wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
+wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it until r-xyz has shipped
 wf up
 wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
@@ -502,6 +503,7 @@ another repository and change that line.
 | `wf ls` | means | what waits on it |
 |---|---|---|
 | `waiting` | not filed yet | — |
+| `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | the engine's word: `running (working)`, `needs-human` | still going | waits |
 | `unsigned` | it succeeded without the closeout it was asked for, or without a field its `output:` declares | **never runs** |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
@@ -795,6 +797,59 @@ The three lists are globs, written once in `src/radius.ts` and printed by `wf de
 git cannot diff says it was not read, and the lesson line says it does not know. Neither reads it as a
 branch that changed nothing.
 
+## A run that waits on a run: `wf start --after`
+
+```bash
+wf start ./a.md --repo ~/code/myapp                                  # a-1x2y
+wf start ./b.md --repo ~/code/myapp --after a-1x2y                   # nothing of it filed until a-1x2y ships
+wf start ./c.md --repo ~/code/myapp --after a-1x2y
+wf start ./d.md --repo ~/code/myapp --after b-3z4w --after c-5v6u
+```
+
+This is the sequencing a person used to do by hand, starting B once A is on main, held by the run as a
+fact. `--after <runId>`, given once for each run to wait on, is frozen on the record as `after`. The tick
+files none of the run's steps until every one of those runs has **shipped**, meaning its result branch is
+on the base branch, as `wf decide` reads it. Steps saying they are done does not count. The run boundary
+is where a person decides what ships, so every run stays a decision. The diamond above is today's flow,
+with the tick doing the waiting: A ships, B and C start from a main that has A, and D starts once both
+have shipped. A conflict between B and C is still a person's to resolve, at the second merge.
+
+- **Shipped is read from git on every pass**, and nothing is carried between passes. A result branch
+  nobody has committed to sits at its base, and the base is on the base branch. So the run also asks for
+  work beyond the base; otherwise a run waiting on a one-step run would start the moment that step was
+  filed. `runReady(run, shipped)` is the pure half, beside `assess`.
+- **The base is read when the roots are filed.** A run that waited starts from its base branch as it is on
+  that pass, with its parents' work on it, not as it was at `wf start`. Every worktree, check and diff of
+  the run is cut from that commit. A run without `--after` keeps the base `wf start` recorded.
+- **Once a step is filed, the parents are never read again.** Deleting a parent's branch after the merge,
+  by `git branch -d` or by `wf decide`'s *drop it*, cannot un-ready a run that has started. The gate
+  applies only to a run with nothing filed.
+- **A deleted branch cannot be read.** Git keeps no record of which commits a deleted branch named: a merge
+  may carry any message, and `git branch -d` needs the branch's worktree removed first. A parent whose
+  result branch is gone therefore reads as not shipped, even if its work was merged, and `wf ls` says
+  `waiting on a-1x2y (wf/a-1x2y/implement gone)`. With `wf up` running, the child starts on the pass after
+  the merge, well before anyone gets round to deleting the branch.
+
+`wf ls` shows the wait on each root, where `waiting` would be: `waiting on a-1x2y`, naming every parent
+that has not shipped. A parent that will never ship without a person gets a reason in brackets:
+`(cancelled)`, `(no such run)` or `(<branch> gone)`. The run then also gets a `→ waiting on you:` line
+with the two ways out: `wf cancel` the child, or start it again without that `--after`. `wf decide` on
+a waiting run says the same and offers nothing else, and `wf tick` adds the wait to the run's line.
+
+`wf start` refuses the following before anything is written, and names the fix for each:
+
+- an id given twice
+- a run the store does not have
+- a run on another repository, or one that ships onto another base branch; the child would never start
+  from a base that has its work
+- a run started `--no-worktree`, which has no result branch to ship
+- a cancelled run, or one whose result branch is gone, unless it has already shipped
+
+A record written before `after` existed waits on nothing.
+
+Not yet built: handing a waiting run its parents' closeouts as data, and `wf plan <folder>`, which starts a
+folder of card briefs along with their edges (`docs/features.md`).
+
 ## Calling a run off
 
 A run could be started and watched but never stopped: the only recourse was killing the session by
@@ -923,7 +978,7 @@ holding a concurrency slot forever.
 | file | |
 |---|---|
 | `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a word the step's harness does not take, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run |
-| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — and what a step is told, `## From <step>`, `## Try <n>` and `## Round <n> of <N>` included |
+| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), and what a step is told, `## From <step>`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |

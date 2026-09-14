@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { StepCheck, StepLog, StepSpec } from '../lib/api';
+import type { StepCheck, StepFiled, StepLog, StepSpec } from '../lib/api';
 
 /** Label and value, one per row. A value that is not set reads as a dash. */
 export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]> }) {
@@ -15,18 +15,76 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
   );
 }
 
-/** A step's frontmatter, as rows for `Facts`. */
-export const specRows = (spec: StepSpec): Array<[string, ReactNode]> => [
+/**
+ * A step's frontmatter, as rows for `Facts` — and, given what the engine filed its current try with, what it runs with. A field
+ * its workflow leaves unset reads as the value the engine filed the task with, marked `default`: `1 · default`, `no limit ·
+ * default`. The permission mode reads as the session runs in it, its harness's choice where none was filed: `auto · default`,
+ * `read-only · by tools`. One the try was filed with other than the workflow's word — a `wf retry --model` — reads as the try's,
+ * marked `this try`. For a step not filed, what the workflow says, or a dash.
+ */
+export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<[string, ReactNode]> => [
   ['harness', code(spec.harness)],
-  ['model', code(spec.model)],
+  ['model', modelRow(spec.model, filed)],
+  ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
   ['after', spec.after.length ? code(spec.after.join(', ')) : null],
   // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
   ...(spec.loop === null ? [] : ([['loop', code(spec.loop)], ['rounds', spec.rounds]] satisfies Array<[string, ReactNode]>)),
   ['resume', code(spec.resume)],
-  ['permission mode', code(spec.permissionMode)],
-  ['deadline', spec.deadlineSeconds === null ? null : `${spec.deadlineSeconds} s`],
-  ['max attempts', spec.maxAttempts],
+  ['permission mode', modeRow(spec.permissionMode, filed)],
+  ['tools', ranWith(toolsWord(spec.tools), filed, (f) => toolsWord(f.tools))],
+  ['deadline', ranWith(secondsWord(spec.deadlineSeconds), filed, (f) => secondsWord(f.deadlineSeconds), 'no limit')],
+  ['max attempts', ranWith(spec.maxAttempts === null ? null : String(spec.maxAttempts), filed, (f) => String(f.maxAttempts))],
 ];
+
+const toolsWord = (tools: string[] | null) => (tools === null ? null : tools.join(', ') || 'none');
+const secondsWord = (seconds: number | null) => (seconds === null ? null : `${seconds} s`);
+
+/**
+ * One field of what a step runs with: the workflow's word, the engine's where the workflow has none — `unset` where the engine was
+ * given none either, for the harness to choose — and the engine's where it filed the try with another.
+ */
+function ranWith(workflow: string | null, filed: StepFiled | null, pick: (filed: StepFiled) => string | null, unset = "harness's own"): ReactNode {
+  const engine = filed && pick(filed);
+  if (!filed || (workflow !== null && (engine === null || engine === workflow))) return code(workflow);
+  return workflow === null
+    ? <Marked value={engine ?? unset} mark="default" word={engine === null} />
+    : <Marked value={engine!} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${engine}.`} />;
+}
+
+/** The model, as `ranWith` reads it — and the model a person's `wf retry --model` asked this try for, marked `this try`, whatever the workflow says. */
+function modelRow(workflow: string | null, filed: StepFiled | null): ReactNode {
+  if (!filed?.askedModel) return ranWith(workflow, filed, (f) => f.model);
+  const says = workflow === null ? 'names no model' : `says ${workflow}`;
+  return <Marked value={filed.model ?? filed.askedModel} mark="this try" title={`Asked for with wf retry --model ${filed.askedModel}; the workflow ${says}.`} />;
+}
+
+/**
+ * The permission mode, as the session runs in it (`runsIn`): its harness's choice where none was filed, marked `default` — `auto` for
+ * Claude Code, not the prompting mode Claude Code has of its own — and a Codex sandbox the step's tools narrowed, marked `by tools`.
+ * Where the api could not ask the harness, as `ranWith` reads it.
+ */
+function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
+  const runs = filed?.runsIn;
+  if (!filed || !runs) return ranWith(workflow, filed, (f) => f.permissionMode);
+  if (runs.by === 'tools') {
+    const named = workflow === null ? '' : `, though the workflow says ${workflow}`;
+    return <Marked value={runs.mode} mark="by tools" title={`Its tools have none that writes, so its harness runs it ${runs.mode}${named}.`} />;
+  }
+  if (workflow === null) return <Marked value={runs.mode} mark="default" />;
+  if (filed.permissionMode !== workflow) {
+    return <Marked value={runs.mode} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${filed.permissionMode ?? 'none'}.`} />;
+  }
+  return runs.mode === workflow ? code(workflow) : <Marked value={runs.mode} mark="as run" title={`The workflow says ${workflow}, which its harness runs as ${runs.mode}.`} />;
+}
+
+function Marked({ value, mark, word = false, title }: { value: string; mark: string; word?: boolean; title?: string }) {
+  return (
+    <span data-mark={mark} title={title}>
+      <span className={word ? undefined : 'font-mono text-xs'}>{value}</span>
+      <span className="text-neutral-500"> · {mark}</span>
+    </span>
+  );
+}
 
 export const code = (value: string | null) => (value === null ? null : <span className="font-mono text-xs">{value}</span>);
 
@@ -47,7 +105,7 @@ export function Check({ check: { command, refused } }: { check: StepCheck }) {
         ]}
       />
       {refused?.unreadable && <p className="text-xs text-red-600 dark:text-red-400">{refused.unreadable}</p>}
-      {refused && <Stream name="output" log={refused.stdout} />}
+      {refused?.stdout && <Stream name="output" log={refused.stdout} />}
       {refused && refused.stderr.lines.length > 0 && <Stream name="stderr" log={refused.stderr} />}
     </section>
   );

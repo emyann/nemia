@@ -25,9 +25,12 @@ export type RunSummary = {
 export type StepSpec = {
   harness: string | null;
   model: string | null;
+  effort: string | null;
   after: string[];
   resume: string | null;
   permissionMode: string | null;
+  /** Null for the harness's own set, empty for none. */
+  tools: string[] | null;
   deadlineSeconds: number | null;
   maxAttempts: number | null;
   /** The step a round runs again, for a looping step; and how many rounds its loop may run, the first included. */
@@ -43,21 +46,72 @@ export type GraphEdge =
 /** Mirrors `RunGraph` in apps/api/src/graph.ts: the steps the run's card leads to, and every edge between steps. */
 export type RunGraph = { roots: string[]; edges: GraphEdge[] };
 
-/** Mirrors `StepCloseout` in apps/api/src/app.ts. */
+/**
+ * Mirrors `StepFiled` in apps/api/src/app.ts: what the engine filed a step's current try with. `maxAttempts` is always on the
+ * record; any other field is null where the task was filed without it — no deadline, which is no limit, and the harness's own
+ * model, effort and tools. `askedModel` is the model a person's `wf retry --model` asked this try for; `runsIn` the permission
+ * mode the session runs in, as its harness decides it — the mode filed, its choice when none was (`auto` for Claude Code), or a
+ * Codex sandbox narrowed by `tools` — and null where the api could not ask the harness.
+ */
+export type StepFiled = {
+  model: string | null;
+  askedModel: string | null;
+  effort: string | null;
+  permissionMode: string | null;
+  runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
+  tools: string[] | null;
+  deadlineSeconds: number | null;
+  maxAttempts: number;
+};
+
+/**
+ * Mirrors `StepArtifact` in apps/api/src/artifacts.ts: a file a closeout named. One the api serves from the step's files
+ * directory has its name, the `url` to read it by, its kind and size; anything else is the path alone.
+ */
+export type StepArtifact = { path: string } | { path: string; name: string; url: string; kind: 'image' | 'text' | 'other'; size: number };
+
+/** Mirrors `StepReply` in apps/api/src/app.ts: a loop's target's answer to one finding. */
+export type StepReply = { finding: string; answer: string; why: string };
+
+/** Mirrors `StepCloseout` in apps/api/src/app.ts: with what it gave of its declared output, what it did not, and its `replies`. */
 export type StepCloseout = {
   outcome: 'done' | 'blocked';
   summary: string;
   needs: string | null;
-  artifacts: string[];
+  artifacts: StepArtifact[];
+  output: Record<string, unknown>;
+  missing: string[];
+  replies: StepReply[] | null;
 };
 
 /**
  * Mirrors `StepCheck` in apps/api/src/app.ts: the command a step is judged by, from the workflow the run
- * froze, and once its check refused, the exit in `wf ls`'s words and the end of each stream.
+ * froze, its task and verdict — `passed`, `exit 1`, `unfinished`, `checking` — and once its check refused, the
+ * exit in `wf ls`'s words and the end of each stream. `stdout` is null on an earlier try's check, whose output the api does not read.
  */
 export type StepCheck = {
   command: string;
-  refused: { exit: string; stdout: StepLog; stderr: StepLog; unreadable: string | null } | null;
+  taskId: string | null;
+  verdict: string | null;
+  refused: { exit: string; stdout: StepLog | null; stderr: StepLog; unreadable: string | null } | null;
+};
+
+/**
+ * Mirrors `StepTry` in apps/api/src/app.ts: one try of a step, earliest first. `then` is what replaced it, null on the current
+ * try, which `current` marks; `note` how it was reached, in `wf ls`'s words. `status` is the step's word on the current try, and
+ * the engine's word for the task on an earlier one.
+ */
+export type StepTry = {
+  try: number;
+  round: number;
+  then: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | null;
+  current: boolean;
+  taskId: string | null;
+  note: string | null;
+  status: string;
+  attempts: StepAttempts;
+  check: StepCheck | null;
+  closeout: StepCloseout | null;
 };
 
 /** Mirrors `RunDetail` in apps/api/src/app.ts. */
@@ -80,6 +134,8 @@ export type RunDetail = {
   steps: Array<{
     name: string;
     spec: StepSpec | null;
+    /** What the engine filed its current try with; null for a step not filed. */
+    filed: StepFiled | null;
     body: string | null;
     told: string | null;
     taskId: string | null;
@@ -94,6 +150,8 @@ export type RunDetail = {
     attempts: StepAttempts;
     /** What its current try consumed, in `wf decide`'s words; null for a step not filed. */
     used: StepUsed | null;
+    /** Every try, earliest first, the current one last: `attempts` counts the current try's task alone. */
+    tries: StepTry[];
   }>;
 };
 
@@ -324,15 +382,18 @@ export const runQuery = (id: string) =>
  * An api process started before `RunDetail` carried it answers without one — the version skew that had the board take
  * every step for a root on 2026-09-13. Refused here, naming the fix, so the run's page and the Factory's card say so,
  * rather than a render throwing on `undefined` and taking the whole floor down with it. Nothing is worked out from
- * `after` instead: a graph the api did not give is the guess this replaces.
+ * `after` instead: a graph the api did not give is the guess this replaces. So is a step without its `tries`, which the
+ * inspector reads for every step: an api from before it carried them.
  */
 export function withGraph(id: string, detail: RunDetail): RunDetail {
+  const restart = 'Restart the api (`npm run dev` from the repository, or whatever serves /api), then reload the page.';
   const graph = (detail as { graph?: Partial<RunGraph> | null }).graph;
   if (!graph || !Array.isArray(graph.roots) || !Array.isArray(graph.edges)) {
-    throw new Error(
-      `The api answered run '${id}' without its graph, so it is older than this board, which draws only the graph the api gives. ` +
-        'Restart the api (`npm run dev` from the repository, or whatever serves /api), then reload the page.',
-    );
+    throw new Error(`The api answered run '${id}' without its graph, so it is older than this board, which draws only the graph the api gives. ${restart}`);
+  }
+  const bare = (detail.steps ?? []).find((step) => !Array.isArray((step as { tries?: unknown }).tries));
+  if (bare) {
+    throw new Error(`The api answered run '${id}' without the tries of its step '${bare.name}', so it is older than this board, which shows every round a step ran. ${restart}`);
   }
   return detail;
 }

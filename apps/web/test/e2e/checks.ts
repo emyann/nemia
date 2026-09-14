@@ -37,6 +37,22 @@ export async function expectVisible(locator: Locator, assertion: string, timeout
   }
 }
 
+/**
+ * The image is drawn, within `timeout`: visible, loaded, and with pixels. A broken image's box is visible all the same, so
+ * `expectVisible` alone passes an image whose request failed.
+ */
+export async function expectDrawn(image: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+  const until = Date.now() + timeout;
+  await expectVisible(image, assertion, timeout);
+  const drawn = () => image.first().evaluate((element) => element instanceof HTMLImageElement && element.complete && element.naturalWidth > 0);
+  let ok = await drawn();
+  while (!ok && Date.now() < until) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    ok = await drawn();
+  }
+  if (!ok) throw new Refused(`${assertion} — the image did not load: no pixels after ${timeout} ms`);
+}
+
 /** As many elements match as `count`, within `timeout`. */
 export async function expectCount(locator: Locator, count: number, assertion: string, timeout = WAIT_MS): Promise<void> {
   const until = Date.now() + timeout;

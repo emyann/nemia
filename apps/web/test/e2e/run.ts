@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectApart, expectBeneath, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectCount, expectDrawn, expectInside, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
@@ -300,6 +300,13 @@ const PAGES: PageSpec[] = [
       // What a step consumed, in its section and in the inspector's Details, in `wf decide`'s words.
       const tokens = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.unverified, exact: true }) });
       await expectVisible(tokens.locator('dd', { hasText: FAKE.used }), `${FAKE.unverified}'s section says what its session used (${FAKE.used})`);
+      // The mode each session runs in, filed with none: its harness's choice, marked default — never "the harness's own".
+      await expectVisible(
+        tokens.locator('[data-mark="default"]', { hasText: 'workspace-write · default' }),
+        `${FAKE.unverified}'s spec says the sandbox its Codex session runs in (workspace-write · default)`,
+      );
+      const blocked = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });
+      await expectVisible(blocked.locator('[data-mark="default"]', { hasText: 'auto · default' }), `${FAKE.blocked}'s spec says the mode its Claude Code session runs in (auto · default)`);
       await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
       const inspected = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
       await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);
@@ -317,6 +324,38 @@ const PAGES: PageSpec[] = [
       await expectVisible(inspector.locator('[data-turn="tools"]', { hasText: SESSION.folded }), `${SESSION.step}'s Activity tab draws its conversation, the calls folded into one line (${SESSION.folded})`);
       await expectVisible(inspector.locator('section[aria-label="Closeout"]'), `${SESSION.step}'s Activity tab ends with its closeout`);
       await expectVisible(inspector.locator(`a[href="/runs/${FAKE.id}/steps/${SESSION.step}"]`, { hasText: 'Open the session' }), `${SESSION.step}'s Activity tab links to its session's page`);
+      await settled(page);
+
+      // tokens' Output: the image it named drawn inline, opening full-size in a new tab; its text file a link; a path on its
+      // branch as it gave it. Left open for the photograph.
+      await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
+      const output = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
+      await output.getByRole('tab', { name: 'Output' }).click();
+      const palette = output.locator(`img[alt="${FAKE.artifacts.image}"]`);
+      await expectDrawn(palette, `${FAKE.unverified}'s Output tab draws the image it named inline (${FAKE.artifacts.image})`);
+      // `has` is queried inside each link, so from the page: `palette` starts at the inspector, which no link is around.
+      const full = output.locator('a[target="_blank"]', { has: page.locator(`img[alt="${FAKE.artifacts.image}"]`) });
+      await expectCount(full, 1, `${FAKE.artifacts.image} is inside a link that opens it in a new tab`);
+      await expectVisible(output.locator('a[target="_blank"]', { hasText: FAKE.artifacts.text }), `the text file it named is a link (${FAKE.artifacts.text})`);
+      await expectVisible(output.getByText(FAKE.artifacts.path, { exact: true }), `a path on its branch is shown as it gave it (${FAKE.artifacts.path})`);
+      await expectDrawn(
+        page.locator(`article > section [aria-label="Artifacts"] img[alt="${FAKE.artifacts.image}"]`),
+        `${FAKE.unverified}'s section on the run's page draws the image too`,
+      );
+      // As the api serves it, through the proxy the page reads it by: a PNG, never cached.
+      const served = await page.request.get(new URL((await full.getAttribute('href')) ?? '', page.url()).href);
+      const headers = served.headers();
+      if (served.status() !== 200 || headers['content-type'] !== 'image/png' || headers['cache-control'] !== 'no-store') {
+        throw new Refused(`the api serves ${FAKE.artifacts.image} as a PNG, never cached — it answered ${served.status()}, ${headers['content-type']}, cache-control ${headers['cache-control']}`);
+      }
+      // Opened full-size: a tab of its own, which draws it under the api's sandboxing policy.
+      const [tab] = await Promise.all([page.context().waitForEvent('page'), full.click()]);
+      try {
+        await tab.waitForLoadState();
+        await expectDrawn(tab.locator('img'), `${FAKE.artifacts.image} opens full-size in a tab of its own`);
+      } finally {
+        await tab.close();
+      }
       await settled(page);
     },
   },
@@ -427,6 +466,24 @@ const PAGES: PageSpec[] = [
       await expectVisible(inspector.locator('[data-note]', { hasText: LOOPING.notes.review }), `the inspector's Details show ${LOOPING.exhausted}'s note under its chip`);
       await settled(page);
       await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas beside the open inspector');
+
+      // implement, the loop's target, ran a try in each of three rounds, each a task of its own: a row a round in its Details.
+      await node(LOOPING.target).click();
+      const target = page.locator(`aside[aria-label="Step ${LOOPING.target}"]`);
+      const rows = target.locator('section[aria-label="Rounds"] li[data-try]');
+      await expectCount(rows, 3, `${LOOPING.target}'s Details list its three rounds, a row each`);
+      for (const [i, label] of ['round 1 · try 1', 'round 2 · try 2 (round)', 'round 3 · try 3 (round)'].entries()) {
+        await expectVisible(rows.nth(i).getByText(label), `row ${i + 1} is ${label}`);
+        await expectVisible(rows.nth(i).getByText(`${LOOPING.id}-implement-${i + 1}`, { exact: true }), `row ${i + 1} names its own task`);
+      }
+      await expectVisible(target.locator('li[data-try="3"][aria-current="true"]'), 'the current round is the one selected');
+      // Round 2 selected: the Output tab shows its closeout, its reply as `finding → answer (why)`, and the other two rounds folded beneath.
+      await target.getByRole('button', { name: 'Show the closeout of round 2 · try 2 (round)' }).click();
+      await expectVisible(target.locator('[data-shown-try="2"]'), "selecting round 2 opens its closeout in the Output tab");
+      await expectVisible(target.getByText(LOOPING.earlier[1].implement, { exact: true }), `round 2's summary (${LOOPING.earlier[1].implement})`);
+      await expectVisible(target.locator('li[data-answer]', { hasText: LOOPING.replied }), `round 2's reply, as finding → answer (why)`);
+      await expectCount(target.locator('section[aria-label="Other tries"] details:not([open])'), 2, 'the other two rounds are folded beneath it');
+      await settled(page);
     },
   },
   {

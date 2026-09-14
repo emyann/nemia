@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, isShipped, lessonLine, listRuns, phaseOfView, readAsks, sensitiveDiff, touchedBy, usedLines, verdictWord } from 'agent-workflows';
-import { assess, type Assessment, composeBrief, type Decision, decision, inFlight, listing, retryLines, roundLines, type Run } from 'agent-workflows/run';
-import { loadWorkflows, terminalSteps, type Workflow } from 'agent-workflows/workflow';
+import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, HARNESSES, isShipped, lessonLine, listRuns, phaseOfView, readAsks, sensitiveDiff, touchedBy, usedLines, verdictWord } from 'agent-workflows';
+import { assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote } from 'agent-workflows/run';
+import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
+import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
 import { workflows } from './workflows.ts';
@@ -41,9 +42,13 @@ export type RunSummary = {
 export type StepSpec = {
   harness: string | null;
   model: string | null;
+  /** How hard the harness is told to think, in its own words. */
+  effort: string | null;
   after: string[];
   resume: string | null;
   permissionMode: string | null;
+  /** The only tools the session may have: null for the harness's own set, empty for none. */
+  tools: string[] | null;
   deadlineSeconds: number | null;
   maxAttempts: number | null;
   /** The step a round runs again, on a looping step. */
@@ -52,12 +57,50 @@ export type StepSpec = {
   rounds: number | null;
 };
 
-/** How a step signed off, when it did. */
+/**
+ * What the engine filed a step's current try with, off its record of the task: what the step runs with where its workflow
+ * leaves a field to the engine. `maxAttempts` is always on the record, the engine's default being 1. Each other field is null
+ * where the task was filed without it — a deadline, which is then no limit; a model, effort or tools, which are then the
+ * harness's own; a permission mode, which its harness chooses, and `runsIn` says.
+ */
+export type StepFiled = {
+  model: string | null;
+  /**
+   * The model a person's `wf retry --model` asked this try for, off the run's record (`EarlierTry.model`): what tells a model the
+   * try was filed on from a default. Null when nobody asked.
+   */
+  askedModel: string | null;
+  effort: string | null;
+  permissionMode: string | null;
+  /**
+   * The permission mode the session runs in, which the engine files as given and its harness decides (`runsInOf`): the mode filed
+   * (`filed`); the harness's choice when none was — `auto` for Claude Code, `workspace-write` for Codex (`default`); or, for Codex,
+   * `read-only` because `tools` has none that writes, whatever was named (`tools`). Null for a harness the api cannot ask.
+   */
+  runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
+  tools: string[] | null;
+  deadlineSeconds: number | null;
+  maxAttempts: number;
+};
+
+/** A loop's target's answer to one finding it was handed, as its closeout gave it. */
+export type StepReply = { finding: string; answer: string; why: string };
+
+/**
+ * How a step signed off, when it did.
+ *
+ * `output` is what it gave of the fields its `output:` declares, and `missing` those it did not (`declaredOutput`). `replies`
+ * is a loop's target's answer to each finding it was handed, when its closeout gave them. `artifacts` are the files it named,
+ * each as `artifactOf` reads it: a file the api serves from the step's files directory, or the path alone.
+ */
 export type StepCloseout = {
   outcome: 'done' | 'blocked';
   summary: string;
   needs: string | null;
-  artifacts: string[];
+  artifacts: StepArtifact[];
+  output: Record<string, unknown>;
+  missing: string[];
+  replies: StepReply[] | null;
 };
 
 /**
@@ -69,13 +112,46 @@ export type StepCloseout = {
  */
 export type StepCheck = {
   command: string;
+  /** The check's task, once the run has filed it. */
+  taskId: string | null;
+  /**
+   * What the check said of the work: `passed`, `exit 1`, `unfinished` for one that did not finish, `checking` while it runs,
+   * and `unknown` for a task the engine has no record of. Null until the run files it.
+   */
+  verdict: string | null;
   refused: {
     exit: string;
-    stdout: StepLog;
+    /**
+     * Null on an earlier try's check: a session's output is read with a `logs` call, which observes every harness again, so
+     * the page reads it for the current try's check alone. Its stderr is a file, and is read for every try.
+     */
+    stdout: StepLog | null;
     stderr: StepLog;
     /** Why its output could not be read, when it could not. */
     unreadable: string | null;
   } | null;
+};
+
+/**
+ * One try of a step, as the run's record keeps it: the tries behind the current one (`StepRecord.tries`), then the current.
+ *
+ * `try` counts from 1, and `round` is the round of its loop the try was filed in (`roundIn`). `then` is what replaced it —
+ * `round`, `retries`, or the mode a person asked for — and null on the current try, which `current` marks. `note` is how the
+ * try was reached, in `wf ls`'s words (`tryNote`), and null on the first. `status` on the current try is the step's word, as on
+ * the step; on an earlier one, the engine's own word for its task — `succeeded`, `failed` — since `wf ls` words only the try
+ * that decides the step. `attempts`, `check` and `closeout` are the try's own, in the step's shapes.
+ */
+export type StepTry = {
+  try: number;
+  round: number;
+  then: EarlierTry['then'] | null;
+  current: boolean;
+  taskId: string | null;
+  note: string | null;
+  status: string;
+  attempts: StepAttempts;
+  check: StepCheck | null;
+  closeout: StepCloseout | null;
 };
 
 /** One run in full, for a person reading it: the spec, and per step what it was told and how it went. */
@@ -105,6 +181,8 @@ export type RunDetail = {
     name: string;
     /** From the workflow the run froze at `wf start`; for a record from before runs froze one, the folder. */
     spec: StepSpec | null;
+    /** What the engine filed its current try with; null for a step not filed, or a task the engine has no record of. */
+    filed: StepFiled | null;
     body: string | null;
     /** For a filed step, the brief the engine was filed with; for one not yet filed, what it would be given now. */
     told: string | null;
@@ -120,6 +198,11 @@ export type RunDetail = {
     attempts: StepAttempts;
     /** What its current try consumed, in `wf decide`'s words; null for a step not filed, which consumed nothing. */
     used: StepUsed | null;
+    /**
+     * Every try, earliest first, the current one last and marked: `attempts` counts the current try's task alone, and each
+     * round of a loop, and each try within one, is a task of its own.
+     */
+    tries: StepTry[];
   }>;
 };
 
@@ -210,10 +293,10 @@ type TaskView = Awaited<ReturnType<typeof e.view>>;
 type Views = ReadonlyMap<string, TaskView>;
 
 /**
- * The engine's view of every task a run has filed — each step's, and each check's — for one run's page.
+ * The engine's view of every task a run's current tries have filed — each step's, and each check's — for its decision.
  * Each `view` observes every harness — a `claude agents` call, a scan of detached runs — so this is an
- * observation per filed task, and a request reads each task once. The list of every run reads them with
- * `everyView`.
+ * observation per filed task, read once for each state of a run. A run's page, which is polled, and the list of every
+ * run read theirs with `everyView`.
  */
 async function viewsOf(run: Run): Promise<Views> {
   const views = new Map<string, TaskView>();
@@ -405,9 +488,11 @@ function summarize(run: Run, views: Views): RunSummary {
 const specOf = (step: Workflow): StepSpec => ({
   harness: step.harness ?? null,
   model: step.model ?? null,
+  effort: step.effort ?? null,
   after: step.after,
   resume: step.resume ?? null,
   permissionMode: step.permissionMode ?? null,
+  tools: step.tools ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
   maxAttempts: step.maxAttempts ?? null,
   loop: step.loop ?? null,
@@ -424,7 +509,10 @@ async function detail(run: Run): Promise<RunDetail> {
   const folder = workflowsOf(run);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  const views = await viewsOf(run);
+  // Every task in the store over one observation, as the list reads them, rather than a `view` — an observation, ~0.3 s here — for
+  // each task of each try, one after another, on a page polled every five seconds: a loop's later rounds made that seconds a poll.
+  // Folding every journal cost about what one observation does (163 journals, 2026-09-13). The record is read first, as the list reads it.
+  const views = await everyView();
   const judged = judge(run, names, workflows, views);
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
@@ -449,27 +537,159 @@ async function detail(run: Run): Promise<RunDetail> {
     graph: graphOf([...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)]),
     steps: names.map((name) => {
       const step = source?.find((s) => s.name === name);
-      const c = closeoutOf(views, run, name);
+      const taskId = run.steps[name]?.taskId ?? null;
+      const current = {
+        status: judged.words.get(name)!,
+        check: checks.get(name) ?? null,
+        // An unreadable closeout is already in `status`; there is nothing here to show of it.
+        closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
+        attempts: attemptsIn(taskId, views),
+      };
       return {
         name,
         spec: step ? specOf(step) : null,
+        filed: filedOf(run.steps[name], views),
         body: step?.body ?? null,
         told: toldOf(run, name, source, views),
-        taskId: run.steps[name]?.taskId ?? null,
+        taskId,
         workspace: run.steps[name]?.workspace ?? null,
         branch: run.steps[name]?.branch ?? null,
-        status: judged.words.get(name)!,
         note: judged.notes.get(name) ?? null,
-        // An unreadable closeout is already in `status`; there is nothing here to show of it.
-        closeout: c && !('error' in c)
-          ? { outcome: c.outcome, summary: c.summary, needs: c.needs ?? null, artifacts: c.artifacts }
-          : null,
-        check: checks.get(name) ?? null,
-        attempts: attemptsOf(run, name, views),
-        used: run.steps[name]?.taskId ? usedOf(used[name]) : null,
+        ...current,
+        used: taskId ? usedOf(used[name]) : null,
+        tries: triesOf(run, name, steps, views, current),
       };
     }),
   };
+}
+
+/** What the engine filed a step's current try with (`StepFiled`), off its record; null for no task, or one the engine has no record of. */
+function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null {
+  const view = record?.taskId ? views.get(record.taskId) : undefined;
+  if (!view || phaseOfView(view) === 'unknown') return null;
+  const { model, effort, permissionMode, tools, deadlineSeconds, maxAttempts } = view.state;
+  return {
+    model: model ?? null,
+    askedModel: askedModelOf(record),
+    effort: effort ?? null,
+    permissionMode: permissionMode ?? null,
+    runsIn: runsInOf(view.state),
+    tools: tools ?? null,
+    deadlineSeconds: deadlineSeconds ?? null,
+    maxAttempts,
+  };
+}
+
+/**
+ * The model a person's `wf retry --model` asked a step's current try for: on the try its task replaced, where `nextTry` keeps the
+ * model with the mode — found past any recheck, which replaced only a check, and kept the task.
+ */
+function askedModelOf(record: StepRecord | undefined): string | null {
+  const tries = record?.tries ?? [];
+  let i = tries.length - 1;
+  while (i >= 0 && tries[i]!.then === 'recheck') i--;
+  return tries[i]?.model ?? null;
+}
+
+/** The flags a harness's command gives its session's permission mode by: Claude Code's mode, and Codex's sandbox. */
+const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
+
+/**
+ * The permission mode a task's session runs in (`StepFiled.runsIn`), as its harness decides it from what the engine was filed with.
+ *
+ * A harness the run brings as a spec — `codex`, `claude-detached` — is asked with its own `command`, a pure function of the request:
+ * the mode it would spawn the session with, and again without `tools`, which tells a sandbox the tools narrowed from one the task
+ * named. So a rule the engine changes is the rule read here. `claude` is the engine's own `claude --bg` runner, whose spawn is no
+ * function it exports: the mode filed, or `auto` (`claudeOps` in agent-engine's runner.ts), which the api test holds to the command
+ * that runner spawns. A task filed with no harness ran on the engine's first (`fallback` in its facade). Null for a harness the api
+ * cannot ask, or one whose command names no mode.
+ */
+function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
+  const name = state.harness ?? Object.keys(HARNESSES)[0]!;
+  if (!Object.hasOwn(HARNESSES, name)) return null;
+  const harness = HARNESSES[name as keyof typeof HARNESSES];
+  const by = state.permissionMode === undefined ? 'default' : 'filed';
+  if (harness === 'claude-bg') return { mode: state.permissionMode ?? 'auto', by };
+  if (typeof harness !== 'object' || !('command' in harness)) return null;
+  const modeOf = (tools: string[] | undefined): string | undefined => {
+    try {
+      const { args } = harness.command({ name: `${state.taskId}/mode`, brief: '', cwd: state.cwd || '/', permissionMode: state.permissionMode, tools });
+      const at = args.findIndex((arg) => MODE_FLAGS.includes(arg));
+      return at < 0 ? undefined : args[at + 1];
+    } catch {
+      return undefined;
+    }
+  };
+  const mode = modeOf(state.tools);
+  if (mode === undefined) return null;
+  return { mode, by: state.tools && modeOf(undefined) !== mode ? 'tools' : by };
+}
+
+/**
+ * How one try of a step signed off, off the engine's record of its task's last attempt — as `closeoutOf` reads the current try's —
+ * with what it gave of the fields its step declares, its `replies`, and each file it named as `artifactOf` reads it. Null for a
+ * try that gave none, and for one whose closeout could not be read, which the step's `status` says of its current try.
+ */
+function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | null, views: Views): StepCloseout | null {
+  const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
+  const c = said === undefined ? undefined : parseCloseout(said);
+  if (!c || 'error' in c) return null;
+  // `replies` apart: a loop's target owes them beside what its step declares, and they are shown as answers, not as a field.
+  const { given, missing } = declaredOutput(step, c, outputFields(step).filter((field) => field !== LOOP_REPLIES));
+  const replies = c.output?.[LOOP_REPLIES];
+  return {
+    outcome: c.outcome,
+    summary: c.summary,
+    needs: c.needs ?? null,
+    artifacts: c.artifacts.map((file) => artifactOf(run, name, file)),
+    output: given,
+    missing,
+    replies: Array.isArray(replies) ? replies.map(replyOf) : null,
+  };
+}
+
+/** One of a closeout's `replies`, forgivingly: the harness held it to its schema, and an agent filled it in. */
+function replyOf(item: unknown): StepReply {
+  const text = (value: unknown) => (typeof value === 'string' ? value : value === undefined ? '' : JSON.stringify(value));
+  if (!item || typeof item !== 'object' || Array.isArray(item)) return { finding: text(item), answer: '', why: '' };
+  const { finding, answer, why } = item as Record<string, unknown>;
+  return { finding: text(finding), answer: text(answer), why: text(why) };
+}
+
+/**
+ * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose
+ * word, check, closeout and attempts the step already has. Off the views already read (`viewsOf`), with no observation of its
+ * own: an earlier refused check's stderr is a file, and its output is not read.
+ */
+function triesOf(run: Run, name: string, steps: readonly Workflow[], views: Views, current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'attempts'>): StepTry[] {
+  const step = steps.find((s) => s.name === name) ?? bare(name);
+  const record = run.steps[name];
+  const earlier = record?.tries ?? [];
+  // How the n-th try was reached, as `wf ls` words it for a record on that try.
+  const noteOf = (n: number) => tryNote(step, { taskId: null, tries: earlier.slice(0, n - 1) }, steps) || null;
+  return [
+    ...earlier.map((t, i): StepTry => ({
+      try: i + 1,
+      round: roundIn({ taskId: null, tries: earlier.slice(0, i) }),
+      then: t.then,
+      current: false,
+      taskId: t.taskId,
+      note: noteOf(i + 1),
+      status: wordOf(views)(t.taskId),
+      attempts: attemptsIn(t.taskId, views),
+      check: step.check ? checkIn(step.check, t.check?.taskId, views) : null,
+      closeout: closeoutIn(run, name, step, t.taskId, views),
+    })),
+    {
+      try: earlier.length + 1,
+      round: roundIn(record),
+      then: null,
+      current: true,
+      taskId: record?.taskId ?? null,
+      note: noteOf(earlier.length + 1),
+      ...current,
+    },
+  ];
 }
 
 /** A usage in `wf decide`'s words: `usedLines`, each line without the label it starts with. */
@@ -612,9 +832,8 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   };
 }
 
-/** Off the engine's view of the step's task. A step with no task, or one the engine has lost, has had none. */
-function attemptsOf(run: Run, name: string, views: Views): StepAttempts {
-  const taskId = run.steps[name]?.taskId;
+/** Off the engine's view of a try's task. A try with no task, or one the engine has lost, has had none. */
+function attemptsIn(taskId: string | null, views: Views): StepAttempts {
   const attempts = (taskId && views.get(taskId)?.state.attempts) || [];
   const latest = attempts.at(-1);
   return {
@@ -638,6 +857,26 @@ function tailOf(output: string, max: number): StepLog {
 const CHECK_LINES = 20;
 
 /**
+ * A check of one try, off the engine's view of its task: the command, its verdict, and once it refused, what it exited with and
+ * the end of its stderr — its output left unread (`StepCheck`). A check is filed for the step, so a settled one's record has a
+ * verdict: an exit code, or `unfinished` — `exitVerdicts`' reading, for a try that need not be the current one.
+ */
+function checkIn(command: string, taskId: string | undefined, views: Views): StepCheck {
+  if (!taskId) return { command, taskId: null, verdict: null, refused: null };
+  const view = views.get(taskId);
+  const phase = phaseOfView(view);
+  const exitCode = view?.state.attempts.at(-1)?.exitCode;
+  const exit = verdictWord(typeof exitCode === 'number' ? exitCode : 'unfinished');
+  const refused = phase === 'failed' || phase === 'stopped';
+  return {
+    command,
+    taskId,
+    verdict: phase === 'unknown' ? 'unknown' : phase === 'succeeded' ? 'passed' : refused ? exit : 'checking',
+    refused: refused ? { exit, stdout: null, stderr: tailOf(endOf(checkStderr(taskId)), CHECK_LINES), unreadable: null } : null,
+  };
+}
+
+/**
  * Each judged step's check: its command, and for a check that refused, what it said — what `checkReports`
  * in runner.ts reads for `wf ls` and `wf decide`, which the package does not export. A `logs` call per
  * refused check, which observes every harness again: on one run's page, and never on the list.
@@ -646,25 +885,16 @@ async function checksOf(run: Run, steps: readonly Workflow[], views: Views): Pro
   const checks = new Map<string, StepCheck>();
   for (const step of steps) {
     if (!step.check) continue;
-    const taskId = run.steps[step.name]?.check?.taskId;
-    const settled = taskId ? views.get(taskId)?.state.settled : null;
-    if (!taskId || (settled !== 'failed' && settled !== 'stopped')) {
-      checks.set(step.name, { command: step.check, refused: null });
-      continue;
-    }
-    let stdout: StepLog = { lines: [], truncated: false };
-    let unreadable: string | null = null;
+    const check = checkIn(step.check, run.steps[step.name]?.check?.taskId, views);
+    checks.set(step.name, check);
+    if (!check.refused) continue;
     try {
-      stdout = tailOf(await e.logs(taskId), CHECK_LINES);
+      check.refused.stdout = tailOf(await e.logs(check.taskId!), CHECK_LINES);
     } catch (err) {
       const why = err instanceof Error ? err.message : String(err);
-      unreadable = `Could not read the output of its check (task ${taskId}): ${why}. \`wf decide ${run.id}\` reads it the same way from the command line.`;
+      check.refused.stdout = { lines: [], truncated: false };
+      check.refused.unreadable = `Could not read the output of its check (task ${check.taskId}): ${why}. \`wf decide ${run.id}\` reads it the same way from the command line.`;
     }
-    checks.set(step.name, {
-      command: step.check,
-      // A check is filed for the step, so the engine's record has a verdict for it: an exit code, or `unfinished`.
-      refused: { exit: verdictWord(exitVerdicts(views, run)(step.name)!), stdout, stderr: tailOf(endOf(checkStderr(taskId)), CHECK_LINES), unreadable },
-    });
   }
   return checks;
 }
@@ -693,17 +923,17 @@ const noSuchRun = (id: string) =>
   `No run '${id}' in this store. GET /api/runs (or \`wf ls\`) lists the runs it has; check WF_ROOT if you expected it here.`;
 
 /**
- * The task a step's routes read — null for a step not filed yet — or why there is no such step to read: no run by that id,
- * or no step by that name on the run's page.
+ * The run and the task a step's routes read — null for a step not filed yet — or why there is no such step to read: no run by
+ * that id, or no step by that name on the run's page.
  */
-function taskOfStep(id: string, step: string): { taskId: string | null } | { error: string } {
+function taskOfStep(id: string, step: string): { run: Run; taskId: string | null } | { error: string } {
   const run = findRun(id);
   if (!run) return { error: noSuchRun(id) };
   // The steps the run's page shows: those on the record, and any the folder has gained since.
   if (!stepNames(run, workflowsOf(run).steps).includes(step)) {
     return { error: `Run '${id}' has no step '${step}'. GET /api/runs/${id} lists the steps it has.` };
   }
-  return { taskId: run.steps[step]?.taskId ?? null };
+  return { run, taskId: run.steps[step]?.taskId ?? null };
 }
 
 /** One of the engine's events in a session's conversation, as `transcript` gives it (`TranscriptEvent` in agent-engine). */
@@ -834,6 +1064,30 @@ export const app = new Hono()
         error: `Could not read the output of step '${step}' (task ${taskId}): ${why}. \`wf logs ${id} ${step}\` reads it the same way from the command line, with the error in full.`,
       }, 502);
     }
+  })
+  // One file of a step's files directory, by name and never by path (artifacts.ts), as its closeout's `artifacts` link it. Read on
+  // each request and never kept: a step that runs again writes its files again.
+  .get('/api/runs/:id/steps/:step/artifacts/:name', (c) => {
+    const id = c.req.param('id');
+    const step = c.req.param('step');
+    const name = c.req.param('name');
+    const found = taskOfStep(id, step);
+    if ('error' in found) return c.json({ error: found.error }, 404);
+    const refused = refusedName(name);
+    if (refused) return c.json({ error: refused }, 400);
+    const file = readArtifactFile(found.run, step, name);
+    if (!file) {
+      return c.json({
+        error: `Step '${step}' of run '${id}' has no file '${name}' in its files directory. GET /api/runs/${id} gives the \`url\` of each file a step's closeout named that the api serves.`,
+      }, 404);
+    }
+    return c.body(new Uint8Array(file.body), 200, {
+      'Content-Type': file.type,
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      // A step's file is an agent's text, served on the board's origin: an SVG opened in a tab runs no script of its.
+      'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox",
+    });
   })
   // A step's conversation, read once from a cursor: the engine's events for the step's current task, and whether it is live.
   .get('/api/runs/:id/steps/:step/transcript', async (c) => {

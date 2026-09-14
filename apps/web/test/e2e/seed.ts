@@ -23,6 +23,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 export const FAKE = {
   id: 'give-the-board-a-look-e2e0',
@@ -55,6 +56,8 @@ export const FAKE = {
   capped: 'apps/web/test/theme.test.ts',
   /** What `tokens`' session consumed, in `wf decide`'s words. */
   used: '14 turns · 31 tool calls · 112k in · 6.35k out',
+  /** What `tokens` named in its closeout: an image and a text file in its files directory, which the api serves, and a path on its branch. */
+  artifacts: { image: 'palette.png', text: 'tokens.txt', path: 'TOKENS.md' },
   /** One per `after` between its steps: implement → review, review → respond, implement → respond, tokens → theme. */
   edges: 4,
 } as const;
@@ -158,6 +161,14 @@ export const LOOPING = {
     implement: 'round 3 of 3',
     review: 'round 3 of 3, and it asked again — once more: wf round go-round-again-e2e2 review',
   },
+  /** What each step said in the rounds before the one it is on: round 1, then round 2. */
+  earlier: [
+    { implement: 'Implemented it.', review: 'Three findings.' },
+    { implement: 'Answered the first review.', review: 'Two findings are still open.' },
+  ],
+  /** What implement answered in round 2, and how the Output tab says it: `finding → answer (why)`. */
+  replies: [{ finding: 'apps/web/src/lib/status.ts — an unknown word reads as working', answer: 'fixed', why: 'It reads as unknown now.' }],
+  replied: 'apps/web/src/lib/status.ts — an unknown word reads as working → fixed (It reads as unknown now.)',
 } as const;
 
 const STEPS = [
@@ -256,10 +267,52 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(root, 'workflows', yours.name, 'plan.md'), '---\nharness: codex\n---\nWrite PLAN.md.\n');
 }
 
-const write = (file: string, text: string): void => {
+const write = (file: string, text: string | Buffer): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
+
+/** A PNG, `width` by `height`, each pixel the colour `colour` gives it: encoded here, since the e2e installs nothing to draw one. */
+export function png(width: number, height: number, colour: (x: number, y: number) => readonly [number, number, number]): Buffer {
+  const stride = width * 3 + 1;
+  const rows = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y++) {
+    // Each row starts with its filter, none.
+    for (let x = 0; x < width; x++) rows.set(colour(x, y), y * stride + 1 + x * 3);
+  }
+  const chunk = (type: string, data: Buffer): Buffer => {
+    const body = Buffer.concat([Buffer.from(type, 'ascii'), data]);
+    const out = Buffer.alloc(body.length + 8);
+    out.writeUInt32BE(data.length, 0);
+    body.copy(out, 4);
+    out.writeUInt32BE(crc32(body), body.length + 4);
+    return out;
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0);
+  header.writeUInt32BE(height, 4);
+  // 8 bits a channel, RGB, and the one compression, filter and interlace a PNG has.
+  header.set([8, 2, 0, 0, 0], 8);
+  const signature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  return Buffer.concat([signature, chunk('IHDR', header), chunk('IDAT', zlib.deflateSync(rows)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+/** CRC-32, as a PNG's chunks carry it. */
+function crc32(bytes: Buffer): number {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = crc & 1 ? (crc >>> 1) ^ 0xedb88320 : crc >>> 1;
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+/** `tokens`' palette as the step photographed it: a swatch a token, in its colour, on a light ground. */
+const PALETTE: ReadonlyArray<readonly [number, number, number]> = [
+  [14, 165, 233], [59, 130, 246], [16, 185, 129], [245, 158, 11], [249, 115, 22],
+  [239, 68, 68], [115, 115, 115], [139, 92, 246], [20, 184, 166], [244, 63, 94],
+];
+const palette = (): Buffer => png(480, 96, (x, y) => (y < 8 || y >= 88 || x % 48 < 4 ? [250, 250, 250] : PALETTE[Math.floor(x / 48)]!));
 
 /**
  * FAKE's repository, at `repo`: a base on `main`, and `branch` off it with the work committed — a source file and a test
@@ -332,9 +385,9 @@ export function seed(root: string, now = Date.now()): void {
    * A step's task as the engine journals one that ran once, from `began` to `ended` minutes ago, and signed off with `closeout`.
    * `nativeId` is the session's own id, which the engine records with the end for a harness that has one, and reads a transcript by; `usage` is what the engine read of the attempt, when it read one.
    */
-  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string, usage?: object): void =>
+  const signedOff = (task: string, harness: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string, usage?: object): void =>
     write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
-      { kind: 'filed', at: ago(began), brief, cwd, maxAttempts: 1 },
+      { kind: 'filed', at: ago(began), brief, cwd, maxAttempts: 1, harness },
       { kind: 'starting', at: ago(began - 1), attempt: 1 },
       { kind: 'spawned', at: ago(began - 1), attempt: 1 },
       { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, ...(nativeId ? { nativeId } : {}), observed: 'done', reason: 'harness', closeout, ...(usage ? { usage } : {}) },
@@ -343,12 +396,21 @@ export function seed(root: string, now = Date.now()): void {
 
   // implement signed off blocked, and its session's conversation is on disk (SESSION). review's task has no journal at all,
   // which is what makes it `unknown`.
-  signedOff(`${id}-implement`, workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
+  signedOff(`${id}-implement`, 'claude', workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SESSION.sessionId}.jsonl`), lines(conversation(SESSION, ago)));
-  signedOff(`${id}-tokens`, lane, 'Pick the colour tokens.', 40, 30, { outcome: 'done', summary: 'Picked the colour tokens.', needs: null, artifacts: [] }, undefined, {
+  // tokens' files, where the run keeps a step's: in its files directory beside the run's record. Named by absolute path in its
+  // closeout, as a step is told to name them, with a path on its branch beside them.
+  const files = path.join(root, 'runs', id, 'artifacts', FAKE.unverified);
+  write(path.join(files, FAKE.artifacts.image), palette());
+  write(path.join(files, FAKE.artifacts.text), 'sky blue emerald amber orange red neutral violet teal rose\n');
+  const tokensCloseout = {
+    outcome: 'done', summary: 'Picked the colour tokens.', needs: null,
+    artifacts: [path.join(files, FAKE.artifacts.image), path.join(files, FAKE.artifacts.text), FAKE.artifacts.path],
+  };
+  signedOff(`${id}-tokens`, 'codex', lane, 'Pick the colour tokens.', 40, 30, tokensCloseout, undefined, {
     turns: 14, toolCalls: 31, inputTokens: 112_000, outputTokens: 6_350,
   });
-  signedOff(`${id}-theme`, lane, 'Apply them to every page.', 30, 10, { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] });
+  signedOff(`${id}-theme`, 'claude', lane, 'Apply them to every page.', 30, 10, { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] });
 
   // theme's check, as the run files one on the check harness: its process exited 1, and the engine wrote the
   // code down with the end of the attempt.
@@ -389,7 +451,7 @@ export function seed(root: string, now = Date.now()): void {
     },
   }, null, 2));
   // plan signed off with no check; draft's session started after it and has not ended; sketch's failed.
-  signedOff(`${NEIGHBOUR.id}-plan`, '/code/hkb-v2', 'Plan it.', 5, 3, { outcome: 'done', summary: 'Planned it.', needs: null, artifacts: [] });
+  signedOff(`${NEIGHBOUR.id}-plan`, 'claude', '/code/hkb-v2', 'Plan it.', 5, 3, { outcome: 'done', summary: 'Planned it.', needs: null, artifacts: [] });
   write(path.join(root, 'engine', 'tasks', `${NEIGHBOUR.id}-draft.jsonl`), lines([
     { kind: 'filed', at: ago(3), brief: 'Draft it.', cwd: '/code/hkb-v2', maxAttempts: 1 },
     { kind: 'starting', at: ago(2.5), attempt: 1 },
@@ -433,11 +495,27 @@ export function seed(root: string, now = Date.now()): void {
   }, null, 2));
   // A declared field is a field of the closeout, beside the four every closeout has: implement answers the findings it
   // was handed, as a loop's target owes from round 2, and review asks for another round.
-  signedOff(roundTask('implement', 3), loopWorkspace, 'Implement it.', 3.9, 2.5, {
+  signedOff(roundTask('implement', 3), 'claude', loopWorkspace, 'Implement it.', 3.9, 2.5, {
     outcome: 'done', summary: 'Answered the second review.', needs: null, artifacts: [],
     replies: [{ finding: 'apps/web/src/lib/status.ts — a word it does not know reads as working', answer: "won't fix", why: 'On purpose, and a test says so.' }],
   });
-  signedOff(roundTask('review', 3), loopWorkspace, 'Review it, and say whether it needs another round.', 2.4, 0.5, {
+  signedOff(roundTask('review', 3), 'codex', loopWorkspace, 'Review it, and say whether it needs another round.', 2.4, 0.5, {
     outcome: 'done', summary: 'One finding is still open.', needs: null, artifacts: [], again: true,
   });
+  // The rounds before, each step's try in each a task the engine ran once: implement's second answered the first review, and
+  // each review asked for another round.
+  const ranOnce = (task: string, harness: string, brief: string, began: number, ended: number, closeout: object): void =>
+    write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
+      { kind: 'filed', at: ago(began), brief, cwd: loopWorkspace, maxAttempts: 1, harness },
+      { kind: 'starting', at: ago(began), attempt: 1 },
+      { kind: 'spawned', at: ago(began), attempt: 1 },
+      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, observed: 'done', reason: 'harness', closeout },
+      { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
+    ]));
+  const said = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], ...more });
+  const [first, second] = LOOPING.earlier;
+  ranOnce(roundTask('implement', 1), 'claude', 'Implement it.', 3.99, 3.7, said(first.implement));
+  ranOnce(roundTask('review', 1), 'codex', 'Review it, and say whether it needs another round.', 3.69, 3.5, said(first.review, { again: true }));
+  ranOnce(roundTask('implement', 2), 'claude', 'Implement it.', 3.49, 3.2, said(second.implement, { replies: LOOPING.replies }));
+  ranOnce(roundTask('review', 2), 'codex', 'Review it, and say whether it needs another round.', 3.19, 3.0, said(second.review, { again: true }));
 }

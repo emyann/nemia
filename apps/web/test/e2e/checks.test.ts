@@ -6,7 +6,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
-import { expectApart, expectBeneath, expectCount, expectInside, expectMovedWith, expectTheme, expectVisible, Refused, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectCount, expectDrawn, expectInside, expectMovedWith, expectTheme, expectVisible, Refused, watch } from './checks.ts';
 
 let browser: Browser;
 before(async () => {
@@ -46,6 +46,17 @@ test('a console error, an uncaught exception, a failed request and a 500 are eac
   const want = [/^console error: the graph did not draw$/, /^uncaught: boom$/, /^request failed: GET http:\/\/e2e\.test\/api\/gone/, /^request answered 500: GET http:\/\/e2e\.test\/api\/runs$/];
   await eventually(() => want.every((pattern) => problems().some((p) => pattern.test(p))));
   for (const pattern of want) assert.ok(problems().some((p) => pattern.test(p)), `${pattern} in:\n${problems().join('\n')}`);
+});
+
+test('an image whose request failed is refused as not drawn, though its box is visible — and one that loaded is drawn', async () => {
+  const pixel = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const { page } = await pageWith(`<img id="broken" src="/api/gone.png" alt="gone" width="40" height="40"><img id="drawn" src="${pixel}" alt="drawn" width="40" height="40">`);
+  await expectVisible(page.locator('#broken'), 'the broken image has a box');
+  await assert.rejects(
+    expectDrawn(page.locator('#broken'), 'the broken image is drawn', 500),
+    (err) => err instanceof Refused && /^the broken image is drawn — the image did not load/.test(err.message),
+  );
+  await expectDrawn(page.locator('#drawn'), 'the loaded image is drawn');
 });
 
 test('a page that does none of those has no problems — or every page would fail, and the watch prove nothing', async () => {

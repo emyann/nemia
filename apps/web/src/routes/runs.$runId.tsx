@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { Artifacts } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
@@ -105,7 +106,7 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
         <StepNote note={step.note} />
       </div>
 
-      {spec && <Facts rows={specRows(spec)} />}
+      {spec && <Facts rows={specRows(spec, step.filed)} />}
 
       {step.check && <Check check={step.check} />}
 
@@ -132,9 +133,10 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
             </p>
           )}
           {closeout.artifacts.length > 0 && (
-            <p className="text-xs text-neutral-500">
-              Artifacts: <span className="font-mono">{closeout.artifacts.join(', ')}</span>
-            </p>
+            <div aria-label="Artifacts" className="text-xs text-neutral-500">
+              Artifacts:
+              <Artifacts artifacts={closeout.artifacts} />
+            </div>
           )}
         </div>
       )}

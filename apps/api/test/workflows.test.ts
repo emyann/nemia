@@ -269,7 +269,7 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
       { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check }) },
       {
         name: 'review',
-        spec: spec({ harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash'], permissionMode: 'dontAsk', output: 'review.schema.json', loop: 'implement', rounds: 3 }),
+        spec: spec({ harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], permissionMode: 'dontAsk', output: 'review.schema.json', loop: 'implement', rounds: 3 }),
       },
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;

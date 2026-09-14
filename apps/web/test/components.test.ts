@@ -90,10 +90,14 @@ function runWith(note: string | null): RunDetail {
     isolate: true, createdAt: at, cancelledAt: null, status: 'failed', moving: false, waitingOnYou: ['review'], warning: null,
     graph: { roots: ['review'], edges: [] },
     steps: [{
-      name: 'review', spec: null, body: 'Review it.', told: null, taskId: 't-1', workspace: null, branch: 'wf/r-1/implement',
+      name: 'review', spec: null, filed: null, body: 'Review it.', told: null, taskId: 't-1', workspace: null, branch: 'wf/r-1/implement',
       status: 'rounds exhausted', note, closeout: null, check: null,
       attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
       used: { usage: null, used: 'not measured', cost: 'not measured' },
+      tries: [{
+        try: 1, round: 1, then: null, current: true, taskId: 't-1', note, status: 'rounds exhausted', check: null, closeout: null,
+        attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+      }],
     }],
   };
 }
@@ -361,7 +365,7 @@ test('the legend draws an edge in each state as the canvas draws it: dashed and 
 
 test("the inspector's Details show `loop` and `rounds` beside `after` on a looping step, and not on another", () => {
   const run = runWith(null);
-  const spec = { harness: 'codex', model: null, after: ['implement'], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 3 };
+  const spec = { harness: 'codex', model: null, effort: null, after: ['implement'], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 3 };
   const looping = { ...run.steps[0]!, spec };
   const html = renderToStaticMarkup(createElement(StepInspector, { run, step: looping, onClose: () => {} }));
   const labels = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
@@ -664,5 +668,173 @@ test("the inspector's Details say what a step used and what it cost beside its a
   // A step not filed consumed nothing: a dash, not a count.
   const unfiled = Object.fromEntries(rows({ ...run.steps[0]!, taskId: null, used: null }));
   assert.deepEqual([unfiled.used, unfiled.cost], ['—', '—']);
+});
+
+// ─── what each round did, what a step runs with, and its files ──────────────
+
+const { Artifacts, TryCloseouts } = await import('../src/components/Closeout.tsx');
+const { Facts, specRows } = await import('../src/components/Facts.tsx');
+type StepTry = import('../src/lib/api.ts').StepTry;
+type StepCloseout = import('../src/lib/api.ts').StepCloseout;
+type StepSpec = import('../src/lib/api.ts').StepSpec;
+type StepFiled = import('../src/lib/api.ts').StepFiled;
+
+/** A markup's text, tags taken for separators: each run of text between two tags, trimmed, and none of the empty ones. */
+const textsOf = (html: string): string[] => html.split(/<[^>]+>/).map((text) => unescaped(text).trim()).filter(Boolean);
+
+const tookAt = '2026-09-13T00:12:30.000Z';
+const ranOnce = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: tookAt, reason: 'harness' } };
+const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}): StepCloseout => ({
+  outcome: 'done', summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, ...more,
+});
+
+/** implement on its third try, as the api gives it: refused by its check on the first, tried again by `retries:`, then sent round by review's loop. */
+const threeTries: StepTry[] = [
+  {
+    try: 1, round: 1, then: 'retries', current: false, taskId: 'r-1-implement', note: null, status: 'succeeded', attempts: ranOnce,
+    check: { command: 'npm test', taskId: 'r-1-implement-check', verdict: 'exit 1', refused: { exit: 'exit 1', stdout: null, stderr: { lines: [], truncated: false }, unreadable: null } },
+    closeout: closeoutSaying('Added the cache.'),
+  },
+  {
+    try: 2, round: 1, then: 'round', current: false, taskId: 'r-1-implement-try2', note: 'try 2, by retries: 1', status: 'succeeded', attempts: ranOnce,
+    check: { command: 'npm test', taskId: 'r-1-implement-try2-check', verdict: 'passed', refused: null },
+    closeout: closeoutSaying('Fixed the failing test.'),
+  },
+  {
+    try: 3, round: 2, then: null, current: true, taskId: 'r-1-implement-try3', note: 'round 2 of 3', status: 'running (working)',
+    attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null } },
+    check: { command: 'npm test', taskId: null, verdict: null, refused: null },
+    closeout: null,
+  },
+];
+
+test("the inspector's Details list a step's rounds, a row a try: its round and how it was reached, its task, attempts and verdict, and a link that selects it", () => {
+  const run = runWith('round 2 of 3');
+  const step = { ...run.steps[0]!, name: 'implement', status: 'running (working)', attempts: threeTries[2]!.attempts, tries: threeTries };
+  const html = renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} }));
+  const section = /<section aria-label="Rounds"[\s\S]*?<\/section>/.exec(html)?.[0];
+  assert.ok(section, `a Rounds section: ${html}`);
+  const rows = [...section.matchAll(/<li data-try="(\d+)"([^>]*)>([\s\S]*?)<\/li>/g)].map((m) => [m[1], /aria-current="true"/.test(m[2]!), textsOf(m[3]!)]);
+  assert.deepEqual(rows, [
+    ['1', false, ['round 1 · try 1', 'closeout', 'r-1-implement', '#1 · 12m 30s', 'check', 'exit 1']],
+    ['2', false, ['round 1 · try 2 (retries)', 'closeout', 'r-1-implement-try2', '#1 · 12m 30s', 'check', 'passed']],
+    // The current try, selected until another is: filed, its attempt still running, its check not filed yet.
+    ['3', true, ['round 2 · try 3 (round)', '· current', 'closeout', 'r-1-implement-try3', '#2 · running', 'check', 'not filed']],
+  ]);
+  assert.deepEqual(
+    [...section.matchAll(/<button type="button" aria-label="([^"]+)"/g)].map((m) => m[1]),
+    ['Show the closeout of round 1 · try 1', 'Show the closeout of round 1 · try 2 (retries)', 'Show the closeout of round 2 · try 3 (round)'],
+  );
+  // The attempts above it are the current try's, and say which try that is.
+  const facts = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textsOf(m[2]!).join(' ')]);
+  assert.deepEqual(facts.slice(0, 2), [['try', 'round 2 · try 3 (round)'], ['attempts', '2']]);
+
+  // One try: no Rounds, and no `try` above the attempts.
+  const once = renderToStaticMarkup(createElement(StepInspector, { run, step: run.steps[0]!, onClose: () => {} }));
+  assert.doesNotMatch(once, /aria-label="Rounds"|>try<\/dt>/);
+  assert.match(once, />attempts<\/dt>/);
+});
+
+test("the Output tab shows the selected try's closeout — its declared output, and its replies as `finding → answer (why)` — and every other try's folded beneath it", () => {
+  const replies = [
+    { finding: 'src/cache.ts:12 — the cache never expires', answer: 'fixed', why: 'Entries expire after the TTL now.' },
+    { finding: 'src/cache.ts:40 — a miss is counted twice', answer: "won't fix", why: 'Once per layer, on purpose.' },
+  ];
+  const tries = threeTries.map((t) => (t.current ? { ...t, closeout: closeoutSaying('Answered the review.', { replies, output: { again: false, risk: 'low' }, missing: ['notes'] }) } : t));
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
+  assert.deepEqual(textsOf(/<p data-shown-try="3"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['round 2 · try 3 (round) · current']);
+  assert.deepEqual([...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]!).join(' ')), [
+    'src/cache.ts:12 — the cache never expires → fixed (Entries expire after the TTL now.)',
+    "src/cache.ts:40 — a miss is counted twice → won't fix (Once per layer, on purpose.)",
+  ]);
+  const declared = /<section aria-label="Declared output"[\s\S]*?<\/section>/.exec(html)![0];
+  assert.deepEqual([...declared.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textsOf(m[2]!).join(' ')]), [['again', 'false'], ['risk', 'low']]);
+  assert.match(declared, />declared and not given: notes</);
+
+  // The others, latest first, each folded: its summary is inside its fold, and the fold is closed.
+  const folds = (markup: string) => [...markup.matchAll(/<details data-try="(\d+)"([^>]*)><summary[^>]*>([\s\S]*?)<\/summary>/g)].map((m) => [m[1], /\bopen\b/.test(m[2]!), textsOf(m[3]!).join('')]);
+  assert.deepEqual(folds(html), [['2', false, 'round 1 · try 2 (retries) — done'], ['1', false, 'round 1 · try 1 — done']]);
+  assert.ok(html.indexOf('Fixed the failing test.') > html.indexOf('<details data-try="2"'), 'an earlier summary is in its fold');
+  assert.ok(html.indexOf('Answered the review.') < html.indexOf('<details'), "the selected try's summary is above the folds");
+
+  // An earlier try selected: its closeout on top, and the current one folded with the rest.
+  const earlier = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'No closeout yet.' }));
+  assert.deepEqual(textsOf(/<p data-shown-try="1"[^>]*>[\s\S]*?<\/p>/.exec(earlier)![0]), ['round 1 · try 1']);
+  assert.deepEqual(folds(earlier), [['3', false, 'round 2 · try 3 (round) · current — done'], ['2', false, 'round 1 · try 2 (retries) — done']]);
+  assert.ok(earlier.indexOf('Added the cache.') < earlier.indexOf('<details'), earlier);
+
+  // A try that gave none says what it was told to, and a step on its first try has no folds and no label.
+  const none = renderToStaticMarkup(createElement(TryCloseouts, { tries: threeTries, selected: threeTries[2]!, none: 'No closeout yet.' }));
+  assert.match(none, /<p class="text-neutral-500">No closeout yet\.<\/p>/);
+  const first = renderToStaticMarkup(createElement(TryCloseouts, { tries: [tries[2]!], selected: tries[2]!, none: 'No closeout yet.' }));
+  assert.doesNotMatch(first, /<details|data-shown-try/);
+});
+
+test("a closeout's image is drawn inline, its name its alt, opening full-size in a new tab; a text file is a link, anything else a link with its size, and a bare path the path", () => {
+  const url = (name: string) => `/api/runs/r-1/steps/shoot/artifacts/${name}`;
+  const dir = '/wf/runs/r-1/artifacts/shoot';
+  const html = renderToStaticMarkup(createElement(Artifacts, {
+    artifacts: [
+      { path: `${dir}/shot.png`, name: 'shot.png', url: url('shot.png'), kind: 'image', size: 48_213 },
+      { path: `${dir}/notes.txt`, name: 'notes.txt', url: url('notes.txt'), kind: 'text', size: 13 },
+      { path: `${dir}/trace.zip`, name: 'trace.zip', url: url('trace.zip'), kind: 'other', size: 2_400_000 },
+      { path: 'RESPONSE.md' },
+    ],
+  }));
+  const [image, text, other, bare] = html.split('<li ').slice(1);
+  assert.match(image!, /data-artifact="image"/);
+  assert.ok(image!.includes(`<a href="${url('shot.png')}" target="_blank" rel="noreferrer"`), image);
+  assert.match(image!, /<a [^>]*><img src="\/api\/runs\/r-1\/steps\/shoot\/artifacts\/shot\.png" alt="shot\.png"/, 'the image inside the link that opens it');
+  assert.match(image!, />shot\.png · 47\.1 KB<\/figcaption>/);
+  assert.ok(text!.includes(`<a href="${url('notes.txt')}" target="_blank" rel="noreferrer"`), text);
+  assert.match(text!, />notes\.txt<\/a><\/span>/, 'a link, and nothing after it');
+  assert.match(other!, />trace\.zip<\/a><span[^>]*> · 2\.3 MB<\/span>/);
+  assert.match(bare!, /data-artifact="path"[^>]*>RESPONSE\.md<\/span>/);
+  assert.doesNotMatch(bare!, /<a /);
+  assert.equal(html.match(/<img /g)?.length, 1, 'only the image is drawn');
+  assert.match(renderToStaticMarkup(createElement(Artifacts, { artifacts: [] })), />none named</);
+});
+
+test("the spec says what a step runs with: the workflow's word where it sets one, the engine's marked `default` where it does not, and a dash for a step not filed", () => {
+  const rowsOf = (spec: StepSpec, filed: StepFiled | null) => Object.fromEntries(
+    [...renderToStaticMarkup(createElement(Facts, { rows: specRows(spec, filed) })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)]
+      .map((m) => [m[1], textsOf(m[2]!).join(' ')]),
+  );
+  const ranWith = (rows: Record<string, string>) => [rows.model, rows.effort, rows['permission mode'], rows.tools, rows.deadline, rows['max attempts']];
+  const unset: StepSpec = { harness: 'claude', model: null, effort: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null };
+
+  // Filed as a step that sets none of them is, on a harness the api could not ask: one attempt, the engine's default, and nothing else said.
+  const bare: StepFiled = { model: null, askedModel: null, effort: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, maxAttempts: 1 };
+  assert.deepEqual(ranWith(rowsOf(unset, bare)), ["harness's own · default", "harness's own · default", "harness's own · default", "harness's own · default", 'no limit · default', '1 · default']);
+  const given: StepFiled = {
+    model: 'opus', askedModel: null, effort: 'high', permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600, maxAttempts: 3,
+  };
+  assert.deepEqual(ranWith(rowsOf(unset, given)), ['opus · default', 'high · default', 'auto · default', 'Read, Grep · default', '3600 s · default', '3 · default']);
+
+  // The mode the session runs in, as its harness decides it: Claude Code's `auto` for a task filed with none — never "the harness's own",
+  // which reads as Claude Code's prompting default — Codex's `workspace-write`, and a Codex sandbox its tools narrowed, whatever was named.
+  assert.equal(rowsOf(unset, { ...bare, runsIn: { mode: 'auto', by: 'default' } })['permission mode'], 'auto · default');
+  assert.equal(rowsOf(unset, { ...bare, runsIn: { mode: 'workspace-write', by: 'default' } })['permission mode'], 'workspace-write · default');
+  const reviewer: StepSpec = { ...unset, harness: 'codex', permissionMode: 'workspace-write', tools: ['Read', 'Grep'] };
+  const narrowed: StepFiled = { ...bare, permissionMode: 'workspace-write', tools: ['Read', 'Grep'], runsIn: { mode: 'read-only', by: 'tools' } };
+  assert.equal(rowsOf(reviewer, narrowed)['permission mode'], 'read-only · by tools');
+  assert.equal(rowsOf({ ...reviewer, permissionMode: null }, { ...narrowed, permissionMode: null })['permission mode'], 'read-only · by tools');
+
+  // A model a person's `wf retry --model` asked for is this try's, and not a default, where the workflow names none.
+  assert.equal(rowsOf(unset, { ...bare, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
+
+  // The workflow's words, unmarked; and a try filed on another model than the workflow's says so.
+  const set: StepSpec = { ...unset, model: 'opus', effort: 'high', permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600, maxAttempts: 2 };
+  const asSet: StepFiled = {
+    model: 'opus', askedModel: null, effort: 'high', permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600, maxAttempts: 2,
+  };
+  assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s', '2']);
+  assert.doesNotMatch(renderToStaticMarkup(createElement(Facts, { rows: specRows(set, asSet) })), /data-mark/);
+  assert.equal(rowsOf(set, { ...asSet, model: 'sonnet' }).model, 'sonnet · this try');
+  assert.equal(rowsOf(set, { ...asSet, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
+
+  // Not filed: the workflow's words, or a dash.
+  assert.deepEqual(ranWith(rowsOf(unset, null)), ['—', '—', '—', '—', '—', '—']);
+  assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '600 s', '2']);
 });
 

@@ -79,6 +79,18 @@ const workflowDir = workflowFolder({
 
 const blocked = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] };
 
+/** `blocked` as the api gives it: a path on the branch is the path alone, and it declared no output and gave no replies. */
+const blockedCloseout = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: [{ path: 'NOTES.md' }], output: {}, missing: [], replies: null };
+
+/** What a step on its first try says of it, as its one entry in `tries`: the current try, reached by nothing. */
+const firstTry = (step: { taskId: string | null; status: string; attempts: object; check: object | null; closeout: object | null }) => [{
+  try: 1, round: 1, then: null, current: true, note: null,
+  taskId: step.taskId, status: step.status, attempts: step.attempts, check: step.check, closeout: step.closeout,
+}];
+
+/** The engine's record of a task `filed` journals: a codex task with one attempt allowed, and nothing else said — which Codex runs in `workspace-write`. */
+const filedBare = { model: null, askedModel: null, effort: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, tools: null, deadlineSeconds: null, maxAttempts: 1 };
+
 /** A run as GET /api/runs lists it. */
 const listed = async (id: string) =>
   (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
@@ -143,35 +155,40 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     steps: undefined,
   });
 
+  const implementTry = {
+    taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout,
+    attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+  };
   assert.deepEqual(implement, {
     name: 'implement',
-    spec: { harness: 'codex', model: 'gpt-5', after: [], resume: null, permissionMode: null, deadlineSeconds: 600, maxAttempts: null, loop: null, rounds: null },
+    spec: { harness: 'codex', model: 'gpt-5', effort: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: 600, maxAttempts: null, loop: null, rounds: null },
+    // The engine's record, not the folder's words: this journal was written with none of them.
+    filed: filedBare,
     body: 'Implement the thing.',
     // What the engine was filed with, not the brief recomposed from today's folder and record.
     told: filedBrief('t-2'),
-    taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
-    status: 'succeeded · BLOCKED',
+    workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
     note: null,
-    closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
-    check: null,
-    attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+    ...implementTry,
     // Its journal carries no usage: nobody measured it, which is not 0.
     used: { usage: null, used: 'not measured', cost: 'not measured' },
+    tries: firstTry(implementTry),
   });
 
+  const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, attempts: { count: 0, latest: null } };
   assert.deepEqual({ ...review, told: undefined }, {
     name: 'review',
-    spec: { harness: null, model: null, after: ['implement'], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: 2, loop: null, rounds: null },
+    spec: { harness: null, model: null, effort: null, after: ['implement'], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: 2, loop: null, rounds: null },
+    // Not filed: the engine has filed it with nothing yet.
+    filed: null,
     body: 'Review what implement did.',
     told: undefined,
-    taskId: null, workspace: null, branch: null,
-    status: 'waiting',
+    workspace: null, branch: null,
     note: null,
-    closeout: null,
-    check: null,
-    attempts: { count: 0, latest: null },
+    ...reviewTry,
     // Not filed: it consumed nothing.
     used: null,
+    tries: firstTry(reviewTry),
   });
   // Not filed, so what it would be given now: implement has run in this workspace, so look there.
   assert.ok(review.told.startsWith('Review what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.'), review.told);
@@ -226,20 +243,23 @@ test('a run whose workflow folder is gone still answers, from its record', async
   // From before runs froze their workflow, and its folder gone: nothing on the record says what waits on what.
   assert.deepEqual(run.graph, { roots: ['implement', 'review'], edges: [] });
   assert.deepEqual(run.waitingOnYou, ['implement']);
+  const implementTry = {
+    taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout,
+    attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+  };
+  const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, attempts: { count: 0, latest: null } };
   assert.deepEqual(run.steps, [
     {
-      name: 'implement', spec: null, body: null, told: filedBrief('t-2'),
-      taskId: 't-2', workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
-      status: 'succeeded · BLOCKED',
+      name: 'implement', spec: null, filed: filedBare, body: null, told: filedBrief('t-2'),
+      workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
       note: null,
-      closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
-      check: null,
-      attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+      ...implementTry,
       used: { usage: null, used: 'not measured', cost: 'not measured' },
+      tries: firstTry(implementTry),
     },
     {
-      name: 'review', spec: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', note: null, closeout: null,
-      check: null, attempts: { count: 0, latest: null }, used: null,
+      name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, note: null,
+      ...reviewTry, used: null, tries: firstTry(reviewTry),
     },
   ]);
 
@@ -278,15 +298,17 @@ test('a folder changed since the run started keeps the steps that ran, and names
   assert.deepEqual(run.steps.map((s: { name: string }) => s.name), ['original', 'review', 'replacement']);
 
   const [original, review, replacement] = run.steps;
-  assert.deepEqual(original, {
-    name: 'original', spec: null, body: null, told: filedBrief('t-6'),
-    taskId: 't-6', workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
-    status: 'succeeded · BLOCKED',
-    note: null,
-    closeout: { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] },
-    check: null,
+  const originalTry = {
+    taskId: 't-6', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+  };
+  assert.deepEqual(original, {
+    name: 'original', spec: null, filed: filedBare, body: null, told: filedBrief('t-6'),
+    workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
+    note: null,
+    ...originalTry,
     used: { usage: null, used: 'not measured', cost: 'not measured' },
+    tries: firstTry(originalTry),
   });
   assert.deepEqual([review.body, review.spec.after, review.status], ['Review it.', ['replacement'], 'waiting']);
   assert.deepEqual([replacement.body, replacement.taskId, replacement.status, replacement.closeout], ['Do the original thing.', null, 'waiting', null]);
@@ -308,8 +330,8 @@ const frozenLoop = [
 ];
 
 const frozenSpecs = {
-  implement: { harness: 'claude', model: 'opus', after: [], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null },
-  review: { harness: 'codex', model: null, after: ['implement'], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 2 },
+  implement: { harness: 'claude', model: 'opus', effort: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null },
+  review: { harness: 'codex', model: null, effort: null, after: ['implement'], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 2 },
 };
 
 const frozenGraph = {
@@ -831,10 +853,12 @@ test('a round the loop asked for, and a try a person asked for, read as the tick
 test("a step with a `check:` carries its command, and once its check refused, the exit and each stream's last lines", async () => {
   const run = await (await app.request('/api/runs/r-20')).json();
   const checkOf = (name: string) => run.steps.find((s: Said) => s.name === name).check;
-  assert.deepEqual(checkOf('build'), { command: 'npm run build', refused: null });
-  assert.deepEqual(checkOf('lint'), { command: 'npm run lint', refused: null });
+  assert.deepEqual(checkOf('build'), { command: 'npm run build', taskId: 'r-20-build-check', verdict: 'passed', refused: null });
+  assert.deepEqual(checkOf('lint'), { command: 'npm run lint', taskId: 'r-20-lint-check', verdict: 'checking', refused: null });
   assert.deepEqual(checkOf('test'), {
     command: 'npm test',
+    taskId: 'r-20-test-check',
+    verdict: 'exit 1',
     refused: {
       exit: 'exit 1',
       stdout: { lines: ['ok 1 - builds', 'not ok 2 - parses a trailing comma', '# fail 1', '', '[wf check] exit 1'], truncated: false },
@@ -845,6 +869,8 @@ test("a step with a `check:` carries its command, and once its check refused, th
   // Stopped before it printed: no number, no stderr file, and the engine's word that there is no session to read.
   assert.deepEqual(checkOf('e2e'), {
     command: 'npm run e2e',
+    taskId: 'r-20-e2e-check',
+    verdict: 'unfinished',
     refused: { exit: 'unfinished', stdout: { lines: ['(no session yet)'], truncated: false }, stderr: { lines: [], truncated: false }, unreadable: null },
   });
   // No `check:` in the workflow the run froze.
@@ -896,4 +922,303 @@ test('the list of runs observes the engine once, however many runs and steps are
   assert.ok(runs.flatMap((r) => r.steps).filter((s) => s.taskId).length >= 3);
   assert.ok(runs.flatMap((r) => r.steps).some((s) => s.status === 'failed ✗ check (exit 1)'), 'a refused check, worded with its exit code, is on the list');
   assert.equal(observations(), 1);
+});
+
+// ─── what each round did, what a step runs with, and its files ──────────────
+
+/**
+ * A `claude` ahead of the real one on PATH for the length of the test, which notes each call and sees no sessions of ours: how
+ * many times a request observed the harnesses.
+ */
+function countingObservations(t: { after: (fn: () => void) => void }): () => number {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-bin-'));
+  const calls = path.join(bin, 'calls');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
+  const before = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${before}`;
+  t.after(() => {
+    process.env.PATH = before;
+  });
+  return () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '').split('\n').filter((line) => line.startsWith('agents')).length;
+}
+
+const gone = path.join(os.tmpdir(), 'hkb-api-no-such-workflow');
+
+test('a step on its third try, in the second round of its loop, carries every try: its round, what replaced it, its task, check and closeout — off one observation', async (t) => {
+  // implement's check refused its first try, and `retries: 1` filed a second, which passed; review asked for another round, and
+  // the loop filed implement's third try, which answered the findings and passed; review then asked for no more.
+  const findings = [{ file: 'src/cache.ts', line: 12, finding: 'The cache never expires.' }, { file: 'src/cache.ts', line: 40, finding: 'A miss is counted twice.' }];
+  const replies = [
+    { finding: 'src/cache.ts:12 — the cache never expires', answer: 'fixed', why: 'Entries expire after the TTL now, and a test waits it out.' },
+    { finding: 'src/cache.ts:40 — a miss is counted twice', answer: "won't fix", why: 'It is counted once per layer, on purpose.' },
+  ];
+  settledTask('r-50-implement', { ...done, summary: 'Added the cache.' });
+  checkTask('r-50-implement-check', { settled: 'failed', exitCode: 1 });
+  fs.mkdirSync(path.join(root, 'checks'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'checks', 'r-50-implement-check.stderr'), 'npm error Test failed.\n');
+  settledTask('r-50-implement-try2', { ...done, summary: 'Fixed the failing test.' });
+  checkTask('r-50-implement-try2-check', { settled: 'succeeded', exitCode: 0 });
+  settledTask('r-50-review', { ...done, summary: 'Two findings.', again: true, findings });
+  settledTask('r-50-implement-try3', { ...done, summary: 'Answered the review.', replies });
+  checkTask('r-50-implement-try3-check', { settled: 'succeeded', exitCode: 0 });
+  settledTask('r-50-review-try2', { ...done, summary: 'Nothing left.', again: false, findings: [] });
+  const reviewOutput = {
+    type: 'object', properties: { again: { type: 'boolean' }, findings: { type: 'array' } }, required: ['again', 'findings'], additionalProperties: false,
+  };
+  writeRun({
+    ...r2, id: 'r-50', workflowDir: gone,
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.', check: 'npm test', retries: 1 },
+      { name: 'review', after: ['implement'], body: 'Review it.', loop: 'implement', rounds: DEFAULT_ROUNDS, output: { file: 'review.json', schema: reviewOutput } },
+    ],
+    steps: {
+      implement: {
+        taskId: 'r-50-implement-try3', check: { taskId: 'r-50-implement-try3-check' },
+        tries: [
+          { taskId: 'r-50-implement', check: { taskId: 'r-50-implement-check' }, then: 'retries' },
+          { taskId: 'r-50-implement-try2', check: { taskId: 'r-50-implement-try2-check' }, then: 'round' },
+        ],
+      },
+      review: { taskId: 'r-50-review-try2', tries: [{ taskId: 'r-50-review', then: 'round' }] },
+    },
+  });
+
+  const observations = countingObservations(t);
+  const run = await (await app.request('/api/runs/r-50')).json();
+  // Eight tasks — implement's three and their checks, review's two — read over one observation of the harnesses, and no refused check
+  // of the current try to read the output of. A `view` each was eight observations, one after another, on a page polled every five seconds.
+  assert.equal(observations(), 1);
+
+  const once = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } };
+  const closeout = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, ...more });
+  const passed = (taskId: string) => ({ command: 'npm test', taskId, verdict: 'passed', refused: null });
+  const [implement, review] = run.steps;
+  assert.deepEqual([implement.status, implement.note, implement.attempts], ['verified ✓', 'round 2 of 3', once]);
+  assert.deepEqual(implement.tries, [
+    {
+      try: 1, round: 1, then: 'retries', current: false, taskId: 'r-50-implement', note: null, status: 'succeeded', attempts: once,
+      // Its check refused: the verdict, and its stderr, which is a file. Its output is not read for a try that is over.
+      check: {
+        command: 'npm test', taskId: 'r-50-implement-check', verdict: 'exit 1',
+        refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['npm error Test failed.'], truncated: false }, unreadable: null },
+      },
+      closeout: closeout('Added the cache.'),
+    },
+    {
+      try: 2, round: 1, then: 'round', current: false, taskId: 'r-50-implement-try2', note: 'try 2, by retries: 1', status: 'succeeded', attempts: once,
+      check: passed('r-50-implement-try2-check'), closeout: closeout('Fixed the failing test.'),
+    },
+    {
+      try: 3, round: 2, then: null, current: true, taskId: 'r-50-implement-try3', note: 'round 2 of 3', status: 'verified ✓', attempts: once,
+      check: passed('r-50-implement-try3-check'), closeout: closeout('Answered the review.', { replies }),
+    },
+  ]);
+  // The current try is where it was: the step's own check and closeout are its.
+  assert.deepEqual([implement.check, implement.closeout], [implement.tries[2].check, implement.tries[2].closeout]);
+
+  assert.deepEqual(review.tries, [
+    {
+      try: 1, round: 1, then: 'round', current: false, taskId: 'r-50-review', note: null, status: 'succeeded', attempts: once, check: null,
+      // What it declared, in its schema's order: the findings implement was handed.
+      closeout: closeout('Two findings.', { output: { again: true, findings } }),
+    },
+    {
+      try: 2, round: 2, then: null, current: true, taskId: 'r-50-review-try2', note: 'round 2 of 3', status: review.status, attempts: once, check: null,
+      closeout: closeout('Nothing left.', { output: { again: false, findings: [] } }),
+    },
+  ]);
+  assert.equal(review.status, 'unverified · done');
+});
+
+test('a step says what it runs with: the workflow\'s effort and tools, and what the engine filed its try with where the workflow says nothing', async () => {
+  // Filed as the tick files a step — with its effort and tools — and, as a step that sets neither, with no deadline and no max attempts.
+  await engine().file({ id: 'r-51-implement', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', effort: 'high', tools: ['Read', 'Grep'] });
+  writeRun({
+    ...r2, id: 'r-51', workflowDir: gone,
+    workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude', effort: 'high', tools: ['Read', 'Grep'] }, { name: 'review', after: ['implement'], body: 'Review it.' }],
+    steps: { implement: { taskId: 'r-51-implement' }, review: { taskId: null } },
+  });
+
+  const [implement, review] = (await (await app.request('/api/runs/r-51')).json()).steps;
+  assert.deepEqual(implement.spec, {
+    harness: 'claude', model: null, effort: 'high', after: [], resume: null, permissionMode: null, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null,
+  });
+  // The engine's defaults, off its journal: one attempt, no deadline — which is no limit — and no model, which is the harness's; and the
+  // mode Claude Code runs a task filed with none in, `auto`, which is not Claude Code's own.
+  assert.deepEqual(implement.filed, {
+    model: null, askedModel: null, effort: 'high', permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: 1,
+  });
+  // Not filed: nothing the engine could say.
+  assert.equal(review.filed, null);
+  // Nor for a task the engine has no record of.
+  assert.equal((await (await app.request('/api/runs/r-4')).json()).steps[0].filed, null);
+});
+
+test('a step says the mode its session runs in, as its harness decides it — a Codex sandbox narrowed by its tools — at shipped defaults', async () => {
+  const e = engine();
+  const cases: Array<[id: string, spec: { harness: string; permissionMode?: string; tools?: string[] }, runsIn: object]> = [
+    ['r-54-claude', { harness: 'claude' }, { mode: 'auto', by: 'default' }],
+    ['r-54-claude-mode', { harness: 'claude', permissionMode: 'dontAsk' }, { mode: 'dontAsk', by: 'filed' }],
+    ['r-54-detached', { harness: 'claude-detached' }, { mode: 'auto', by: 'default' }],
+    ['r-54-codex', { harness: 'codex' }, { mode: 'workspace-write', by: 'default' }],
+    ['r-54-codex-writes', { harness: 'codex', tools: ['Read', 'Bash'] }, { mode: 'workspace-write', by: 'default' }],
+    // A reviewer that may not write: read-only, whatever mode it named.
+    ['r-54-codex-reads', { harness: 'codex', tools: ['Read', 'Grep'] }, { mode: 'read-only', by: 'tools' }],
+    ['r-54-codex-named', { harness: 'codex', permissionMode: 'workspace-write', tools: ['Read'] }, { mode: 'read-only', by: 'tools' }],
+    ['r-54-codex-bypass', { harness: 'codex', permissionMode: 'bypassPermissions' }, { mode: 'danger-full-access', by: 'filed' }],
+  ];
+  for (const [id, spec, runsIn] of cases) {
+    await e.file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', ...spec });
+    writeRun({ ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }], steps: { implement: { taskId: `${id}-implement` } } });
+    const [implement] = (await (await app.request(`/api/runs/${id}`)).json()).steps;
+    assert.deepEqual(implement.filed.runsIn, runsIn, id);
+  }
+});
+
+test("the mode the api says a Claude Code task runs in is the one the engine's `claude --bg` runner spawns it with", async (t) => {
+  // That runner's spawn is no pure function the engine exports, so the api says its rule after it. This holds the two together: the
+  // argv the runner hands a fake `claude` on PATH, as the engine's own tests record it.
+  // Seeded here, not borrowed from the test before, whose first wrong mode would stop it before it seeds the second.
+  const said = new Map<string, string>();
+  for (const [id, permissionMode] of [['r-59-claude', undefined], ['r-59-claude-mode', 'dontAsk']] as const) {
+    const spec = { harness: 'claude', ...(permissionMode ? { permissionMode } : {}) };
+    await engine().file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', ...spec });
+    writeRun({ ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }], steps: { implement: { taskId: `${id}-implement` } } });
+    const res = await app.request(`/api/runs/${id}`);
+    assert.equal(res.status, 200, id);
+    said.set(id, (await res.json()).steps[0].filed.runsIn.mode);
+  }
+
+  // The engine's Effect surface, where its runners are: the Promise one has none.
+  const { claudeOps } = await import('agent-engine/effect');
+  const { Effect } = await import('effect');
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-claude-'));
+  const argsFile = path.join(bin, 'args');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
+  const before = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${before}`;
+  t.after(() => {
+    process.env.PATH = before;
+  });
+  const spawnedWith = async (permissionMode: string | undefined) => {
+    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { permissionMode } : {}) }));
+    const args = fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
+    return args[args.indexOf('--permission-mode') + 1];
+  };
+  assert.equal(said.get('r-59-claude'), await spawnedWith(undefined), 'filed with no mode');
+  assert.equal(said.get('r-59-claude-mode'), await spawnedWith('dontAsk'), 'filed with one');
+});
+
+test("a model a person's `wf retry --model` asked for is on the try it was asked for, past a recheck — and on no other", async () => {
+  await engine().file({ id: 'r-55-implement-try2', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', model: 'sonnet' });
+  const asked = { taskId: 'r-55-implement', then: 'fresh', model: 'sonnet' };
+  const cases: Array<[id: string, tries: object[], askedModel: string | null]> = [
+    ['r-55', [asked], 'sonnet'],
+    // Its check run again: the same task, still the try sonnet was asked for.
+    ['r-56', [asked, { taskId: 'r-55-implement-try2', then: 'recheck' }], 'sonnet'],
+    ['r-57', [{ taskId: 'r-55-implement', then: 'nudge' }], null],
+    ['r-58', [{ taskId: 'r-55-implement', then: 'retries' }], null],
+  ];
+  for (const [id, tries, askedModel] of cases) {
+    writeRun({
+      ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
+      steps: { implement: { taskId: 'r-55-implement-try2', tries } },
+    });
+    const { filed } = (await (await app.request(`/api/runs/${id}`)).json()).steps[0];
+    assert.deepEqual([filed.model, filed.askedModel], ['sonnet', askedModel], id);
+  }
+});
+
+/** A PNG of one pixel. */
+const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+/** An SVG that carries a script: an agent's markup, which would run on the board's origin opened as a page of its own. */
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>parent.pwned = true</script><rect width="10" height="10"/></svg>\n';
+
+/** r-52's `shoot`, which named its files: some in its files directory, and some not, or not by a name the api serves. */
+function seedFiles() {
+  const dir = path.join(root, 'runs', 'r-52', 'artifacts', 'shoot');
+  const files: Record<string, string | Buffer> = {
+    'shot.png': PNG, 'notes.txt': 'It rendered.\n', 'trace.zip': 'PK', 'sub/deep.png': PNG,
+    // Markup that would run on the board's origin opened as a page: served sandboxed, and the HTML as text. The page is not named.
+    'diagram.svg': SVG, 'page.html': '<script>parent.pwned = true</script>\n',
+    // Each a file the directory has, which a refusal alone keeps from being served.
+    '..shot.png': PNG, 'a\\b.png': PNG,
+    // Beside the directory, where `..` leads.
+    '../outside.png': PNG,
+  };
+  for (const [name, body] of Object.entries(files)) {
+    fs.mkdirSync(path.dirname(path.join(dir, name)), { recursive: true });
+    fs.writeFileSync(path.join(dir, name), body);
+  }
+  // Seeded by each test that reads it: the link is made afresh.
+  fs.rmSync(path.join(dir, 'link.png'), { force: true });
+  fs.symlinkSync(path.join(dir, '..', 'outside.png'), path.join(dir, 'link.png'));
+  const named = ['shot.png', 'notes.txt', 'trace.zip', 'diagram.svg', '../outside.png', 'sub/deep.png', 'link.png', '..shot.png', 'gone.png'].map((name) => path.join(dir, name));
+  // `path.join` resolves `..`: named as a step would spell it.
+  named[4] = `${dir}/../outside.png`;
+  settledTask('t-52-shoot', { ...done, artifacts: [...named, 'RESPONSE.md', '/etc/hosts'] });
+  writeRun({ ...r2, id: 'r-52', workflowDir: gone, workflow: [{ name: 'shoot', after: [], body: 'Shoot it.' }], steps: { shoot: { taskId: 't-52-shoot' } } });
+  return { dir, named };
+}
+
+test("a closeout's files in the step's files directory carry where the api serves them, their kind and size — any other path is the path alone", async () => {
+  const { dir, named } = seedFiles();
+  const [shoot] = (await (await app.request('/api/runs/r-52')).json()).steps;
+  const served = (name: string, kind: string, size: number) => ({ path: path.join(dir, name), name, url: `/api/runs/r-52/steps/shoot/artifacts/${encodeURIComponent(name)}`, kind, size });
+  assert.deepEqual(shoot.closeout.artifacts, [
+    served('shot.png', 'image', PNG.length),
+    served('notes.txt', 'text', 13),
+    served('trace.zip', 'other', 2),
+    served('diagram.svg', 'image', Buffer.byteLength(SVG)),
+    // Outside the directory, however it is spelled; under it, which no name reaches; a link out of it; a name the route refuses; a file it does not have.
+    { path: named[4] }, { path: named[5] }, { path: named[6] }, { path: named[7] }, { path: named[8] },
+    // A path on the branch, and an absolute path anywhere else, which is not looked at.
+    { path: 'RESPONSE.md' }, { path: '/etc/hosts' },
+  ]);
+  assert.deepEqual(shoot.tries[0].closeout.artifacts, shoot.closeout.artifacts);
+});
+
+test("a step's file is served by name, with its type and no caching — and a name that is a path, or not in the directory, is refused", async () => {
+  seedFiles();
+  const base = '/api/runs/r-52/steps/shoot/artifacts';
+
+  const image = await app.request(`${base}/shot.png`);
+  assert.equal(image.status, 200);
+  assert.equal(image.headers.get('content-type'), 'image/png');
+  assert.equal(image.headers.get('cache-control'), 'no-store');
+  assert.equal(image.headers.get('x-content-type-options'), 'nosniff');
+  assert.deepEqual(Buffer.from(await image.arrayBuffer()), PNG);
+
+  const text = await app.request(`${base}/notes.txt`);
+  assert.deepEqual([text.status, text.headers.get('content-type'), text.headers.get('cache-control'), await text.text()], [200, 'text/plain; charset=utf-8', 'no-store', 'It rendered.\n']);
+  assert.equal((await app.request(`${base}/trace.zip`)).headers.get('content-type'), 'application/octet-stream');
+
+  // Markup an agent wrote runs no script on the board's origin, opened in a tab: an SVG is served as an image under a policy that
+  // sandboxes it, and HTML as text. So is every file served.
+  const svg = await app.request(`${base}/diagram.svg`);
+  assert.deepEqual([svg.status, svg.headers.get('content-type'), await svg.text()], [200, 'image/svg+xml', SVG]);
+  assert.equal((await app.request(`${base}/page.html`)).headers.get('content-type'), 'text/plain; charset=utf-8');
+  for (const name of ['diagram.svg', 'page.html', 'shot.png', 'notes.txt', 'trace.zip']) {
+    const policy = (await app.request(`${base}/${name}`)).headers.get('content-security-policy') ?? '';
+    assert.ok(policy.split(/\s*;\s*/).includes('sandbox'), `${name} is served sandboxed: ${policy || 'no policy'}`);
+    assert.match(policy, /\bdefault-src 'none'/, `${name}: ${policy}`);
+  }
+
+  // Every one of these names a file on disk: only the refusal stands between it and the response.
+  for (const name of ['..%2Foutside.png', 'sub%2Fdeep.png', 'a%5Cb.png', '..shot.png']) {
+    const res = await app.request(`${base}/${name}`);
+    assert.equal(res.status, 400, name);
+    const { error } = await res.json();
+    assert.ok(/is not the name of a file: a name has no `\/`, `\\`, or `\.\.`/.test(error), `${name}: ${error}`);
+  }
+  // Not a regular file in the directory: absent, a directory, and a link that leads out of it.
+  for (const name of ['gone.png', 'sub', 'link.png']) {
+    const res = await app.request(`${base}/${name}`);
+    assert.equal(res.status, 404, name);
+    assert.match((await res.json()).error, /has no file .* in its files directory/, name);
+  }
+  // No such run, and no such step.
+  assert.match((await (await app.request('/api/runs/no-such-run/steps/shoot/artifacts/shot.png')).json()).error, /No run 'no-such-run'/);
+  assert.equal((await app.request('/api/runs/r-52/steps/deploy/artifacts/shot.png')).status, 404);
 });

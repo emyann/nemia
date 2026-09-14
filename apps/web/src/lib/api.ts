@@ -8,6 +8,8 @@ export type RunSummary = {
   id: string;
   repo: string;
   brief: string;
+  /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */
+  workflowDir: string;
   createdAt: string;
   cancelledAt: string | null;
   status: RunStatus;
@@ -171,6 +173,61 @@ export const capabilitiesQuery = queryOptions({
   queryKey: ['capabilities'],
   queryFn: () => get<Capabilities>('/api/capabilities'),
 });
+
+/** Mirrors `WorkflowStepSpec` in apps/api/src/workflows.ts: every key a step of a workflow sets, before any run froze it. */
+export type WorkflowStepSpec = {
+  harness: string | null;
+  model: string | null;
+  effort: string | null;
+  after: string[];
+  resume: string | null;
+  input: string[];
+  permissionMode: string | null;
+  tools: string[] | null;
+  deadlineSeconds: number | null;
+  maxAttempts: number | null;
+  check: string | null;
+  retries: number | null;
+  /** The schema file `output:` names. */
+  output: string | null;
+  loop: string | null;
+  rounds: number | null;
+};
+
+/**
+ * Mirrors `WorkflowListing` in apps/api/src/workflows.ts: a folder of steps, where it is read from — the repository's
+ * `workflows/`, or yours — its README's description, its steps and its graph; or, for a folder that does not read as a
+ * workflow, the loader's refusal and no steps.
+ */
+export type WorkflowListing = {
+  name: string;
+  from: 'repo' | 'yours';
+  dir: string;
+  description: string | null;
+  steps: Array<{ name: string; spec: WorkflowStepSpec }>;
+  graph: RunGraph;
+  error: string | null;
+};
+
+/** Every workflow there is. Not polled: it changes when a person edits a folder. Read again on each visit. */
+export const workflowsQuery = queryOptions({
+  queryKey: ['workflows'],
+  queryFn: () => get<WorkflowListing[]>('/api/workflows'),
+});
+
+/** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
+export const workflowNameOf = (workflowDir: string): string => workflowDir.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || workflowDir;
+
+/**
+ * Start a run of a workflow, as `wf start` does: the api writes the run's record and files nothing. Resolves with the new
+ * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s, or the api's own about the brief.
+ */
+export async function startRun(start: { workflow: string; from: WorkflowListing['from']; brief: string }): Promise<{ id: string }> {
+  const res = await fetch('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(start) });
+  const body = (await res.json().catch(() => undefined)) as { id?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.id === 'string') return { id: body.id };
+  throw new Error(typeof body?.error === 'string' ? body.error : `POST /api/runs answered ${res.status} ${res.statusText}`);
+}
 
 export const runQuery = (id: string) =>
   queryOptions({

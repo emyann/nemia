@@ -9,7 +9,8 @@
  * failed — finished, not in flight, and off the Factory's floor until finished runs are shown. Nothing
  * runs. The pages must render a run as the api reads it, whatever the engine says of its tasks.
  *
- * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
+ * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT. And the workflows
+ * the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS.
  *
  * Written by hand rather than through agent-workflows: the web app imports no package, and a record
  * format that moves under the pages should fail here, where a person would see it.
@@ -20,6 +21,8 @@ import path from 'node:path';
 export const FAKE = {
   id: 'give-the-board-a-look-e2e0',
   title: 'Give the board a look',
+  /** The folder in the store it was started from, which names its workflow on the Runs page and the run's page. */
+  workflow: 'workflow',
   steps: ['implement', 'review', 'respond', 'tokens', 'theme'],
   blocked: 'implement',
   /** Signed off with no `check:`: done on its own word. */
@@ -134,6 +137,40 @@ export function seedCheckout(repo: string, mcpServer: string): void {
   }, null, 2));
 }
 
+/**
+ * The workflows the Workflows page lists. In the checkout's `workflows/`, `dev`: implement ⇄ review, described by its README,
+ * each step with what the page draws on its node; and `broken`, whose reviewer misspells `after`, which the loader refuses.
+ * In the store's `workflows/`, yours: `mine`, one step and no README.
+ */
+export const WORKFLOWS = {
+  good: {
+    name: 'dev',
+    description: 'Implement what was asked, then a second engineer reviews it, three rounds at most.',
+    steps: ['implement', 'review'],
+    runsOn: 'claude · opus',
+    check: 'npm test && npm run typecheck',
+    tools: 'Read, Grep, Glob, Bash',
+    loop: 'implement · 3 rounds',
+  },
+  broken: { name: 'broken', error: 'review: `afer` is not a key a step has.' },
+  yours: { name: 'mine', steps: ['plan'] },
+} as const;
+
+/** Write WORKFLOWS: the checkout's into `repo`, and yours into the store at `root`. */
+export function seedWorkflows(repo: string, root: string): void {
+  const { good, broken, yours } = WORKFLOWS;
+  const dev = path.join(repo, 'workflows', good.name);
+  write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
+  write(path.join(dev, 'implement.md'), `---\nharness: claude\nmodel: opus\ncheck: ${good.check}\n---\nImplement what was asked.\n`);
+  write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview the change.\n`);
+  write(path.join(dev, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }, null, 2));
+  const bad = path.join(repo, 'workflows', broken.name);
+  write(path.join(bad, 'README.md'), `# ${broken.name}\n\nA reviewer whose after is misspelt.\n`);
+  write(path.join(bad, 'implement.md'), 'Implement what was asked.\n');
+  write(path.join(bad, 'review.md'), '---\nafer: implement\n---\nReview the change.\n');
+  write(path.join(root, 'workflows', yours.name, 'plan.md'), '---\nharness: codex\n---\nWrite PLAN.md.\n');
+}
+
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
@@ -146,7 +183,7 @@ const lines = (events: object[]): string => events.map((event) => `${JSON.string
 export function seed(root: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = FAKE;
-  const workflowDir = path.join(root, 'workflow');
+  const workflowDir = path.join(root, FAKE.workflow);
   for (const step of STEPS) write(path.join(workflowDir, step.file), step.text);
 
   const workspace = path.join(root, 'worktrees', id, 'implement');

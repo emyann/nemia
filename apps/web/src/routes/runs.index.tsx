@@ -1,6 +1,7 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { StatusChip } from '../components/StatusChip';
+import { WorkflowLink } from '../components/WorkflowLink';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { titleOf } from '../lib/factory';
 
@@ -21,7 +22,8 @@ function Runs() {
   if (!runs.length) {
     return (
       <p className="text-sm text-neutral-500">
-        No runs yet. Start one with <code>npx wf start</code>.
+        No runs yet. Start one from <Link to="/workflows" className="underline underline-offset-2">Workflows</Link>, or with{' '}
+        <code>npx wf start</code>.
       </p>
     );
   }
@@ -39,18 +41,10 @@ function RunRow({ run }: { run: RunSummary }) {
   const title = titleOf(run);
 
   return (
-    <li>
-      <Link
-        to="/runs/$runId"
-        params={{ runId: run.id }}
-        className="-mx-2 block rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900"
-      >
-        <div className="flex items-baseline justify-between gap-4">
-          <p className="truncate font-medium">{title}</p>
-          <time className="shrink-0 text-xs text-neutral-500" dateTime={run.createdAt}>
-            {new Date(run.createdAt).toLocaleString()}
-          </time>
-        </div>
+    // The run's link, and beside it when it started and the workflow's link: side by side, since a link inside a link is not HTML.
+    <li className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900">
+      <Link to="/runs/$runId" params={{ runId: run.id }} className="block min-w-0 flex-1">
+        <p className="truncate font-medium">{title}</p>
         <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
           <span className="font-mono">{run.id}</span>
           <span>{run.repo}</span>
@@ -68,6 +62,12 @@ function RunRow({ run }: { run: RunSummary }) {
           ))}
         </ul>
       </Link>
+      <div className="flex shrink-0 flex-col items-end gap-1 pt-0.5">
+        <time className="text-xs text-neutral-500" dateTime={run.createdAt}>
+          {new Date(run.createdAt).toLocaleString()}
+        </time>
+        <WorkflowLink dir={run.workflowDir} />
+      </div>
     </li>
   );
 }

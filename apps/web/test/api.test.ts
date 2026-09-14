@@ -175,3 +175,42 @@ test("a run's decision is asked for once while a live step's engine word moves, 
   assert.ok(shown.slice(shown.indexOf(first)).every((data) => data !== undefined), JSON.stringify(shown));
 });
 
+
+const { askTry } = await import('../src/lib/api.ts');
+
+/** POST …/retry answering `status` and `body`, for the length of the test; what was sent is kept in `sent`. */
+function asking(t: { after: (fn: () => void) => void }, status: number, body: string, sent: Array<{ url: string; init: RequestInit }>) {
+  const before = globalThis.fetch;
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    sent.push({ url, init });
+    return new Response(body, { status, headers: { 'content-type': 'application/json' } });
+  }) as typeof fetch;
+  t.after(() => {
+    globalThis.fetch = before;
+  });
+}
+
+test('an answer is asked for as the api takes it — POST, JSON, the step by name — and resolves with the try and its ask file', async (t) => {
+  const sent: Array<{ url: string; init: RequestInit }> = [];
+  asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r 1.asks/retry-implement-2' }), sent);
+  assert.deepEqual(await askTry('r 1', 'implement', { mode: 'nudge', message: '--flag stays' }), { try: 2, file: '/store/runs/r 1.asks/retry-implement-2' });
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0]!.url, '/api/runs/r%201/steps/implement/retry');
+  assert.equal(sent[0]!.init.method, 'POST');
+  assert.deepEqual(sent[0]!.init.headers, { 'content-type': 'application/json' });
+  assert.deepEqual(JSON.parse(String(sent[0]!.init.body)), { mode: 'nudge', message: '--flag stays' });
+});
+
+test("REFUSED: an ask the api refuses rejects with the api's words, verbatim; an answer without the try it asked for, or without JSON, says so", async (t) => {
+  const refusal = "held is still running, so there is nothing to try again until it ends. Wait for it: wf ls r-1 (or stop the run: wf cancel r-1).";
+  const sent: Array<{ url: string; init: RequestInit }> = [];
+  asking(t, 409, JSON.stringify({ error: refusal }), sent);
+  await assert.rejects(askTry('r-1', 'held', { mode: 'nudge' }), (err: Error) => err.message === refusal);
+
+  globalThis.fetch = (async () => new Response(JSON.stringify({ ok: true }), { status: 202 })) as typeof fetch;
+  await assert.rejects(askTry('r-1', 'implement', { mode: 'nudge' }), (err: Error) =>
+    /^POST \/api\/runs\/r-1\/steps\/implement\/retry answered 202 .*without the try it asked for/.test(err.message) && /before asking again/.test(err.message));
+
+  globalThis.fetch = (async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' })) as typeof fetch;
+  await assert.rejects(askTry('r-1', 'implement', { mode: 'nudge' }), (err: Error) => err.message === 'POST /api/runs/r-1/steps/implement/retry answered 502 Bad Gateway');
+});

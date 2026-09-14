@@ -15,6 +15,7 @@ import { Hono } from 'hono';
 import { HOME, start } from 'agent-workflows';
 import { loadWorkflows, workflowDescription, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
+import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
@@ -126,50 +127,16 @@ const isObject = (value: unknown): value is Record<string, unknown> => typeof va
 
 const SHAPE = '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name';
 
-/** One status and what to do next. */
-type Refusal = { status: 400 | 403 | 404 | 409 | 415 | 422; error: string };
-
-/** The names a start may be addressed to: this machine's loopback, on any port. The api listens on 127.0.0.1 alone (port.ts). */
-const LOOPBACK_HOST = /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d{1,5})?$/i;
-
-/**
- * Why a start is refused before its body is read, or null. A run's brief is what an agent acts on in the repository once
- * `wf up` files it, so a page on another site must not be able to write one — and a `fetch` with a body, from any page,
- * reaches the api without the browser asking it first, unless the body is JSON.
- *
- * - Addressed to a name that is not this machine (`Host`): a site whose name was pointed at 127.0.0.1, which the browser
- *   treats as that site's own origin. Absent — a client that sends none — is this machine.
- * - Made by a page on another site (`Sec-Fetch-Site`, which the browser sets and no page can): anything but `same-origin`,
- *   which the board is, through vite's proxy too. `same-site` is refused: another port on localhost is the same site.
- *   Absent is a client outside a browser, such as curl.
- * - Not sent as `application/json`: the one body a page on another site cannot send without the browser asking the api
- *   first, and the api answers no such question. That holds in a browser too old to send `Sec-Fetch-Site`.
- *
- * Not `Origin` against `Host`: vite's proxy rewrites `Host` to the api's (`changeOrigin`), so the board's own start would read
- * as another site's.
- */
-function refusedBeforeReading(host: string | undefined, site: string | undefined, type: string | undefined): Refusal | null {
-  if (host !== undefined && !LOOPBACK_HOST.test(host.trim())) {
-    return {
-      status: 403,
-      error: `POST /api/runs refuses a request addressed to ${host}: the api starts a run only for a request to this machine — localhost, 127.0.0.1 or [::1] — so that a site whose name points here cannot start one. Reach the api at http://127.0.0.1:<port>, or start the run from the board.`,
-    };
-  }
-  if (site !== undefined && site !== 'same-origin') {
-    return {
-      status: 403,
-      error: `POST /api/runs refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): a run's brief is what an agent acts on in this repository. Start it from the board's Workflows page, or with \`wf start\`.`,
-    };
-  }
-  const media = type?.split(';')[0]?.trim().toLowerCase();
-  if (media !== 'application/json') {
-    return {
-      status: 415,
-      error: `POST /api/runs takes its body as \`content-type: application/json\`, and this request sent ${media ? `\`${media}\`` : 'no content-type'} — a body any page can send without asking. Send ${SHAPE}, with that header.`,
-    };
-  }
-  return null;
-}
+/** A start, as the guard's refusals word it (guard.ts). */
+const START: Guarded = {
+  route: 'POST /api/runs',
+  does: 'starts a run',
+  forAnother: 'start one',
+  why: "a run's brief is what an agent acts on in this repository",
+  reach: 'start the run from the board',
+  instead: "Start it from the board's Workflows page, or with `wf start`",
+  shape: SHAPE,
+};
 
 /**
  * The workflow folder a start names, found among the folders the sources have — never joined from what was sent, so no
@@ -223,9 +190,9 @@ export const workflows = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // The board's one write, and the one a person makes at the command line: `wf start <brief> --workflows <folder> --repo <repo>`.
+  // The board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder> --repo <repo>`.
   .post('/api/runs', async (c) => {
-    const refused = refusedBeforeReading(c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     if (refused) return c.json({ error: refused.error }, refused.status);
     const repo = repoOf();
     let body: unknown;

@@ -3,12 +3,14 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Artifacts } from '../components/Closeout';
 import { Decide } from '../components/Decide';
+import { NeedsBanner } from '../components/Needs';
 import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runQuery, type RunDetail } from '../lib/api';
+import { offersOf } from '../lib/asks';
 import { decidableRun } from '../lib/decide';
 
 export const Route = createFileRoute('/runs/$runId')({
@@ -44,12 +46,7 @@ function Run({ run }: { run: RunDetail }) {
     <article className="space-y-6">
       <BackToRuns />
 
-      {run.waitingOnYou.length > 0 && (
-        <p className="rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, refused by its
-          check, or out of rounds —{' '}<code>wf decide {run.id}</code>
-        </p>
-      )}
+      <NeedsBanner run={run} />
 
       {run.warning && (
         <p className="rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
@@ -62,8 +59,8 @@ function Run({ run }: { run: RunDetail }) {
         <WorkflowLink dir={run.workflowDir} />
       </header>
 
-      {/* Between the banner and the canvas, for a run with something to decide: never while it runs. */}
-      {decidableRun(run) && <Decide run={run} />}
+      {/* Between the banner and the canvas, for a run with something to decide — never while it runs — or a try a person has asked for. */}
+      {(decidableRun(run) || offersOf(run).length > 0) && <Decide run={run} />}
 
       <section aria-label="The run's steps as a graph" className="flex flex-col gap-4 md:flex-row">
         <div className="min-w-0 flex-1">

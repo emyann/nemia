@@ -33,6 +33,13 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
+- **The e2e's watch counts every 4xx a page sees against it.** A refusal the e2e makes on purpose goes
+  in a page of its own, with a watch that must see that one refusal and nothing else (the `answer` page,
+  learned by the run that added the answer box). And the e2e visits every page in light, then every page
+  in dark, so a page that writes to the store takes its write back before it ends.
+- **The engine's `transcript` of an attempt still in flight observes its harness** — one `claude agents`
+  call per read, since the session's id is on no record yet. Read it on a run's detail, never on the list
+  the Factory polls (learned by the run that put a blocked session's last line on the board).
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).

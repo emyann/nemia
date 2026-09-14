@@ -838,3 +838,149 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   assert.deepEqual(ranWith(rowsOf(set, null)), ['opus', 'high', 'dontAsk', 'none', '600 s', '2']);
 });
 
+
+// ─── what a step needs, and the answer ──────────────────────────────────────
+
+const Answering = await import('../src/components/Decide.tsx');
+const { NeedsBanner } = await import('../src/components/Needs.tsx');
+const Closeouts = await import('../src/components/Closeout.tsx');
+const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
+type Offer = import('../src/lib/asks.ts').Offer;
+
+const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
+
+/** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
+function needing(status: string, needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'lastLine'>>, over: { waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
+  const run = runOf(status, over);
+  return { ...run, steps: [{ ...run.steps[0]!, needs: null, blockedByHarness: false, lastLine: null, asked: null, ...needs }] };
+}
+
+test("a step's node says what it needs: a gate's question after `waiting on you`, and a session the harness blocked, with what it said last — whole on hover", () => {
+  const question = 'Should a finished run keep its card on the Factory?';
+  const gate = nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: ['review'] }));
+  // One line, as the node's others: a second would make it taller than the layering's row.
+  const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(gate);
+  assert.ok(footer, gate);
+  assert.equal(footer[1], `asks: ${question}`);
+  assert.equal(footer[2], `<span class="font-semibold">waiting on you</span><span data-need="asks"> · asks: ${question}</span>`);
+  // Asked already, the api waits on nobody for it: no gate, and no question. Nor on a run called off.
+  assert.doesNotMatch(nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: [] })), /data-need/);
+  assert.doesNotMatch(nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: [], cancelledAt: at })), /data-need/);
+
+  const held = nodeMarkup(needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] }));
+  assert.equal(gateDrawn(held), false, 'blocked by the harness is no gate: the step asked nothing');
+  assert.ok(held.includes(`<p data-need="harness" title="blocked by the harness: ${LOGIN}" class="truncate `), held);
+  assert.ok(held.includes(`>blocked by the harness: ${LOGIN}</p>`), held);
+  assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: true }, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
+  assert.doesNotMatch(nodeMarkup(needing('running (working)', {}, { waitingOnYou: [] })), /data-need/);
+});
+
+/** The Decide section's answers for `offers`, rendered inside the query client their asks are made with. */
+const offersMarkup = (offers: Offer[]) =>
+  renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(Answering.Offers, { runId: 'r-1', offers })));
+
+test("the answers: a box for a step that asks, Try again for a refused check with a recheck, its box closed while a recheck is chosen — and a try asked, `wf ls`'s note", () => {
+  const html = offersMarkup([
+    { step: 'implement', kind: 'answer', needs: 'Which database?' },
+    { step: 'theme', kind: 'try-again', recheck: true, unfinished: false },
+    { step: 'lint', kind: 'try-again', recheck: true, unfinished: true },
+    { step: 'docs', kind: 'try-again', recheck: false, unfinished: false },
+    { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--nudge, with your answer) — the next tick files it' },
+  ]);
+  assert.match(html, /^<section aria-label="Answer"/);
+  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, { kind: m[1]!, html: m[3]! }]));
+  assert.deepEqual([...rows].map(([name, { kind }]) => [name, kind]), [
+    ['implement', 'answer'], ['theme', 'try-again'], ['lint', 'try-again'], ['docs', 'try-again'], ['plan', 'asked'],
+  ]);
+  const said = (name: string) => textsOf(/<p [^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!.html)![1]!).join(' ');
+  const buttons = (name: string) => [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
+  // A server render writes `checked` before `value`.
+  const radios = (name: string) => [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  const boxes = (name: string) => [...rows.get(name)!.html.matchAll(/<textarea /g)].length;
+  const closed = (name: string) => /<textarea [^>]*\bdisabled=""/.test(rows.get(name)!.html);
+
+  // An answer: what it asks, a box, and a button that waits for an answer; a nudge unless a new session is chosen.
+  assert.equal(said('implement'), 'implement asks: Which database?');
+  assert.equal(boxes('implement'), 1);
+  assert.deepEqual(buttons('implement'), [['submit', true, 'Answer and continue']]);
+  assert.deepEqual(radios('implement'), [['nudge', true], ['fresh', false]]);
+  assert.match(rows.get('implement')!.html, /<label for="[^"]+" class="sr-only">Your answer to implement<\/label>/);
+
+  // A refused check: something to tell it if you like, and its check again; the check first where it did not finish.
+  assert.equal(said('theme'), 'theme was refused by its check');
+  assert.equal(boxes('theme'), 1);
+  assert.deepEqual(buttons('theme'), [['submit', false, 'Try again']]);
+  assert.deepEqual(radios('theme'), [['nudge', true], ['fresh', false], ['recheck', false]]);
+  assert.deepEqual(radios('lint'), [['nudge', false], ['fresh', false], ['recheck', true]]);
+  // A recheck files no session, so a message on it is refused (`messageRefusal`): its box is closed while it is chosen, and says why.
+  assert.equal(closed('lint'), true, rows.get('lint')!.html);
+  assert.match(rows.get('lint')!.html, /placeholder="A recheck runs the check again and files no session: there is nobody to tell\."/);
+  assert.deepEqual([closed('implement'), closed('theme'), closed('docs')], [false, false, false]);
+  assert.equal(said('docs'), 'docs ended without the closeout it was asked for');
+  assert.deepEqual(radios('docs'), [['nudge', true], ['fresh', false]]);
+
+  // Asked: what `wf ls` says of it, and nothing to press.
+  assert.deepEqual(textsOf(rows.get('plan')!.html), ['plan', 'try 2 asked (--nudge, with your answer) — the next tick files it']);
+  assert.deepEqual(buttons('plan'), []);
+  assert.equal(boxes('plan'), 0);
+  assert.doesNotMatch(html, /data-refused/);
+});
+
+test('the Decide section puts the answers first, before what there is to decide, and its commands still only copy', () => {
+  const decision = {
+    touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
+    total: { usage: null, used: 'not measured', cost: 'not measured' },
+    commands: [{ label: 'ship it' as const, command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null }],
+  };
+  const offers = createElement(QueryClientProvider, { client: new QueryClient() }, createElement(Answering.Offers, { runId: 'r-1', offers: [{ step: 'implement', kind: 'answer', needs: 'Which database?' }] }));
+  const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision, offers }));
+  assert.ok(html.indexOf('aria-label="Answer"') < html.indexOf('data-lesson'), html);
+  const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
+  assert.deepEqual([...commands.matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])), [true]);
+  assert.match(html, />implement<\/strong> asks: Which database\?</);
+});
+
+test('the tries say `your answer` beside a try a person answered, and above its closeout in the Output tab, selected or folded', () => {
+  const answer = 'Postgres, the one in docker-compose.yml.';
+  const answered = threeTries.map((t) => ({ ...t, answer: t.try === 2 ? answer : null }));
+  const rounds = renderToStaticMarkup(createElement(Closeouts.Rounds, { tries: answered, selected: 3, onSelect: () => {} }));
+  assert.deepEqual([...rounds.matchAll(/<li data-try="(\d+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], /data-your-answer/.test(m[2]!)]), [['1', false], ['2', true], ['3', false]]);
+  assert.ok(rounds.includes(`<p data-your-answer="true" title="${answer}" class="line-clamp-2 break-words"><span class="text-neutral-500">your answer </span>${answer}</p>`), rounds);
+
+  const selected = renderToStaticMarkup(createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[1]!, none: 'No closeout yet.' }));
+  assert.ok(selected.indexOf('your answer:') >= 0 && selected.indexOf('your answer:') < selected.indexOf('Fixed the failing test.'), selected);
+  const folded = renderToStaticMarkup(createElement(Closeouts.TryCloseouts, { tries: answered, selected: answered[2]!, none: 'No closeout yet.' }));
+  const fold = /<details data-try="2"[\s\S]*?<\/details>/.exec(folded)![0];
+  assert.ok(fold.indexOf('your answer:') >= 0 && fold.indexOf('your answer:') < fold.indexOf('Fixed the failing test.'), fold);
+  assert.doesNotMatch(/<details data-try="1"[\s\S]*?<\/details>/.exec(folded)![0], /your answer/);
+});
+
+test("REFUSED: the banner offers no try of a session the harness blocked — it says the board cannot continue it, and gives the two commands that can, each only copied", () => {
+  const base = needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] });
+  const asks = { ...base.steps[0]!, name: 'implement', taskId: 't-2', status: 'succeeded · BLOCKED', needs: 'Which database?', blockedByHarness: false, lastLine: null };
+  const run: RunDetail = { ...base, waitingOnYou: ['implement'], steps: [asks, base.steps[0]!] };
+  const html = renderToStaticMarkup(createElement(NeedsBanner, { run }));
+
+  assert.match(html, /^<section aria-label="Waiting on you"/);
+  const texts = textsOf(html);
+  assert.ok(texts.includes('asks: Which database?'), html);
+  // After the step's name, which is a tag of its own.
+  assert.ok(texts.includes(`is blocked by the harness: ${LOGIN}`), html);
+  // For the session the harness blocked alone: what the board cannot do, and the commands, in order.
+  assert.equal([...html.matchAll(/data-unblock/g)].length, 1);
+  assert.match(html, /<li data-need="harness" data-step="review"[^>]*><p [^>]*>[\s\S]*?<\/p><div data-unblock="true"/);
+  assert.match(html, /The board cannot continue it: its session has not ended/);
+  assert.deepEqual([...html.matchAll(/<li class="flex[^"]*"><code [^>]*>([^<]*)<\/code>/g)].map((m) => unescaped(m[1]!)), [
+    'AE_ROOT="${WF_ROOT:-$HOME/.agent-workflows}/engine" ae stop t-1',
+    'wf retry r-1 review',
+  ]);
+  // Nothing on it asks for a try: each button copies a command, and there is nothing to type.
+  const buttons = [...html.matchAll(/<button [^>]*>/g)].map((m) => m[0]);
+  assert.equal(buttons.length, 2);
+  assert.ok(buttons.every((button) => /data-copy="true"/.test(button)), html);
+  // Nor the call to continue it, which the board cannot answer.
+  assert.doesNotMatch(html, /<textarea|<form|— continue it/);
+
+  // Called off: nobody waits for either.
+  assert.equal(renderToStaticMarkup(createElement(NeedsBanner, { run: { ...run, cancelledAt: at, waitingOnYou: [] } })), '');
+});

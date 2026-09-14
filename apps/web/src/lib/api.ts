@@ -15,11 +15,27 @@ export type RunSummary = {
   status: RunStatus;
   /** Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file. */
   moving: boolean;
-  /** `note` is what `wf ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints nothing. */
-  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null }>;
+  /**
+   * `note` is what `wf ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints nothing.
+   * `needs` and `blockedByHarness` are what a person has to know to act on it (`StepNeeds`).
+   */
+  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
   /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds. Empty on a cancelled run. */
   waitingOnYou: string[];
 };
+
+/**
+ * Mirrors `StepNeeds` in apps/api/src/app.ts. `needs`: the closeout's, for a step whose current try signed off blocked. `blockedByHarness`:
+ * whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. What that session said last is
+ * on a run's detail alone (`lastLine`): the list reads no conversation.
+ */
+export type StepNeeds = { needs: string | null; blockedByHarness: boolean };
+
+/** Mirrors `StepAsked` in apps/api/src/app.ts: a try a person asked for, which the next tick files. */
+export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null };
+
+/** How `wf retry` tries a step again: continue its session, a new one, or its check run again and no session. */
+export type RetryMode = 'nudge' | 'fresh' | 'recheck';
 
 /** Mirrors `StepSpec` in apps/api/src/app.ts. */
 export type StepSpec = {
@@ -112,6 +128,8 @@ export type StepTry = {
   attempts: StepAttempts;
   check: StepCheck | null;
   closeout: StepCloseout | null;
+  /** What a person said to this try when they asked for it — `wf decide`'s `your answer` — or null. */
+  answer: string | null;
 };
 
 /** Mirrors `RunDetail` in apps/api/src/app.ts. */
@@ -144,6 +162,12 @@ export type RunDetail = {
     status: string;
     /** As on `RunSummary`. */
     note: string | null;
+    needs: string | null;
+    blockedByHarness: boolean;
+    /** For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read. */
+    lastLine: string | null;
+    /** The try a person asked for that the next tick files; null when none is. */
+    asked: StepAsked | null;
     closeout: StepCloseout | null;
     /** Null for a step with no `check:`. */
     check: StepCheck | null;
@@ -367,6 +391,28 @@ export async function startRun(start: { workflow: string; from: WorkflowListing[
     );
   }
   throw new Error(typeof body?.error === 'string' ? body.error : `POST /api/runs answered ${res.status} ${res.statusText}`);
+}
+
+/**
+ * Ask for another try of a step, as `wf retry` does: the api calls the package's `retry()`, which writes the ask and nothing else, and the
+ * next tick files the try. Resolves with the try asked for and its ask file; rejects with the api's refusal in full — the package's words
+ * for a message that cannot ride on the ask or a step that may not be tried again that way, or the api's own about the request.
+ *
+ * Sent as `application/json`, which the api requires of it, as of a start.
+ */
+export async function askTry(runId: string, step: string, how: { mode: RetryMode; model?: string; message?: string }): Promise<{ try: number; file: string }> {
+  const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`;
+  const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
+  const body = (await res.json().catch(() => undefined)) as { try?: unknown; file?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.try === 'number') return { try: body.try, file: String(body.file) };
+  if (res.ok) {
+    // Written, it may well be: look before asking again.
+    throw new Error(
+      `POST ${route} answered ${res.status} ${res.statusText} without the try it asked for, so the api and this board disagree about what an ask answers. ` +
+        `The ask may be written: look at the step's note (\`wf ls ${runId}\`) before asking again, and restart the api (\`npm run dev\`).`,
+    );
+  }
+  throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
 }
 
 export const runQuery = (id: string) =>

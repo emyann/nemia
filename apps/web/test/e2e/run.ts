@@ -2,7 +2,7 @@
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
  *  1. Builds the web app.
- *  2. Seeds a store in a temporary WF_ROOT with three fake runs, the first with a real repository and branch to decide
+ *  2. Seeds a store in a temporary WF_ROOT with four fake runs, the first with a real repository and branch to decide
  *     on, and beside it a checkout for the api to serve (`HKB_REPO`) on the Capabilities page, and workflows in both for
  *     the Workflows page (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
@@ -25,7 +25,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectBeneath, expectCount, expectDrawn, expectInside, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { CHECKOUT, FAKE, HELD, LOOPING, NEIGHBOUR, REGISTRY, seed, seedCheckout, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -83,6 +83,12 @@ async function nextVisit(page: Page, check: (again: Page) => Promise<void>): Pro
   }
 }
 
+/** The theme a page is in, as its browser prefers it: what names a photograph taken beside the visit's own. */
+const themeOf = (page: Page): Promise<string> => page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+
+/** What the `answer` page answers FAKE's blocked step with. */
+const ANSWER = 'Keep it off the floor: a finished run is under Show finished.';
+
 /** The pages, and what each must have. A new page gets a line here, or the check never looks at it. */
 const PAGES: PageSpec[] = [
   {
@@ -97,13 +103,19 @@ const PAGES: PageSpec[] = [
       // The review's case: a run `assess` calls failed, with a session of it still running, is in flight.
       await expectVisible(beside, `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`);
       await expectVisible(beside.getByText(/since it started$/), 'its card counts the time since it started, as a card in flight does');
+      // A run whose session the harness blocked is in flight too: its card names the harness. What the session said last is on the
+      // run's page, which reads it: the list reads no conversation.
+      await expectVisible(
+        page.locator(`.react-flow__node[data-id="${HELD.id}"] [data-need="harness"][data-step="${HELD.blocked}"]`, { hasText: new RegExp(`^${HELD.blocked} is blocked by the harness$`) }),
+        `the card of a run whose session the harness blocked says so — not needs-human alone (${HELD.id})`,
+      );
       await settled(page);
 
       // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight.
       // Its followers read `waiting`, and will for ever; they do not keep it on the floor.
       await expectCount(card, 0, `a run whose check refused is finished, not in flight: no card on the floor by default (${FAKE.id})`);
       // So is the loop out of rounds: it waits on a person, and nothing of it moves.
-      await expectVisible(page.getByText('1 in flight · 2 finished · 2 waiting on you'), 'the Factory counts both finished, and waiting on you');
+      await expectVisible(page.getByText('2 in flight · 2 finished · 2 waiting on you'), 'the Factory counts both finished, and waiting on you');
       await showFinished(page);
       await expectVisible(
         page.locator(`.react-flow__node[data-id="${LOOPING.id}"] [data-state="exhausted"][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
@@ -112,6 +124,10 @@ const PAGES: PageSpec[] = [
       await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
       await expectVisible(card.getByText(/^started .+ ago$/), 'the card reads finished: when it started, not a clock still counting');
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
+      await expectVisible(
+        card.locator(`[data-need="asks"][data-step="${FAKE.blocked}"]`, { hasText: `${FAKE.blocked} asks: ${SESSION.closeout.needs}` }),
+        `the card says what ${FAKE.blocked}, signed off blocked, asks (${SESSION.closeout.needs})`,
+      );
       await expectVisible(card.locator(`a[href="/runs/${FAKE.id}"]`), "the card's title links to the run's page");
       await expectVisible(card.locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }), `the card shows ${FAKE.refused}'s refused check as a red chip`);
 
@@ -128,6 +144,7 @@ const PAGES: PageSpec[] = [
       await expectVisible(card.getByText(FAKE.touched, { exact: true }), `the open card of a run waiting on you says what its branch touched (${FAKE.touched})`);
       for (const name of FAKE.steps) await expectVisible(step(name), `the open run draws ${name}`);
       await expectVisible(step(FAKE.blocked).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate on the Factory`);
+      await expectVisible(step(FAKE.blocked).locator('[data-need="asks"]', { hasText: `asks: ${SESSION.closeout.needs}` }), `${FAKE.blocked}'s node on the Factory says what it asks`);
       await expectVisible(
         step(FAKE.refused).locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }),
         `${FAKE.refused}, whose check refused, has a red chip`,
@@ -257,6 +274,15 @@ const PAGES: PageSpec[] = [
       await expectCount(graph.locator('.react-flow__node'), FAKE.steps.length, `the run's graph has a node per step (${FAKE.steps.join(', ')})`);
       for (const step of FAKE.steps) await expectVisible(graph.locator(`.react-flow__node[data-id="${step}"]`), `the graph has ${step}`);
       await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"]`).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate`);
+      // What it waits for, as its closeout gave it: on its node, and in the banner at the top of the page.
+      await expectVisible(
+        graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"] [data-need="asks"]`, { hasText: `asks: ${SESSION.closeout.needs}` }),
+        `${FAKE.blocked}'s node says what it asks (${SESSION.closeout.needs})`,
+      );
+      await expectVisible(
+        page.locator(`section[aria-label="Waiting on you"] [data-need="asks"][data-step="${FAKE.blocked}"]`, { hasText: `${FAKE.blocked} asks: ${SESSION.closeout.needs}` }),
+        `the banner says what ${FAKE.blocked} asks`,
+      );
       await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.refused}"] [data-state="failed-check"]`), `${FAKE.refused}'s refused check is a red chip on the run's graph`);
       await expectVisible(page.locator('section[aria-label="Check"]').getByText(FAKE.said), `the run's page shows how ${FAKE.refused}'s check's output ended`);
       await expectCount(graph.locator('.react-flow__edge animateMotion'), 0, `no dot travels the run's edges: nothing moves into ${FAKE.refused}, whose check refused`);
@@ -295,7 +321,17 @@ const PAGES: PageSpec[] = [
       await expectVisible(decide.locator('[data-command="drop it"] code', { hasText: `branch -D ${FAKE.branch}` }), 'drop it: the branch deleted, as a line');
       await expectVisible(decide.locator('[data-command="once more"] code', { hasText: `wf retry ${FAKE.id} ${FAKE.refused}` }), `once more: ${FAKE.refused} tried again, as a line`);
       await expectCount(decide.locator('button[data-copy]'), await decide.locator('[data-command]').count(), 'a copy button beside each command');
-      await expectCount(decide.locator('button:not([data-copy])'), 0, 'no button in the Decide section but one that copies');
+      await expectCount(decide.locator('section[aria-label="Commands"] button:not([data-copy])'), 0, 'no button among the commands but one that copies');
+      // Before them, the answers: a box for the step that asks, and Try again for the step whose check refused, its check again an option.
+      const answers = decide.locator('section[aria-label="Answer"]');
+      const answer = answers.locator(`[data-offer="answer"][data-step="${FAKE.blocked}"]`);
+      await expectVisible(answer.getByRole('textbox', { name: `Your answer to ${FAKE.blocked}` }), `an answer box for ${FAKE.blocked}, which asks`);
+      await expectVisible(answer.getByRole('button', { name: 'Answer and continue' }), 'and its button');
+      await expectVisible(answer.getByRole('radio', { name: /^a new session/ }), 'a new session as an option to the nudge');
+      const again = answers.locator(`[data-offer="try-again"][data-step="${FAKE.refused}"]`);
+      await expectVisible(again.getByRole('button', { name: 'Try again' }), `Try again for ${FAKE.refused}, whose check refused`);
+      await expectVisible(again.getByRole('radio', { name: /^its check again/ }), 'its check run again as an option');
+      await expectCount(decide.locator('button:not([data-copy])'), await answers.locator('button').count(), "every other button in the Decide section is an answer's");
 
       // What a step consumed, in its section and in the inspector's Details, in `wf decide`'s words.
       const tokens = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.unverified, exact: true }) });
@@ -356,6 +392,116 @@ const PAGES: PageSpec[] = [
       } finally {
         await tab.close();
       }
+      await settled(page);
+    },
+  },
+  {
+    // The board's second write: an answer refused, shown in the package's words, and then one taken, asked for through the api, with the
+    // step's row saying what `wf ls` says. Each file is taken back, so every page after this one, in either theme, reads the store as seeded.
+    name: 'answer',
+    route: `/runs/${FAKE.id}`,
+    expect: async (page) => {
+      await sidebar(page);
+      const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
+        r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${FAKE.id}/steps/${FAKE.blocked}/retry`;
+      const asks = path.join(store!, 'runs', `${FAKE.id}.asks`);
+      const file = path.join(asks, `retry-${FAKE.blocked}-2`);
+
+      // Refused first, in a page of its own whose one refusal is the point. A file already at the name try 2's ask goes under, which
+      // `wf retry` did not write: no tick honours it, so the step still waits on you and its box is there — and the package refuses to
+      // write over it. Its sentence must be beside the box, word for word, the answer still in the box, and nothing written.
+      fs.mkdirSync(asks, { recursive: true });
+      fs.writeFileSync(file, '{}\n');
+      const refused = await page.context().newPage();
+      try {
+        const { problems } = watch(refused);
+        await refused.goto(page.url(), { waitUntil: 'networkidle' });
+        const refusedRow = refused.locator(`section[aria-label="Answer"] [data-step="${FAKE.blocked}"]`);
+        const refusedBox = refusedRow.getByRole('textbox', { name: `Your answer to ${FAKE.blocked}` });
+        await expectVisible(refusedBox, `the answer box for ${FAKE.blocked}, with a file that is no ask at its try's name`);
+        await refusedBox.fill(ANSWER);
+        const [answered] = await Promise.all([
+          refused.waitForResponse(retried, { timeout: WAIT_MS }),
+          refusedRow.getByRole('button', { name: 'Answer and continue' }).click(),
+        ]);
+        const { error } = (await answered.json()) as { error?: string };
+        if (answered.status() !== 409 || !error?.startsWith(`try 2 of ${FAKE.blocked} is already asked for`)) {
+          throw new Refused(`the package refuses to write over the file at try 2's name — the api answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        await expectVisible(refusedRow.locator('[data-refused]'), 'the refusal is shown beside the box, not swallowed');
+        const shown = await refusedRow.locator('[data-refused] p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal beside the box is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        if ((await refusedBox.inputValue()) !== ANSWER) throw new Refused('the answer stays in the box after a refusal, to send again');
+        const there = fs.readdirSync(asks);
+        if (there.length !== 1 || fs.readFileSync(file, 'utf8') !== '{}\n') throw new Refused(`nothing is written on a refusal — ${asks} holds ${there.join(', ')}`);
+        await settled(refused);
+        await refused.screenshot({ path: path.join(OUT, `answer-refused-${await themeOf(refused)}.png`), fullPage: true });
+        await refused.waitForLoadState('networkidle');
+        // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
+        const expected = `request answered 409: POST ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await refused.close();
+        fs.rmSync(file, { force: true });
+      }
+
+      const decide = page.locator('section[aria-label="Decide"]');
+      const row = decide.locator(`section[aria-label="Answer"] [data-step="${FAKE.blocked}"]`);
+      const box = row.getByRole('textbox', { name: `Your answer to ${FAKE.blocked}` });
+      await expectVisible(box, `the answer box for ${FAKE.blocked}`);
+      const send = row.getByRole('button', { name: 'Answer and continue' });
+      if (await send.isEnabled()) throw new Refused('Answer and continue is disabled while there is no answer — it was enabled with none');
+      await box.fill(ANSWER);
+      const [response] = await Promise.all([
+        page.waitForResponse(retried, { timeout: WAIT_MS }),
+        send.click(),
+      ]);
+      if (response.status() !== 202) throw new Refused(`the api takes the answer, through the board's proxy — it answered ${response.status()}: ${await response.text()}`);
+
+      const note = 'try 2 asked (--nudge, with your answer) — the next tick files it';
+      await expectVisible(decide.locator(`[data-offer="asked"][data-step="${FAKE.blocked}"] [data-note]`, { hasText: note }), `the step's row says what wf ls says once the run is read again (${note})`);
+      const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });
+      await expectVisible(section.locator('[data-note]', { hasText: note }), `${FAKE.blocked}'s section says it too`);
+      await expectCount(page.locator(`section[aria-label="Waiting on you"] [data-step="${FAKE.blocked}"]`), 0, 'and the banner no longer names it: nobody waits on you for it');
+      // The ask is the package's file, as `wf retry` writes it: the api wrote nothing else.
+      const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+      if (written?.mode !== 'nudge' || written?.message !== ANSWER) {
+        throw new Refused(`the ask is written as wf retry writes it, with the answer — ${file} holds ${JSON.stringify(written)}`);
+      }
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `answer-asked-${await themeOf(page)}.png`), fullPage: true });
+
+      fs.rmSync(asks, { recursive: true, force: true });
+      await expectVisible(box, `with the ask taken back, ${FAKE.blocked} waits on you again, and its box is back once the run is read again`);
+    },
+  },
+  {
+    name: 'held',
+    route: `/runs/${HELD.id}`,
+    expect: async (page) => {
+      await sidebar(page);
+      const said = `blocked by the harness: ${HELD.line}`;
+      const banner = page.locator('section[aria-label="Waiting on you"]');
+      const need = banner.locator(`[data-need="harness"][data-step="${HELD.blocked}"]`);
+      await expectVisible(need.getByText(`${HELD.blocked} is ${said}`), 'the banner names the harness, and what the session said last');
+      await expectCount(banner.getByText(/^Waiting on you:/), 0, "nobody is waiting on you in the package's words: the step asked nothing");
+
+      // No button that asks for a try the package refuses — a try of a session that has not ended reads running — but what the board cannot
+      // do, and the two commands that can: stop the session, then try it again.
+      const unblock = need.locator('[data-unblock]');
+      await expectVisible(unblock.getByText(/^The board cannot continue it: its session has not ended/), 'the banner says the board cannot continue the session, and why');
+      await expectVisible(unblock.locator('li code', { hasText: `ae stop ${HELD.id}-${HELD.blocked}` }), "the command that stops the session's task, in wf's engine store");
+      await expectVisible(unblock.locator('li code', { hasText: `wf retry ${HELD.id} ${HELD.blocked}` }), 'and the one that tries it again once it stopped');
+      await expectCount(banner.locator('button:not([data-copy])'), 0, 'nothing in the banner but buttons that copy: the board runs neither');
+      await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'no Decide section: nothing to decide while the run runs, and no try the package would take');
+
+      const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
+      const node = graph.locator(`.react-flow__node[data-id="${HELD.blocked}"]`);
+      await expectVisible(node.locator('[data-state="needs-human"]', { hasText: 'needs-human' }), "the step's chip is the engine's word, needs-human");
+      await expectVisible(node.locator('[data-need="harness"]', { hasText: said }), 'its node says the harness blocked it, and what the session said last');
+      await expectCount(node.getByText('waiting on you'), 0, 'and is no human gate: nothing was asked of a person');
       await settled(page);
     },
   },
@@ -682,12 +828,12 @@ async function main(): Promise<void> {
   const checkout = path.join(store, 'checkout');
   seedCheckout(checkout, path.join(API, 'test', 'fixtures', 'mcp-server.ts'));
   seedWorkflows(checkout, store);
-  // A `claude` that sees no sessions, first on the api's PATH. The engine observes `claude agents` on every
-  // list; the pages are about the store, not about the sessions on this machine. And where Claude Code keeps its
+  // A `claude` that lists the store's sessions (REGISTRY) — HELD's, blocked — first on the api's PATH. The engine observes `claude
+  // agents` on every list; the pages are about the store, not about the sessions on this machine. And where Claude Code keeps its
   // transcripts, in the store (CLAUDE_CONFIG_DIR): the engine reads a session's conversation from there, never from this machine's.
   const bin = path.join(store, 'bin');
   fs.mkdirSync(bin);
-  fs.writeFileSync(path.join(bin, 'claude'), "#!/bin/sh\necho '[]'\n", { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then cat "${path.join(store, REGISTRY)}"; else echo '[]'; fi\n`, { mode: 0o755 });
 
   const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API,
 {

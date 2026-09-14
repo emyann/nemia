@@ -1,44 +1,61 @@
-import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check as Done, ChevronRight, Copy } from 'lucide-react';
-import { decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
-import { barOf, changeOf, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
+import { askTry, decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RetryMode, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
+import { offersOf, type Offer } from '../lib/asks';
+import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
 import { Facts } from './Facts';
 
 /**
- * The Decide section of a run's page: what `wf decide` shows a person, read once for the run's state (`decisionQuery`)
- * and shown only when the api says there is something to decide. An api that refuses says why, here.
+ * The Decide section of a run's page: the answer each step waiting on you can be given (`offersOf`), then what `wf decide` shows a
+ * person — read once for the run's state (`decisionQuery`), only while the run has something to decide, and shown when the api says
+ * there is. A run that still runs with a session the harness blocked has an answer and nothing to decide. An api that refuses says why, here.
  */
 export function Decide({ run }: { run: RunDetail }) {
-  const { data, error } = useQuery(decisionQuery(run.id, decisionStamp(run)));
-  if (error) {
+  const decidable = decidableRun(run);
+  const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
+  const offers = offersOf(run);
+  const answers = offers.length > 0 ? <Offers runId={run.id} offers={offers} /> : null;
+  if (decidable && error) {
     return (
-      <section aria-label="Decide" className="space-y-1 rounded border border-neutral-200 p-4 dark:border-neutral-800">
-        <h2 className="font-semibold">Decide</h2>
+      <DecideFrame runId={run.id}>
+        {answers}
         <p className="text-sm text-red-600 dark:text-red-400">
           Could not read what there is to decide: {error.message} <code>wf decide {run.id}</code> reads it from the command line.
         </p>
-      </section>
+      </DecideFrame>
     );
   }
-  return isDecidable(data) ? <DecideSection runId={run.id} decision={data} /> : null;
+  if (decidable && isDecidable(data)) return <DecideSection runId={run.id} decision={data} offers={answers} />;
+  return answers && <DecideFrame runId={run.id}>{answers}</DecideFrame>;
 }
 
-/**
- * What there is to decide, in `wf decide`'s order: what each branch touched and the lesson line, the check-affecting
- * files in full, what the run consumed, and the commands — copyable, and none of them run from here.
- */
-export function DecideSection({ runId, decision }: { runId: string; decision: Decidable }) {
-  const { touched, lesson, sensitive, total, commands } = decision;
+/** The Decide section's frame: its heading, and what the board does from it and what it leaves to you. */
+function DecideFrame({ runId, children }: { runId: string; children: ReactNode }) {
   return (
     <section aria-label="Decide" className="space-y-5 rounded border border-neutral-200 p-4 dark:border-neutral-800">
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
         <p className="text-xs text-neutral-500">
-          What <code>wf decide {runId}</code> shows. The board runs none of it: copy a command to run it yourself.
+          What <code>wf decide {runId}</code> shows. The board runs none of its commands: copy one to run it yourself. An answer given
+          here asks for a try as <code>wf retry</code> does, and the next tick files it.
         </p>
       </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * What there is to decide, in `wf decide`'s order: what each branch touched and the lesson line, the check-affecting
+ * files in full, what the run consumed, and the commands — copyable, and none of them run from here. `offers` go first.
+ */
+export function DecideSection({ runId, decision, offers = null }: { runId: string; decision: Decidable; offers?: ReactNode }) {
+  const { touched, lesson, sensitive, total, commands } = decision;
+  return (
+    <DecideFrame runId={runId}>
+      {offers}
 
       <div className="space-y-4">
         {touched.length ? (
@@ -57,7 +74,152 @@ export function DecideSection({ runId, decision }: { runId: string; decision: De
       </section>
 
       <Commands commands={commands} />
+    </DecideFrame>
+  );
+}
+
+/** Each of `wf retry`'s ways, as an answer offers it. */
+const MODES: Record<RetryMode, string> = {
+  nudge: 'continue its session',
+  fresh: 'a new session',
+  recheck: 'its check again, and no session',
+};
+
+const BUTTON =
+  'rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
+
+const TEXTAREA =
+  'block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
+
+/**
+ * What the board can ask for each step waiting on you (`offersOf`), a row a step. Each ask is `wf retry`'s, made by the api through the
+ * package's `retry()`, which writes the ask and nothing else; the next tick files the try.
+ */
+export function Offers({ runId, offers }: { runId: string; offers: readonly Offer[] }) {
+  return (
+    <section aria-label="Answer" className="space-y-2">
+      <h3 className="text-xs font-medium text-neutral-500">
+        Answer — each asks for a try as <code>wf retry {runId} &lt;step&gt;</code> does, and the next tick files it
+      </h3>
+      <ul className="space-y-3">
+        {offers.map((offer) => (
+          <OfferRow key={offer.step} runId={runId} offer={offer} />
+        ))}
+      </ul>
     </section>
+  );
+}
+
+/** What a step needs, as its row says it after its name. */
+function offerSaid(offer: Exclude<Offer, { kind: 'asked' }>): string {
+  switch (offer.kind) {
+    case 'answer':
+      return offer.needs ? `asks: ${offer.needs}` : 'signed off blocked, and said nothing of what it needs';
+    case 'try-again':
+      return !offer.recheck ? 'ended without the closeout it was asked for' : offer.unfinished ? 'has a check that did not finish: no verdict on the work' : 'was refused by its check';
+  }
+}
+
+/**
+ * One step's answer: what it needs, then the box and the button that ask — an answer to a step that signed off blocked, `Try again` for a
+ * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the run is read again and the
+ * row says what `wf ls` says: `try 2 asked (…) — the next tick files it`.
+ */
+export function OfferRow({ runId, offer }: { runId: string; offer: Offer }) {
+  const queryClient = useQueryClient();
+  const [message, setMessage] = useState('');
+  // A check that did not finish is run again first, as `wf decide` offers it: the run spent no retry on it.
+  const [mode, setMode] = useState<RetryMode>(offer.kind === 'try-again' && offer.unfinished ? 'recheck' : 'nudge');
+  const field = useId();
+  // A recheck files no session, so it carries no message — `messageRefusal` refuses one — and the box is closed while it is chosen.
+  const rechecking = mode === 'recheck';
+  const ask = useMutation({
+    mutationFn: (how: { mode: RetryMode; message?: string }) => askTry(runId, offer.step, how),
+    onSuccess: () => {
+      setMessage('');
+      // The run as the api has it now: the step's note says the try is asked, and the step waits on nobody.
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+    },
+  });
+  // Once the api says the try is asked, its words show rather than this row's; a step waiting on you again later starts afresh.
+  const { reset } = ask;
+  useEffect(() => {
+    if (offer.kind === 'asked') reset();
+  }, [offer.kind, reset]);
+
+  if (offer.kind === 'asked' || ask.isSuccess) {
+    return (
+      <li data-offer="asked" data-step={offer.step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+        <strong>{offer.step}</strong>{' '}
+        <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
+          {offer.kind === 'asked' ? (offer.note ?? `try ${offer.try} asked`) : `try ${ask.data?.try} asked — the next tick files it`}
+        </span>
+      </li>
+    );
+  }
+
+  const modes: RetryMode[] = offer.kind === 'try-again' && offer.recheck ? ['nudge', 'fresh', 'recheck'] : ['nudge', 'fresh'];
+  return (
+    <li data-offer={offer.kind} data-step={offer.step} className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+      <p className="line-clamp-4 whitespace-pre-wrap break-words" title={offerSaid(offer)}>
+        <strong>{offer.step}</strong> {offerSaid(offer)}
+      </p>
+      <form
+        aria-label={offer.kind === 'answer' ? `Answer ${offer.step}` : `Try ${offer.step} again`}
+        className="space-y-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          // An answer goes as it was typed, as `--message` takes it. Something to tell a try is optional: none, when nothing was written,
+          // and none with a recheck, whatever the closed box still holds.
+          const said = !rechecking && (offer.kind === 'answer' || message.trim()) ? { message } : {};
+          ask.mutate({ mode, ...said });
+        }}
+      >
+        <label htmlFor={field} className="sr-only">
+          {offer.kind === 'answer' ? `Your answer to ${offer.step}` : `What to tell ${offer.step}, if anything`}
+        </label>
+        <textarea
+          id={field}
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          rows={offer.kind === 'answer' ? 3 : 2}
+          disabled={rechecking}
+          placeholder={
+            offer.kind === 'answer'
+              ? 'Your answer: the next try is told it, under “Your answer”.'
+              : rechecking
+                ? 'A recheck runs the check again and files no session: there is nobody to tell.'
+                : 'Anything to tell it (optional): the next try is told it.'
+          }
+          className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
+        />
+        {rechecking && message.trim() && (
+          <p data-recheck-note className="text-xs text-neutral-500">
+            Not sent with a recheck: it files no session to read it. Choose a session to send it.
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button type="submit" disabled={ask.isPending || (offer.kind === 'answer' && !message.trim())} className={BUTTON}>
+            {ask.isPending ? 'Asking…' : offer.kind === 'answer' ? 'Answer and continue' : 'Try again'}
+          </button>
+          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <legend className="sr-only">How to try {offer.step} again</legend>
+            {modes.map((m) => (
+              <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
+                {MODES[m]} <code className="text-neutral-500">--{m}</code>
+              </label>
+            ))}
+          </fieldset>
+        </div>
+      </form>
+      {ask.isError && (
+        <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+          <p className="text-sm font-medium text-red-800 dark:text-red-300">Not asked. The api refused it:</p>
+          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{ask.error.message}</p>
+        </div>
+      )}
+    </li>
   );
 }
 

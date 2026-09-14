@@ -1,10 +1,15 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { stepLogQuery, type RunDetail } from '../lib/api';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { Link } from '@tanstack/react-router';
+import type { RunDetail } from '../lib/api';
 import { duration, isLive } from '../lib/canvas';
 import { stepState, type StepState } from '../lib/status';
+import { foldTranscript } from '../lib/transcript';
+import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
 import { Check, code, Facts, specRows, Told, when } from './Facts';
+
+// Loaded when the Activity tab is first opened: markdown and the scroller weigh more than the canvas the inspector sits beside.
+const Conversation = lazy(() => import('./conversation/Conversation').then((m) => ({ default: m.Conversation })));
 import { StatusChip, StepNote } from './StatusChip';
 
 type Step = RunDetail['steps'][number];
@@ -88,8 +93,8 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
       <div role="tabpanel" className={`min-h-0 flex-1 p-3 ${tab === 'Activity' ? 'flex flex-col gap-2' : 'space-y-4 overflow-auto'}`}>
         {tab === 'Details' && <Details step={step} state={state} runCancelled={runCancelled} />}
         {tab === 'Output' && <Output step={step} state={state} />}
-        {/* Keyed by run and step, so a log never stands in for another step's while that one loads. */}
-        {tab === 'Activity' && <Activity key={`${run.id}/${step.name}`} runId={run.id} step={step} live={isLive(state)} />}
+        {/* Keyed by run and step, so a conversation never stands in for another step's while that one is read. */}
+        {tab === 'Activity' && <Activity key={`${run.id}/${step.name}`} run={run} step={step} />}
       </div>
     </aside>
   );
@@ -183,46 +188,41 @@ function Output({ step, state }: { step: Step; state: StepState }) {
   );
 }
 
-function Activity({ runId, step, live }: { runId: string; step: Step; live: boolean }) {
-  const filed = step.taskId !== null;
-  const { data, error, isPending } = useQuery({
-    ...stepLogQuery(runId, step.name, live),
-    enabled: filed,
-    // The key changes when the step stops; keep showing what was read until the last read lands.
-    placeholderData: keepPreviousData,
-  });
-  const log = useRef<HTMLPreElement>(null);
-  // Follow the newest line, unless a person has scrolled up to read an older one.
-  const following = useRef(true);
-  useLayoutEffect(() => {
-    if (log.current && following.current) log.current.scrollTop = log.current.scrollHeight;
-  }, [data]);
+/** How many of the conversation's last turns the tab draws: its tail, with the whole of it a click away. */
+const ACTIVITY_TURNS = 30;
 
-  if (!filed) return <p className="text-neutral-500">Not filed yet, so there is no output.</p>;
-  if (isPending) return <p className="text-neutral-500">Reading its output…</p>;
-  if (!data) return <p className="text-red-600">{error?.message ?? 'Could not read its output.'}</p>;
+/** The tail of the step's conversation — the session page's, read and followed the same way — and the way to the whole of it. */
+function Activity({ run, step }: { run: RunDetail; step: Step }) {
+  const following = useStepTranscript(run.id, step.name, step.taskId);
+  const turns = useMemo(() => foldTranscript(following.events), [following.events]);
+  const tail = turns.slice(-ACTIVITY_TURNS);
+
+  if (!step.taskId) return <p className="text-neutral-500">Not filed yet, so there is no conversation.</p>;
 
   return (
     <>
-      <p className="text-xs text-neutral-500">
-        {live ? 'Read again every 5 s while it runs.' : 'Not running, so not read again.'}
-        {data.truncated && ' The last 200 lines.'}
-      </p>
-      {error && <p className="text-xs text-red-600">{error.message}</p>}
-      {data.lines.length ? (
-        <pre
-          ref={log}
-          onScroll={(event) => {
-            const el = event.currentTarget;
-            following.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-          }}
-          className="min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 font-mono text-[11px] leading-snug dark:bg-neutral-950"
+      <div className="flex items-baseline justify-between gap-2 text-xs text-neutral-500">
+        <p>
+          {following.loading ? 'Reading its conversation…' : following.live ? 'Followed as it runs.' : 'Not running, so not followed.'}
+          {tail.length < turns.length && ` The last ${tail.length} of ${turns.length}.`}
+        </p>
+        <Link
+          to="/runs/$runId/steps/$step"
+          params={{ runId: run.id, step: step.name }}
+          className="shrink-0 font-medium text-neutral-900 underline-offset-2 hover:underline dark:text-neutral-100"
         >
-          {data.lines.join('\n')}
-        </pre>
-      ) : (
-        <p className="text-neutral-500">No output yet.</p>
-      )}
+          Open the session
+        </Link>
+      </div>
+      {following.error && <p className="text-xs text-red-600">{following.error}</p>}
+      {!following.loading &&
+        (tail.length ? (
+          <Suspense fallback={<p className="text-neutral-500">Reading its conversation…</p>}>
+            <Conversation turns={tail} live={following.live} density="compact" className="min-h-0 flex-1" />
+          </Suspense>
+        ) : (
+          !following.error && <p className="text-neutral-500">{following.live ? 'Nothing said yet.' : 'Its session said nothing the engine can read.'}</p>
+        ))}
     </>
   );
 }

@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CapabilitiesRouteImport } from './routes/capabilities'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
+import { Route as RunsRunIdStepsStepRouteImport } from './routes/runs.$runId_.steps.$step'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +35,25 @@ const RunsRunIdRoute = RunsRunIdRouteImport.update({
   path: '/runs/$runId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RunsRunIdStepsStepRoute = RunsRunIdStepsStepRouteImport.update({
+  id: '/runs/$runId_/steps/$step',
+  path: '/runs/$runId/steps/$step',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/capabilities': typeof CapabilitiesRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs/': typeof RunsIndexRoute
+  '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/capabilities': typeof CapabilitiesRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs': typeof RunsIndexRoute
+  '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +61,30 @@ export interface FileRoutesById {
   '/capabilities': typeof CapabilitiesRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs/': typeof RunsIndexRoute
+  '/runs/$runId_/steps/$step': typeof RunsRunIdStepsStepRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/capabilities' | '/runs/$runId' | '/runs/'
+  fullPaths:
+    | '/'
+    | '/capabilities'
+    | '/runs/$runId'
+    | '/runs/'
+    | '/runs/$runId/steps/$step'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/capabilities' | '/runs/$runId' | '/runs'
-  id: '__root__' | '/' | '/capabilities' | '/runs/$runId' | '/runs/'
+  to:
+    | '/'
+    | '/capabilities'
+    | '/runs/$runId'
+    | '/runs'
+    | '/runs/$runId/steps/$step'
+  id:
+    | '__root__'
+    | '/'
+    | '/capabilities'
+    | '/runs/$runId'
+    | '/runs/'
+    | '/runs/$runId_/steps/$step'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +92,7 @@ export interface RootRouteChildren {
   CapabilitiesRoute: typeof CapabilitiesRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
   RunsIndexRoute: typeof RunsIndexRoute
+  RunsRunIdStepsStepRoute: typeof RunsRunIdStepsStepRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +125,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunsRunIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/runs/$runId_/steps/$step': {
+      id: '/runs/$runId_/steps/$step'
+      path: '/runs/$runId/steps/$step'
+      fullPath: '/runs/$runId/steps/$step'
+      preLoaderRoute: typeof RunsRunIdStepsStepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +140,7 @@ const rootRouteChildren: RootRouteChildren = {
   CapabilitiesRoute: CapabilitiesRoute,
   RunsRunIdRoute: RunsRunIdRoute,
   RunsIndexRoute: RunsIndexRoute,
+  RunsRunIdStepsStepRoute: RunsRunIdStepsStepRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -2,7 +2,8 @@
  * The store `npm run e2e` serves: three fake runs, written the way `wf` and the engine write theirs.
  *
  * FAKE has five steps in two lanes, frozen on the record as `wf start` freezes them, with the folder beside
- * it. `implement` signed off blocked, `review` was filed and the engine has no record of its task
+ * it. `implement` signed off blocked, with its session's conversation on disk for the engine to read (SESSION),
+ * `review` was filed and the engine has no record of its task
  * (`unknown`), and `respond` is not filed. Beside them `tokens` signed off with no `check:` (`unverified`),
  * and `theme`, which waits on it, signed off and its check refused with exit 1: the engine's record of the
  * check's attempt, and its output and stderr as the check harness leaves them. So `assess` has the run
@@ -37,6 +38,67 @@ export const FAKE = {
   /** One per `after` between its steps: implement → review, review → respond, implement → respond, tokens → theme. */
   edges: 4,
 } as const;
+
+/**
+ * FAKE's `implement`, as its session said it: a Claude Code session's transcript, written where Claude Code keeps one — under
+ * `claude/projects` in the store, which the e2e gives the api as CLAUDE_CONFIG_DIR — and read by the engine by the session id
+ * the task's end records. The prompt; a thought with its text; words; seven calls with nothing said between them — three
+ * commands, one of which failed, a search, and three files read — with a thought kept without its text among them; words in
+ * markdown; a lone edit; a system line; and the closeout, which is implement's.
+ */
+export const SESSION = {
+  step: 'implement',
+  sessionId: '5b0f7a52-2c1e-4d8b-9a3f-6e1d2c7b4a90',
+  prompt: 'Implement what was asked.\n\n## What was asked for\n\nGive the board a look.',
+  thought: 'The Factory draws every run; a finished one should step off the floor.',
+  /** The seven calls between two things said, as one line. */
+  folded: 'Ran 3 commands, searched code, read 3 files',
+  calls: 7,
+  /** An item of the list in the words that follow the calls, as their markdown draws it. */
+  listed: 'a finished run steps off the floor',
+  system: 'Background session idle',
+  closeout: {
+    outcome: 'blocked',
+    summary: 'The Factory renders every run in flight; the run page is unchanged.',
+    needs: 'Should a finished run keep its card on the Factory?',
+    artifacts: [],
+  },
+} as const;
+
+/** SESSION's transcript, a line of JSON each as Claude Code 2.1.270 writes them, dated by `ago` (minutes before now). */
+function conversation(session: typeof SESSION, ago: (minutes: number) => string): object[] {
+  const line = { sessionId: session.sessionId, isSidechain: false, userType: 'external', cwd: '/code/hkb-v2', version: '2.1.270', gitBranch: `wf/${FAKE.id}/implement` };
+  let n = 0;
+  let minutes = 41;
+  const next = (type: 'user' | 'assistant', content: unknown) =>
+    ({ ...line, type, uuid: `${type}-${++n}`, timestamp: ago((minutes -= 0.5)), message: { role: type, content } });
+  const call = (id: string, name: string, input: object, result: string, isError = false) => [
+    next('assistant', [{ type: 'tool_use', id, name, input }]),
+    next('user', [{ type: 'tool_result', tool_use_id: id, content: result, ...(isError ? { is_error: true } : {}) }]),
+  ];
+  return [
+    { type: 'custom-title', customTitle: `ae/${FAKE.id}-implement/1`, sessionId: session.sessionId },
+    next('user', session.prompt),
+    next('assistant', [{ type: 'thinking', thinking: session.thought, signature: 'e2e' }]),
+    next('assistant', [{ type: 'text', text: 'I will start where the Factory decides which runs are on its floor.' }]),
+    ...call('toolu_e2e_status', 'Bash', { command: 'git status --short' }, ''),
+    next('assistant', [{ type: 'thinking', thinking: '', signature: 'e2e' }]),
+    ...call('toolu_e2e_test', 'Bash', { command: 'npm test --workspace web' }, '# tests 33\n# pass 33\n# fail 0'),
+    ...call('toolu_e2e_grep', 'Grep', { pattern: 'moving', path: 'apps/web/src' }, 'apps/web/src/lib/factory.ts:42:  return run.moving;'),
+    ...call('toolu_e2e_tsc', 'Bash', { command: 'npx tsc --noEmit' }, "src/lib/factory.ts(48,3): error TS2322: Type 'string' is not assignable to type 'boolean'.", true),
+    ...call('toolu_e2e_read1', 'Read', { file_path: '/code/hkb-v2/apps/web/src/lib/factory.ts' }, "1\timport type { RunSummary } from './api';"),
+    ...call('toolu_e2e_read2', 'Read', { file_path: '/code/hkb-v2/apps/web/src/components/FactoryCanvas.tsx' }, "1\timport { useMemo } from 'react';"),
+    ...call('toolu_e2e_read3', 'Read', { file_path: '/code/hkb-v2/apps/web/src/routes/index.tsx' }, "1\timport { createFileRoute } from '@tanstack/react-router';"),
+    next('assistant', [{
+      type: 'text',
+      text: `Every run in flight keeps its card:\n\n- ${session.listed}\n- \`Show finished\` brings it back\n\n\`\`\`ts\nexport const onTheFloor = (run: RunSummary) => run.moving;\n\`\`\``,
+    }]),
+    ...call('toolu_e2e_edit', 'Edit', { file_path: '/code/hkb-v2/apps/web/src/lib/factory.ts', old_string: 'run.status', new_string: 'run.moving' }, 'The file has been updated.'),
+    { ...line, type: 'system', uuid: 'system-1', subtype: 'informational', content: session.system, level: 'info', timestamp: ago((minutes -= 0.5)) },
+    next('assistant', [{ type: 'tool_use', id: 'toolu_e2e_closeout', name: 'StructuredOutput', input: session.closeout }]),
+    next('user', [{ type: 'tool_result', tool_use_id: 'toolu_e2e_closeout', content: [{ type: 'text', text: 'Structured output provided successfully' }] }]),
+  ];
+}
 
 /**
  * A second run, started after FAKE: `sketch` failed and `ship`, which waits on it, will never be filed, so
@@ -167,23 +229,23 @@ export function seed(root: string, now = Date.now()): void {
     },
   }, null, 2));
 
-  /** A step's task as the engine journals one that ran once, from `began` to `ended` minutes ago, and signed off with `closeout`. */
-  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object): void =>
+  /**
+   * A step's task as the engine journals one that ran once, from `began` to `ended` minutes ago, and signed off with `closeout`.
+   * `nativeId` is the session's own id, which the engine records with the end for a harness that has one, and reads a transcript by.
+   */
+  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object, nativeId?: string): void =>
     write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
       { kind: 'filed', at: ago(began), brief, cwd, maxAttempts: 1 },
       { kind: 'starting', at: ago(began - 1), attempt: 1 },
       { kind: 'spawned', at: ago(began - 1), attempt: 1 },
-      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, observed: 'done', reason: 'harness', closeout },
+      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, ...(nativeId ? { nativeId } : {}), observed: 'done', reason: 'harness', closeout },
       { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
     ]));
 
-  // implement signed off blocked. review's task has no journal at all, which is what makes it `unknown`.
-  signedOff(`${id}-implement`, workspace, 'Implement what was asked.', 42, 12, {
-    outcome: 'blocked',
-    summary: 'The Factory renders every run in flight; the run page is unchanged.',
-    needs: 'Should a finished run keep its card on the Factory?',
-    artifacts: [],
-  });
+  // implement signed off blocked, and its session's conversation is on disk (SESSION). review's task has no journal at all,
+  // which is what makes it `unknown`.
+  signedOff(`${id}-implement`, workspace, SESSION.prompt, 42, 12, SESSION.closeout, SESSION.sessionId);
+  write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SESSION.sessionId}.jsonl`), lines(conversation(SESSION, ago)));
   signedOff(`${id}-tokens`, lane, 'Pick the colour tokens.', 40, 30, { outcome: 'done', summary: 'Picked the colour tokens.', needs: null, artifacts: [] });
   signedOff(`${id}-theme`, lane, 'Apply them to every page.', 30, 10, { outcome: 'done', summary: 'Applied them to every page.', needs: null, artifacts: [] });
 

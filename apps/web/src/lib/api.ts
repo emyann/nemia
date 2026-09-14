@@ -93,19 +93,6 @@ export type StepAttempts = {
 export type StepLog = { lines: string[]; truncated: boolean };
 
 /**
- * A step's output, read on the page's beat while the step runs and left alone once it is not.
- *
- * Whether it runs is in the key, so the output is read once more when a step stops: the last beat
- * before it stopped can miss how it ended.
- */
-export const stepLogQuery = (runId: string, step: string, running: boolean) =>
-  queryOptions({
-    queryKey: ['runs', runId, 'steps', step, 'log', running ? 'running' : 'not running'],
-    queryFn: () => get<StepLog>(`/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/log`),
-    refetchInterval: running ? 5_000 : false,
-  });
-
-/**
  * Mirrors `TranscriptEvent` in packages/agent-engine/src/runner.ts, as the api passes it on: one thing said in a session's
  * conversation. A `tool_result` carries its call's `id`, so an event is unique by `id` and `kind` together.
  */

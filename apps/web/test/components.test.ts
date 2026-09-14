@@ -155,3 +155,58 @@ test('a step a person has sent round or asked to retry is no gate from the momen
     assert.equal(gateDrawn(nodeMarkup(runOf(status, { note, waitingOnYou: ['review'] }))), true, `${status}, nothing asked`);
   }
 });
+const { ToolCallView, TurnView } = await import('../src/components/conversation/Turns.tsx');
+const { foldTranscript } = await import('../src/lib/transcript.ts');
+type TranscriptEvent = import('../src/lib/api.ts').TranscriptEvent;
+
+test("a thought is drawn folded: a line that says it thought, and its text only once it is opened", () => {
+  const thoughts: TranscriptEvent[] = [
+    { id: 'a-1:0', at, role: 'assistant', kind: 'thinking', text: 'The word goes in a file.' },
+    { id: 'a-2:0', at, role: 'assistant', kind: 'thinking' },
+    { id: 'a-3:0', at, role: 'assistant', kind: 'text', text: 'Writing it.' },
+  ];
+  const [withText, without] = foldTranscript(thoughts).map((turn) => renderToStaticMarkup(createElement(TurnView, { turn, live: false, last: false })));
+  assert.match(withText!, /data-turn="thinking"/);
+  assert.match(withText!, /aria-expanded="false"/);
+  assert.match(withText!, /data-state="closed"/);
+  assert.match(withText!, /<p>Thought<\/p>/);
+  assert.doesNotMatch(withText!, /The word goes in a file/, 'folded: its text is not drawn until it is opened');
+  assert.match(without!, /<p>Thought, with no text kept<\/p>/, 'a thought the harness kept no text for says so');
+});
+
+test('a tool call is drawn with its result: folded, how its result says it went; opened, what it was given and what came back', () => {
+  const [turn] = foldTranscript([
+    { id: 'toolu_bash', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'echo word > WORD.txt' } } },
+    { id: 'toolu_bash', at, role: 'user', kind: 'tool_result', result: { text: 'WORD.txt: Permission denied', isError: true } },
+  ]);
+  assert.ok(turn?.kind === 'tool');
+  // Live and last, as a call still running would be: its result says how it went, not the session.
+  const folded = renderToStaticMarkup(createElement(TurnView, { turn, live: true, last: true }));
+  assert.match(folded, /data-tool-state="error"/);
+  assert.match(folded, /data-tool="Bash"/);
+  assert.match(folded, /echo word &gt; WORD\.txt/, 'what it ran, on its line');
+  assert.doesNotMatch(folded, /Permission denied/, 'folded: the result is behind its line');
+
+  const opened = renderToStaticMarkup(createElement(ToolCallView, { call: turn.call, running: false, defaultOpen: true }));
+  assert.match(opened, /data-state="open"/);
+  assert.match(opened, /command.{1,16}echo word &gt; WORD\.txt/, 'its input');
+  assert.match(opened, />Error<\/h4>/);
+  assert.match(opened, /WORD\.txt: Permission denied/, 'its result');
+
+  // With no result yet: running while the session may answer it, and unanswered once it cannot.
+  const call = { ...turn.call, result: null };
+  assert.match(renderToStaticMarkup(createElement(ToolCallView, { call, running: true })), /data-tool-state="running"/);
+  assert.match(renderToStaticMarkup(createElement(ToolCallView, { call, running: false })), /data-tool-state="no-result"/);
+});
+
+test('a StructuredOutput call is drawn as the closeout, named, with its outcome — not as a tool call', () => {
+  const [turn] = foldTranscript([
+    { id: 'toolu_closeout', at, role: 'assistant', kind: 'tool_use', tool: { name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable', needs: 'A writable WORD.txt', artifacts: [] } } },
+  ]);
+  const html = renderToStaticMarkup(createElement(TurnView, { turn: turn!, live: false, last: true }));
+  assert.match(html, /aria-label="Closeout"/);
+  assert.match(html, />Closeout<\/h3>/);
+  assert.match(html, /data-outcome="blocked"/);
+  assert.match(html, /A writable WORD\.txt/);
+  assert.doesNotMatch(html, /data-turn="tool"/);
+});

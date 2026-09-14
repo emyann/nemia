@@ -13,7 +13,8 @@ trying a step again with `retries:` and `wf retry` (§4 F), going round again wi
 that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planned/`, §4 Q), a run
 that waits on a run (`wf start --after`, the first half of §4 P), and three guards made to hold (a session
 the harness blocked tried again, `shipped` with nothing past the base, an ask file that is not an ask), and a plan as a folder of cards whose waiting runs are handed their parents'
-closeouts (`wf plan`, the rest of §4 P) have shipped.
+closeouts (`wf plan`, the rest of §4 P), and telling a running step something (`wf say`, with its route and the session page's
+prompt box: the steering channel's upper half) have shipped.
 
 ## Shipped: the check
 
@@ -510,16 +511,50 @@ What it leaves:
   on: a box on a blocked step in the Decide section, posting to a route guarded as `POST /api/runs` is. The api
   reads no answers yet. Its `listing` and `tryNote` calls pass none, so the board's note never says `answered`,
   and its once-more command, cut from the offer by `ONCE_MORE`, is `wf retry <run> <step>` without `--message`.
-- **The steering channel.** A message reaches a step that is over and waiting, not one still running. An
-  instruction mid-flight, the case §4b found sent by cross-session message, still has no ask file. It would take
-  the same shape, composed on read and printed by `wf decide`, plus a way to reach a live session that `wf`
-  does not have.
+- **The steering channel.** A message reached a step that was over and waiting, not one still running. *Shipped
+  since, below: `wf say`*, over the engine's `say`, which is the way to reach a live session `wf` did not have. The
+  record is the engine's journal of the task rather than an ask file, and `wf decide` prints it.
 - **`wf round` carries no message.** A person's once more still says nothing about what to look at.
 - **The question beside the answer is read from the engine.** `wf decide` views the task of the try before the
   answered one for its `needs`: one more view per answered step, and no question printed if the engine has lost
   that task.
 - **A plan is not steps.** `plan`'s `steps` are prose for one `implement`; a run that files steps from a plan
   is still §2 below.
+
+## Shipped: the steering channel — `wf say`
+
+Plan §6 item 3, the upper half, over S3's `Engine.say`. A step steered mid-flight by cross-session message left
+nothing on its run (§4b, *steering by message*), and the words were typed into a terminal against an engine task
+id, away from the session page where the conversation is.
+
+- `wf say <run> <step> "<words>"` calls `Engine.say` on the step's current try's task, which hands the words to
+  the session through its harness and journals a `said` entry. The verb writes nothing of its own. Refused first
+  in the package's words (`sayRefusal`: no such step, a cancelled run, a step not filed, a task settled, which
+  points at `wf retry --message`), then in the engine's, verbatim.
+- The words are read back off the engine's view: `wf ls` notes `said to 2×` beside the try the step is on
+  (`saidCount`, `saidWord`), and `wf decide` prints each thing said to every try under the step, before its
+  closeout, with its time and the words fenced (`saidLines`).
+- Open issue 16's fix in this layer: a try or a round that continues a session carries what was said to the last
+  try's task as `## Said to your session`, inside `## Try <n>` or `## Round <n>`, before `## Your answer`.
+- `POST /api/runs/:id/steps/:step/say`, guarded as the retry route is, calls `say()`: 409 for a refusal, 502 for
+  words the harness did not take, 202 with the entry. The step's detail carries `said`, and the session page draws
+  each as a turn of its own, beside the conversation, under which a prompt box sends more.
+
+What it leaves:
+
+- **Taken is not read** (engine open issue 12). `said` means the harness took the words, and the record says
+  nothing more; Claude Code can still set them aside.
+- **A new session is handed none of it.** `--fresh`, and a nudge with no session left to continue, start without
+  what was said to the last try, as they start without its conversation. A person who wants it said again says
+  it with `--message`.
+- **`wf ls` counts the current try; `wf decide` reads every try.** An earlier try's task is viewed once more for
+  it, as its question is for an answered try.
+- **`wf decide` prints nothing per step while the run runs.** Words said to a step of a run still running are in
+  `wf ls`'s note and on the session page until the run waits on a person.
+- **The box closes on the board's last read of the step.** Read every five seconds, so a session that ended since
+  is refused by the api when words are sent, and the refusal is shown; nothing is said.
+- **Only the session page draws what was said.** The inspector's Activity tab folds the transcript alone.
+- **Codex and `claude-detached` steps have no channel**, and the engine refuses them in its words.
 
 ## Shipped: a run that waits on a run — `wf start --after`
 

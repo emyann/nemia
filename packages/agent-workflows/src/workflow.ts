@@ -62,6 +62,13 @@ export type Workflow = {
    * the sandbox `permissionMode` names.
    */
   tools?: string[];
+  /**
+   * What the session may not have, in Claude Code's permission rules — `disallow: Bash(npm run build), SendMessage`.
+   * Absent: nothing denied beyond the checkout's settings. Claude Code is given the list as `--disallowedTools`, and a
+   * deny beats an allow, so a step is kept from a command `.claude/settings.json` allows for another step's sake by
+   * machinery, not by its brief. Refused on codex, which has no tool list: its fence is the sandbox `permissionMode` names.
+   */
+  disallow?: string[];
   deadlineSeconds?: number;
   maxAttempts?: number;
   /**
@@ -126,7 +133,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'deadlineSeconds', 'maxAttempts', 'check', 'retries', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'deadlineSeconds', 'maxAttempts', 'check', 'retries', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -247,6 +254,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     effort: wordOf(name, 'effort', meta.effort, harness),
     permissionMode: wordOf(name, 'permissionMode', meta.permissionMode, harness),
     tools: toolsOf(name, meta.tools, harness),
+    disallow: disallowOf(name, meta.disallow, harness),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
     maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
     check: checkOf(name, meta.check),
@@ -314,7 +322,9 @@ function readKeys(step: string, block: string): Partial<Record<StepKey, string>>
         ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
         : key === 'tools'
           ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
-          : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
+          : key === 'disallow'
+            ? `${step}: \`disallow\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
+            : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
     }
     meta[key] = value;
   }
@@ -381,6 +391,43 @@ function toolsOf(step: string, tools: string | undefined, harness: string | unde
       : 'a name is written bare, without quotes or brackets'}. ${written}`);
   }
   return names;
+}
+
+const DISALLOW_EXAMPLE = '`disallow: Bash(npm run build), SendMessage`';
+
+/**
+ * One permission rule as Claude Code writes one: a tool's name, and what it may not run in parentheses. The engine's
+ * `file()` refuses an entry of any other shape; it is checked here as well, so a folder is refused before anything is spent.
+ */
+const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
+
+/**
+ * `disallow:` as the rules the harness is given to deny, refused unless each entry is one rule.
+ *
+ * Split on commas, as `tools:` is, so a comma inside a rule's parentheses would reach the harness as two pieces of it, and is
+ * refused as `tools:` refuses one. Refused on codex, which has no tool list to deny from: its fence is the sandbox.
+ */
+function disallowOf(step: string, disallow: string | undefined, harness: string | undefined): string[] | undefined {
+  if (disallow === undefined) return undefined;
+  const named = `${step}: \`disallow: ${disallow}\``;
+  const written = `Each entry is one rule, a tool or a tool and what it may not run, comma-separated: ${DISALLOW_EXAMPLE}.`;
+  if (harness === 'codex') {
+    refuse(`${named} is a deny list, and codex has no tool list to deny from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`permissionMode: read-only\` for a step that must not write.`);
+  }
+  if (/\([^)]*,|\[[^\]]*,|"[^"]*,|'[^']*,/.test(disallow)) {
+    const pieces = disallow.split(',').map((s) => `\`${s.trim()}\``).join(', ');
+    refuse(`${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as rules. ${written} Two commands are two rules: \`Bash(git push), Bash(git reset)\`.`);
+  }
+  const rules = disallow.split(',').map((s) => s.trim()).filter(Boolean);
+  if (!rules.length) refuse(`${named} names no rule. ${written} Without the line, the step is denied nothing beyond the checkout's settings.`);
+  const odd = rules.find((r) => !RULE.test(r));
+  if (odd) {
+    refuse(`${named} has \`${odd}\`, which is not one rule: ${/[()]/.test(odd)
+      ? 'a rule has one pair of parentheses, right after the name, closed'
+      : /\s/.test(odd) ? 'a space outside the parentheses separates two rules, to the harness'
+      : 'a rule is a bare name, without quotes or brackets'}. ${written}`);
+  }
+  return rules;
 }
 
 function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined): number | undefined {

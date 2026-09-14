@@ -1260,32 +1260,51 @@ test('REFUSED before, now carried: a step with `tools:` and `effort:` reaches `e
   assert.deepEqual([check.harness, check.tools, check.effort], ['check', undefined, undefined]);
 });
 
+test('a step with `disallow:` reaches `e.file` with exactly those rules as `disallowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
+  const RULES = ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'];
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ndisallow: Bash(npm run build), Bash(npm run e2e), SendMessage', 'failed', 1);
+  assert.deepEqual(tasks.get(`${run.id}-implement`)!.spec.disallowedTools, RULES, 'the first filing');
+
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.deepEqual([nudged.disallowedTools, nudged.resumeFrom], [RULES, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+
+  settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
+  settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
+  await retry(e, run.id, 'implement', { mode: 'fresh' });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  assert.deepEqual(tasks.get(`${run.id}-implement-try3`)!.spec.disallowedTools, RULES, 'a new session, denied the same');
+
+  assert.equal(tasks.get(`${run.id}-implement-check`)!.spec.disallowedTools, undefined, "the check is the run's own, and denied nothing");
+});
+
 test("at shipped defaults a step names neither, and is filed with neither: the harness's own tools, at its own effort", async () => {
   const run = started(folder());
   const { e, tasks } = board();
   await advance(e, readRun(run.id));
   const spec = tasks.get(`${run.id}-implement`)!.spec;
-  assert.deepEqual([spec.tools, spec.effort], [undefined, undefined]);
+  assert.deepEqual([spec.tools, spec.disallowedTools, spec.effort], [undefined, undefined, undefined]);
 });
 
-test("a round files its target with the target's tools and effort, and the looping step — a new session each round — with its own", async () => {
+test("a round files its target with the target's tools, deny list and effort, and the looping step — a new session each round — with its own", async () => {
   const REVIEWS = ['Read', 'Grep', 'Glob', 'Bash'];
   const EDITS = ['Read', 'Edit', 'Write', 'Bash'];
-  const run = started(looped('tools: Read, Grep, Glob, Bash\neffort: max\n', 'tools: Read, Edit, Write, Bash\neffort: low\n'));
+  const run = started(looped('tools: Read, Grep, Glob, Bash\ndisallow: Bash(npm run build)\neffort: max\n', 'tools: Read, Edit, Write, Bash\ndisallow: SendMessage\neffort: low\n'));
   const b = board();
   await advance(b.e, readRun(run.id));
   const implement1 = b.tasks.get(`${run.id}-implement`)!.spec;
-  assert.deepEqual([implement1.tools, implement1.effort], [EDITS, 'low']);
+  assert.deepEqual([implement1.tools, implement1.disallowedTools, implement1.effort], [EDITS, ['SendMessage'], 'low']);
   await toReview(b, run.id, 1, true);
   const review1 = b.tasks.get(`${run.id}-review`)!.spec;
-  assert.deepEqual([review1.tools, review1.effort], [REVIEWS, 'max']);
+  assert.deepEqual([review1.tools, review1.disallowedTools, review1.effort], [REVIEWS, ['Bash(npm run build)'], 'max']);
 
   assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
   const implement2 = b.tasks.get(`${run.id}-implement-try2`)!.spec;
-  assert.deepEqual([implement2.tools, implement2.effort, implement2.resumeFrom], [EDITS, 'low', `native-${run.id}-implement`], 'the round, continuing implement');
+  assert.deepEqual([implement2.tools, implement2.disallowedTools, implement2.effort, implement2.resumeFrom], [EDITS, ['SendMessage'], 'low', `native-${run.id}-implement`], 'the round, continuing implement');
   await toReview(b, run.id, 2, false);
   const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
-  assert.deepEqual([review2.tools, review2.effort, review2.resumeFrom], [REVIEWS, 'max', undefined], "round 2's review");
+  assert.deepEqual([review2.tools, review2.disallowedTools, review2.effort, review2.resumeFrom], [REVIEWS, ['Bash(npm run build)'], 'max', undefined], "round 2's review");
 });
 
 // ─── what a consumer reads without a log: `phaseOfView`, `closeoutAsked`, `exitVerdicts` ───

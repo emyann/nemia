@@ -929,7 +929,7 @@ export function declaredOutput(step: Workflow, said: Closeout | undefined, field
 
 /**
  * A step's declared output as `wf decide` prints it, after the summary: an array as a list under its
- * name — an item with a `file` leads with `file:line`, its other fields beneath — and anything else as
+ * name — an item that says where it is leads with the place (`placeText`), its other fields beneath — and anything else as
  * `name: value`. A declared field the closeout did not give is named, since it is why the step reads
  * unsigned. `fields` as `declaredOutput` takes them: `owedFields`, so a loop's target's `replies` are printed too.
  */
@@ -954,17 +954,37 @@ const labelled = (name: string, value: unknown, first = '', next = first): strin
   return [`${first}${name}: ${head}`, ...more.map((l) => `${next}  ${l}`)];
 };
 
-/** One entry of a listed array. */
+/**
+ * A place as `wf decide` prints one, never as JSON: `file:line` (or the file, with no line), `page · theme`, a string as it
+ * is, and any other object as its keys and values. What a place holds beside those follows it, the same way.
+ */
+export function placeText(where: unknown): string {
+  if (!where || typeof where !== 'object') return textOf(where);
+  if (Array.isArray(where)) return where.map(placeText).join(', ');
+  const o = where as Record<string, unknown>;
+  const lead = typeof o.file === 'string' ? [typeof o.line === 'number' ? `${o.file}:${o.line}` : o.file]
+    : typeof o.page === 'string' ? [typeof o.theme === 'string' ? `${o.page} · ${o.theme}` : o.page]
+    : [];
+  const led = typeof o.file === 'string' ? ['file', 'line'] : typeof o.page === 'string' ? ['page', 'theme'] : [];
+  const rest = Object.entries(o).filter(([k]) => !led.includes(k)).map(([k, v]) => `${k}: ${placeText(v)}`);
+  return [...lead, ...rest].join(' · ') || '{}';
+}
+
+/**
+ * One entry of a listed array. A finding leads with where it is — a `file` and `line` of its own, or a `where` of any shape,
+ * as `placeText` prints it (U2's review printed a nested `where` as JSON) — and its other fields follow beneath.
+ */
 function itemLines(item: unknown): string[] {
   if (!item || typeof item !== 'object' || Array.isArray(item)) {
     const [head, ...more] = textOf(item).split('\n');
     return [`  - ${head}`, ...more.map((l) => `    ${l}`)];
   }
   const o = item as Record<string, unknown>;
-  if (typeof o.file === 'string') {
-    const at = typeof o.line === 'number' ? `${o.file}:${o.line}` : o.file;
-    const rest = Object.entries(o).filter(([k]) => k !== 'file' && k !== 'line');
-    return [`  - ${at}`, ...rest.flatMap(([k, v]) => labelled(k, v, '    '))];
+  const own = typeof o.file === 'string';
+  if (own || Object.hasOwn(o, 'where')) {
+    const [head, ...more] = placeText(own ? { file: o.file, line: o.line } : o.where).split('\n');
+    const rest = Object.entries(o).filter(([k]) => (own ? k !== 'file' && k !== 'line' : k !== 'where'));
+    return [`  - ${head}`, ...more.map((l) => `    ${l}`), ...rest.flatMap(([k, v]) => labelled(k, v, '    '))];
   }
   const entries = Object.entries(o);
   if (!entries.length) return ['  - {}'];

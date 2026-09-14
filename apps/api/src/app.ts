@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, isShipped, lessonLine, listRuns, phaseOfView, readAsks, sensitiveDiff, touchedBy, usedLines, verdictWord } from 'agent-workflows';
-import { assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, tryNote } from 'agent-workflows/run';
+import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, HARNESSES, isShipped, lessonLine, listRuns, phaseOfView, readAsks, sensitiveDiff, touchedBy, usedLines, verdictWord } from 'agent-workflows';
+import { assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
@@ -60,13 +60,24 @@ export type StepSpec = {
 /**
  * What the engine filed a step's current try with, off its record of the task: what the step runs with where its workflow
  * leaves a field to the engine. `maxAttempts` is always on the record, the engine's default being 1. Each other field is null
- * where the task was filed without it — a deadline, which is then no limit; a model, effort, mode or tools, which are then the
- * harness's own.
+ * where the task was filed without it — a deadline, which is then no limit; a model, effort or tools, which are then the
+ * harness's own; a permission mode, which its harness chooses, and `runsIn` says.
  */
 export type StepFiled = {
   model: string | null;
+  /**
+   * The model a person's `wf retry --model` asked this try for, off the run's record (`EarlierTry.model`): what tells a model the
+   * try was filed on from a default. Null when nobody asked.
+   */
+  askedModel: string | null;
   effort: string | null;
   permissionMode: string | null;
+  /**
+   * The permission mode the session runs in, which the engine files as given and its harness decides (`runsInOf`): the mode filed
+   * (`filed`); the harness's choice when none was — `auto` for Claude Code, `workspace-write` for Codex (`default`); or, for Codex,
+   * `read-only` because `tools` has none that writes, whatever was named (`tools`). Null for a harness the api cannot ask.
+   */
+  runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
   tools: string[] | null;
   deadlineSeconds: number | null;
   maxAttempts: number;
@@ -282,21 +293,16 @@ type TaskView = Awaited<ReturnType<typeof e.view>>;
 type Views = ReadonlyMap<string, TaskView>;
 
 /**
- * The engine's view of every task a run has filed — each step's, and each check's — for one run's page; with `tries`, those of
- * every try behind the current one too, which a decision does not read.
+ * The engine's view of every task a run's current tries have filed — each step's, and each check's — for its decision.
  * Each `view` observes every harness — a `claude agents` call, a scan of detached runs — so this is an
- * observation per filed task, and a request reads each task once. The list of every run reads them with
- * `everyView`.
+ * observation per filed task, read once for each state of a run. A run's page, which is polled, and the list of every
+ * run read theirs with `everyView`.
  */
-async function viewsOf(run: Run, tries = false): Promise<Views> {
+async function viewsOf(run: Run): Promise<Views> {
   const views = new Map<string, TaskView>();
-  for (const record of Object.values(run.steps)) {
-    for (const t of [...(tries ? (record.tries ?? []) : []), record]) {
-      for (const taskId of [t.taskId, t.check?.taskId]) {
-        // Once a task: a recheck keeps the step's task on the try after it.
-        if (taskId && !views.has(taskId)) views.set(taskId, await e.view(taskId));
-      }
-    }
+  for (const { taskId, check } of Object.values(run.steps)) {
+    if (taskId) views.set(taskId, await e.view(taskId));
+    if (check) views.set(check.taskId, await e.view(check.taskId));
   }
   return views;
 }
@@ -503,7 +509,10 @@ async function detail(run: Run): Promise<RunDetail> {
   const folder = workflowsOf(run);
   const workflows = folder.steps;
   const names = stepNames(run, workflows);
-  const views = await viewsOf(run, true);
+  // Every task in the store over one observation, as the list reads them, rather than a `view` — an observation, ~0.3 s here — for
+  // each task of each try, one after another, on a page polled every five seconds: a loop's later rounds made that seconds a poll.
+  // Folding every journal cost about what one observation does (163 journals, 2026-09-13). The record is read first, as the list reads it.
+  const views = await everyView();
   const judged = judge(run, names, workflows, views);
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
@@ -539,7 +548,7 @@ async function detail(run: Run): Promise<RunDetail> {
       return {
         name,
         spec: step ? specOf(step) : null,
-        filed: filedOf(taskId, views),
+        filed: filedOf(run.steps[name], views),
         body: step?.body ?? null,
         told: toldOf(run, name, source, views),
         taskId,
@@ -554,19 +563,66 @@ async function detail(run: Run): Promise<RunDetail> {
   };
 }
 
-/** What the engine filed a task with (`StepFiled`), off its record; null for no task, or one the engine has no record of. */
-function filedOf(taskId: string | null, views: Views): StepFiled | null {
-  const view = taskId ? views.get(taskId) : undefined;
+/** What the engine filed a step's current try with (`StepFiled`), off its record; null for no task, or one the engine has no record of. */
+function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null {
+  const view = record?.taskId ? views.get(record.taskId) : undefined;
   if (!view || phaseOfView(view) === 'unknown') return null;
   const { model, effort, permissionMode, tools, deadlineSeconds, maxAttempts } = view.state;
   return {
     model: model ?? null,
+    askedModel: askedModelOf(record),
     effort: effort ?? null,
     permissionMode: permissionMode ?? null,
+    runsIn: runsInOf(view.state),
     tools: tools ?? null,
     deadlineSeconds: deadlineSeconds ?? null,
     maxAttempts,
   };
+}
+
+/**
+ * The model a person's `wf retry --model` asked a step's current try for: on the try its task replaced, where `nextTry` keeps the
+ * model with the mode — found past any recheck, which replaced only a check, and kept the task.
+ */
+function askedModelOf(record: StepRecord | undefined): string | null {
+  const tries = record?.tries ?? [];
+  let i = tries.length - 1;
+  while (i >= 0 && tries[i]!.then === 'recheck') i--;
+  return tries[i]?.model ?? null;
+}
+
+/** The flags a harness's command gives its session's permission mode by: Claude Code's mode, and Codex's sandbox. */
+const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
+
+/**
+ * The permission mode a task's session runs in (`StepFiled.runsIn`), as its harness decides it from what the engine was filed with.
+ *
+ * A harness the run brings as a spec — `codex`, `claude-detached` — is asked with its own `command`, a pure function of the request:
+ * the mode it would spawn the session with, and again without `tools`, which tells a sandbox the tools narrowed from one the task
+ * named. So a rule the engine changes is the rule read here. `claude` is the engine's own `claude --bg` runner, whose spawn is no
+ * function it exports: the mode filed, or `auto` (`claudeOps` in agent-engine's runner.ts), which the api test holds to the command
+ * that runner spawns. A task filed with no harness ran on the engine's first (`fallback` in its facade). Null for a harness the api
+ * cannot ask, or one whose command names no mode.
+ */
+function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
+  const name = state.harness ?? Object.keys(HARNESSES)[0]!;
+  if (!Object.hasOwn(HARNESSES, name)) return null;
+  const harness = HARNESSES[name as keyof typeof HARNESSES];
+  const by = state.permissionMode === undefined ? 'default' : 'filed';
+  if (harness === 'claude-bg') return { mode: state.permissionMode ?? 'auto', by };
+  if (typeof harness !== 'object' || !('command' in harness)) return null;
+  const modeOf = (tools: string[] | undefined): string | undefined => {
+    try {
+      const { args } = harness.command({ name: `${state.taskId}/mode`, brief: '', cwd: state.cwd || '/', permissionMode: state.permissionMode, tools });
+      const at = args.findIndex((arg) => MODE_FLAGS.includes(arg));
+      return at < 0 ? undefined : args[at + 1];
+    } catch {
+      return undefined;
+    }
+  };
+  const mode = modeOf(state.tools);
+  if (mode === undefined) return null;
+  return { mode, by: state.tools && modeOf(undefined) !== mode ? 'tools' : by };
 }
 
 /**

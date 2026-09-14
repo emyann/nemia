@@ -88,8 +88,8 @@ const firstTry = (step: { taskId: string | null; status: string; attempts: objec
   taskId: step.taskId, status: step.status, attempts: step.attempts, check: step.check, closeout: step.closeout,
 }];
 
-/** The engine's record of a task `filed` journals: a codex task with one attempt allowed, and nothing else said. */
-const filedBare = { model: null, effort: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: 1 };
+/** The engine's record of a task `filed` journals: a codex task with one attempt allowed, and nothing else said — which Codex runs in `workspace-write`. */
+const filedBare = { model: null, askedModel: null, effort: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, tools: null, deadlineSeconds: null, maxAttempts: 1 };
 
 /** A run as GET /api/runs lists it. */
 const listed = async (id: string) =>
@@ -944,7 +944,7 @@ function countingObservations(t: { after: (fn: () => void) => void }): () => num
 
 const gone = path.join(os.tmpdir(), 'hkb-api-no-such-workflow');
 
-test('a step on its third try, in the second round of its loop, carries every try: its round, what replaced it, its task, check and closeout — one view a task', async (t) => {
+test('a step on its third try, in the second round of its loop, carries every try: its round, what replaced it, its task, check and closeout — off one observation', async (t) => {
   // implement's check refused its first try, and `retries: 1` filed a second, which passed; review asked for another round, and
   // the loop filed implement's third try, which answered the findings and passed; review then asked for no more.
   const findings = [{ file: 'src/cache.ts', line: 12, finding: 'The cache never expires.' }, { file: 'src/cache.ts', line: 40, finding: 'A miss is counted twice.' }];
@@ -985,8 +985,9 @@ test('a step on its third try, in the second round of its loop, carries every tr
 
   const observations = countingObservations(t);
   const run = await (await app.request('/api/runs/r-50')).json();
-  // Eight tasks — implement's three and their checks, review's two — each read once, and no refused check of the current try to read the output of.
-  assert.equal(observations(), 8);
+  // Eight tasks — implement's three and their checks, review's two — read over one observation of the harnesses, and no refused check
+  // of the current try to read the output of. A `view` each was eight observations, one after another, on a page polled every five seconds.
+  assert.equal(observations(), 1);
 
   const once = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } };
   const closeout = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, ...more });
@@ -1042,22 +1043,105 @@ test('a step says what it runs with: the workflow\'s effort and tools, and what 
   assert.deepEqual(implement.spec, {
     harness: 'claude', model: null, effort: 'high', after: [], resume: null, permissionMode: null, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null,
   });
-  // The engine's defaults, off its journal: one attempt, and no deadline — which is no limit — model or mode, which are the harness's.
-  assert.deepEqual(implement.filed, { model: null, effort: 'high', permissionMode: null, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: 1 });
+  // The engine's defaults, off its journal: one attempt, no deadline — which is no limit — and no model, which is the harness's; and the
+  // mode Claude Code runs a task filed with none in, `auto`, which is not Claude Code's own.
+  assert.deepEqual(implement.filed, {
+    model: null, askedModel: null, effort: 'high', permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: 1,
+  });
   // Not filed: nothing the engine could say.
   assert.equal(review.filed, null);
   // Nor for a task the engine has no record of.
   assert.equal((await (await app.request('/api/runs/r-4')).json()).steps[0].filed, null);
 });
 
+test('a step says the mode its session runs in, as its harness decides it — a Codex sandbox narrowed by its tools — at shipped defaults', async () => {
+  const e = engine();
+  const cases: Array<[id: string, spec: { harness: string; permissionMode?: string; tools?: string[] }, runsIn: object]> = [
+    ['r-54-claude', { harness: 'claude' }, { mode: 'auto', by: 'default' }],
+    ['r-54-claude-mode', { harness: 'claude', permissionMode: 'dontAsk' }, { mode: 'dontAsk', by: 'filed' }],
+    ['r-54-detached', { harness: 'claude-detached' }, { mode: 'auto', by: 'default' }],
+    ['r-54-codex', { harness: 'codex' }, { mode: 'workspace-write', by: 'default' }],
+    ['r-54-codex-writes', { harness: 'codex', tools: ['Read', 'Bash'] }, { mode: 'workspace-write', by: 'default' }],
+    // A reviewer that may not write: read-only, whatever mode it named.
+    ['r-54-codex-reads', { harness: 'codex', tools: ['Read', 'Grep'] }, { mode: 'read-only', by: 'tools' }],
+    ['r-54-codex-named', { harness: 'codex', permissionMode: 'workspace-write', tools: ['Read'] }, { mode: 'read-only', by: 'tools' }],
+    ['r-54-codex-bypass', { harness: 'codex', permissionMode: 'bypassPermissions' }, { mode: 'danger-full-access', by: 'filed' }],
+  ];
+  for (const [id, spec, runsIn] of cases) {
+    await e.file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', ...spec });
+    writeRun({ ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }], steps: { implement: { taskId: `${id}-implement` } } });
+    const [implement] = (await (await app.request(`/api/runs/${id}`)).json()).steps;
+    assert.deepEqual(implement.filed.runsIn, runsIn, id);
+  }
+});
+
+test("the mode the api says a Claude Code task runs in is the one the engine's `claude --bg` runner spawns it with", async (t) => {
+  // That runner's spawn is no pure function the engine exports, so the api says its rule after it. This holds the two together: the
+  // argv the runner hands a fake `claude` on PATH, as the engine's own tests record it.
+  // Seeded here, not borrowed from the test before, whose first wrong mode would stop it before it seeds the second.
+  const said = new Map<string, string>();
+  for (const [id, permissionMode] of [['r-59-claude', undefined], ['r-59-claude-mode', 'dontAsk']] as const) {
+    const spec = { harness: 'claude', ...(permissionMode ? { permissionMode } : {}) };
+    await engine().file({ id: `${id}-implement`, brief: 'Implement it.', cwd: '/code/app', ...spec });
+    writeRun({ ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', ...spec }], steps: { implement: { taskId: `${id}-implement` } } });
+    const res = await app.request(`/api/runs/${id}`);
+    assert.equal(res.status, 200, id);
+    said.set(id, (await res.json()).steps[0].filed.runsIn.mode);
+  }
+
+  // The engine's Effect surface, where its runners are: the Promise one has none.
+  const { claudeOps } = await import('agent-engine/effect');
+  const { Effect } = await import('effect');
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-claude-'));
+  const argsFile = path.join(bin, 'args');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
+  const before = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${before}`;
+  t.after(() => {
+    process.env.PATH = before;
+  });
+  const spawnedWith = async (permissionMode: string | undefined) => {
+    await Effect.runPromise(claudeOps().spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: bin, ...(permissionMode ? { permissionMode } : {}) }));
+    const args = fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
+    return args[args.indexOf('--permission-mode') + 1];
+  };
+  assert.equal(said.get('r-59-claude'), await spawnedWith(undefined), 'filed with no mode');
+  assert.equal(said.get('r-59-claude-mode'), await spawnedWith('dontAsk'), 'filed with one');
+});
+
+test("a model a person's `wf retry --model` asked for is on the try it was asked for, past a recheck — and on no other", async () => {
+  await engine().file({ id: 'r-55-implement-try2', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', model: 'sonnet' });
+  const asked = { taskId: 'r-55-implement', then: 'fresh', model: 'sonnet' };
+  const cases: Array<[id: string, tries: object[], askedModel: string | null]> = [
+    ['r-55', [asked], 'sonnet'],
+    // Its check run again: the same task, still the try sonnet was asked for.
+    ['r-56', [asked, { taskId: 'r-55-implement-try2', then: 'recheck' }], 'sonnet'],
+    ['r-57', [{ taskId: 'r-55-implement', then: 'nudge' }], null],
+    ['r-58', [{ taskId: 'r-55-implement', then: 'retries' }], null],
+  ];
+  for (const [id, tries, askedModel] of cases) {
+    writeRun({
+      ...r2, id, workflowDir: gone, workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude' }],
+      steps: { implement: { taskId: 'r-55-implement-try2', tries } },
+    });
+    const { filed } = (await (await app.request(`/api/runs/${id}`)).json()).steps[0];
+    assert.deepEqual([filed.model, filed.askedModel], ['sonnet', askedModel], id);
+  }
+});
+
 /** A PNG of one pixel. */
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+
+/** An SVG that carries a script: an agent's markup, which would run on the board's origin opened as a page of its own. */
+const SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"><script>parent.pwned = true</script><rect width="10" height="10"/></svg>\n';
 
 /** r-52's `shoot`, which named its files: some in its files directory, and some not, or not by a name the api serves. */
 function seedFiles() {
   const dir = path.join(root, 'runs', 'r-52', 'artifacts', 'shoot');
   const files: Record<string, string | Buffer> = {
     'shot.png': PNG, 'notes.txt': 'It rendered.\n', 'trace.zip': 'PK', 'sub/deep.png': PNG,
+    // Markup that would run on the board's origin opened as a page: served sandboxed, and the HTML as text. The page is not named.
+    'diagram.svg': SVG, 'page.html': '<script>parent.pwned = true</script>\n',
     // Each a file the directory has, which a refusal alone keeps from being served.
     '..shot.png': PNG, 'a\\b.png': PNG,
     // Beside the directory, where `..` leads.
@@ -1070,9 +1154,9 @@ function seedFiles() {
   // Seeded by each test that reads it: the link is made afresh.
   fs.rmSync(path.join(dir, 'link.png'), { force: true });
   fs.symlinkSync(path.join(dir, '..', 'outside.png'), path.join(dir, 'link.png'));
-  const named = ['shot.png', 'notes.txt', 'trace.zip', '../outside.png', 'sub/deep.png', 'link.png', '..shot.png', 'gone.png'].map((name) => path.join(dir, name));
+  const named = ['shot.png', 'notes.txt', 'trace.zip', 'diagram.svg', '../outside.png', 'sub/deep.png', 'link.png', '..shot.png', 'gone.png'].map((name) => path.join(dir, name));
   // `path.join` resolves `..`: named as a step would spell it.
-  named[3] = `${dir}/../outside.png`;
+  named[4] = `${dir}/../outside.png`;
   settledTask('t-52-shoot', { ...done, artifacts: [...named, 'RESPONSE.md', '/etc/hosts'] });
   writeRun({ ...r2, id: 'r-52', workflowDir: gone, workflow: [{ name: 'shoot', after: [], body: 'Shoot it.' }], steps: { shoot: { taskId: 't-52-shoot' } } });
   return { dir, named };
@@ -1086,8 +1170,9 @@ test("a closeout's files in the step's files directory carry where the api serve
     served('shot.png', 'image', PNG.length),
     served('notes.txt', 'text', 13),
     served('trace.zip', 'other', 2),
+    served('diagram.svg', 'image', Buffer.byteLength(SVG)),
     // Outside the directory, however it is spelled; under it, which no name reaches; a link out of it; a name the route refuses; a file it does not have.
-    { path: named[3] }, { path: named[4] }, { path: named[5] }, { path: named[6] }, { path: named[7] },
+    { path: named[4] }, { path: named[5] }, { path: named[6] }, { path: named[7] }, { path: named[8] },
     // A path on the branch, and an absolute path anywhere else, which is not looked at.
     { path: 'RESPONSE.md' }, { path: '/etc/hosts' },
   ]);
@@ -1108,6 +1193,17 @@ test("a step's file is served by name, with its type and no caching — and a na
   const text = await app.request(`${base}/notes.txt`);
   assert.deepEqual([text.status, text.headers.get('content-type'), text.headers.get('cache-control'), await text.text()], [200, 'text/plain; charset=utf-8', 'no-store', 'It rendered.\n']);
   assert.equal((await app.request(`${base}/trace.zip`)).headers.get('content-type'), 'application/octet-stream');
+
+  // Markup an agent wrote runs no script on the board's origin, opened in a tab: an SVG is served as an image under a policy that
+  // sandboxes it, and HTML as text. So is every file served.
+  const svg = await app.request(`${base}/diagram.svg`);
+  assert.deepEqual([svg.status, svg.headers.get('content-type'), await svg.text()], [200, 'image/svg+xml', SVG]);
+  assert.equal((await app.request(`${base}/page.html`)).headers.get('content-type'), 'text/plain; charset=utf-8');
+  for (const name of ['diagram.svg', 'page.html', 'shot.png', 'notes.txt', 'trace.zip']) {
+    const policy = (await app.request(`${base}/${name}`)).headers.get('content-security-policy') ?? '';
+    assert.ok(policy.split(/\s*;\s*/).includes('sandbox'), `${name} is served sandboxed: ${policy || 'no policy'}`);
+    assert.match(policy, /\bdefault-src 'none'/, `${name}: ${policy}`);
+  }
 
   // Every one of these names a file on disk: only the refusal stands between it and the response.
   for (const name of ['..%2Foutside.png', 'sub%2Fdeep.png', 'a%5Cb.png', '..shot.png']) {

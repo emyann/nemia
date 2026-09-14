@@ -20,6 +20,8 @@ export const specRows = (spec: StepSpec): Array<[string, ReactNode]> => [
   ['harness', code(spec.harness)],
   ['model', code(spec.model)],
   ['after', spec.after.length ? code(spec.after.join(', ')) : null],
+  // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
+  ...(spec.loop === null ? [] : ([['loop', code(spec.loop)], ['rounds', spec.rounds]] satisfies Array<[string, ReactNode]>)),
   ['resume', code(spec.resume)],
   ['permission mode', code(spec.permissionMode)],
   ['deadline', spec.deadlineSeconds === null ? null : `${spec.deadlineSeconds} s`],

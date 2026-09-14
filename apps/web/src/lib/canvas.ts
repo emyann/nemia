@@ -3,7 +3,7 @@
  * complete, and where a person left the nodes — a run's steps, or the Factory's runs and which are open. Pure, apart
  * from the storage calls at the end, each of which survives a browser that refuses storage.
  */
-import type { StepAttempts } from './api';
+import type { GraphEdge, RunGraph, StepAttempts } from './api';
 import type { Point } from './layout';
 import { satisfiesAfter, type StepState } from './status.ts';
 
@@ -40,21 +40,92 @@ export function attemptLine(attempts: StepAttempts, live: boolean, now: number):
   return `#${count} · started ${duration(now - started)} ago`;
 }
 
-export type CanvasEdge = { id: string; source: string; target: string; complete: boolean };
+/**
+ * An edge as the canvases draw it. `complete`: the work at both ends is done — never, on a `loop` edge, which stands for a
+ * round that may yet come. `pulsing`: work is moving along it now — into a step at work, or back round a loop whose next
+ * round is due. `label`: on a `loop` edge past its first round, the round it is on.
+ */
+export type CanvasEdge = {
+  id: string;
+  source: string;
+  target: string;
+  kind: GraphEdge['kind'];
+  complete: boolean;
+  pulsing: boolean;
+  label: string | null;
+};
 
-/** One edge per `after` between steps the run has. Complete when the work at both ends is done: verified, or on its own word. */
-export function edgesOf(steps: ReadonlyArray<{ name: string; after: readonly string[]; state: StepState }>): CanvasEdge[] {
-  const stateOf = new Map(steps.map((s) => [s.name, s.state]));
-  return steps.flatMap((step) =>
-    [...new Set(step.after)]
-      .filter((parent) => stateOf.has(parent))
-      .map((parent) => ({
-        id: `${parent}->${step.name}`,
-        source: parent,
-        target: step.name,
-        complete: satisfiesAfter(stateOf.get(parent)!) && satisfiesAfter(step.state),
-      })),
-  );
+/** A step as its edges read it: its state, and the note `wf ls` prints beside it. */
+export type EdgeStep = { name: string; state: StepState; note: string | null };
+
+/**
+ * The run's graph as the api gives it, between the steps the run has: an `after` edge complete when the work at both ends
+ * is done — verified, or on its own word — and a `loop` edge from the looping step back to its target.
+ */
+export function edgesOf(graph: RunGraph, steps: readonly EdgeStep[]): CanvasEdge[] {
+  const of = new Map(steps.map((s) => [s.name, s]));
+  const seen = new Set<string>();
+  return graph.edges.flatMap((edge): CanvasEdge[] => {
+    const source = of.get(edge.from);
+    const target = of.get(edge.to);
+    const id = edge.kind === 'loop' ? `loop:${edge.from}->${edge.to}` : `${edge.from}->${edge.to}`;
+    if (!source || !target || seen.has(id)) return [];
+    seen.add(id);
+    if (edge.kind === 'after') {
+      const complete = satisfiesAfter(source.state) && satisfiesAfter(target.state);
+      return [{ id, source: edge.from, target: edge.to, kind: 'after', complete, pulsing: target.state === 'working', label: null }];
+    }
+    return [{
+      id, source: edge.from, target: edge.to, kind: 'loop', complete: false,
+      pulsing: roundDue(source.note),
+      label: loopLabel([source.note, target.note], edge.rounds),
+    }];
+  });
+}
+
+/** The round a note puts a step of a loop on — `round 2 of 3`, `round 3 of 3, and it asked again — …`, `round 4 asked (wf round) — …` — and its cap when it says one. */
+const ROUND = /^round (\d+)(?: of (\d+))?/;
+
+/**
+ * `round n of N` for a loop past its first round, off the notes `wf ls` prints: the looping step's first, where a round due
+ * and a loop out of rounds are said, then its target's, which is filed first each round. Null while the loop is on its first.
+ * N is the note's, else the loop's `rounds`: a round a person asked for past the cap reads `round 4 of 3`.
+ */
+export function loopLabel(notes: ReadonlyArray<string | null>, rounds: number): string | null {
+  for (const note of notes) {
+    const m = note ? ROUND.exec(note) : null;
+    if (m && Number(m[1]) > 1) return `round ${m[1]} of ${m[2] ?? rounds}`;
+  }
+  return null;
+}
+
+/** Whether the looping step's note says its next round is due: it asked again with rounds left, or a person asked (`roundDueNote`). */
+export const roundDue = (note: string | null): boolean => note !== null && /^round \d+(?: of \d+ due\b| asked \(wf round\))/.test(note);
+
+/** The handles a `loop` edge leaves its looping step by and comes into its target by: under each node (`StepNode`). */
+export const LOOP_SOURCE = 'loop-out';
+export const LOOP_TARGET = 'loop-in';
+
+/** A `loop` edge's colour, its arrow's too: apart from the greys an `after` edge is drawn in, and readable in either theme. */
+export const LOOP_STROKE = 'var(--color-violet-500)';
+
+/** How far below the lower of its ends a `loop` edge dips: under the row, and clear of the node's own border. */
+export const LOOP_DEPTH = 44;
+
+/**
+ * A `loop` edge's path, from under its looping step to under its target: straight down from one, beneath the row, and up
+ * into the other, where its arrow points. A cubic whose control points sit below both ends; its middle, where the label
+ * goes, is `depth` below the lower end.
+ */
+export function loopPath(source: Point, target: Point, depth = LOOP_DEPTH): { path: string; labelX: number; labelY: number } {
+  const bottom = Math.max(source.y, target.y) + depth;
+  // A cubic's point at t = ½ is ⅛ of each end and ⅜ of each control point: the control height that puts it at `bottom`.
+  const control = (bottom - (source.y + target.y) / 8) / 0.75;
+  return {
+    path: `M ${source.x},${source.y} C ${source.x},${control} ${target.x},${control} ${target.x},${target.y}`,
+    labelX: (source.x + target.x) / 2,
+    labelY: bottom,
+  };
 }
 
 /** Where each step goes: where a person left it, if they moved it, else where the layering puts it. */

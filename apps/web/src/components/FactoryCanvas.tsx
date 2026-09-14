@@ -37,15 +37,17 @@ import {
   toggleOpen,
   type Span,
 } from '@/lib/factory';
-import { extentOf, layers, layout, type Point, type StepEdges } from '@/lib/layout';
+import { extentOf, layout, stepsOf, type Point } from '@/lib/layout';
 import { stepState } from '@/lib/status';
+import { LoopEdge } from './LoopEdge';
 import { RunNode, type RunFlowNode } from './RunNode';
 import { StepInspector } from './StepInspector';
 import { StepNode, type StepFlowNode } from './StepNode';
-import { stepData, stepEdges, stepMinimapFill } from './stepGraph';
+import { cardEdges, stepData, stepEdges, stepMinimapFill } from './stepGraph';
 
 // Declared once: a new object per render makes React Flow warn and mount every node afresh.
 const nodeTypes = { run: RunNode, step: StepNode };
+const edgeTypes = { loop: LoopEdge };
 
 type FloorNode = RunFlowNode | StepFlowNode;
 
@@ -70,13 +72,13 @@ const minimapFill = (node: FloorNode) =>
 /** A step's node on the floor, named by its run too: two runs may each have an `implement`. */
 const stepId = (runId: string, step: string) => `${runId}/${step}`;
 
-/** Where an open run's steps go beside its card, from names and `after` alone; or why they cannot. */
-type Unfolded = { at: Map<string, Point>; first: string[]; span: Span } | { error: string };
+/** Where an open run's steps go beside its card, from their names and the `after` edges of its graph alone; or why they cannot. */
+type Unfolded = { at: Map<string, Point>; span: Span } | { error: string };
 
-function unfold(steps: readonly StepEdges[]): Unfolded {
+function unfold(names: readonly string[], edges: RunDetail['graph']['edges']): Unfolded {
   try {
-    const at = layout(steps);
-    return { at: graphAt(at), first: layers(steps)[0] ?? [], span: spanOf(extentOf(at)) };
+    const at = layout(stepsOf(names, edges));
+    return { at: graphAt(at), span: spanOf(extentOf(at)) };
   } catch (err) {
     return { error: err instanceof Error ? err.message : String(err) };
   }
@@ -135,10 +137,13 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const reading = useMemo(() => open.filter((id) => ids.includes(id)), [open, idsKey]);
   const reads = useQueries({ queries: reading.map((id) => runQuery(id)) });
 
-  // The layering reads names and `after` only, so a refetch that moves a status does not redo it.
-  const shapes = reading.map((id, i) => [id, reads[i]?.data?.steps.map((s) => ({ name: s.name, after: s.spec?.after ?? [] })) ?? null] as const);
+  // The layering reads names and the graph's edges only, so a refetch that moves a status does not redo it.
+  const shapes = reading.map((id, i) => {
+    const data = reads[i]?.data;
+    return [id, data ? { names: data.steps.map((s) => s.name), edges: data.graph.edges } : null] as const;
+  });
   const shapesKey = JSON.stringify(shapes);
-  const unfolded = useMemo(() => new Map(shapes.map(([id, steps]) => [id, steps && unfold(steps)])), [shapesKey]);
+  const unfolded = useMemo(() => new Map(shapes.map(([id, shape]) => [id, shape && unfold(shape.names, shape.edges)])), [shapesKey]);
 
   const readsKey = JSON.stringify(reads.map((read) => [read.dataUpdatedAt, read.errorUpdatedAt]));
   const graphs = useMemo(
@@ -281,15 +286,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
       [...graphs].flatMap(([runId, graph]): Edge[] =>
         graph && 'run' in graph
           ? [
-              // The card is the run's head: one dashed edge into each step that waits on no other.
-              ...graph.first.map((step) => ({
-                id: `${runId}/->${step}`,
-                source: runId,
-                target: stepId(runId, step),
-                style: { strokeDasharray: '3 4' },
-                selectable: false,
-                focusable: false,
-              })),
+              // The card is the run's head: one dashed edge into each of the roots the api's graph names, and no other.
+              ...cardEdges(graph.run, runId, `${runId}/`),
               ...stepEdges(graph.run, `${runId}/`),
             ]
           : [],
@@ -431,6 +429,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
               nodes={nodes}
               edges={edges}
               nodeTypes={nodeTypes}
+              edgeTypes={edgeTypes}
               onNodesChange={onNodesChange}
               onNodeClick={(event, node) => {
                 // The title's link and the chevron do what they do, and no more.

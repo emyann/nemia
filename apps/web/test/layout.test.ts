@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COLUMN_WIDTH, extentOf, layers, layout, ROW_HEIGHT } from '../src/lib/layout.ts';
+import { COLUMN_WIDTH, extentOf, layers, layout, ROW_HEIGHT, stepsOf } from '../src/lib/layout.ts';
 
 // A layering that loops would hang the suite rather than fail it; these fail it.
 const bounded = { timeout: 2_000 };
@@ -102,4 +102,25 @@ test("a layout's extent is a column's width per column and a row's height per ro
     { name: 'web', after: ['plan'] },
     { name: 'merge', after: ['api', 'web'] },
   ])), { width: 3 * COLUMN_WIDTH, height: 2 * ROW_HEIGHT });
+});
+
+test("the layering reads a graph's `after` edges and leaves its `loop` edges out, so an edge back opens no column", bounded, () => {
+  const names = ['implement', 'test', 'review'];
+  const edges = [
+    { from: 'implement', to: 'test', kind: 'after' },
+    { from: 'test', to: 'review', kind: 'after' },
+    { from: 'review', to: 'implement', kind: 'loop' },
+  ];
+  assert.deepEqual(stepsOf(names, edges), [
+    { name: 'implement', after: [] },
+    { name: 'test', after: ['implement'] },
+    { name: 'review', after: ['test'] },
+  ]);
+  assert.deepEqual(layers(stepsOf(names, edges)), [['implement'], ['test'], ['review']]);
+  assert.deepEqual(layout(stepsOf(names, edges)), layout(stepsOf(names, edges.filter((e) => e.kind === 'after'))));
+  // What leaving it out is for: read as an `after`, the edge back is a cycle, which the layering refuses.
+  const asAfter = names.map((name) => ({ name, after: edges.filter((e) => e.to === name).map((e) => e.from) }));
+  assert.throws(() => layers(asAfter), /cycle among implement, test, review\b/);
+  // A loop edge and nothing else orders nothing: both steps in the first column.
+  assert.deepEqual(layers(stepsOf(['implement', 'review'], [{ from: 'review', to: 'implement', kind: 'loop' }])), [['implement', 'review']]);
 });

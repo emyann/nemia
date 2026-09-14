@@ -61,6 +61,10 @@ export const LOOPING = {
   steps: ['implement', 'review'],
   /** The looping step, out of rounds. */
   exhausted: 'review',
+  /** The step its loop runs again: where the edge back from `exhausted` arrives. */
+  target: 'implement',
+  /** What the edge back is labelled, from review's note: the round the loop is on. */
+  round: 'round 3 of 3',
   /** What `wf ls` prints beside each step: the round it is on, and for the loop out of rounds, the command that takes it once more. */
   notes: {
     implement: 'round 3 of 3',

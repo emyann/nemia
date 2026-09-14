@@ -23,7 +23,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectApart, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectCount, expectInside, expectMovedWith, expectVisible, Refused, settled, watch } from './checks.ts';
 import { CHECKOUT, FAKE, LOOPING, NEIGHBOUR, seed, seedCheckout } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
@@ -250,6 +250,15 @@ const PAGES: PageSpec[] = [
       const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
       const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);
       await expectCount(graph.locator('.react-flow__node'), LOOPING.steps.length, `the loop's graph has a node per step (${LOOPING.steps.join(', ')})`);
+      // The graph the run froze: an arrow from implement to review, and the edge back that `loop: implement` makes, under the row.
+      const edge = (id: string) => graph.locator(`.react-flow__edge[data-id="${id}"]`);
+      await expectCount(graph.locator('.react-flow__edge'), 2, "the loop's graph has two edges: implement → review, and the edge back");
+      await expectVisible(edge('implement->review').locator('.react-flow__edge-path'), 'an arrow from implement to review');
+      const back = edge(`loop:${LOOPING.exhausted}->${LOOPING.target}`);
+      await expectVisible(back.locator('.react-flow__edge-path'), `the edge back from ${LOOPING.exhausted} to ${LOOPING.target}, drawn as a loop`);
+      await expectVisible(back.getByText(LOOPING.round, { exact: true }), `the edge back says the round the loop is on (${LOOPING.round})`);
+      await settled(page);
+      await expectBeneath(back.locator('.react-flow__edge-path'), graph.locator('.react-flow__node'), 'the edge back runs beneath the row, under both steps');
       // On the canvas there is no room under a chip: the note follows what the state means, on hover.
       await expectVisible(
         node(LOOPING.exhausted).locator(`[data-state="exhausted"][title^="rounds exhausted: "][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),

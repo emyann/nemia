@@ -123,7 +123,10 @@ function Details({ step, state, runCancelled }: { step: Step; state: StepState; 
           <Facts rows={specRows(spec)} />
         </section>
       ) : (
-        <p className="text-neutral-500">No spec: the workflow folder does not have this step now.</p>
+        <p className="text-neutral-500">
+          No spec: the workflow the run is judged by does not have this step — the one it froze at <code>wf start</code>, or on
+          a record from before runs froze one, its folder.
+        </p>
       )}
       {step.told && <Told told={step.told} filed={step.taskId !== null} />}
     </>

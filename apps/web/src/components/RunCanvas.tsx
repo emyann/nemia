@@ -14,8 +14,9 @@ import {
 } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
 import { forgetLayout, place, readLayout, saveLayout } from '../lib/canvas';
-import { layout, type Point } from '../lib/layout';
+import { layout, stepsOf, type Point } from '../lib/layout';
 import { stepState } from '../lib/status';
+import { LoopEdge } from './LoopEdge';
 import { stepData, stepEdges, stepMinimapFill } from './stepGraph';
 import { StepNode, type StepFlowNode } from './StepNode';
 
@@ -23,6 +24,7 @@ type Props = { run: RunDetail; selected: string | null; onSelect: (step: string 
 
 // Declared once: a new object per render makes React Flow warn and mount every node afresh.
 const nodeTypes = { step: StepNode };
+const edgeTypes = { loop: LoopEdge };
 
 const FIT = { padding: 0.2, maxZoom: 1.25 };
 
@@ -30,18 +32,20 @@ const button =
   'rounded border border-neutral-300 bg-white px-2 py-1 text-xs text-neutral-700 shadow-sm hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-white dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
 
 /**
- * The run as the DAG it is: a node per step, an edge per `after`.
+ * The run as the graph it froze: a node per step, an edge per `after`, and the edge back that `loop:` makes — as the api's
+ * `graph` has them, never worked out here from a step's spec.
  *
- * Laid out from `after` the first time the run is seen in this browser; after that, wherever a
+ * Laid out from the `after` edges the first time the run is seen in this browser; after that, wherever a
  * person dragged the nodes, kept per run until "Reset layout" lays it out again.
  */
 export function RunCanvas(props: Props) {
-  const { steps } = props.run;
-  // The layering reads names and `after` only, so a refetch that moves a status does not redo it.
-  const shape = JSON.stringify(steps.map((s) => [s.name, s.spec?.after ?? []]));
+  const { steps, graph } = props.run;
+  // The layering reads names and the graph's edges only, so a refetch that moves a status does not redo it.
+  const names = steps.map((s) => s.name);
+  const shape = JSON.stringify([names, graph.edges]);
   const computed = useMemo(() => {
     try {
-      return layout(steps.map((s) => ({ name: s.name, after: s.spec?.after ?? [] })));
+      return layout(stepsOf(names, graph.edges));
     } catch (err) {
       return err instanceof Error ? err : new Error(String(err));
     }
@@ -167,6 +171,7 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onPaneClick={() => onSelect(null)}
         nodesConnectable={false}
@@ -213,12 +218,12 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
   );
 }
 
-/** Beside the zoom controls: what the drawing means. */
+/** Beside the zoom controls: what the drawing means. Wrapped short of the minimap, which would cover its last words. */
 function Legend() {
   return (
     <Panel
       position="bottom-left"
-      className="ml-14 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500 dark:text-neutral-400"
+      className="mr-40 ml-14 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500 dark:text-neutral-400"
     >
       <span className="flex items-center gap-1">
         <span className="size-2.5 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />
@@ -239,6 +244,13 @@ function Legend() {
           <line x1="0" y1="3" x2="18" y2="3" strokeWidth="1.5" strokeDasharray="4 3" />
         </svg>
         to come
+      </span>
+      <span className="flex items-center gap-1">
+        <svg width="18" height="10" aria-hidden className="fill-none stroke-violet-500">
+          <path d="M 16,1 C 16,12 2,12 2,2.5" strokeWidth="1.5" strokeDasharray="3 2" />
+          <path d="M 0,4.5 L 2,1.5 L 4,4.5" strokeWidth="1.5" />
+        </svg>
+        loops back
       </span>
     </Panel>
   );

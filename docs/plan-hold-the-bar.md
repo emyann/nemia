@@ -818,6 +818,11 @@ owner is not mid-run.
   them and write `routeTree.gen.ts` and `.e2e/` into the workspace; only its brief keeps it from them. A
   per-step deny — `disallow:` on a step, passed as `--disallowedTools "Bash(npm run build)" …` — closes it
   by machinery. → agent-workflows, small (the engine passes what the step names, as `tools:`).
+- **the card's touched line double-counts a fan-out (B6's round-2 review):** `touchedSummary` sums `+a −r` over
+  every result branch, and a follower in its own worktree starts from its parent's branch, so a parent's lines
+  appear once per result branch; `wf decide` prints each branch on its own line and never sums. Count each
+  file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
+  last value only (`indexOf` on parsed objects is −1). → apps, with B7.
 
 ## 5. What the plan does not do
 

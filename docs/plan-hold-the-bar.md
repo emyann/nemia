@@ -813,6 +813,11 @@ owner is not mid-run.
   again" line stays until the task settles while events flow. Clear it on the EventSource `open`. → apps,
   with B7. Also from S2, measured: one open stream on a running Claude step is two `claude agents` calls a
   second (~0.22 s each); the engine's open-issues names the fix (a runner verb that finds one session).
+- **the reviewer's fence has two holes the brief covers (W3's round-2 review):** `.claude/settings.json`
+  allows `npm run build` and `npm run e2e` for implement's sake, so a `dontAsk` reviewer with Bash may run
+  them and write `routeTree.gen.ts` and `.e2e/` into the workspace; only its brief keeps it from them. A
+  per-step deny — `disallow:` on a step, passed as `--disallowedTools "Bash(npm run build)" …` — closes it
+  by machinery. → agent-workflows, small (the engine passes what the step names, as `tools:`).
 
 ## 5. What the plan does not do
 

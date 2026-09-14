@@ -396,8 +396,14 @@ async function waitsIn(run: Run, reader: typeof e): Promise<Wait[]> {
   return waitsOf(run, (id) => read.get(id) ?? { shipped: false });
 }
 
-/** A run waited on that never ships without a person — no such run, a cancelled one, a result branch gone: what `wf ls` prints `→ waiting on you:` for. */
-const neverShips = (w: Wait): boolean => Boolean(w.missing || w.cancelledAt || w.gone?.length);
+/**
+ * A run waited on that never ships without a person: what `wf ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to resolve.
+ *
+ * The package decides it (`neverShips` in run.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when it may
+ * never ship without a person, why — so any reason it carries counts, one the package adds after `missing`, `cancelledAt` and `gone`
+ * included, rather than a copy of the three it has today. Exporting `neverShips` would make this an import.
+ */
+const neverShips = (w: Wait): boolean => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
 
 /** What a run still waits on (`RunWaiting`), in the package's words; null when it waits on no run. */
 function waitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {

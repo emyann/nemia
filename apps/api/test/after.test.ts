@@ -159,8 +159,9 @@ test("the list's words and waits are `list`'s, run by run — and `advice` is `w
     if (cli.waiting.length) {
       assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
       assert.equal(api.waiting?.advice, waitAdvice(readRun(id), cli.waiting), id);
-      // `wf ls` prints `→ waiting on you:` exactly for these.
-      assert.equal(api.waiting?.onYou, cli.waiting.some((w) => Boolean(w.missing || w.cancelledAt || w.gone?.length)), id);
+      // Whether a person has to act, held to the package's own words rather than a copy of its rule: `waitAdvice` says "nothing of <run> is
+      // filed until …" exactly while every run waited on may still ship, and what is yours to resolve otherwise.
+      assert.equal(api.waiting?.onYou, !waitAdvice(readRun(id), cli.waiting).startsWith(`nothing of ${id} is filed until `), id);
     }
   }
 });

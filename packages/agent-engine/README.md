@@ -37,7 +37,7 @@ Definition of done — a closed list, and it is closed:
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
 change seems to belong in here, check it against the boundary above first: it almost certainly
-knows about a second workload. A knob on the workload — `model`, `tools`, `effort`, `mcp` — is a field
+knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp` — is a field
 carried on the task and read by a runner, never a callback into `decide`.
 
 ### The one real decision in here: resume policy
@@ -240,7 +240,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, an `mcp` that is not a map of `.mcp.json` servers (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -267,7 +267,7 @@ every task behind the failed one stalled on every pass.
 
 ## Narrowing a session: `tools`, `effort` and `mcp`
 
-All three are fields on the task, carried on the `filed` event and `State` and read only by a runner.
+All four are fields on the task, carried on the `filed` event and `State` and read only by a runner.
 `decide` never reads any of them, and a test reads `decide` to keep it so.
 
 | harness | `tools: Read, Grep, Glob` | `effort: high` |
@@ -289,6 +289,16 @@ the tool a closing statement is made with — and the control wrote the file.
 **Codex has no tool list**, only one shell and three sandboxes, so the list can only take writing
 away: a list with none of Bash, Write or Edit runs `read-only` whatever sandbox the task named,
 and a list with any of them leaves the sandbox as the task named it.
+
+**`disallowedTools` is the other half of the fence.** `tools` says which tools a session has;
+`disallowedTools` says what it may not use of them, in Claude Code's permission rules, one per entry:
+`SendMessage`, `Bash(npm run build)`. Claude Code is given the list as `--disallowedTools`, right after
+`--tools` and ended by the same flag, and a deny beats every allow: the checkout's
+`.claude/settings.json`, `--allowedTools`, the permission mode. So a step in `dontAsk` can be kept from
+a command the settings allow for another step's sake. `file()` refuses an entry that is not one rule:
+a space or a comma outside the parentheses is two rules to the harness. An empty list denies nothing
+and passes no flag. Codex refuses a list that denies anything: it has no tool to take away, and the list
+would be dropped without a word.
 
 ### MCP servers: `mcp`, and never the operator's
 
@@ -689,7 +699,7 @@ reason `Runner` is a seam and not an import.
 | engine dies mid-session | session runs on, next tick adopts it | session dies with it |
 | run state | `claude agents --json` | an in-memory map |
 | usage | turns, tool calls and tokens from the transcript, once the session is idle; no cost | from the SDK's result, cost included |
-| narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session | not wired: it passes only `model` and `permissionMode` |
+| narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session; `disallowedTools` → `--disallowedTools` | not wired: it passes only `model` and `permissionMode` |
 | MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json` and the task's `mcp`, never the operator's | not wired |
 | the conversation as events | `transcript`, from the session's transcript | not wired: no `transcript` |
 | good for | the fleet, long work, unattended | one task in the foreground, with a human watching |

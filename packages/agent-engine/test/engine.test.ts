@@ -486,16 +486,17 @@ test('no schema, no statement: a task ends exactly as it did before', async () =
 
 import fs from 'node:fs';
 
-test('tools, effort and mcp are declared by the task and reach every attempt untouched', async () => {
+test('tools, disallowedTools, effort and mcp are declared by the task and reach every attempt untouched', async () => {
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
-  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], effort: 'low', mcp }));
+  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp }));
   await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'failed' });
   await b.run(tick());
   assert.equal(b.spawned.length, 2, 'a retry was spawned');
   for (const r of b.spawned) {
     assert.deepEqual(r.tools, ['Read', 'Grep'], 'the retry is fenced exactly as the first attempt was');
+    assert.deepEqual(r.disallowedTools, ['Bash(npm run build)'], 'and denied the same');
     assert.equal(r.effort, 'low');
     assert.deepEqual(r.mcp, mcp, 'and given the same servers');
   }
@@ -504,6 +505,7 @@ test('tools, effort and mcp are declared by the task and reach every attempt unt
   await plain.run(file(spec));
   await plain.run(tick());
   assert.equal(plain.spawned[0]!.tools, undefined, 'no list, no fence');
+  assert.equal(plain.spawned[0]!.disallowedTools, undefined, 'no deny list');
   assert.equal(plain.spawned[0]!.effort, undefined);
   assert.equal(plain.spawned[0]!.mcp, undefined, 'no map, no servers of its own');
 });
@@ -512,7 +514,7 @@ test('decide never reads tools, effort, MCP servers, usage, an exit code or an e
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt/);
+  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt/);
 });
 
 // ─── usage: carried from the sighting, null when nobody measured ────────────

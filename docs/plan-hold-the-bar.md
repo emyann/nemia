@@ -910,18 +910,20 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — the order to file is 4–5 (D1, done), then Q, then P.
+Everything left, in one list, as of 2026-09-14 — the order to file is 4–5 (D1, done), then Q (Q1 done, Q2 filed), then P (P1 filed beside Q2).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
 1. **P — Cards with edges** (§4 P): `after: [runId]` on the record, `wf start --after`, a pure
    `runReady(run, shipped)` gating roots on shipped parents, `wf ls` saying `waiting on <run>`; the Factory
-   as a graph of cards; then `wf plan <folder>`. workflows + board. *Next after Q.*
+   as a graph of cards; then `wf plan <folder>`. workflows + board. *P1 (agent-workflows: `--after`, `runReady`,
+   `waiting on <run>`) filed 2026-09-14 as `a-run-that-waits-on-a-run-wf-vaka`, from `./workflows/dev`, beside Q2;
+   P2 (the Factory as a graph of cards, the start form's "after"; then `wf plan <folder>`) after both land.*
 2. **Q — A step that asks, and a step that plans** (§4 Q): `wf retry --nudge --message`, the answer box
    on a blocked step (the board's second write), a `plan` step and a `dev-planned` variant. *Q1 (agent-workflows:
-   `--message`, `## Your answer`, `dev-planned`) filed 2026-09-14 as `a-step-that-asks-gets-an-ans-v5qd`; Q2 (apps: the
-   answer box, a guarded `POST` that calls `retry()`, and the `needs` text — or the harness's last line — on the card,
-   the node and the run page) after it lands.*
+   `--message`, `## Your answer`, `dev-planned`) done, `ed702d7`. Q2 (apps: the answer box, a guarded `POST` that
+   calls `retry()`, and the `needs` text — or the harness's last line — on the card, the node and the run page)
+   filed 2026-09-14 as `the-board-says-what-a-step-n-e26v`, from `./workflows/dev-build`.*
 3. **The steering channel** (deferred from §4 S): a prompt box on the session page that sends into a
    running session, the message recorded on the run. api + engine (a `say` op).
 

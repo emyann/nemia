@@ -218,12 +218,12 @@ function Canvas({ run, selected, onSelect, computed }: Props & { computed: Reado
   );
 }
 
-/** Beside the zoom controls: what the drawing means. */
+/** Beside the zoom controls: what the drawing means. Wrapped short of the minimap, which would cover its last words. */
 function Legend() {
   return (
     <Panel
       position="bottom-left"
-      className="ml-14 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500 dark:text-neutral-400"
+      className="mr-40 ml-14 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-neutral-500 dark:text-neutral-400"
     >
       <span className="flex items-center gap-1">
         <span className="size-2.5 animate-spin rounded-full border-2 border-sky-500 border-t-transparent" />

@@ -493,9 +493,9 @@ A step with no closeout — still running, never filed, or from a run older than
 with nothing: a settled one reads `unverified`, never `succeeded · done`. The summary is left off that
 screen on purpose: it was written for `wf decide`.
 
-*It makes a lost artifact visible.* `artifacts` are checked against the branch, and a declared file
-that is not there is reported. The first real run lost a reviewer's entire output to exactly that,
-silently.
+*It makes a lost artifact visible.* `artifacts` are checked against the step's files directory, where a
+file named from the workspace root is collected (*A step's files*, below), and a declared file the run
+does not have is reported. The first real run lost a reviewer's entire output to exactly that, silently.
 
 **Committing is the run's job.** Every brief tells the step that the run commits whatever it leaves,
 and that being unable to commit is not a reason to block. That is not generosity. Codex's sandbox
@@ -785,17 +785,26 @@ rides the branch into what ships; gitignored, it never reaches the next step's w
 makes a directory per step, beside the run's record under `WF_ROOT` and outside every workspace, before
 it files the step.
 
-- **The step is told where it is**, on its brief, beside the closeout contract (`artifactsContract`):
-  *put them in `<dir>`; name them in `artifacts` by absolute path*. Mechanism, like the closeout: no
-  workflow author has to remember to say it.
+- **The step is told both ways**, on its brief, beside the closeout contract (`artifactsContract`): put a
+  file in `<dir>` and name it by absolute path, or leave it in the workspace and name it by its path from
+  the workspace root. Mechanism, like the closeout: no workflow author has to remember to say it.
+- **A file named from the workspace root is collected.** On the pass that hands the step off, before its
+  check is filed, the tick copies each such file into `<dir>` at the same path (`collectArtifacts`), and
+  the run reads it from there. So a step that cannot write outside its worktree — Codex in
+  `workspace-write`, which the engine gives no other directory — hands its files over too, and so does a
+  file git ignores, which never reaches the branch. Every pass until the check is filed copies only what
+  changed, so a pass that dies halfway loses nothing, and nothing is written through a link a step made in
+  its directory.
 - **The step's check is given it** as `WF_ARTIFACTS`.
 - **A declared artifact is looked for where its path says** (`artifactPlace`). A path from the workspace
-  root is looked for on the branch, as before. An absolute path is looked for in the step's own
-  directory, on disk, with links followed. Any other absolute path — another step's directory, a `..`
-  that climbs out, a link inside that leads out, `/etc/passwd` — is reported and never opened, stat-ed or
-  resolved: a closeout is an agent's text.
-- **`wf decide` lists the directory** after the step's closeout, each file by absolute path with its
-  size, below whatever it declared that is not where it says.
+  root is read from `<dir>`, where it was collected, or, for a run from before collection whose workspace no
+  longer has it, from the branch. An absolute path is looked for in the step's own directory, on disk, with
+  links followed. Any other absolute path — another step's directory, a `..` that climbs out, a link inside
+  that leads out, `/etc/passwd` — is reported and never opened, stat-ed or resolved: a closeout is an
+  agent's text. So is a path from the workspace root that climbs out of it, as written or through a link.
+- **`wf decide` names each refusal** under the step's closeout, never passing one over: a path outside the
+  workspace or the directory, a directory, a file that is not there, and a file in the workspace that was
+  not collected. Then it lists the directory, each file by absolute path with its size.
 
 A file reaches a later step by its path, declared. `workflows/ui/implement.md` declares `screenshots`,
 the absolute paths of its PNGs, and `review` reads them with `input: implement`.

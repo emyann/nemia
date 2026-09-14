@@ -24,7 +24,7 @@ export { planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -924,7 +924,13 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // Every finished step, failed and stopped too, until its check is filed or a later step works in its
   // workspace: the check judges the committed tree, and nothing it leaves behind — nor the next step's
   // work in progress — is committed under this step's name (`handOffDue`).
-  for (const name of handOffDue(steps, run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
+  //
+  // And on the same passes, what a finished step named from its workspace root is collected into its files directory: before its check
+  // is filed, and before a step after it works in its workspace (`collectArtifacts`).
+  const collected = handOffDue(steps, run, phaseOf).flatMap((name) => {
+    handOff(run.steps[name]!.workspace!, name);
+    return collectArtifacts(run, name, signedOff(name));
+  });
 
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked);
   const { check, retry, round, blocked, status } = assessed;
@@ -940,7 +946,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // it on the record. Nothing about the engine changes: to it, this is one more task.
   const tried: string[] = [];
   const rechecked: string[] = [];
-  const notes: string[] = [...askNotes];
+  const notes: string[] = [...askNotes, ...collected];
   for (const r of retry) {
     const step = steps.find((s) => s.name === r.step)!;
     const record = run.steps[r.step]!;
@@ -1420,30 +1426,116 @@ export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run) =
 };
 
 /**
- * Artifacts a step DECLARED that are not where it says they are.
+ * Artifacts a step DECLARED that the run does not have, and why (`MissingArtifact`).
  *
  * The whole point of declaring them. The first real run lost the reviewer's entire output because
  * REVIEW.md was written and never committed, and nothing anywhere noticed — the merge was clean
- * and empty. A declared file that is not on the branch is now a mismatch somebody can see. Since
- * the run commits whatever a step leaves, a missing one was never written — or was written where
- * git will not take it, like a gitignored path.
+ * and empty. A declared file the run does not have is now a mismatch somebody can see.
  *
- * An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
- * on disk: present when it is a file inside the directory once every link on the way is followed, so a
- * link that leads out is as missing as where it leads. Any other absolute path is reported without being
- * looked at (`artifactPlace`).
+ * A path from the workspace root is read where the tick collected it (`collectArtifacts`), and the workspace says why when it is not
+ * there (`workspaceArtifact`). An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
+ * on disk: present when it is a file inside the directory once every link on the way is followed, so a link that leads out is as missing
+ * as where it leads. Any other absolute path, and a path that climbs out of the workspace as written, are reported without being looked
+ * at (`artifactPlace`).
  */
-export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): string[] {
+export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): MissingArtifact[] {
   if (!closeout || 'error' in closeout) return [];
-  const branch = run.steps[stepName]?.branch;
   const dir = artifactsDir(run, stepName);
-  return closeout.artifacts.filter((f) => {
-    const place = artifactPlace(f, dir);
-    if (place === 'outside') return true;
-    if (place === 'files') return !isFileIn(f, dir);
-    if (!branch) return false;
-    try { git(run.repo, 'cat-file', '-e', `${branch}:${f}`); return false; } catch { return true; }
-  });
+  const missing: MissingArtifact[] = [];
+  for (const file of closeout.artifacts) {
+    const place = artifactPlace(file, dir);
+    const why = place === 'outside' || place === 'escapes' ? place
+      : place === 'files' ? (isFileIn(file, dir) ? undefined : 'missing')
+      : workspaceArtifact(run, stepName, file, dir);
+    if (why) missing.push({ path: file, why });
+  }
+  return missing;
+}
+
+/**
+ * Why a file named from the workspace root is not one the run has — or undefined when it is: collected into `dir`, which answers first,
+ * whatever the workspace holds since. Otherwise the workspace says why, where the record names one: a link that leads out of it, a
+ * directory, or a file the run did not collect — its step has not handed off, or the copy was refused. Named even when the file is on the
+ * branch too: the run reads a step's files from its directory, and one it refused to copy is not passed over. Only with nothing in the
+ * workspace is the branch asked: a file there is one a run from before collection left, whose worktree is gone.
+ */
+function workspaceArtifact(run: Run, stepName: string, file: string, dir: string): MissingArtifact['why'] | undefined {
+  const rel = path.normalize(file);
+  if (isFileIn(path.join(dir, rel), dir)) return undefined;
+  const { workspace, branch } = run.steps[stepName] ?? {};
+  const at = workspace ? inWorkspace(workspace, rel) : { kind: 'absent' as const };
+  if (at.kind === 'outside') return 'escapes';
+  if (at.kind === 'directory') return 'directory';
+  if (at.kind === 'file') return 'not collected';
+  const onBranch = branch ? gitSays(run.repo, 'cat-file', '-t', `${branch}:${rel}`)?.trim() : undefined;
+  return onBranch === 'blob' ? undefined : onBranch === 'tree' ? 'directory' : 'not there';
+}
+
+/**
+ * What is at a path from a workspace's root, every link on the way followed: a file, and where it really is; a directory; something else;
+ * nothing — or `outside`, when a link leads out of the workspace, which is not looked at further.
+ */
+function inWorkspace(workspace: string, rel: string): { kind: 'file'; real: string } | { kind: 'directory' | 'other' | 'absent' | 'outside' } {
+  let root: string;
+  let real: string;
+  try {
+    root = fs.realpathSync(workspace);
+    real = fs.realpathSync(path.join(workspace, rel));
+  } catch { return { kind: 'absent' }; }
+  if (real !== root && !inside(root, real)) return { kind: 'outside' };
+  const at = fs.statSync(real, { throwIfNoEntry: false });
+  return at?.isFile() ? { kind: 'file', real } : at?.isDirectory() ? { kind: 'directory' } : { kind: at ? 'other' : 'absent' };
+}
+
+/**
+ * Copy each file a step's closeout names from its workspace root into the step's files directory, at the same path — so a step that cannot
+ * write outside its worktree (Codex in `workspace-write`, which the engine gives no other directory) still hands its files over, and the
+ * steps after it and `wf decide` read them from one place (`missingArtifacts`, `artifactFiles`).
+ *
+ * `advance` runs it on each pass that hands a step off (`handOffDue`): until its check is filed, and until a step after it works in its
+ * workspace. Level-triggered and idempotent, so a pass that dies halfway loses nothing: a copy with its source's size and time is left as
+ * it is. Nothing is copied, and `wf decide` says why, for a path that climbs out of the workspace (never read), a link that leads out of it
+ * (not followed), a directory, and a file that is not there. Nothing is written through a link in the files directory, which a step may
+ * have made. It never throws, as a hand-off does not. The pass's note names what was copied.
+ */
+function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undefined): string[] {
+  const workspace = run.steps[stepName]?.workspace;
+  if (!closeout || !workspace) return [];
+  const dir = artifactsDir(run, stepName);
+  const copied: string[] = [];
+  for (const file of closeout.artifacts) {
+    if (artifactPlace(file, dir) !== 'workspace') continue;
+    const rel = path.normalize(file);
+    const at = inWorkspace(workspace, rel);
+    if (at.kind !== 'file') continue;
+    try {
+      if (!plainDirectoriesTo(dir, rel)) continue;
+      const to = path.join(dir, rel);
+      const from = fs.statSync(at.real);
+      const there = lstatOf(to);
+      // Within a millisecond: the time a copy is given goes through a `Date` and a float of seconds, and reads back a hair off the source's.
+      if (there && (!there.isFile() || (there.size === from.size && Math.abs(there.mtimeMs - from.mtimeMs) < 1))) continue;
+      fs.copyFileSync(at.real, to);
+      fs.utimesSync(to, from.atime, from.mtime);
+      copied.push(rel);
+    } catch { /* not collected, and `wf decide` says so */ }
+  }
+  return copied.length ? [`${stepName}: collected ${copied.join(', ')} into ${dir}`] : [];
+}
+
+/** Make the directories from `dir` down to the one `rel` is in — false, and nothing made below, where one is already there and is not a plain directory. */
+function plainDirectoriesTo(dir: string, rel: string): boolean {
+  const top = lstatOf(dir);
+  if (top && !top.isDirectory()) return false;
+  if (!top) fs.mkdirSync(dir, { recursive: true });
+  let at = dir;
+  for (const part of path.dirname(rel).split(path.sep).filter((p) => p && p !== '.')) {
+    at = path.join(at, part);
+    const st = lstatOf(at);
+    if (!st) fs.mkdirSync(at);
+    else if (!st.isDirectory()) return false;
+  }
+  return true;
 }
 
 /** Whether `file` is a regular file inside `dir`, with every link on the way to either followed. */

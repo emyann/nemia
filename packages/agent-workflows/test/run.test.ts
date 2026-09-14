@@ -1273,16 +1273,20 @@ test('a step is told where its files go, before its closeout — a fresh step, a
   for (const brief of briefs) {
     const told = brief.indexOf('\n## Files for the steps after you\n');
     assert.ok(told >= 0, brief);
-    assert.ok(brief.includes(`Put them in \`${FILES}\`; name them in \`artifacts\` by absolute path.`), brief);
+    assert.ok(brief.includes(`- Put it in \`${FILES}\`, and name it in \`artifacts\` by absolute path.`), brief);
+    assert.ok(brief.includes('- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root'), brief);
     assert.ok(told < brief.indexOf('\n## When you are finished\n'), 'the closeout stays last');
   }
   // What it will be judged by, then where its files go, then how to finish.
   assert.ok(briefs[2]!.indexOf('\n## Before you sign off\n') < briefs[2]!.indexOf('\n## Files for the steps after you\n'));
-  assert.match(artifactsContract(FILES), /given the same\ndirectory as `WF_ARTIFACTS`/);
+  assert.match(artifactsContract(FILES), /given the same directory as `WF_ARTIFACTS`/);
+  assert.match(artifactsContract(FILES), /the run copies each such file into that directory, at the\n  same path, before it checks your work/);
+  assert.match(artifactsContract(FILES), /Refused, and not read: an absolute\npath anywhere else, and a path that climbs out of the workspace with `\.\.`/);
 });
 
-test('a declared artifact is on the branch by a relative path, in the files directory by an absolute one inside it, and outside anywhere else', () => {
-  for (const f of ['RESPONSE.md', 'docs/notes.md', '../outside.md']) assert.equal(artifactPlace(f, FILES), 'branch', f);
+test('a declared artifact is from the workspace by a relative path — refused when it climbs out of it — in the files directory by an absolute one inside it, and outside anywhere else', () => {
+  for (const f of ['RESPONSE.md', 'docs/notes.md', './docs/notes.md', 'docs/../RESPONSE.md', '.e2e/shot.png', '..notes.md']) assert.equal(artifactPlace(f, FILES), 'workspace', f);
+  for (const f of ['../outside.md', '..', '../', 'docs/../../outside.md', './../outside.md']) assert.equal(artifactPlace(f, FILES), 'escapes', f);
   for (const f of [`${FILES}/factory-light.png`, `${FILES}/shots/run-dark.png`, `${FILES}/shots/../factory-light.png`, `${FILES}/..hidden.png`]) {
     assert.equal(artifactPlace(f, FILES), 'files', f);
   }
@@ -1291,15 +1295,21 @@ test('a declared artifact is on the branch by a relative path, in the files dire
   }
 });
 
-test("`wf decide` tells apart why a declared file is missing, then lists the step's files with their sizes", () => {
-  const lines = artifactLines(FILES, ['NOTES.md', `${FILES}/gone.png`, '/etc/passwd'], [
+test("`wf decide` tells apart why a declared file is missing — each refusal named, never passed over — then lists the step's files with their sizes", () => {
+  const lines = artifactLines(FILES, [
+    { path: 'NOTES.md', why: 'not there' }, { path: `${FILES}/gone.png`, why: 'missing' }, { path: '/etc/passwd', why: 'outside' },
+    { path: 'shots', why: 'directory' }, { path: '../secret.txt', why: 'escapes' }, { path: 'leak.txt', why: 'escapes' }, { path: '.e2e/shot.png', why: 'not collected' },
+  ], [
     { path: `${FILES}/factory-light.png`, bytes: 512 },
     { path: `${FILES}/shots/run-dark.png`, bytes: 48_230 },
     { path: `${FILES}/trace.zip`, bytes: 3 * 1024 * 1024 },
   ]);
   assert.deepEqual(lines, [
-    '!! declared but not on the branch: NOTES.md  — it did not travel',
+    '!! declared but not in the workspace: NOTES.md  — nothing to collect',
+    '!! declared a directory, not collected: shots  — a step names each file',
+    `!! declared and not collected: .e2e/shot.png  — in the workspace, and not in ${FILES}`,
     `!! declared but not in ${FILES}: ${FILES}/gone.png`,
+    `!! declared outside the workspace, and not read: ../secret.txt, leak.txt  — name a file from the workspace root, or put it in ${FILES}`,
     `!! declared outside ${FILES}, and not read: /etc/passwd  — a step's files go in its own directory`,
     'files:',
     `  ${FILES}/factory-light.png  512 B`,

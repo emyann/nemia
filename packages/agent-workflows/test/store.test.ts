@@ -646,7 +646,7 @@ test('a step is told where its files go — a directory the run made for it, out
     assert.ok(!files.startsWith(run.repo + path.sep), `${name}: not in the workspace, where it would ride the branch`);
     const told = brief.indexOf('\n## Files for the steps after you\n');
     assert.ok(told >= 0, `${name}: ${brief}`);
-    assert.ok(brief.includes(`Put them in \`${files}\`; name them in \`artifacts\` by absolute path.`), `${name}: ${brief}`);
+    assert.ok(brief.includes(`- Put it in \`${files}\`, and name it in \`artifacts\` by absolute path.`), `${name}: ${brief}`);
     assert.ok(told < brief.indexOf('\n## When you are finished\n'), `${name}: beside the closeout, which stays last`);
   }
 });
@@ -660,7 +660,7 @@ test("a declared file in the step's files directory counts when it is there, is 
   fs.writeFileSync(path.join(files, 'shots', 'run-dark.png'), 'a png');
   const declared = [path.join(files, 'factory-light.png'), path.join(files, 'shots', 'run-dark.png'), path.join(files, 'never-written.png'), path.join(files, 'shots')];
 
-  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(declared)), [path.join(files, 'never-written.png'), path.join(files, 'shots')], 'a directory is not a file');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(declared)), [{ path: path.join(files, 'never-written.png'), why: 'missing' }, { path: path.join(files, 'shots'), why: 'missing' }], 'a directory is not a file');
   assert.deepEqual(artifactFiles(run, 'implement'), [
     { path: path.join(files, 'factory-light.png'), bytes: 3 },
     { path: path.join(files, 'shots', 'run-dark.png'), bytes: 5 },
@@ -684,14 +684,14 @@ test("an absolute path outside the step's files directory is refused, and never 
 
   const spies = ['existsSync', 'statSync', 'lstatSync', 'realpathSync', 'readFileSync', 'openSync', 'accessSync', 'readdirSync']
     .map((method) => t.mock.method(fs, method as 'statSync'));
-  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(outside)), outside);
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(outside)), outside.map((p) => ({ path: p, why: 'outside' })));
   const looked = spies.flatMap((spy) => spy.mock.calls.map((call) => String(call.arguments[0])))
     .filter((p) => outside.some((o) => path.resolve(p) === path.resolve(o)));
   assert.deepEqual(looked, [], 'refused without being opened, stat-ed or resolved');
 
   // A link inside the directory that leads out is as outside as where it leads, and is not listed.
   fs.symlinkSync(secret, path.join(files, 'link.txt'));
-  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])), [path.join(files, 'link.txt')]);
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])), [{ path: path.join(files, 'link.txt'), why: 'missing' }]);
   assert.deepEqual(artifactFiles(run, 'implement'), []);
 });
 
@@ -2392,4 +2392,105 @@ test('REFUSED at `wf start`, before a run is written: an --input that is not the
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
   await assert.rejects(main(['plan', plan, '--repo', repo, '--input', path.join(given, 'a', 'notes.md')]), refusedWith(/^wf plan does not take --input: a card's inputs are not a thing yet\./));
   assert.equal(runsWritten(), before, 'nor by the CLI');
+});
+
+// ─── files named from the workspace, collected ──────────────────────────────
+
+test("a file `artifacts` names from the workspace root is collected into the step's files directory when the step hands off, before its check is filed — again, only what changed, after a pass that died — and read from there; an absolute path in the directory is read where it is", async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  // What a step that can write only its workspace leaves — a file for the branch, and one git ignores — and one written into the directory by absolute path.
+  fs.writeFileSync(path.join(run.repo, '.gitignore'), '.e2e/\n');
+  fs.mkdirSync(path.join(run.repo, '.e2e'));
+  fs.writeFileSync(path.join(run.repo, '.e2e', 'shot.png'), 'png');
+  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# response\n');
+  fs.writeFileSync(path.join(files, 'trace.zip'), 'zip');
+  const named = ['RESPONSE.md', './.e2e/shot.png', path.join(files, 'trace.zip')];
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
+
+  // A pass that hands off, collects, and dies filing the check.
+  const dying = { ...b.e, file: async (spec: { id: string }) => { if (spec.id.endsWith('-check')) throw new Error('the pass died'); return b.e.file(spec as never); } } as unknown as Engine;
+  await assert.rejects(advance(dying, readRun(run.id)), /the pass died/);
+  assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response\n');
+  assert.equal(fs.readFileSync(path.join(files, '.e2e', 'shot.png'), 'utf8'), 'png', 'a file git ignores, which never reaches the branch');
+
+  // The next pass collects again — only what changed since — and files the check.
+  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# response, amended\n');
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.checked, pass.notes], [['implement'], [`implement: collected RESPONSE.md into ${files}`]]);
+  assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
+  assert.equal(fs.readFileSync(path.join(files, 'trace.zip'), 'utf8'), 'zip', 'an absolute path in the directory, where it is');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), []);
+  assert.deepEqual(artifactFiles(run, 'implement').map((f) => path.relative(files, f.path)).sort(), ['.e2e/shot.png', 'RESPONSE.md', 'trace.zip']);
+
+  // Once its check is filed, the workspace is the check's: nothing more is collected.
+  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# rewritten while the check ran\n');
+  assert.deepEqual((await advance(b.e, readRun(run.id))).notes, []);
+  assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
+});
+
+test("REFUSED as findings on the screen, never silently: a path that climbs out of the workspace is never read, a link that leads out is not followed, and a directory and a file not there are not collected — `wf decide` names each", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  const secret = path.join(path.dirname(run.repo), `secret-${run.id}.txt`);
+  fs.writeFileSync(secret, "not a step's to name\n");
+  fs.mkdirSync(path.join(run.repo, 'shots'));
+  fs.writeFileSync(path.join(run.repo, 'shots', 'a.png'), 'png');
+  fs.symlinkSync(secret, path.join(run.repo, 'leak.txt'));
+  const climbs = `../${path.basename(secret)}`;
+  b.settle(`${run.id}-implement`, 'succeeded', declaring([climbs, 'never-written.md', 'shots', 'leak.txt']));
+
+  const spies = ['existsSync', 'statSync', 'lstatSync', 'realpathSync', 'readFileSync', 'openSync', 'accessSync', 'readdirSync', 'copyFileSync', 'cpSync']
+    .map((method) => t.mock.method(fs, method as 'statSync'));
+  const looked = () => spies.flatMap((spy) => spy.mock.calls.flatMap((call) => call.arguments.slice(0, 2).filter((a) => typeof a === 'string') as string[]))
+    .filter((p) => path.resolve(p) === secret);
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.filed, pass.notes], [['review'], []], 'review filed, and nothing collected');
+  assert.deepEqual(artifactFiles(run, 'implement'), []);
+  assert.deepEqual(looked(), [], 'the file outside the workspace is neither opened, stat-ed nor resolved by the tick');
+
+  b.settle(`${run.id}-review`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs: 'a person' });
+  const out: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.map(String).join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  try { await main(['decide', run.id], b.e); } finally { log.mock.restore(); }
+  const lines = out.join('\n').split('\n');
+  const at = lines.indexOf('  implement');
+  assert.ok(at >= 0, lines.join('\n'));
+  assert.deepEqual(lines.slice(at).filter((l) => l.startsWith('    !! ')), [
+    '    !! declared but not in the workspace: never-written.md  — nothing to collect',
+    '    !! declared a directory, not collected: shots  — a step names each file',
+    `    !! declared outside the workspace, and not read: ${climbs}, leak.txt  — name a file from the workspace root, or put it in ${files}`,
+  ]);
+  assert.deepEqual(looked(), [], 'nor by wf decide');
+});
+
+test("REFUSED at shipped defaults: a copy is never written through a link a step made in its files directory — on the way to it, or in its place — what the link leads to is left as it was, and `wf decide` names the file not collected, though it is on the branch", async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));
+  fs.writeFileSync(path.join(elsewhere, 'shot.png'), 'what was there');
+  fs.writeFileSync(path.join(elsewhere, 'report.md'), 'what was there');
+  // A step that can write its files directory makes links in it, then names workspace files whose copies would go through them.
+  fs.symlinkSync(elsewhere, path.join(files, 'shots'));
+  fs.symlinkSync(path.join(elsewhere, 'report.md'), path.join(files, 'report.md'));
+  fs.mkdirSync(path.join(run.repo, 'shots'));
+  fs.writeFileSync(path.join(run.repo, 'shots', 'shot.png'), 'png');
+  fs.writeFileSync(path.join(run.repo, 'report.md'), '# report\n');
+  const named = ['shots/shot.png', 'report.md'];
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
+
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.checked, pass.notes], [['implement'], []], 'its check filed, and nothing collected');
+  assert.deepEqual(Object.fromEntries(fs.readdirSync(elsewhere).map((f) => [f, fs.readFileSync(path.join(elsewhere, f), 'utf8')])),
+    { 'report.md': 'what was there', 'shot.png': 'what was there' });
+  // Handed off, both are on the branch. The run reads a step's files from its directory, and says what it did not collect.
+  assert.equal(execFileSync('git', ['cat-file', '-t', `${run.branch}:report.md`], { cwd: run.repo, encoding: 'utf8' }).trim(), 'blob');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), [{ path: 'shots/shot.png', why: 'not collected' }, { path: 'report.md', why: 'not collected' }]);
 });

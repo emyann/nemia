@@ -1398,31 +1398,45 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  * step's worktree at all. So the run makes a directory per step, beside the run's record and outside
  * every workspace (`artifactsDir` in runner.ts), and says where it is. Mechanism, like the closeout: a
  * step does not have to find somewhere, and a workflow author does not have to remember to say where.
+ *
+ * Both ways are said, because not every step can use the first: Codex in `workspace-write` writes only its
+ * worktree, and the engine gives it no other directory. A file named from the workspace root is collected into
+ * the directory at hand-off, before the check (`collectArtifacts` in runner.ts), so such a step hands it over too.
  */
 export const artifactsContract = (dir: string): string => [
   '', '## Files for the steps after you', '',
-  `Put them in \`${dir}\`; name them in \`artifacts\` by absolute path.`,
+  'A screenshot, a log or a report reaches the steps after you and the person who decides in either of two ways.',
   '',
-  'The run made that directory for this step, outside every workspace, so a file there reaches the',
-  'steps after you and the person who decides without riding the branch: a screenshot, a log, a',
-  'report. A file that belongs on the branch, such as `RESPONSE.md`, stays in the workspace and is',
-  "named by its path from the workspace root. The run's check of this step is given the same",
-  'directory as `WF_ARTIFACTS`. An absolute path anywhere else is refused, and not read.',
+  `- Put it in \`${dir}\`, and name it in \`artifacts\` by absolute path. The run made that directory for`,
+  '  this step, outside every workspace, so a file there does not ride the branch.',
+  '- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root, such as',
+  '  `RESPONSE.md` or `.e2e/shot.png`. When you finish, the run copies each such file into that directory, at the',
+  '  same path, before it checks your work, so a step that cannot write outside its workspace hands its files over',
+  '  all the same. A file left in the workspace is committed with the rest too, unless git ignores it.',
+  '',
+  "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
+  'path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a',
+  'file that is not there: name each file.',
 ].join('\n');
 
 /**
  * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
  *
- *   branch   a path from the workspace root — on the step's branch, where it travelled
- *   files    an absolute path inside the step's files directory — on disk, where the run keeps it
- *   outside  any other absolute path — refused. A closeout is an agent's text, and the run does not
- *            look at a file on this machine because a step named it. `..` is resolved first, so a path
- *            that climbs out of the directory is outside however it is spelled.
+ *   workspace  a path from the workspace root — collected from the workspace into the step's files directory
+ *              when the step hands off (`collectArtifacts` in runner.ts), and read from there
+ *   files      an absolute path inside the step's files directory — on disk, where the run keeps it
+ *   escapes    a path from the workspace root that climbs out of it, `../notes.md` — refused, and never read
+ *   outside    any other absolute path — refused. A closeout is an agent's text, and the run does not
+ *              look at a file on this machine because a step named it. `..` is resolved first, so a path
+ *              that climbs out of the directory is outside however it is spelled.
  */
-export type ArtifactPlace = 'branch' | 'files' | 'outside';
+export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside';
 
 export function artifactPlace(file: string, dir: string): ArtifactPlace {
-  if (!path.isAbsolute(file)) return 'branch';
+  if (!path.isAbsolute(file)) {
+    const rel = path.normalize(file);
+    return rel === '..' || rel.startsWith(`..${path.sep}`) ? 'escapes' : 'workspace';
+  }
   const within = path.relative(path.resolve(dir), path.resolve(file));
   // Empty is the directory itself, which is not a file in it.
   return within && within !== '..' && !within.startsWith(`..${path.sep}`) && !path.isAbsolute(within) ? 'files' : 'outside';
@@ -1432,16 +1446,33 @@ export function artifactPlace(file: string, dir: string): ArtifactPlace {
 export type ArtifactFile = { path: string; bytes: number };
 
 /**
- * What `wf decide` prints about a step's files, after its closeout: each declared file that is not where
- * it says, told apart by why, and then every file in the step's directory with its size.
+ * A declared artifact the run does not have, and why (`missingArtifacts` in runner.ts):
+ *
+ *   not there      a path from the workspace root with nothing at it, nor on the branch
+ *   directory      a path from the workspace root that is a directory: not collected, since a step names each file
+ *   not collected  a file in the workspace that is not in the step's files directory: its step has not handed off, or the copy was refused
+ *   missing        an absolute path in the step's files directory that is not a file there
+ *   escapes        a path that climbs out of the workspace, as written or through a link in it: refused, and not read
+ *   outside        an absolute path outside the step's files directory: refused, and not read
  */
-export function artifactLines(dir: string, missing: readonly string[], files: readonly ArtifactFile[]): string[] {
-  const at = (place: ArtifactPlace) => missing.filter((f) => artifactPlace(f, dir) === place);
-  const [onBranch, inFiles, outside] = [at('branch'), at('files'), at('outside')];
+export type MissingArtifact = { path: string; why: 'not there' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' };
+
+/**
+ * What `wf decide` prints about a step's files, after its closeout: each declared file the run does not have, told apart by why —
+ * a refusal is named as one, never passed over — and then every file in the step's directory, collected or written there, with its size.
+ */
+export function artifactLines(dir: string, missing: readonly MissingArtifact[], files: readonly ArtifactFile[]): string[] {
+  const line = (why: MissingArtifact['why'], say: (names: string) => string): string[] => {
+    const names = missing.filter((m) => m.why === why).map((m) => m.path);
+    return names.length ? [say(names.join(', '))] : [];
+  };
   return [
-    ...(onBranch.length ? [`!! declared but not on the branch: ${onBranch.join(', ')}  — it did not travel`] : []),
-    ...(inFiles.length ? [`!! declared but not in ${dir}: ${inFiles.join(', ')}`] : []),
-    ...(outside.length ? [`!! declared outside ${dir}, and not read: ${outside.join(', ')}  — a step's files go in its own directory`] : []),
+    ...line('not there', (names) => `!! declared but not in the workspace: ${names}  — nothing to collect`),
+    ...line('directory', (names) => `!! declared a directory, not collected: ${names}  — a step names each file`),
+    ...line('not collected', (names) => `!! declared and not collected: ${names}  — in the workspace, and not in ${dir}`),
+    ...line('missing', (names) => `!! declared but not in ${dir}: ${names}`),
+    ...line('escapes', (names) => `!! declared outside the workspace, and not read: ${names}  — name a file from the workspace root, or put it in ${dir}`),
+    ...line('outside', (names) => `!! declared outside ${dir}, and not read: ${names}  — a step's files go in its own directory`),
     ...(files.length ? ['files:', ...files.map((f) => `  ${f.path}  ${sizeOf(f.bytes)}`)] : []),
   ];
 }

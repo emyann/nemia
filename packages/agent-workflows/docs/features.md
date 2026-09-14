@@ -1086,6 +1086,76 @@ What it leaves:
   and nothing removes `runs/<id>/`, as nothing removes a run's artifacts.
 - **A card has no inputs** (`wf plan`), as §6 left it.
 
+### Artifacts collected from the workspace
+
+§4b's *the artifacts directory and Codex*, from U1's review. Every brief names `runs/<id>/artifacts/<step>/`, and a Codex step
+in `workspace-write` cannot write there: it writes only its worktree and tmp, and the engine passes no `--add-dir`. The fix is
+the one hkb's `exports` had. The step names a path in its workspace, and the run collects it.
+
+What was built:
+
+- `artifactPlace` tells four places apart, reading only the path:
+  - `workspace`: a path from the workspace root;
+  - `escapes`: one that climbs out of it, such as `../notes.md`;
+  - `files`: an absolute path in the step's directory;
+  - `outside`: any other absolute path.
+- `collectArtifacts` in `runner.ts` runs on every pass that hands a step off: before its check is filed, and before a step after it
+  works in its workspace. It copies each `workspace` file into the step's directory at the same path, and the pass's note names
+  what it copied. It is level-triggered, so a pass that dies halfway loses nothing: the next copies only what changed, by size
+  and by time within a millisecond. Nothing is copied for:
+  - a path that climbs out of the workspace, which is never read;
+  - a link that leads out of the workspace, which is not followed;
+  - a directory, or a file that is not there.
+
+  Nor is a copy ever written through a link a step made in its files directory, whether on the way to it or in its place.
+- `missingArtifacts` now says why, as `MissingArtifact`. A file named from the workspace is read from the directory, and the
+  workspace says why when it is not there. Only when the workspace has nothing does the branch count, for a run from before
+  collection whose worktree is gone. `artifactLines` gives each reason its own line on `wf decide`'s screen: not in the
+  workspace, a directory, not collected, not in the directory, outside the workspace, outside the directory.
+- `artifactsContract`, on every brief, says both ways. Put a file in the directory and name it by absolute path, or leave it in
+  the workspace and name it by its path from the root.
+
+What was measured:
+
+- `test/run.test.ts`:
+  - `artifactPlace` on workspace paths, `docs/../RESPONSE.md` and `..notes.md` among them, and on five spellings of climbing out;
+  - `artifactLines` with every reason, compared whole;
+  - the contract's two ways and its refusals.
+- `test/store.test.ts` (3 new), on a real repository with `start`, `advance` and `main`:
+  - A step names `RESPONSE.md`, `./.e2e/shot.png` (which git ignores) and an absolute path in its directory. A pass hands off,
+    collects both workspace files, and dies filing the check. `RESPONSE.md` is then amended, and the next pass copies only it,
+    files the check, and `missingArtifacts` is empty. Once the check is filed, a change in the workspace is not collected.
+  - A path that climbs out to a real file, a link in the workspace to that file, a directory, and a file never written. Nothing is
+    collected. With `fs` spied, neither the tick nor `wf decide` passes the outside file's path to any call. `wf decide` prints
+    the three lines under the step.
+  - A link in the files directory on the way to a copy, and another in a copy's place. What they lead to is left as it was, and
+    `wf decide` names both files not collected, though both are on the branch.
+  - The earlier tests of absolute paths inside and outside the directory now expect a reason, `missing` or `outside`, and are
+    otherwise unchanged.
+- Each guard was broken on purpose and the tests rerun:
+  - collecting nothing fails 1 test;
+  - reading a climbing path as the workspace fails 3;
+  - following a link out of the workspace fails 2;
+  - copying on every pass fails 1;
+  - passing a link on the way to a copy fails 1;
+  - writing through a link in a copy's place fails 1.
+- The collection test at first failed intermittently. A copy's time, set through a `Date`, read back a fraction of a millisecond
+  off its source's, so an unchanged file was copied again, and its pass's note named it. The comparison is now within a
+  millisecond, and the store tests passed five runs in a row.
+- An earlier version counted a file as present whenever it was on the branch. The link test showed that hid a file the run had
+  refused to copy, so the branch is now asked only when the workspace has nothing at that path.
+- agent-workflows: 364 tests, 363 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 364 (363 passed, 1 skipped), api 114 and web 158, all passing.
+
+What it leaves:
+
+- **The board serves only a file directly in the directory, named by an absolute path.** The api's artifacts route requires
+  `artifactPlace(...) === 'files'`, so a collected file named from the workspace shows as a bare path on the Output tab. The api
+  would look for it at `path.join(dir, file)`.
+- **A directory is not collected.** A step names each file in it, and a directory named whole is named on the screen.
+- **A file rewritten at the same size within a millisecond of its copy is not copied again.** Collection runs once the step has
+  finished, so only something else writing the workspace could do that.
+
 ## 1. Forgetting a run (`wf rm`)
 
 **Why.** Runs, worktrees and branches accumulate, and clearing them is manual: `git worktree

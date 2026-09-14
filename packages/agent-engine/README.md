@@ -702,6 +702,15 @@ decline what it judges out of bounds. `transcript` gives them as a `system` even
 operator's settings, a burst past its rate limit, or the same words twice inside its repeat window, set them
 aside where the engine cannot see, and the entry is written all the same: `said` means handed over.
 
+**A `blocked` session is told, and may never read.** Measured on 2.1.270: a `--bg` session waiting on a
+permission prompt queued the words and did not read them while it waited; stopped, it had not read them; and
+continued as B8's Continue and `wf retry` continue one — a new session resuming its id — its conversation did not
+have them. So words said to a session blocked on a prompt nobody answers are on the record for that attempt and
+reached no model: say them again to the attempt that continues it, or carry them in its brief. A session the
+harness itself holds up is another matter — one stalled on a login refresh (2026-09-13) moved on when a
+cross-session message reached it — and `claude agents` does not say which wait a session is in, so neither is
+refused (`docs/open-issues.md`, issue 16).
+
 | harness | how | refused |
 |---|---|---|
 | `claude` | a line on the session's inbox socket | a task in `bypassPermissions` — Claude Code holds a message into such a session for a person to approve, and a background session nobody attached to holds it for ever; and words that make a line longer than the inbox reads (1,048,576 characters) |
@@ -712,7 +721,7 @@ aside where the engine cannot see, and the entry is written all the same: `said`
 **Refused, with exit code 2**, nothing sent and nothing journalled, and the fix in the sentence: empty words; a
 task the engine has no record of; a harness with no channel, in its own words; what the harness cannot carry; a
 task that has settled, or has been asked to stop; one with no attempt in flight; and one whose attempt its
-harness does not list running — `working` or `blocked`, since a session waiting on a person is told too. Where
+harness does not list running — `working` or `blocked`, since a session waiting on a person is running, and is told (above). Where
 the fix is to continue a session that has ended, the sentence says so: a new task with `resumeFrom`, which is
 what `wf retry --message` does. A registry that cannot be read, or words the harness did not take, reject
 without an exit code: nothing was said, so ask again.

@@ -44,10 +44,14 @@ const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
 const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-live-${label}-`));
 
-/** Tick until every task has settled or ten minutes pass, check, and leave no session behind. */
-const settleThenCheck = async (engine: Engine, ids: Record<string, string>, check: (views: Record<string, TaskView>) => void) => {
+/**
+ * Do `act`, tick until every task has settled or ten minutes pass, check, and leave no session behind — one that
+ * `act` threw on included.
+ */
+const settleThenCheck = async (engine: Engine, ids: Record<string, string>, check: (views: Record<string, TaskView>) => void, act?: () => Promise<void>) => {
   const views: Record<string, TaskView> = {};
   try {
+    await act?.();
     const until = Date.now() + 10 * 60_000;
     while (Date.now() < until) {
       await engine.tick();
@@ -58,6 +62,9 @@ const settleThenCheck = async (engine: Engine, ids: Record<string, string>, chec
     check(views);
   } finally {
     // The engine releases a session once its end is on the record; this is for one that never got that far.
+    for (const [k, id] of Object.entries(ids)) {
+      if (!views[k]) { try { views[k] = await engine.view(id); } catch { /* no view, nothing known to clean */ } }
+    }
     for (const v of Object.values(views)) {
       if (!v.sessionId) continue;
       const short = v.sessionId.split('-')[0]!;
@@ -233,7 +240,7 @@ const NAME_CLOSEOUT = {
 test('say reaches a working --bg session: told a file name, it writes that file; the same session never told writes none — and the journal has what was said', {
   skip,
   timeout: 15 * 60_000,
-}, async () => {
+}, async (t) => {
   // Shipped defaults: `claude`, `auto`. Bash to wait with, Write to answer with.
   const engine = createEngine({ root: tmp('say-board') });
   const told = tmp('say-told');
@@ -244,19 +251,10 @@ test('say reaches a working --bg session: told a file name, it writes that file;
     control: await engine.file({ ...common, cwd: control }),
   };
   const name = `SAID-${randomUUID().slice(0, 8)}.txt`;
-
-  // Told once it is seen at work: listed running, in its sleep loop.
+  const words = `The file to write is ${name}`;
   let said: Said | undefined;
-  const until = Date.now() + 5 * 60_000;
-  while (!said && Date.now() < until) {
-    await engine.tick();
-    const { phase } = await engine.view(ids.told);
-    if (phase === 'running (working)' || phase === 'working (quiescent)') said = await engine.say(ids.told, `The file to write is ${name}`);
-    else await new Promise((r) => setTimeout(r, 5_000));
-  }
 
   await settleThenCheck(engine, ids, (views) => {
-    assert.ok(said, 'the told session was seen working, and told');
     assert.equal(views.told?.state.settled, 'succeeded', `told settled: ${views.told?.phase}`);
     assert.ok(fs.existsSync(path.join(told, name)), 'the told session wrote the file the words named');
     assert.deepEqual(views.told?.state.attempts.at(-1)?.closeout, { name }, 'and closed with its name');
@@ -266,11 +264,26 @@ test('say reaches a working --bg session: told a file name, it writes that file;
     assert.deepEqual(fs.readdirSync(control).filter((f) => f.startsWith('SAID-')), [], 'the control, never told, wrote nothing');
     assert.deepEqual(views.control?.state.attempts.at(-1)?.closeout, { name: '' }, 'and closed with no name');
     assert.deepEqual(views.control?.state.said, []);
+  }, async () => {
+    // Told once it is seen at work: listed running, in its sleep loop. Inside `settleThenCheck`, so a `say` that
+    // rejects still leaves no session behind.
+    const until = Date.now() + 5 * 60_000;
+    while (!said && Date.now() < until) {
+      await engine.tick();
+      const { phase } = await engine.view(ids.told);
+      if (phase === 'running (working)' || phase === 'working (quiescent)') said = await engine.say(ids.told, words);
+      else await new Promise((r) => setTimeout(r, 5_000));
+    }
+    assert.ok(said, 'the told session was seen working within five minutes, and told');
   });
 
-  // The session's own record has the words too, as the transcript reader gives them to a board.
+  // The session's own record has the words too, as the transcript reader gives them to a board: a system event
+  // whose text is the words, or Claude Code's sentence around them on a line of their own — never the model's own
+  // mention of the file's name, which would pass with the reader of words sent in broken.
   const { events } = await engine.transcript(ids.told);
-  assert.ok(events.some((e) => e.text?.includes(name)), `the told session's transcript carries the words: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`);
+  const arrived = events.filter((e) => e.role === 'system' && e.kind === 'system' && e.text?.split('\n').includes(words));
+  assert.equal(arrived.length, 1, `the told session's transcript carries the words once, as a system event: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`);
+  t.diagnostic(`the words arrived ${arrived[0]!.text === words ? 'while the session worked (an attachment line)' : 'while it was idle (the line that starts a turn)'}`);
 });
 
 const WORD_CLOSEOUT = {

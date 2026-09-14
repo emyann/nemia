@@ -27,7 +27,7 @@ const config = tmp('config');
 process.env.CLAUDE_CONFIG_DIR = config;
 const sessions = path.join(config, 'sessions');
 const { createEngine } = await import('../src/facade.ts');
-const { claudeInbox, CLAUDE_INBOX_LINE_MAX } = await import('../src/runner.ts');
+const { claudeInbox, claudeInboxLine, claudeInboxPost, inboxSocketRefuses, CLAUDE_INBOX_LINE_MAX } = await import('../src/runner.ts');
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number; pid?: number };
 
@@ -73,19 +73,33 @@ const fake = fakeClaude();
 process.env.PATH = `${fake.bin}:${process.env.PATH}`;
 const work = tmp('work');
 
-/** A session's inbox: a Unix socket that reads each connection's lines and answers nothing, as Claude Code's does. */
-const inbox = async () => {
+/**
+ * A session's inbox: a Unix socket that reads each connection's lines, answers nothing, and closes its end once the
+ * sender has, as Claude Code's does. `neverCloses` reads the line and keeps its end open, as a process busy past the
+ * post's deadline would; `neverReads` takes the connection and reads nothing.
+ */
+const inbox = async (o: { neverCloses?: boolean; neverReads?: boolean } = {}) => {
   const at = path.join(tmp('sock'), 'in.sock');
   const lines: Array<{ type?: string; session_id?: string; message?: { role?: string; content?: string } }> = [];
-  const server = net.createServer((c) => {
+  const open = new Set<net.Socket>();
+  const server = net.createServer({ allowHalfOpen: true, pauseOnConnect: o.neverReads === true }, (c) => {
+    open.add(c);
+    c.on('close', () => open.delete(c));
+    if (o.neverReads) return;
     let got = '';
     c.setEncoding('utf8');
     c.on('data', (d) => { got += d; });
-    c.on('end', () => { for (const l of got.split('\n')) if (l.trim()) lines.push(JSON.parse(l)); c.end(); });
+    c.on('end', () => {
+      for (const l of got.split('\n')) if (l.trim()) lines.push(JSON.parse(l));
+      if (!o.neverCloses) c.end();
+    });
   });
   await new Promise<void>((resolve) => server.listen(at, resolve));
   server.unref();
-  return { path: at, lines, close: () => new Promise<void>((resolve) => server.close(() => resolve())) };
+  return {
+    path: at, lines,
+    close: () => new Promise<void>((resolve) => { for (const c of open) c.destroy(); server.close(() => resolve()); }),
+  };
 };
 
 /** The registration Claude Code writes for a running session, by its pid. */
@@ -159,7 +173,7 @@ test("at shipped defaults, say hands the words verbatim to the running session's
   await box.close();
 });
 
-test('a blocked session is told too: it reads the words once it moves again', async () => {
+test('a session its harness lists blocked is running, and its inbox is handed the words as a working one is', async () => {
   const engine = createEngine({ root: tmp('board') });
   const { id, row, box } = await running(engine);
   fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'blocked', status: 'idle' } : r)));
@@ -335,6 +349,49 @@ test('an inbox that is a symlink to a real socket is refused before anything is 
   const me = process.getuid!();
   await assert.rejects(claudeInbox(sessions, row.pid!, row.sessionId, me + 1), (e: Error) => /cannot be read \(not a file of yours\)/.test(e.message));
   await box.close();
+});
+
+test("a socket another user owns is refused — the check on what lstat said, handed another uid, since no test can make a socket another user's", async () => {
+  const box = await inbox();
+  const me = process.getuid!();
+  const stat = fs.lstatSync(box.path);
+  assert.equal(inboxSocketRefuses(box.path, stat, me), undefined, 'a socket of mine is sent to');
+  assert.equal(inboxSocketRefuses(box.path, stat, undefined), undefined, 'and one on a platform with no uids');
+  assert.match(inboxSocketRefuses(box.path, stat, me + 1) ?? '', new RegExp(`is owned by uid ${me}, not by you\\. Refusing to send`));
+  const link = path.join(tmp('link'), 'in.sock');
+  fs.symlinkSync(box.path, link);
+  assert.match(inboxSocketRefuses(link, fs.lstatSync(link), me) ?? '', /is not a socket — a symlink/, 'a link to my own socket, all the same');
+  await box.close();
+});
+
+// ─── the post: given once the whole line is written ─────────────────────────
+
+test('an inbox that reads the words and never closes its end — a process busy past the deadline — was given them: said, and journalled', async () => {
+  const engine = createEngine({ root: tmp('board') });
+  const { id, row } = await running(engine, {}, false);
+  const box = await inbox({ neverCloses: true });
+  register(row, { messagingSocketPath: box.path });
+  // Waits out the post's whole deadline, five seconds: the inbox never closes.
+  const said = await engine.say(id, 'are you there');
+  assert.deepEqual(box.lines.map((l) => l.message?.content), ['are you there'], 'the inbox has the words');
+  assert.deepEqual((await engine.view(id)).state.said, [said], 'and so does the record');
+  await box.close();
+});
+
+test('the post resolves once the whole line is written, closed or not; it rejects when the line is still being written at the deadline, which an inbox drops', async () => {
+  const slow = await inbox({ neverCloses: true });
+  await claudeInboxPost(slow.path, claudeInboxLine('s', 'hello'), 200);
+  assert.equal(slow.lines.length, 1);
+
+  // Bigger than a socket's buffer, to an inbox that reads nothing: most of it never leaves this process.
+  const deaf = await inbox({ neverReads: true });
+  await assert.rejects(claudeInboxPost(deaf.path, claudeInboxLine('s', 'x'.repeat(4 * 1024 * 1024)), 200),
+    (e: Error) => /took only part of the line within 200 ms, and an inbox drops a line cut short/.test(e.message));
+
+  const gone = path.join(tmp('gone'), 'in.sock');
+  await assert.rejects(claudeInboxPost(gone, claudeInboxLine('s', 'hello'), 200), (e: NodeJS.ErrnoException) => e.code === 'ENOENT');
+  await slow.close();
+  await deaf.close();
 });
 
 // ─── a harness brought as a PromiseRunner ───────────────────────────────────

@@ -508,31 +508,53 @@ export const claudeInbox = async (sessionsDir: string, pid: number, sessionId: s
   try { stat = await fs.promises.lstat(socket); } catch (e) {
     throw new Error(`session ${sessionId}'s inbox, ${socket}, is not there (${e instanceof Error ? e.message : String(e)}): it has exited.`);
   }
-  if (!stat.isSocket()) throw new Error(`${socket} is not a socket — a symlink, or something else in its place. Refusing to send.`);
-  if (uid !== undefined && stat.uid !== uid) throw new Error(`${socket} is owned by uid ${stat.uid}, not by you. Refusing to send.`);
+  const refused = inboxSocketRefuses(socket, stat, uid);
+  if (refused) throw new Error(refused);
   return socket;
+};
+
+/**
+ * Why a session's inbox is not a socket to send to, as a sentence — or `undefined`: a path that is not a socket
+ * (`lstat` does not follow a symlink, so a link to a real socket is refused too), or one another user owns. Given
+ * what `lstat` said and who "this user" is, and pure, so a test can hand it a socket of another user's, which no
+ * test can make without root.
+ */
+export const inboxSocketRefuses = (socket: string, stat: { isSocket(): boolean; uid: number }, uid: number | undefined): string | undefined => {
+  if (!stat.isSocket()) return `${socket} is not a socket — a symlink, or something else in its place. Refusing to send.`;
+  if (uid !== undefined && stat.uid !== uid) return `${socket} is owned by uid ${stat.uid}, not by you. Refusing to send.`;
+  return undefined;
 };
 
 /** How long a post to a session's inbox may take. The inbox answers nothing, so this bounds a connection that hangs. */
 const SAY_TIMEOUT_MS = 5_000;
 
 /**
- * One line, written to a Unix socket and the connection ended. Resolves once the line was written and the
- * inbox closed its end without an error — it writes nothing back, so that is all there is to hear.
+ * One line, written to a session's inbox socket and the connection ended.
+ *
+ * Resolves once the whole line is written: from then on it is in the socket's queue, and Claude Code reads it
+ * when its loop comes back to the connection. So an inbox slow to close its end — a process busy past the
+ * deadline — has still been given the words, and this says so, rather than reporting words it handed over as
+ * words it did not (found in review). Rejects when the line was not all written: the connection refused or
+ * reset, or still being written at the deadline. An inbox drops a line cut short, so then nothing was given.
  */
-const postLine = (socket: string, line: string, timeoutMs = SAY_TIMEOUT_MS) => new Promise<void>((resolve, reject) => {
+export const claudeInboxPost = (socket: string, line: string, timeoutMs = SAY_TIMEOUT_MS) => new Promise<void>((resolve, reject) => {
   let written = false;
+  let done = false;
+  const finish = (error?: Error) => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    if (error) reject(error); else resolve();
+  };
   const c = net.createConnection({ path: socket });
-  const timer = setTimeout(() => { c.destroy(); reject(new Error(`${socket} took nothing within ${timeoutMs} ms`)); }, timeoutMs);
+  const timer = setTimeout(() => {
+    c.destroy();
+    finish(written ? undefined : new Error(`${socket} took only part of the line within ${timeoutMs} ms, and an inbox drops a line cut short`));
+  }, timeoutMs);
   c.on('connect', () => c.end(line, () => { written = true; }));
   c.on('data', () => { /* the inbox answers nothing; anything it did say is not ours to read */ });
-  c.on('error', (e) => { clearTimeout(timer); reject(e); });
-  c.on('close', (hadError) => {
-    clearTimeout(timer);
-    if (hadError) return;
-    if (written) resolve();
-    else reject(new Error(`${socket} closed the connection before the words were written`));
-  });
+  c.on('error', (e) => finish(e));
+  c.on('close', () => finish(written ? undefined : new Error(`${socket} closed the connection before the words were written`)));
 });
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -924,7 +946,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           if (pid === undefined) {
             throw new Error(`\`claude agents\` lists no process for ${session.name} (${session.sessionId}): it has exited, or this runner has not observed it.`);
           }
-          await postLine(await claudeInbox(sessionsDir, pid, session.sessionId), claudeInboxLine(session.sessionId, text));
+          await claudeInboxPost(await claudeInbox(sessionsDir, pid, session.sessionId), claudeInboxLine(session.sessionId, text));
         },
         catch: (cause) => new RunnerError({ verb: 'say', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
       }),

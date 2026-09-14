@@ -188,7 +188,9 @@ export type Engine = {
    * The words go before the entry: a `said` on the record is words a harness took, and a `say` that rejects has
    * journalled nothing. What the session makes of them is its own affair, and `decide` never reads them. Words
    * taken are not words read: a harness may still set them aside (Claude Code: its `crossSessionInbound`
-   * setting, a rate limit, an identical repeat), and says nothing back when it does.
+   * setting, a rate limit, an identical repeat), and says nothing back when it does. A session its harness lists
+   * `blocked` is told too, and reads the words only if it moves again: one waiting on a permission prompt nobody
+   * answers keeps them queued, and a stopped or continued one has lost them (open issue 16).
    *
    * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing sent or journalled — for an empty
    * `text`; a task this engine has no record of; a harness with no channel into a running session (a
@@ -437,7 +439,10 @@ export function createEngine(options: EngineOptions = {}): Engine {
       }
       const sighting = observed.get(name);
       if (!sighting) throw refuse(`\`${taskId}\`'s attempt ${last.n} is not running yet: its harness lists no \`${name}\`. Ask again once \`ae ls\` shows it running.`);
-      // A session waiting on a person hears it too: it reads the words once it moves again.
+      // A session waiting on a person is running, and its inbox takes words as a working one's does. It reads them
+      // only if it moves again: one stalled on a login refresh moved on when a message came (2026-09-13); one waiting
+      // on a permission prompt nobody answers keeps them queued, and loses them when stopped or continued (open issue
+      // 16). `claude agents` does not say which wait a session is in, so neither is refused.
       if (sighting.state !== 'working' && sighting.state !== 'blocked') {
         throw refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: the next pass writes its end. ${resume}`);
       }

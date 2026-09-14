@@ -856,6 +856,38 @@ test('`wf retry` is refused, saying what to do instead: a step still running, a 
   assert.equal(retryRefusal(RETRIED, run({ implement: 't1', review: null }), 'implement', { mode: 'fresh' }, phases({ t1: 'succeeded' }), blocked, asked), null, 'blocked, and settled');
 });
 
+test("REFUSED before, now accepted: a step whose session its harness blocked, with nothing signed, may be asked a nudge or a fresh session when the harness's word is given — a try due that stops the session first; --recheck, a session still working, one that signed off, and a caller with no word of the harness are refused as before", () => {
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'running' });
+  const needsHuman = (id: string) => id === 't1';
+  const nothingSigned = () => undefined;
+  const refusal = (how: RetryHow, blockedOf: (id: string) => boolean = needsHuman, closeout: (s: string) => Closeout | undefined = nothingSigned) =>
+    retryRefusal(STEPS, r, 'implement', how, p, closeout, asked, () => undefined, [], blockedOf);
+
+  for (const how of [{ mode: 'nudge' }, { mode: 'fresh' }, { mode: 'fresh', model: 'opus' }, { mode: 'nudge', message: 'logged in again: carry on' }] as RetryHow[]) {
+    assert.equal(refusal(how), null, JSON.stringify(how));
+  }
+  assert.equal(refusal({ mode: 'recheck' }),
+    "--recheck runs a step's check again, and implement is running, its session blocked by its harness with nothing signed off: no check of it failed. Ask for another session instead: wf retry r-1 implement (or --fresh).");
+  assert.match(refusal({ mode: 'nudge' }, () => false)!, /^implement is still running, so there is nothing to try again until it ends/, 'a session still working');
+  assert.match(refusal({ mode: 'nudge' }, needsHuman, signedDone)!, /^implement is still running/, 'a session that signed off and runs on');
+  assert.match(retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, p, nothingSigned, asked)!, /^implement is still running/, "a caller with no word of the harness — the board's POST, today");
+
+  // The tick's reading: the ask is due, to stop the session first, and the run is still going, waiting on nobody.
+  const a = assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman);
+  assert.deepEqual([a.retry, a.ready, a.blocked, a.status], [[{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }], [], [], 'running']);
+  assert.deepEqual(assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)]).retry, [], "without the harness's word, nothing is due");
+  assert.deepEqual(decision(STEPS, r, p, nothingShipped, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman), { kind: 'running', waiting: ['implement'] }, 'live and due, named once');
+  const l = listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]);
+  assert.deepEqual([l.steps[0], l.waitingOnYou], [{ name: 'implement', status: 'needs-human', branch: null, note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' }, []]);
+  assert.equal(listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, undefined, 'a session still working: nothing due, nothing said');
+
+  // Once the session has settled, the same ask is due as any stopped step's, and filed.
+  assert.deepEqual(assess(STEPS, r, phases({ t1: 'stopped' }), nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman).retry,
+    [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }]);
+  assert.equal(listing(STEPS, r, shown({ t1: 'stopped' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, 'try 2 asked (--nudge) — the next tick files it');
+});
+
 test('a step tried again is told what became of the last try: continued, that and no more; a new session, the whole brief — and what the check said, as data', () => {
   const implement: Workflow = { ...step('implement'), check: 'npm test && npm run typecheck', retries: 1 };
   const refusal = { command: 'npm test && npm run typecheck', verdict: 1 as Verdict, stdout: 'not ok 3 - parses a trailing comma', stderr: 'npm error Test failed.' };

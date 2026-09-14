@@ -147,6 +147,8 @@ export function assess(
   asks: readonly RetryAsk[] = [],
   /** What people asked for with `wf round`, and the run has not consumed yet. */
   roundAsks: readonly RoundAsk[] = [],
+  /** Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to stop it first. */
+  harnessBlocked: (taskId: string) => boolean = () => false,
 ): Assessment {
   // A cancelled run outranks anything its tasks say. Nothing more is filed for it however
   // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
@@ -156,7 +158,7 @@ export function assess(
 
   const status = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps)]));
   // A step about to be tried again is not final: what waits on it waits, and the run is still going.
-  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks);
+  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked);
   for (const r of retry) status.set(r.step, 'running');
   // Nor is a looping step whose loop goes round again: what waits on it waits for the next round's answer.
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks);
@@ -473,8 +475,13 @@ export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: str
 /** How a person asks for a try with `wf retry`: one way, the model a `--model` names, and what they said with it. */
 export type RetryHow = { mode: RetryMode; model?: string; message?: string };
 
-/** A try to file on this pass: of which step, its number, how, on whose word — and, for a person's, what they said with it. */
-export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; by: 'retries' | 'ask' };
+/**
+ * A try to file on this pass: of which step, its number, how, on whose word — and, for a person's, what they said with it.
+ *
+ * `stopFirst` on a person's try of a step whose session its harness blocked (`retryable`): the pass asks the engine to stop that session
+ * and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped step, and files it.
+ */
+export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; by: 'retries' | 'ask'; stopFirst?: true };
 
 /**
  * Why a message cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the
@@ -530,6 +537,14 @@ export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): bo
  * pass, since nothing else has a check to run again. A step that signed off blocked only once its session
  * has settled: a session can outlive its closeout, and a try resuming one still running would be two agents
  * in one conversation.
+ *
+ * And one try that is not over: a step whose session its harness blocked — the engine's `needs-human`, as
+ * `harnessBlocked` says it — and that signed nothing, `blockedByHarness`. It reads `running`, and nothing in it
+ * moves without a person: measured on 2026-09-13 and 2026-09-14, a `--bg` session stopped on "Could not refresh
+ * your login because another Claude Code process is refreshing it" and waited for ever. `nudge` and `fresh` may be
+ * asked for it, and the tick stops the session before it files the try (`stopFirst`), so no two agents share the
+ * conversation. Not `recheck`: nothing of it was checked. Left out, `harnessBlocked` says no session is blocked,
+ * and such a step is running, with nothing to try, as it was.
  */
 export function retryable(
   step: Workflow,
@@ -538,22 +553,26 @@ export function retryable(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => boolean = () => false,
   steps: readonly Workflow[] = [],
-): { status: StepStatus; modes: RetryMode[] } {
+  /** Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human` (`harnessBlocked` in runner.ts). */
+  harnessBlocked: (taskId: string) => boolean = () => false,
+): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean } {
   const status = stepStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps);
   const taskId = run.steps[step.name]?.taskId;
   const settled = taskId ? ['succeeded', 'failed', 'stopped'].includes(phaseOf(taskId)) : false;
+  const blockedByHarness = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
   const modes: RetryMode[] =
     status === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
-    : status === 'unsigned' || status === 'failed' || status === 'stopped' || (status === 'blocked' && settled) ? ['nudge', 'fresh']
+    : status === 'unsigned' || status === 'failed' || status === 'stopped' || (status === 'blocked' && settled) || blockedByHarness ? ['nudge', 'fresh']
     : [];
-  return { status, modes };
+  return { status, modes, blockedByHarness };
 }
 
 /**
  * The tries due now. Pure, and blind to cancellation on purpose: `assess` answers for a cancelled run, and
  * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
  *
- * A person's ask for a step's next try, when the step may be tried again that way. Otherwise a check that
+ * A person's ask for a step's next try, when the step may be tried again that way — with `stopFirst` for a step
+ * whose session its harness blocked (`retryable`), since that session is still there to stop. Otherwise a check that
  * REFUSED (`refusedCheck`), while `retries:` has tries left: the step re-filed as a nudge. Past them, or for a
  * check that did not finish, nothing is due — the step waits on the person, as it always has.
  *
@@ -568,16 +587,21 @@ export function retriesDue(
   askedCloseout: (taskId: string) => boolean = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
+  /** Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to stop it first. */
+  harnessBlocked: (taskId: string) => boolean = () => false,
 ): Retry[] {
   const due: Retry[] = [];
   for (const step of steps) {
     const record = run.steps[step.name];
-    const { status, modes } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps);
+    const { status, modes, blockedByHarness } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked);
     if (!record?.taskId || !modes.length) continue;
     const next = tryOf(run, step.name) + 1;
     const ask = asks.find((a) => a.step === step.name && a.try === next && modes.includes(a.mode));
     if (ask) {
-      due.push({ step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), ...(ask.message !== undefined ? { message: ask.message } : {}), by: 'ask' });
+      due.push({
+        step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), ...(ask.message !== undefined ? { message: ask.message } : {}), by: 'ask',
+        ...(blockedByHarness ? { stopFirst: true as const } : {}),
+      });
     } else if (status === 'failed (check)' && record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name))
       && retriesSpent(record) < (step.retries ?? 0)) {
       due.push({ step: step.name, try: next, mode: 'nudge', by: 'retries' });
@@ -611,6 +635,9 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
  * run, which files nothing, so the ask would never be honoured; an ask for the same try already waiting; a step whose last try is not over, or that let what
  * waits on it run (`retryable`); `--recheck` where no check failed; and a step the run is about to try again
  * itself, because `retries:` still covers its refusal — that step is not waiting on a person.
+ *
+ * A step whose session its harness blocked, with nothing signed, may be asked for only when `harnessBlocked` is given: the tick
+ * stops that session before it files the try (`retryable`). Without it, such a step is still running, and refused as one.
  */
 export function retryRefusal(
   steps: readonly Workflow[],
@@ -622,6 +649,8 @@ export function retryRefusal(
   askedCloseout: (taskId: string) => boolean = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
+  /** Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is running, and refused. */
+  harnessBlocked: (taskId: string) => boolean = () => false,
 ): string | null {
   const wrong = messageRefusal(how, `wf retry ${run.id} ${name}`);
   if (wrong) return wrong;
@@ -635,7 +664,7 @@ export function retryRefusal(
   if (pending) {
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
   }
-  const { status, modes } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps);
+  const { status, modes, blockedByHarness } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked);
   if (!modes.length) {
     const why: Partial<Record<StepStatus, string>> = {
       waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: wf ls ${run.id}.`,
@@ -649,7 +678,8 @@ export function retryRefusal(
     return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
   }
   if (!modes.includes(how.mode)) {
-    return `--recheck runs a step's check again, and ${name} is ${status}: no check of it failed. Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`;
+    const is = blockedByHarness ? 'is running, its session blocked by its harness with nothing signed off' : `is ${status}`;
+    return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`;
   }
   if (retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf).some((r) => r.step === name)) {
     const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);
@@ -678,9 +708,9 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   return [inRound, `try ${record!.tries!.length + 1}, ${how}`, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
 
-/** A try due now, as `wf ls` and `wf decide` say it. */
+/** A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session its harness blocked, that the session is stopped first. */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => (r.by === 'ask'
-  ? `try ${r.try} asked (${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}) — the next tick files it`
+  ? `try ${r.try} asked (${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? 'stopping its blocked session, then the tick files it' : 'the next tick files it'}`
   : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`);
 
 /**
@@ -1383,10 +1413,12 @@ export function decision(
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
+  /** Whether a task's session is blocked by its harness (`retryable`): a person's try of such a step is waited on too. */
+  harnessBlocked: (taskId: string) => boolean = () => false,
 ): Decision {
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
-  const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks);
+  const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked);
   const statusOf = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps)]));
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
@@ -1395,8 +1427,9 @@ export function decision(
       .filter((s) => statusOf.get(s.name) === 'checking'
         || (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name]!.taskId!))))
       .map((s) => s.name);
-    // A step the next tick tries again is waited on too: nothing is decided about it yet. So is a loop going round again.
-    return { kind: 'running', waiting: [...live, ...ready, ...retry.map((r) => r.step), ...round.map((r) => r.step)].sort() };
+    // A step the next tick tries again is waited on too: nothing is decided about it yet. So is a loop going round again. A step whose
+    // blocked session the tick stops first is both live and due, and named once.
+    return { kind: 'running', waiting: [...new Set([...live, ...ready, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort() };
   }
 
   const branches = terminalSteps(steps)
@@ -1505,7 +1538,8 @@ export function listing(
     return c && !('error' in c) ? c : undefined;
   };
   // A step the next tick tries again is waiting on the run, not on you — you asked, or its `retries:` did. So is a loop going round again.
-  const due = run.cancelledAt ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks);
+  // The engine's word says when a harness blocked a session: a person's try of that step is due, and stops the session first.
+  const due = run.cancelledAt ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human');
   const rounds = run.cancelledAt ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks);
 
   const waitingOnYou: string[] = [];

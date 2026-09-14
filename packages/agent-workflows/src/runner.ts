@@ -21,7 +21,7 @@ export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundD
 export type { ParentRun, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Shipped, Wait } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -378,6 +378,13 @@ async function adoptRounds(
  */
 export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
   Boolean(views.get(taskId)?.state.closeoutSchema);
+
+/**
+ * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What
+ * tells a step waiting on a person with nothing signed, as on a login refresh the harness lost, from one still working (`retryable`).
+ * Exported, log-free, for a consumer that asks `retry` for such a step as `wf retry` does.
+ */
+export const harnessBlocked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean => views.get(taskId)?.phase === 'needs-human';
 
 /**
  * What each step's current check exited with, off the engine's record: the code its process gave, or
@@ -749,7 +756,8 @@ function handOff(workspace: string, step: string): void {
  * One pass's work: the steps it filed, the steps whose checks it filed, the steps it tried again, and where the
  * run stands — and `notes`, each line starting with its step: what cutting a worktree had to say (a path
  * `.worktreeinclude` lists that the main checkout does not have, a line it refused, an `npm ci` that ran or
- * failed), each try and each round filed and on whose word, and an ask file that cannot be read. `looped` names the
+ * failed), each try and each round filed and on whose word, a blocked session the engine was asked to stop for a try, and an ask file that
+ * cannot be read. `looped` names the
  * looping steps whose loop this pass took round again. `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`).
  */
 export type Advanced = { run: Run; filed: string[]; checked: string[]; tried: string[]; looped: string[]; status: Assessment['status']; blocked: string[]; notes: string[]; waiting: Wait[] };
@@ -768,6 +776,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   const signedOff = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
+  const sessionBlocked = harnessBlocked(views);
   // A person's word, read on every pass: an ask made while this pass was elsewhere is read by the next.
   const { asks, rounds: roundAsks, notes: askNotes } = readAsks(run.id);
   const adoptedRounds = await adoptRounds(e, run, steps, views, phaseOf, signedOff, asked, roundAsks);
@@ -804,7 +813,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // work in progress — is committed under this step's name (`handOffDue`).
   for (const name of handOffDue(steps, run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
 
-  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks);
+  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked);
   const { check, retry, round, blocked, status } = assessed;
   // A run that waits on runs (`--after`) files its roots once every one of them has shipped, as its `wf decide` says, read on this pass.
   // Only a run with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`gated`).
@@ -822,6 +831,16 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   for (const r of retry) {
     const step = steps.find((s) => s.name === r.step)!;
     const record = run.steps[r.step]!;
+    // A try of a step whose session its harness blocked: the session is stopped first, and nothing is filed. Asked once — a task the engine
+    // already holds the request for is not asked again — and a later pass, once the task has settled, reads the try due as one of a stopped
+    // step, and files it. Nothing is carried between the two: a pass after a restart reads the same engine record, and does the same.
+    if (r.stopFirst) {
+      if (!views.get(record.taskId!)?.state.stopRequested) {
+        await e.stop(record.taskId!);
+        notes.push(`${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; its harness blocked its session, so the engine is asked to stop it, and the try is filed once it has`);
+      }
+      continue;
+    }
     tried.push(r.step);
     notes.push(`${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : `wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}`}`);
     // A recheck files no session. Its check is filed below with the others, under the new try's id.
@@ -1090,7 +1109,8 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
   return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)));
 }
 
-export type Asked = { run: Run; ask: RetryAsk; file: string };
+/** A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files the try. */
+export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean };
 
 /**
  * Ask for another try of a step — `wf retry` — by writing the ask, and nothing else. The next tick honours it once.
@@ -1099,13 +1119,18 @@ export type Asked = { run: Run; ask: RetryAsk; file: string };
  * `--recheck`, a step that is not waiting on a person, a cancelled run, an ask for that try already there. Like a
  * cancellation, the ask is the person's own file, and the verb never writes the run's json, which the tick owns. What
  * the person said goes in the ask, `message`, and nowhere else: the tick carries it into the try's brief.
+ *
+ * `stopBlocked` takes a step whose session its harness blocked, with nothing signed (`retryable`): the ask is written as any other, and
+ * the tick stops that session before it files the try. `wf retry` passes it. Left out, such a step is running and refused as one — the
+ * board's `POST …/retry` calls this without it, and apps/api's tests hold that refusal to a 409 until the board takes the same word.
  */
-export async function retry(e: Engine, id: string, stepName: string, how: RetryHow): Promise<Asked> {
+export async function retry(e: Engine, id: string, stepName: string, how: RetryHow, { stopBlocked = false }: { stopBlocked?: boolean } = {}): Promise<Asked> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
+  const blocked = stopBlocked ? harnessBlocked(views) : () => false;
   const refusal = (asks: readonly RetryAsk[]) =>
-    retryRefusal(steps, run, stepName, how, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks);
+    retryRefusal(steps, run, stepName, how, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, blocked);
   const refuse = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
 
   const refused = refusal(readAsks(id).asks);
@@ -1120,7 +1145,8 @@ export async function retry(e: Engine, id: string, stepName: string, how: RetryH
     refuse(refusal(readAsks(id).asks) ?? strayAsk(file, askIn(file, stepName, ask.try), `try ${ask.try} of ${stepName}`, `wf retry ${id} ${stepName}`)
       ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
   }
-  return { run, ask, file };
+  const step = steps.find((s) => s.name === stepName)!;
+  return { run, ask, file, stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked).blockedByHarness };
 }
 
 /**
@@ -1519,7 +1545,8 @@ export async function decide(e: Engine, id: string): Promise<{
   const asked = closeoutAsked(views);
   // The verdict the screen prints, off the log: a refusal and a check that did not finish, told apart by it.
   const verdictOf = (name: string) => checks[name]?.verdict;
-  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds);
+  const blocked = harnessBlocked(views);
+  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds, blocked);
   // What a person said to a step's current try, off their ask file, and what the try before it needed, off the engine's record of that
   // try: the run's record keeps neither.
   const said = readAnswers(id);
@@ -1534,7 +1561,7 @@ export async function decide(e: Engine, id: string): Promise<{
   }
   return {
     run, decision: d, closeouts, checks,
-    retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks),
+    retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked),
     rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds),
     offers: [...roundLines(steps, run, d), ...retryLines(steps, run, d, phaseOf, reader, asked)],
     used: consumption(views, run),

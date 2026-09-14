@@ -1791,3 +1791,79 @@ test("REFUSED at shipped defaults: a one-step run whose step failed with nothing
   const next = start({ brief: 'the child of merged work', repo, workflowDir: folder(), after: [q.run.id] });
   assert.deepEqual((await advance(c.e, readRun(next.id))).filed, ['implement']);
 });
+
+// ─── a session the harness blocked ──────────────────────────────────────────
+
+/** A board whose views carry a stop once it is asked for, as the engine's record does: `stopRequested` from then on. */
+const recordingStops = (b: ReturnType<typeof board>): Engine => ({
+  ...b.e,
+  view: async (id: string) => {
+    const v = await b.e.view(id);
+    return { ...v, state: { ...v.state, stopRequested: b.stopped.includes(id) } };
+  },
+}) as Engine;
+
+test("REFUSED before, now accepted at shipped defaults: `wf retry` on a step whose session its harness blocked, with nothing signed — the tick stops the session, files nothing while it stops, and once it has, files the try as a nudge that continues it", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  // The engine's word for a session the harness marked blocked, its attempt running and nothing signed.
+  b.settle(taskId, 'needs-human' as TaskPhase);
+  const e = recordingStops(b);
+
+  // Asked for without the harness's word — the board's POST, today — it is still running, and refused.
+  await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge' }), refusedWith(/^implement is still running/));
+  assert.deepEqual(asksOf(run.id), []);
+
+  // `wf retry`, as a person types it.
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['retry', run.id, 'implement'], e);
+  assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
+  assert.equal(printed[0], `${run.id}  asked: try 2 of implement (--nudge) — its harness blocked its session: the next tick stops it, and files the try once it has stopped`);
+  assert.deepEqual((await list(e, readRun(run.id))).steps[0], { name: 'implement', status: 'needs-human', branch: run.branch, note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' });
+
+  const record = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
+  const first = await advance(e, readRun(run.id));
+  assert.deepEqual([b.stopped, first.tried, first.filed, first.status], [[taskId], [], [], 'running'], 'the session asked to stop, and nothing filed');
+  assert.ok(first.notes.some((n) => n.startsWith('implement: try 2 — wf retry --nudge; its harness blocked its session, so the engine is asked to stop it')), first.notes.join('\n'));
+  assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8'), record, 'the record untouched');
+  assert.deepEqual(asksOf(run.id), ['retry-implement-2'], 'the ask waits for its try');
+
+  // Passes while the engine stops it — the second on a board read afresh, as after a restart: nothing carried, no second stop, nothing filed.
+  for (const engineOf of [() => e, () => recordingStops(b)]) {
+    const again = await advance(engineOf(), readRun(run.id));
+    assert.deepEqual([b.stopped, again.tried, again.filed, again.notes], [[taskId], [], [], []]);
+  }
+
+  // The engine settles it stopped: the next pass files try 2 as it files one for a stopped step, a nudge that continues the session.
+  b.settle(taskId, 'stopped');
+  const filed = await advance(e, readRun(run.id));
+  const try2 = `${run.id}-implement-try2`;
+  assert.deepEqual([filed.tried, b.filings], [['implement'], [taskId, try2]]);
+  const spec = b.tasks.get(try2)!.spec;
+  assert.equal(spec.resumeFrom, `native-${taskId}`, 'the blocked session, continued');
+  assert.match(spec.brief, /^## Try 2\n\nThe last try's session was stopped before it signed off\.\nA person asked for this try: `wf retry --nudge`\./);
+  assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId, then: 'nudge' }]);
+  assert.deepEqual(asksOf(run.id), [], 'consumed');
+  const after = await advance(e, readRun(run.id));
+  assert.deepEqual([after.tried, b.stopped, b.filings.filter((f) => f === try2).length], [[], [taskId], 1], 'once');
+});
+
+test("REFUSED at shipped defaults: `wf retry` on a step whose session still works, `--recheck` on one its harness blocked, and one that signed off and runs on — exit 2, and no ask written", async () => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const { main } = await import('../src/cli.ts');
+  b.settle(`${run.id}-implement`, 'running');
+  await assert.rejects(main(['retry', run.id, 'implement'], b.e), refusedWith(/^implement is still running, so there is nothing to try again until it ends/));
+  await assert.rejects(main(['retry', run.id, 'implement', '--fresh'], b.e), refusedWith(/^implement is still running/));
+  b.settle(`${run.id}-implement`, 'needs-human' as TaskPhase);
+  await assert.rejects(main(['retry', run.id, 'implement', '--recheck'], b.e),
+    refusedWith(/^--recheck runs a step's check again, and implement is running, its session blocked by its harness with nothing signed off: no check of it failed/));
+  b.settle(`${run.id}-implement`, 'needs-human' as TaskPhase, SIGNED);
+  await assert.rejects(main(['retry', run.id, 'implement'], b.e), refusedWith(/^implement is still running/));
+  assert.deepEqual([asksOf(run.id), b.stopped], [[], []]);
+});

@@ -125,7 +125,7 @@ const messageOf = (err: unknown): string => (err instanceof Error ? err.message 
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const SHAPE = '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name';
+const SHAPE = '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, and `"after": ["<runId>", …]` for the runs it waits on';
 
 /** A start, as the guard's refusals word it (guard.ts). */
 const START: Guarded = {
@@ -165,20 +165,29 @@ function folderOf(name: string, from: WorkflowSource | undefined, repo: string, 
 /**
  * What `POST /api/runs` starts, or why it does not: the body's shape (400), the workflow it names (404, 409), and the
  * brief (422) — the api's own, since `start()` takes any string and `wf start` prints its help for none.
+ *
+ * `after` is only shaped here: a list of run ids, as `wf start --after <runId>` takes each, and never a blank one, which the CLI refuses
+ * too (`--after=`). Whether this run may wait on each is `start()`'s to say (`afterRefusal`), in its words.
  */
-function startOf(body: unknown, repo: string, home: string): { dir: string; brief: string } | Refusal {
+function startOf(body: unknown, repo: string, home: string): { dir: string; brief: string; after: string[] | undefined } | Refusal {
   if (!isObject(body)) return { status: 400, error: `POST /api/runs takes a JSON object: ${SHAPE}.` };
-  const { workflow, brief, from } = body;
+  const { workflow, brief, from, after } = body;
   if (typeof workflow !== 'string' || !workflow) return { status: 400, error: `POST /api/runs names the workflow to start in \`workflow\`, a folder's name: ${SHAPE}.` };
   if (from !== undefined && from !== 'repo' && from !== 'yours') {
     return { status: 400, error: `\`from\` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named '${workflow}'.` };
+  }
+  if (after !== undefined && (!Array.isArray(after) || !after.every((id) => typeof id === 'string' && id.trim() !== ''))) {
+    return {
+      status: 400,
+      error: `\`after\` is the runs this one waits on, by id, as \`wf start --after <runId>\` takes each: a list of run ids, such as \`"after": ["add-a-cache-k2q9"]\`, or left out for a run that waits on none. This request's was ${JSON.stringify(after)}. GET /api/runs lists the runs there are.`,
+    };
   }
   const folder = folderOf(workflow, from, repo, home);
   if ('status' in folder) return folder;
   if (typeof brief !== 'string' || !brief.trim()) {
     return { status: 422, error: `A run needs a brief: what to do, as \`wf start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".` };
   }
-  return { dir: folder.dir, brief: brief.trim() };
+  return { dir: folder.dir, brief: brief.trim(), after };
 }
 
 export const workflows = new Hono()
@@ -190,7 +199,9 @@ export const workflows = new Hono()
       return c.json({ error: messageOf(err) }, 500);
     }
   })
-  // The board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder> --repo <repo>`.
+  // The repository a start runs in: what the start form lists the runs of, for a run to wait on.
+  .get('/api/repository', (c) => c.json({ repo: repoOf() }))
+  // The board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder> --repo <repo> --after <runId>`.
   .post('/api/runs', async (c) => {
     const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     if (refused) return c.json({ error: refused.error }, refused.status);
@@ -204,12 +215,12 @@ export const workflows = new Hono()
     const asked = startOf(body, repo, HOME);
     if ('status' in asked) return c.json({ error: asked.error }, asked.status);
     try {
-      const { id } = start({ brief: asked.brief, repo, workflowDir: asked.dir });
+      const { id } = start({ brief: asked.brief, repo, workflowDir: asked.dir, ...(asked.after ? { after: asked.after } : {}) });
       c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
       return c.json({ id }, 201);
     } catch (err) {
       // `wf start`'s refusal, word for word: a folder that does not read as a workflow, a step named for another's check
-      // or try, a `.worktreeinclude` it cannot use, or a repository git cannot read.
+      // or try, a `.worktreeinclude` it cannot use, a repository git cannot read, or a run this one cannot wait on (`afterRefusal`).
       return c.json({ error: messageOf(err) }, 422);
     }
   });

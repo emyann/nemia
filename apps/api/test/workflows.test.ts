@@ -21,7 +21,8 @@ execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', 
 const { app } = await import('../src/app.ts');
 const { listWorkflows } = await import('../src/workflows.ts');
 const { HOME_REPO } = await import('../src/capabilities.ts');
-const { readRun } = await import('agent-workflows');
+const { parentRecord, readRun } = await import('agent-workflows');
+const { afterRefusal } = await import('agent-workflows/run');
 const { isReadme, loadWorkflows } = await import('agent-workflows/workflow');
 type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
 
@@ -284,4 +285,99 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
   const ui = path.join(HOME_REPO, 'workflows', 'ui');
   assert.deepEqual(files(ui), files(path.join(shipped, 'ui')));
   for (const f of files(ui)) assert.equal(fs.readFileSync(path.join(ui, f), 'utf8'), fs.readFileSync(path.join(shipped, 'ui', f), 'utf8'), `workflows/ui/${f} is the package's`);
+});
+
+// ─── a run that waits on a run ──────────────────────────────────────────────
+
+/** A run of the repository's `good` as `wf start` records one, never filed — and called off, when `cancelledAt` says when. */
+function parentRun(id: string, cancelledAt?: string): void {
+  if (fs.existsSync(path.join(root, 'runs', `${id}.json`))) return;
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim();
+  write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
+    id, repo, workspace: repo, baseRef: head, branch: 'main', isolate: true, brief: `Run ${id}`, workflowDir: good, workflow: loadWorkflows(good),
+    steps: { implement: { taskId: null }, review: { taskId: null } }, createdAt: '2026-09-14T00:00:00.000Z',
+  }));
+  if (cancelledAt) write(path.join(root, 'runs', `${id}.cancelled`), cancelledAt);
+}
+
+/** The runs a start below waits on: written by the first test that needs them, since the tests above count the store's files from empty. */
+function parents(): void {
+  parentRun('p-running');
+  parentRun('p-cancelled', '2026-09-14T00:30:00.000Z');
+}
+
+test('GET /api/repository is the repository a start runs in, as the start form lists the runs of', async () => {
+  const res = await app.request('/api/repository');
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { repo });
+});
+
+test('POST /api/runs takes `after` and passes it to `start()`, which freezes it on the record as `wf start --after` does — and the board reads the run waiting on it', async () => {
+  parents();
+  const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it ships.', after: ['p-running'] });
+  assert.equal(res.status, 201, await res.clone().text());
+  const { id } = await res.json();
+  assert.deepEqual(readRun(id).after, ['p-running']);
+  assert.deepEqual(filedTasks(), [], 'nothing filed');
+
+  const detail = await (await app.request(`/api/runs/${id}`)).json();
+  assert.deepEqual([detail.after, detail.waiting?.word], [['p-running'], 'waiting on p-running']);
+
+  // None to wait on is a run that waits on none: the record `wf start` wrote before there was an `after`.
+  const none = await post({ workflow: 'good', from: 'repo', brief: 'Right away.', after: [] });
+  assert.equal(none.status, 201);
+  assert.equal(Object.hasOwn(readRun((await none.json()).id), 'after'), false);
+});
+
+test('REFUSED at shipped defaults: `after` that is not a list of run ids is a 400, before the workflow is looked for — and nothing is written', async () => {
+  const before = runFiles();
+  for (const after of ['p-running', {}, null, 42, [1], [null], ['p-running', 7], [''], ['  ']]) {
+    const res = await post({ workflow: 'good', from: 'repo', brief: 'Do it.', after });
+    assert.equal(res.status, 400, JSON.stringify(after));
+    const { error } = await res.json();
+    assert.ok(error.startsWith('`after` is the runs this one waits on, by id, as `wf start --after <runId>` takes each: a list of run ids'), error);
+    assert.ok(error.includes(`This request's was ${JSON.stringify(after)}.`), error);
+  }
+  // Shaped before the folder is read: a workflow nobody has is not what it is told first.
+  assert.equal((await post({ workflow: 'nope', brief: 'Do it.', after: 'p-running' })).status, 400);
+  assert.deepEqual(runFiles(), before);
+  assert.deepEqual(filedTasks(), []);
+});
+
+test("REFUSED at shipped defaults: a run `wf start --after` will not wait on is a 422 carrying `afterRefusal`'s sentence word for word — no such run, a cancelled one, one given twice — and nothing is written", async () => {
+  parents();
+  const before = runFiles();
+  const refusedBy = async (after: string[]): Promise<string> => {
+    const res = await post({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after });
+    assert.equal(res.status, 422, JSON.stringify(after));
+    const { error } = await res.json();
+    assert.equal(error, afterRefusal(after, { repo, branch: 'main' }, parentRecord), JSON.stringify(after));
+    return error;
+  };
+  assert.equal(await refusedBy(['no-such-run']), '--after no-such-run: the store has no run no-such-run. --after takes a run this one waits on, by its id — wf ls lists them.');
+  assert.equal(
+    await refusedBy(['p-running', 'p-cancelled']),
+    '--after p-cancelled: p-cancelled was cancelled at 2026-09-14T00:30:00.000Z, and a cancelled run never ships, so this run would wait for ever. Start it without --after p-cancelled.',
+  );
+  assert.equal(await refusedBy(['p-running', 'p-running']), '--after p-running is given twice, and a run waits on another once. Give each run one --after.');
+  assert.deepEqual(runFiles(), before);
+  assert.deepEqual(filedTasks(), []);
+});
+
+test('REFUSED at shipped defaults: a start with `after` that another site could make is refused by the guard before its body is read — and nothing is written', async () => {
+  parents();
+  const before = runFiles();
+  const body = JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after: ['p-running'] });
+  const sent = (headers: Record<string, string>) => app.request('/api/runs', { method: 'POST', headers, body });
+  const site = await sent({ 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
+  assert.equal(site.status, 403);
+  assert.ok((await site.json()).error.startsWith('POST /api/runs refuses a request made by a page on another site'));
+  const host = await sent({ 'content-type': 'application/json', host: 'evil.example:8787' });
+  assert.equal(host.status, 403);
+  assert.ok((await host.json()).error.startsWith('POST /api/runs refuses a request addressed to evil.example:8787'));
+  const type = await sent({ 'content-type': 'text/plain;charset=UTF-8' });
+  assert.equal(type.status, 415);
+  assert.ok((await type.json()).error.includes('`"after": ["<runId>", …]`'), 'the shape it takes names `after`');
+  assert.deepEqual(runFiles(), before);
+  assert.deepEqual(filedTasks(), []);
 });

@@ -73,7 +73,7 @@ Every `.md` in the folder is a step but its `README.md` (in any case), which say
 for: its first paragraph, past a heading, is the description the board lists the workflow with
 (`workflowDescription`). A folder with a README and no step is refused as a folder with no step is.
 A repository carries its workflows checked in, one folder each under `<repo>/workflows/`, as
-`.github/workflows/` holds a repository's CI — this one has `dev`, `dev-build` and `ui` there — and
+`.github/workflows/` holds a repository's CI — this one has `dev`, `dev-build`, `dev-planned` and `ui` there — and
 `wf start <brief> --workflows workflows/dev` picks one. The board lists them, and the folders under
 `~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
 `GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
@@ -161,7 +161,7 @@ and `Bash(node --test:*)` for the suite, and those run the build and the e2e by 
 `npx turbo run test build` and `node --test apps/web/test/e2e/run.ts`. No deny list closes an allow that runs
 any task or any file (`node --test` takes a glob, so a rule on the file's path is walked around). What keeps a
 reviewer from those is the allow narrowed in `.claude/settings.json`, which this package does not own; until
-then, a sentence in the dev and dev-build review briefs.
+then, a sentence in the dev, dev-build and dev-planned review briefs, and in dev-planned's plan brief.
 
 **The engine is the source of these words.** The permission modes and efforts `src/workflow.ts` refuses
 are copies of agent-engine's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES` and

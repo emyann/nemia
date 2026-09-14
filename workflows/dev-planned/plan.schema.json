@@ -1,0 +1,34 @@
+{
+  "type": "object",
+  "properties": {
+    "approach": {
+      "type": "string",
+      "description": "The change in a paragraph: what it does, and why this way rather than another. Not `summary`: every closeout has one, and it goes to the person who decides, never to a step."
+    },
+    "files": {
+      "type": "array",
+      "description": "Every path the change would touch, by path from the workspace root, each with one line on what changes in it.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": { "type": "string", "description": "The file, by path from the workspace root: one you have read, or one the change would add." },
+          "change": { "type": "string", "description": "One line on what changes in it." }
+        },
+        "required": ["path", "change"],
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "type": "array",
+      "description": "The work, in order: each one a thing a second engineer could do, and check was done.",
+      "items": { "type": "string" }
+    },
+    "risks": {
+      "type": "array",
+      "description": "What could go wrong, what the tests would not catch, and what you are unsure of. Empty when nothing is.",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["approach", "files", "steps", "risks"],
+  "additionalProperties": false
+}

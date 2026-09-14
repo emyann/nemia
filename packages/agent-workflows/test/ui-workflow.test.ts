@@ -124,7 +124,7 @@ test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`,
   const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { allow: string[] } };
   for (const rule of REVIEW_DENIED) assert.ok(settings.permissions.allow.includes(rule), `${rule} is allowed by the settings, word for word`);
 
-  const folders = [WORKFLOWS, path.join(WORKFLOWS, 'ui'), ...['dev', 'dev-build', 'ui'].map((d) => path.join(REPO, 'workflows', d))];
+  const folders = [WORKFLOWS, path.join(WORKFLOWS, 'ui'), ...['dev', 'dev-build', 'dev-planned', 'ui'].map((d) => path.join(REPO, 'workflows', d))];
   for (const dir of folders) {
     const byName = Object.fromEntries(loadWorkflows(dir).map((s) => [s.name, s]));
     assert.deepEqual(byName.implement?.disallow, IMPLEMENT_DENIED, `${dir}: implement`);

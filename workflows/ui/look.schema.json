@@ -1,0 +1,22 @@
+{
+  "type": "object",
+  "properties": {
+    "findings": {
+      "type": "array",
+      "description": "What a person would notice, one finding each. Empty when nothing is: a review that invents work to look thorough is worse than a short one.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "string", "description": "The route, as implement's pages name it." },
+          "theme": { "type": "string", "enum": ["light", "dark", "both"], "description": "The theme it is wrong in." },
+          "screenshot": { "type": ["string", "null"], "description": "The absolute path of the screenshot it shows in; null when none does, such as one that is missing." },
+          "what": { "type": "string", "description": "What is wrong and where on the page, against what was asked for." }
+        },
+        "required": ["page", "theme", "screenshot", "what"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["findings"],
+  "additionalProperties": false
+}

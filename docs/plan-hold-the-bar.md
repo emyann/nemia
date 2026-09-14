@@ -637,6 +637,11 @@ owner is not mid-run.
   `packages/agent-engine/test/resume.test.ts:134` expects the same usage the first try recorded, so the
   refusal rests on the view assertion alone; have the retry write a different number of responses. → the
   next engine run, with anything else that opens `resume.test.ts`.
+- **the fence judges a compound command by its segments (G's review, 2026-09-13):** A2's reviewer ran
+  `npm test` fine under `dontAsk`; G's ran `cd packages/agent-workflows && node --test …` and was denied,
+  because `cd` matched no allow rule — every segment must. `git log … && git status && git diff …` passed
+  for that reason. `Bash(cd:*)` is now allowed (it does nothing on its own), and the operator folders'
+  review body says how to run the suite. Verified, not guessed: the denial is in the session transcript.
 
 ## 5. What the plan does not do
 

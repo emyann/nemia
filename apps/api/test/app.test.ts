@@ -85,7 +85,7 @@ const blockedCloseout = { outcome: 'blocked', summary: 'Half of it is done.', ne
 /** What a step on its first try says of it, as its one entry in `tries`: the current try, reached by nothing. */
 const firstTry = (step: { taskId: string | null; status: string; attempts: object; check: object | null; closeout: object | null }) => [{
   try: 1, round: 1, then: null, current: true, note: null,
-  taskId: step.taskId, status: step.status, attempts: step.attempts, check: step.check, closeout: step.closeout,
+  taskId: step.taskId, status: step.status, attempts: step.attempts, check: step.check, closeout: step.closeout, answer: null,
 }];
 
 /** The engine's record of a task `filed` journals: a codex task with one attempt allowed, and nothing else said — which Codex runs in `workspace-write`. */
@@ -122,8 +122,8 @@ test('runs are read from the workflow store and summarized, with what each step 
     moving: false,
     steps: [
       // t-1 is on the record and not in this engine's store: a fresh WF_ROOT has no tasks at all.
-      { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown', note: null },
-      { name: 'review', taskId: null, branch: null, status: 'waiting', note: null },
+      { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown', note: null, needs: null, blockedByHarness: null },
+      { name: 'review', taskId: null, branch: null, status: 'waiting', note: null, needs: null, blockedByHarness: null },
     ],
     waitingOnYou: [],
   }]);
@@ -169,6 +169,8 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     told: filedBrief('t-2'),
     workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
     note: null,
+    // Its question, off its closeout; no session the harness blocked; nothing asked of it yet.
+    needs: 'Which database?', blockedByHarness: null, asked: null,
     ...implementTry,
     // Its journal carries no usage: nobody measured it, which is not 0.
     used: { usage: null, used: 'not measured', cost: 'not measured' },
@@ -185,6 +187,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     told: undefined,
     workspace: null, branch: null,
     note: null,
+    needs: null, blockedByHarness: null, asked: null,
     ...reviewTry,
     // Not filed: it consumed nothing.
     used: null,
@@ -252,13 +255,14 @@ test('a run whose workflow folder is gone still answers, from its record', async
     {
       name: 'implement', spec: null, filed: filedBare, body: null, told: filedBrief('t-2'),
       workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
-      note: null,
+      note: null, needs: 'Which database?', blockedByHarness: null, asked: null,
       ...implementTry,
       used: { usage: null, used: 'not measured', cost: 'not measured' },
       tries: firstTry(implementTry),
     },
     {
       name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, note: null,
+      needs: null, blockedByHarness: null, asked: null,
       ...reviewTry, used: null, tries: firstTry(reviewTry),
     },
   ]);
@@ -305,7 +309,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
   assert.deepEqual(original, {
     name: 'original', spec: null, filed: filedBare, body: null, told: filedBrief('t-6'),
     workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
-    note: null,
+    note: null, needs: 'Which database?', blockedByHarness: null, asked: null,
     ...originalTry,
     used: { usage: null, used: 'not measured', cost: 'not measured' },
     tries: firstTry(originalTry),
@@ -451,8 +455,9 @@ test('each step says how many attempts it has had, when the latest began, and ho
   // A task the engine has no record of has had no attempts it can speak for.
   assert.deepEqual((await (await app.request('/api/runs/r-4')).json()).steps[0].attempts, { count: 0, latest: null });
 
-  // The list is kept as it was, with the note `wf ls` prints beside a step: none, for a step on its first try.
-  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), ['name', 'taskId', 'branch', 'status', 'note']);
+  // The list is kept as it was, with the note `wf ls` prints beside a step — none, for a step on its first try — and what a person
+  // has to know to act on it.
+  assert.deepEqual(Object.keys((await listed('r-7')).steps[0]), ['name', 'taskId', 'branch', 'status', 'note', 'needs', 'blockedByHarness']);
   assert.equal((await listed('r-7')).steps[0].note, null);
 });
 
@@ -1003,14 +1008,15 @@ test('a step on its third try, in the second round of its loop, carries every tr
         refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['npm error Test failed.'], truncated: false }, unreadable: null },
       },
       closeout: closeout('Added the cache.'),
+      answer: null,
     },
     {
       try: 2, round: 1, then: 'round', current: false, taskId: 'r-50-implement-try2', note: 'try 2, by retries: 1', status: 'succeeded', attempts: once,
-      check: passed('r-50-implement-try2-check'), closeout: closeout('Fixed the failing test.'),
+      check: passed('r-50-implement-try2-check'), closeout: closeout('Fixed the failing test.'), answer: null,
     },
     {
       try: 3, round: 2, then: null, current: true, taskId: 'r-50-implement-try3', note: 'round 2 of 3', status: 'verified ✓', attempts: once,
-      check: passed('r-50-implement-try3-check'), closeout: closeout('Answered the review.', { replies }),
+      check: passed('r-50-implement-try3-check'), closeout: closeout('Answered the review.', { replies }), answer: null,
     },
   ]);
   // The current try is where it was: the step's own check and closeout are its.
@@ -1021,10 +1027,12 @@ test('a step on its third try, in the second round of its loop, carries every tr
       try: 1, round: 1, then: 'round', current: false, taskId: 'r-50-review', note: null, status: 'succeeded', attempts: once, check: null,
       // What it declared, in its schema's order: the findings implement was handed.
       closeout: closeout('Two findings.', { output: { again: true, findings } }),
+      answer: null,
     },
     {
       try: 2, round: 2, then: null, current: true, taskId: 'r-50-review-try2', note: 'round 2 of 3', status: review.status, attempts: once, check: null,
       closeout: closeout('Nothing left.', { output: { again: false, findings: [] } }),
+      answer: null,
     },
   ]);
   assert.equal(review.status, 'unverified · done');

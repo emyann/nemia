@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, HARNESSES, isShipped, lessonLine, listRuns, phaseOfView, readAsks, sensitiveDiff, touchedBy, usedLines, verdictWord } from 'agent-workflows';
-import { assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote } from 'agent-workflows/run';
+import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, phaseOfView, readAnswers, readAsks, retry, sensitiveDiff, touchedBy, usedLines, verdictWord, type Retry, type RetryAsk, type RetryHow, type RetryMode } from 'agent-workflows';
+import { answerOf, assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
+import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { workflows } from './workflows.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
@@ -33,10 +34,28 @@ export type RunSummary = {
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
    * `round 2 of 3`, `round 3 asked (wf round) — …` — and null where it prints nothing.
    */
-  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null }>;
+  steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
   /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds — on a run nobody has called off. */
   waitingOnYou: string[];
 };
+
+/**
+ * What a person has to know to act on a step, in the package's words and the engine's, never worked out here.
+ *
+ * `needs` is the closeout's, for a step whose current try signed off blocked: its question. Null for any other step.
+ *
+ * `blockedByHarness` is set for a step whose session the harness marked blocked and that gave no closeout — the engine's
+ * `needs-human` — which is no question of the step's: measured on "Could not refresh your login because another Claude Code
+ * process is refreshing it". `lastLine` is what the session said last, as the engine's `transcript` reads it: its last `text`
+ * or `system` event, or null when it said none or its conversation cannot be read.
+ */
+export type StepNeeds = { needs: string | null; blockedByHarness: { lastLine: string | null } | null };
+
+/**
+ * A try a person asked for — with `wf retry`, or the board's answer box — that the next tick files: `assess`'s, off their ask
+ * file. `model` is the one a `--model` named, and `message` what they said with it; each null where the ask has none.
+ */
+export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null };
 
 /** A step's frontmatter, from the workflow the run is judged by. `null` where the step does not set it. */
 export type StepSpec = {
@@ -152,6 +171,11 @@ export type StepTry = {
   attempts: StepAttempts;
   check: StepCheck | null;
   closeout: StepCloseout | null;
+  /**
+   * What a person said to this try when they asked for it (`answerOf`, off their ask file): the answer `wf decide` prints under the
+   * `needs` of the try before as `your answer`. Null for a try nobody answered — and for every first try, which nobody asked for.
+   */
+  answer: string | null;
 };
 
 /** One run in full, for a person reading it: the spec, and per step what it was told and how it went. */
@@ -192,6 +216,11 @@ export type RunDetail = {
     status: string;
     /** As on `RunSummary`. */
     note: string | null;
+    /** As on `RunSummary` (`StepNeeds`). */
+    needs: string | null;
+    blockedByHarness: StepNeeds['blockedByHarness'];
+    /** The try a person asked for, which the next tick files (`StepAsked`); null when none is asked. */
+    asked: StepAsked | null;
     closeout: StepCloseout | null;
     /** Null for a step with no `check:` in the workflow the run froze. */
     check: StepCheck | null;
@@ -400,6 +429,10 @@ type Judged = {
   waitingOnYou: string[];
   status: RunStatus;
   moving: boolean;
+  /** The tries people asked for that the next tick files, by step: `assess`'s, off their ask files. */
+  asked: ReadonlyMap<string, Retry>;
+  /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a try was answered (`answerOf`). */
+  answers: readonly RetryAsk[];
 };
 
 /**
@@ -425,7 +458,9 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   const verdicts = exitVerdicts(views, run);
   // Unreadable ask files are `notes` the tick prints and does not honour; neither does the board.
   const { asks, rounds } = readAsks(run.id);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds);
+  // And what people said with them, as `list` reads it: without it a try a person answered reads as one they did not.
+  const answers = readAnswers(run.id);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
   // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
@@ -442,6 +477,8 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
     // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
     // A round due is filed as a try is: a loop's looping step settled, and nothing of it in flight until the tick files the round.
     moving: inFlight(run, phase).length > 0 || (tickReads && (ready.length > 0 || check.length > 0 || retry.length > 0 || round.length > 0)),
+    asked: new Map(retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
+    answers,
   };
 }
 
@@ -461,7 +498,7 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
   return step && workflows ? composeBrief(step, run, workflows) : null;
 }
 
-function summarize(run: Run, views: Views): RunSummary {
+async function summarize(run: Run, views: Views): Promise<RunSummary> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const judged = judge(run, names, folder, views);
@@ -474,16 +511,61 @@ function summarize(run: Run, views: Views): RunSummary {
     cancelledAt: run.cancelledAt ?? null,
     status: judged.status,
     moving: judged.moving,
-    steps: names.map((name) => ({
+    steps: await Promise.all(names.map(async (name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
       branch: run.steps[name]?.branch ?? null,
       status: judged.words.get(name)!,
       note: judged.notes.get(name) ?? null,
-    })),
+      ...(await needsOf(run, name, views)),
+    }))),
     waitingOnYou: judged.waitingOnYou,
   };
 }
+
+/**
+ * What a person has to know to act on a step (`StepNeeds`), off the views the request already read: its current try's closeout, and
+ * the engine's word for its task. The session's last line costs a read of its conversation, and only for a step the harness blocked.
+ */
+async function needsOf(run: Run, name: string, views: Views): Promise<StepNeeds> {
+  const view = run.steps[name]?.taskId ? views.get(run.steps[name]!.taskId!) : undefined;
+  const said = view ? closeoutOf(views, run, name) : undefined;
+  return {
+    needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
+    blockedByHarness: view?.phase === 'needs-human' && said === undefined ? { lastLine: await lastLineOf(view) } : null,
+  };
+}
+
+/** Where the last read of a blocked session's conversation stopped, and what it had said last by then: by task and attempt. */
+const lastSaid = new Map<string, { cursor: string; line: string | null }>();
+
+/**
+ * What a session said last — its last `text` or `system` event, trimmed — through the engine's `transcript`, or null when it has said
+ * none or its conversation cannot be read.
+ *
+ * Read from where the last read of the same attempt stopped, so a page polled every five seconds reads what the session wrote since,
+ * not its whole conversation again; a cursor the engine refuses, of a transcript replaced since, is read again from the start. A read's
+ * cache, and nothing is decided by it: a fresh process reads from the start.
+ */
+async function lastLineOf(view: TaskView): Promise<string | null> {
+  const key = `${view.id}#${view.state.attempts.length}`;
+  const read = (after?: string) => e.transcript(view.id, after).catch(() => undefined);
+  let from = lastSaid.get(key);
+  let got = from ? await read(from.cursor) : undefined;
+  if (!got) {
+    from = undefined;
+    got = await read();
+  }
+  if (!got) return null;
+  const last = got.events.filter((event) => (event.kind === 'text' || event.kind === 'system') && event.text?.trim()).at(-1);
+  const line = last?.text?.trim() ?? from?.line ?? null;
+  lastSaid.set(key, { cursor: got.cursor, line });
+  return line;
+}
+
+/** A try asked for, as the page says it (`StepAsked`). */
+const askedOf = (r: Retry | undefined): StepAsked | null =>
+  r ? { try: r.try, mode: r.mode, model: r.model ?? null, message: r.message ?? null } : null;
 
 const specOf = (step: Workflow): StepSpec => ({
   harness: step.harness ?? null,
@@ -535,7 +617,7 @@ async function detail(run: Run): Promise<RunDetail> {
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
     // The steps `judge` words: the judged workflow, then a `bare` step for each one the page shows beside it.
     graph: graphOf([...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)]),
-    steps: names.map((name) => {
+    steps: await Promise.all(names.map(async (name) => {
       const step = source?.find((s) => s.name === name);
       const taskId = run.steps[name]?.taskId ?? null;
       const current = {
@@ -555,11 +637,13 @@ async function detail(run: Run): Promise<RunDetail> {
         workspace: run.steps[name]?.workspace ?? null,
         branch: run.steps[name]?.branch ?? null,
         note: judged.notes.get(name) ?? null,
+        ...(await needsOf(run, name, views)),
+        asked: askedOf(judged.asked.get(name)),
         ...current,
         used: taskId ? usedOf(used[name]) : null,
-        tries: triesOf(run, name, steps, views, current),
+        tries: triesOf(run, name, steps, views, current, judged.answers),
       };
-    }),
+    })),
   };
 }
 
@@ -659,14 +743,26 @@ function replyOf(item: unknown): StepReply {
 /**
  * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose
  * word, check, closeout and attempts the step already has. Off the views already read (`viewsOf`), with no observation of its
- * own: an earlier refused check's stderr is a file, and its output is not read.
+ * own: an earlier refused check's stderr is a file, and its output is not read. What a person said to each try is off the
+ * answers the request read (`readAnswers`).
  */
-function triesOf(run: Run, name: string, steps: readonly Workflow[], views: Views, current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'attempts'>): StepTry[] {
+function triesOf(
+  run: Run,
+  name: string,
+  steps: readonly Workflow[],
+  views: Views,
+  current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'attempts'>,
+  answers: readonly RetryAsk[],
+): StepTry[] {
   const step = steps.find((s) => s.name === name) ?? bare(name);
   const record = run.steps[name];
   const earlier = record?.tries ?? [];
-  // How the n-th try was reached, as `wf ls` words it for a record on that try.
-  const noteOf = (n: number) => tryNote(step, { taskId: null, tries: earlier.slice(0, n - 1) }, steps) || null;
+  // The step's record as it stood on its n-th try: the tries behind that one.
+  const recordAt = (n: number): StepRecord => ({ taskId: null, tries: earlier.slice(0, n - 1) });
+  // What a person said to the n-th try, asked of the record as it stood then: `answerOf` reads a step's current try.
+  const answerAt = (n: number): string | null => answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;
+  // How the n-th try was reached, as `wf ls` words it for a record on that try — `answered`, when a person answered it.
+  const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
   return [
     ...earlier.map((t, i): StepTry => ({
       try: i + 1,
@@ -679,6 +775,7 @@ function triesOf(run: Run, name: string, steps: readonly Workflow[], views: View
       attempts: attemptsIn(t.taskId, views),
       check: step.check ? checkIn(step.check, t.check?.taskId, views) : null,
       closeout: closeoutIn(run, name, step, t.taskId, views),
+      answer: answerAt(i + 1),
     })),
     {
       try: earlier.length + 1,
@@ -688,6 +785,7 @@ function triesOf(run: Run, name: string, steps: readonly Workflow[], views: View
       taskId: record?.taskId ?? null,
       note: noteOf(earlier.length + 1),
       ...current,
+      answer: answerAt(earlier.length + 1),
     },
   ];
 }
@@ -1014,13 +1112,55 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
   }
 }
 
+/** The body `POST …/retry` takes: `wf retry`'s flags, as JSON. */
+const RETRY_SHAPE = '`{ "mode": "nudge" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>" }`';
+
+/** An ask for another try of a step, as the guard's refusals word it (guard.ts). */
+const retryGuard = (id: string, step: string): Guarded => ({
+  route: `POST /api/runs/${id}/steps/${step}/retry`,
+  does: 'asks for another try of a step',
+  forAnother: 'ask for one',
+  why: "the next tick files the try a person asks for, and the answer it carries goes into the brief an agent acts on in this repository",
+  reach: "answer the step from the run's page on the board",
+  instead: `Answer it from the run's page on the board, or with \`wf retry ${id} ${step}\``,
+  shape: RETRY_SHAPE,
+});
+
+const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * How a try is asked for, off `POST …/retry`'s body — or why the body is not an ask (400): `wf retry`'s one way, the model its
+ * `--model` names, which is a new session's, and `--message`. Whether the message may ride on the ask is the package's to say
+ * (`messageRefusal`), and whether the step may be tried again that way (`retryRefusal`).
+ */
+function howOf(body: unknown): RetryHow | Refusal {
+  if (!isObject(body)) return { status: 400, error: `POST …/retry takes a JSON object: ${RETRY_SHAPE}.` };
+  const { mode, model, message } = body;
+  if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') {
+    return {
+      status: 400,
+      error: `\`mode\` is how to try the step again, as \`wf retry\` takes it: "nudge" continues its session, told what happened; "fresh" starts a new session on its branch; "recheck" runs its check again and files no session. This request's was ${JSON.stringify(mode) ?? 'left out'}: ${RETRY_SHAPE}.`,
+    };
+  }
+  if (model !== undefined && (typeof model !== 'string' || !model.trim())) {
+    return { status: 400, error: `\`model\` names the model a new session runs on, as \`wf retry --model <m>\` does: a name, or left out for the step's own. This request's was ${JSON.stringify(model)}.` };
+  }
+  if (model !== undefined && mode !== 'fresh') {
+    return { status: 400, error: `\`model\` names the model a new session runs on, as \`wf retry --model <m>\` does, so it goes with "mode": "fresh" — a nudge continues a session on the model it has, and a recheck files no session. This request asked for "${mode}".` };
+  }
+  if (message !== undefined && typeof message !== 'string') {
+    return { status: 400, error: `\`message\` is what to tell the step, as \`wf retry --message "<answer>"\` takes it: text, or left out. This request's was ${JSON.stringify(message)}.` };
+  }
+  return { mode, ...(model !== undefined ? { model } : {}), ...(message !== undefined ? { message } : {}) };
+}
+
 export const app = new Hono()
   .get('/api/health', (c) => c.json({ ok: true }))
   // What the repository offers a step, read from the checkout on each request (capabilities.ts). Each MCP server
   // the settings enable is started and asked for its tools once while the api runs; one that fails is an `error`
   // on its entry, never a failed request.
   .get('/api/capabilities', async (c) => c.json(await capabilitiesOf(repoOf())))
-  // A repository's workflows, listed, and a run of one started — the board's one write (workflows.ts).
+  // A repository's workflows, listed, and a run of one started — the board's first write (workflows.ts).
   .route('/', workflows)
   .get('/api/runs', async (c) => {
     // What one request costs, however many runs there are: one harness observation (one
@@ -1033,7 +1173,9 @@ export const app = new Hono()
     // the two reads would show as `unknown` until the next poll.
     const runs = listRuns();
     const views = await everyView();
-    return c.json(runs.map((run) => summarize(run, views)));
+    const summaries: RunSummary[] = [];
+    for (const run of runs) summaries.push(await summarize(run, views));
+    return c.json(summaries);
   })
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');
@@ -1047,6 +1189,37 @@ export const app = new Hono()
     const run = findRun(id);
     if (!run) return c.json({ error: noSuchRun(id) }, 404);
     return c.json(await decisionOf(run));
+  })
+  // The board's second write: a person's ask for another try of a step — the answer to a step that signed off blocked, a nudge, a
+  // recheck — made by the package's `retry()`, `wf retry`'s own, which writes the ask file and nothing else; the next tick honours it
+  // once. Guarded as a start is (guard.ts). Refused in the package's words, verbatim: a message that cannot ride on the ask
+  // (`messageRefusal`, 422) before the run is read, and a step that may not be tried again that way (`retryRefusal`, 409) after.
+  .post('/api/runs/:id/steps/:step/retry', async (c) => {
+    const id = c.req.param('id');
+    const step = c.req.param('step');
+    const refused = refusedBeforeReading(retryGuard(id, step), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    const found = taskOfStep(id, step);
+    if ('error' in found) return c.json({ error: found.error }, 404);
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: `POST …/retry takes a JSON body: ${RETRY_SHAPE}.` }, 400);
+    }
+    const how = howOf(body);
+    if ('status' in how) return c.json({ error: how.error }, how.status);
+    const wrong = messageRefusal(how, `wf retry ${id} ${step}`);
+    if (wrong) return c.json({ error: wrong }, 422);
+    try {
+      const { ask, file } = await retry(e, id, step, how);
+      // Accepted, and not yet done: the try is filed by the next tick, as one asked for at the command line is.
+      return c.json({ try: ask.try, file }, 202);
+    } catch (err) {
+      const said = err instanceof Error ? err.message : String(err);
+      if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
+      return c.json({ error: `Could not ask for another try of step '${step}': ${said}. \`wf retry ${id} ${step}\` asks the same way from the command line.` }, 502);
+    }
   })
   // A step's session output as text, for `wf logs` parity. The board reads the conversation from the transcript routes below.
   .get('/api/runs/:id/steps/:step/log', async (c) => {

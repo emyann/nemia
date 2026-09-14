@@ -1727,3 +1727,37 @@ test('REFUSED at `wf start`, before a run is written: --after an unknown run, a 
   await typed();
   assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${printed[0]!.split(' ')[0]}.json`), 'utf8')), 'after'), false);
 });
+
+// ─── an ask file that is not an ask ─────────────────────────────────────────
+
+test("REFUSED by name at shipped defaults: a file at an ask's name that is not an ask — `wf retry` and `wf round` name it and say to delete it, never to wait for an ask no pass honours", async () => {
+  const { run, e, filings } = await throughCheck('check: npm test', 'failed', 1);
+  const file = path.join(asksDir(run.id), 'retry-implement-2');
+  fs.mkdirSync(asksDir(run.id), { recursive: true });
+  fs.writeFileSync(file, '{}');
+  assert.equal((await list(e, readRun(run.id))).steps[0]!.note, undefined, '`wf ls` shows nothing asked');
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, [], 'and no pass honours it');
+  await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge' }), refusedWith(new RegExp(
+    `^try 2 of implement cannot be asked for: ${escaped(file)} is already there, and it is not an ask — it asks for no mode wf retry knows \\(undefined\\)\\. `
+    + `No tick honours it, and wf ls shows nothing asked, so waiting would be for ever\\. Delete it \\(rm ${escaped(file)}\\), then ask again: wf retry ${escaped(run.id)} implement\\.$`,
+  )));
+  assert.equal(fs.readFileSync(file, 'utf8'), '{}', 'not written over');
+  assert.equal(filings.length, 2);
+  // Deleted, as the refusal says: the ask is written, and the next pass honours it.
+  fs.rmSync(file);
+  await retry(e, run.id, 'implement', { mode: 'nudge' });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+
+  const looping = started(looped('rounds: 1\n'));
+  const b = board();
+  await advance(b.e, readRun(looping.id));
+  await toReview(b, looping.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(looping.id))).looped, [], 'out of rounds, on the first');
+  const roundFile = path.join(asksDir(looping.id), 'round-review-2');
+  fs.mkdirSync(asksDir(looping.id), { recursive: true });
+  fs.writeFileSync(roundFile, '[]');
+  await assert.rejects(round(b.e, looping.id), refusedWith(new RegExp(
+    `^round 2 of review's loop cannot be asked for: ${escaped(roundFile)} is already there, and it is not an ask — it is not an ask wf round wrote\\. .*Delete it \\(rm ${escaped(roundFile)}\\), then ask again: wf round ${escaped(looping.id)} review\\.$`,
+  )));
+  assert.equal(fs.readFileSync(roundFile, 'utf8'), '[]');
+});

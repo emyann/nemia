@@ -1114,9 +1114,26 @@ export async function retry(e: Engine, id: string, stepName: string, how: RetryH
     step: stepName, try: tryOf(run, stepName) + 1, mode: how.mode, ...(how.model ? { model: how.model } : {}),
     ...(how.message !== undefined ? { message: how.message } : {}), at: new Date().toISOString(),
   };
-  // Someone asked in the moment since the look above: said as the look would have said it.
-  if (!writeAsk(askFile(id, stepName, ask.try), ask)) refuse(refusal(readAsks(id).asks) ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
-  return { run, ask, file: askFile(id, stepName, ask.try) };
+  const file = askFile(id, stepName, ask.try);
+  // Someone asked in the moment since the look above: said as the look would have said it. Or a file is at the ask's name that no pass reads as one.
+  if (!writeAsk(file, ask)) {
+    refuse(refusal(readAsks(id).asks) ?? strayAsk(file, askIn(file, stepName, ask.try), `try ${ask.try} of ${stepName}`, `wf retry ${id} ${stepName}`)
+      ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
+  }
+  return { run, ask, file };
+}
+
+/**
+ * Why an ask cannot be written where a file that is not one already stands, in words that name it — or null, when there is none: the file reads
+ * as an ask, or it is gone, consumed by a pass since the verb looked. `read` is the file read as the tick reads it (`askIn`, `roundAskIn`).
+ *
+ * An ask is written under its try's name, exclusively, and never over a file there. One that does not read as an ask — `{}`, a hand edit, a torn
+ * copy — is honoured by no pass, and `wf ls` shows nothing asked, so "already asked for, wait for it" would be a wait for ever. The way out is a
+ * person's: delete the file, and ask again.
+ */
+function strayAsk(file: string, read: RetryAsk | RoundAsk | string, what: string, again: string): string | null {
+  if (typeof read !== 'string' || !lstatOf(file)) return null;
+  return `${what} cannot be asked for: ${file} is already there, and it is not an ask — ${read}. No tick honours it, and wf ls shows nothing asked, so waiting would be for ever. Delete it (rm ${file}), then ask again: ${again}.`;
 }
 
 export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
@@ -1142,7 +1159,9 @@ export async function round(e: Engine, id: string, stepName?: string): Promise<R
   // Someone asked in the moment since the look above: said as the look would have said it.
   if (!writeAsk(file, ask)) {
     const now = answer(readAsks(id).rounds);
-    refuse('refusal' in now ? now.refusal : `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.`);
+    refuse('refusal' in now ? now.refusal
+      : strayAsk(file, roundAskIn(file, ask.step, ask.round), `round ${ask.round} of ${ask.step}'s loop`, `wf round ${id} ${ask.step}`)
+        ?? `round ${ask.round} of ${ask.step}'s loop is already asked for. Wait for it: wf ls ${id}.`);
   }
   return { run, ask, file };
 }

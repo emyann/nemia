@@ -1413,12 +1413,30 @@ test('REFUSED: `wf retry` with an empty --message, or --message on --recheck —
   for (const [flags, pattern] of [
     [['--message', ''], /^--message is empty/],
     [['--recheck', '--message', 'the second reading'], /^--message carries your answer into the try's brief, and --recheck files no session/],
-    [['--message'], /^--message takes what to tell the step/],
-    [['--message', '--fresh'], /^--message takes what to tell the step/],
-    [['--message', 'a', '--message', 'b'], /^wf retry takes --message once/],
+    [['--message'], /^--message takes what to tell the step, quoted/],
+    [['--message', '--fresh'], /^--message takes what to tell the step, and --fresh is one of wf retry's own flags, so the answer was left out: .*give it as --message=--fresh\.$/],
+    [['--nudge', '--message', '--model', 'opus'], /^--message takes what to tell the step, and --model is one of wf retry's own flags/],
+    [['--message=', '--fresh'], /^--message is empty/],
+    [['--message=a', '--message', 'b'], /^wf retry takes --message once/],
   ] as const) {
     await assert.rejects(main(['retry', 'no-such-run', 'implement', ...flags]), refusedWith(pattern), flags.join(' '));
   }
+});
+
+test('`wf retry --message` takes the next argument as the answer whatever it starts with — an answer about a flag names it — and `--message=<answer>` too', async (t) => {
+  t.mock.method(console, 'log', () => {});
+  const { main } = await import('../src/cli.ts');
+  /** What the ask file says of how, after `wf retry` with these flags on a step waiting on you. */
+  const asked = async (...flags: string[]) => {
+    const { run, e } = await throughCheck('check: npm test', 'stopped');
+    await main(['retry', run.id, 'implement', ...flags], e);
+    const { step: _, try: __, at: ___, ...how } = JSON.parse(fs.readFileSync(path.join(asksDir(run.id), 'retry-implement-2'), 'utf8'));
+    return how;
+  };
+  assert.deepEqual(await asked('--message', '--flag stays; say so in the README'), { mode: 'nudge', message: '--flag stays; say so in the README' });
+  assert.deepEqual(await asked('--fresh', '--message', '-n is short for --dry-run'), { mode: 'fresh', message: '-n is short for --dry-run' });
+  assert.deepEqual(await asked('--message=--fresh'), { mode: 'nudge', message: '--fresh' }, "a flag's name, as the whole answer");
+  assert.deepEqual(await asked('--message=keep --flag=on', '--model', 'opus'), { mode: 'fresh', model: 'opus', message: 'keep --flag=on' });
 });
 
 test('REFUSED at read: an ask file whose message is not text, is empty, or rides on a recheck is not honoured — and one written before messages reads as it always did', async () => {

@@ -565,8 +565,10 @@ retries: 1
   answer rides on the ask — `message`, in the person's own file — beside `--nudge`, `--fresh` or `--model <m>`,
   and the next tick carries it into the try's brief inside `## Try <n>`, as `## Your answer`: the text as it was
   written, after on whose word the try is and before what the check said. A step that did not sign off blocked
-  may be told something too. Refused before anything is written: an empty message, and `--message` with
-  `--recheck`, which files no session to read it. A hand-written ask file is held to the same word by the tick,
+  may be told something too. `--message` takes the next argument as the answer, whatever it starts with, so
+  an answer about a flag names it; `--message=<answer>` carries one that is only one of the verb's own flags.
+  Refused before anything is written: an empty message, and `--message` with `--recheck`, which files no
+  session to read it. A hand-written ask file is held to the same word by the tick,
   and one from before messages reads as it did. The record keeps no message: what `wf ls` and `wf decide` say
   of an answered try is read off the ask file, waiting or in `done/`.
 - **The record keeps the current try where it always was.** `steps[name].taskId` and `steps[name].check` are

@@ -21,7 +21,9 @@ const HELP = `wf — run a workflow of agent steps
                                --recheck runs its check again, and files no session;
                                --message "<answer>" goes into the try's brief, as ## Your answer:
                                for a step that signed off blocked, the answer to its needs — or
-                               what you have to say to any step you try again; not with --recheck
+                               what you have to say to any step you try again; not with --recheck.
+                               The next argument is the answer, whatever it starts with; an answer
+                               that is only one of these flags' names goes as --message=<answer>
   wf round <runId> [<step>]    once more: a loop out of rounds goes round again, once, on the
                                next tick — the step it loops to continued, then a new reviewer
   wf show <runId>              the run, and what each step was told
@@ -103,6 +105,9 @@ function decideHow(argv: string[]): { sensitive?: string[] } {
   return { sensitive };
 }
 
+/** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
+const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--model', '--message'];
+
 /**
  * `wf retry`'s one choice of how, read off its flags: at most one way, `--model` with a name, and `--message` at most once, with what
  * to tell the step — refused, before a run is read, when it is empty or rides on `--recheck` (`messageRefusal`).
@@ -117,10 +122,15 @@ function retryHow(argv: string[]): RetryHow {
       const model = argv[++i];
       if (!model || model.startsWith('--')) usage('--model takes the model to run the new session on: wf retry <runId> <step> --model <m>');
       given.push({ mode: 'fresh', model });
-    } else if (arg === '--message') {
+    } else if (arg === '--message' || arg.startsWith('--message=')) {
       if (message !== undefined) usage('wf retry takes --message once: put the whole answer in it, quoted — wf retry <runId> <step> --message "<answer>".');
-      const text = argv[++i];
-      if (text === undefined || text.startsWith('--')) usage('--message takes what to tell the step, quoted: wf retry <runId> <step> --message "<answer>"');
+      // The next argument is the answer, whatever it starts with: an answer about a flag names it ("--flag stays"). Only one of this verb's own
+      // flags, alone, is read as the answer left out — and `--message=<answer>` carries even that.
+      const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
+      if (text === undefined) return usage('--message takes what to tell the step, quoted: wf retry <runId> <step> --message "<answer>"');
+      if (arg === '--message' && RETRY_FLAGS.includes(text)) {
+        usage(`--message takes what to tell the step, and ${text} is one of wf retry's own flags, so the answer was left out: wf retry <runId> <step> --message "<answer>". If ${text} is the whole answer, give it as --message=${text}.`);
+      }
       message = text;
     } else usage(`wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>".`);
   }

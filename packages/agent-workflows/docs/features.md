@@ -447,7 +447,9 @@ said.
 - `wf retry <run> <step> [--nudge | --fresh | --model <m>] --message "<answer>"` puts `message` on the ask
   file, beside the mode, and writes nothing else. Refused before anything is written (`messageRefusal`, from
   the CLI's parse and from `retryRefusal`): an empty or blank message, and `--message` with `--recheck`, which
-  files no session to read it; in the CLI also a `--message` with no text, or given twice. A message to a step
+  files no session to read it; in the CLI also a `--message` with no text, one followed by nothing but one of
+  the verb's own flags (the answer left out; `--message=<answer>` gives such an answer), or one given twice.
+  Any other next argument is the answer, `--flag stays` included. A message to a step
   that did not sign off blocked is allowed, and the usage text says what the flag is for.
 - The tick honours the ask once, as before, and carries the message through `Retry` and `RetryBriefing` into
   the brief: `## Your answer` inside `## Try <n>`, the text as written, after the paragraph that says where
@@ -481,6 +483,9 @@ What was measured:
   `--message "<answer>"` after its command, and `apps/api/test/decision.test.ts` pins the offer's shape
   (`:  wf retry <run> <step>  (--fresh`), because the board cuts its command out of the line. The package's
   suite cannot see that test. The offer went back to what it was, and the command moved under the question.
+- Round 2's review found `--message` refusing any answer that started with `--`, so the brief's own example
+  question ("Rename --flag, or keep it?") could not be answered by naming the flag. The next argument is now
+  the answer, and a test gives four such answers through the CLI and reads them off the ask file.
 - No session has run `dev-planned`. Whether `plan` asks at the right moments is its brief's prose until a run
   shows it.
 - One observation against §4 Q's measurement: this step's own session, filed by `wf` on Claude Code, listed

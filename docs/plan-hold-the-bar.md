@@ -801,6 +801,13 @@ owner is not mid-run.
   `effort` nor `tools`, so a person cannot see the effort a step runs at (none set here → the harness
   default). A **timeline** on the run page and in `wf decide` — per try and per check: filed, spawned,
   ended, queue and run time, `used` — and `effort`/`tools` in the spec rows. → apps + `wf decide`, small.
+- **rounds are invisible in the inspector, defaults read as `—`, artifacts are bare paths (operator,
+  2026-09-13):** a step in round 2 shows `attempts 1` (the engine's count for the current try's task)
+  beside `round 2 of 3` (the run's tries), and the earlier round's task, closeout, check and replies are
+  nowhere on the board; deadline and max attempts show `—` where the engine filed defaults; `effort` and
+  `tools` are not rows; the Output tab's artifacts cannot be opened. B7: `tries` on the api's step, effective
+  values marked `default`, a Rounds section and per-try Output, and an artifacts route serving a listed
+  file by name (inside the run-owned directory, never a path) with images inline. → apps, filed after B6/S2.
 
 ## 5. What the plan does not do
 

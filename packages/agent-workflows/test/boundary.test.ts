@@ -52,9 +52,9 @@ test('only runner.ts imports agent-engine — not even for a type', () => {
   assert.ok(importsOf('src/runner.ts').includes('agent-engine'), 'and runner.ts does, so this is looking at the right files');
 });
 
-test('run.ts and check.ts read no disk, spawn nothing, and do not reach for the I/O module', () => {
+test('run.ts, check.ts and radius.ts read no disk, spawn nothing, and do not reach for the I/O module', () => {
   const impure = ['fs', 'node:fs', 'fs/promises', 'node:fs/promises', 'child_process', 'node:child_process', './runner.ts'];
-  for (const file of ['src/run.ts', 'src/check.ts']) {
+  for (const file of ['src/run.ts', 'src/check.ts', 'src/radius.ts']) {
     assert.deepEqual(importsOf(file).filter((m) => impure.includes(m)), [], file);
   }
 });

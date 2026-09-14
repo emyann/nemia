@@ -126,6 +126,25 @@ test('a line of a Claude transcript: the harness speaking is system, a subagent 
   assert.deepEqual(claudeTranscriptEvents({ ...base, type: 'system', subtype: 'turn_duration', durationMs: 5 }, 120), [{ id: '@120', at: at(0), role: 'system', kind: 'system', text: 'turn_duration' }], 'no uuid: its place in the file');
 });
 
+test('words another process sent a working session — a peer, or `say` — are a system event with those words; any other attachment gives nothing', () => {
+  // As 2.1.270 wrote it into a `--bg` session's transcript, when a line was posted to its inbox while it worked.
+  const line = {
+    parentUuid: 'p', isSidechain: false, type: 'attachment', uuid: 'att-peer', timestamp: at(0), sessionId: 's',
+    attachment: {
+      type: 'queued_command', prompt: 'The file to write is SAID-bc11750e.txt', source_uuid: 'src', commandMode: 'prompt',
+      origin: { kind: 'peer', from: 'unknown', verifiedPeerPid: 4165162, verifiedPeerProcStart: '13623112' }, timestamp: at(0), isMeta: true,
+    },
+  };
+  assert.deepEqual(claudeTranscriptEvents(line, 0), [{ id: 'att-peer', at: at(0), role: 'system', kind: 'system', text: 'The file to write is SAID-bc11750e.txt' }]);
+  assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { ...line.attachment, origin: { kind: 'other' } } }, 0), [], 'a queued command of any other origin is not read as words sent in');
+  assert.deepEqual(claudeTranscriptEvents({ ...line, attachment: { type: 'environment' } }, 0), [], 'nor is any other attachment');
+  // Arriving while the session is idle, the words start a turn as an `isMeta` user line, read as any such line is.
+  assert.deepEqual(
+    claudeTranscriptEvents({ type: 'user', uuid: 'idle', timestamp: at(1), isMeta: true, origin: { kind: 'peer', from: 'unknown' }, message: { role: 'user', content: 'Another Claude session sent a message:\nIdle check' } }, 0),
+    [{ id: 'idle:0', at: at(1), role: 'system', kind: 'system', text: 'Another Claude session sent a message:\nIdle check' }],
+  );
+});
+
 test('read again with its cursor, a transcript gives only what was appended; a line still being written waits for the next read', async () => {
   const sessionId = randomUUID();
   const lines = claudeLines(sessionId).map((l) => JSON.stringify(l));

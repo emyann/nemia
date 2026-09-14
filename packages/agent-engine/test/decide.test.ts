@@ -243,3 +243,44 @@ test('an attempt in flight has no end time, and does not borrow the one before i
   const s = fold(TASK, [...ran('failed', 2), { kind: 'starting', at: at(4), attempt: 2 }, { kind: 'spawned', at: at(5), attempt: 2 }]);
   assert.deepEqual(s.attempts.map((a) => [a.ended, a.endedAt]), [['failed', at(3)], [null, null]]);
 });
+
+// ─── what a person said ─────────────────────────────────────────────────────
+
+/** The same journal with words said to attempt 1 just after it spawned. */
+const told = (events: Event[], text = 'widen the scope to the api'): Event[] => {
+  const i = events.findIndex((e) => e.kind === 'spawned');
+  return [...events.slice(0, i + 1), { kind: 'said', at: at(1_500), attempt: 1, text }, ...events.slice(i + 1)];
+};
+
+test('a `said` event changes no decision: running, blocked, ended done, failed with an attempt left, past the deadline, lost', () => {
+  const cases: Array<[string, Event[], Map<string, Sighting>, ReturnType<typeof now>]> = [
+    ['running', [filed(), ...started()], seen([N1, 'working']), now(5_000)],
+    ['blocked', [filed(), ...started()], seen([N1, 'blocked']), now(5_000)],
+    ['ended done', ran('done'), seen([N1, 'done']), now(9)],
+    ['failed with an attempt left', ran('failed', 2), seen([N1, 'failed']), now(9)],
+    ['past the deadline', [withDeadline(10), ...started()], seen([N1, 'working']), now(20_000)],
+    ['never registered', [filed(), ...started()], seen(), now(60_000)],
+  ];
+  for (const [label, events, observed, when] of cases) {
+    const said = fold(TASK, told(events));
+    assert.equal(said.said.length, 1, `${label}: the words are on the state`);
+    assert.deepEqual(decide(said, observed, when), decide(fold(TASK, events), observed, when), label);
+  }
+});
+
+test('a journal with no `said` in it — every journal written before `say` — folds to `said: []` and otherwise the same state', () => {
+  const { said: none, ...legacy } = fold(TASK, ran('failed', 2));
+  assert.deepEqual(none, []);
+  const { said, ...rest } = fold(TASK, told(ran('failed', 2)));
+  assert.deepEqual(said, [{ at: at(1_500), attempt: 1, text: 'widen the scope to the api' }]);
+  assert.deepEqual(rest, legacy, 'nothing else on the state moved');
+});
+
+test('the fold keeps every `said` in order, each with the attempt it was said to', () => {
+  const s = fold(TASK, [
+    ...told(ran('failed', 2), 'first'),
+    { kind: 'starting', at: at(4), attempt: 2 }, { kind: 'spawned', at: at(5), attempt: 2 },
+    { kind: 'said', at: at(6), attempt: 2, text: 'second' },
+  ]);
+  assert.deepEqual(s.said.map((x) => [x.attempt, x.text]), [[1, 'first'], [2, 'second']]);
+});

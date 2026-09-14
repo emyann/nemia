@@ -510,11 +510,11 @@ test('tools, disallowedTools, effort and mcp are declared by the task and reach 
   assert.equal(plain.spawned[0]!.mcp, undefined, 'no map, no servers of its own');
 });
 
-test('decide never reads tools, effort, MCP servers, usage, an exit code or an end time — carried on the record, never judged', () => {
+test('decide never reads tools, effort, MCP servers, usage, an exit code, an end time or what a person said — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt/);
+  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said/);
 });
 
 // ─── usage: carried from the sighting, null when nobody measured ────────────

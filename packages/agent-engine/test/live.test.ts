@@ -24,6 +24,11 @@
  * have taken the transcript with it. So a session is told a word, settles and is released; then
  * `ae logs` must still read it, and a second task resuming it must still say the word.
  *
+ * And `say` is measured before it is trusted, because the inbox it posts to answers nothing: a session told to
+ * wait for a message naming a file is told a name, and must write that file and close with its name, while an
+ * identical session never told must write nothing — without it, a session that wrote a file of its own accord
+ * would pass.
+ *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
 import { test } from 'node:test';
@@ -33,16 +38,20 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createEngine, type Engine, type TaskView } from '../src/facade.ts';
+import { createEngine, type Engine, type Said, type TaskView } from '../src/facade.ts';
 
 const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
 const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-live-${label}-`));
 
-/** Tick until every task has settled or ten minutes pass, check, and leave no session behind. */
-const settleThenCheck = async (engine: Engine, ids: Record<string, string>, check: (views: Record<string, TaskView>) => void) => {
+/**
+ * Do `act`, tick until every task has settled or ten minutes pass, check, and leave no session behind — one that
+ * `act` threw on included.
+ */
+const settleThenCheck = async (engine: Engine, ids: Record<string, string>, check: (views: Record<string, TaskView>) => void, act?: () => Promise<void>) => {
   const views: Record<string, TaskView> = {};
   try {
+    await act?.();
     const until = Date.now() + 10 * 60_000;
     while (Date.now() < until) {
       await engine.tick();
@@ -53,6 +62,9 @@ const settleThenCheck = async (engine: Engine, ids: Record<string, string>, chec
     check(views);
   } finally {
     // The engine releases a session once its end is on the record; this is for one that never got that far.
+    for (const [k, id] of Object.entries(ids)) {
+      if (!views[k]) { try { views[k] = await engine.view(id); } catch { /* no view, nothing known to clean */ } }
+    }
     for (const v of Object.values(views)) {
       if (!v.sessionId) continue;
       const short = v.sessionId.split('-')[0]!;
@@ -210,6 +222,68 @@ test("a --bg session filed with no mcp, in an empty directory, has no MCP tools 
     assert.equal(views.bare?.state.settled, 'succeeded', `bare settled: ${views.bare?.phase}`);
     assert.deepEqual(said('bare'), { mcpServers: [], mcpTools: [] }, "no mcp and no .mcp.json: none of the operator's servers, connectors or Chrome");
   });
+});
+
+const SAY_BRIEF = [
+  'You are waiting for a message from another session that names a file.',
+  'Until one arrives, run `sleep 10` with your Bash tool, one call at a time, at most 30 times.',
+  'When a message names a file, create that file in the current directory with your Write tool, containing the word ok, and do nothing else.',
+  'Then give your closing statement: in name, the file name the message gave, or an empty string if no message came.',
+].join(' ');
+const NAME_CLOSEOUT = {
+  type: 'object',
+  properties: { name: { type: 'string' } },
+  required: ['name'],
+  additionalProperties: false,
+};
+
+test('say reaches a working --bg session: told a file name, it writes that file; the same session never told writes none — and the journal has what was said', {
+  skip,
+  timeout: 15 * 60_000,
+}, async (t) => {
+  // Shipped defaults: `claude`, `auto`. Bash to wait with, Write to answer with.
+  const engine = createEngine({ root: tmp('say-board') });
+  const told = tmp('say-told');
+  const control = tmp('say-control');
+  const common = { brief: SAY_BRIEF, closeoutSchema: NAME_CLOSEOUT, deadlineSeconds: 600, effort: 'low', tools: ['Bash', 'Write'] };
+  const ids = {
+    told: await engine.file({ ...common, cwd: told }),
+    control: await engine.file({ ...common, cwd: control }),
+  };
+  const name = `SAID-${randomUUID().slice(0, 8)}.txt`;
+  const words = `The file to write is ${name}`;
+  let said: Said | undefined;
+
+  await settleThenCheck(engine, ids, (views) => {
+    assert.equal(views.told?.state.settled, 'succeeded', `told settled: ${views.told?.phase}`);
+    assert.ok(fs.existsSync(path.join(told, name)), 'the told session wrote the file the words named');
+    assert.deepEqual(views.told?.state.attempts.at(-1)?.closeout, { name }, 'and closed with its name');
+    assert.deepEqual(views.told?.state.said, [said], 'the journal has what was said, once');
+
+    assert.equal(views.control?.state.settled, 'succeeded', `control settled: ${views.control?.phase}`);
+    assert.deepEqual(fs.readdirSync(control).filter((f) => f.startsWith('SAID-')), [], 'the control, never told, wrote nothing');
+    assert.deepEqual(views.control?.state.attempts.at(-1)?.closeout, { name: '' }, 'and closed with no name');
+    assert.deepEqual(views.control?.state.said, []);
+  }, async () => {
+    // Told once it is seen at work: listed running, in its sleep loop. Inside `settleThenCheck`, so a `say` that
+    // rejects still leaves no session behind.
+    const until = Date.now() + 5 * 60_000;
+    while (!said && Date.now() < until) {
+      await engine.tick();
+      const { phase } = await engine.view(ids.told);
+      if (phase === 'running (working)' || phase === 'working (quiescent)') said = await engine.say(ids.told, words);
+      else await new Promise((r) => setTimeout(r, 5_000));
+    }
+    assert.ok(said, 'the told session was seen working within five minutes, and told');
+  });
+
+  // The session's own record has the words too, as the transcript reader gives them to a board: a system event
+  // whose text is the words, or Claude Code's sentence around them on a line of their own — never the model's own
+  // mention of the file's name, which would pass with the reader of words sent in broken.
+  const { events } = await engine.transcript(ids.told);
+  const arrived = events.filter((e) => e.role === 'system' && e.kind === 'system' && e.text?.split('\n').includes(words));
+  assert.equal(arrived.length, 1, `the told session's transcript carries the words once, as a system event: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`);
+  t.diagnostic(`the words arrived ${arrived[0]!.text === words ? 'while the session worked (an attachment line)' : 'while it was idle (the line that starts a turn)'}`);
 });
 
 const WORD_CLOSEOUT = {

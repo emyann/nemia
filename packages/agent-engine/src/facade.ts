@@ -13,10 +13,10 @@
 import { Effect, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, type Event, type ResumePolicy, type Sighting } from './domain.ts';
+import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  claudeOps, claudeRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
+  claudeOps, claudeRefuses, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
   type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
@@ -62,6 +62,12 @@ export type PromiseRunner = {
    * `logs` is what they have.
    */
   transcript?(sessionId: string, after?: TranscriptCursor): Promise<Transcript>;
+  /**
+   * Optional. Hand `text` to the running session `session` names — the name the engine chose, and the id your
+   * `observe` listed it under on the pass just made — and resolve once your harness has taken it; reject when it
+   * did not, and nothing is journalled. Without it, `say` refuses this harness's tasks.
+   */
+  say?(session: { name: string; sessionId: string }, text: string): Promise<void>;
 };
 
 /**
@@ -174,6 +180,27 @@ export type Engine = {
    * `after` that none of them gave. A `PromiseRunner`'s cursor is its own, and passed through.
    */
   transcript(taskId: string, after?: TranscriptCursor): Promise<Transcript>;
+  /**
+   * Tell the task's session something while it runs — `kubectl attach` with its audit line. `text` is handed, as
+   * given, to the session of the attempt in flight through the task's own harness, and then journalled as a
+   * `said` entry — `at`, `attempt`, `text` — which is returned, and which `view` carries as `state.said`.
+   *
+   * The words go before the entry: a `said` on the record is words a harness took, and a `say` that rejects has
+   * journalled nothing. What the session makes of them is its own affair, and `decide` never reads them. Words
+   * taken are not words read: a harness may still set them aside (Claude Code: its `crossSessionInbound`
+   * setting, a rate limit, an identical repeat), and says nothing back when it does. A session its harness lists
+   * `blocked` is told too, and reads the words only if it moves again: one waiting on a permission prompt nobody
+   * answers keeps them queued, and a stopped or continued one has lost them (open issue 16).
+   *
+   * Refused — rejected with an `Error` whose `exitCode` is 2, and nothing sent or journalled — for an empty
+   * `text`; a task this engine has no record of; a harness with no channel into a running session (a
+   * `HarnessSpec`, in its own words, or a `PromiseRunner` without `say`); what the harness cannot carry (Claude
+   * Code: a task in `bypassPermissions`, or words longer than its inbox reads); a task that has settled, or has
+   * been asked to stop; one with no attempt in flight; and one whose attempt its harness does not list running.
+   * A registry that cannot be read this time, or words the harness did not take, reject with the harness's
+   * error and no `exitCode`: ask again.
+   */
+  say(taskId: string, text: string): Promise<Said>;
   /** Everything that has happened since `after`, and where to resume. */
   feed(after?: Cursor): Promise<{ entries: FeedEntry[]; cursor: Cursor }>;
   /**
@@ -231,6 +258,10 @@ const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Reco
           ...(h.transcript ? {
             transcript: (id: string, after?: TranscriptCursor) =>
               wrap(() => h.transcript!(id, after), (m) => new RunnerError({ verb: 'transcript', message: m })),
+          } : {}),
+          ...(h.say ? {
+            say: (session: { name: string; sessionId: string }, text: string) =>
+              wrap(() => h.say!(session, text), (m) => new RunnerError({ verb: 'say', message: m })),
           } : {}),
         },
   ]));
@@ -377,6 +408,53 @@ export function createEngine(options: EngineOptions = {}): Engine {
       if (!sessionId) return { events: [], cursor: after ?? start };
       return go(read(sessionId, after === start ? undefined : after));
     },
+    say: async (taskId, text) => {
+      const refuse = (why: string) => Object.assign(new Error(`say: ${why}`), { exitCode: 2 });
+      const resume = 'Continue its session with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.';
+      if (typeof text !== 'string' || !text.trim()) throw refuse('`text` is empty. Give the words the session should hear.');
+      const events = await go(Effect.flatMap(Journal, (j) => j.read(taskId)));
+      if (!events.length) throw refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+      const state = fold(taskId, events);
+      // The task's own harness, as for `transcript`: only its registry can name the session, and only it has a way in.
+      const asked = state.harness ?? fallback;
+      const harness = Object.hasOwn(runners, asked) ? asked : fallback;
+      const runner = runners[harness]!;
+      const h = harnesses[harness]!;
+      const deliver = runner.say;
+      if (!deliver) {
+        throw refuse((isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`);
+      }
+      const cannot = h === 'claude-bg' ? claudeSayRefuses(state, text) : undefined;
+      if (cannot) throw refuse(cannot);
+      // What the record says first, then what the harness says: a settled task is not asked about.
+      if (state.settled) throw refuse(`\`${taskId}\` has settled (${state.settled}): no session of it is running to hear anything. ${resume}`);
+      if (state.stopRequested) throw refuse(`\`${taskId}\` has been asked to stop: its session is being stopped, not steered. ${resume}`);
+      const last = state.attempts.at(-1);
+      if (!last) throw refuse(`\`${taskId}\` has not started an attempt yet, so there is no session to hear anything. Ask again once \`ae ls\` shows it running.`);
+      if (last.ended !== null) throw refuse(`\`${taskId}\` has no attempt running: attempt ${last.n} ended \`${last.ended}\`. ${resume}`);
+      const name = nameFor(taskId, last.n);
+      let observed: Map<string, Sighting>;
+      try { observed = await go(runner.observe); } catch (e) {
+        throw new Error(`say: the \`${harness}\` registry could not be read (${e instanceof Error ? e.message : String(e)}), so ${name} could not be found. Nothing was said; ask again.`);
+      }
+      const sighting = observed.get(name);
+      if (!sighting) throw refuse(`\`${taskId}\`'s attempt ${last.n} is not running yet: its harness lists no \`${name}\`. Ask again once \`ae ls\` shows it running.`);
+      // A session waiting on a person is running, and its inbox takes words as a working one's does. It reads them
+      // only if it moves again: one stalled on a login refresh moved on when a message came (2026-09-13); one waiting
+      // on a permission prompt nobody answers keeps them queued, and loses them when stopped or continued (open issue
+      // 16). `claude agents` does not say which wait a session is in, so neither is refused.
+      if (sighting.state !== 'working' && sighting.state !== 'blocked') {
+        throw refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: the next pass writes its end. ${resume}`);
+      }
+      try { await go(deliver({ name, sessionId: sighting.sessionId }, text)); } catch (e) {
+        throw new Error(`say: ${name} was not given the words (${e instanceof Error ? e.message : String(e)}). Nothing was journalled.`);
+      }
+      const said: Said = { at: new Date().toISOString(), attempt: last.n, text };
+      try { await go(Effect.flatMap(Journal, (j) => j.append(taskId, { kind: 'said', ...said }))); } catch (e) {
+        throw new Error(`say: ${name} was given the words, but they could not be journalled (${e instanceof Error ? e.message : String(e)}): the record does not show them.`);
+      }
+      return said;
+    },
     feed: (after = 0) => go(Effect.flatMap(Journal, (j) => j.feed(after))),
 
     watch: ({ onEntry, from = 0, intervalMs = 1_000, onError }) => {
@@ -442,7 +520,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
 export { codex, claudeDetached } from './runner-detached.ts';
 export type { HarnessSpec } from './runner-detached.ts';
 export { nameFor } from './domain.ts';
-export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage } from './domain.ts';
+export type { Event, Observed, Outcome, Sighting, EndReason, ResumePolicy, State, Attempt, Usage, Said } from './domain.ts';
 export type { McpServer, SpawnRequest, Transcript, TranscriptCursor, TranscriptEvent } from './runner.ts';
 export type { FeedEntry, Cursor } from './journal.ts';
 export type { TaskView } from './engine.ts';

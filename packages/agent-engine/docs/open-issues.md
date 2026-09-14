@@ -5,9 +5,10 @@ it can be picked up later without reconstructing it from commit history. The las
 record of what was fixed, with commits, so the open items have their context. A fixed item leaves
 its number behind rather than renumbering the rest, so "bug 9" means the same thing everywhere.
 
-State as of 2026-09-13: agent-engine after the hold-the-bar engine work (repository
-`docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), and a
-session's conversation read as events (§4 S1); agent-workflows `0e7b02a`.
+State as of 2026-09-14: agent-engine after the hold-the-bar engine work (repository
+`docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), a
+session's conversation read as events (§4 S1), and `say`, a person's words into a running session on the
+record (§6 item 3, the engine half); agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -142,7 +143,71 @@ has no Codex servers configured.
 -p --output-format json` prints that id in the one object it prints at exit, so until then there are no
 events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
 (`claudeResultOutput` in `agent-engine/src/runner-detached.ts`). Low priority, like issue 4: this
-harness exists for comparison.
+harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox.
+
+### 12. `said` means the words were handed to the inbox, not that the session read them
+
+**Where.** `claudeOps.say` in `agent-engine/src/runner.ts`: a line posted to the session's inbox socket, which
+writes nothing back (measured: the connection closes in a few milliseconds, with no bytes).
+
+**Effect.** Words Claude Code sets aside are journalled all the same: a `crossSessionInbound` of `hold` or
+`refuse` in the operator's user, project or managed settings; a burst past the inbox's rate limit; the same
+words twice inside its repeat window (said twice, journalled twice, perhaps delivered once); a full queue. Only
+`bypassPermissions`, the one hold the engine can see coming from the task, is refused up front.
+
+**Possible fix.** Claude Code tells a sender what became of a message — held, delivered, refused, dropped — as
+a `peer_message_status` line to the reply address the message carries in `from`, when that address is a `uds:`
+socket in its own sockets directory and the sender's pid is verified. The engine would have to listen on such a
+socket for the length of a `say`, and the status of a held message can arrive minutes later. Not done: it is
+Claude Code's peer protocol, not the documented script path.
+
+### 13. The channel rests on Claude Code's session registration, as measured on 2.1.270
+
+The inbox socket and its line are documented ("The session's inbox socket", code.claude.com
+cross-session-messaging). Where a session's socket is, for a process that is not its child, is not: the runner
+reads `messagingSocketPath` from `~/.claude/sessions/<pid>.json`, found by the pid `claude agents --json` lists.
+A release can move either, and only `AE_LIVE=1` would notice; the fake-registration tests pin the engine's
+reading, not Claude Code's. On native Windows the inbox is a named pipe and needs the session's token, which the
+engine does not read, so every `say` there rejects (not a socket). The other way in, attaching to the session's
+terminal over the background daemon's control socket and typing, was not taken: it is a terminal path, and it
+would type into whatever prompt the session has open.
+
+### 14. A session reported `done` by quiet is refused, though it could still hear
+
+The Claude runner reports a `working` session quiet for 90 seconds as `done` (the quiescence floor), and `say`
+refuses a session its harness does not list running, so words cannot reach one that has gone quiet — the "nudge
+it past a stall" case — although `claude agents` still has it running and its inbox would start a turn. The next
+pass writes its end anyway. `wf retry --message` continues it.
+
+### 15. Words delivered and not journalled, if the process dies between the two
+
+`Engine.say` delivers, then appends `said`. A process killed in between has handed a session words with no
+trace, which is the failure `say` exists to prevent; the window is one append long. A journal that rejects the
+append is reported (`was given the words, but they could not be journalled`), so only a crash is silent. The
+other order was refused because it would record words that may never have arrived.
+
+### 16. Words said to a session blocked on a permission prompt wait with it, and are lost when it is continued
+
+**Measured** (2026-09-14, Claude Code 2.1.270, `--model haiku`, by hand; `say-blocked-probe.log` in the
+steering-channel run's artifacts). A `--bg` session in `default` mode stopped on the prompt for a `touch`, listed
+`blocked`/`waiting`. A line posted to its inbox was queued — a `queue-operation` `enqueue` line in its
+transcript — and not read: 45 seconds later it was still blocked, and nothing more was written. `claude stop` left
+it unread. Then `claude --bg --resume <id>`, as B8's Continue and `wf retry` continue a session, started one under a
+new id whose conversation held the first's up to the interrupted call, and not the words.
+
+**Effect.** `say` accepts a `blocked` session, so such words are journalled `said` to attempt N and reach no model.
+Once that attempt is stopped and continued, the next one has not heard them, and the record says only that attempt
+N was told. Found in review, which asked whether "it reads the words once it moves again" had been measured; it had
+not.
+
+**Why it is not refused.** The harness lists a session `blocked` for its own stalls too, and a session stalled on a
+login refresh moved on when a cross-session message reached it (2026-09-13, the section on a closeout not read,
+below: 22:47:40Z). That is the "nudge it past a stall" case `say` exists for, and `claude agents` does not say which
+kind of wait a session is in. Not measured: whether a session approved through `claude attach` then reads the words
+queued while it waited, and a login-refresh stall nudged by `say` rather than by a peer's `SendMessage`.
+
+**Possible fix.** Whatever continues a blocked attempt carries what was said to it — `state.said` for that
+attempt — into the continuation's brief, as `wf retry --message` carries an answer. That is the upper layer's.
 
 ## Verified live, once
 
@@ -163,9 +228,26 @@ harness exists for comparison.
   from `claude agents` — and afterwards `ae logs` still read its transcript, and a second task resuming
   its id said the word back and was released in turn. Whether the first was still running when it was
   released, and so whether `claude stop` came before `rm` on a live session, was not recorded.
+- **`say` over the session's inbox socket** (engine, the run `the-steering-channel-engine-ff6b`).
+  `test/live.test.ts` on Claude Code 2.1.270, 2026-09-14, passed twice by the implementing step: two
+  `--bg` sessions at `effort: low` looped on `sleep 10` until a message named a file; `say` sent the
+  name to one, which wrote that file and named it in its closeout, and whose journal carried one
+  `said` event; the control, never told, wrote nothing and had `said: []`. The second run used the
+  stricter transcript check: the words arrived as exactly one `system` event, an attachment line
+  (`queued_command`, origin `peer`), while the session worked. Recorded here by the merger from the
+  step's closeout: the run's artifacts hold the hand probe (`say-probe.md`, busy and idle sessions, and
+  `say-blocked-probe.log`, issue 16), not the live test's own log.
 
 ## Verified by tests, not by a live run
 
+- **`say`'s refusals and the inbox's guards.** A fake `claude` that keeps a registry, a real Unix socket as
+  the inbox, and registration files the test writes, at shipped defaults (`test/say.test.ts`). Every refusal
+  is made to refuse with nothing sent or journalled. A test cannot make a file another user's without root, so
+  the owner checks are made to refuse by handing them another uid: the registration's through `claudeInbox`, the
+  socket's through `inboxSocketRefuses` (the first version tested the socket's only allowing; found in review).
+  An inbox that reads the words and never closes its end has been given them at the post's deadline, and says
+  so; one that reads nothing, sent a line bigger than a socket's buffer, has not. The `crossSessionInbound` holds (issue 12) and the Windows pipe
+  (issue 13) are read off 2.1.270's bundle and docs, not run.
 - **A session's conversation as events** (plan §4 S1). The Claude reader was written against the line
   shapes of the 150 transcripts last written on this machine (Claude Code up to 2.1.270), the Codex
   reader against the 34 rollouts here (codex-cli 0.154.0); each is checked on a file the test writes,

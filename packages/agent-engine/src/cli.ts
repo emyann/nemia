@@ -187,13 +187,14 @@ const line = (v: TaskView) => {
  */
 const KINDS: Record<string, string> = {
   filed: 'filed', starting: 'starting', spawned: 'started',
-  ended: 'ended', settled: 'SETTLED', 'stop-requested': 'stop asked',
+  ended: 'ended', settled: 'SETTLED', 'stop-requested': 'stop asked', said: 'said',
 };
 
 const entryLine = (taskId: string, event: Event) => {
   const extra = event.kind === 'settled' ? `  ${event.outcome}`
     : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? '' : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
     : event.kind === 'spawned' && event.error ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
+    : event.kind === 'said' ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0]!.slice(0, 160)}`
     : '';
   return `${event.at.slice(11, 19)}  ${taskId.padEnd(34)} ${(KINDS[event.kind] ?? event.kind).padEnd(10)}${extra}`;
 };
@@ -207,6 +208,7 @@ const HELP = `ae — an engine for agent sessions
   ae show <id>                 the journal, line by line
   ae logs <id>                 the session's output
   ae stop <id>                 ask it to stop
+  ae say <id> "<text>"         tell its running session something, and journal it
   ae feed [cursor]             what happened, since a cursor — the upper layer's API
   ae watch [cursor]            the same, followed
 
@@ -271,6 +273,14 @@ export async function main(argv: string[]): Promise<void> {
       if (!arg) return console.log(HELP);
       await engine.stop(arg);
       return console.log(`${arg}  stop requested`);
+
+    // The words are everything after the id, so an unquoted sentence is one message. An empty one is the
+    // engine's to refuse, as every refusal is: exit 2, and nothing journalled.
+    case 'say': {
+      if (!arg) return console.log(HELP);
+      const said = await engine.say(arg, argv.slice(2).join(' '));
+      return console.log(entryLine(arg, { kind: 'said', ...said }));
+    }
 
     case 'tick': {
       const r = await engine.tick();

@@ -156,26 +156,29 @@ say something to the next one writes a file, deliberately, like a person would �
 
 ### Declared output: `output:` and `input:`
 
-Two keys, neither control flow — one declares, one reads. `workflows/ui/`'s review and its reply:
+Two keys, neither control flow — one declares, one reads. `workflows/ui/`'s two steps:
 
 ```md
 ---
-harness: codex
-after: implement
-permissionMode: read-only
-output: review.schema.json
+harness: claude
+check: npm test && npm run typecheck && npm run build && npm run e2e
+output: implement.schema.json   # screenshots, pages
 ---
-Review the change in this workspace as a second engineer would. …
+Implement what was asked, in this repository. It changes what a person sees in the web app. …
 ```
 
 ```md
 ---
-after: review, look
-resume: implement
-input: review, look
-check: npm test && npm run typecheck && npm run build && npm run e2e
+harness: claude
+after: implement
+input: implement
+tools: Read, Grep, Glob, Bash
+permissionMode: dontAsk
+output: review.schema.json      # findings, and again: boolean
+loop: implement
+rounds: 3
 ---
-Two reviewers have been through your change. One read the code: its findings are below, under *From review* …
+Review the change in this workspace as a second engineer would, and look at it as a person who opens the web app would. …
 ```
 
 - **`output: <file>`** names a JSON Schema beside the step, relative to the workflow folder. `wf start`
@@ -197,17 +200,19 @@ Two reviewers have been through your change. One read the code: its findings are
 process does not* was written against handing the implementer's account to the reviewer. A declared
 output is an artifact: the step's deliberate product, exactly what `REVIEW.md` used to be. What
 changed is the transport, not the rule. The summary still goes to the person who decides and nowhere
-else. Nothing from any step's closeout reaches a step that did not ask for it. `implement` declares
-nothing and `review` reads nothing, so the reviewer judges the diff — and in a round, it is handed
-implement's replies to the last findings and nothing else, because its own `loop:` asked for them.
+else. Nothing from any step's closeout reaches a step that did not ask for it. In `workflows/`,
+`implement` declares nothing and `review` reads nothing, so the reviewer judges the diff — and in a
+round, it is handed implement's replies to the last findings and nothing else, because its own `loop:`
+asked for them. In `workflows/ui/`, `review` also reads implement's `screenshots` and `pages`: pictures
+of the change, which are artifacts, and not an account of it.
 
 The transport buys three things. The reviewer writes nothing, so it runs `permissionMode: read-only`.
 The harness enforces the review's shape. And the review lives on the engine's record of the attempt,
 not on a branch, so `git branch -D` no longer deletes the only copy. `wf decide` prints a declared
 output after the step's summary: `findings` as a list, any other field as `name: value`. A step that
-wants a file for a person still writes one: `workflows/ui/respond.md` writes `RESPONSE.md`, because a
-reply is for the person who decides. In `workflows/`, implement's replies travel on its closeout
-instead, to the next reviewer and to `wf decide`.
+wants a file for a person still writes one, and a picture goes in its files directory (*A step's
+files*, below). A loop's replies travel on its target's closeout instead, to the next reviewer and to
+`wf decide`.
 
 ## It works, and here is the run that proved it
 
@@ -612,31 +617,44 @@ it files the step.
   size, below whatever it declared that is not where it says.
 
 A file reaches a later step by its path, declared. `workflows/ui/implement.md` declares `screenshots`,
-the absolute paths of its PNGs, and `look` reads them with `input: implement`.
+the absolute paths of its PNGs, and `review` reads them with `input: implement`.
 
 ### `workflows/ui/`: a change a person will see
 
 ```
-implement ──► review (codex, read-only: the code)       ──┐
-          └─► look   (claude: implement's screenshots)   ──┴─► respond (resumes implement)
+implement ⇄ review   (review: the diff, and implement's screenshots and the pages beside it)
 ```
 
-`implement` and `respond` carry `check: npm test && npm run typecheck && npm run build && npm run e2e`.
+`implement` carries `check: npm test && npm run typecheck && npm run build && npm run e2e`.
 `npm run e2e` (`apps/web/test/e2e/` in this repository) builds the web app, serves it against a seeded
 store, visits every page in headless Chromium in a light and a dark theme, asserts what each page must
-have, and screenshots each into `WF_ARTIFACTS`. `implement` is told to run it into its own directory and
-read the PNGs before it signs off, and declares `screenshots` and `pages` (`implement.schema.json`).
-`look` is handed those and nothing else of implement, reads the images, and declares `findings` by page
-and theme (`look.schema.json`). `review` is `workflows/review.md` and its schema, copied, and a test holds
-the copy to the original. `respond` is the fan-in: it reads both reviews, continues implement's session,
-and answers them in `RESPONSE.md`.
+have, and screenshots each into `WF_ARTIFACTS`. Before it signs off, `implement` is told to run it into its
+own directory and read the PNGs, and to use the look skill on every page it changed. It declares
+`screenshots` and `pages` (`implement.schema.json`). `review` reads the diff, is handed those and nothing
+else of implement, and uses the look skill on the screenshots and the pages side by side. Its schema is
+`workflows/review.md`'s, `again` and all, with one difference: a finding says where it is as
+`where: { file, line }` for the code or `{ page, theme }` for what a person sees, strict, so a finding that
+names neither does not fit the closeout the step is filed with. `again: true` sends the change round
+again, at most `rounds: 3`, as in `workflows/`.
 
 ```bash
 wf start "Give the Factory a legend" --workflows packages/agent-workflows/workflows/ui
 ```
 
-Neither reviewer can write, by machinery rather than by its brief. `look` has `tools: Read, Grep, Glob`,
-so no Edit, Write or Bash. `review` runs on codex, which has no tool list, in `permissionMode: read-only`.
+**Looking is a skill, not a step.** `.claude/skills/look/SKILL.md`, in this repository, says how any step
+looks at the web app. It reads the e2e's PNGs. It serves the app on ports of its own and photographs every
+page with the browser's `browser_*` tools (`.mcp.json`), and never with `browser_run_code_unsafe`, which
+`.claude/settings.json` denies. And it judges the layout, both themes, and what a person notices first. It
+writes nothing into the workspace. `look` was a step of its own while the reviewer ran on codex, which
+reads no image and has no browser, and `respond` answered two reviewers while there was no loop. Neither
+reason holds now.
+
+`review` cannot edit, by machinery rather than by its brief: `tools: Read, Grep, Glob, Bash` has no Edit or
+Write, and in `permissionMode: dontAsk` a Bash command `.claude/settings.json` does not allow is denied
+without a prompt. The same settings allow no `browser_*` tool, so at this repository's settings `review`
+looks through the screenshots and opens no page (measured; `docs/features.md`, *Shipped: looking is a
+skill*). The repository's `workflows/ui/` is this folder, copied with a README of its own, and a test holds
+the copy to it.
 
 ## Deciding what ships
 

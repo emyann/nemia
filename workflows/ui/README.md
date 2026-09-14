@@ -14,7 +14,9 @@ screenshots it read and the pages they show (`implement.schema.json`). `review` 
 `tools: Read, Grep, Glob, Bash` in `permissionMode: dontAsk`, so it has no tool that writes and a command
 `.claude/settings.json` does not allow is denied without a prompt. It is handed implement's screenshots
 and pages and nothing else of implement (`input: implement`), reads the diff, and uses the look skill on
-the screenshots and the pages side by side. Its findings are its closeout (`review.schema.json`), each
+the screenshots and the pages side by side. At this repository's settings it looks through the
+screenshots: in `dontAsk` a `browser_*` call is denied, because `.claude/settings.json` allows none
+(measured; `packages/agent-workflows/docs/features.md`, *Shipped: looking is a skill*). Its findings are its closeout (`review.schema.json`), each
 naming a file and a line or a page and a theme, and `again: true` sends the change round again:
 implement's own session is continued with the findings, then a new review. After the third round, a
 person decides.

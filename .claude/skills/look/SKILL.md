@@ -78,9 +78,11 @@ and you would be judging your own stylesheet.
 **Never `browser_run_code_unsafe`.** It runs code of your choosing in the browser server's own process,
 past every fence the other tools keep, and `.claude/settings.json` denies it by name.
 
-If a command to serve the app is denied — a step in `dontAsk` runs only what `.claude/settings.json`
-allows — the pictures are the pages. Say that you judged from the screenshots, and do not guess at what a
-page does when pressed.
+**When the browser is denied.** A step in `permissionMode: dontAsk` runs only the commands and tools
+`.claude/settings.json` allows, and today that is no `browser_*` tool, no command that serves the app and
+no `cp`: each is denied without a prompt. Reading a PNG outside the workspace is allowed. (Measured with
+Claude Code 2.1.270.) Then the pictures are the pages: read them, say in what you report that you judged
+from the screenshots, and do not guess at what a page does when pressed.
 
 ## 3. Judge what you see
 

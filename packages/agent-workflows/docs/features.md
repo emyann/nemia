@@ -8,8 +8,8 @@ State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
-`rounds:` and `wf round` (§4 R), a step's `tools:` and `effort:` (§4 I), and the decider screen
-(§4 G) have shipped.
+`rounds:` and `wf round` (§4 R), a step's `tools:` and `effort:` (§4 I), the decider screen
+(§4 G), and looking as a skill with `workflows/ui/` as implement ⇄ review (§4 U2) have shipped.
 
 ## Shipped: the check
 
@@ -42,8 +42,8 @@ waits on it is filed. `wf decide` prints the declared output after the summary.
 The anchoring rule is kept by making both ends declared. A step's summary still goes only to the
 person who decides, and nothing from any closeout reaches a step that did not ask for it.
 `workflows/review.md` now declares `findings` (`review.schema.json`) and runs read-only.
-`workflows/respond.md` read them with `input: review` until the loop replaced it; `workflows/ui/respond.md`
-still does, and writes `RESPONSE.md` for the person.
+`workflows/respond.md` read them with `input: review` until the loop replaced it, and `workflows/ui/respond.md`
+did until the loop replaced it there too (§4 U2).
 The README section *Declared output* is the full account.
 
 What it leaves:
@@ -61,16 +61,18 @@ The run makes `runs/<id>/artifacts/<step>/` under `WF_ROOT` before it files a st
 it is on its brief, beside the closeout contract, and gives the step's check the same directory as
 `WF_ARTIFACTS`. A declared artifact by absolute path counts when it is a file in that directory; any other
 absolute path is refused without being looked at. `wf decide` lists the directory's files with their
-sizes. With it comes `workflows/ui/`: implement, then review and look side by side, then respond, checked
-by `npm run e2e`, which screenshots every page of the web app in both themes into the step's directory
-for `look` to read. The README section *A step's files* is the account.
+sizes. With it came `workflows/ui/`, checked by `npm run e2e`, which screenshots every page of the web app
+in both themes into the step's directory for the steps after it to read — since §4 U2, implement ⇄ review
+(*Shipped: looking is a skill*, below). The README section *A step's files* is the account.
 
 What it leaves:
 
-- **Reading outside the worktree, unattended, has not been run.** The screenshots live under `WF_ROOT`,
-  outside `look`'s worktree. Nobody has yet run a `claude` step in `auto` mode to see whether it reads
-  them without asking. If it stalls `needs-human`, the fix is a directory the step may read, carried on
-  the task the way `mcp:` will be (§4 E4).
+- **Reading outside the worktree, unattended, is measured in `dontAsk` only.** The screenshots live under
+  `WF_ROOT`, outside the reviewer's worktree. A `claude -p` spawned as the engine spawns `workflows/ui/review.md`
+  (`--permission-mode dontAsk --tools Read,Grep,Glob,Bash --mcp-config .mcp.json --strict-mcp-config`, in a
+  worktree) read a PNG under `runs/<id>/artifacts/` without asking (Claude Code 2.1.270, 2026-09-13). Nobody
+  has run a step in `auto` mode to see the same. If one stalls `needs-human`, the fix is a directory the step
+  may read, carried on the task the way `mcp:` will be (§4 E4).
 - **The board does not show a step's files.** That needs a small api endpoint over
   `runs/<id>/artifacts/` and a list in the step inspector (plan, *The `ui/` workflow*).
 - **The api does not tell an unfiled step its directory.** `composeBrief` takes the directory as a fifth
@@ -100,9 +102,9 @@ worktree (Claude Code 2.1.270, on a machine whose operator has a user-scope serv
 
 What it leaves:
 
-- **Every Claude step has it, the readers too.** `look` does not need a browser. Per-step choice is the
-  `mcp:` question under *Shipped: what a step may have*, below: the engine's `mcp` adds servers beside
-  `.mcp.json`, and cannot take that file's servers away.
+- **Every Claude step has it, the readers too,** and a tool list does not take it away (measured, under
+  *Shipped: looking is a skill*). Per-step choice is the `mcp:` question under *Shipped: what a step may
+  have*, below: the engine's `mcp` adds servers beside `.mcp.json`, and cannot take that file's servers away.
 - **Codex steps do not have it.** Codex reads no `.mcp.json`. The engine hands a task's `mcp` to Codex as
   one `-c mcp_servers=…` override, so a Codex browser waits on the same `mcp:` key.
 - **Two browser builds.** No `@playwright/mcp` release pins the e2e's playwright 1.62.1 (Chromium 1234),
@@ -238,10 +240,8 @@ What it leaves:
   draws no loop edge. Each is an argument or a word in the apps, from what `listing` already says.
 - **A loop is a chain.** A step in the loop that forks or merges is refused, because its worktree is cut
   once and a round would not bring the target's new commits into it. Merging the target's branch into
-  such a worktree each round would lift that, and a loop over `workflows/ui/`'s two reviewers needs it.
-- **`workflows/ui/` does not loop.** Its review is `workflows/review.md` less `loop:`, `rounds:` and
-  `again`, and its respond is still the fan-in of review and look. A test holds the copy to the original,
-  less the loop.
+  such a worktree each round would lift that, and a loop over two reviewers side by side needs it.
+  `workflows/ui/` had two, and loops now because looking became a skill and its reviewers one (§4 U2).
 - **`wf logs <run> <step>`** on a step of the loop waiting for its round says it has not run: it reads the
   current try, which is not filed yet. The earlier tries are under their own ids, for `ae logs`.
 - **An ask carries no message**, as `wf retry`'s does not: `wf round` says once more, not what to look at.
@@ -267,19 +267,20 @@ harness thinks, `effort: high`. Both reach `e.file` on every filing of the step:
 - `phaseOfView`, `closeoutAsked` and `exitVerdicts` are exported from the package root, so a consumer words a
   step as `wf ls` does off the views it already has, with no `logs` call. `wf ls` now says `unknown`, not
   `pending`, for a task the engine has no record of (plan §4b).
-- `workflows/ui/look.md` has `tools: Read, Grep, Glob`. The two reviewers stay on codex in
-  `permissionMode: read-only`, and their frontmatter gives the Claude form: `tools: Read, Grep, Glob, Bash`.
+- `workflows/review.md` stays on codex in `permissionMode: read-only`, and its frontmatter gives the Claude
+  form: `tools: Read, Grep, Glob, Bash`, which `workflows/ui/review.md` uses in `dontAsk` since §4 U2.
 
 What it leaves:
 
 - **`mcp:` on a step is the next question.** Every Claude step gets the checkout's `.mcp.json` (E4), readers
   included. The engine's task `mcp` adds servers beside that file and cannot withhold it. A per-step `mcp:` that
-  narrows — `look` without a browser, or a reader with only the servers it names — needs the engine to leave the
+  narrows — a reader without a browser, or with only the servers it names — needs the engine to leave the
   checkout's file out when a task asks it to. Until then an `mcp:` key could only add, and a step that named
   none would still have every server in the file. So the key is not built.
-- **Whether `--tools` narrows a server's tools is read, not measured.** `claude --help` (2.1.270) says the list
-  is "from the built-in set", so `look`'s `browser_*` tools are taken to survive `tools: Read, Grep, Glob`. No
-  live test has filed a step with both a tool list and `.mcp.json`.
+- **`--tools` does not narrow a server's tools, measured.** `claude --help` (2.1.270) says the list is "from the
+  built-in set", and a `claude -p` with `--tools Read,Grep,Glob,Bash` and `.mcp.json` listed every `browser_*`
+  tool (2026-09-13, *Shipped: looking is a skill*). What keeps a server's tool from such a step is its permission
+  mode and the settings, not its tool list. No `--bg` step has been filed with both yet.
 - **The shipped reviewers still cannot be shown to run the suite.** They are on codex, and its `read-only`
   sandbox writes nothing, while the root `npm test` runs turbo, which writes a cache. Nobody has run it under
   that sandbox. A Claude reviewer with `tools: Read, Grep, Glob, Bash` has the tool for it, and the operator's own
@@ -293,6 +294,49 @@ What it leaves:
   exports, in a follow-up.
 - **Codex's tool-list fence in the engine is unused.** The engine runs a codex task `read-only` when its list has
   none of Bash, Write or Edit. No step reaches that now, and `permissionMode: read-only` says the same plainly.
+
+## Shipped: looking is a skill — `workflows/ui/` as implement ⇄ review
+
+Plan §4 U2. `workflows/ui/` forked implement into `look`, `review` and `respond`, which read as three kinds of
+work when it was one loop. `look` was a step because the reviewer ran on codex, which reads no image and has no
+browser, and `respond` because there was no loop. Neither holds: `workflows/ui/review.md` runs on Claude, every
+Claude step has the checkout's `.mcp.json`, and §4 R gave the edge back.
+
+- **The look skill**, `.claude/skills/look/SKILL.md` in this repository: read the e2e's PNGs; serve the app as
+  the e2e does and photograph the pages with the `browser_*` tools, never `browser_run_code_unsafe`; judge the
+  layout, both themes and what a person notices first, in `look.md`'s words. It writes nothing into the
+  workspace.
+- **`implement`** uses it on every page it changed before it signs off. Its check, `screenshots` and `pages`
+  are unchanged.
+- **`review`** is `input: implement`, `tools: Read, Grep, Glob, Bash`, `permissionMode: dontAsk`,
+  `loop: implement`, `rounds: 3`: the old review's prose, then the old look's. Its schema is
+  `workflows/review.schema.json` with a finding's place as `where: { file, line } | { page, theme }`, strict.
+- **`look.md`, `look.schema.json` and `respond.md` are gone**, from this folder and the repository's copy.
+  `test/ui-workflow.test.ts` loads the two steps and the loop; makes the closeout schema refuse a finding that
+  names neither a file nor a page, half of one, or both, with `ajv` (now a dev dependency); and holds the
+  repository's `workflows/ui/` to this folder, README aside, catching a copy that drifts.
+
+What it leaves:
+
+- **At this repository's settings the reviewer looks through the screenshots only.** Measured on 2026-09-13 with a
+  `claude -p` spawned as the engine spawns `review` (Claude Code 2.1.270): a Read of a PNG under
+  `runs/<id>/artifacts/` and `git status` were allowed; `browser_navigate`, `browser_take_screenshot` and `cp`
+  were denied without a prompt, because `.claude/settings.json` allows none of them and `dontAsk` denies what
+  it does not allow. So the skill's browser half is inert for `review` until a person adds the browser tools a
+  reader may use to `allow` — by name, not `mcp__playwright` whole, which would allow `browser_file_upload` and
+  `browser_evaluate` too. The skill says what to do meanwhile: judge from the pictures, and say so.
+- **The browser photographs the light theme only.** The app and its canvas follow `prefers-color-scheme`, the
+  browser's is light (measured), and no `browser_*` tool changes it; `browser_run_code_unsafe` could, and is
+  denied. The dark theme is the e2e's `<page>-dark.png`. A browser that photographs the dark needs its server to
+  start that way: a second server in `.mcp.json` given `--config` with `browser.contextOptions.colorScheme`, or a
+  per-step `mcp:`.
+- **The browser saves only under its output directory or the workspace.** Playwright MCP refuses any other
+  path, so a step's own photographs reach its files directory by a copy, which a `dontAsk` step cannot make.
+  They stay in `/tmp/playwright-mcp`, one directory for every step on the machine (plan §4b); the skill names a
+  folder per run and step inside it.
+- **The pictures `review` reads are the check's.** `implement`'s check runs `npm run e2e` into the directory its
+  `screenshots` name, after it signs off and before `review` is filed, so each round's reviewer reads the
+  change as it stands under the same paths. A photograph `implement` takes with the browser is not among them.
 
 ## Shipped: the decider screen
 

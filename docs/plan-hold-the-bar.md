@@ -745,9 +745,16 @@ owner is not mid-run.
   file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
   last value only (`indexOf` on parsed objects is −1). → apps, with B7.
 
+- **the settings' prefix allows reach the build and the e2e by other names (D1's round-2 review, 2026-09-14):** the
+  reviewers are denied `Bash(npm run build)` and `Bash(npm run e2e)` by machinery now, but `.claude/settings.json`
+  allows `Bash(npx turbo run test:*)` and `Bash(node --test:*)`, so `npx turbo run test build` builds the web app and
+  `node --test apps/web/test/e2e/run.ts` runs the e2e, and a deny cannot close an allow that runs any task or any file
+  (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
+  and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
+
 ### Settled
 
-Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, filed 2026-09-14, closes the last two).
+Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
 
 - **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
   mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
@@ -894,7 +901,7 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — the order to file is 4–5 (D1, filed), then Q, then P.
+Everything left, in one list, as of 2026-09-14 — the order to file is 4–5 (D1, done), then Q, then P.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -902,13 +909,15 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
    `runReady(run, shipped)` gating roots on shipped parents, `wf ls` saying `waiting on <run>`; the Factory
    as a graph of cards; then `wf plan <folder>`. workflows + board. *Next after Q.*
 2. **Q — A step that asks, and a step that plans** (§4 Q): `wf retry --nudge --message`, the answer box
-   on a blocked step (the board's second write), a `plan` step and a `dev-planned` variant. *Next after D1.*
+   on a blocked step (the board's second write), a `plan` step and a `dev-planned` variant. *Q1 (agent-workflows:
+   `--message`, `## Your answer`, `dev-planned`) filed 2026-09-14 as `a-step-that-asks-gets-an-ans-v5qd`; Q2 (apps: the
+   answer box, a guarded `POST` that calls `retry()`) after it lands.*
 3. **The steering channel** (deferred from §4 S): a prompt box on the session page that sends into a
    running session, the message recorded on the run. api + engine (a `say` op).
 
 **agent-workflows, small**
-4. Per-step `disallow:` → `--disallowedTools`, a field on the task. *D1, filed 2026-09-14.*
-5. `wf decide` prints a nested `where` as JSON — `itemLines`. *D1.*
+4. Per-step `disallow:` → `--disallowedTools`, a field on the task. *Done, D1, `825be29`.*
+5. `wf decide` prints a nested `where` as JSON — `itemLines`. *Done, D1, `825be29`.*
 6. `radius` and workspace globs (`./packages/*`, `**`).
 7. Step order: `run.steps` alphabetical; order by `after` at `wf start`.
 8. `wf start --input <file>` into `runs/<id>/inputs/`, named in every brief.
@@ -929,5 +938,11 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 
 **Documentation**
 19. The ledger reordered: open first, settled below. *Done, `55acbde`.*
+
+**Settings, a decision by hand**
+20. `.claude/settings.json`'s `Bash(npx turbo run test:*)` and `Bash(node --test:*)` reach the build and the e2e by other
+    names (`npx turbo run test build`, `node --test apps/web/test/e2e/run.ts`), and no deny closes a prefix allow that
+    runs any task or any file (D1's round-2 review). The reviewers' briefs name both; narrowing the allows — or
+    dropping them for `npm test` and `cd packages/<p> && npm test` — is the owner's call.
 
 **Not doing** (§5): no LLM in a tick or in `wf decide`; no `labels:`/`risk:`/`guide:` keys; no gate inside a step; no lint tool yet.

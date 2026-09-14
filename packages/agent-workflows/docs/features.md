@@ -934,6 +934,47 @@ What it leaves:
   consumed say, is not handed on.
 - **Starting a plan twice starts every card twice.** Nothing records that a folder was started.
 
+## Shipped: six small items
+
+Plan §6 items 6, 7, 8, 9, 24 and 25, one commit each, with the §4b findings they came from. Nothing in the engine, and
+nothing in apps/.
+
+### `radius` reads the base's `workspaces` as npm does
+
+G's round-2 review found that the decider screen took the base's `workspaces` globs as written. `./packages/*` became a
+regexp that no path git prints could match, so every package's changes fell into one `packages` group, and nothing under
+`./packages/*/docs/` counted as a lesson. This repository writes `packages/*`, so it never showed here.
+
+What was built:
+
+- `workspaceGlob` drops a leading `./` and a trailing `/`, and everything in `radius.ts` that reads a workspace goes through
+  it: `groupOf` (now `packageOf`, then a top-level directory), `lessonGlobs` and the new `isLesson`.
+- A glob with `**` is not refused, since the repository's `package.json` is not ours. `deepWorkspaces` names such globs as
+  written, `radius` carries them, and `radiusLines` adds a `workspaces` line under the branch that names each one. Each file
+  still counts once. Its group is the outermost directory a glob names. It counts as a lesson only in that package's own
+  `docs/`, since `packages/**/docs/` would also take a `docs/` in a package's source, or one directly under `packages/`.
+- `wf decide --help` says both, under the lists.
+
+What was measured:
+
+- Two pure tests in `test/radius.test.ts`:
+  - `./packages/*` groups `packages/x/src/a.ts` under `packages/x` and counts `packages/x/docs/notes.md` as a lesson, but not
+    a `docs/` in a package's source. `./packages/*`, `./packages/*/`, `.//packages/*` and `packages/*/` each group exactly as
+    `packages/*` does. No `workspaces` line is printed.
+  - `['packages/**', 'apps/*']`: five files in three groups, the group counts summing to five. The one lesson is the
+    package's own `docs/`. The screen's last line names `packages/**`, once per branch.
+- Each guard was broken on purpose and the tests rerun: leaving `./` in place fails the first test, and turning a `**`
+  glob into a `docs/` glob fails the second.
+- agent-workflows: 351 tests, 350 passed, and one was skipped, the live browser test that needs `AE_LIVE=1`. Typecheck clean.
+
+What it leaves:
+
+- **The board does not draw the `workspaces` line.** The api hands on the package's radius, `deepWorkspaces` included, but
+  the decide panel on the run page draws only the groups and the chips.
+- **A package nested inside another counts in the outer one**, with or without `**`, as before: `packages/*` plus
+  `packages/x/plugins/*` puts `packages/x/plugins/p/src/a.ts` under `packages/x`. A lesson in the inner package's `docs/`
+  still counts, through `lessonGlobs`; with `**` it does not.
+
 ## 1. Forgetting a run (`wf rm`)
 
 **Why.** Runs, worktrees and branches accumulate, and clearing them is manual: `git worktree

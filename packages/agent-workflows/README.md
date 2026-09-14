@@ -873,7 +873,10 @@ screen shows what the branch touched, read out of git:
 ```
 
 - **touched** is `git diff --numstat` against the run's base, grouped by workspace package (the base's
-  own `workspaces`, which no step could edit) or else by top-level directory. A move counts in both
+  own `workspaces`, which no step could edit, read as npm reads them: `./packages/*` is `packages/*`) or
+  else by top-level directory. A `workspaces` glob with `**` is not refused, since the repository's file is
+  not ours, but a `workspaces` line names it: a file still counts once, in the outermost package on its
+  way. A move counts in both
   places it touched, a binary file as a file with no lines. Then, each only when true, the
   *agent-facing* files — what an agent reads as instructions: `CLAUDE.md`, `AGENTS.md`, `.claude/`,
   `.codex/`, `.mcp.json`, a `README.md` — and the *check-affecting* ones: every `package.json`, the
@@ -885,7 +888,7 @@ screen shows what the branch touched, read out of git:
   files in full, for one screen; the touched lines still say which files are check-affecting. The
   heading with `none` under it means nothing on the list changed, not that nobody looked.
 - **lesson** says whether the run changed a file where the next agent reads — `CLAUDE.md`,
-  `AGENTS.md`, the root's `docs/` or a workspace package's — or that it wrote nothing there. Not any
+  `AGENTS.md`, the root's `docs/` or a workspace package's own — or that it wrote nothing there. Not any
   `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. CLAUDE.md's *When you miss* is a rule, and
   this line holds a person to it.
 - **used** and **cost** are the engine's `usage` for the step's current try, summed over its attempts.

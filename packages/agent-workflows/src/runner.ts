@@ -1638,7 +1638,10 @@ export function touchedBy(run: Run, branch: string): Radius | { error: string } 
   try { return radius(numstat, workspacesOf(run)); } catch (err) { return { error: (err as Error).message }; }
 }
 
-/** The base's npm `workspaces`, which `radius` groups a change by — read at the base, where no step could have edited them. */
+/**
+ * The base's npm `workspaces`, which `radius` groups a change by — read at the base, where no step could have edited them, and handed on
+ * as written: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` on the screen (`workspaceGlob`, `deepWorkspaces`).
+ */
 function workspacesOf(run: Run): string[] {
   try {
     const { workspaces } = JSON.parse(gitSays(run.repo, 'show', `${run.baseRef}:package.json`) ?? '{}');

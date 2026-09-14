@@ -22,8 +22,13 @@ export type Group = { name: string; files: number; added: number; removed: numbe
 
 export type Radius = {
   changes: Change[]; groups: Group[]; agentFacing: string[]; checkAffecting: string[];
-  /** The changes to a file where the next agent reads (`lessonGlobs`), for the lesson line. */
+  /** The changes to a file where the next agent reads (`isLesson`), for the lesson line. */
   lessons: Change[];
+  /**
+   * The base's `workspaces` globs that have `**`, as written (`deepWorkspaces`): each file still counts once, and the screen names
+   * them. Absent on a radius nobody read workspaces for.
+   */
+  deepWorkspaces?: string[];
 };
 
 /** A branch the screen read, and what it touched — or why that could not be read. */
@@ -46,9 +51,27 @@ export const CHECK_AFFECTING: readonly string[] = ['**/package.json', '**/packag
  */
 export const LESSON: readonly string[] = ['**/CLAUDE.md', '**/AGENTS.md', 'docs/'];
 
-/** The lesson list for a repository: `LESSON`, and `<workspace>/docs/` for each of its npm `workspaces` globs. */
+/**
+ * A `workspaces` glob as the radius matches it: a leading `./` and a trailing `/` dropped, so `./packages/*` is `packages/*`, with or
+ * without a slash after it. npm reads them the same; a regexp built from `./packages/*` as written never matched a path git prints, so every package's
+ * change fell into one `packages` group and no package's `docs/` counted as a lesson.
+ */
+export const workspaceGlob = (written: string): string => written.replace(/^(?:\.\/+)+/, '').replace(/\/+$/, '');
+
+/**
+ * The globs among a repository's `workspaces` that have `**`, as written. Not refused — the repository's `package.json` is not
+ * ours — but named on the screen (`radiusLines`), since such a glob names a package at any depth: each file counts once all the
+ * same, in the outermost package on its way (`packageOf`), and as a lesson only in that package's own `docs/` (`isLesson`).
+ */
+export const deepWorkspaces = (workspaces: readonly string[]): string[] => workspaces.filter((w) => workspaceGlob(w).includes('**'));
+
+/**
+ * The lesson list for a repository: `LESSON`, and `<workspace>/docs/` for each of its npm `workspaces` globs without `**`. Made from
+ * `packages/**`, that glob would take a `docs/` inside a package's source too — `packages/x/src/docs/`, product code — so a `**` glob's
+ * packages are read one file at a time instead (`isLesson`).
+ */
 export const lessonGlobs = (workspaces: readonly string[]): string[] =>
-  [...LESSON, ...workspaces.map((w) => `${w.replace(/\/+$/, '')}/docs/`)];
+  [...LESSON, ...workspaces.map(workspaceGlob).filter((w) => !w.includes('**')).map((w) => `${w}/docs/`)];
 
 /** The group of a file in no directory. */
 export const ROOT_GROUP = '(root)';
@@ -122,18 +145,37 @@ export function parseNumstat(numstat: string): Change[] {
 }
 
 /**
- * The group a file counts in: the workspace package it is in when a `workspaces` glob names a
- * directory on its way (`packages/agent-workflows`), else its top-level directory, else the root.
+ * The workspace package a file is in: the outermost directory on its way that a `workspaces` glob names (`packages/agent-workflows`),
+ * or undefined when none does. Outermost, so a glob with `**`, which names every directory below `packages/`, puts a file in one package.
  */
-export function groupOf(file: string, workspaces: readonly string[] = []): string {
+export function packageOf(file: string, workspaces: readonly string[]): string | undefined {
   const dirs = file.split('/').slice(0, -1);
-  if (!dirs.length) return ROOT_GROUP;
-  const packages = workspaces.map(globRegExp);
+  const packages = workspaces.map((w) => globRegExp(workspaceGlob(w)));
   for (let n = 1; n <= dirs.length; n++) {
     const dir = dirs.slice(0, n).join('/');
     if (packages.some((p) => p.test(dir))) return dir;
   }
-  return dirs[0]!;
+  return undefined;
+}
+
+/**
+ * The group a file counts in: the workspace package it is in (`packageOf`), else its top-level directory, else the root.
+ */
+export function groupOf(file: string, workspaces: readonly string[] = []): string {
+  const dirs = file.split('/').slice(0, -1);
+  if (!dirs.length) return ROOT_GROUP;
+  return packageOf(file, workspaces) ?? dirs[0]!;
+}
+
+/**
+ * Whether a file is where the next agent reads: on `lessonGlobs`, or — for a package a `**` glob names — in the `docs/` of the one
+ * package `packageOf` puts it in, and no `docs/` deeper in that package.
+ */
+export function isLesson(file: string, workspaces: readonly string[] = []): boolean {
+  if (matches(file, lessonGlobs(workspaces))) return true;
+  const deep = deepWorkspaces(workspaces).map((w) => globRegExp(workspaceGlob(w)));
+  const pkg = deep.length ? packageOf(file, workspaces) : undefined;
+  return pkg !== undefined && deep.some((p) => p.test(pkg)) && file.startsWith(`${pkg}/docs/`);
 }
 
 /**
@@ -158,11 +200,15 @@ export function radius(numstat: string, workspaces: readonly string[] = []): Rad
     groups: [...groups.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
     agentFacing: touching(AGENT_FACING).map(nameOf),
     checkAffecting: touching(CHECK_AFFECTING).map(nameOf),
-    lessons: touching(lessonGlobs(workspaces)),
+    lessons: changes.filter((c) => pathsOf(c).some((p) => isLesson(p, workspaces))),
+    deepWorkspaces: deepWorkspaces(workspaces),
   };
 }
 
-/** The radius for a person: a line per group, then the agent-facing and check-affecting lines, each only when true. */
+/**
+ * The radius for a person: a line per group, then the agent-facing and check-affecting lines, each only when true — and a line naming
+ * a `workspaces` glob with `**`, when the base has one, since the groups above are read through it.
+ */
 export function radiusLines(r: Radius): string[] {
   if (!r.changes.length) return ['nothing — the branch changed no file against the base'];
   const width = Math.max(...r.groups.map((g) => g.name.length));
@@ -176,6 +222,9 @@ export function radiusLines(r: Radius): string[] {
     ...groups,
     ...(r.agentFacing.length ? [`agent-facing     ${r.agentFacing.join(', ')}`] : []),
     ...(r.checkAffecting.length ? [`check-affecting  ${r.checkAffecting.join(', ')}`] : []),
+    ...(r.deepWorkspaces?.length
+      ? [`workspaces       ${r.deepWorkspaces.join(', ')} in the base's package.json ${r.deepWorkspaces.length > 1 ? 'cross' : 'crosses'} directories: a file counts once, in the outermost package on its way, and as a lesson only in that package's docs/`]
+      : []),
   ];
 }
 

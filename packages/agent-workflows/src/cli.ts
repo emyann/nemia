@@ -117,6 +117,9 @@ each step, before its closeout, what a person said to its sessions while they ra
   where the next agent reads:                ${LESSON.join(', ')}, and <workspace>/docs/ for each
                                              npm workspace in the base's package.json — not any docs/
 
+A workspace glob is read as npm reads it, ./packages/* as packages/*. One with ** is named on the screen,
+and a file still counts once: in the outermost package on its way, and as a lesson only in its docs/.
+
 A glob is a path from the repository root: * and ? stay within a directory, ** crosses any number of
 them (a leading **/ crosses none as well), and a trailing / takes everything below.`;
 

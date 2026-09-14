@@ -300,6 +300,13 @@ a space or a comma outside the parentheses is two rules to the harness. An empty
 and passes no flag. Codex refuses a list that denies anything: it has no tool to take away, and the list
 would be dropped without a word.
 
+**Measured, as `--tools` was** (2026-09-14, Claude Code 2.1.270, `claude -p` in `dontAsk`, by hand): a
+session given `--allowedTools "Bash(npm run build)" "Bash(npm run e2e)"` and told to run both ran both. The
+same session given `--disallowedTools "Bash(npm run build),Bash(npm run e2e)"` as well ran neither, so one
+argument with a space inside each rule reads as two rules, and the deny beat the allow. A session given
+`--disallowedTools "SendMessage,CronCreate,CronDelete,RemoteTrigger"` started with 26 tools and none of
+those four; without it, 30. No `AE_LIVE` test holds this yet.
+
 ### MCP servers: `mcp`, and never the operator's
 
 A Claude Code session spawned with no MCP flags loads every server the operator has: user scope

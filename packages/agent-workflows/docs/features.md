@@ -260,6 +260,10 @@ and each round, as `tools:` does.
   brackets or in quotes: the list is split on every comma), when an entry is not one rule, and on codex, whose message
   names `permissionMode`. The engine's `file()` refuses a `disallowedTools` that is not a list of rules, and codex
   refuses one that denies anything rather than drop it.
+- **Measured, not only passed** (2026-09-14, Claude Code 2.1.270, `claude -p` in `dontAsk`). Given `--allowedTools`
+  for `npm run build` and `npm run e2e`, a session told to run both ran both. Given
+  `--disallowedTools "Bash(npm run build),Bash(npm run e2e)"` as well, it ran neither. The implement list took
+  `SendMessage`, `CronCreate`, `CronDelete` and `RemoteTrigger` from the session's tools (30 → 26).
 - The shipped Claude reviewers (`workflows/dev`, `dev-build` and `ui`, and the package's `workflows/ui`) are denied
   `Bash(npm run build)` and `Bash(npm run e2e)`: `.claude/settings.json` allows both for implement's check, and both
   write into the workspace. Their brief still says not to run them; the fence is what keeps them from it.
@@ -275,6 +279,8 @@ What it leaves:
   step outside `dontAsk`, or settings with a looser allow such as `Bash(npm run build:*)`, would need the looser rule.
 - **The board does not show it.** The api's step spec and the inspector name `tools` and not `disallow`. → apps.
 - **`ae` briefs have no `disallowedTools` key.** The engine's task has the field, and its CLI does not read one.
+- **No live test holds the deny.** The measurement above was made by hand. `agent-engine/test/live.test.ts`
+  (`AE_LIVE=1`) holds `--tools`, and not `--disallowedTools`.
 
 ## Shipped: what a step may have — `tools:` and `effort:`
 

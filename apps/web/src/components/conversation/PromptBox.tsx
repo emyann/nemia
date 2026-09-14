@@ -3,7 +3,7 @@ import { ArrowUpIcon, LockIcon } from 'lucide-react';
 import { useId, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { sayToStep, type Said } from '@/lib/api';
-import type { Sayable } from '@/lib/say';
+import { textAfterSaid, type Sayable } from '@/lib/say';
 import { cn } from '@/lib/utils';
 
 type Props = {
@@ -29,8 +29,9 @@ export function PromptBox({ runId, step, sayable, onSaid }: Props) {
   const queryClient = useQueryClient();
   const send = useMutation({
     mutationFn: (words: string) => sayToStep(runId, step, words),
-    onSuccess: (said) => {
-      setText('');
+    onSuccess: (said, words) => {
+      // Emptied only if it still holds what was sent: what a person wrote while the words were being said is kept.
+      setText((now) => textAfterSaid(now, words));
       onSaid(said);
       // The run as the api has it now: what was said to the step, and its note.
       void queryClient.invalidateQueries({ queryKey: ['runs', runId] });

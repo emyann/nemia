@@ -554,6 +554,10 @@ What it leaves:
 - **The box closes on the board's last read of the step.** Read every five seconds, so a session that ended since
   is refused by the api when words are sent, and the refusal is shown; nothing is said.
 - **Only the session page draws what was said.** The inspector's Activity tab folds the transcript alone.
+- **An arrival is known by its words.** The session page takes a system line whose text is what was said, or ends with
+  it after Claude Code's line for a peer's message, written no more than 5 s before the entry, as the session's record of
+  the words reaching it, and draws the words once (`heardIn`). A Claude Code that wrote them otherwise would draw them
+  twice again, and lose nothing.
 - **Codex and `claude-detached` steps have no channel**, and the engine refuses them in its words.
 
 ## Shipped: a run that waits on a run — `wf start --after`

@@ -7,7 +7,7 @@ import { StatusChip, StepNote } from '@/components/StatusChip';
 import { runQuery, type RunDetail, type Said } from '@/lib/api';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
-import { foldTranscript, withSaid } from '@/lib/transcript';
+import { foldTranscript, heardIn, withSaid } from '@/lib/transcript';
 import { useStepTranscript } from '@/lib/useStepTranscript';
 
 // `$runId_`: at /runs/$runId/steps/$step, and not drawn inside the run's page, which has no outlet for it.
@@ -54,7 +54,11 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
   // What this page said that the run, as last read, does not have yet — kept with the task it was said to, so a later try starts afresh.
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
   const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);
-  const turns = useMemo(() => withSaid(foldTranscript(following.events), said), [following.events, said]);
+  // Words the session's transcript shows reaching it are drawn once, as what was said, where they reached it (`heardIn`).
+  const turns = useMemo(() => {
+    const heard = heardIn(following.events, said);
+    return withSaid(foldTranscript(heard.events), heard.said);
+  }, [following.events, said]);
   const quiet = (text: string) => <p className="p-6 text-sm text-muted-foreground">{text}</p>;
 
   return (

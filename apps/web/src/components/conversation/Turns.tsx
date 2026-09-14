@@ -64,7 +64,8 @@ export function TurnView({ turn, live, last, tail }: { turn: Turn; live: boolean
 
 /**
  * What a person said to the session, off the engine's journal: on the reader's side, as their words, marked as said to the session while it
- * ran, with when. The words as given, not as markdown: they are on the record as typed.
+ * ran, with when — and, once the session's transcript shows the words reaching it, that they are in its conversation. Drawn once: the session's
+ * own line for them is taken out (`heardIn`). The words as given, not as markdown: they are on the record as typed.
  */
 function Told({ turn }: { turn: ToldTurn }) {
   return (
@@ -77,6 +78,14 @@ function Told({ turn }: { turn: ToldTurn }) {
           <time dateTime={turn.at} title={turn.at}>
             {new Date(turn.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </time>
+          {turn.arrived && (
+            <>
+              <span aria-hidden>·</span>
+              <span data-arrived={turn.arrived} title={`In the session's conversation at ${turn.arrived}`}>
+                in its conversation
+              </span>
+            </>
+          )}
         </p>
         <Bubble variant="tinted" align="end">
           <BubbleContent className="max-h-72 overflow-y-auto whitespace-pre-wrap scroll-fade-b">{turn.text}</BubbleContent>

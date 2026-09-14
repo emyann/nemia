@@ -41,3 +41,9 @@ export function mergeSaid(read: readonly Said[], sent: readonly Said[]): Said[] 
   const known = new Set(read.map(key));
   return [...read, ...sent.filter((s) => !known.has(key(s)))].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
 }
+
+/**
+ * What the prompt box holds once the api has said `sent`: nothing, when it still holds those words — and otherwise what was written since, so a
+ * person who starts on the next message while the last is being said keeps it.
+ */
+export const textAfterSaid = (now: string, sent: string): string => (now === sent ? '' : now);

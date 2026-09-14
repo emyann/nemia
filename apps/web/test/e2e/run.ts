@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { CHECKOUT, DIAMOND, DIAMOND_RUNS, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { arrivalLine, CHECKOUT, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -743,7 +743,7 @@ const PAGES: PageSpec[] = [
     // The steering channel: words said to draft's running session from its page, through the api, to the session's inbox and onto its record,
     // where the step's detail and `wf decide` read them back. Then, in a page of its own whose one refusal is the point, words sent after the
     // session ended while the page still showed it running: refused in the package's words under the box, and nothing said or journalled. The
-    // page follows a live session, whose stream never finishes (`follows`). The writes are taken back — the engine's journal of draft's task as
+    // page follows a live session, whose stream never finishes (`follows`). The writes are taken back — draft's task journal and its conversation as
     // seeded — so every page after this one, in either theme, reads the store as it was.
     name: 'say',
     route: `/runs/${SAYING.run}/steps/${SAYING.step}`,
@@ -752,6 +752,8 @@ const PAGES: PageSpec[] = [
       await sidebar(page);
       const journal = path.join(store!, 'engine', 'tasks', `${SAYING.run}-${SAYING.step}.jsonl`);
       const seeded = fs.readFileSync(journal, 'utf8');
+      const conversation = path.join(store!, DRAFT_TRANSCRIPT);
+      const seededConversation = fs.readFileSync(conversation, 'utf8');
       const sayRoute = `/api/runs/${SAYING.run}/steps/${SAYING.step}/say`;
       const said = (r: { request: () => { method: () => string }; url: () => string }) => r.request().method() === 'POST' && new URL(r.url()).pathname === sayRoute;
       const boxOf = (p: Page, state = '') => p.locator(`section${state ? `[data-say="${state}"]` : ''}[aria-label="Say something to ${SAYING.step}"]`);
@@ -788,6 +790,11 @@ const PAGES: PageSpec[] = [
         const told = talk.locator('[data-turn="told"]', { hasText: SAYING.words });
         await expectVisible(told, 'the words, a turn of their own in the conversation');
         await expectVisible(told.getByText('You said, while it ran'), 'marked as yours, said while the session ran');
+        // The session reads them between calls and writes their arrival into its transcript (`arrivalLine`), which the page follows: the words are
+        // drawn once, as what was said, and the session's own line for them is not drawn beside it.
+        await expectVisible(told.locator('[data-arrived]', { hasText: 'in its conversation' }), "the turn says the words are in the session's conversation, once its transcript shows them");
+        await expectCount(talk.locator('[data-turn="system"]', { hasText: SAYING.words }), 0, "no system line with the words: the session's record of their arrival is the turn");
+        await expectCount(talk.getByText(SAYING.words, { exact: true }), 1, 'the words are drawn once');
         if ((await fieldOf(page).inputValue()) !== '') throw new Refused('the box is emptied once the words are said');
         await expectVisible(top.locator('[data-note]', { hasText: 'said to 1×' }), "the step's note says it was said to, in wf ls's words");
 
@@ -844,9 +851,12 @@ const PAGES: PageSpec[] = [
         } finally {
           await refused.close();
         }
+        // The page following draft sees its session end and stops following, before its conversation is taken back from under the stream.
+        await expectCount(top.locator('[data-following]'), 0, 'the page following draft stops following once its session has ended');
       } finally {
-        // Taken back: draft's task as seeded — at work, and told nothing.
+        // Taken back: draft's task and its conversation as seeded — at work, told nothing, and nothing arrived.
         fs.writeFileSync(journal, seeded);
+        fs.writeFileSync(conversation, seededConversation);
       }
       // Read again, the run has draft at work once more, and the box is open.
       await expectVisible(boxOf(page, 'open'), 'with the writes taken back, the box is open again once the run is read again');
@@ -1125,20 +1135,24 @@ const heard: unknown[] = [];
 
 /**
  * A Unix socket standing in for a session's inbox, as Claude Code's reads one: each connection's lines kept, as JSON where they parse, nothing
- * answered, and its end closed once the sender's is. Unreferenced, so it keeps nothing alive; it goes with the store.
+ * answered, and its end closed once the sender's is; each line is handed to `onLine` once kept. Unreferenced, so it keeps nothing alive; it goes
+ * with the store.
  */
-function listen(socket: string): Promise<void> {
+function listen(socket: string, onLine: (line: unknown) => void = () => {}): Promise<void> {
   const server = net.createServer({ allowHalfOpen: true }, (connection) => {
     let got = '';
     connection.setEncoding('utf8');
     connection.on('data', (chunk) => (got += chunk));
     connection.on('end', () => {
       for (const line of got.split('\n').filter((l) => l.trim())) {
+        let read: unknown = line;
         try {
-          heard.push(JSON.parse(line));
+          read = JSON.parse(line);
         } catch {
-          heard.push(line);
+          // Kept as it came.
         }
+        heard.push(read);
+        onLine(read);
       }
       connection.end();
     });
@@ -1236,7 +1250,12 @@ async function main(): Promise<void> {
   fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then cat "${path.join(store, REGISTRY)}"; else echo '[]'; fi\n`, { mode: 0o755 });
 
   // draft's inbox (SAYING): the socket its registration names, listening before the api can be asked to say anything into it.
-  await listen(path.join(store, INBOX));
+  // And, as a working session does when it reads the words between calls, the stand-in writes their arrival into draft's transcript.
+  const draftTranscript = path.join(store, DRAFT_TRANSCRIPT);
+  await listen(path.join(store, INBOX), (line) => {
+    const { session_id: sessionId, message } = (line ?? {}) as { session_id?: unknown; message?: { content?: unknown } };
+    if (sessionId === SAYING.sessionId && typeof message?.content === 'string') fs.appendFileSync(draftTranscript, arrivalLine(message.content, new Date().toISOString()));
+  });
   apiEnv = {
     ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,

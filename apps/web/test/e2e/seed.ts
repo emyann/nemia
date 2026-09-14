@@ -146,7 +146,8 @@ export const NEIGHBOUR = {
 /**
  * NEIGHBOUR's `draft`, the session in flight the `say` page speaks to: `claude agents` lists it at work, with the pid Claude Code registers it
  * under — `claude/sessions/<pid>.json` in the store, the e2e's CLAUDE_CONFIG_DIR, whose `messagingSocketPath` is INBOX — and its conversation so
- * far is on disk: the prompt, words, and a call still waiting on its result. run.ts listens on INBOX, standing in for the session's inbox.
+ * far is on disk (DRAFT_TRANSCRIPT): the prompt, words, and a call still waiting on its result. run.ts listens on INBOX, standing in for the
+ * session's inbox, and writes into that file what a working session writes when it reads the words between calls (`arrivalLine`).
  */
 export const SAYING = {
   run: NEIGHBOUR.id,
@@ -162,6 +163,22 @@ export const SAYING = {
 
 /** Where in the store the stand-in for draft's inbox listens: a Unix socket run.ts opens before the api starts. */
 export const INBOX = 'inbox.sock';
+
+/** Where draft's conversation is kept, from the store: the file its session writes, and run.ts adds to when the session reads words. */
+export const DRAFT_TRANSCRIPT = path.join('claude', 'projects', '-code-hkb-v2', `${SAYING.sessionId}.jsonl`);
+
+/**
+ * The line a working Claude Code session writes into its transcript when it reads words another process posted to its inbox, between calls: a
+ * `queued_command` attachment from a peer, as 2.1.270 wrote one (agent-engine's transcript test), for the words `prompt`, at `at`.
+ */
+export function arrivalLine(prompt: string, at: string): string {
+  const uuid = `draft-arrival-${Date.parse(at)}`;
+  return `${JSON.stringify({
+    parentUuid: 'draft-assistant-2', isSidechain: false, userType: 'external', cwd: '/code/hkb-v2', sessionId: SAYING.sessionId, version: '2.1.270', gitBranch: 'main',
+    type: 'attachment', uuid, timestamp: at,
+    attachment: { type: 'queued_command', prompt, source_uuid: uuid, commandMode: 'prompt', origin: { kind: 'peer', from: 'unknown' }, timestamp: at, isMeta: true },
+  })}\n`;
+}
 
 /**
  * A third run, started last: `review` loops back to `implement`, the loop is on round 3 of the 3 a loop runs when it
@@ -629,7 +646,7 @@ export function seed(root: string, now = Date.now()): void {
   write(path.join(root, 'claude', 'sessions', `${SAYING.pid}.json`), JSON.stringify({
     pid: SAYING.pid, sessionId: SAYING.sessionId, name: `ae/${SAYING.run}-${SAYING.step}/1`, kind: 'bg', messagingSocketPath: path.join(root, INBOX),
   }));
-  write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${SAYING.sessionId}.jsonl`), lines(draftConversation(ago)));
+  write(path.join(root, DRAFT_TRANSCRIPT), lines(draftConversation(ago)));
   write(path.join(root, 'engine', 'tasks', `${NEIGHBOUR.id}-sketch.jsonl`), lines([
     { kind: 'filed', at: ago(5), brief: 'Sketch it.', cwd: '/code/hkb-v2', maxAttempts: 1 },
     { kind: 'starting', at: ago(4), attempt: 1 },

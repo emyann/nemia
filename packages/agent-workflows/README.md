@@ -676,8 +676,10 @@ its own, and everything below reads the words back off the engine's view of the 
   continue) is handed none, as it is handed none of the last one's conversation: say it again with `--message`.
 - **On the board**, the session page (`/runs/<run>/steps/<step>`) has a prompt box under the conversation. It posts to
   `POST /api/runs/:id/steps/:step/say`, guarded as the retry route is, which calls this verb: a refusal shows under the
-  box as the package or the engine words it. The step's detail carries `said`, and the page draws each as a turn of
-  its own. The box is closed, with the reason, for a step with no session in flight.
+  box as the package or the engine words it, and words typed while a message is being said are kept. The step's detail
+  carries `said`, and the page draws each as a turn of its own, once: where the session's transcript shows the words
+  reaching it, the turn stands in place of that line. The box is closed, with the reason, for a step with no session in
+  flight.
 
 ### Going round again: `loop:` and `rounds:`
 

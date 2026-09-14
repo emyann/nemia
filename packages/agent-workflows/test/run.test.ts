@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, type Closeout, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -1482,4 +1482,140 @@ test("a new session of a loop's target within a round is handed the findings it 
   assert.doesNotMatch(nudged, /## Round 2 of 3|## From review/, 'the continued session was handed them already');
   assert.match(nudged, /- `replies`: your answer/, 'and still owes them');
   assert.doesNotMatch(composeBrief(IMPLEMENT, inRound(1), LOOP, fromAsking, FILES, undefined, newSessions[0]), /## Round|## From review/, 'round 1 has no findings to hand');
+});
+
+// ─── waiting on a run ───────────────────────────────────────────────────────
+
+/** A `shipped` that answers yes for these runs, and keeps every run it was asked about. */
+const shippedOnly = (...ids: string[]) => {
+  const asked: string[] = [];
+  return { asked, shipped: (id: string) => { asked.push(id); return ids.includes(id); } };
+};
+
+/** Another run's record, as a parent's. */
+const record = (id: string, rest: Partial<Run> = {}): Run => run({ implement: 'x' }, { id, ...rest });
+
+test('a record from before there was an `after` reads as ready, and so does a run started without one — and no parent is read for either', () => {
+  const legacy = run({ implement: null, review: null });
+  assert.equal(Object.hasOwn(legacy, 'after'), false);
+  const { asked, shipped } = shippedOnly();
+  assert.equal(runReady(legacy, shipped), true);
+  assert.equal(runReady(run({ implement: null, review: null }, { after: [] }), shipped), true);
+  assert.deepEqual(asked, []);
+  assert.deepEqual(assess(STEPS, legacy, phases({})).ready, ['implement'], 'and its first step is ready exactly as before');
+});
+
+test('REFUSED: a run whose parent has not shipped is not ready, pass after pass — every parent must ship, and each that has not is named, in order', () => {
+  const child = run({ implement: null, review: null }, { after: ['a-1', 'b-2'] });
+  for (let pass = 0; pass < 3; pass++) assert.equal(runReady(child, shippedOnly().shipped), false);
+  assert.deepEqual(waitingOn(child, shippedOnly().shipped), ['a-1', 'b-2']);
+  assert.equal(runReady(child, shippedOnly('a-1').shipped), false, 'one of two is not enough');
+  assert.deepEqual(waitingOn(child, shippedOnly('a-1').shipped), ['b-2']);
+  assert.equal(runReady(child, shippedOnly('a-1', 'b-2').shipped), true);
+});
+
+test('a run that has started is never gated again: its parents are not read, so a branch deleted after the merge cannot un-ready it — nor can a round that left no step filed', () => {
+  const { asked, shipped } = shippedOnly();
+  assert.equal(runReady(run({ implement: 't1', review: null }, { after: ['a-1'] }), shipped), true);
+  // A round moves every step of its loop behind, and a later pass files each again: between the two, no step has a task.
+  const between = run({ implement: null, review: null }, { after: ['a-1'] });
+  between.steps.implement = { taskId: null, tries: [{ taskId: 't1', then: 'round' }] };
+  assert.equal(hasStarted(between), true);
+  assert.equal(runReady(between, shipped), true);
+  assert.deepEqual(asked, []);
+  assert.equal(hasStarted(run({ implement: null, review: null }, { after: ['a-1'] })), false);
+  assert.deepEqual([gated(between), gated(run({ implement: null, review: null }, { after: ['a-1'] })), gated(run({ implement: null }))], [false, true, false]);
+});
+
+test('a cancelled run waits on nothing, and reads no parent: it files nothing anyway', () => {
+  const { asked, shipped } = shippedOnly();
+  assert.deepEqual(waitingOn(run({ implement: null }, { after: ['a-1'], cancelledAt: '2026-09-14T09:00:00Z' }), shipped), []);
+  assert.deepEqual(asked, []);
+});
+
+test('`waitsOf` says why a parent may never ship — no such run, cancelled, a result branch gone — and `waitWord` and `waitAdvice` say it', () => {
+  const child = run({ implement: null, review: null }, { id: 'c-1', after: ['a-1', 'b-2', 'x-9', 'g-3'] });
+  const at = '2026-09-14T10:00:00Z';
+  const parents: Record<string, ParentRun> = {
+    'a-1': { record: record('a-1'), shipped: false },
+    'b-2': { record: record('b-2', { cancelledAt: at }), shipped: false },
+    'g-3': { record: record('g-3'), shipped: false, gone: ['wf/g-3/implement'] },
+  };
+  const waits = waitsOf(child, (id) => parents[id] ?? { shipped: false });
+  assert.deepEqual(waits, [{ run: 'a-1' }, { run: 'b-2', cancelledAt: at }, { run: 'x-9', missing: true }, { run: 'g-3', gone: ['wf/g-3/implement'] }]);
+  assert.equal(waitWord(waits), 'waiting on a-1, b-2 (cancelled), x-9 (no such run), g-3 (wf/g-3/implement gone)');
+  assert.equal(waitAdvice(child, waits),
+    `b-2 was cancelled at ${at}, and a cancelled run never ships; the store has no run x-9; wf/g-3/implement is gone, and git cannot find it on main`
+    + ' — yours to resolve: wf cancel c-1, or start the work again without --after b-2 --after x-9 --after g-3');
+  assert.equal(waitAdvice(child, [{ run: 'a-1' }]), 'nothing of c-1 is filed until wf decide says a-1 has shipped onto main; nothing to decide yet');
+  assert.equal(waitAdvice(child, [{ run: 'a-1' }, { run: 'b-2' }]), 'nothing of c-1 is filed until wf decide says a-1 and b-2 have shipped onto main; nothing to decide yet');
+});
+
+test("a pass records the tips of a finished run's result branches — succeeded or failed, never running or cancelled, never --no-worktree — writes nothing when none moved, and keeps a tip once its branch is gone", () => {
+  const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
+  const branched = (rest: Partial<Run> = {}): Run => {
+    const r = run({ a: 't1', b: 't2', c: 't3' }, rest);
+    for (const name of ['a', 'b', 'c']) r.steps[name]!.branch = `wf/r-1/${name}`;
+    return r;
+  };
+  assert.deepEqual(tipBranches(branched(), fan, 'succeeded'), ['wf/r-1/c'], 'the result branch, and no other');
+  assert.deepEqual(tipBranches(branched(), fan, 'failed'), ['wf/r-1/c']);
+  assert.deepEqual([tipBranches(branched(), fan, 'running'), tipBranches(branched(), fan, 'cancelled')], [[], []]);
+  assert.deepEqual(tipBranches(branched({ isolate: false }), fan, 'succeeded'), []);
+  const onBase = branched();
+  onBase.steps.c!.branch = 'main';
+  assert.deepEqual(tipBranches(onBase, fan, 'succeeded'), [], 'a run that worked on its base branch has no result branch');
+  const chain = run({ implement: 't1', review: 't2' });
+  chain.steps.implement!.branch = chain.steps.review!.branch = 'wf/r-1/implement';
+  assert.deepEqual(tipBranches(chain, STEPS, 'succeeded'), ['wf/r-1/implement']);
+
+  const seenOnce = tipsSeen(branched(), ['wf/r-1/c'], { 'wf/r-1/c': 'aaa', 'wf/r-1/a': 'zzz' });
+  assert.deepEqual(seenOnce, { 'wf/r-1/c': 'aaa' });
+  assert.equal(tipsSeen(branched(), ['wf/r-1/c'], {}), undefined, 'nothing seen, nothing to write');
+  const recorded = branched({ tips: seenOnce });
+  assert.equal(tipsSeen(recorded, ['wf/r-1/c'], { 'wf/r-1/c': 'aaa' }), undefined, 'unchanged, so the run is not written');
+  assert.equal(tipsSeen(recorded, ['wf/r-1/c'], {}), undefined, 'a branch git no longer has keeps its tip');
+  assert.deepEqual(tipsSeen(recorded, ['wf/r-1/c'], { 'wf/r-1/c': 'bbb' }), { 'wf/r-1/c': 'bbb' }, 'a commit after it finished moves the tip');
+});
+
+test("`wf ls` puts `waiting on <run>` on each root of a waiting run, where `waiting` would be — what waits on a root still says `waiting`", () => {
+  const fan = [step('a'), step('b'), step('c', ['a', 'b'])];
+  const child = run({ a: null, b: null, c: null }, { after: ['p-1'] });
+  const waits = [{ run: 'p-1', cancelledAt: '2026-09-14T10:00:00Z' }];
+  const said = listing(fan, child, () => 'unknown', () => undefined, undefined, undefined, [], [], [], waits);
+  assert.deepEqual(said.steps.map((s) => s.status), ['waiting on p-1 (cancelled)', 'waiting on p-1 (cancelled)', 'waiting']);
+  assert.deepEqual(said.waiting, waits);
+  // Without waits, as every caller from before passes, the words are what they were.
+  assert.deepEqual(listing(fan, child, () => 'unknown', () => undefined).steps.map((s) => s.status), ['waiting', 'waiting', 'waiting']);
+  // A run called off, or one that has started, says nothing of runs it waited on, whatever it is handed.
+  const off = listing(fan, { ...child, cancelledAt: '2026-09-14T11:00:00Z' }, () => 'unknown', () => undefined, undefined, undefined, [], [], [], waits);
+  assert.deepEqual([off.steps.map((s) => s.status), off.waiting], [['waiting', 'waiting', 'waiting'], []]);
+  const going = listing(fan, run({ a: 't1', b: null, c: null }, { after: ['p-1'] }), () => 'running', () => undefined, undefined, undefined, [], [], [], waits);
+  assert.deepEqual([going.steps.map((s) => s.status), going.waiting], [['running', 'waiting', 'waiting'], []]);
+});
+
+test('REFUSED by name at `wf start --after`: a run given twice, one the store does not have, one on another repository or base branch, one run --no-worktree, a cancelled one, one whose result branch is gone', () => {
+  const at = '2026-09-14T10:00:00Z';
+  // What the record and git say, and nothing of whether a run shipped: a cancelled run never does, as its `wf decide` says.
+  const parents: Record<string, Pick<ParentRun, 'record' | 'gone'>> = {
+    'a-1': { record: record('a-1') },
+    'r-2': { record: record('r-2', { repo: '/elsewhere' }) },
+    'd-3': { record: record('d-3', { isolate: false }) },
+    'f-4': { record: record('f-4', { branch: 'feature' }) },
+    'c-5': { record: record('c-5', { cancelledAt: at }) },
+    'g-6': { record: record('g-6'), gone: ['wf/g-6/implement'] },
+  };
+  const parentOf = (id: string): Pick<ParentRun, 'record' | 'gone'> => parents[id] ?? {};
+  const refusal = (...after: string[]) => afterRefusal(after, { repo: '/repo', branch: 'main' }, parentOf);
+  assert.match(refusal('a-1', 'a-1')!, /^--after a-1 is given twice, and a run waits on another once\./);
+  assert.match(refusal('a-1', 'x-9')!, /^--after x-9: the store has no run x-9\. .*wf ls lists them\.$/);
+  assert.equal(refusal('r-2'), '--after r-2: r-2 works on /elsewhere, and this run on /repo. A run waits for another to ship onto its own base branch, which a run on another repository never does: start it with --repo /elsewhere, or start it without --after r-2.');
+  assert.match(refusal('d-3')!, /^--after d-3: d-3 worked on main itself \(--no-worktree\), so it has no result branch to ship, and this run would wait for ever\./);
+  assert.match(refusal('f-4')!, /^--after f-4: f-4 ships onto feature, and this run would start from main, a base without f-4's work\. Check out feature/);
+  assert.equal(refusal('c-5'), `--after c-5: c-5 was cancelled at ${at}, and a cancelled run never ships, so this run would wait for ever. Start it without --after c-5.`);
+  assert.match(refusal('g-6')!, /^--after g-6: wf\/g-6\/implement is gone, and git cannot find it on main, so this run would wait for ever\. If g-6's work is on main, there is nothing to wait for/);
+  // Allowed: no parent, and a parent still to ship — on the same repository, however it is spelled.
+  assert.equal(refusal(), null);
+  assert.equal(refusal('a-1'), null);
+  assert.equal(afterRefusal(['a-1'], { repo: '/repo/', branch: 'main' }, parentOf), null);
 });

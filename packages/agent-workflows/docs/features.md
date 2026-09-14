@@ -9,8 +9,9 @@ outputs (package J), a step's files directory with `workflows/ui/` (U1), a brows
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
 `rounds:` and `wf round` (§4 R), a step's `tools:` and `effort:` (§4 I) and its `disallow:` (§4b), the decider screen
-(§4 G), looking as a skill with `workflows/ui/` as implement ⇄ review (§4 U2), and an answer for a step
-that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planned/`, §4 Q) have shipped.
+(§4 G), looking as a skill with `workflows/ui/` as implement ⇄ review (§4 U2), an answer for a step
+that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planned/`, §4 Q), and a run
+that waits on a run (`wf start --after`, the first half of §4 P) have shipped.
 
 ## Shipped: the check
 
@@ -516,9 +517,192 @@ What it leaves:
   answered one for its `needs`: one more view per answered step, and no question printed if the engine has lost
   that task.
 - **A plan is not steps.** `plan`'s `steps` are prose for one `implement`; a run that files steps from a plan
-  is still §2 below.
+  is still §4 below.
 
-## 1. Forgetting a run (`wf rm`)
+## Shipped: a run that waits on a run — `wf start --after`
+
+Plan §4 P, its first half. All day a person had done the sequencing by hand: start B once A is on main.
+Now the run holds that as a fact. The run boundary is the human gate, so a run's dependents start when
+the run has **shipped**, meaning its own `wf decide` says `shipped`: not running, not cancelled, and its
+result branch on the base branch as `isShipped` reads it. Its steps saying they are done does not count. The engine is untouched: waiting on a run is
+a fact of the layer above it.
+
+What was built:
+
+- `wf start <brief> --workflows <dir> --repo <r> --after <runId> [--after <runId> ...]` freezes
+  `after: string[]` on the record, the way the workflow is frozen. The field is written only when given, so
+  a run without `--after` writes the record it always did. Every record from before reads as waiting on
+  none.
+- `runReady(run, shipped)` in `run.ts` is pure and sits beside `assess`. It rests on `waitingOn`, which
+  returns the runs in `after` that have not shipped. `shipped` is never called for a run that is not
+  `gated`: one with no `after`, a cancelled run, or a run with any step filed on any try (`hasStarted`: a
+  step a round moved behind counts). That is how a started run's parents are never read again.
+- `parentOf(e, id)` in `runner.ts` reads a parent on every pass that asks, once per pass (`parentsOf`). It
+  counts the parent shipped exactly when `decision`, the function behind the parent's own `wf decide`, says
+  `shipped`: not running, not cancelled, and every result branch on the base branch. Git is asked first;
+  the engine's view of the parent's tasks is read only once its branches are on the base. A result branch
+  git no longer has is `gone`, and not shipped. `wf start` reads only the record and git (`parentRecord`).
+- `advance` files a run's roots only when `runReady` holds, and nothing else is gated. In the pass that
+  files the roots of a run that waited, it reads the tip of the base branch into `baseRef`. Every worktree,
+  check and diff of that run is then cut from a base that has its parents' work.
+- A finished run's own tick records its result branches' tips on its record, as `tips` (`tipBranches` and
+  `tipsSeen`, pure): only for a run that succeeded or failed, never one running or cancelled, and written only
+  when a tip moved. A branch git no longer has keeps the tip last seen. When a branch is gone, `isShipped`
+  asks git whether its recorded tip is on the base, so a parent merged and cleaned up still ships. That
+  reading is the same for the parent's own `wf decide`, the board's decide and the gate.
+- `wf start` reads `--after=<runId>`, `--repo=<r>` and `--workflows=<dir>` as well as the spaced forms, and
+  refuses any other argument: a flag it does not take, a misspelt one, a value flag with no value or given
+  twice, and a second brief. Before this, a misspelt `--after` was dropped, and the run waited on nothing.
+- What each command shows for a waiting run:
+  - `wf ls` shows `waiting on <run>` on each root, through `listing`'s new `waits` argument; a step that
+    waits on a root still says `waiting`. A parent that will never ship without a person gets a reason in
+    brackets: `(cancelled)`, `(no such run)` or `(<branch> gone)`. For those it also prints
+    `→ waiting on you: … — yours to resolve: wf cancel <run>, or start the work again without --after <parent>`
+    (`waitAdvice`).
+  - `wf decide` says the same two lines and offers nothing else.
+  - `wf tick` adds the wait to the run's line.
+  - The same list is available to code as `Advanced.waiting`, `Listing.waiting` and `decide().waiting`.
+- `wf start` refuses before anything is written, and the refusal names the fix (`afterRefusal`, pure):
+  - an id given twice;
+  - a run the store does not have;
+  - a run on another repository;
+  - a run started `--no-worktree`, which has no result branch to ship;
+  - a run on another base branch, since the child would never start from a base that has its work;
+  - a cancelled run, which `wf decide` never calls shipped, or one whose result branch is gone and whose tip
+    git cannot find on the base.
+
+  The CLI also refuses `--after` with no run after it.
+
+What was measured:
+
+- Pure tests in `test/run.test.ts`:
+  - a legacy record and a run with `after: []` read as ready without a parent being read;
+  - an unshipped parent is not ready, pass after pass, and one shipped parent of two is not enough;
+  - a started run, including one a round left with no step filed, is ready without a parent being read;
+  - a cancelled run reads no parent;
+  - the words, including `waitAdvice`, compared whole;
+  - `listing` on a fan-in's roots, on a cancelled run and on a started one;
+  - each refusal of `afterRefusal`, by name;
+  - which branches a pass records tips for (a finished run's result branches only), that an unchanged tip
+    writes nothing, and that a tip is kept once its branch is gone.
+- Store tests in `test/store.test.ts`, on a real git repository in a temp dir with `start` and `advance`
+  run for real against a fake engine board:
+  - A child of a parent whose step is still running files nothing, pass after pass, with and without a
+    commit on the parent's branch. `wf ls` says `waiting on <parent>`, and `decide` returns the wait with no
+    offers. Merged with `--no-ff` while the parent still runs, the parent's `wf decide` says running and the
+    child files nothing. Once the parent signs off, its `wf decide` says shipped and the next pass files the
+    roots: `baseRef` is the merge commit, and the child's worktree holds the parent's file.
+  - A parent whose step signs off with no commit past its base: its `wf decide` says shipped, the child's
+    next pass files its roots, and `wf start --after` it is accepted. Parent and child share one board, as
+    they share one engine.
+  - A parent merged, its tip recorded by its own pass, then its worktree removed and its branch deleted with
+    `git branch -d`: its `wf decide` still says shipped, a child that started on the merge files `review`, one
+    that had not files its roots, and `wf start --after` it is accepted.
+  - The diamond's D, after B and C: B is merged and its branch deleted while C is still running. D says
+    `waiting on C` alone, pass after pass. Once C signs off and is merged, the next pass files D's roots on a
+    base with both parents' files.
+  - A parent dropped with `git branch -D` after its tip was recorded, and one merged and deleted before any
+    pass saw it finish: both read `(<branch> gone)`, the child files nothing, and `wf start --after` either one
+    is refused.
+  - Through the CLI, `wf start` refuses `--after=` with no run, `--afer`, `-a`, `--repo` twice and a second
+    brief, with nothing written, and writes `--after=<runId>` as `--after <runId>`.
+  - A cancelled parent: nothing is filed, and still nothing once its branch is merged. Through `main`,
+    `wf ls` and `wf decide` print exactly the lines above. Then `cancel` on the child leaves it waiting on
+    nothing.
+  - Every `wf start` refusal, through `start` and through the CLI, leaves the store's file count unchanged.
+    `--after` twice with different runs is written in order, and a run without it has no `after` key.
+- `npm test && npm run typecheck` from the root exited 0. agent-workflows ran 313 tests, 11 of them new: 312
+  passed, and one was skipped, the live browser test that needs `AE_LIVE=1`. agent-engine ran 239 (235 passed,
+  4 live tests skipped), api 89 and web 116, all passing.
+- The CLI itself, in a throwaway `WF_ROOT` over a throwaway repository, with the parent's branch recorded
+  and committed to by hand. It covers `wf start --after=<runId>` with `--workflows=` and `--repo=`, `wf ls`,
+  `wf decide`, six refusals (a duplicate, an unknown run, `--after` with no id, `--afer`, `--after=`, an
+  unquoted brief) that leave no record, the merge, and a cancelled parent. The parent's step was never filed,
+  so after the merge its own `wf decide` says
+  `still running: implement` and the child still says `waiting on` it. Kept as `wf-start-after.txt` in the
+  step's artifacts. No tick ran there: a real engine would have filed real sessions, so the gate's filing is
+  measured on the fake board only.
+- Found while building: a result branch is cut at its run's base, which is on the base branch, so `isShipped`
+  answers yes for a branch nobody has committed to. Read that way, a child of a one-step run would start the
+  moment the parent's step was filed. Round 1 guarded it with a rule of its own, work past the base, and
+  review found that rule stricter than `wf decide`. A parent that finished with nothing to commit read
+  `shipped` on its own `wf decide`, while its child waited for ever under a plain `waiting on <parent>` with no
+  reason and no way out, and `wf start --after` it was accepted. The gate now asks `decision` itself, so the
+  two cannot disagree, and a store test signs a parent off with no commit.
+- Found while building: whether a deleted branch was merged cannot be read.
+  - `git merge-base --is-ancestor` on a branch that no longer exists exits 128.
+  - `git branch -d` refuses a branch a worktree uses.
+  - This repository's merges carry their own messages ("Merge Q1: …"), so neither the merge commit nor main's
+    reflog names the branch.
+
+  Rounds 1 and 2 stopped there: a branch deleted before a child's roots were filed read not shipped. Round 3's
+  review found that strands the diamond's D, whose last parent can take hours in review while the first is
+  cleaned up, and the request's own test said a parent merged and then deleted still files. So each finished
+  run's tick records its tips. That is a fact about the parent, written by the parent's own tick, and the gate
+  still asks git about it on every pass.
+- No real session has run as a child. A real merge has never released a real step.
+
+What it leaves:
+
+- **The Factory's graph of cards** (apps, the next run). The api does not carry `after` yet: `summarize` and
+  `detail` in `apps/api/src/app.ts` build `RunSummary` and `RunDetail` field by field, so each needs an `after`
+  added. Then two things the board has to do the tick's way:
+  - The api's `listing` call passes no waits, so a waiting root says `waiting`.
+  - Its `moving` reads `ready.length > 0`, which is true for a waiting run. It needs `waitsOf` and `runReady`,
+    over `parentOf`, which reads the parent's tasks off the engine.
+
+  The start form on the Workflows page gains *after*: `start({ after })`, with the refusal as its 422.
+- **A tip is recorded only by a tick.** A run whose branch is merged and deleted before any `wf tick` or `wf up`
+  pass saw it finish has no tip, and its children read `(<branch> gone)` until a person starts them again
+  without that `--after`. The same happens to a result branch rewritten after its tip was recorded and then
+  deleted. With `wf up` running, a run is seen within a pass of finishing.
+- **A parent that finished failed with nothing committed has shipped.** That is `wf decide`'s reading, and the gate
+  shares it: a run that is not running, whose result branches are on the base branch, says `shipped` whatever its
+  steps ended as. It is rare, since a terminal step that never got a branch keeps a run awaiting. A fix belongs in
+  `decision`, where the board's decide would get it too.
+- **A parent's tasks are viewed twice a pass** while a child waits on it and its branches are on the base: once for
+  its own pass, and once for the gate.
+- **A parent is read once, on the way in.** A parent that ships a second change after its child started is
+  not waited on again, by design. Later work is a new run with its own `--after`.
+
+## 1. A waiting run handed its parents' closeouts
+
+**Why.** A run that waited starts from a base with its parents' work, and without a word of what they were
+for or what they decided. The plan's §4 P names the next step: a dependent run's brief is handed its parents'
+closeout summaries as data, which is `input:` one level up.
+
+**What it has to settle.**
+
+- **Whether a summary may travel.** `composeBrief` keeps a step's summary from every other step, because it is
+  the producer's account and would anchor whoever reads it. A shipped parent's summary is different: a person
+  read it and merged the work. Say why in the code, or hand the parent's declared outputs instead.
+- **Which closeout.** A parent's terminal steps, read off the engine's record of their current try. The
+  engine may have lost that task by the time the child starts, and the child's brief should say so rather than
+  hand nothing silently.
+- **When.** At the pass that files the roots, the one that reads `baseRef`, and never again. The parents
+  are not read after that.
+
+**Already taught.** `## From <step>` puts data in a fence longer than any backticks in it (`fenced`), under a
+label saying whose it is. `input:` refuses a step that does not wait on what it reads, and here `after` is
+that edge.
+
+## 2. A plan as a folder of cards: `wf plan <folder>`
+
+**Why.** The second half of §4 P. A plan is a folder of card briefs, one markdown file per card, with
+`workflow: dev` and `after: <card>` in its frontmatter. The closed-key parser refuses the rest. `wf plan
+<folder>` prints the whole graph, then starts every card with its edges: the shape an agent writes for
+someone who describes a plan in prose.
+
+**What it has to settle.**
+
+- **Names to ids.** A card's `after:` names cards, and run ids are made at start, so the plan starts the cards
+  in order and resolves each edge to the id it just made.
+- **Refused as a folder, before any card starts.** A cycle, which runs started one by one cannot have and a
+  folder can; an `after:` naming no card; and everything `afterRefusal` refuses of an edge to a run already in
+  the store.
+- **What a person sees.** The graph as it will run, and the ids, so `wf ls` reads it back.
+
+## 3. Forgetting a run (`wf rm`)
 
 **Why.** Runs, worktrees and branches accumulate, and clearing them is manual: `git worktree
 remove`, `git branch -D`, deleting `~/.agent-workflows/runs/<id>.json`.
@@ -541,6 +725,9 @@ back: implement `9efc52a`, review `8a2a31f`, respond `621fcff`.
   the check shipped (open issue 2), but a worktree can still hold work written after the last pass.
 - A locked worktree makes git refuse. Report it; do not delete the directory behind git's back.
 - A run whose tasks the engine no longer knows must be removable (fixed by `0e7b02a`).
+- Since `--after` shipped: a run another run waits on, and has not started on, is not forgotten
+  quietly. The waiting run would read `waiting on <run> (no such run)` for ever. Refuse, or name the runs
+  it strands.
 
 **The brief, to re-run on current master.**
 
@@ -571,7 +758,7 @@ Write tests for the pure part — whatever decides what may be removed and what 
 the style of the tests already in `test/`. Run the whole suite before you commit.
 ```
 
-## 2. A run that grows steps from a plan
+## 4. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
 

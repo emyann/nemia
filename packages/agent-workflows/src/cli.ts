@@ -3,14 +3,17 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, outputLines, owedFields, parseGlobs, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, outputLines, owedFields, parseGlobs, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
-  wf start <brief.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree]
+  wf start <brief.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...]
+                               --after <runId>: file nothing of this run until wf decide says that
+                               run has shipped — finished, and its result branch on the base
+                               branch — and start from the base as it is then; once per run
   wf tick                      one pass: tick the engine, file what became ready
   wf up [ms]                   the same, on a timer
-  wf ls [runId]                runs and their steps
+  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>
   wf cancel <runId>            stop what it has in flight; file nothing more
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
@@ -58,11 +61,6 @@ so its output already names the work. Point it at this board:
 
     AE_ROOT="\${WF_ROOT:-$HOME/.agent-workflows}/engine" ae watch`;
 
-const flag = (argv: string[], name: string, fallback?: string) => {
-  const i = argv.indexOf(`--${name}`);
-  return i >= 0 ? argv[i + 1] : fallback;
-};
-
 const usage = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
 
 const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
@@ -103,6 +101,46 @@ function decideHow(argv: string[]): { sensitive?: string[] } {
     sensitive = globs;
   }
   return { sensitive };
+}
+
+type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[] };
+
+/** What each of `wf start`'s value flags takes, as its refusal says it. */
+const START_TAKES = {
+  '--workflows': 'the workflow folder: wf start <brief> --workflows <dir>',
+  '--repo': 'the repository the run works on: wf start <brief> --repo <r>',
+  '--after': 'the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]',
+} as const;
+
+/**
+ * `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>` and `--after <runId>` — each also as `--flag=<value>`, and
+ * `--after` as often as there are runs to wait on — and `--no-worktree`. Anything else is refused before anything is read: a flag the verb
+ * does not take, a misspelt one, a value flag with no value or given twice, and a second brief. Dropped, a misspelt `--after` started a run
+ * that waited on nothing, and the tick filed it at once.
+ */
+function startHow(argv: string[]): StartHow {
+  const how: StartHow = { isolate: true, after: [] };
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--no-worktree') { how.isolate = false; continue; }
+    const joined = arg.startsWith('--') && arg.includes('=');
+    const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
+    if (!Object.hasOwn(START_TAKES, name)) {
+      usage(arg.startsWith('-')
+        ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on.`
+        : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`);
+    }
+    const flagName = name as keyof typeof START_TAKES;
+    const value = joined ? arg.slice(arg.indexOf('=') + 1) : argv[++i];
+    if (!value || (!joined && value.startsWith('--'))) usage(`${flagName} takes ${START_TAKES[flagName]}`);
+    if (flagName === '--after') how.after.push(value!);
+    else {
+      const key = flagName === '--repo' ? 'repo' : 'workflows';
+      if (how[key] !== undefined) usage(`wf start takes ${flagName} once: a run works on one ${key === 'repo' ? 'repository' : 'workflow'}.`);
+      how[key] = value;
+    }
+  }
+  return how;
 }
 
 /** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
@@ -149,16 +187,19 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'start': {
       const arg = rest[0];
       if (!arg || arg.startsWith('--')) return console.log(HELP);
+      const how = startHow(rest.slice(1));
       const brief = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8').trim() : arg;
       const run = start({
         brief,
-        repo: path.resolve(flag(rest, 'repo', '.')!),
-        workflowDir: path.resolve(flag(rest, 'workflows', './workflows')!),
-        isolate: !rest.includes('--no-worktree'),
+        repo: path.resolve(how.repo ?? '.'),
+        workflowDir: path.resolve(how.workflows ?? './workflows'),
+        isolate: how.isolate,
+        after: how.after,
       });
       const steps = stepsOf(run);
       console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.name).join(' → ')}`);
       console.log(`workspace: ${run.workspace}`);
+      if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
       console.log(`run 'wf tick' (or 'wf up') to start it`);
       return;
     }
@@ -172,7 +213,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
         const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
         const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
-        console.log(`${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}`);
+        const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : '';
+        console.log(`${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`);
         for (const note of r.notes) console.log(`   ${note}`);
       }
       return;
@@ -199,7 +241,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       for (const run of runs) {
         const calledOff = run.cancelledAt ? '  (cancelled)' : '';
         console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}`);
-        const { steps, waitingOnYou } = await list(e, run);
+        const { steps, waitingOnYou, waiting } = await list(e, run);
         // As wide as this run's longest status, so its branches still line up beside it.
         const width = Math.max(20, ...steps.map((s) => s.status.length));
         for (const s of steps) {
@@ -209,6 +251,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         // The step a person has to act on, and where to act. Said here and not left to the result
         // line, because a run blocked on its first step has no result branch yet.
         if (waitingOnYou.length) console.log(`   → waiting on you: ${waitingOnYou.join(', ')}  —  wf decide ${run.id}`);
+        // A run it waits on that will never ship without a person — cancelled, say — is a person's to resolve, and the line says how.
+        if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
         // Where to go and look. A run whose result nobody can find is a run that did not happen.
         const result = resultBranches(run);
         if (result.length) console.log(`   → result: ${result.join(', ')}  —  wf decide ${run.id}`);
@@ -242,11 +286,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, used, answers, answering } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, used, answers, answering, waiting } = await decide(e, rest[0]);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}`;
       const steps = stepsOf(run);
 
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
+      // Nothing of it is filed: the runs it waits on are the whole of what there is to say, and nothing else is offered.
+      if (waiting.length) return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}`);
       if (decision.kind === 'running') {
         console.log(`${head}\n\n  still running: ${decision.waiting.join(', ')}`);
         // A try the next tick files is why a run that had stopped is running again: said, with whose word it is.

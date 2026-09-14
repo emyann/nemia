@@ -4,7 +4,8 @@
  * Four verbs the engine cannot run without: spawn one, observe all, stop one, read one's logs. A
  * fifth, `release`, is optional — letting go of a session whose end is on the record, for a harness
  * whose registry would otherwise keep it for ever. So is a sixth, `transcript`: the same session's
- * conversation as events, for a person to follow, and nothing the engine acts on. Swap the layer and the same engine drives a
+ * conversation as events, for a person to follow, and nothing the engine acts on. And a seventh, `say`:
+ * a person's words handed to a session while it runs, which the engine journals and never acts on. Swap the layer and the same engine drives a
  * different harness; `Runner.test()` drives nothing at all, which is how the engine's tests cost zero
  * dollars.
  *
@@ -16,6 +17,7 @@ import { Context, Effect, Layer, Schema } from 'effect';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionInfo, getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
@@ -104,7 +106,8 @@ export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor }
  * harness that needs another to be driven is asking the engine to learn something about it — which is
  * the line this type exists to hold. `release` does not cross it: optional, told only what the record
  * already says, and answering nothing the engine acts on. Nor does `transcript`: optional, and read
- * for a person, never by `decide`.
+ * for a person, never by `decide`. Nor does `say`: optional, a person's words carried in, and nothing
+ * the engine decides on.
  */
 export type RunnerOps = {
   readonly spawn: (r: SpawnRequest) => Effect.Effect<void, RunnerError>;
@@ -129,6 +132,14 @@ export type RunnerOps = {
    * remembered between reads that the cursor does not carry.
    */
   readonly transcript?: (sessionId: string, after?: TranscriptCursor) => Effect.Effect<Transcript, RunnerError>;
+  /**
+   * Hand `text` to a session that is running, as a person's words: optional, for a harness with a channel
+   * into a live session. Given the session as the engine knows it — the name it chose, and the id `observe`
+   * listed it under on the pass just made — and resolves once the harness has taken the words; rejects when
+   * it did not, and then nothing was said. What the session does with them is its own affair: the engine
+   * journals that they were said, and `decide` never reads that.
+   */
+  readonly say?: (session: { name: string; sessionId: string }, text: string) => Effect.Effect<void, RunnerError>;
 };
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
@@ -294,8 +305,9 @@ const resultText = (content: unknown): string =>
 
 /**
  * One line of a Claude Code transcript as events. A `user` or `assistant` line gives one per content
- * block, a `system` line one of its own, and any other line — a title, an attachment, a file-history
- * snapshot — none. Pure, so both runners that read Claude Code's transcripts share it.
+ * block, a `system` line one of its own, a message another process sent while the session was working
+ * one `system` event, and any other line — a title, another attachment, a file-history snapshot — none.
+ * Pure, so both runners that read Claude Code's transcripts share it.
  *
  * Read as Claude Code writes them (measured on the 150 transcripts last written on this machine, up to
  * 2.1.270): every conversation line carries a `uuid` and a `timestamp`; a line nearly always holds one
@@ -306,17 +318,31 @@ const resultText = (content: unknown): string =>
  * (`isSidechain`) is left out, as the SDK's reading leaves it. A block of a type not read here is a
  * `text` event naming it, as `renderTranscript` names one. A line with no time gives nothing: none has
  * been seen, and a time made up for one would be a lie about when it was said.
+ *
+ * Words another process put into the session — a peer's `SendMessage`, or `say` — are written two ways
+ * (measured on 2.1.270, posting to a `--bg` session's inbox). Arriving while it works, as an `attachment`
+ * line whose `queued_command` carries the words as `prompt` and a `peer` origin: read here as a `system`
+ * event with those words, since the model is handed them as a reminder, not as its user's. Arriving while it
+ * is idle, as the `isMeta` user line that starts its next turn, wrapped in Claude Code's own sentence about
+ * where it came from: read as any `isMeta` line is.
  */
 export const claudeTranscriptEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
   const line = entry as {
     type?: unknown; uuid?: unknown; timestamp?: unknown; subtype?: unknown; content?: unknown;
     isMeta?: unknown; isSidechain?: unknown; message?: { content?: unknown } | null;
+    attachment?: { type?: unknown; prompt?: unknown; origin?: { kind?: unknown } | null } | null;
   } | null;
   const at = isoTime(line?.timestamp);
   if (!line || !at || line.isSidechain === true) return [];
   const id = typeof line.uuid === 'string' && line.uuid ? line.uuid : `@${offset}`;
   if (line.type === 'system') {
     return [{ id, at, role: 'system', kind: 'system', text: typeof line.content === 'string' ? line.content : String(line.subtype ?? 'system') }];
+  }
+  if (line.type === 'attachment') {
+    const a = line.attachment;
+    return a?.type === 'queued_command' && a.origin?.kind === 'peer' && typeof a.prompt === 'string'
+      ? [{ id, at, role: 'system', kind: 'system', text: a.prompt }]
+      : [];
   }
   if (line.type !== 'user' && line.type !== 'assistant') return [];
   const role = line.isMeta === true ? 'system' : line.type;
@@ -417,6 +443,98 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
   return undefined;
 };
 
+/**
+ * The longest line Claude Code's inbox reads, in characters. A longer one drops the connection and
+ * delivers nothing, and says so to nobody (`Ftt` in 2.1.270's inbox), so `say` refuses it first.
+ */
+export const CLAUDE_INBOX_LINE_MAX = 1_048_576;
+
+/**
+ * The one line a person's words are posted as, to a session's inbox: a `user` message, as Claude Code's
+ * own inbox documents it, naming the session it is for. The inbox drops a line whose `session_id` is not
+ * its session's, so a socket that has passed to another session since it was observed hears nothing.
+ */
+export const claudeInboxLine = (sessionId: string, text: string): string =>
+  `${JSON.stringify({ type: 'user', session_id: sessionId, message: { role: 'user', content: text } })}\n`;
+
+/**
+ * What cannot be said to a Claude Code task's session, as a sentence that says what to do instead — or `undefined`.
+ *
+ * `bypassPermissions`: Claude Code holds a message from outside for a person to approve when the session it
+ * reaches bypasses permission prompts, and a background session nobody has attached to keeps that approval
+ * open for ever (the cross-session messaging docs, and 2.1.270's inbound gate). Words sent there reach nobody.
+ */
+export const claudeSayRefuses = (task: { permissionMode?: string }, text: string): string | undefined => {
+  if (task.permissionMode === 'bypassPermissions') {
+    return "the task runs in `permissionMode: bypassPermissions`, and Claude Code holds a message sent into such a session for a person to approve — in a background session nobody has attached to, for ever. Nothing said would reach it. Continue its session with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.";
+  }
+  const length = claudeInboxLine('00000000-0000-0000-0000-000000000000', text).length;
+  if (length > CLAUDE_INBOX_LINE_MAX) {
+    return `\`text\` makes a line of ${length} characters, and Claude Code's inbox drops a line over ${CLAUDE_INBOX_LINE_MAX} without delivering it. Say less: put the rest in a file, and name the file.`;
+  }
+  return undefined;
+};
+
+/**
+ * A running session's inbox, as Claude Code registered it: `<sessions>/<pid>.json`, whose
+ * `messagingSocketPath` is the socket it listens on. The pid is the one `claude agents` lists for the
+ * session. Refused rather than guessed — the path is the process's, and a pid outlives nothing:
+ *
+ * - a registration that is not a file this user owns, or that is now another session's;
+ * - no absolute `messagingSocketPath`: the session runs without an inbox (Claude Code could not set one up);
+ * - a path that is not a socket — a symlink, or anything else put in its place — or one this user does not
+ *   own. Claude Code refuses the same before it sends, and so does this.
+ *
+ * `uid` is who "this user" is: the process's own, passed only by a test, which cannot make a file another's.
+ */
+export const claudeInbox = async (sessionsDir: string, pid: number, sessionId: string, uid = process.getuid?.()): Promise<string> => {
+  const file = path.join(sessionsDir, `${pid}.json`);
+  let registration: { sessionId?: unknown; messagingSocketPath?: unknown };
+  try {
+    const stat = await fs.promises.lstat(file);
+    if (!stat.isFile() || (uid !== undefined && stat.uid !== uid)) throw new Error('not a file of yours');
+    registration = JSON.parse(await fs.promises.readFile(file, 'utf8'));
+  } catch (e) {
+    throw new Error(`the session's registration, ${file}, cannot be read (${e instanceof Error ? e.message : String(e)}): it has exited, or runs somewhere this process cannot see.`);
+  }
+  if (registration?.sessionId !== sessionId) {
+    throw new Error(`pid ${pid} is registered to ${String(registration?.sessionId)} now, not ${sessionId}: the session has exited.`);
+  }
+  const socket = registration.messagingSocketPath;
+  if (typeof socket !== 'string' || !path.isAbsolute(socket)) {
+    throw new Error(`session ${sessionId} has no inbox (its registration names no socket): Claude Code could not set one up for it, and \`/status\` in the session says why.`);
+  }
+  let stat: fs.Stats;
+  try { stat = await fs.promises.lstat(socket); } catch (e) {
+    throw new Error(`session ${sessionId}'s inbox, ${socket}, is not there (${e instanceof Error ? e.message : String(e)}): it has exited.`);
+  }
+  if (!stat.isSocket()) throw new Error(`${socket} is not a socket — a symlink, or something else in its place. Refusing to send.`);
+  if (uid !== undefined && stat.uid !== uid) throw new Error(`${socket} is owned by uid ${stat.uid}, not by you. Refusing to send.`);
+  return socket;
+};
+
+/** How long a post to a session's inbox may take. The inbox answers nothing, so this bounds a connection that hangs. */
+const SAY_TIMEOUT_MS = 5_000;
+
+/**
+ * One line, written to a Unix socket and the connection ended. Resolves once the line was written and the
+ * inbox closed its end without an error — it writes nothing back, so that is all there is to hear.
+ */
+const postLine = (socket: string, line: string, timeoutMs = SAY_TIMEOUT_MS) => new Promise<void>((resolve, reject) => {
+  let written = false;
+  const c = net.createConnection({ path: socket });
+  const timer = setTimeout(() => { c.destroy(); reject(new Error(`${socket} took nothing within ${timeoutMs} ms`)); }, timeoutMs);
+  c.on('connect', () => c.end(line, () => { written = true; }));
+  c.on('data', () => { /* the inbox answers nothing; anything it did say is not ours to read */ });
+  c.on('error', (e) => { clearTimeout(timer); reject(e); });
+  c.on('close', (hadError) => {
+    clearTimeout(timer);
+    if (hadError) return;
+    if (written) resolve();
+    else reject(new Error(`${socket} closed the connection before the words were written`));
+  });
+});
+
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');
 
@@ -512,6 +630,11 @@ export type ClaudeOptions = {
   usageFrom?: (sessionId: string, since: number) => Promise<Usage | undefined>;
   /** Where the runner writes what it hands the CLI by path — a task's MCP config. Default `~/.agent-engine`. */
   root?: string;
+  /**
+   * Where Claude Code registers each running session, by pid: `say` finds a session's inbox there. Default
+   * `sessions` under `$CLAUDE_CONFIG_DIR`, or under `~/.claude`, read when the runner is made.
+   */
+  sessionsDir?: string;
 };
 
 /**
@@ -542,6 +665,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const quiescentAfterMs = options.quiescentAfterMs ?? QUIESCENT_AFTER_MS;
   const now = options.now ?? (() => Date.now());
   const root = options.root ?? path.join(os.homedir(), '.agent-engine');
+  const sessionsDir = options.sessionsDir ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
   /** A task's MCP config, kept outside the workspace: a file in a step's worktree travels down its branch. */
   const mcpFile = (name: string) => path.join(root, 'mcp', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);
   const transcriptTime = options.transcriptTime ?? (async (sessionId: string) => {
@@ -606,6 +730,12 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * pass always makes before it releases anything.
    */
   const listed = new Map<string, Observed>();
+  /**
+   * The process `claude agents` last listed for each of our sessions, by session id: how `say` finds the
+   * session's registration, and so its inbox. Rebuilt by every `observe`, which `say` is always handed a
+   * session from; a session listed with no process — one that has exited — has none.
+   */
+  const pids = new Map<string, number>();
 
   return ({
     spawn: (r) => Effect.try({
@@ -658,9 +788,10 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
 
     observe: sh('claude', ['agents', '--all', '--json'], { verb: 'observe' }).pipe(
       Effect.map((out) => {
-        const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string; startedAt?: unknown }>;
+        const rows = JSON.parse(out) as Array<{ sessionId?: string; name?: string; state?: string; status?: string; startedAt?: unknown; pid?: unknown }>;
         const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
         listed.clear();
+        pids.clear();
         for (const row of rows) {
           // `state` and `status` answer different questions and are NOT a fallback chain. `state`
           // is the session's lifecycle; `status` is whether its process is busy this instant. A
@@ -671,6 +802,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           // For this harness the session id IS the native id — `--resume` takes exactly it.
           if (row.name?.startsWith('ae/') && row.sessionId && state) {
             listed.set(row.sessionId, state);
+            if (Number.isInteger(row.pid) && (row.pid as number) > 0) pids.set(row.sessionId, row.pid as number);
             m.set(row.name, {
               sighting: { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId },
               // When THIS session started, as the harness recorded it: what usage is counted from.
@@ -771,6 +903,30 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       Effect.tryPromise({
         try: () => readTranscript(transcriptFile(sessionId), after, claudeTranscriptEvents),
         catch: (cause) => new RunnerError({ verb: 'transcript', message: cause instanceof Error ? cause.message : String(cause) }),
+      }),
+
+    /**
+     * A person's words, posted verbatim to the session's own inbox socket — the one Claude Code documents for a
+     * script to post into a session, and the one another session's `SendMessage` reaches. No token: on macOS
+     * and Linux the inbox takes a connection without one (it requires one only on native Windows, whose inbox
+     * is a named pipe and is refused as not a socket), and the token beside the registration is another
+     * session's credential, not this engine's to read. Measured on 2.1.270 (`test/live.test.ts`): a busy
+     * session reads the words between tool calls; an idle one starts a turn with them.
+     *
+     * The inbox writes nothing back, so this resolves on the words being taken, not on their being read: a
+     * `crossSessionInbound` of `hold` or `refuse` in the operator's settings, a rate limit, or an identical
+     * repeat inside Claude Code's window, drops them where nothing here can see.
+     */
+    say: (session, text) =>
+      Effect.tryPromise({
+        try: async () => {
+          const pid = pids.get(session.sessionId);
+          if (pid === undefined) {
+            throw new Error(`\`claude agents\` lists no process for ${session.name} (${session.sessionId}): it has exited, or this runner has not observed it.`);
+          }
+          await postLine(await claudeInbox(sessionsDir, pid, session.sessionId), claudeInboxLine(session.sessionId, text));
+        },
+        catch: (cause) => new RunnerError({ verb: 'say', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
       }),
   });
 };

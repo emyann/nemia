@@ -68,6 +68,13 @@ export type HarnessSpec = {
     file: (nativeId: string) => string | undefined;
     events: (entry: unknown, offset: number) => TranscriptEvent[];
   };
+  /**
+   * Why a session of this harness cannot be told anything while it runs, in its own words and saying what to
+   * do instead. This runner has no `say` — a harness that runs a prompt and exits takes nothing in the
+   * meantime — so `say` refuses every task of a spec with this sentence, and a spec without one with the
+   * engine's.
+   */
+  noChannel?: string;
 };
 
 /**
@@ -602,6 +609,7 @@ export const codex: HarnessSpec = {
   // The conversation, from Codex's own rollout of the thread rather than the stream: the rollout dates
   // every record, and `exec --json` dates none.
   transcript: { file: codexRolloutFile, events: codexRolloutEvents },
+  noChannel: "`codex exec` reads its prompt once and takes nothing while it runs: there is no channel into a running Codex session. Continue its thread with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.",
   // Best effort: codex prints a thread/session id in its JSONL. Only needed for resume.
   nativeIdPattern: '"(?:thread_id|session_id|id)"\\s*:\\s*"([0-9a-f-]{16,})"',
   /**
@@ -684,6 +692,7 @@ export const claudeDetached: HarnessSpec = {
   // The same transcript `claude --bg` writes, read the same way — but only once the session has exited:
   // its id is in the one object `--output-format json` prints, and that is printed last.
   transcript: { file: claudeTranscriptFile, events: claudeTranscriptEvents },
+  noChannel: "`claude -p` listens for messages, but this harness learns its session's id only from what it prints as it exits, so nothing can be addressed to one while it runs. File the task on `claude` to be able to tell it something, or continue its session with a new task that carries the words (`resumeFrom`).",
   /** The checkout's `.mcp.json`, found on disk here so that `command` stays a function of what it is given. */
   prepare: (r) => {
     const found = checkoutMcpConfig(r.cwd);

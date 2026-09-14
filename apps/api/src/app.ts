@@ -510,7 +510,13 @@ class Unread extends Error {
  * (`transcript` finds the session through it); once the attempt has ended, `transcript` reads by the session's id on the record.
  */
 async function readTranscript(id: string, step: string, taskId: string, after: string | undefined): Promise<Read> {
-  const view = await e.view(taskId);
+  let view: TaskView;
+  try {
+    view = await e.view(taskId);
+  } catch (err) {
+    const why = err instanceof Error ? err.message : String(err);
+    throw new Unread(502, `Could not read task ${taskId} of step '${step}': ${why}. \`wf ls\` reads the same record from the command line.`);
+  }
   if (phaseOfView(view) === 'unknown') {
     throw new Unread(404, `Step '${step}' of run '${id}' was filed as task ${taskId}, and the engine has no record of it: there is no conversation to read. \`wf ls\` shows the step unknown.`);
   }
@@ -630,6 +636,8 @@ export const app = new Hono()
     }
     return streamSSE(c, async (stream) => {
       await send(stream, read);
+      // Whether the last read failed. A failure is said once, and cleared with `readable` by the first read that works.
+      let failing = false;
       while (read.live) {
         await stream.sleep(STREAM_EVERY_MS);
         // Nobody is reading: stop asking the engine. Each read observes the harnesses.
@@ -637,9 +645,20 @@ export const app = new Hono()
         try {
           read = await readTranscript(id, step, taskId, read.cursor);
         } catch (err) {
-          await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error: err instanceof Error ? err.message : String(err) }) });
-          return;
+          const error = err instanceof Error ? err.message : String(err);
+          // An answer about the conversation — its task gone from the engine's record — ends the stream: no read will change it.
+          if (err instanceof Unread && err.status !== 502) {
+            await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: false }) });
+            return;
+          }
+          // Anything else is this read, not the conversation: a journal or a transcript that could not be opened this second
+          // most likely can be the next. Read again on the next beat, from the same cursor, as a tick would.
+          if (!failing) await stream.writeSSE({ event: 'unreadable', data: JSON.stringify({ error, retrying: true }) });
+          failing = true;
+          continue;
         }
+        if (failing) await stream.writeSSE({ event: 'readable', data: '{}' });
+        failing = false;
         await send(stream, read);
       }
       if (!stream.aborted) await stream.writeSSE({ event: 'settled', data: JSON.stringify({ cursor: read.cursor }), id: read.cursor });

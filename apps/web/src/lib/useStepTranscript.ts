@@ -53,10 +53,14 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
           frame ||= requestAnimationFrame(flush);
         });
         stream.addEventListener('settled', () => end(null));
+        // A read that failed, and is being tried again every second: said, and still followed. One that will not be: the end.
         stream.addEventListener('unreadable', (message) => {
-          const said = (JSON.parse(message.data) as { error?: unknown }).error;
-          end(typeof said === 'string' ? said : 'The conversation could not be read any further.');
+          const { error, retrying } = JSON.parse(message.data) as { error?: unknown; retrying?: unknown };
+          const said = typeof error === 'string' ? error : 'The conversation could not be read.';
+          if (retrying === true) setState((s) => ({ ...s, error: `${said} Reading it again every second.` }));
+          else end(said);
         });
+        stream.addEventListener('readable', () => setState((s) => ({ ...s, error: null })));
         stream.addEventListener('error', () => {
           // A dropped connection is retried by the EventSource itself; it closes only when the api answered with a refusal.
           if (stream.readyState === EventSource.CLOSED) end('The api refused to follow this conversation any further. Reload the page to read it again.');

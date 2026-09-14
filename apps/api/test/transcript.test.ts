@@ -108,12 +108,15 @@ fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
 fs.writeFileSync(path.join(root, 'runs', `${RUN}.json`), JSON.stringify({
   id: RUN, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Talk it through',
   workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
-  workflow: ['implement', 'resumed', 'live', 'gone', 'lost', 'review'].map((name) => ({ name, after: [], body: `${name} it.` })),
+  workflow: ['implement', 'resumed', 'live', 'gone', 'broken', 'flaky', 'vanishing', 'lost', 'review'].map((name) => ({ name, after: [], body: `${name} it.` })),
   steps: {
     implement: { taskId: 't-implement' },
     resumed: { taskId: 't-resumed' },
     live: { taskId: 't-live' },
     gone: { taskId: 't-gone' },
+    broken: { taskId: 't-broken' },
+    flaky: { taskId: 't-flaky' },
+    vanishing: { taskId: 't-vanishing' },
     // Filed, and the engine has no record of its task.
     lost: { taskId: 't-lost' },
     review: { taskId: null },
@@ -270,4 +273,73 @@ test('the stream stops asking the engine once its reader goes away', { timeout: 
   const before = observations();
   await sleep(3_000);
   assert.equal(observations(), before, 'no `claude agents` call once the reader has gone: the task is still live, and nobody is reading');
+});
+
+test("a conversation the engine cannot read is a 502 that says how to read the step's output from the command line", async () => {
+  const sessionId = settledTask('t-broken');
+  // A directory where the transcript should be: found, opened, and not read.
+  fs.rmSync(transcriptFile(sessionId));
+  fs.mkdirSync(transcriptFile(sessionId));
+  const res = await app.request(url('broken'));
+  assert.equal(res.status, 502);
+  const { error } = await res.json();
+  assert.match(error, /^Could not read the conversation of step 'broken' \(task t-broken\): /);
+  assert.match(error, /`wf logs r-talk broken` reads its output from the command line\.$/);
+});
+
+test('a read that fails mid-stream is said once and read again every second: following resumes from the same cursor, and ends settled', { timeout: 30_000 }, async () => {
+  const sessionId = runningTask('t-flaky');
+  const lines = conversation(sessionId);
+  writeTranscript(sessionId, lines.slice(0, 4));
+  const res = await app.request(streamUrl('flaky'));
+  const reader = res.body!.getReader();
+  const text = { value: '' };
+  await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
+
+  // The task's journal cannot be read for a while — a directory where the file was — as a read that fails would find it.
+  const aside = `${journalFile('t-flaky')}.aside`;
+  fs.renameSync(journalFile('t-flaky'), aside);
+  fs.mkdirSync(journalFile('t-flaky'));
+  const failing = (await readUntil(reader, text, (said) => said.some((b) => b.event === 'unreadable'))).filter((b) => b.event === 'unreadable');
+  const { error, retrying } = JSON.parse(failing[0]!.data!);
+  assert.equal(retrying, true, 'said as a read that will be tried again');
+  assert.match(error, /^Could not read task t-flaky of step 'flaky': /);
+  const answered = await app.request(url('flaky'));
+  assert.equal(answered.status, 502, 'the read route answers the same failure with a 502, not a 500');
+  assert.match((await answered.json()).error, /^Could not read task t-flaky of step 'flaky': .*`wf ls` reads the same record/);
+  // Some beats of it.
+  await sleep(2_500);
+
+  // Readable again, and the session went on, then its task settled.
+  fs.rmdirSync(journalFile('t-flaky'));
+  fs.renameSync(aside, journalFile('t-flaky'));
+  writeTranscript(sessionId, lines.slice(4));
+  await readUntil(reader, text, (said) => eventsIn(said).length >= 8);
+  journal('t-flaky', ending('t-flaky', sessionId));
+  const said = await readUntil(reader, text, () => false);
+
+  assert.deepEqual(said.filter((b) => b.event === 'unreadable').length, 1, 'the failure is said once, however many beats it lasts');
+  const [unreadableAt, readableAt] = [said.findIndex((b) => b.event === 'unreadable'), said.findIndex((b) => b.event === 'readable')];
+  assert.ok(readableAt > unreadableAt, 'and cleared by `readable` once a read works');
+  assert.equal(said.filter((b) => b.event === 'readable').length, 1);
+  assert.deepEqual(eventsIn(said), (await engine().transcript('t-flaky')).events, 'every event, once each: read again from the cursor it had');
+  assert.equal(said.at(-1)?.event, 'settled');
+});
+
+test("a task that leaves the engine's record mid-stream ends the stream: `unreadable`, not tried again, and never `settled`", { timeout: 30_000 }, async () => {
+  const sessionId = runningTask('t-vanishing');
+  writeTranscript(sessionId, conversation(sessionId).slice(0, 2));
+  const res = await app.request(streamUrl('vanishing'));
+  const reader = res.body!.getReader();
+  const text = { value: '' };
+  await readUntil(reader, text, (said) => eventsIn(said).length >= 1);
+  fs.rmSync(journalFile('t-vanishing'));
+  // Resolves only once the api closes the stream; a stream that went on trying would time the test out.
+  const said = await readUntil(reader, text, () => false);
+  const last = said.at(-1)!;
+  assert.equal(last.event, 'unreadable');
+  const { error, retrying } = JSON.parse(last.data!);
+  assert.equal(retrying, false);
+  assert.match(error, /was filed as task t-vanishing, and the engine has no record of it/);
+  assert.ok(!said.some((b) => b.event === 'settled'));
 });

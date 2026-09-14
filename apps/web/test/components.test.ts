@@ -478,10 +478,11 @@ test("a workflow's step is drawn in the spec mode: what it runs on, its check, t
   const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2]!)]);
   assert.deepEqual(lines, [
     ['check', 'npm test && npm run typecheck'],
-    ['tools', 'Read, Grep, Glob, Bash'],
+    ['tools', '4'],
     ['mode', 'dontAsk'],
     ['loop', 'implement · 3 rounds'],
   ], html);
+  assert.match(html, /<dt[^>]*>tools<\/dt><dd[^>]*title="Read, Grep, Glob, Bash"/, html);
 
   // Nothing has happened to it: no chip, no attempt, no gate, no spinner — none of what a run's step shows below its head.
   assert.doesNotMatch(html, /data-state=/, html);
@@ -502,6 +503,22 @@ test('a step that sets nothing is drawn on the defaults, with no lines under its
 
   const { specLines } = await import('../src/components/StepNode.tsx');
   assert.deepEqual(specLines({ ...unset, loop: 'implement', rounds: 1 }), [['loop', 'implement · 1 round']]);
+});
+
+test('a step with more than three tools counts them on its node, named in the title; three or fewer are written out', async () => {
+  const { specLines } = await import('../src/components/StepNode.tsx');
+  const four = ['Read', 'Grep', 'Glob', 'Bash'];
+  assert.deepEqual(specLines({ ...unset, tools: four }), [['tools', '4', 'Read, Grep, Glob, Bash']]);
+  assert.deepEqual(specLines({ ...unset, tools: four.slice(0, 3) }), [['tools', 'Read, Grep, Glob']]);
+  assert.deepEqual(specLines({ ...unset, tools: ['Read'] }), [['tools', 'Read']]);
+
+  /** The tools line as drawn: what it shows, and its title. */
+  const toolsLine = (html: string) => {
+    const m = /<dt[^>]*>tools<\/dt><dd[^>]*title="([^"]*)"[^>]*>([^<]*)<\/dd>/.exec(html);
+    return m && { shows: m[2], title: m[1] };
+  };
+  assert.deepEqual(toolsLine(await specMarkup({ ...unset, tools: [...four, 'Edit'] })), { shows: '5', title: 'Read, Grep, Glob, Bash, Edit' });
+  assert.deepEqual(toolsLine(await specMarkup({ ...unset, tools: four.slice(0, 3) })), { shows: 'Read, Grep, Glob', title: 'Read, Grep, Glob' });
 });
 // ─── the decision ────────────────────────────────────────────────────────────
 

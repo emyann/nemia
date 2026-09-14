@@ -473,7 +473,8 @@ const PAGES: PageSpec[] = [
       await expectCount(graph.locator('.react-flow__node'), good.steps.length, `${good.name}'s graph has a node per step (${good.steps.join(', ')})`);
       for (const step of good.steps) await expectVisible(node(step).getByText(good.runsOn, { exact: true }), `${step}'s node says what it runs on (${good.runsOn})`);
       await expectVisible(node('implement').getByText(good.check, { exact: true }), `implement's node shows its check (${good.check})`);
-      await expectVisible(node('review').getByText(good.tools, { exact: true }), `review's node shows its tools (${good.tools})`);
+      const tools = good.tools.split(', ').length;
+      await expectVisible(node('review').locator(`dd[title="${good.tools}"]`, { hasText: new RegExp(`^${tools}$`) }), `review's node counts its ${tools} tools and names them on hover (${good.tools})`);
       await expectVisible(node('review').getByText(good.loop, { exact: true }), `review's node shows its loop and its rounds (${good.loop})`);
       // Chips only: since B5 an edge's path carries `data-state` too, so the count is taken inside the nodes.
       await expectCount(graph.locator('.react-flow__node [data-state]'), 0, 'a step no run has started has no status chip');

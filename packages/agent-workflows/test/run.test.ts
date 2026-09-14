@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -342,6 +342,46 @@ test('a run that worked directly on its base branch is never read as shipped', (
 test('a run that never filed anything has no branch to ship, and is not "shipped"', () => {
   const d = decision(STEPS, run({ implement: null, review: null }), phases({}), () => true);
   assert.equal(d.kind, 'running');
+});
+
+test("REFUSED: a result branch with nothing past the base is shipped only when every step succeeded — failed, blocked, unsigned or refused by its check, the run is decided; work past the base on the base branch is shipped whatever the steps said", () => {
+  // A result branch is cut at the run's base, so git calls one nobody committed to "on the base branch". Read as shipped, a run whose
+  // last step failed said `shipped`: `wf decide` hid the failure, and a run waiting on it started.
+  const unchanged = () => 'unchanged' as const;
+  const says = (outcome: Closeout['outcome']) => (): Closeout => ({ outcome, summary: 's', artifacts: [] });
+  const cases: Array<[string, Decision, string, string[]]> = [
+    ['failed', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), unchanged), 'failed', ['review']],
+    ['stopped', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'stopped' }), unchanged), 'failed', ['review']],
+    ['blocked', decision(STEPS, finished(), DONE, unchanged, says('blocked')), 'blocked', []],
+    ['unsigned', decision(STEPS, finished(), DONE, unchanged, () => undefined, () => true), 'blocked', []],
+  ];
+  for (const [why, d, outcome, failed] of cases) {
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed, d.branches], [outcome, failed, ['wf/r-1/review']], why);
+  }
+  const checked: Workflow[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
+  const refused = decision(checked, run({}, { steps: { implement: { taskId: 't1', branch: 'wf/r-1/implement' }, review: { taskId: 't2', branch: 'wf/r-1/review', check: { taskId: 'c2' } } } }),
+    phases({ t1: 'succeeded', t2: 'succeeded', c2: 'failed' }), unchanged, says('done'), () => true, () => 1);
+  assert.deepEqual(refused.kind === 'awaiting' && [refused.outcome, refused.failedCheck], ['failed', ['review']], 'refused by its check');
+
+  // Every step succeeded, with nothing to commit: shipped, as before.
+  assert.deepEqual(decision(STEPS, finished(), DONE, unchanged), { kind: 'shipped', branches: ['wf/r-1/review'] });
+  assert.deepEqual(decision(STEPS, finished(), DONE, unchanged, says('done'), () => true), { kind: 'shipped', branches: ['wf/r-1/review'] });
+  // Work past the base, merged by a person: shipped though a step failed.
+  assert.deepEqual(decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), () => true), { kind: 'shipped', branches: ['wf/r-1/review'] });
+
+  // A fan-out ships on its work only when every branch has some on the base; one that never moved leaves a failed run decided.
+  const fan = [step('implement'), step('docs', ['implement']), step('tests', ['implement'])];
+  const r = run({}, { steps: { implement: { taskId: 't1', branch: 'wf/r-1/implement' }, docs: { taskId: 't2', branch: 'wf/r-1/docs' }, tests: { taskId: 't3', branch: 'wf/r-1/tests' } } });
+  const half = (b: string) => (b === 'wf/r-1/docs' ? true : 'unchanged' as const);
+  const failing = decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), half);
+  assert.deepEqual(failing.kind === 'awaiting' && [failing.outcome, failing.failed], ['failed', ['tests']]);
+  assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), half).kind, 'shipped');
+  assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), () => true).kind, 'shipped');
+
+  // Git is asked once a branch, and not past the first branch that is not on the base.
+  const asked: string[] = [];
+  decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), (b) => { asked.push(b); return b !== 'wf/r-1/docs' && 'unchanged'; });
+  assert.deepEqual(asked, ['wf/r-1/docs']);
 });
 
 // ─── the closeout ───────────────────────────────────────────────────────────

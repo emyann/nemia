@@ -18,9 +18,9 @@ export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { ParentRun, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Wait } from './run.ts';
+export type { ParentRun, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Shipped, Wait } from './run.ts';
 import { fansOut, loadWorkflows, terminalSteps, type Workflow } from './workflow.ts';
-import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Wait } from './run.ts';
+import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -1293,31 +1293,45 @@ export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactF
 }
 
 /**
- * Has this branch landed on the base branch? Git's answer, not ours.
+ * Has this branch landed on the base branch? Git's answer, not ours — and which yes it is (`Shipped`).
  *
  * `--is-ancestor` rather than a merge-commit search, so a fast-forward, a squash-merge that was
  * then merged, and a rebase all read the same: the commits are in, therefore it shipped.
+ *
+ * A yes is `'unchanged'` when nothing is committed on the branch past the run's base: it was cut there, so it
+ * has been on the base branch since it was cut, and `decision` calls that shipped only for a run whose steps
+ * all succeeded. Asked the same way the other way round — is the branch within the base — and `'unchanged'`
+ * too when git cannot say, so a run on a base git cannot read is decided by a person, never waved through.
  *
  * A branch git no longer has — deleted after the merge — is asked by the tip the run's tick recorded
  * once the run had finished (`tipsSeen`): still git's answer, about the commit the branch named. Git
  * keeps no trace of it otherwise: a merge carries any message, and `git branch -d` needs the worktree
  * removed first. With no tip recorded, a branch that is gone has not landed as far as anyone can tell.
  */
-export function isShipped(run: Run, branch: string): boolean {
-  const onBase = (commit: string) => execFileSync('git', ['merge-base', '--is-ancestor', commit, run.branch], { cwd: run.repo, stdio: 'ignore' });
+export function isShipped(run: Run, branch: string): Shipped {
+  const within = (commit: string, base: string) => execFileSync('git', ['merge-base', '--is-ancestor', commit, base], { cwd: run.repo, stdio: 'ignore' });
+  // On the base branch already: with commits past the run's base, or none. Exit 1 is git's no — the commit is not within the run's base.
+  const landed = (commit: string): Shipped => {
+    try {
+      within(commit, run.baseRef);
+      return 'unchanged';
+    } catch (err) {
+      return (err as { status?: number }).status === 1 ? true : 'unchanged';
+    }
+  };
   try {
-    onBase(branch);
-    return true;
+    within(branch, run.branch);
   } catch (err) {
     // Exit 1 is git's no. Anything else is a name git cannot read, and the tip is asked instead — only then, since a branch that is
     // still there and not on the base has not landed, whatever an older tip of it says.
     const tip = run.tips?.[branch];
     if ((err as { status?: number }).status === 1 || !tip) return false;
     try {
-      onBase(tip);
-      return true;
+      within(tip, run.branch);
     } catch { return false; }
+    return landed(tip);
   }
+  return landed(branch);
 }
 
 /**
@@ -1338,10 +1352,11 @@ export function parentRecord(id: string): Pick<ParentRun, 'record' | 'gone'> {
  * A run another waits on (`--after`), read by the pass that asks and carried nowhere — what `runReady` and `waitsOf` are handed.
  *
  * Shipped is the run's own `wf decide`'s word, and nothing stricter or looser: `decision` says `shipped` — the run is not running, it was
- * not cancelled, and every result branch is on its base branch (`isShipped`). A child starts when its parent's `wf decide` says shipped,
- * and a child waits exactly while it does not. A result branch is cut at its run's base, which is on the base branch, so a branch nobody
- * has committed to is on it from the moment it is cut: a parent still running has not shipped for that, and one that finished with nothing
- * to commit has, as its `wf decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
+ * not cancelled, and every result branch is on its base branch (`isShipped`), with work past its base or with every step succeeded. A child
+ * starts when its parent's `wf decide` says shipped, and a child waits exactly while it does not. A result branch is cut at its run's base,
+ * which is on the base branch, so a branch nobody has committed to is on it from the moment it is cut: a parent still running has not shipped
+ * for that, nor one that ended failed, blocked or unsigned with nothing committed; one whose steps all signed off with nothing to commit has,
+ * as its `wf decide` says. A run that worked on its base branch itself (`--no-worktree`) never has.
  *
  * Git first, which costs no harness observe: a result branch not on the base branch has not shipped, whatever the run's steps say. The
  * engine's view of the parent's tasks is read only once every one is.

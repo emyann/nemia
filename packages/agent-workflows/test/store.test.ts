@@ -1761,3 +1761,33 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
   )));
   assert.equal(fs.readFileSync(roundFile, 'utf8'), '[]');
 });
+
+// ─── shipped, with nothing past the base ────────────────────────────────────
+
+test("REFUSED at shipped defaults: a one-step run whose step failed with nothing committed reads failed, not shipped, and a run `--after` it files nothing — with its work merged onto the base, a failed step's run is shipped, and its child starts", async () => {
+  const repo = aRepo();
+  const c = board();
+  const p = await aParent(repo, c);
+  c.settle(`${p.run.id}-implement`, 'failed');
+  await advance(c.e, readRun(p.run.id));   // its own pass: nothing to hand off, and its tip recorded
+  assert.equal(gitIn(repo, 'rev-list', '--count', `${p.run.baseRef}..${p.branch}`), '0', 'nothing past its base');
+  assert.equal(gitIn(repo, 'merge-base', '--is-ancestor', p.branch, p.run.branch), '', 'and so on the base branch, as git reads it');
+  const d = (await decide(c.e, p.run.id)).decision;
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed, d.branches], ['failed', ['implement'], [p.branch]], '`wf decide` shows the failure');
+  assert.equal((await parentOf(c.e, p.run.id)).shipped, false);
+  const child = start({ brief: 'the child of a failure', repo, workflowDir: folder(), after: [p.run.id] });
+  for (let pass = 0; pass < 3; pass++) {
+    const r = await advance(c.e, readRun(child.id));
+    assert.deepEqual([r.filed, r.waiting], [[], [{ run: p.run.id }]], `pass ${pass + 1}`);
+  }
+
+  // Its step failed, and a person merged what it committed: shipped, whatever the step said.
+  const q = await aParent(repo, c, { work: 'kept.txt', signed: false });
+  c.settle(`${q.run.id}-implement`, 'failed');
+  const before = await decide(c.e, q.run.id);
+  assert.deepEqual(before.decision.kind === 'awaiting' && before.decision.outcome, 'failed', 'not merged yet: decided');
+  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge the work of a failed step', q.branch);
+  assert.deepEqual((await decide(c.e, q.run.id)).decision, { kind: 'shipped', branches: [q.branch] });
+  const next = start({ brief: 'the child of merged work', repo, workflowDir: folder(), after: [q.run.id] });
+  assert.deepEqual((await advance(c.e, readRun(next.id))).filed, ['implement']);
+});

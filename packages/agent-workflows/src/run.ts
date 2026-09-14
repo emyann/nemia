@@ -1329,6 +1329,11 @@ const sizeOf = (bytes: number): string =>
  * is the result branch an ancestor of the base branch — and a `decidedAt` field would be a second
  * copy of it, wrong the moment somebody merges by hand. A run still holds no status of its own;
  * cancellation remains the single exception, and it is one because nothing else knows it.
+ *
+ * Git's yes is not always an answer, though. A result branch is cut at the run's base, which is on the
+ * base branch, so a branch nobody committed to is "on the base branch" from the moment it is cut. Read
+ * as shipped, a run whose last step failed with nothing committed said `shipped`: `wf decide` hid the
+ * failure, and a run waiting on it (`--after`) started. So `shipped` says which yes it is (`Shipped`).
  */
 export type Decision =
   | { kind: 'running'; waiting: string[] }
@@ -1354,11 +1359,24 @@ export type Decision =
       direct: boolean;
     };
 
+/**
+ * Whether a result branch is on the run's base branch, as git says it (`isShipped` in runner.ts):
+ *
+ *   false        it is not
+ *   'unchanged'  it is, and only because nothing is committed on it past the run's base — where it was cut
+ *   true         it is, with commits past the run's base: work a person merged
+ *
+ * `decision` calls a run shipped on `true` whatever its steps said, and on `'unchanged'` only when every
+ * step succeeded: a branch that never moved says nothing landed, and a run that failed or waits on a
+ * person has not shipped for having nothing to merge.
+ */
+export type Shipped = boolean | 'unchanged';
+
 export function decision(
   steps: readonly Workflow[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  shipped: (branch: string) => boolean,
+  shipped: (branch: string) => Shipped,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => boolean = () => false,
   /** What each step's current check exited with: a refusal and a check that did not finish are told apart. */
@@ -1391,8 +1409,15 @@ export function decision(
   const direct = branches.includes(run.branch);
 
   // Every terminal branch, not some: a fan-out that ends in two branches is not shipped because
-  // one of them landed.
-  if (branches.length && !direct && branches.every(shipped)) return { kind: 'shipped', branches };
+  // one of them landed. Each is asked once, and none after the first that is not on the base branch.
+  const said = new Map<string, Shipped>();
+  const landed = (branch: string): Shipped => {
+    if (!said.has(branch)) said.set(branch, shipped(branch));
+    return said.get(branch)!;
+  };
+  const onBase = branches.length > 0 && !direct && branches.every(landed);
+  // Work past the base on the base branch was merged by a person: shipped, whatever the steps said.
+  if (onBase && branches.every((b) => landed(b) === true)) return { kind: 'shipped', branches };
 
   // Told apart on purpose. A step that STOPPED itself and said why is a question for you; one the
   // engine recorded as failed is a thing that broke; one its check refused broke something the run
@@ -1409,9 +1434,11 @@ export function decision(
   const unverified = named('unverified');
   // A loop out of rounds broke nothing: its step asked for more than the workflow allows, and a person decides.
   const exhausted = named('exhausted');
+  const outcome = failed.length || checkFailed.length ? 'failed' : stuck.length || unsigned.length || exhausted.length ? 'blocked' : 'succeeded';
+  // A branch that never moved is on the base branch from the moment it was cut: shipped only when there was nothing wrong to hide.
+  if (onBase && outcome === 'succeeded') return { kind: 'shipped', branches };
   return {
-    kind: 'awaiting',
-    outcome: failed.length || checkFailed.length ? 'failed' : stuck.length || unsigned.length || exhausted.length ? 'blocked' : 'succeeded',
+    kind: 'awaiting', outcome,
     branches, failed, stuck, failedCheck, unfinishedCheck, unsigned, unverified, exhausted, direct,
   };
 }

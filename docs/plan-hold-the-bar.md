@@ -696,6 +696,24 @@ owner is not mid-run.
   worktree and tmp; the engine passes no `--add-dir`). Latent while the reviewer is Opus. The fix is
   hkb's `exports`: a step lists a relative path under `artifacts` and the run *collects* it into the
   directory at hand-off, before the check — then no step needs to write outside its workspace. → with R.
+- **the settings' prefix allows reach the build and the e2e by other names (D1's round-2 review, 2026-09-14):** the
+  reviewers are denied `Bash(npm run build)` and `Bash(npm run e2e)` by machinery now, but `.claude/settings.json`
+  allows `Bash(npx turbo run test:*)` and `Bash(node --test:*)`, so `npx turbo run test build` builds the web app and
+  `node --test apps/web/test/e2e/run.ts` runs the e2e, and a deny cannot close an allow that runs any task or any file
+  (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
+  and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
+
+- **a stale ask on a harness-blocked step that resumes by itself (W4's review, 2026-09-14):** `wf retry` on a step
+  whose session the harness blocked is due only while the engine says `needs-human`; if the session starts working
+  again before a tick stops it (a cross-session nudge, no `wf up`), the ask is neither due nor spent — `wf ls` shows
+  nothing — and files try 2 at once if the step later fails, stops or is unsigned, ahead of `retries:`. A task with
+  no `stopRequested` tells it apart. Stop the session anyway, or name it in `wf ls`/`wf decide`. → agent-workflows,
+  small (§6 item 24).
+
+### Settled
+
+Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+
 - **steering by message leaves no trace on the run (F2's review, finding 2):** the operator widened
   a step's scope and added an ask through cross-session messages; the run's record shows only two
   commit messages and a closeout, and the reviewer rightly could not tell an authorised change from
@@ -744,24 +762,9 @@ owner is not mid-run.
   appear once per result branch; `wf decide` prints each branch on its own line and never sums. Count each
   file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
   last value only (`indexOf` on parsed objects is −1). → apps, with B7.
-
-- **the settings' prefix allows reach the build and the e2e by other names (D1's round-2 review, 2026-09-14):** the
-  reviewers are denied `Bash(npm run build)` and `Bash(npm run e2e)` by machinery now, but `.claude/settings.json`
-  allows `Bash(npx turbo run test:*)` and `Bash(node --test:*)`, so `npx turbo run test build` builds the web app and
-  `node --test apps/web/test/e2e/run.ts` runs the e2e, and a deny cannot close an allow that runs any task or any file
-  (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
-  and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
-
-- **a stale ask on a harness-blocked step that resumes by itself (W4's review, 2026-09-14):** `wf retry` on a step
-  whose session the harness blocked is due only while the engine says `needs-human`; if the session starts working
-  again before a tick stops it (a cross-session nudge, no `wf up`), the ask is neither due nor spent — `wf ls` shows
-  nothing — and files try 2 at once if the step later fails, stops or is unsigned, ahead of `retries:`. A task with
-  no `stopRequested` tells it apart. Stop the session anyway, or name it in `wf ls`/`wf decide`. → agent-workflows,
-  small (§6 item 24).
-
-### Settled
-
-Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+  *S3 `7762c46` + S4 `1fe141e`: `ae say`/`wf say` hand the words to the session over its inbox socket and the engine journals
+  them; `wf decide` prints them under the step, a continued session is handed them again, and the session page has the
+  prompt box. The ask-file shape was not needed: the engine's journal is the one record.*
 
 - **workers could not search the web (S3's plan step, 2026-09-14):** its risks said WebSearch and `claude agents
   --help` were denied to it. Measured with `claude -p` from this checkout: `WebSearch` denied in `dontAsk` and in
@@ -936,7 +939,7 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3 all done; S4 (item 3, upper half) in flight; then the small items.
+Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4 all done; nothing in flight; the small items are what is left.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -960,8 +963,8 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
    measured the harness and asked which channel; answered A, the session's inbox socket, through `wf retry
    --message`. Done, `7762c46`: `Engine.say`, the `said` event, `ae say`; verified live twice; issue 16 (a session
    blocked on a permission prompt loses the words when continued). S4 (agent-workflows `wf say` + `saidLines` in `wf
-   decide` + `## Said to your session` in a nudge's brief; api `POST …/say`; the session page's prompt box) filed
-   2026-09-14 as `the-steering-channel-upper-h-d7es`, from `./workflows/dev-build`.*
+   decide` + `## Said to your session` in a nudge's brief; api `POST …/say`; the session page's prompt box) done,
+   `1fe141e`. **Item 3 is done**: a mid-flight instruction leaves a trace.*
 
 **agent-workflows, small**
 4. Per-step `disallow:` → `--disallowedTools`, a field on the task. *Done, D1, `825be29`.*

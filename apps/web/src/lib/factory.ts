@@ -3,7 +3,8 @@
  * says, where a card goes, and where an open run's graph goes beside it. Pure.
  */
 import type { RunSummary } from './api';
-import { COLUMN_WIDTH, NODE_WIDTH, type Point } from './layout.ts';
+import type { EdgeState } from './canvas.ts';
+import { COLUMN_WIDTH, layers, NODE_WIDTH, type Point } from './layout.ts';
 
 /**
  * Whether a run is in flight, and so on the Factory by default: `assess` has it `running`, or it still moves
@@ -14,8 +15,62 @@ import { COLUMN_WIDTH, NODE_WIDTH, type Point } from './layout.ts';
  * finished once it has stopped moving without running: succeeded; failed at a refused check or a step
  * signed off blocked, whose followers read `waiting` and will never be filed; or cancelled, its stop landed.
  * A person such a run waits on finds it under "Show finished", or on Runs.
+ *
+ * A run started `--after` runs that have not shipped is in flight while each may still ship: it moves, since the tick files its roots
+ * when they do. Not once one never will without a person (`waiting.onYou`) — no such run, a cancelled one, a branch gone — though
+ * `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until a person acts, and it waits on them.
  */
-export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'>): boolean => run.status === 'running' || run.moving;
+export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & { waiting?: RunSummary['waiting'] }): boolean =>
+  run.moving || (run.status === 'running' && !run.waiting?.onYou);
+
+/**
+ * Whether the run waits on a person: a step does (`waitingOnYou`), or a run it waits on never ships without one — what `wf ls` prints
+ * `→ waiting on you` for, either way.
+ */
+export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou'> & { waiting?: RunSummary['waiting'] }): boolean =>
+  run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou);
+
+/**
+ * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
+ * a run that never ships is one, though it has filed nothing and is not in flight; in flight; or finished.
+ */
+export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
+  run.cancelledAt ? 'cancelled' : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
+
+type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after'>;
+
+/**
+ * The runs on the Factory's floor, oldest first: every run when finished runs are asked for; otherwise every run in flight, and each
+ * finished run that a run in flight waits on (`after`), so the edge into it leaves from a card.
+ *
+ * The finished card, and not a stub: it is dimmed as a finished card is, it says what the run was for and whether it shipped or was
+ * called off, and it opens into the run's steps — a stub would say only an id, and send a person to Runs to learn the rest. One level: a
+ * finished parent brings none of its own parents onto the floor, since it waits on nothing any more.
+ */
+export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean): T[] {
+  const waitedOn = new Set(runs.filter(inFlight).flatMap((run) => run.after));
+  return byAge(runs).filter((run) => showFinished || inFlight(run) || waitedOn.has(run.id));
+}
+
+/** An edge between two cards on the Factory: from a run to one that waits on it. Dashed, to come, until the child starts; solid once it has. */
+export type RunEdge = { id: string; source: string; target: string; state: Extract<EdgeState, 'to-come' | 'done'> };
+
+/**
+ * The edges between the cards on the floor: one from each run in a card's `after` that is on the floor too, to that card. A run in `after`
+ * that is not — finished with "Show finished" off and waited on by no run in flight, or one the store has lost — draws none; the card's
+ * `waiting` line still names it.
+ *
+ * A child has started once any of its steps is filed: its parents shipped, and it no longer waits (`gated` in agent-workflows).
+ */
+export function runEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'>>): RunEdge[] {
+  const floor = new Set(runs.map((run) => run.id));
+  return runs.flatMap((child) => {
+    const started = child.steps.some((step) => step.taskId !== null);
+    return [...new Set(child.after)]
+      .filter((parent) => floor.has(parent) && parent !== child.id)
+      .map((parent): RunEdge => ({ id: `after:${parent}->${child.id}`, source: parent, target: child.id, state: started ? 'done' : 'to-come' }));
+  });
+}
 
 /** A card's title: the brief's first line with words on it, without a heading's hashes; else the run id. */
 export const titleOf = (run: Pick<RunSummary, 'id' | 'brief'>): string =>
@@ -97,33 +152,56 @@ export const movedOpen = (open: string[], id: string): string[] =>
  *    the other, so the card coming back takes a free place instead.
  * 3. Any other card takes the first free place, row by row: the first cell from which every cell it
  *    takes is free. An open run wider than the grid starts a row, and its graph runs past the grid's edge.
+ *    Closed cards joined by `after` — each run's parents on the floor — are placed together, the first time
+ *    one of them comes up: layered as a run's steps are (`layers`), each a column right of every card it
+ *    waits on and level with the middle of them, so a diamond reads as one; and the whole at the first free
+ *    place right of every card already down that one of them waits on, and left of every one that waits on it.
+ *    When some of a group are down and others are not, the group is laid out again together if a graph moved
+ *    one of them aside, and the others go in among the cards down if they are coming onto the floor — each
+ *    only where every edge still points right, the other way if that one cannot, and the cards down kept
+ *    where they are if neither can.
  *
- * A card is in the cell nearest its corner, and an open run in the cells its span covers from there —
- * beyond the grid's edges as well as on the grid, so a graph running past the edge moves a card a person
- * parked there; only (3) keeps to the grid. A card off the floor holds no cell: finished runs pile up,
- * and holding their cells would leave holes that never close.
+ * A card is in the cell nearest its corner — both rows, for one the layering puts halfway down a row — and
+ * an open run in the cells its span covers from there, beyond the grid's edges as well as on the grid, so a
+ * graph running past the edge moves a card a person parked there; only (3) keeps to the grid. A card off the
+ * floor holds no cell: finished runs pile up, and holding their cells would leave holes that never close.
  */
 export function placeRuns(
   ids: readonly string[],
   onFloor: ReadonlyMap<string, Point>,
   saved: ReadonlyMap<string, Point> | null,
   spans: ReadonlyMap<string, Span> = new Map(),
+  after: ReadonlyMap<string, readonly string[]> = new Map(),
 ): Map<string, Point> {
   const floor = new Set(ids);
   const order = [...[...spans.keys()].filter((id) => floor.has(id)), ...ids.filter((id) => !spans.has(id))];
   const spanOfId = (id: string) => spans.get(id) ?? ONE_CELL;
+  // The edges between cards on the floor, each way.
+  const parents = new Map(ids.map((id) => [id, [...new Set(after.get(id) ?? [])].filter((p) => floor.has(p) && p !== id)]));
+  const children = new Map(ids.map((id) => [id, ids.filter((child) => parents.get(child)!.includes(id))]));
   const at = new Map<string, Point>();
   // Every cell a placed card is in; and the cells of the open runs, which a card on the floor yields to.
   const taken = new Set<string>();
   const unfolded = new Set<string>();
-  const put = (id: string, point: Point) => {
-    at.set(id, point);
+  const mark = (id: string, point: Point) => {
     for (const cell of cellsOf(point, spanOfId(id))) {
       taken.add(cell);
       if (spans.has(id)) unfolded.add(cell);
     }
   };
+  const put = (id: string, point: Point) => {
+    at.set(id, point);
+    mark(id, point);
+  };
+  /** Cards given up, to be placed again: the cells are worked out afresh, since cards may share one. */
+  const unput = (gone: readonly string[]) => {
+    for (const id of gone) at.delete(id);
+    taken.clear();
+    unfolded.clear();
+    for (const [id, point] of at) mark(id, point);
+  };
   const free = (point: Point, span: Span, of: ReadonlySet<string>) => cellsOf(point, span).every((cell) => !of.has(cell));
+  const columnOf = (id: string) => Math.round(at.get(id)!.x / CELL_WIDTH);
 
   for (const id of order) {
     const here = onFloor.get(id);
@@ -133,28 +211,101 @@ export function placeRuns(
     const left = saved?.get(id);
     if (!at.has(id) && left && free(left, spanOfId(id), taken)) put(id, left);
   }
-  for (const id of order) {
-    if (at.has(id)) continue;
-    const span = spanOfId(id);
-    // The last column an anchor can take and keep the graph in the row, or the first for one wider than the grid.
-    const last = GRID_COLUMNS - Math.min(span.columns, GRID_COLUMNS);
-    for (let cell = 0; ; cell++) {
-      const point = { x: (cell % GRID_COLUMNS) * CELL_WIDTH, y: Math.floor(cell / GRID_COLUMNS) * CELL_HEIGHT };
-      if (cell % GRID_COLUMNS <= last && free(point, span, taken)) {
-        put(id, point);
-        break;
+  /**
+   * The closed cards `after` joins to `id`, placed or not, oldest first. `id` alone when it is open, and when what joins it goes round in
+   * a cycle, which a record edited by hand could have: each of those cards is then placed on its own turn.
+   */
+  const groupOf = (id: string): string[] => {
+    if (spans.has(id)) return [id];
+    const found = new Set([id]);
+    for (const one of found) {
+      for (const other of [...parents.get(one)!, ...children.get(one)!]) if (!spans.has(other)) found.add(other);
+    }
+    const group = ids.filter((other) => found.has(other));
+    try {
+      layers(group.map((name) => ({ name, after: parents.get(name)!.filter((p) => found.has(p)) })));
+    } catch {
+      return [id];
+    }
+    return group;
+  };
+  /**
+   * Where each of `members` goes, in cells from the corner of the room they take: their layering's columns, each centred on the
+   * tallest — so a column a card short of it sits half a row down. Asked only of cards `groupOf` found in no cycle.
+   */
+  const shapeOf = (members: readonly string[]): Map<string, Point> => {
+    const columns = layers(members.map((name) => ({ name, after: parents.get(name)!.filter((p) => members.includes(p)) })));
+    const cells = columns.flatMap((column, c) => column.map((name, i) => [name, { x: c, y: i - (column.length - 1) / 2 }] as const));
+    const top = Math.min(...cells.map(([, p]) => p.y));
+    return new Map(cells.map(([name, p]) => [name, { x: p.x, y: p.y - top }]));
+  };
+  /**
+   * `members` put down in their shape at the first free place, row by row, where each is right of every card already down that it waits
+   * on and left of every one that waits on it. When no column keeps both, `strict` puts nothing and says so; otherwise the second gives
+   * way, and the first holds.
+   */
+  const placeTogether = (members: readonly string[], strict: boolean): boolean => {
+    const shape = shapeOf(members);
+    const cell = (name: string) => shape.get(name)!;
+    const first = Math.max(0, ...members.flatMap((m) => parents.get(m)!.filter((p) => at.has(p)).map((p) => columnOf(p) + 1 - cell(m).x)));
+    const cap = Math.min(Infinity, ...members.flatMap((m) => children.get(m)!.filter((c) => at.has(c)).map((c) => columnOf(c) - 1 - cell(m).x)));
+    if (cap < first && strict) return false;
+    const width = Math.max(...members.map((m) => cell(m).x + spanOfId(m).columns));
+    // The last column an anchor can take and keep the whole in the row, or the first for one wider than the grid — and no further right
+    // than the cards that wait on them allow, when they allow a column at all.
+    const last = Math.min(Math.max(first, GRID_COLUMNS - Math.min(width, GRID_COLUMNS)), cap < first ? Infinity : cap);
+    for (let row = 0; ; row++) {
+      for (let column = first; column <= last; column++) {
+        const points = members.map((m) => [m, { x: (column + cell(m).x) * CELL_WIDTH, y: (row + cell(m).y) * CELL_HEIGHT }] as const);
+        if (points.every(([m, point]) => free(point, spanOfId(m), taken))) {
+          for (const [m, point] of points) put(m, point);
+          return true;
+        }
       }
     }
+  };
+
+  for (const id of order) {
+    if (at.has(id)) continue;
+    const group = groupOf(id);
+    const loose = group.filter((m) => !at.has(m));
+    const down = group.filter((m) => at.has(m));
+    if (!down.length) {
+      placeTogether(group, false);
+      continue;
+    }
+    /** The cards not yet placed, in among the cards down, which stay where they are. */
+    const amongDown = () => placeTogether(loose, true);
+    /** The whole group laid out again — or, where a card outside it leaves no column for that, the cards down put back. */
+    const again = () => {
+      const were = down.map((m) => [m, at.get(m)!] as const);
+      unput(down);
+      if (placeTogether(group, true)) return true;
+      for (const [m, point] of were) put(m, point);
+      return false;
+    };
+    // A card of the group that was on the floor and has lost its place — a graph unfolded over it — takes the rest of its group with it,
+    // laid out again together: moved a card at a time, the group would be layered over the cards that moved alone. Cards coming onto the
+    // floor go in among the ones down first, which a person is looking at. Either only where every edge still points right: laid out
+    // again, a group that waits on an open run and that the open run waits on too has no column when the two are also joined directly
+    // (a triangle, a chain with a skip). And if neither can, the cards down stay, and only the cards not yet placed give way.
+    const movedAside = loose.some((m) => onFloor.has(m));
+    if (!(movedAside ? again() || amongDown() : amongDown() || again())) placeTogether(loose, false);
   }
   return new Map(ids.map((id) => [id, at.get(id)!]));
 }
 
-/** The cells a card at `point` is in, as `row:column`: from the cell nearest its corner, `span` across and down, on the grid or off it. */
+/**
+ * The cells a card at `point` is in, as `row:column`: from the cell nearest its corner, `span` across and down, on the grid or off it.
+ * A card a quarter of a row or more from its nearest row is in the row it straddles too: the layering puts a card halfway down a row, level
+ * with the middle of the two beside it, and a card placed beneath it must not land on its lower half.
+ */
 function cellsOf({ x, y }: Point, span: Span): string[] {
   const column = Math.round(x / CELL_WIDTH);
-  const row = Math.round(y / CELL_HEIGHT);
+  const top = Math.round(y / CELL_HEIGHT - 0.25);
+  const bottom = Math.round(y / CELL_HEIGHT + 0.25) + span.rows - 1;
   const cells: string[] = [];
-  for (let r = row; r < row + span.rows; r++) {
+  for (let r = top; r <= bottom; r++) {
     for (let c = column; c < column + span.columns; c++) cells.push(`${r}:${c}`);
   }
   return cells;

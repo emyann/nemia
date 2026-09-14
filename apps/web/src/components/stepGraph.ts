@@ -1,6 +1,7 @@
 import { MarkerType } from '@xyflow/react';
-import type { RunDetail } from '../lib/api';
+import type { RunDetail, RunSummary } from '../lib/api';
 import { edgeState, edgesOf, edgeStroke, LOOP_SOURCE, LOOP_TARGET, type EdgeState } from '../lib/canvas';
+import { runEdges } from '../lib/factory';
 import { stepState, type StepState } from '../lib/status';
 import type { StateFlowEdge } from './StateEdge';
 import type { StepNodeData } from './StepNode';
@@ -74,6 +75,14 @@ export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
  * step with no `after` — and none into a step that waits on another, whatever its spec says or lacks. Each says what its
  * root is doing: done once the root's work is, running while work moves into it, and to come otherwise.
  */
+/**
+ * The edges between the Factory's cards (`runEdges`): from a run into each card on the floor that waits on it, out of the one card's right
+ * side and into the other's left, drawn as every edge is — dashed while the card waits, solid once its run has started.
+ */
+export function afterEdges(runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after' | 'steps'>>): StateFlowEdge[] {
+  return runEdges(runs).map((e) => drawn(e.id, e.source, e.target, e.state, false));
+}
+
 export function cardEdges(run: RunDetail, card: string, prefix: string): StateFlowEdge[] {
   const runCancelled = run.cancelledAt !== null;
   const states = new Map(run.steps.map((s) => [s.name, stepState(s.status, runCancelled)]));

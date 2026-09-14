@@ -12,8 +12,15 @@ export type RunSummary = {
   workflowDir: string;
   createdAt: string;
   cancelledAt: string | null;
+  /** The runs this one waits on (`wf start --after`), as its record froze them: the edges from their cards to its card on the Factory. */
+  after: string[];
+  /** The runs its roots still wait on, in the package's words (`RunWaiting`); null once there are none, or the run has started. */
+  waiting: RunWaiting | null;
   status: RunStatus;
-  /** Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file. */
+  /**
+   * Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file — the roots of a
+   * run waiting on runs that may still ship among them, and not those of one waiting on a run that never ships without a person.
+   */
   moving: boolean;
   /**
    * `note` is what `wf ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints nothing.
@@ -22,6 +29,18 @@ export type RunSummary = {
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
   /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds. Empty on a cancelled run. */
   waitingOnYou: string[];
+};
+
+/**
+ * Mirrors `RunWaiting` in apps/api/src/app.ts: what a run started `--after` still waits on, in the package's words. `runs` are each run
+ * not shipped, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what `wf ls` prints on its roots —
+ * `waiting on a-1x2y (cancelled)` — and `advice` the line `wf decide` prints under it; `onYou` whether a person has to act.
+ */
+export type RunWaiting = {
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
+  word: string;
+  advice: string;
+  onYou: boolean;
 };
 
 /**
@@ -143,6 +162,9 @@ export type RunDetail = {
   isolate: boolean;
   createdAt: string;
   cancelledAt: string | null;
+  /** As on `RunSummary`. */
+  after: string[];
+  waiting: RunWaiting | null;
   status: RunStatus;
   moving: boolean;
   waitingOnYou: string[];
@@ -219,8 +241,11 @@ export type Decidable = {
   commands: DecideCommand[];
 };
 
-/** Mirrors `RunDecision` in apps/api/src/app.ts: `running` while nobody is waited on, `nothing` for a run called off or shipped. */
-export type RunDecision = { running: true } | { nothing: string } | Decidable;
+/**
+ * Mirrors `RunDecision` in apps/api/src/app.ts: `waiting` for a run whose roots wait on runs not shipped, `running` while nobody is
+ * waited on, `nothing` for a run called off or shipped.
+ */
+export type RunDecision = { waiting: RunWaiting } | { running: true } | { nothing: string } | Decidable;
 
 /**
  * What `wf decide` shows a person about a run. Read once for each state of the run, never on the page's beat: the api
@@ -373,13 +398,20 @@ export const workflowsQuery = queryOptions({
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
 export const workflowNameOf = (workflowDir: string): string => workflowDir.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || workflowDir;
 
+/** The repository a start runs in, as the api resolved it: what the start form lists the runs of. Read once a visit. */
+export const repositoryQuery = queryOptions({
+  queryKey: ['repository'],
+  queryFn: () => get<{ repo: string }>('/api/repository'),
+});
+
 /**
  * Start a run of a workflow, as `wf start` does: the api writes the run's record and files nothing. Resolves with the new
- * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s, or the api's own about the request.
+ * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s (`afterRefusal`'s, for a run it will not wait
+ * on), or the api's own about the request. `after` names the runs it waits on, as `--after` does; left out when there are none.
  *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */
-export async function startRun(start: { workflow: string; from: WorkflowListing['from']; brief: string }): Promise<{ id: string }> {
+export async function startRun(start: { workflow: string; from: WorkflowListing['from']; brief: string; after?: readonly string[] }): Promise<{ id: string }> {
   const res = await fetch('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(start) });
   const body = (await res.json().catch(() => undefined)) as { id?: unknown; error?: unknown } | undefined;
   if (res.ok && typeof body?.id === 'string') return { id: body.id };

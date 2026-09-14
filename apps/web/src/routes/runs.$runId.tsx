@@ -48,6 +48,8 @@ function Run({ run }: { run: RunDetail }) {
 
       <NeedsBanner run={run} />
 
+      <WaitingOnRuns run={run} />
+
       {run.warning && (
         <p className="rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
           {run.warning}
@@ -137,6 +139,40 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
           )}
         </div>
       )}
+    </section>
+  );
+}
+
+/**
+ * What a run started `--after` runs still waits on, as `wf decide` says it for such a run and offers nothing else: `wf ls`'s word, what it
+ * leaves a person to do, and each run it names, linked to its page where the store has it. Amber when one never ships without a person.
+ */
+function WaitingOnRuns({ run }: { run: RunDetail }) {
+  const { waiting } = run;
+  if (!waiting) return null;
+  return (
+    <section
+      aria-label="Waiting on runs"
+      data-on-you={waiting.onYou}
+      className={`space-y-1 rounded px-3 py-2 text-sm ${
+        waiting.onYou ? 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200' : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-900 dark:text-neutral-300'
+      }`}
+    >
+      <p className="font-mono">{waiting.word}</p>
+      <p data-advice>{waiting.advice}</p>
+      <ul className="flex flex-wrap gap-x-3 text-xs">
+        {waiting.runs.map((w) => (
+          <li key={w.run}>
+            {w.missing ? (
+              <span className="font-mono">{w.run}</span>
+            ) : (
+              <Link to="/runs/$runId" params={{ runId: w.run }} className="font-mono underline underline-offset-2">
+                {w.run}
+              </Link>
+            )}
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }

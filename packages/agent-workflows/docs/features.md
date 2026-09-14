@@ -645,14 +645,12 @@ What was measured:
 
 What it leaves:
 
-- **The Factory's graph of cards** (apps, the next run). The api does not carry `after` yet: `summarize` and
-  `detail` in `apps/api/src/app.ts` build `RunSummary` and `RunDetail` field by field, so each needs an `after`
-  added. Then two things the board has to do the tick's way:
-  - The api's `listing` call passes no waits, so a waiting root says `waiting`.
-  - Its `moving` reads `ready.length > 0`, which is true for a waiting run. It needs `waitsOf` and `runReady`,
-    over `parentOf`, which reads the parent's tasks off the engine.
-
-  The start form on the Workflows page gains *after*: `start({ after })`, with the refusal as its 422.
+- **The Factory's graph of cards** — done by P2 (apps, 2026-09-14): `RunSummary` and `RunDetail` carry `after`
+  and `waiting` (`waitsOf`, `waitWord`, `waitAdvice`, read once per request off the same views), `moving` is false
+  for a run waiting on a run that never ships, the Factory draws the edges and keeps a group joined by `after`
+  layered, and the start form takes *after*, with `afterRefusal`'s sentence as its refusal. The api reads whether
+  a waited-on run never ships off `Wait`'s contract because `neverShips` is not exported: export it, and that
+  becomes an import.
 - **A tip is recorded only by a tick.** A run whose branch is merged and deleted before any `wf tick` or `wf up`
   pass saw it finish has no tip, and its children read `(<branch> gone)` until a person starts them again
   without that `--after`. The same happens to a result branch rewritten after its tip was recorded and then

@@ -22,10 +22,10 @@ import { Switch } from '@/components/ui/switch';
 import { runQuery, type RunDetail, type RunSummary } from '@/lib/api';
 import { forgetFactoryLayout, forgetFactoryOpen, readFactoryLayout, readFactoryOpen, saveFactoryLayout, saveFactoryOpen } from '@/lib/canvas';
 import {
-  byAge,
   CARD_WIDTH,
   CELL_HEIGHT,
   CELL_WIDTH,
+  floorRuns,
   graphAt,
   inFlight,
   keepLayout,
@@ -35,6 +35,7 @@ import {
   spanOf,
   titleOf,
   toggleOpen,
+  waitsOnYou,
   type Span,
 } from '@/lib/factory';
 import { extentOf, layout, stepsOf, type Point } from '@/lib/layout';
@@ -44,7 +45,7 @@ import { RunNode, type RunFlowNode } from './RunNode';
 import { StateEdge } from './StateEdge';
 import { StepInspector } from './StepInspector';
 import { StepNode, type StepFlowNode } from './StepNode';
-import { cardEdges, stepData, stepEdges, stepMinimapFill } from './stepGraph';
+import { afterEdges, cardEdges, stepData, stepEdges, stepMinimapFill } from './stepGraph';
 
 // Declared once: a new object per render makes React Flow warn and mount every node afresh.
 const nodeTypes = { run: RunNode, step: StepNode };
@@ -64,7 +65,7 @@ const HANDFUL = 5;
 const minimapFill = (node: FloorNode) =>
   node.type === 'step'
     ? stepMinimapFill[stepState(node.data.step.status, node.data.runCancelled)]
-    : node.data.run.waitingOnYou.length
+    : waitsOnYou(node.data.run)
       ? 'var(--color-amber-500)'
       : node.data.finished
         ? 'var(--color-neutral-400)'
@@ -90,7 +91,9 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
 
 /**
  * Every run in flight, a card each, on a floor a person can arrange — and beside each card a person
- * opens, that run's steps, drawn as its page draws them.
+ * opens, that run's steps, drawn as its page draws them. A run started `--after` runs is drawn with an
+ * edge from each of their cards into its own (`afterEdges`), and a finished run a run in flight waits on
+ * is on the floor for it (`floorRuns`); cards joined so are laid out layered, parents left of children.
  *
  * Laid out on a grid, oldest first, the first time a run is seen in this browser — so a run that
  * starts takes the next free cell and moves no card already down — and after that wherever a person
@@ -123,7 +126,9 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const [showFinished, setShowFinished] = useState(false);
 
   const flying = useMemo(() => new Set(runs.filter(inFlight).map((run) => run.id)), [runs]);
-  const shown = useMemo(() => byAge(runs).filter((run) => showFinished || flying.has(run.id)), [runs, flying, showFinished]);
+  const shown = useMemo(() => floorRuns(runs, showFinished), [runs, showFinished]);
+  // Each card's runs it waits on: what lays the cards joined by an edge out layered.
+  const after = useMemo(() => new Map(shown.map((run) => [run.id, run.after])), [shown]);
   const known = useMemo(() => new Set(runs.map((run) => run.id)), [runs]);
   const ids = shown.map((run) => run.id);
   const idsKey = JSON.stringify(ids);
@@ -172,7 +177,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // Where each card is and how big React Flow measured it, changed only through `onNodesChange`, a run
   // joining or leaving the floor or opening or closing, and a reset. What a card shows is read below.
   const [placed, setPlaced] = useState<RunFlowNode[]>(() => {
-    const at = placeRuns(ids, new Map(), readFactoryLayout());
+    const at = placeRuns(ids, new Map(), readFactoryLayout(), new Map(), after);
     return shown.map((run) => nodeOf(run, at.get(run.id)!));
   });
   // Cards a person has dropped where they dragged them: the floor is laid out again on each drop, so a
@@ -190,7 +195,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setPlaced((current) => {
       const have = new Map(current.map((node) => [node.id, node]));
       // Cards on the floor stay put, unless a graph now covers them; one coming back yields its old cell.
-      const at = placeRuns(ids, new Map(current.map((node) => [node.id, node.position])), readFactoryLayout(), spans);
+      const at = placeRuns(ids, new Map(current.map((node) => [node.id, node.position])), readFactoryLayout(), spans, after);
       const next = shown.map((run) => {
         const node = have.get(run.id);
         const point = at.get(run.id)!;
@@ -283,8 +288,10 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   }, [placed, shown, flying, openSet, graphs, sizes, selected, toggle]);
 
   const edges = useMemo(
-    () =>
-      [...graphs].flatMap(([runId, graph]): Edge[] =>
+    (): Edge[] => [
+      // Between the cards: from each run a card waits on, into it.
+      ...afterEdges(shown),
+      ...[...graphs].flatMap(([runId, graph]): Edge[] =>
         graph && 'run' in graph
           ? [
               // The card is the run's head: one edge into each of the roots the api's graph names, and no other.
@@ -293,7 +300,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
             ]
           : [],
       ),
-    [graphs],
+    ],
+    [graphs, shown],
   );
 
   // What the observers and the reveal read, as of the last commit.
@@ -382,7 +390,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     forgetFactoryLayout();
     setOpen([]);
     setSelected(null);
-    const at = placeRuns(ids, new Map(), null);
+    const at = placeRuns(ids, new Map(), null, new Map(), after);
     setPlaced((current) => current.map((node) => ({ ...node, position: at.get(node.id) ?? node.position })));
     setFits((n) => n + 1);
   };
@@ -396,8 +404,9 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setFits((n) => n + 1);
   };
   const finished = runs.length - flying.size;
-  // Said beside the counts: a run stopped at a step that needs a person is finished, so off the floor by default.
-  const waiting = runs.filter((run) => run.waitingOnYou.length > 0).length;
+  // Said beside the counts: a run stopped at a step that needs a person is finished, so off the floor by default — and so is one
+  // waiting on a run that never ships without a person.
+  const waiting = runs.filter(waitsOnYou).length;
   const cells = placed.reduce((sum, node) => {
     const { columns, rows } = spans.get(node.id) ?? ONE_CELL;
     return sum + columns * rows;
@@ -476,7 +485,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
               <Background variant={BackgroundVariant.Dots} gap={16} />
               <Controls showInteractive={false} showFitView={false} />
               {/* Wrapped short of the minimap, when there is one. */}
-              <CanvasLegend className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />
+              <CanvasLegend cards className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />
               {cells > HANDFUL && <MiniMap<FloorNode> pannable zoomable style={{ width: 128, height: 88 }} nodeColor={minimapFill} />}
             </ReactFlow>
           </div>

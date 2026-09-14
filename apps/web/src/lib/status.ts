@@ -41,7 +41,8 @@ export function stepState(status: string, runCancelled: boolean): StepState {
   // The engine's word for a session that ended, which is not work that was done: at most its own word.
   if (word === 'succeeded') return 'unverified';
   if (word === 'unknown') return 'unknown';
-  if (word === 'waiting' || word === 'pending') return runCancelled ? 'cancelled' : 'waiting';
+  // `waiting on a-1x2y (cancelled), b-3z4w`: a root of a run started `--after` runs that have not shipped. Not filed, as `waiting` is.
+  if (word === 'waiting' || word.startsWith('waiting on ') || word === 'pending') return runCancelled ? 'cancelled' : 'waiting';
   // `running (working)`, `working (quiescent)`, `starting`, `between attempts` — and, on purpose, a word `wf ls` has
   // gained since this was written: a step the board cannot name is shown as still going, never as done or as needing you.
   return 'working';

@@ -136,6 +136,26 @@ export async function expectApart(these: Locator, those: Locator, assertion: str
 }
 
 /**
+ * Every element of `these` runs beneath every element of `row`: it reaches lower than the lowest of them, and rises no
+ * higher than the middle of any — a loop's edge back curved under its steps, not over them or through them. Nothing
+ * matched on either side is refused too.
+ */
+export async function expectBeneath(these: Locator, row: Locator, assertion: string): Promise<void> {
+  const [under, over] = await Promise.all([boxesOf(these), boxesOf(row)]);
+  if (!under.length || !over.length) throw new Refused(`${assertion} — nothing to compare: ${under.length} and ${over.length} found`);
+  const problems = under.flatMap(({ name, box }) => {
+    if (!box) return [`${name} is not on the page`];
+    return over.flatMap((other) => {
+      if (!other.box) return [`${other.name} is not on the page`];
+      if (box.y + box.height <= other.box.y + other.box.height) return [`${name} reaches no lower than ${other.name}`];
+      if (box.y < other.box.y + other.box.height / 2) return [`${name} rises above the middle of ${other.name}`];
+      return [];
+    });
+  });
+  if (problems.length) throw new Refused(`${assertion} — ${problems.join(', ')}`);
+}
+
+/**
  * While `move` runs, `leader` moves, and every element of `followers` moves by as much: an open run's steps
  * dragged with its card. A pixel of slack for positions that round differently.
  */

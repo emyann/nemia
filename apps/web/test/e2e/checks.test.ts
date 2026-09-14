@@ -6,7 +6,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
-import { expectApart, expectCount, expectInside, expectMovedWith, expectTheme, expectVisible, Refused, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectCount, expectInside, expectMovedWith, expectTheme, expectVisible, Refused, watch } from './checks.ts';
 
 let browser: Browser;
 before(async () => {
@@ -118,4 +118,23 @@ test('a step left behind when its card moves is refused, naming it — and so is
     (err: Error) => err instanceof Refused && err.message === 'the steps move with the card — run/review did not move with run');
   await assert.rejects(expectMovedWith(page.locator('.step'), page.locator('#card'), async () => {}, 'the steps move with the card'),
     (err: Error) => err instanceof Refused && err.message === 'the steps move with the card — run did not move');
+});
+
+test("an edge back that runs beside its steps, or over them, is refused, naming both — and so is a comparison with nothing on one side", async () => {
+  const { page } = await pageWith(`<div style="position:relative">
+    <div class="step" data-id="implement" style="position:absolute;left:0;top:100px;width:100px;height:60px"></div>
+    <div class="step" data-id="review" style="position:absolute;left:300px;top:100px;width:100px;height:80px"></div>
+    <div class="edge" data-id="loop:review->implement" style="position:absolute;left:50px;top:160px;width:300px;height:60px"></div>
+    <div class="beside" data-id="beside" style="position:absolute;left:50px;top:145px;width:300px;height:30px"></div>
+    <div class="over" data-id="over" style="position:absolute;left:50px;top:40px;width:300px;height:200px"></div>
+  </div>`);
+  await expectBeneath(page.locator('.edge'), page.locator('.step'), 'the edge back runs beneath the row');
+  // Level with the row: it reaches no lower than review, the taller of the two.
+  await assert.rejects(expectBeneath(page.locator('.beside'), page.locator('.step'), 'the edge back runs beneath the row'),
+    (err: Error) => err instanceof Refused && err.message === 'the edge back runs beneath the row — beside reaches no lower than review');
+  // Lower than both, and over them too: it rises above the middle of each.
+  await assert.rejects(expectBeneath(page.locator('.over'), page.locator('.step'), 'the edge back runs beneath the row'),
+    (err: Error) => err instanceof Refused && err.message === 'the edge back runs beneath the row — over rises above the middle of implement, over rises above the middle of review');
+  await assert.rejects(expectBeneath(page.locator('.gone'), page.locator('.step'), 'the edge back runs beneath the row'),
+    (err: Error) => err instanceof Refused && err.message === 'the edge back runs beneath the row — nothing to compare: 0 and 2 found');
 });

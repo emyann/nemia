@@ -929,7 +929,7 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8 all done; nothing in flight; what is left is the small items and item 3.
+Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8 all done; S3 (item 3, engine half) in flight; then the small items.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -947,7 +947,10 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
    done, `1e471b7`. Left by Q2 for agent-workflows: the board cannot continue a harness-blocked session, because
    the package reads it as running — item 10, in W4.*
 3. **The steering channel** (deferred from §4 S): a prompt box on the session page that sends into a
-   running session, the message recorded on the run. api + engine (a `say` op).
+   running session, the message recorded on the run. api + engine (a `say` op). *S3 (engine: `Engine.say`,
+   a `said` journal event, `ae say`; the harness's delivery measured by a plan step first) filed 2026-09-14 as
+   `the-steering-channel-engine-ff6b`, from `./workflows/dev-planned` — the first real run of the plan step.
+   S4 (agent-workflows `wf say` + the run record, api route, the session page's prompt box) after it.*
 
 **agent-workflows, small**
 4. Per-step `disallow:` → `--disallowedTools`, a field on the task. *Done, D1, `825be29`.*

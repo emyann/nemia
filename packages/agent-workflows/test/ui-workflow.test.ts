@@ -69,8 +69,9 @@ test('look and respond are gone: both steps use the look skill, which the reposi
 });
 
 test('REFUSED: a step told to use the look skill that could not reach it — no Skill tool and not told its file, or told a file that is not there', () => {
-  // review's tools leave out Skill, so its body is the only way it learns where the skill is.
-  assert.equal(steps.review?.tools?.includes('Skill'), false);
+  // review has the Skill tool, and its body names the file too. The guard is exercised on a copy without the tool.
+  assert.equal(steps.review?.tools?.includes('Skill'), true);
+  const fenced = { ...steps.review!, tools: steps.review!.tools!.filter((t) => t !== 'Skill') };
   for (const step of ui) {
     assert.match(said(step.body), /`\.claude\/skills\/look\/SKILL\.md`/, `${step.name} is told the skill's file`);
     assert.deepEqual(unreachableSkills(step), [], step.name);
@@ -78,14 +79,14 @@ test('REFUSED: a step told to use the look skill that could not reach it — no 
 
   const review = steps.review!;
   const told = '`.claude/skills/look/SKILL.md`';
-  assert.deepEqual(unreachableSkills({ ...review, body: review.body.replaceAll(told, 'the skill') }), [
+  assert.deepEqual(unreachableSkills({ ...fenced, body: review.body.replaceAll(told, 'the skill') }), [
     'the look skill is named, and this step has no Skill tool and is not told its file',
   ]);
-  assert.ok(unreachableSkills({ ...review, body: review.body.replaceAll(told, '`.claude/skills/looking/SKILL.md`') }).includes(
+  assert.ok(unreachableSkills({ ...fenced, body: review.body.replaceAll(told, '`.claude/skills/looking/SKILL.md`') }).includes(
     '.claude/skills/looking/SKILL.md is not in the repository',
   ), 'a renamed skill');
   // The rule is the Skill tool's: a step that has it loads the skill by name.
-  assert.deepEqual(unreachableSkills({ ...review, tools: [...review.tools!, 'Skill'], body: review.body.replaceAll(told, 'the skill') }), []);
+  assert.deepEqual(unreachableSkills({ ...review, body: review.body.replaceAll(told, 'the skill') }), []);
 });
 
 test('implement is checked in a browser; review, which writes nothing, declares no check', () => {
@@ -105,7 +106,7 @@ test('implement declares the screenshots it looked at and the pages they show, a
 test('review writes nothing by machinery: on Claude, tools that read and Bash, in dontAsk — and implement has every tool', () => {
   const { harness, after, input, tools, permissionMode, output, loop, rounds } = steps.review!;
   assert.deepEqual({ harness, after, input, tools, permissionMode, output: output?.file, loop, rounds }, {
-    harness: 'claude', after: ['implement'], input: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash'], permissionMode: 'dontAsk',
+    harness: 'claude', after: ['implement'], input: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill'], permissionMode: 'dontAsk',
     output: 'review.schema.json', loop: 'implement', rounds: 3,
   });
   assert.deepEqual(tools?.filter((t) => ['Edit', 'Write', 'NotebookEdit'].includes(t)), [], 'nothing that edits');

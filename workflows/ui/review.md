@@ -7,8 +7,8 @@ input: implement
 # Fenced by machinery: only these tools — no Edit, no Write, so nothing of its own is committed — and in dontAsk every
 # Bash command .claude/settings.json does not allow is denied without a prompt. These are Claude Code's built-in tools
 # (`--tools`); the browser's `browser_*` tools, which the look skill drives, come from the checkout's `.mcp.json` and
-# are not on this line. Nor is Skill (measured: no Skill tool), so the body names the look skill by its file, for Read.
-tools: Read, Grep, Glob, Bash
+# are not on this line. Skill is, so the step can invoke the look skill; the body names its file too, for Read.
+tools: Read, Grep, Glob, Bash, Skill
 permissionMode: dontAsk
 # The review travels as this step's closeout — `findings` and `again`, in the shape review.schema.json declares. A
 # finding names where it is: a file and a line, or a page and a theme.
@@ -25,7 +25,7 @@ Read the diff. Look for: correctness bugs, cases the tests do not cover, and any
 not do what was asked. Style is not interesting unless it hides a bug.
 
 Then look at the pages. Under *From implement* are `screenshots`, the absolute paths of PNGs of each page
-in a light and a dark theme, and `pages`, the routes they show. Read the look skill first:
+in a light and a dark theme, and `pages`, the routes they show. Invoke the look skill (the Skill tool), or read it first:
 `.claude/skills/look/SKILL.md`, from the workspace root, with your Read tool — this step has no Skill
 tool, so the skill is not loaded for you. Then use the look skill on implement's screenshots and on the
 pages, side by side: read every screenshot with your Read tool, and open the pages the skill says how to

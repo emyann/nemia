@@ -4,7 +4,7 @@ model: opus
 after: implement
 # Fenced by machinery for most of what it could do: only these tools — no Edit, no Write — and in dontAsk every Bash command
 # .claude/settings.json does not allow is denied without a prompt. The suite and git reads are allowed.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, Skill
 permissionMode: dontAsk
 # The review travels as this step's closeout — `findings` and `again`, in the shape review.schema.json declares.
 output: review.schema.json

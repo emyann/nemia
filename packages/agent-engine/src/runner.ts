@@ -3,7 +3,8 @@
  *
  * Four verbs the engine cannot run without: spawn one, observe all, stop one, read one's logs. A
  * fifth, `release`, is optional — letting go of a session whose end is on the record, for a harness
- * whose registry would otherwise keep it for ever. Swap the layer and the same engine drives a
+ * whose registry would otherwise keep it for ever. So is a sixth, `transcript`: the same session's
+ * conversation as events, for a person to follow, and nothing the engine acts on. Swap the layer and the same engine drives a
  * different harness; `Runner.test()` drives nothing at all, which is how the engine's tests cost zero
  * dollars.
  *
@@ -13,6 +14,7 @@
  */
 import { Context, Effect, Layer, Schema } from 'effect';
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -64,12 +66,43 @@ export type McpServer =
   | { type: 'http' | 'sse'; url: string; headers?: Record<string, string> };
 
 /**
+ * One thing that happened in a session's conversation, in the same shape for every harness.
+ *
+ * `id` is the harness's own, so the same record read again gives the same id. A `tool_result` carries
+ * its call's `id`: that is how a result pairs to its call, and why an event is unique by `id` and
+ * `kind` together, not by `id` alone. `at` is the time on the harness's own record, never the time it
+ * was read — so a resumed Claude session's inherited conversation keeps its parent's times, and the
+ * caller decides what to show. A tool result is `user`, as the model receives it.
+ */
+export type TranscriptEvent = {
+  id: string;
+  /** ISO 8601, from the harness's record. */
+  at: string;
+  role: 'assistant' | 'user' | 'system';
+  kind: 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system';
+  text?: string;
+  tool?: { name: string; input: unknown };
+  result?: { text: string; isError: boolean };
+};
+
+/**
+ * Where a transcript read stopped, to hand back to the next: the byte offset after the last whole line
+ * read, and a hash of the bytes just before it. The offset alone cannot tell a file that was replaced
+ * and has grown past it from the same file grown longer; the hash can, and so can it a file cut shorter.
+ */
+export type TranscriptCursor = string;
+
+/** A read of a session's conversation: the events from the cursor asked with, and the cursor to ask again with. */
+export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor };
+
+/**
  * The seam itself, as a plain value.
  *
  * Four verbs. A harness that cannot do one of them is not a harness this engine can drive, and a
  * harness that needs another to be driven is asking the engine to learn something about it — which is
  * the line this type exists to hold. `release` does not cross it: optional, told only what the record
- * already says, and answering nothing the engine acts on.
+ * already says, and answering nothing the engine acts on. Nor does `transcript`: optional, and read
+ * for a person, never by `decide`.
  */
 export type RunnerOps = {
   readonly spawn: (r: SpawnRequest) => Effect.Effect<void, RunnerError>;
@@ -87,6 +120,13 @@ export type RunnerOps = {
    * from one that has exited, and the task's `worktree`, since a harness may remove the one it cut.
    */
   readonly release?: (session: Sighting, task: { worktree?: string | boolean }) => Effect.Effect<void, RunnerError>;
+  /**
+   * The session's conversation as events, from `after` on, and the cursor to ask again with. Optional:
+   * a harness that keeps no record of its conversation has `logs`, and that is all. Pull-only and
+   * level-triggered — a caller polls with the cursor it was given, nothing is pushed, and nothing is
+   * remembered between reads that the cursor does not carry.
+   */
+  readonly transcript?: (sessionId: string, after?: TranscriptCursor) => Effect.Effect<Transcript, RunnerError>;
 };
 
 export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner') {
@@ -156,6 +196,154 @@ export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: num
     }
   }
   return found;
+};
+
+/** A Claude Code session's transcript file, for the other runner that reads one: `claude -p`'s. */
+export const claudeTranscriptFile = (sessionId: string): string | undefined => transcriptFile(sessionId);
+
+/**
+ * How much of a file, before a cursor's offset, its hash covers. Past the end of what every line of one
+ * session repeats — its cwd, session id, version and branch come to a few hundred bytes — so the hash
+ * covers the line's own id and time.
+ */
+const CURSOR_TAIL_BYTES = 4096;
+const cursorAt = (offset: number, tail: Uint8Array): TranscriptCursor =>
+  `${offset}.${createHash('sha256').update(tail).digest('hex').slice(0, 16)}`;
+const START: TranscriptCursor = cursorAt(0, new Uint8Array());
+
+/** Whether `after` is a cursor a transcript read could have given. */
+export const isTranscriptCursor = (after: string): boolean => /^(0|[1-9]\d*)\.[0-9a-f]{16}$/.test(after);
+
+/** No conversation to read yet: no events, and a cursor that reads from the start. */
+export const noTranscript = (): Transcript => ({ events: [], cursor: START });
+
+/** A record's own time as ISO 8601, or `undefined` when it has none that parses. */
+export const isoTime = (t: unknown): string | undefined => {
+  const ms = typeof t === 'string' ? Date.parse(t) : NaN;
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : undefined;
+};
+
+/**
+ * The events in a JSONL file from `after` on, and where to ask again. The one reader behind every
+ * harness's `transcript`; what a line means is `eventsOf`'s, given the line parsed and the byte offset
+ * it starts at (an id for a record that has none).
+ *
+ * Only whole lines are read: a line still being written waits for the next read, and the cursor stops
+ * before it. A cursor is taken only while the file still holds, just before its offset, the bytes it
+ * was given at — so a file that shrank, or was replaced, is read again from the start, rather than from
+ * the middle of something else or as nothing for ever. A line that is not JSON is passed over. No file
+ * is no events and a cursor at the start. A cursor no read gave is refused: it is somebody's bug.
+ */
+export const readTranscript = async (
+  file: string | undefined,
+  after: TranscriptCursor | undefined,
+  eventsOf: (entry: unknown, offset: number) => TranscriptEvent[],
+): Promise<Transcript> => {
+  if (after !== undefined && !isTranscriptCursor(after)) {
+    throw new Error(`\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`);
+  }
+  if (!file) return noTranscript();
+  let handle: fs.promises.FileHandle;
+  try { handle = await fs.promises.open(file, 'r'); } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return noTranscript();
+    throw e;
+  }
+  try {
+    const { size } = await handle.stat();
+    const bytes = async (from: number, to: number) => {
+      const buf = Buffer.alloc(Math.max(0, to - from));
+      let got = 0;
+      while (got < buf.length) {
+        const { bytesRead } = await handle.read(buf, got, buf.length - got, from + got);
+        if (bytesRead === 0) break;
+        got += bytesRead;
+      }
+      return buf.subarray(0, got);
+    };
+    const tailBefore = (offset: number) => bytes(Math.max(0, offset - CURSOR_TAIL_BYTES), offset);
+    const asked = after === undefined ? 0 : Number(after.slice(0, after.indexOf('.')));
+    const from = asked > 0 && asked <= size && cursorAt(asked, await tailBefore(asked)) === after ? asked : 0;
+    const chunk = await bytes(from, size);
+    const events: TranscriptEvent[] = [];
+    // Line by line while a newline ends one: what follows the last is still being written. A newline
+    // byte never occurs inside a UTF-8 character, so cutting at one never splits a character.
+    let read = 0;
+    for (let end = chunk.indexOf(0x0a); end !== -1; end = chunk.indexOf(0x0a, read)) {
+      let entry: unknown;
+      try { entry = JSON.parse(chunk.toString('utf8', read, end)); } catch { entry = undefined; }
+      if (entry !== undefined) events.push(...eventsOf(entry, from + read));
+      read = end + 1;
+    }
+    const offset = from + read;
+    return { events, cursor: offset === 0 ? START : cursorAt(offset, await tailBefore(offset)) };
+  } finally {
+    await handle.close();
+  }
+};
+
+/** A tool result's content as text: a string as it is, a list of blocks as their text, naming any that is not text. */
+const resultText = (content: unknown): string =>
+  typeof content === 'string' ? content
+    : Array.isArray(content) ? content.map((b) => {
+        const block = b as { type?: unknown; text?: unknown } | null;
+        return block?.type === 'text' && typeof block.text === 'string' ? block.text : `[${String(block?.type)}]`;
+      }).join('\n')
+    : '';
+
+/**
+ * One line of a Claude Code transcript as events. A `user` or `assistant` line gives one per content
+ * block, a `system` line one of its own, and any other line — a title, an attachment, a file-history
+ * snapshot — none. Pure, so both runners that read Claude Code's transcripts share it.
+ *
+ * Read as Claude Code writes them (measured on the 150 transcripts last written on this machine, up to
+ * 2.1.270): every conversation line carries a `uuid` and a `timestamp`; a line nearly always holds one
+ * block, so a block's id is the line's `uuid` and its place in it; a `tool_result` sits in a `user`
+ * line and names its call by `tool_use_id`; and thinking is often written with its text empty, which
+ * gives a thinking event with no `text` rather than an invented one. A line the harness itself put into
+ * the conversation (`isMeta`, like "Continue from where you left off.") is `system`. A subagent's line
+ * (`isSidechain`) is left out, as the SDK's reading leaves it. A block of a type not read here is a
+ * `text` event naming it, as `renderTranscript` names one. A line with no time gives nothing: none has
+ * been seen, and a time made up for one would be a lie about when it was said.
+ */
+export const claudeTranscriptEvents = (entry: unknown, offset: number): TranscriptEvent[] => {
+  const line = entry as {
+    type?: unknown; uuid?: unknown; timestamp?: unknown; subtype?: unknown; content?: unknown;
+    isMeta?: unknown; isSidechain?: unknown; message?: { content?: unknown } | null;
+  } | null;
+  const at = isoTime(line?.timestamp);
+  if (!line || !at || line.isSidechain === true) return [];
+  const id = typeof line.uuid === 'string' && line.uuid ? line.uuid : `@${offset}`;
+  if (line.type === 'system') {
+    return [{ id, at, role: 'system', kind: 'system', text: typeof line.content === 'string' ? line.content : String(line.subtype ?? 'system') }];
+  }
+  if (line.type !== 'user' && line.type !== 'assistant') return [];
+  const role = line.isMeta === true ? 'system' : line.type;
+  const said = (i: number, text: string): TranscriptEvent => ({ id: `${id}:${i}`, at, role, kind: role === 'system' ? 'system' : 'text', text });
+  const content = line.message?.content;
+  if (typeof content === 'string') return [said(0, content)];
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((b: unknown, i): TranscriptEvent[] => {
+    const block = b as {
+      type?: unknown; text?: unknown; thinking?: unknown; id?: unknown; name?: unknown; input?: unknown;
+      tool_use_id?: unknown; content?: unknown; is_error?: unknown;
+    } | null;
+    switch (block?.type) {
+      case 'text':
+        return [said(i, typeof block.text === 'string' ? block.text : '')];
+      case 'thinking':
+      case 'redacted_thinking':
+        return [{ id: `${id}:${i}`, at, role, kind: 'thinking', ...(typeof block.thinking === 'string' && block.thinking ? { text: block.thinking } : {}) }];
+      case 'tool_use':
+        return [{ id: typeof block.id === 'string' ? block.id : `${id}:${i}`, at, role, kind: 'tool_use', tool: { name: String(block.name), input: block.input } }];
+      case 'tool_result':
+        return [{
+          id: typeof block.tool_use_id === 'string' ? block.tool_use_id : `${id}:${i}`, at, role, kind: 'tool_result',
+          result: { text: resultText(block.content), isError: block.is_error === true },
+        }];
+      default:
+        return [said(i, `[${String(block?.type)}]`)];
+    }
+  });
 };
 
 /**
@@ -569,6 +757,14 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         try: () => getSessionMessages(sessionId),
         catch: (cause) => new RunnerError({ verb: 'logs', message: String(cause) }),
       }).pipe(Effect.map(renderTranscript)),
+
+    // Read from the raw JSONL rather than through `getSessionMessages`, as the closeout is: the SDK's
+    // messages carry no timestamp, and a board needs to know when each thing was said.
+    transcript: (sessionId, after) =>
+      Effect.tryPromise({
+        try: () => readTranscript(transcriptFile(sessionId), after, claudeTranscriptEvents),
+        catch: (cause) => new RunnerError({ verb: 'transcript', message: cause instanceof Error ? cause.message : String(cause) }),
+      }),
   });
 };
 

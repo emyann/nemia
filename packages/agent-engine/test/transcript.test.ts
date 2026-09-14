@@ -1,0 +1,521 @@
+/**
+ * A session's conversation as events — a transcript file where Claude Code keeps one, and a rollout where
+ * Codex keeps one, each written by the test.
+ *
+ * The board shows a step's session as it happens by polling `transcript` with the cursor each read gives
+ * (plan §4 S). So what is checked is what a poller sees: every event dated by the harness's own record and
+ * given a role; a tool result paired to its call; the closeout a call like any other; a second read
+ * emitting only what was appended; and a cursor from a file that shrank, or was replaced, reading again
+ * rather than nothing for ever. Then the same through `createEngine()` at shipped defaults, with a fake
+ * `claude` or `codex` on PATH: `logs` as it was, and each refusal made to refuse.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { Effect } from 'effect';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { randomUUID } from 'node:crypto';
+import type { TranscriptEvent } from '../src/runner.ts';
+
+const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `ae-transcript-${label}-`));
+
+// Where Claude Code keeps transcripts is read when the runner is loaded, so it is set before the import.
+const config = tmp('config');
+process.env.CLAUDE_CONFIG_DIR = config;
+// Where Codex keeps rollouts is read when one is looked for; set here, once, for the whole file.
+const codexHome = tmp('codex-home');
+process.env.CODEX_HOME = codexHome;
+const { claudeOps, claudeTranscriptEvents } = await import('../src/runner.ts');
+const { claudeDetached, codex, codexRolloutEvents, detachedOps } = await import('../src/runner-detached.ts');
+
+/** When the fixture's conversation happened: an hour ago, as a resumed session's inherited turns were. */
+const T0 = Date.now() - 3_600_000;
+const at = (s: number) => new Date(T0 + s * 1000).toISOString();
+const jsonl = (lines: object[]) => lines.map((l) => `${JSON.stringify(l)}\n`).join('');
+
+// ─── Claude Code ────────────────────────────────────────────────────────────
+
+const claudeFile = (sessionId: string) => path.join(config, 'projects', 'fake-project', `${sessionId}.jsonl`);
+const writeClaude = (sessionId: string, text: string) => {
+  fs.mkdirSync(path.dirname(claudeFile(sessionId)), { recursive: true });
+  fs.writeFileSync(claudeFile(sessionId), text);
+};
+
+/**
+ * A transcript as Claude Code 2.1.270 writes one: a title line, the prompt, an attachment, then one line
+ * per content block — thinking, text, a Bash call and its failed result, the StructuredOutput call and its
+ * result — and a system line. Chained by `parentUuid`, as the SDK's reader (`logs`) follows them.
+ */
+const claudeLines = (sessionId: string): object[] => {
+  const line = { sessionId, isSidechain: false, userType: 'external', entrypoint: 'cli', cwd: '/repo', version: '2.1.270', gitBranch: 'main' };
+  return [
+    { type: 'custom-title', customTitle: 'ae/t/1', sessionId },
+    { ...line, type: 'user', uuid: 'u-1', parentUuid: null, timestamp: at(0), message: { role: 'user', content: 'Write the word to WORD.txt, then give your closeout.' } },
+    { ...line, type: 'attachment', uuid: 'att-1', parentUuid: 'u-1', timestamp: at(0), attachment: { type: 'environment' } },
+    { ...line, type: 'assistant', uuid: 'a-1', parentUuid: 'u-1', timestamp: at(1), message: { id: 'msg_1', role: 'assistant', content: [{ type: 'thinking', thinking: 'The word goes in a file.', signature: 'sig' }] } },
+    { ...line, type: 'assistant', uuid: 'a-2', parentUuid: 'a-1', timestamp: at(2), message: { id: 'msg_1', role: 'assistant', content: [{ type: 'text', text: 'Writing it now.' }] } },
+    { ...line, type: 'assistant', uuid: 'a-3', parentUuid: 'a-2', timestamp: at(3), message: { id: 'msg_1', role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_bash', name: 'Bash', input: { command: 'echo word > WORD.txt' } }] } },
+    { ...line, type: 'user', uuid: 'u-2', parentUuid: 'a-3', timestamp: at(5), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_bash', content: 'WORD.txt: Permission denied', is_error: true }] } },
+    { ...line, type: 'assistant', uuid: 'a-4', parentUuid: 'u-2', timestamp: at(6), message: { id: 'msg_2', role: 'assistant', content: [{ type: 'tool_use', id: 'toolu_closeout', name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable' } }] } },
+    { ...line, type: 'user', uuid: 'u-3', parentUuid: 'a-4', timestamp: at(7), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'toolu_closeout', content: [{ type: 'text', text: 'Structured output provided successfully' }] }] } },
+    { ...line, type: 'system', uuid: 's-1', parentUuid: 'u-3', subtype: 'informational', content: 'Background session idle', level: 'info', timestamp: at(8), isMeta: false },
+  ];
+};
+
+/** What that transcript says, as events. */
+const CLAUDE_EVENTS: TranscriptEvent[] = [
+  { id: 'u-1:0', at: at(0), role: 'user', kind: 'text', text: 'Write the word to WORD.txt, then give your closeout.' },
+  { id: 'a-1:0', at: at(1), role: 'assistant', kind: 'thinking', text: 'The word goes in a file.' },
+  { id: 'a-2:0', at: at(2), role: 'assistant', kind: 'text', text: 'Writing it now.' },
+  { id: 'toolu_bash', at: at(3), role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'echo word > WORD.txt' } } },
+  { id: 'toolu_bash', at: at(5), role: 'user', kind: 'tool_result', result: { text: 'WORD.txt: Permission denied', isError: true } },
+  { id: 'toolu_closeout', at: at(6), role: 'assistant', kind: 'tool_use', tool: { name: 'StructuredOutput', input: { outcome: 'blocked', summary: 'WORD.txt is not writable' } } },
+  { id: 'toolu_closeout', at: at(7), role: 'user', kind: 'tool_result', result: { text: 'Structured output provided successfully', isError: false } },
+  { id: 's-1', at: at(8), role: 'system', kind: 'system', text: 'Background session idle' },
+];
+
+/** Every event carries a time that parses and a role, whatever else it has. */
+const datedWithRoles = (events: TranscriptEvent[]) => {
+  assert.ok(events.length > 0, 'there are events to check');
+  for (const e of events) {
+    assert.ok(typeof e.at === 'string' && Number.isFinite(Date.parse(e.at)), `${e.id} has a time: ${e.at}`);
+    assert.ok(['assistant', 'user', 'system'].includes(e.role), `${e.id} has a role: ${e.role}`);
+  }
+};
+
+const claudeRead = (sessionId: string, after?: string) => Effect.runPromise(claudeOps().transcript!(sessionId, after));
+
+test("the Claude runner reads a session's conversation from its transcript: dated by it, each result paired to its call, the closeout a call like any other", async () => {
+  const sessionId = randomUUID();
+  writeClaude(sessionId, jsonl(claudeLines(sessionId)));
+
+  const { events } = await claudeRead(sessionId);
+  assert.deepEqual(events, CLAUDE_EVENTS);
+  datedWithRoles(events);
+  assert.ok(events.every((e) => Date.parse(e.at) < Date.now() - 3_000_000), "each at the transcript's own time, an hour ago, not the read's");
+  const calls = events.filter((e) => e.kind === 'tool_use');
+  assert.deepEqual(events.filter((e) => e.kind === 'tool_result').map((e) => e.id), calls.map((e) => e.id), 'each result carries its call\'s id');
+  assert.deepEqual(
+    calls.find((e) => e.tool?.name === 'StructuredOutput')?.tool?.input,
+    { outcome: 'blocked', summary: 'WORD.txt is not writable' },
+    'the closeout is not hidden: a call, with what it said',
+  );
+});
+
+test('a line of a Claude transcript: the harness speaking is system, a subagent is left to its own, a block not read is named, a line with no time gives nothing', () => {
+  const base = { sessionId: 's', timestamp: at(0) };
+  assert.deepEqual(
+    claudeTranscriptEvents({ ...base, type: 'user', uuid: 'm', isMeta: true, message: { content: [{ type: 'text', text: 'Continue from where you left off.' }] } }, 0),
+    [{ id: 'm:0', at: at(0), role: 'system', kind: 'system', text: 'Continue from where you left off.' }],
+  );
+  assert.deepEqual(claudeTranscriptEvents({ ...base, type: 'assistant', uuid: 'x', isSidechain: true, message: { content: [{ type: 'text', text: 'a subagent' }] } }, 0), []);
+  assert.deepEqual(
+    claudeTranscriptEvents({ ...base, type: 'user', uuid: 'i', message: { content: [{ type: 'image', source: {} }, { type: 'tool_result', tool_use_id: 't', content: [{ type: 'text', text: 'shot' }, { type: 'image' }] }] } }, 0),
+    [
+      { id: 'i:0', at: at(0), role: 'user', kind: 'text', text: '[image]' },
+      { id: 't', at: at(0), role: 'user', kind: 'tool_result', result: { text: 'shot\n[image]', isError: false } },
+    ],
+  );
+  assert.deepEqual(
+    claudeTranscriptEvents({ ...base, type: 'assistant', uuid: 'r', message: { content: [{ type: 'thinking', thinking: '', signature: 'sig' }] } }, 0),
+    [{ id: 'r:0', at: at(0), role: 'assistant', kind: 'thinking' }],
+    'thinking written with no text is a thinking event with no text, not an invented one',
+  );
+  assert.deepEqual(claudeTranscriptEvents({ type: 'assistant', uuid: 'n', message: { content: [{ type: 'text', text: 'when?' }] } }, 0), [], 'no time, no event');
+  assert.deepEqual(claudeTranscriptEvents({ ...base, type: 'system', subtype: 'turn_duration', durationMs: 5 }, 120), [{ id: '@120', at: at(0), role: 'system', kind: 'system', text: 'turn_duration' }], 'no uuid: its place in the file');
+});
+
+test('read again with its cursor, a transcript gives only what was appended; a line still being written waits for the next read', async () => {
+  const sessionId = randomUUID();
+  const lines = claudeLines(sessionId).map((l) => JSON.stringify(l));
+  writeClaude(sessionId, `${lines.slice(0, 5).join('\n')}\n`);
+
+  const first = await claudeRead(sessionId);
+  assert.deepEqual(first.events, CLAUDE_EVENTS.slice(0, 3));
+
+  // Two more lines, and half of a third.
+  const third = lines[7]!;
+  fs.appendFileSync(claudeFile(sessionId), `${lines[5]}\n${lines[6]}\n${third.slice(0, 40)}`);
+  const second = await claudeRead(sessionId, first.cursor);
+  assert.deepEqual(second.events, CLAUDE_EVENTS.slice(3, 5), 'only the two appended lines; not the half-written one');
+
+  const again = await claudeRead(sessionId, second.cursor);
+  assert.deepEqual(again, { events: [], cursor: second.cursor }, 'nothing new: nothing, and the same cursor');
+
+  fs.appendFileSync(claudeFile(sessionId), `${third.slice(40)}\n`);
+  assert.deepEqual((await claudeRead(sessionId, again.cursor)).events, CLAUDE_EVENTS.slice(5, 6), 'the line, once written whole');
+});
+
+test('read in two pieces, cut at any byte, a transcript gives what it gives read whole', async () => {
+  const sessionId = randomUUID();
+  const text = jsonl(claudeLines(sessionId));
+  // Every line boundary, and a cut inside every line.
+  const cuts = new Set<number>();
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) { cuts.add(i + 1); cuts.add(i - 7); }
+  for (const cut of cuts) {
+    writeClaude(sessionId, text.slice(0, cut));
+    const first = await claudeRead(sessionId);
+    fs.appendFileSync(claudeFile(sessionId), text.slice(cut));
+    const second = await claudeRead(sessionId, first.cursor);
+    assert.deepEqual([...first.events, ...second.events], CLAUDE_EVENTS, `cut at byte ${cut}`);
+  }
+});
+
+test('a cursor past the end of a file that shrank reads again from the start; so does one from a file replaced by a longer one', async () => {
+  const sessionId = randomUUID();
+  const lines = claudeLines(sessionId);
+  writeClaude(sessionId, jsonl(lines));
+  const whole = await claudeRead(sessionId);
+  assert.equal(whole.events.length, CLAUDE_EVENTS.length);
+
+  // Cut shorter: the old cursor is past its end.
+  writeClaude(sessionId, jsonl(lines.slice(0, 5)));
+  const shrunk = await claudeRead(sessionId, whole.cursor);
+  assert.deepEqual(shrunk.events, CLAUDE_EVENTS.slice(0, 3), 'read from the start, not nothing for ever');
+
+  // Replaced by another conversation that has grown past the old offset: the offset alone would read mid-line.
+  const other = lines.map((l) => JSON.parse(JSON.stringify(l).replaceAll('Writing it now.', 'Writing it now, differently.')) as object);
+  writeClaude(sessionId, jsonl([...other, ...other]));
+  const replaced = await claudeRead(sessionId, shrunk.cursor);
+  assert.equal(replaced.events[0]?.id, 'u-1:0', 'read from the start');
+  assert.equal(replaced.events.length, CLAUDE_EVENTS.length * 2);
+
+  assert.deepEqual(await claudeRead(randomUUID(), whole.cursor), { events: [], cursor: (await claudeRead(randomUUID())).cursor }, 'no transcript at all: nothing, from the start');
+});
+
+test('a cursor no read gave is refused, naming it', async () => {
+  const sessionId = randomUUID();
+  writeClaude(sessionId, jsonl(claudeLines(sessionId)));
+  for (const bad of ['12', 'abc.0123456789abcdef', '-1.0123456789abcdef', '12.xyz']) {
+    await assert.rejects(claudeRead(sessionId, bad), (e: Error) => e.message.includes(`\`${bad}\` is not a cursor a transcript read gave`));
+  }
+});
+
+// ─── Codex, and the detached runner ─────────────────────────────────────────
+
+const rolloutFile = (thread: string) => path.join(codexHome, 'sessions', '2026', '09', '13', `rollout-2026-09-13T06-00-00-${thread}.jsonl`);
+const writeRollout = (thread: string, text: string) => {
+  fs.mkdirSync(path.dirname(rolloutFile(thread)), { recursive: true });
+  fs.writeFileSync(rolloutFile(thread), text);
+};
+
+/** A run file as the worker leaves one, written by hand: what `detachedOps` reads a run's `nativeId` from. */
+const runFile = (root: string, harness: string, name: string, run: object) => {
+  const dir = path.join(root, 'runs', harness);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(
+    path.join(dir, `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`),
+    JSON.stringify({ name, state: 'done', pid: 0, heartbeatAt: new Date().toISOString(), logFile: '/dev/null', exitCode: 0, ...run }),
+  );
+};
+
+/**
+ * A rollout as codex-cli 0.154.0 writes one: the session's metadata, the instructions and context Codex
+ * gives the model, then each thing both as the model was given it (`response_item`) and as a thread item
+ * (`event_msg` / `item_completed`) — the prompt, reasoning, a message, a command that failed, a file
+ * change, an item of a type not measured, the final answer — and the task's end.
+ */
+const rolloutLines = (thread: string): object[] => [
+  { timestamp: at(0), type: 'session_meta', payload: { id: thread, session_id: thread, cwd: '/repo', cli_version: '0.154.0', base_instructions: { text: 'You are Codex.' } } },
+  { timestamp: at(0), type: 'event_msg', payload: { type: 'task_started', turn_id: 'turn-1' } },
+  { timestamp: at(1), type: 'response_item', payload: { type: 'message', role: 'developer', content: [{ type: 'input_text', text: '<permissions instructions>' }] } },
+  { timestamp: at(1), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: '<recommended_plugins>' }] } },
+  { timestamp: at(1), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Review the change.' }] } },
+  { timestamp: at(1), type: 'event_msg', payload: { type: 'item_completed', thread_id: thread, turn_id: 'turn-1', item: { type: 'UserMessage', id: 'user-1', content: [{ type: 'text', text: 'Review the change.', text_elements: [] }] } } },
+  { timestamp: at(2), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'Reasoning', id: 'rs_1', summary_text: [], raw_content: [] } } },
+  { timestamp: at(2), type: 'response_item', payload: { type: 'reasoning', id: 'rs_1', summary: [], encrypted_content: 'gAAAA' } },
+  { timestamp: at(3), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'AgentMessage', id: 'msg_1', content: [{ type: 'Text', text: 'I will run the tests.' }], phase: 'commentary' } } },
+  { timestamp: at(3), type: 'response_item', payload: { type: 'message', role: 'assistant', phase: 'commentary', content: [{ type: 'output_text', text: 'I will run the tests.' }] } },
+  { timestamp: at(4), type: 'response_item', payload: { type: 'custom_tool_call', call_id: 'call_1', name: 'exec', input: 'text((await tools.exec_command({cmd:"npm test"})).output)' } },
+  { timestamp: at(9), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'CommandExecution', id: 'exec-1', command: ['/bin/bash', '-lc', 'npm test'], cwd: 'file:///repo', status: 'failed', exit_code: 1, aggregated_output: '1 failing', stdout: '1 failing', stderr: '' } } },
+  { timestamp: at(9), type: 'response_item', payload: { type: 'custom_tool_call_output', call_id: 'call_1', output: [{ type: 'input_text', text: 'Script completed\n' }] } },
+  { timestamp: at(10), type: 'event_msg', payload: { type: 'token_count', info: null } },
+  { timestamp: at(11), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'FileChange', id: 'exec-2', changes: { '/repo/REVIEW.md': { type: 'add', content: '- one finding' } }, status: 'completed', stdout: 'Success. Updated the following files:\nA /repo/REVIEW.md', stderr: '' } } },
+  { timestamp: at(12), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'NotMeasuredYet', id: 'item-9' } } },
+  { timestamp: at(13), type: 'event_msg', payload: { type: 'item_completed', turn_id: 'turn-1', item: { type: 'AgentMessage', id: 'msg_2', content: [{ type: 'Text', text: '{"outcome":"done","summary":"one finding"}' }], phase: 'final_answer' } } },
+  { timestamp: at(14), type: 'event_msg', payload: { type: 'task_complete', turn_id: 'turn-1', last_agent_message: '{"outcome":"done","summary":"one finding"}', error: null } },
+];
+
+/** What that rollout says, as events: the same shape as Claude Code's, as far as the records allow. */
+const CODEX_EVENTS: TranscriptEvent[] = [
+  { id: 'user-1', at: at(1), role: 'user', kind: 'text', text: 'Review the change.' },
+  { id: 'rs_1', at: at(2), role: 'assistant', kind: 'thinking' },
+  { id: 'msg_1', at: at(3), role: 'assistant', kind: 'text', text: 'I will run the tests.' },
+  { id: 'exec-1', at: at(9), role: 'assistant', kind: 'tool_use', tool: { name: 'CommandExecution', input: { command: ['/bin/bash', '-lc', 'npm test'], cwd: 'file:///repo' } } },
+  { id: 'exec-1', at: at(9), role: 'user', kind: 'tool_result', result: { text: '1 failing', isError: true } },
+  { id: 'exec-2', at: at(11), role: 'assistant', kind: 'tool_use', tool: { name: 'FileChange', input: { changes: { '/repo/REVIEW.md': { type: 'add', content: '- one finding' } } } } },
+  { id: 'exec-2', at: at(11), role: 'user', kind: 'tool_result', result: { text: 'Success. Updated the following files:\nA /repo/REVIEW.md', isError: false } },
+  { id: 'item-9', at: at(12), role: 'system', kind: 'system', text: '[NotMeasuredYet]' },
+  { id: 'msg_2', at: at(13), role: 'assistant', kind: 'text', text: '{"outcome":"done","summary":"one finding"}' },
+  { id: 'turn-1:complete', at: at(14), role: 'system', kind: 'system', text: 'task_complete' },
+];
+
+const detachedRead = (ops: ReturnType<typeof detachedOps>, sessionId: string, after?: string) => Effect.runPromise(ops.transcript!(sessionId, after));
+
+test("the Codex runner reads a thread's conversation from its rollout, found by the thread id its worker kept — the same shape as Claude Code's", async () => {
+  const root = tmp('root');
+  const thread = randomUUID();
+  writeRollout(thread, jsonl(rolloutLines(thread)));
+  runFile(root, 'codex', 'ae/c1/1', { nativeId: thread });
+
+  const { events } = await detachedRead(detachedOps(codex, root), 'ae/c1/1');
+  assert.deepEqual(events, CODEX_EVENTS);
+  datedWithRoles(events);
+  assert.equal(events.find((e) => e.kind === 'text' && e.text?.startsWith('{"outcome"'))?.id, 'msg_2', 'the final answer is not hidden');
+});
+
+test('a Codex run whose worker has no thread id yet has nothing to read; the id an ended attempt recorded reads its rollout with no run file', async () => {
+  const root = tmp('root');
+  const thread = randomUUID();
+  writeRollout(thread, jsonl(rolloutLines(thread)));
+  runFile(root, 'codex', 'ae/c2/1', {});
+  const ops = detachedOps(codex, root);
+
+  const none = await detachedRead(ops, 'ae/c2/1');
+  assert.deepEqual(none.events, []);
+  assert.deepEqual((await detachedRead(ops, thread, none.cursor)).events, CODEX_EVENTS, 'by the id itself, from the start');
+  assert.deepEqual((await detachedRead(ops, '../../etc/passwd')).events, [], 'a name that is no thread id is looked up as nothing');
+});
+
+test('read again with its cursor, a rollout gives only what was appended, cut at any line', async () => {
+  const root = tmp('root');
+  const thread = randomUUID();
+  runFile(root, 'codex', 'ae/c3/1', { nativeId: thread });
+  const ops = detachedOps(codex, root);
+  const text = jsonl(rolloutLines(thread));
+  for (let cut = text.indexOf('\n') + 1; cut > 0; cut = text.indexOf('\n', cut) + 1) {
+    writeRollout(thread, text.slice(0, cut));
+    const first = await detachedRead(ops, 'ae/c3/1');
+    fs.appendFileSync(rolloutFile(thread), text.slice(cut));
+    const second = await detachedRead(ops, 'ae/c3/1', first.cursor);
+    assert.deepEqual([...first.events, ...second.events], CODEX_EVENTS, `cut at byte ${cut}`);
+  }
+});
+
+test("a Codex record: a failed task's end is its error; a command that exited 0 is no error; a record with no time gives nothing", () => {
+  assert.deepEqual(
+    codexRolloutEvents({ timestamp: at(0), type: 'event_msg', payload: { type: 'task_complete', turn_id: 't', error: { message: 'Invalid value: banana' } } }, 0),
+    [{ id: 't:complete', at: at(0), role: 'system', kind: 'system', text: 'Invalid value: banana' }],
+  );
+  assert.deepEqual(
+    codexRolloutEvents({ timestamp: at(0), type: 'event_msg', payload: { type: 'item_completed', item: { type: 'CommandExecution', id: 'x', command: ['ls'], status: 'completed', exit_code: 0, aggregated_output: 'a' } } }, 0)[1]?.result,
+    { text: 'a', isError: false },
+  );
+  assert.deepEqual(codexRolloutEvents({ type: 'event_msg', payload: { type: 'item_completed', item: { type: 'AgentMessage', id: 'm', content: [] } } }, 0), []);
+  assert.deepEqual(codexRolloutEvents({ timestamp: at(0), type: 'response_item', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'context' }] } }, 0), [], 'the model-facing copy is not read');
+});
+
+test("claude-detached reads the transcript `claude --bg` would, once its run has the session's id; a spec that keeps no record has no transcript", async () => {
+  const root = tmp('root');
+  const sessionId = randomUUID();
+  writeClaude(sessionId, jsonl(claudeLines(sessionId)));
+  runFile(root, 'claude-detached', 'ae/d1/1', { nativeId: sessionId });
+  assert.deepEqual((await detachedRead(detachedOps(claudeDetached, root), 'ae/d1/1')).events, CLAUDE_EVENTS);
+
+  assert.equal(detachedOps({ name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) }, root).transcript, undefined);
+});
+
+// ─── the engine, at shipped defaults ────────────────────────────────────────
+
+const { createEngine } = await import('../src/facade.ts');
+type PromiseRunner = import('../src/facade.ts').PromiseRunner;
+type Sighting = import('../src/facade.ts').Sighting;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
+  const prev = process.env.PATH;
+  process.env.PATH = `${bin}:${prev}`;
+  try { return await f(); } finally { process.env.PATH = prev; }
+};
+
+/**
+ * A fake `claude`: `agents` prints its rows, and `--bg --name <n>` adds one, working and idle, under a new
+ * session id; anything else succeeds and does nothing. While `<bin>/agents-fails` exists, `agents` fails,
+ * as a registry under contention does. Every call is written down.
+ */
+const fakeClaude = () => {
+  const bin = tmp('bin');
+  const registry = path.join(bin, 'registry.json');
+  const calls = path.join(bin, 'calls.jsonl');
+  const agentsFails = path.join(bin, 'agents-fails');
+  fs.writeFileSync(registry, '[]');
+  fs.writeFileSync(calls, '');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args) + '\\n');
+const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
+if (args[0] === 'agents' && fs.existsSync(${JSON.stringify(agentsFails)})) { process.stderr.write('registry unavailable\\n'); process.exit(1); }
+if (args[0] === 'agents') { process.stdout.write(JSON.stringify(rows)); process.exit(0); }
+if (args[0] === '--bg') {
+  rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'idle', kind: 'background', startedAt: Date.now() });
+  fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows));
+}
+`, { mode: 0o755 });
+  type Row = { name: string; sessionId: string; state: string };
+  const rows = () => JSON.parse(fs.readFileSync(registry, 'utf8')) as Row[];
+  return {
+    bin,
+    rows,
+    set: (name: string, change: Partial<Row>) => fs.writeFileSync(registry, JSON.stringify(rows().map((r) => (r.name === name ? { ...r, ...change } : r)))),
+    agentsFail: (fails: boolean) => (fails ? fs.writeFileSync(agentsFails, '') : fs.rmSync(agentsFails, { force: true })),
+    /** How many times `claude agents` has been run. */
+    agentsCalls: () => fs.readFileSync(calls, 'utf8').split('\n').filter((l) => l.startsWith('["agents"')).length,
+  };
+};
+
+/** A fake `codex` that prints a thread's first events and exits, beside a `claude` whose registry is empty. */
+const fakeCodex = (thread: string) => {
+  const bin = tmp('bin');
+  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then echo '[]'; fi\n`, { mode: 0o755 });
+  fs.writeFileSync(path.join(bin, 'codex'), `#!/bin/sh\necho '{"type":"thread.started","thread_id":"${thread}"}'\necho '{"type":"turn.started"}'\n`, { mode: 0o755 });
+  return bin;
+};
+
+test("at shipped defaults, a Claude task's transcript is its session's, read through its own harness from the cursor given — and logs is as it was", async () => {
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const engine = createEngine({ root: tmp('root') });
+    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd') });
+
+    const before = await engine.transcript(id);
+    assert.deepEqual(before.events, [], 'no session yet: nothing to read');
+
+    await engine.tick();
+    const [row] = claude.rows();
+    assert.equal(row?.name, `ae/${id}/1`, 'spawned');
+    const lines = claudeLines(row!.sessionId);
+    writeClaude(row!.sessionId, jsonl(lines.slice(0, 7)));
+
+    const first = await engine.transcript(id, before.cursor);
+    assert.deepEqual(first.events, CLAUDE_EVENTS.slice(0, 5), 'from the start, with the cursor a read of nothing gave');
+    datedWithRoles(first.events);
+    const started = Date.parse((await engine.view(id)).state.attempts[0]!.startedAt);
+    assert.ok(first.events.every((e) => Date.parse(e.at) < started), 'turns older than the attempt keep their own times: the caller decides what to show');
+
+    fs.appendFileSync(claudeFile(row!.sessionId), jsonl(lines.slice(7)));
+    const second = await engine.transcript(id, first.cursor);
+    assert.deepEqual(second.events, CLAUDE_EVENTS.slice(5), 'only what was appended');
+    assert.deepEqual(await engine.transcript(id, second.cursor), { events: [], cursor: second.cursor }, 'and then nothing, from the same cursor');
+
+    assert.equal(await engine.logs(id), [
+      'user      Write the word to WORD.txt, then give your closeout.',
+      'assistant [thinking]',
+      'assistant Writing it now.',
+      'assistant [Bash]',
+      'user      [tool_result]',
+      'assistant [StructuredOutput]',
+      'user      [tool_result]',
+    ].join('\n'), "logs: the SDK's reading of the same transcript, flattened to text, as it was");
+  });
+});
+
+test("at shipped defaults, a Codex task's transcript is read from its rollout, by the thread id its worker saw — and logs is its output, as it was", async () => {
+  const thread = randomUUID();
+  writeRollout(thread, jsonl(rolloutLines(thread)));
+  await onPath(fakeCodex(thread), async () => {
+    const engine = createEngine({ root: tmp('root') });
+    const id = await engine.file({ brief: 'Review the change.', cwd: tmp('cwd'), harness: 'codex' });
+    await engine.tick();
+    // The worker runs the harness a moment after the tick returns, and keeps the thread id it prints.
+    let read = await engine.transcript(id);
+    for (const until = Date.now() + 15_000; !read.events.length && Date.now() < until; read = await engine.transcript(id)) await sleep(50);
+    assert.deepEqual(read.events, CODEX_EVENTS);
+    assert.match(await engine.logs(id), /"thread\.started"/);
+  });
+});
+
+test('refused, each naming what to do: a task the engine has no record of, a cursor no read gave, a harness that keeps no conversation', async () => {
+  const refusal = (pattern: RegExp) => (e: Error & { exitCode?: number }) => e.exitCode === 2 && pattern.test(e.message);
+
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const engine = createEngine({ root: tmp('root') });
+    await assert.rejects(engine.transcript('t-nope'), refusal(/^transcript: `t-nope` is not a task on this board\. `ae ls`, or `list\(\)`, gives the ones it has\.$/));
+    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    await assert.rejects(engine.transcript(id, 'from-the-top'), refusal(/^transcript: `from-the-top` is not a cursor a transcript read gave\. Pass the `cursor`/));
+    assert.deepEqual((await engine.transcript(id)).events, [], 'the same task, asked without one, is read');
+    // A HarnessSpec's reader is the engine's too, and refuses the same.
+    const codexId = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), harness: 'codex' });
+    await assert.rejects(engine.transcript(codexId, 'page-2'), refusal(/^transcript: `page-2` is not a cursor a transcript read gave\./));
+  });
+
+  // A harness brought as a PromiseRunner with no `transcript`, and a HarnessSpec with none.
+  const sessions = new Map<string, Sighting>();
+  const plain: PromiseRunner = {
+    async spawn(r) { sessions.set(r.name, { sessionId: 's-1', state: 'working' }); },
+    async observe() { return new Map(sessions); },
+    async stop() {},
+    async logs() { return 'what it printed'; },
+  };
+  const own = createEngine({ root: tmp('root'), harnesses: { plain }, defaultHarness: 'plain' });
+  const ownId = await own.file({ brief: 'the prompt', cwd: '/repo' });
+  await assert.rejects(own.transcript(ownId), refusal(/^transcript: the `plain` harness keeps no conversation this engine can read\. `logs` gives what its session printed\.$/));
+  const sh = createEngine({ root: tmp('root'), harnesses: { sh: { name: 'sh', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) } } });
+  await assert.rejects(sh.transcript(await sh.file({ brief: 'the prompt', cwd: '/repo' })), refusal(/^transcript: the `sh` harness keeps no conversation/));
+
+});
+
+test("a PromiseRunner's cursor is its own: passed through as it gave it, and never replaced by the engine's", async () => {
+  const sessions = new Map<string, Sighting>();
+  const asked: Array<[string, string | undefined]> = [];
+  const said = (n: number) => ({ id: `e-${n}`, at: at(n), role: 'assistant', kind: 'text', text: `line ${n}` } as const);
+  // Pages, in a shape no file reader gives.
+  const talking: PromiseRunner = {
+    async spawn(r) { sessions.set(r.name, { sessionId: 's-1', state: 'working' }); },
+    async observe() { return new Map(sessions); },
+    async stop() {},
+    async logs() { return 'what it printed'; },
+    async transcript(sessionId, after) {
+      asked.push([sessionId, after]);
+      const page = after === undefined ? 1 : Number(after.replace('page-', ''));
+      return { events: [said(page)], cursor: `page-${page + 1}` };
+    },
+  };
+  const engine = createEngine({ root: tmp('root'), harnesses: { talking }, defaultHarness: 'talking' });
+  const id = await engine.file({ brief: 'the prompt', cwd: '/repo' });
+
+  const nothing = await engine.transcript(id);
+  assert.deepEqual(nothing.events, [], 'no session yet: not asked');
+  assert.deepEqual(await engine.transcript(id, 'page-9'), { events: [], cursor: 'page-9' }, 'no session yet, asked with its own cursor: that cursor back');
+
+  await engine.tick();
+  const first = await engine.transcript(id, nothing.cursor);
+  assert.deepEqual(first, { events: [said(1)], cursor: 'page-2' }, "the engine's start is asked as no cursor");
+  const second = await engine.transcript(id, first.cursor);
+  assert.deepEqual(second, { events: [said(2)], cursor: 'page-3' }, 'its own cursor, not refused');
+  assert.deepEqual(asked, [['s-1', undefined], ['s-1', 'page-2']]);
+});
+
+test("a registry that cannot be read: an ended attempt's transcript is read by the id on the record, with no registry asked; one in flight reads as nothing new, from the cursor given", async () => {
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const engine = createEngine({ root: tmp('root') });
+    const id = await engine.file({ brief: 'Write the word to WORD.txt, then give your closeout.', cwd: tmp('cwd') });
+    await engine.tick();
+    const [row] = claude.rows();
+    assert.equal(row?.name, `ae/${id}/1`, 'spawned');
+    writeClaude(row!.sessionId, jsonl(claudeLines(row!.sessionId)));
+    const first = await engine.transcript(id);
+    assert.deepEqual(first.events, CLAUDE_EVENTS, 'in flight, found by observing its harness');
+
+    claude.agentsFail(true);
+    assert.deepEqual(await engine.transcript(id, first.cursor), { events: [], cursor: first.cursor }, 'in flight, registry unread: nothing new, and the cursor given back — not a rejection');
+    assert.deepEqual((await engine.transcript(id)).events, [], 'and from the start, nothing observed either');
+
+    claude.agentsFail(false);
+    claude.set(row!.name, { state: 'done' });
+    await engine.tick();
+    const ended = (await engine.view(id)).state.attempts[0]!;
+    assert.equal(ended.nativeId, row!.sessionId, "the attempt ended, its session's id on the record");
+
+    claude.agentsFail(true);
+    const before = claude.agentsCalls();
+    assert.deepEqual((await engine.transcript(id)).events, CLAUDE_EVENTS, 'ended, registry unread: read all the same');
+    assert.deepEqual(await engine.transcript(id, first.cursor), { events: [], cursor: first.cursor }, 'from the cursor given');
+    assert.equal(claude.agentsCalls(), before, 'and the registry was not asked');
+    assert.match(await engine.logs(id), /Write the word to WORD\.txt/, 'as logs reads it');
+  });
+});

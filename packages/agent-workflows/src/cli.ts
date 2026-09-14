@@ -3,14 +3,18 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, outputLines, owedFields, parseGlobs, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, sensitiveDiff, start, startPlan, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
   wf start <brief.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...]
                                --after <runId>: file nothing of this run until wf decide says that
                                run has shipped — finished, and its result branch on the base
-                               branch — and start from the base as it is then; once per run
+                               branch — and start from the base as it is then; once per run.
+                               --workflows takes a folder, or a name under <repo>/workflows/: dev
+  wf plan <folder> [--repo .]  start a plan: one run per card in the folder, parents first, each
+                               --after the runs of the cards its after: names (wf plan --help)
   wf tick                      one pass: tick the engine, file what became ready
   wf up [ms]                   the same, on a timer
   wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>
@@ -63,6 +67,28 @@ so its output already names the work. Point it at this board:
 
 const usage = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
 
+const PLAN_HELP = `wf plan <folder> [--repo .]
+
+Start a plan: one run per card in the folder, parents first, each waiting on the runs of the cards it names.
+That is the record wf start --after writes, so the tick files a card's run once its parents have shipped, and
+every card is a decision at its own wf decide. Nothing else is written: the runs and their after are the plan.
+It prints a line per card: the card, its run, its workflow, and what it waits on.
+
+A card is one markdown file, <card>.md, and README.md beside the cards says what the plan is for:
+
+    ---
+    workflow: dev     # a workflow under <repo>/workflows/, or a path from the plan folder
+    after: b, c       # the cards whose runs ship first; without it, the card starts at once
+    ---
+    Put the flag on the settings page, now that it is parsed and stored.
+
+The body is the run's brief. Refused by name before any run is started: a key a card does not have, a card
+with no workflow: or an empty body, an after: naming a card the folder does not have, cards that wait on
+each other, a file that is not .md, a folder with no card, and a card whose workflow does not load.
+
+The folder says what --after, --workflows and --no-worktree would, and wf plan refuses them. A wf start that
+refuses part-way stops the plan: the runs it started stand, and it prints a wf start for each card left.`;
+
 const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
 
 What the run produced, and the choice it leaves you. It prints the commands — ship it, drop it, once
@@ -103,6 +129,42 @@ function decideHow(argv: string[]): { sensitive?: string[] } {
   return { sensitive };
 }
 
+/**
+ * How a verb reads its flags: the value flags it takes and what each takes, as its refusal says it; its switches; the value flags it takes
+ * more than once; flags it refuses with a reason of their own; and the refusals of an argument it does not take and of a flag given twice.
+ */
+type FlagRules = {
+  takes: Readonly<Record<string, string>>;
+  switches?: readonly string[];
+  repeats?: readonly string[];
+  refuses?: Readonly<Record<string, string>>;
+  unknown: (arg: string) => string;
+  twice: (flag: string) => string;
+};
+
+/**
+ * A verb's flags after its one positional argument — `wf start`'s and `wf plan`'s — each value flag also as `--flag=<value>`. Anything else is
+ * refused before anything is read: a flag the verb does not take, a misspelt one, a value flag with no value or given twice, and a second
+ * positional. Dropped, a misspelt `--after` started a run that waited on nothing, and the tick filed it at once.
+ */
+function readFlags(argv: string[], rules: FlagRules): { values: Record<string, string[]>; switches: string[] } {
+  const values: Record<string, string[]> = {};
+  const switches: string[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (rules.switches?.includes(arg)) { switches.push(arg); continue; }
+    const joined = arg.startsWith('--') && arg.includes('=');
+    const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
+    if (rules.refuses && Object.hasOwn(rules.refuses, name)) usage(rules.refuses[name]!);
+    if (!Object.hasOwn(rules.takes, name)) usage(rules.unknown(arg));
+    const value = joined ? arg.slice(arg.indexOf('=') + 1) : argv[++i];
+    if (!value || (!joined && value.startsWith('--'))) usage(`${name} takes ${rules.takes[name]}`);
+    if (values[name] && !rules.repeats?.includes(name)) usage(rules.twice(name));
+    (values[name] ??= []).push(value!);
+  }
+  return { values, switches };
+}
+
 type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[] };
 
 /** What each of `wf start`'s value flags takes, as its refusal says it. */
@@ -112,35 +174,38 @@ const START_TAKES = {
   '--after': 'the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]',
 } as const;
 
-/**
- * `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>` and `--after <runId>` — each also as `--flag=<value>`, and
- * `--after` as often as there are runs to wait on — and `--no-worktree`. Anything else is refused before anything is read: a flag the verb
- * does not take, a misspelt one, a value flag with no value or given twice, and a second brief. Dropped, a misspelt `--after` started a run
- * that waited on nothing, and the tick filed it at once.
- */
+/** `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>`, `--after <runId>` as often as there are runs to wait on, and `--no-worktree`. */
 function startHow(argv: string[]): StartHow {
-  const how: StartHow = { isolate: true, after: [] };
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === '--no-worktree') { how.isolate = false; continue; }
-    const joined = arg.startsWith('--') && arg.includes('=');
-    const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
-    if (!Object.hasOwn(START_TAKES, name)) {
-      usage(arg.startsWith('-')
-        ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on.`
-        : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`);
-    }
-    const flagName = name as keyof typeof START_TAKES;
-    const value = joined ? arg.slice(arg.indexOf('=') + 1) : argv[++i];
-    if (!value || (!joined && value.startsWith('--'))) usage(`${flagName} takes ${START_TAKES[flagName]}`);
-    if (flagName === '--after') how.after.push(value!);
-    else {
-      const key = flagName === '--repo' ? 'repo' : 'workflows';
-      if (how[key] !== undefined) usage(`wf start takes ${flagName} once: a run works on one ${key === 'repo' ? 'repository' : 'workflow'}.`);
-      how[key] = value;
-    }
-  }
-  return how;
+  const { values, switches } = readFlags(argv, {
+    takes: START_TAKES,
+    switches: ['--no-worktree'],
+    repeats: ['--after'],
+    unknown: (arg) => (arg.startsWith('-')
+      ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on.`
+      : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`),
+    twice: (flag) => `wf start takes ${flag} once: a run works on one ${flag === '--repo' ? 'repository' : 'workflow'}.`,
+  });
+  return { workflows: values['--workflows']?.[0], repo: values['--repo']?.[0], isolate: !switches.length, after: values['--after'] ?? [] };
+}
+
+/**
+ * `wf plan`'s one flag, after the folder: `--repo <r>`. `wf start`'s others are refused by name, each with why the folder says it instead;
+ * and anything else, as `wf start` refuses it.
+ */
+function planHow(argv: string[]): { repo?: string } {
+  const { values } = readFlags(argv, {
+    takes: { '--repo': 'the repository the plan works on: wf plan <folder> --repo <r>' },
+    refuses: {
+      '--after': 'wf plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan. To wait on a run already started, start the card by hand: wf start <card.md> --workflows <dir> --after <runId>.',
+      '--workflows': 'wf plan does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
+      '--no-worktree': 'wf plan does not take --no-worktree: a card another waits on ships a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
+    },
+    unknown: (arg) => (arg.startsWith('-')
+      ? `wf plan does not take ${arg}. It takes the plan folder, then --repo <r>.`
+      : `wf plan takes one folder, and ${arg} is a second. A plan is every card in one folder: wf plan <folder> --repo <r>.`),
+    twice: () => 'wf plan takes --repo once: a plan works on one repository.',
+  });
+  return { repo: values['--repo']?.[0] };
 }
 
 /** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
@@ -189,10 +254,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (!arg || arg.startsWith('--')) return console.log(HELP);
       const how = startHow(rest.slice(1));
       const brief = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8').trim() : arg;
+      const repo = path.resolve(how.repo ?? '.');
       const run = start({
         brief,
-        repo: path.resolve(how.repo ?? '.'),
-        workflowDir: path.resolve(how.workflows ?? './workflows'),
+        repo,
+        // A folder from here, or one of the repository's by name: `--workflows dev` is <repo>/workflows/dev.
+        workflowDir: workflowFolder(how.workflows ?? './workflows', process.cwd(), repo),
         isolate: how.isolate,
         after: how.after,
       });
@@ -201,6 +268,22 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       console.log(`workspace: ${run.workspace}`);
       if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
       console.log(`run 'wf tick' (or 'wf up') to start it`);
+      return;
+    }
+
+    // A folder of cards, started as a whole. It writes the runs and nothing else; the tick does the waiting.
+    case 'plan': {
+      if (rest.includes('--help')) return console.log(PLAN_HELP);
+      const folder = rest[0];
+      if (!folder || folder.startsWith('--')) return console.log(HELP);
+      const plan = { dir: path.resolve(folder), repo: path.resolve(planHow(rest.slice(1)).repo ?? '.') };
+      const { started, stopped, folderOf } = startPlan(plan);
+      for (const line of planLines(started)) console.log(line);
+      if (stopped) {
+        const told = planStopped({ card: stopped.card, why: stopped.error.message, rest: stopped.rest }, started, { ...plan, folderOf });
+        throw Object.assign(new Error(told), { exitCode: stopped.error.exitCode ?? 1 });
+      }
+      console.log(`run 'wf tick' (or 'wf up') to start them`);
       return;
     }
 

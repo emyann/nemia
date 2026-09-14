@@ -4,6 +4,7 @@ import { checkStderr, closeoutAsked, closeoutOf, closeoutReader, engine, exitVer
 import { assess, composeBrief, inFlight, listing, type Assessment, type Run } from 'agent-workflows/run';
 import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
+import { graphOf, type RunGraph } from './graph.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];
@@ -32,7 +33,7 @@ export type RunSummary = {
   waitingOnYou: string[];
 };
 
-/** A step's frontmatter. `null` where the workflow file does not set it. */
+/** A step's frontmatter, from the workflow the run is judged by. `null` where the step does not set it. */
 export type StepSpec = {
   harness: string | null;
   model: string | null;
@@ -41,6 +42,10 @@ export type StepSpec = {
   permissionMode: string | null;
   deadlineSeconds: number | null;
   maxAttempts: number | null;
+  /** The step a round runs again, on a looping step. */
+  loop: string | null;
+  /** How many rounds its loop may run, the first included: set on every looping step, as the parser sets it. */
+  rounds: number | null;
 };
 
 /** How a step signed off, when it did. */
@@ -86,9 +91,15 @@ export type RunDetail = {
   waitingOnYou: string[];
   /** Set when the workflow folder cannot be read, or no longer has the steps the run started with. */
   warning: string | null;
+  /**
+   * The steps as a graph, from the workflow the run is judged by (`judgedSteps`), for every client to draw the same:
+   * `graphOf`. A step the page shows and that workflow does not have waits on nothing, so it is a root.
+   */
+  graph: RunGraph;
   /** The recorded steps in the order the run started with them, then any the folder has gained. */
   steps: Array<{
     name: string;
+    /** From the workflow the run froze at `wf start`; for a record from before runs froze one, the folder. */
     spec: StepSpec | null;
     body: string | null;
     /** For a filed step, the brief the engine was filed with; for one not yet filed, what it would be given now. */
@@ -172,7 +183,9 @@ async function everyView(): Promise<Views> {
  *
  * The run record is the truth about what ran; the folder is only where the prose came from, and it
  * can be edited or deleted after `wf start`. So a folder that no longer reads is a warning on the
- * run, not a failure of the request.
+ * run, not a failure of the request — and on a run that froze its workflow, nothing the page draws
+ * comes from it. The case that made this so: an api older than the package's parser refused the
+ * folder's newer keys, and every step of a run whose record had the whole graph read as a root.
  */
 function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { steps: null; warning: string } {
   try {
@@ -183,7 +196,9 @@ function workflowsOf(run: Run): { steps: Workflow[]; warning: null } | { steps: 
       : `The workflow folder ${run.workflowDir} is gone.`;
     return {
       steps: null,
-      warning: `${why} The steps are listed from the run record, without their spec or prose.`,
+      warning: run.workflow
+        ? `${why} Nothing here is read from it: the steps, their spec, prose and graph are the workflow the run froze at \`wf start\`, which is what it is judged by.`
+        : `${why} The steps are listed from the run record, without their spec or prose.`,
     };
   }
 }
@@ -207,8 +222,9 @@ function driftOf(run: Run, workflows: readonly Workflow[]): string | null {
   const inFolder = new Set(workflows.map((s) => s.name));
   const removed = Object.keys(run.steps).filter((name) => !inFolder.has(name));
   const added = workflows.map((s) => s.name).filter((name) => !Object.hasOwn(run.steps, name));
+  const shown = run.workflow ? 'shown as the run froze it' : 'shown from the run record without spec or prose';
   const said = [
-    ...(removed.length ? [`it no longer has ${removed.join(', ')}, shown from the run record without spec or prose`] : []),
+    ...(removed.length ? [`it no longer has ${removed.join(', ')}, ${shown}`] : []),
     ...(added.length ? [`it has ${added.join(', ')}, which the run did not start with`] : []),
   ];
   return said.length ? `The workflow folder ${run.workflowDir} has changed since this run started: ${said.join('; ')}.` : null;
@@ -294,8 +310,8 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
  * For a filed step, the brief the engine holds: it is what the step was given. Recomposing it now
  * would not be — `composeBrief` points a step with no `after` at every step filed so far, so a
  * finished first step would read as told to look at work done after it, and an edited folder would
- * rewrite it. For a step not yet filed, what `composeBrief` would give it now. For a filed task the
- * engine has no record of, nobody can say.
+ * rewrite it. For a step not yet filed, what `composeBrief` would give it now, from `workflows` — the
+ * workflow the run froze, as the tick composes it. For a filed task the engine has no record of, nobody can say.
  */
 function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, views: Views): string | null {
   const taskId = run.steps[name]?.taskId;
@@ -335,7 +351,15 @@ const specOf = (step: Workflow): StepSpec => ({
   permissionMode: step.permissionMode ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
   maxAttempts: step.maxAttempts ?? null,
+  loop: step.loop ?? null,
+  rounds: step.rounds ?? null,
 });
+
+/**
+ * Where what a page shows of a step's workflow is read from: the workflow the run froze at `wf start`, which the tick
+ * files from and `judgedSteps` judges by; the folder only for a record from before runs froze one. Null when neither reads.
+ */
+const shownWorkflow = (run: Run, folder: readonly Workflow[] | null): readonly Workflow[] | null => run.workflow ?? folder;
 
 async function detail(run: Run): Promise<RunDetail> {
   const folder = workflowsOf(run);
@@ -343,7 +367,9 @@ async function detail(run: Run): Promise<RunDetail> {
   const names = stepNames(run, workflows);
   const views = await viewsOf(run);
   const judged = judge(run, names, workflows, views);
-  const checks = await checksOf(run, judgedSteps(run, workflows), views);
+  const steps = judgedSteps(run, workflows);
+  const checks = await checksOf(run, steps, views);
+  const source = shownWorkflow(run, workflows);
   return {
     id: run.id,
     brief: run.brief,
@@ -358,14 +384,16 @@ async function detail(run: Run): Promise<RunDetail> {
     moving: judged.moving,
     waitingOnYou: judged.waitingOnYou,
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
+    // The steps `judge` words: the judged workflow, then a `bare` step for each one the page shows beside it.
+    graph: graphOf([...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)]),
     steps: names.map((name) => {
-      const step = workflows?.find((s) => s.name === name);
+      const step = source?.find((s) => s.name === name);
       const c = closeoutOf(views, run, name);
       return {
         name,
         spec: step ? specOf(step) : null,
         body: step?.body ?? null,
-        told: toldOf(run, name, workflows, views),
+        told: toldOf(run, name, source, views),
         taskId: run.steps[name]?.taskId ?? null,
         workspace: run.steps[name]?.workspace ?? null,
         branch: run.steps[name]?.branch ?? null,

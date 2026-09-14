@@ -138,12 +138,14 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', workflowDir, baseRef: 'def456',
     branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', cancelledAt: null,
     // implement signed off blocked, so review can never be filed: the run is over, and failed.
-    status: 'failed', moving: false, waitingOnYou: ['implement'], warning: null, steps: undefined,
+    status: 'failed', moving: false, waitingOnYou: ['implement'], warning: null,
+    graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
+    steps: undefined,
   });
 
   assert.deepEqual(implement, {
     name: 'implement',
-    spec: { harness: 'codex', model: 'gpt-5', after: [], resume: null, permissionMode: null, deadlineSeconds: 600, maxAttempts: null },
+    spec: { harness: 'codex', model: 'gpt-5', after: [], resume: null, permissionMode: null, deadlineSeconds: 600, maxAttempts: null, loop: null, rounds: null },
     body: 'Implement the thing.',
     // What the engine was filed with, not the brief recomposed from today's folder and record.
     told: filedBrief('t-2'),
@@ -157,7 +159,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
 
   assert.deepEqual({ ...review, told: undefined }, {
     name: 'review',
-    spec: { harness: null, model: null, after: ['implement'], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: 2 },
+    spec: { harness: null, model: null, after: ['implement'], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: 2, loop: null, rounds: null },
     body: 'Review what implement did.',
     told: undefined,
     taskId: null, workspace: null, branch: null,
@@ -216,6 +218,9 @@ test('a run whose workflow folder is gone still answers, from its record', async
   const run = await res.json();
   assert.match(run.warning, /is gone/);
   assert.ok(run.warning.includes(gone), run.warning);
+  assert.match(run.warning, /without their spec or prose/);
+  // From before runs froze their workflow, and its folder gone: nothing on the record says what waits on what.
+  assert.deepEqual(run.graph, { roots: ['implement', 'review'], edges: [] });
   assert.deepEqual(run.waitingOnYou, ['implement']);
   assert.deepEqual(run.steps, [
     {
@@ -285,6 +290,72 @@ test('a folder changed since the run started keeps the steps that ran, and names
     ['original', 'succeeded · BLOCKED'], ['review', 'waiting'], ['replacement', 'waiting'],
   ]);
   assert.deepEqual(summary.waitingOnYou, ['original']);
+});
+
+/** A loop as `wf start` freezes it: review loops back to implement, for at most two rounds. */
+const frozenLoop = [
+  { name: 'implement', after: [], body: 'Implement it, as frozen.', harness: 'claude', model: 'opus' },
+  {
+    name: 'review', after: ['implement'], body: 'Review it, as frozen.', harness: 'codex', loop: 'implement', rounds: 2,
+    output: { file: 'review.json', schema: { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false } },
+  },
+];
+
+const frozenSpecs = {
+  implement: { harness: 'claude', model: 'opus', after: [], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null },
+  review: { harness: 'codex', model: null, after: ['implement'], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 2 },
+};
+
+const frozenGraph = {
+  roots: ['implement'],
+  edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 2 }],
+};
+
+test('a run that froze its workflow draws from it when its folder does not read: spec, prose, what a step would be told, and the graph', async () => {
+  // The case seen on 2026-09-13: the folder holds a key this parser does not know — written for a newer one — so it does not
+  // read, and every step came back with no spec and was drawn as a root. The record had the graph all along.
+  const newer = workflowFolder({
+    'implement.md': '---\nharness: claude\nsomeNewerKey: yes\n---\nImplement it.\n',
+    'review.md': '---\nafter: implement\nloop: implement\n---\nReview it.\n',
+  });
+  writeRun({ ...r2, id: 'r-40', workflowDir: newer, workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+
+  const run = await (await app.request('/api/runs/r-40')).json();
+  assert.match(run.warning, /no longer reads as a workflow/);
+  assert.match(run.warning, /someNewerKey/);
+  // Not the pre-freeze record's warning, which would say the page has no spec to show.
+  assert.doesNotMatch(run.warning, /without their spec or prose/);
+  assert.match(run.warning, /the workflow the run froze/);
+  assert.deepEqual(run.steps.map((s: { name: string; spec: unknown; body: string }) => [s.name, s.spec, s.body]), [
+    ['implement', frozenSpecs.implement, 'Implement it, as frozen.'],
+    ['review', frozenSpecs.review, 'Review it, as frozen.'],
+  ]);
+  assert.deepEqual(run.graph, frozenGraph);
+  // Not filed: what the tick would file it with, composed from the frozen workflow.
+  assert.ok(run.steps[0].told?.startsWith('Implement it, as frozen.\n\n## What was asked for'), run.steps[0].told);
+
+  // And with no folder at all: the same page.
+  writeRun({ ...r2, id: 'r-41', workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'), workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+  const gone = await (await app.request('/api/runs/r-41')).json();
+  assert.match(gone.warning, /is gone\. Nothing here is read from it/);
+  assert.deepEqual(gone.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
+  assert.deepEqual(gone.graph, frozenGraph);
+});
+
+test('a run that froze its workflow is drawn from it, not from a folder that reads and says something else', async () => {
+  // Edited after `wf start`: the same steps, the loop taken out, and review no longer waiting on implement.
+  const edited = workflowFolder({
+    'implement.md': '---\nharness: codex\n---\nImplement it, edited.\n',
+    'review.md': '---\nharness: claude\n---\nReview it, edited.\n',
+  });
+  writeRun({ ...r2, id: 'r-42', workflowDir: edited, workflow: frozenLoop, steps: { implement: { taskId: null }, review: { taskId: null } } });
+
+  const run = await (await app.request('/api/runs/r-42')).json();
+  assert.equal(run.warning, null);
+  assert.deepEqual(run.steps.map((s: { spec: unknown }) => s.spec), [frozenSpecs.implement, frozenSpecs.review]);
+  assert.deepEqual(run.steps.map((s: { body: string }) => s.body), ['Implement it, as frozen.', 'Review it, as frozen.']);
+  assert.deepEqual(run.graph, frozenGraph);
+  assert.ok(run.steps[1].told?.startsWith('Review it, as frozen.'), run.steps[1].told);
 });
 
 test('an unknown run is refused with a 404 that says where to look', async () => {

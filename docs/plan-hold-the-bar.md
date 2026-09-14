@@ -573,6 +573,40 @@ diff }], used: Record<step, Usage>, commands }`, built from what G exports (`tou
 `sensitiveDiff`, `lessonLine`, `consumption`, `branchesToRead`) and read once when the run is
 decidable — not on the page's 5 s poll, since it runs `git diff`. Nothing in packages/.
 
+### W — Workflows on the board: a repository's workflows, listed, drawn, started · after B4 · package (tiny) + api + web
+
+**The ask (operator, 2026-09-13):** a Workflows menu with several workflows — the dev one, a UI one,
+one that is not CI at all — each with its own steps, that a person can trigger; later, workflows people
+write with an agent. And: is `check` a step?
+
+**What holds already.** A workflow is a folder; `wf start <brief> --workflows <folder>` picks one; the
+run freezes the steps on its record (`run.workflow`, `workflowDir`). Several exist: the package's
+default (implement ⇄ review), its `ui/`, the operator's folders. `implement` and `review` are steps —
+agent sessions in a workspace. **`check` is not a step:** it is the run's verdict on a step, a command
+executed after the step signs off with no agent judging it, and a key on the step so the DAG stays
+about who does the work. A non-agent step a workflow may need (publish, deploy, a script) is a *shell
+step* — `harness: shell`, `command:` — on the engine's `HarnessSpec` seam, which the check harness
+already uses. Later, its own package.
+
+**What changes.**
+- *Convention.* `<repo>/workflows/<name>/` — a repository carries its workflows checked in, as
+  `.github/workflows/` does. A `README.md` in the folder describes it (first paragraph = the board's
+  description); the loader skips it — today every `.md` is a step. This repo gets `workflows/dev/`
+  (implement ⇄ review, `npm test && npm run typecheck`), `workflows/dev-build/` (+ build + e2e) and
+  `workflows/ui/`, what the operator's folders are today, and runs are filed from them.
+- *Api.* `GET /api/workflows`: each folder under the repo's `workflows/` and, marked *yours*, under
+  `~/.agent-workflows/workflows/` — name, where from, description, steps with their specs, the graph
+  (B4's `graphOf`), and a folder that does not read as a workflow listed with the loader's refusal, not
+  hidden. `POST /api/runs { workflow, brief }` → the package's `start()`, the CLI's own: it writes the
+  record and files nothing; the daemon files it. A refused start is a 422 carrying `wf start`'s message.
+  The board's first write, and the one a person makes at the CLI today.
+- *Web.* A **Workflows** item after Runs: each workflow a card — its DAG drawn with the run canvas's
+  nodes in a spec mode (no attempt, no status), its steps' specs (harness, model, check, tools, loop
+  and rounds), its description — and **Start a run**: a brief box, the run's id and a link to it on
+  success, the refusal in full otherwise. The Runs page and the run page name the workflow a run used.
+- *Not now.* A `wf new <name>` scaffold or a "describe your workflow" skill: the keys are a closed
+  list refused by name, so an agent already gets told what it wrote wrong.
+
 ## 4b. Findings from wave 1, for the packages that own them
 
 Recorded here at merge time so they are not lost; fold each into its ledger when that package's

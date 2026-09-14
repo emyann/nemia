@@ -497,6 +497,56 @@ this repository, checkable.
 `git diff` and the check. Owns `workflow.ts`, `runner.ts`, their tests, README. Refusal test: a
 step with `tools:` reaches the engine with exactly that list.
 
+### S — The session on the board: a step's conversation, live · after E5, B3 · engine, then api + web
+
+**The ask (operator, 2026-09-13, from the Activity tab and Claude Code web):** the inspector's
+Activity tab shows `assistant [Read]` / `user [tool_result]` lines, re-read every 5 s. Claude Code
+web shows the same session as a conversation — messages, tool calls folded into "Ran 3 commands, read
+3 files", thinking, streamed as it happens — and the operator can open a running session from a phone.
+Wanted on the Factory: the same view, or at least a link to it.
+
+**Where each layer stands, and what it gains.**
+- *Engine.* `RunnerOps.logs(sessionId)` already reads the transcript typed (the Claude runner via the
+  SDK's `getSessionMessages`, the Codex runner off its rollout file) and flattens it to text
+  (`renderTranscript`). A structured op beside it is the same kind of thing: **`transcript(taskId,
+  after?)`** returns the session's events in one shape for every harness — `{ at, role, kind: 'text' |
+  'thinking' | 'tool_use' | 'tool_result' | 'system', text?, tool?: { name, input }, result?: { text,
+  isError }, id }` — and a `cursor` to ask again from. Level-triggered and pull-only, like everything
+  the engine does: no push, no socket. Reading what a harness wrote is a runner's job; `decide` does not
+  change. Codex parity: the same shape from the rollout, as far as its records allow; what it lacks is
+  said in the README, not faked.
+- *Api.* `GET /api/runs/:id/steps/:step/transcript?after=<cursor>` → `{ events, cursor, live }`, and
+  `GET …/transcript/stream`, server-sent events: the api polls the engine with the cursor every second
+  while the task is live and pushes what is new, closes when it settles. The api is where streaming
+  lives, because the api is the one long-lived process that talks to browsers; the engine stays a
+  library. The `/log` route stays for `wf logs` parity.
+- *Web.* The Activity tab becomes a conversation, and gets room: a **session page**
+  (`/runs/$runId/steps/$step`) with the conversation full-height, linked from the inspector ("Open the
+  session"); the inspector's tab shows the tail of the same stream. Rendering: the shadcn-family chat
+  components — shadcn/ui's own conversation layer (June 2026: `MessageScroller`, `Message`, `Bubble`,
+  `Marker`, `scroll-fade`, `shimmer`) and Vercel's **AI Elements** registry for what it does not cover
+  (`Tool` folding a call and its result, `Reasoning` for thinking, `Response` for markdown, `CodeBlock`)
+  — installed from their registries into `apps/web/src/components/`, themed by the tokens the board
+  already has, read-only (no `PromptInput`). Consecutive tool calls fold into one line ("Ran 3
+  commands, searched code, read 3 files"), as Claude Code web does. Fed by an `EventSource` on the
+  stream route while live, one fetch when not. No AI SDK runtime, no assistant-ui: the board renders a
+  transcript, it does not host a model.
+- *A link to Claude Code web.* If `claude agents --json` (or the registry) carries a URL for a session
+  that Remote Control shows on claude.ai/code, the inspector shows "Open in Claude Code web". The
+  scheme is not documented; the S2 run checks, and adds the link only from a field it can read.
+
+**Not in S, said so:** a prompt input that steers the session from the board. Possible — the harness
+has cross-session messaging, and it is how the operator nudged two blocked sessions today — but it is
+a write path with no trace on the run (§4b, "steering by message"). It is its own package once the
+read path exists, with the message recorded on the run.
+
+**S1 (engine):** `transcript` on `RunnerOps`, both runners, `Engine.transcript(taskId, after?)`, tests
+with a real transcript file and a rollout fixture; README. Refusal tests: an unknown task refuses by
+name; a cursor from a shorter file does not re-emit; a `StructuredOutput` call is an event like any
+tool call (the closeout is not hidden). **S2 (api + web):** the two routes, the page, the components,
+the fold, the link if there is one; e2e page in `PAGES` with a seeded transcript; a test that the SSE
+route closes when the task settles. S2 after S1 merges.
+
 ## 4b. Findings from wave 1, for the packages that own them
 
 Recorded here at merge time so they are not lost; fold each into its ledger when that package's

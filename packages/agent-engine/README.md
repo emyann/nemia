@@ -28,6 +28,7 @@ Definition of done — a closed list, and it is closed:
 - [x] run a workload on a harness: durably, observably, to completion
 - [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`)
 - [x] attempts, stop, logs — as text, and as the conversation to follow (`transcript`)
+- [x] a person's words into a session while it runs, on the record (`say`)
 - [x] concurrency ceiling, per harness — two subscriptions are two pools
 - [x] the feed — a cursored stream of everything that happened
 - [x] resume — an attempt continues the one before it, by policy
@@ -71,7 +72,7 @@ JOIN KEY  a name we choose        →  claude --name ae/<task>/<attempt>
 ```
 
 That's the whole engine. `decide()` is pure, total, and returns exactly one step; everything
-effectful is the four verbs of `Runner`, and two optional ones: one that lets a finished session go, and one that reads its conversation. Kubernetes' control plane for the loop, durable
+effectful is the four verbs of `Runner`, and three optional ones: one that lets a finished session go, one that reads its conversation, and one that hands a running session a person's words. Kubernetes' control plane for the loop, durable
 execution's journal for the memory, and the local harness as the kubelet.
 
 **The engine never holds a session.** `claude --bg` hands it to the harness, which already owns
@@ -144,7 +145,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 |---|---|
 | `'claude-bg'` | Claude Code's background sessions; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, and two optional ones, `release` and `transcript`, for anything else at all |
+| a `PromiseRunner` | four async methods, and three optional ones, `release`, `transcript` and `say`, for anything else at all |
 
 **`src/cli.ts` imports `createEngine`, and types, and nothing else from the engine.** That is
 deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
@@ -658,6 +659,64 @@ that keeps no conversation this engine can read — a `PromiseRunner` or a `Harn
 through as the runner gave it, and hands the runner none of its own. The start a read of no session
 returns reaches the runner as no cursor at all.
 
+## Telling a running session something: `say`
+
+`kubectl attach` speaks to a running container and leaves an audit line; `say` is that. It hands a person's
+words to the session of a task's attempt in flight, through the task's own harness, and journals them:
+
+```ts
+const said = await engine.say(taskId, 'Widen the scope to apps/api too.')
+// { at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen the scope to apps/api too.' }
+;(await engine.view(taskId)).state.said   // every one, in the order said
+```
+
+```bash
+node bin/ae.ts say <id> Widen the scope to apps/api too.   # the words are everything after the id
+```
+
+**Why it exists.** A step steered mid-flight by cross-session message left nothing on its run, so its reviewer
+could not tell a change a person had authorised from a step overstepping. Now the words are a `said` entry on
+the task's journal — `at`, `attempt`, `text` — in the feed, in `ae show`, and on `state.said`. **`decide` never
+reads it**, and a test pins that: what was said to a session is a fact for whoever reviews the work, not a
+judgement on it.
+
+**The words go first, the entry after.** A `said` on the record is words a harness took, and a `say` that
+rejects has journalled nothing. The price is a crash window: a process killed between the two has delivered
+words and left no trace. The other order leaves a trace of words that may never have been delivered, on a
+record whose whole use is to be believed.
+
+**How the words reach a Claude Code session**, measured on 2.1.270 before relying on it. Every session listens
+on its own inbox socket: the one another session's `SendMessage` reaches, and the one Claude Code documents for a
+script to post into. The runner finds it through the session's registration, `~/.claude/sessions/<pid>.json` and
+its `messagingSocketPath`, by the pid `claude agents` lists, and posts one line —
+`{"type":"user","session_id":…,"message":{"role":"user","content":…}}` — with the words as given. No token: on
+macOS and Linux the inbox does not ask for one, and the key beside the registration is another session's
+credential, not the engine's. The `session_id` makes the inbox drop the words if the socket has passed to
+another session since it was observed. A registration this user does not own, a socket path that is a symlink
+or not a socket, or a socket another user owns, is refused before anything is sent. A busy session reads the
+words between tool calls; an idle one starts a turn with them. Either way Claude Code tells the model they came
+from another session and not from its user — so words cannot approve a permission prompt, and a session may
+decline what it judges out of bounds. `transcript` gives them as a `system` event.
+
+**Taken is not read.** The inbox writes nothing back. A `crossSessionInbound` of `hold` or `refuse` in the
+operator's settings, a burst past its rate limit, or the same words twice inside its repeat window, set them
+aside where the engine cannot see, and the entry is written all the same: `said` means handed over.
+
+| harness | how | refused |
+|---|---|---|
+| `claude` | a line on the session's inbox socket | a task in `bypassPermissions` — Claude Code holds a message into such a session for a person to approve, and a background session nobody attached to holds it for ever; and words that make a line longer than the inbox reads (1,048,576 characters) |
+| `codex` | — | always: `codex exec` reads its prompt once and takes nothing while it runs |
+| `claude-detached` | — | always: its session's id is known only once `claude -p` exits |
+| a `PromiseRunner` | its own `say`, when it has one | when it has none |
+
+**Refused, with exit code 2**, nothing sent and nothing journalled, and the fix in the sentence: empty words; a
+task the engine has no record of; a harness with no channel, in its own words; what the harness cannot carry; a
+task that has settled, or has been asked to stop; one with no attempt in flight; and one whose attempt its
+harness does not list running — `working` or `blocked`, since a session waiting on a person is told too. Where
+the fix is to continue a session that has ended, the sentence says so: a new task with `resumeFrom`, which is
+what `wf retry --message` does. A registry that cannot be read, or words the harness did not take, reject
+without an exit code: nothing was said, so ask again.
+
 ## Letting a sandboxed Codex step commit
 
 Codex's `workspace-write` sandbox keeps `.git` read-only on purpose — including the real git
@@ -713,6 +772,7 @@ reason `Runner` is a seam and not an import.
 | narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session; `disallowedTools` → `--disallowedTools` | not wired: it passes only `model` and `permissionMode` |
 | MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json` and the task's `mcp`, never the operator's | not wired |
 | the conversation as events | `transcript`, from the session's transcript | not wired: no `transcript` |
+| telling a running session something | `say`, a line on the session's inbox socket | not wired: no `say` |
 | good for | the fleet, long work, unattended | one task in the foreground, with a human watching |
 
 The Agent SDK is a typed wrapper around the same CLI, but the wrapping is over **stdio
@@ -761,7 +821,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
 | `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `src/journal.ts` | append-only JSONL per task, plus the board-wide feed |
-| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `release` and `transcript` — Claude Code's runner, words and usage, and the one transcript reader |
+| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `release`, `transcript` and `say` — Claude Code's runner, words and usage, its inbox, and the one transcript reader |
 | `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits; the Codex and `claude -p` specs, and Codex's rollout read as a transcript |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
@@ -778,9 +838,10 @@ selector, and it is why no attempt can ever run twice.
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
-| `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, and each refusal at shipped defaults |
+| `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
+| `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, and what a released session still has, against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, and `say` into a working session, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 
@@ -804,6 +865,7 @@ node bin/ae.ts up                # reconcile on a timer — this is the daemon
 node bin/ae.ts ls                # every task, desired vs observed
 node bin/ae.ts show <id>         # the journal, then one line per attempt
 node bin/ae.ts logs <id>         # the session's own output
+node bin/ae.ts say <id> "…"      # tell its running session something; journalled
 node bin/ae.ts stop <id>
 ```
 

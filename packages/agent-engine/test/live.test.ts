@@ -24,6 +24,11 @@
  * have taken the transcript with it. So a session is told a word, settles and is released; then
  * `ae logs` must still read it, and a second task resuming it must still say the word.
  *
+ * And `say` is measured before it is trusted, because the inbox it posts to answers nothing: a session told to
+ * wait for a message naming a file is told a name, and must write that file and close with its name, while an
+ * identical session never told must write nothing — without it, a session that wrote a file of its own accord
+ * would pass.
+ *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
 import { test } from 'node:test';
@@ -33,7 +38,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createEngine, type Engine, type TaskView } from '../src/facade.ts';
+import { createEngine, type Engine, type Said, type TaskView } from '../src/facade.ts';
 
 const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
@@ -210,6 +215,62 @@ test("a --bg session filed with no mcp, in an empty directory, has no MCP tools 
     assert.equal(views.bare?.state.settled, 'succeeded', `bare settled: ${views.bare?.phase}`);
     assert.deepEqual(said('bare'), { mcpServers: [], mcpTools: [] }, "no mcp and no .mcp.json: none of the operator's servers, connectors or Chrome");
   });
+});
+
+const SAY_BRIEF = [
+  'You are waiting for a message from another session that names a file.',
+  'Until one arrives, run `sleep 10` with your Bash tool, one call at a time, at most 30 times.',
+  'When a message names a file, create that file in the current directory with your Write tool, containing the word ok, and do nothing else.',
+  'Then give your closing statement: in name, the file name the message gave, or an empty string if no message came.',
+].join(' ');
+const NAME_CLOSEOUT = {
+  type: 'object',
+  properties: { name: { type: 'string' } },
+  required: ['name'],
+  additionalProperties: false,
+};
+
+test('say reaches a working --bg session: told a file name, it writes that file; the same session never told writes none — and the journal has what was said', {
+  skip,
+  timeout: 15 * 60_000,
+}, async () => {
+  // Shipped defaults: `claude`, `auto`. Bash to wait with, Write to answer with.
+  const engine = createEngine({ root: tmp('say-board') });
+  const told = tmp('say-told');
+  const control = tmp('say-control');
+  const common = { brief: SAY_BRIEF, closeoutSchema: NAME_CLOSEOUT, deadlineSeconds: 600, effort: 'low', tools: ['Bash', 'Write'] };
+  const ids = {
+    told: await engine.file({ ...common, cwd: told }),
+    control: await engine.file({ ...common, cwd: control }),
+  };
+  const name = `SAID-${randomUUID().slice(0, 8)}.txt`;
+
+  // Told once it is seen at work: listed running, in its sleep loop.
+  let said: Said | undefined;
+  const until = Date.now() + 5 * 60_000;
+  while (!said && Date.now() < until) {
+    await engine.tick();
+    const { phase } = await engine.view(ids.told);
+    if (phase === 'running (working)' || phase === 'working (quiescent)') said = await engine.say(ids.told, `The file to write is ${name}`);
+    else await new Promise((r) => setTimeout(r, 5_000));
+  }
+
+  await settleThenCheck(engine, ids, (views) => {
+    assert.ok(said, 'the told session was seen working, and told');
+    assert.equal(views.told?.state.settled, 'succeeded', `told settled: ${views.told?.phase}`);
+    assert.ok(fs.existsSync(path.join(told, name)), 'the told session wrote the file the words named');
+    assert.deepEqual(views.told?.state.attempts.at(-1)?.closeout, { name }, 'and closed with its name');
+    assert.deepEqual(views.told?.state.said, [said], 'the journal has what was said, once');
+
+    assert.equal(views.control?.state.settled, 'succeeded', `control settled: ${views.control?.phase}`);
+    assert.deepEqual(fs.readdirSync(control).filter((f) => f.startsWith('SAID-')), [], 'the control, never told, wrote nothing');
+    assert.deepEqual(views.control?.state.attempts.at(-1)?.closeout, { name: '' }, 'and closed with no name');
+    assert.deepEqual(views.control?.state.said, []);
+  });
+
+  // The session's own record has the words too, as the transcript reader gives them to a board.
+  const { events } = await engine.transcript(ids.told);
+  assert.ok(events.some((e) => e.text?.includes(name)), `the told session's transcript carries the words: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`);
 });
 
 const WORD_CLOSEOUT = {

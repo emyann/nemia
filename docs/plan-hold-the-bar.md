@@ -685,15 +685,6 @@ owner is not mid-run.
   alphabetical — so `wf ls` and the board show `implement · respond · review` for a workflow that
   runs implement → review → respond. Order steps by `after` (a topological sort in `workflow.ts`,
   applied at `wf start`) so a row reads as the DAG runs. → G, with the decider screen.
-- **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
-  mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
-  `bypassPermissions`). What remains is that A's `PERMISSION_MODES` in `workflow.ts` is a copy of
-  the engine's lists and already differs: the engine takes `manual` for Claude, the parser does
-  not; the engine takes `bypassPermissions` for codex, the parser does not. The engine now exports
-  `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES`, `CODEX_EFFORTS` — but `workflow.ts`
-  may not import the engine (`runner.ts` is the only importer). Either the run validates modes
-  through `e.file()`'s own refusal and the parser stops copying, or a test in agent-workflows pins
-  the copy to the engine's exports. → I, with the `tools:`/`effort:` pass-through.
 - **apps/api tests hit the live registry.** Every `e.view` runs `claude agents --json` against this
   machine; under parallel turbo the api test process dies with "Promise resolution is still pending
   but the event loop has already resolved" while other packages' tests run beside it (seen at C's
@@ -758,6 +749,15 @@ owner is not mid-run.
 
 Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, filed 2026-09-14, closes the last two).
 
+- **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
+  mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
+  `bypassPermissions`). What remains is that A's `PERMISSION_MODES` in `workflow.ts` is a copy of
+  the engine's lists and already differs: the engine takes `manual` for Claude, the parser does
+  not; the engine takes `bypassPermissions` for codex, the parser does not. The engine now exports
+  `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX_SANDBOXES`, `CODEX_EFFORTS` — but `workflow.ts`
+  may not import the engine (`runner.ts` is the only importer). Either the run validates modes
+  through `e.file()`'s own refusal and the parser stops copying, or a test in agent-workflows pins
+  the copy to the engine's exports. → I, with the `tools:`/`effort:` pass-through.
 - **agent-workflows (`list`, `runner.ts`):** `wf ls` prints `pending` for a task the engine has no
   record of; `phaseOfView` already draws the `unknown` line for the DAG, `listing`'s phase word does
   not. The board (run W) words it `unknown` itself and tests that it matches `list` wherever `list`

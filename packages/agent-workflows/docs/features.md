@@ -12,7 +12,8 @@ trying a step again with `retries:` and `wf retry` (§4 F), going round again wi
 (§4 G), looking as a skill with `workflows/ui/` as implement ⇄ review (§4 U2), an answer for a step
 that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planned/`, §4 Q), a run
 that waits on a run (`wf start --after`, the first half of §4 P), and three guards made to hold (a session
-the harness blocked tried again, `shipped` with nothing past the base, an ask file that is not an ask) have shipped.
+the harness blocked tried again, `shipped` with nothing past the base, an ask file that is not an ask), and a plan as a folder of cards whose waiting runs are handed their parents'
+closeouts (`wf plan`, the rest of §4 P) have shipped.
 
 ## Shipped: the check
 
@@ -518,7 +519,7 @@ What it leaves:
   answered one for its `needs`: one more view per answered step, and no question printed if the engine has lost
   that task.
 - **A plan is not steps.** `plan`'s `steps` are prose for one `implement`; a run that files steps from a plan
-  is still §4 below.
+  is still §2 below.
 
 ## Shipped: a run that waits on a run — `wf start --after`
 
@@ -787,44 +788,123 @@ What it leaves:
   and "nothing to decide yet", though the parent's own `wf decide` has something to decide: `waitAdvice` does not
   read a parent's outcome.
 
-## 1. A waiting run handed its parents' closeouts
+## Shipped: a plan as a folder of cards — `wf plan` — and a waiting run handed its parents' closeouts
 
-**Why.** A run that waited starts from a base with its parents' work, and without a word of what they were
-for or what they decided. The plan's §4 P names the next step: a dependent run's brief is handed its parents'
-closeout summaries as data, which is `input:` one level up.
+Plan §4 P, its second half. A person who describes a plan in prose (A, then B and C, then D) writes it as files and
+starts it whole. The tick does the waiting, and every card is still a decision at its own `wf decide`. A run that
+waited is told what its parents concluded, without a person pasting it. Nothing in the engine, and nothing in apps/.
 
-**What it has to settle.**
+What was built:
 
-- **Whether a summary may travel.** `composeBrief` keeps a step's summary from every other step, because it is
-  the producer's account and would anchor whoever reads it. A shipped parent's summary is different: a person
-  read it and merged the work. Say why in the code, or hand the parent's declared outputs instead.
-- **Which closeout.** A parent's terminal steps, read off the engine's record of their current try. The
-  engine may have lost that task by the time the child starts, and the child's brief should say so rather than
-  hand nothing silently.
-- **When.** At the pass that files the roots, the one that reads `baseRef`, and never again. The parents
-  are not read after that.
+- **A card is a markdown file.** `parsePlan(files)` in the new `src/plan.ts` is pure. Handed the folder's entries, it
+  reads each `<card>.md` as a card named for its file, with exactly two frontmatter keys, `workflow:` and `after:`
+  (card names, comma-separated), and its body as the brief. `README.md` is skipped. It refuses by name, with the fix:
+  - a key a card does not have, set twice or to nothing, and a line that is not `key: value`;
+  - no `workflow:`, and an empty body;
+  - an `after:` naming no card, or one card twice;
+  - a file that is not `.md`, a folder inside the plan, and a folder with no card.
 
-**Already taught.** `## From <step>` puts data in a fence longer than any backticks in it (`fenced`), under a
-label saying whose it is. `input:` refuses a step that does not wait on what it reads, and here `after` is
-that edge.
+  The frontmatter is split as a step's is (`splitFrontmatter`, now shared), so a byte-order mark, `\r\n` and a block
+  that never closes read the same for both.
+- **`planOrder(cards)`**, pure, puts parents first, and goes by name among the cards that may go next. It refuses an
+  `after:` naming a card the plan does not have or the card itself, and a cycle, named round:
+  `a.md, d.md, b.md wait on each other — a after d, d after b, b after a`.
+- **`workflowFolder(given, from, repo)`** in `workflow.ts` finds a workflow by a path from where it is written, or,
+  when nothing is there and the value is a bare name, under `<repo>/workflows/`. `wf start --workflows` used to take
+  only a path. It now takes a name too (`--workflows dev`), and a card's `workflow:` is read the same way, from the
+  plan folder. A name found nowhere is refused, naming both places and the workflows the repository has.
+- **`wf plan <folder> --repo <r>`** calls `startPlan` in `runner.ts`:
+  - It reads the folder (`readPlan`).
+  - Before the first `start()`, it finds every card's workflow and asks of it what `start` refuses (`stepsToStart`,
+    split out of `start`). A refusal comes back behind the card: `b.md: \`workflow: deb\` — no workflow folder at …`.
+    A `.worktreeinclude` that `start` would refuse is refused once, up front.
+  - It starts each card in order, `after` the run ids of its parents' runs. That is the record `wf start --after`
+    writes, so the tick, `wf ls`, `wf decide` and the board need nothing new, and nothing else is written.
+  - It prints one line per card (`planLines`): the card, its run, its workflow as the card names it, and what it waits
+    on, by card and by run. Then `wf start`'s `run 'wf tick'` line.
+  - A `start()` that refuses part-way stops the plan (`PlanStarted.stopped`). The runs it started stand.
+    `planStopped` names them, the card and the refusal, and prints `wf start <card> --workflows <folder> --repo <r>
+    --after <id>` for each card left, parents first, with `<c's run id>` for a parent not started yet.
+- `wf plan` takes `--repo`. It refuses `--after`, `--workflows` and `--no-worktree` by name, since the folder says
+  each, and anything else as `wf start` refuses it: `startHow`'s loop became `readFlags`, which both verbs read their
+  flags with. `wf start`'s refusals read as they did, and their tests pass unchanged. `wf plan --help` shows a card.
+- **`## From run <id>`.** On the pass that files a gated run's roots, the pass that reads `baseRef`, `advance`
+  gathers `parentCloseouts`: for each parent, its record, the first line of its brief, and each terminal step's
+  closeout off the engine's view of its current try, read as `wf decide` reads one (`closeoutOf`). `composeBrief`
+  takes them as its last argument and stays pure.
+  - Each root's brief gains a section per parent, right after *What was asked for*: the first line, then for each
+    terminal step its `summary` and the fields its `output:` declares, as `## From <step>` prints them. Each is fenced
+    (`fenced`).
+  - A parent whose record or workflow cannot be read, a step never filed, a task holding no closeout (a failed step
+    whose work a person merged) and a closeout that does not parse each say so and why, and the roots are filed all
+    the same.
+  - Steps after a root, tries, rounds, and runs without `after` are composed as before.
+- **Whether a summary may travel**, which the list of what to build had left open: it does, and `fromRunSection` says why. Between steps
+  the summary is the author's account of work nobody has judged, and it would anchor whoever judges it. A shipped
+  parent's summary was read by a person beside its diff before they merged the work, so one run later it is the record
+  of what is already in the workspace.
 
-## 2. A plan as a folder of cards: `wf plan <folder>`
+What was measured:
 
-**Why.** The second half of §4 P. A plan is a folder of card briefs, one markdown file per card, with
-`workflow: dev` and `after: <card>` in its frontmatter. The closed-key parser refuses the rest. `wf plan
-<folder>` prints the whole graph, then starts every card with its edges: the shape an agent writes for
-someone who describes a plan in prose.
+- Pure tests in `test/plan.test.ts` (7):
+  - the diamond, parsed from its files in any order, with the README skipped, and a Windows file read as the same card;
+  - `planOrder` parents first, and by name among the cards that may go next;
+  - each refusal above by name, including a cycle of three with a card waiting on it and a root beside it, named
+    without either, and `planOrder` refusing a cycle on its own;
+  - `planLines` compared whole, and `planStopped` compared whole, with runs started and with none.
+- `test/boundary.test.ts` holds `plan.ts` to reading no disk, spawning nothing and not importing `runner.ts`.
+- `test/workflow.test.ts` (2): `workflowFolder` by name, by a relative path from the right folder, by an absolute path,
+  and a folder where it is written found before the repository's of that name. Refused, each message compared whole: a
+  name the repository does not have, a path that is not there, a path that is never read as a name, a file, and a
+  repository with no `workflows/`.
+- `test/run.test.ts` (1): `composeBrief` handed three parents — one whose summary holds a fence and whose step declares
+  a field, one whose step has no closeout, and one whose record cannot be read — compared as text. With none, and with
+  `[]`, the brief is exactly what it was; with them, nothing before or after the sections changes.
+- Store tests in `test/store.test.ts` (7), on a real git repository, with `start`, `advance`, `startPlan` and `main`
+  run for real against the fake board:
+  - `wf plan` on the diamond through `main`: four runs and no other file in the store, printed parents first, each
+    `after` the right ids in the card's order, the briefs the cards' bodies, and workflows found by name and by a path
+    from the plan folder. `wf ls` says D is `waiting on <B's run>, <C's run>`, and a pass files A's step and none of the
+    others'.
+  - A folder whose second card's workflow does not load: refused with the workflow's own refusal behind `b.md`, and no
+    run written, not even A's. The same for a workflow that is not there, a cycle, a folder inside the plan, a folder
+    with only a README, and no folder.
+  - `--after`, `--after=`, `--workflows`, `--no-worktree`, `--repos`, `--repo` twice, `--repo` and `--repo=` with no
+    value, and a second folder: each refused by name, with no run written.
+  - `wf start --workflows <name>` starts `<repo>/workflows/<name>`, and a misspelt name is refused whole.
+  - A `start()` that throws on the third card: A and B stand with their edges, and `stopped` names C, its error, and D.
+  - A child of two parents, merged, one of them with a terminal step that declares `output:`. The child's root brief
+    has `## From run <parent>` right after the child's brief: the parent's first line, its summary, and `findings` as
+    JSON. The second parent's section has its summary and no declared block. The first parent's own root brief, a run
+    without `after`, has no such section, and neither has the child's `review`, filed after its root.
+  - Two parents a person merged after their steps failed, one with no closeout and one whose closeout does not parse:
+    the child's roots are filed, and each section says why nothing can be given.
+- Each of the three code commits was typechecked and tested on its own tree: 332, 337 and then 340 tests in
+  agent-workflows, 17 of them new, all passing but the live browser test, which is skipped without `AE_LIVE=1`.
+- The CLI itself, in a throwaway `WF_ROOT` over a throwaway repository with a `workflows/dev`. `wf plan` refused
+  `--after`, a cycle of three and a misspelt `workflow:`, with no run written. It then started the diamond and printed
+  its four lines, and `wf ls` read D as waiting on B and C. Kept as `wf-plan.txt` in the step's artifacts. No tick ran
+  there, so no real session was filed, and no real child has been handed a real parent's closeout.
+- `npm test && npm run typecheck` from the root exited 0. agent-workflows ran 340 tests, 17 of them new: 339 passed,
+  and one was skipped, the live browser test. agent-engine ran 239 (235 passed, 4 live tests skipped), api 98 and web
+  126, all passing. The log is `root-check.txt` in the step's artifacts.
 
-**What it has to settle.**
+What it leaves:
 
-- **Names to ids.** A card's `after:` names cards, and run ids are made at start, so the plan starts the cards
-  in order and resolves each edge to the id it just made.
-- **Refused as a folder, before any card starts.** A cycle, which runs started one by one cannot have and a
-  folder can; an `after:` naming no card; and everything `afterRefusal` refuses of an edge to a run already in
-  the store.
-- **What a person sees.** The graph as it will run, and the ids, so `wf ls` reads it back.
+- **The Factory's graph is P2's** (apps): the api does not carry `after` yet (the `--after` section above says what it
+  needs), and a plan is drawn only once it does. **A plan's own page on the board** is later: today a plan is its runs,
+  and nothing groups them.
+- **A card started by hand carries its frontmatter.** After a part-way stop, the commands `wf plan` prints give the card
+  file to `wf start`, which reads a file's whole text as the brief, the `workflow:` and `after:` lines included.
+- **A card cannot wait on a run outside its folder.** `after:` names cards; to wait on a run already started, start that
+  card by hand with `--after`, as the refusal of `wf plan --after` says.
+- **The parents' closeouts reach only each root's first try.** A try `wf retry --fresh` files later, or a new session a
+  round files, is not given `## From run <id>`: the parents are read once, on the pass that files the roots.
+- **Only a parent's terminal steps are read.** What an earlier step of the parent declared, a plan its implementer
+  consumed say, is not handed on.
+- **Starting a plan twice starts every card twice.** Nothing records that a folder was started.
 
-## 3. Forgetting a run (`wf rm`)
+## 1. Forgetting a run (`wf rm`)
 
 **Why.** Runs, worktrees and branches accumulate, and clearing them is manual: `git worktree
 remove`, `git branch -D`, deleting `~/.agent-workflows/runs/<id>.json`.
@@ -880,7 +960,7 @@ Write tests for the pure part — whatever decides what may be removed and what 
 the style of the tests already in `test/`. Run the whole suite before you commit.
 ```
 
-## 4. A run that grows steps from a plan
+## 2. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
 

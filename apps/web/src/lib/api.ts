@@ -175,6 +175,25 @@ export const capabilitiesQuery = queryOptions({
 export const runQuery = (id: string) =>
   queryOptions({
     queryKey: ['runs', id],
-    queryFn: () => get<RunDetail>(`/api/runs/${encodeURIComponent(id)}`),
+    queryFn: () => get<RunDetail>(`/api/runs/${encodeURIComponent(id)}`).then((detail) => withGraph(id, detail)),
     refetchInterval: 5_000,
   });
+
+/**
+ * A run's detail, refused unless it carries its `graph`, which is all the canvases draw.
+ *
+ * An api process started before `RunDetail` carried it answers without one — the version skew that had the board take
+ * every step for a root on 2026-09-13. Refused here, naming the fix, so the run's page and the Factory's card say so,
+ * rather than a render throwing on `undefined` and taking the whole floor down with it. Nothing is worked out from
+ * `after` instead: a graph the api did not give is the guess this replaces.
+ */
+export function withGraph(id: string, detail: RunDetail): RunDetail {
+  const graph = (detail as { graph?: Partial<RunGraph> | null }).graph;
+  if (!graph || !Array.isArray(graph.roots) || !Array.isArray(graph.edges)) {
+    throw new Error(
+      `The api answered run '${id}' without its graph, so it is older than this board, which draws only the graph the api gives. ` +
+        'Restart the api (`npm run dev` from the repository, or whatever serves /api), then reload the page.',
+    );
+  }
+  return detail;
+}

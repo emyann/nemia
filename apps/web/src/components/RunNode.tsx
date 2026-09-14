@@ -1,10 +1,12 @@
+import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import type { RunSummary } from '@/lib/api';
+import { decisionQuery, type RunSummary } from '@/lib/api';
 import { duration } from '@/lib/canvas';
+import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
 import { repoName, titleOf } from '@/lib/factory';
 import { useNow } from '@/lib/useNow';
 import { StatusChip } from './StatusChip';
@@ -86,6 +88,9 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
         ))}
       </ul>
 
+      {/* For triage among the runs waiting on you: how far the work reaches, read once the card is opened. */}
+      {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
+
       {open && (reading || trouble) && (
         <p className={`px-3 text-[11px] ${trouble ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
           {trouble ?? 'Reading its steps…'}
@@ -107,5 +112,24 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
       {/* Where the dashed edge into the run's first steps leaves the card. */}
       <Handle type="source" position={Position.Right} isConnectable={false} className="opacity-0" />
     </Card>
+  );
+}
+
+/** What a run waiting on you touched, in a line: `touched 2 packages · +979 −12`, from its decision, read once for its state. */
+function TouchedLine({ run }: { run: RunSummary }) {
+  const { data, error } = useQuery(decisionQuery(run.id, decisionStamp(run)));
+  if (error) {
+    return (
+      <p className="truncate px-3 text-[11px] text-red-600 dark:text-red-400" title={error.message}>
+        touched: not read — {error.message}
+      </p>
+    );
+  }
+  if (!isDecidable(data)) return null;
+  const line = touchedSummary(data.touched);
+  return (
+    <p data-touched-line className="truncate px-3 font-mono text-[11px] text-muted-foreground" title={line}>
+      {line}
+    </p>
   );
 }

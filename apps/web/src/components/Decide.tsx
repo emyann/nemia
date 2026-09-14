@@ -1,0 +1,302 @@
+import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Check as Done, Copy } from 'lucide-react';
+import { decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
+import { barOf, changeOf, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
+import { cn } from '../lib/utils';
+import { Facts } from './Facts';
+
+/**
+ * The Decide section of a run's page: what `wf decide` shows a person, read once for the run's state (`decisionQuery`)
+ * and shown only when the api says there is something to decide. An api that refuses says why, here.
+ */
+export function Decide({ run }: { run: RunDetail }) {
+  const { data, error } = useQuery(decisionQuery(run.id, decisionStamp(run)));
+  if (error) {
+    return (
+      <section aria-label="Decide" className="space-y-1 rounded border border-neutral-200 p-4 dark:border-neutral-800">
+        <h2 className="font-semibold">Decide</h2>
+        <p className="text-sm text-red-600 dark:text-red-400">
+          Could not read what there is to decide: {error.message} <code>wf decide {run.id}</code> reads it from the command line.
+        </p>
+      </section>
+    );
+  }
+  return isDecidable(data) ? <DecideSection runId={run.id} decision={data} /> : null;
+}
+
+/**
+ * What there is to decide, in `wf decide`'s order: what each branch touched and the lesson line, the check-affecting
+ * files in full, what the run consumed, and the commands — copyable, and none of them run from here.
+ */
+export function DecideSection({ runId, decision }: { runId: string; decision: Decidable }) {
+  const { touched, lesson, sensitive, total, commands } = decision;
+  return (
+    <section aria-label="Decide" className="space-y-5 rounded border border-neutral-200 p-4 dark:border-neutral-800">
+      <div className="space-y-1">
+        <h2 className="font-semibold">Decide</h2>
+        <p className="text-xs text-neutral-500">
+          What <code>wf decide {runId}</code> shows. The board runs none of it: copy a command to run it yourself.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        {touched.length ? (
+          touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
+        ) : (
+          <p className="text-sm text-neutral-500">No branch to read: no step worked on one.</p>
+        )}
+        <LessonChip lesson={lesson} />
+      </div>
+
+      <InFull sensitive={sensitive} touched={touched} />
+
+      <section aria-label="Used" className="space-y-1">
+        <h3 className="text-xs font-medium text-neutral-500">Used, over every step's current try</h3>
+        <Facts rows={[['used', total.used], ['cost', total.cost]]} />
+      </section>
+
+      <Commands commands={commands} />
+    </section>
+  );
+}
+
+/** What one branch touched: a row per group with its +/− bar, then the agent-facing and check-affecting files, each only when there are any. */
+export function TouchedBranch({ touched: { branch, radius } }: { touched: Touched }) {
+  return (
+    <div data-touched={branch} className="space-y-2">
+      <p className="text-sm">
+        <span className="text-neutral-500">touched </span>
+        <span className="break-all font-mono text-xs">{branch}</span>
+      </p>
+      {'error' in radius ? (
+        <p className="text-sm text-red-700 dark:text-red-400">not read: {radius.error}</p>
+      ) : radius.changes.length ? (
+        <>
+          <GroupRows groups={radius.groups} />
+          <Chips agentFacing={radius.agentFacing} checkAffecting={radius.checkAffecting} />
+        </>
+      ) : (
+        <p className="text-sm text-neutral-500">nothing — the branch changed no file against the base</p>
+      )}
+    </div>
+  );
+}
+
+function GroupRows({ groups }: { groups: readonly Group[] }) {
+  const most = mostLines(groups);
+  return (
+    <ul
+      aria-label="Groups"
+      className="grid grid-cols-[minmax(0,max-content)_max-content_minmax(3rem,1fr)_max-content] items-center gap-x-3 gap-y-1 text-xs"
+    >
+      {groups.map((g) => {
+        const counted = g.files - g.binary;
+        return (
+          <li key={g.name} data-group={g.name} className="contents">
+            <span className="truncate font-mono" title={g.name}>
+              {g.name}
+            </span>
+            <span className="text-right tabular-nums text-neutral-500">
+              {g.files} file{g.files === 1 ? '' : 's'}
+            </span>
+            <GroupBar group={g} most={most} />
+            <span className="font-mono tabular-nums">
+              {counted > 0 && (
+                <>
+                  <span className="text-emerald-700 dark:text-emerald-400">+{g.added}</span>{' '}
+                  <span className="text-red-700 dark:text-red-400">−{g.removed}</span>
+                </>
+              )}
+              {g.binary > 0 && <span className="text-neutral-500">{counted > 0 ? ` · ${g.binary} binary` : 'binary'}</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** A group's lines as a bar: added then removed, as long as the group's share of the most lines any group on the branch changed. */
+export function GroupBar({ group, most }: { group: Pick<Group, 'added' | 'removed'>; most: number }) {
+  const { added, removed } = barOf(group, most);
+  return (
+    <span
+      data-bar
+      role="img"
+      aria-label={`+${group.added} −${group.removed}`}
+      className="flex h-2 w-full overflow-hidden rounded-sm bg-neutral-100 dark:bg-neutral-800"
+    >
+      <span data-added className="h-full bg-emerald-500" style={{ width: `${added}%` }} />
+      <span data-removed className="h-full bg-red-500" style={{ width: `${removed}%` }} />
+    </span>
+  );
+}
+
+const AGENT_FACING = 'the next agent reads this';
+const CHECK_AFFECTING = 'could make its check pass';
+
+/** The files an agent reads as instructions (amber), and those that decide what a check means (red outline). Nothing for a list that is empty. */
+export function Chips({ agentFacing, checkAffecting }: { agentFacing: readonly string[]; checkAffecting: readonly string[] }) {
+  if (!agentFacing.length && !checkAffecting.length) return null;
+  const row = (label: string, files: readonly string[], kind: string, title: string, className: string) =>
+    files.length > 0 && (
+      <p className="flex flex-wrap items-center gap-1.5">
+        <span className="w-28 shrink-0 text-neutral-500">{label}</span>
+        {files.map((file) => (
+          <span key={file} data-chip={kind} title={title} className={cn('break-all rounded px-1.5 py-0.5 font-mono text-[11px]', className)}>
+            {file}
+          </span>
+        ))}
+      </p>
+    );
+  return (
+    <div className="space-y-1.5 text-xs">
+      {row('agent-facing', agentFacing, 'agent-facing', AGENT_FACING, 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300')}
+      {row('check-affecting', checkAffecting, 'check-affecting', CHECK_AFFECTING, 'text-red-700 ring-1 ring-red-400 ring-inset dark:text-red-400 dark:ring-red-700')}
+    </div>
+  );
+}
+
+/** The lesson line: green when the run wrote where the next agent reads, amber when it wrote nothing there, dashed when nobody can say. */
+export function LessonChip({ lesson }: { lesson: Lesson }) {
+  const [text, title, className] =
+    lesson.state === 'written'
+      ? [`lesson · ${lesson.said}`, 'The run changed a file where the next agent reads.', 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300']
+      : lesson.state === 'nothing'
+        ? [lesson.said, 'What this run learned is written nowhere the next agent reads (CLAUDE.md, "When you miss").', 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300']
+        : [`lesson ${lesson.said}`, 'A branch could not be read, so nobody can say what it wrote.', 'border border-dashed border-neutral-300 text-neutral-600 dark:border-neutral-700 dark:text-neutral-400'];
+  return (
+    <p>
+      <span data-lesson={lesson.state} title={title} className={cn('inline-block rounded px-2 py-0.5 font-mono text-xs', className)}>
+        {text}
+      </span>
+    </p>
+  );
+}
+
+/** The check-affecting files of each branch in full, collapsed a file each. */
+function InFull({ sensitive, touched }: { sensitive: readonly SensitiveDiff[]; touched: readonly Touched[] }) {
+  return (
+    <section aria-label="In full" className="space-y-2">
+      <h3 className="text-xs font-medium text-neutral-500">In full: the check-affecting files — what a change could edit to make its check pass</h3>
+      {sensitive.map(({ branch, files, error }) => (
+        <div key={branch} className="space-y-1.5">
+          {sensitive.length > 1 && <p className="break-all font-mono text-xs text-neutral-500">{branch}</p>}
+          {error ? (
+            <p className="text-sm text-red-700 dark:text-red-400">not read: {error}</p>
+          ) : files.length ? (
+            files.map((file) => <DiffFileView key={file.path} file={file} counts={changeOf(touched.find((t) => t.branch === branch), file.path)} />)
+          ) : (
+            <p className="text-sm text-neutral-500">none</p>
+          )}
+        </div>
+      ))}
+    </section>
+  );
+}
+
+const LINE_CLASS: Record<DiffLine, string> = {
+  meta: 'font-semibold text-neutral-500',
+  hunk: 'bg-sky-50 text-sky-800 dark:bg-sky-950/60 dark:text-sky-300',
+  added: 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300',
+  removed: 'bg-red-50 text-red-800 dark:bg-red-950/50 dark:text-red-300',
+  context: '',
+};
+
+/** One file's unified diff, folded under its name, coloured by line; where the api cut it, how much more `wf decide` prints. */
+export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
+  return (
+    <details data-diff={file.path} className="rounded border border-neutral-200 dark:border-neutral-800">
+      <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-900">
+        <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
+          {file.path}
+        </span>
+        {counts && (
+          <span className="shrink-0 font-mono tabular-nums">
+            {counts.added === null ? (
+              'binary'
+            ) : (
+              <>
+                <span className="text-emerald-700 dark:text-emerald-400">+{counts.added}</span>{' '}
+                <span className="text-red-700 dark:text-red-400">−{counts.removed}</span>
+              </>
+            )}
+          </span>
+        )}
+      </summary>
+      <pre className="max-h-96 overflow-auto border-t border-neutral-200 py-1 font-mono text-[11px] leading-snug dark:border-neutral-800">
+        {file.lines.map((line, i) => {
+          const kind = diffLine(line);
+          return (
+            <span key={i} data-line={kind} className={cn('block w-max min-w-full whitespace-pre px-2', LINE_CLASS[kind])}>
+              {line || ' '}
+            </span>
+          );
+        })}
+      </pre>
+      {file.cut > 0 && (
+        <p data-cut={file.cut} className="border-t border-neutral-200 px-2 py-1 text-xs text-neutral-500 dark:border-neutral-800">
+          {file.cut} more line{file.cut === 1 ? '' : 's'} — <code>wf decide</code> prints all
+        </p>
+      )}
+    </details>
+  );
+}
+
+/** Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one. */
+export function Commands({ commands }: { commands: readonly DecideCommand[] }) {
+  return (
+    <section aria-label="Commands" className="space-y-2">
+      <h3 className="text-xs font-medium text-neutral-500">Commands — copy one to run it; the board runs none</h3>
+      {commands.length ? (
+        <ul className="space-y-2">
+          {commands.map((c) => (
+            <li key={`${c.label} ${c.command}`} data-command={c.label} className="space-y-0.5">
+              {c.said && <p className="text-xs text-neutral-500">{c.said.replace(`:  ${c.command}`, '')}</p>}
+              <div className="flex items-center gap-2">
+                <span className="w-16 shrink-0 text-xs text-neutral-500">{c.label}</span>
+                <code className="min-w-0 flex-1 overflow-x-auto whitespace-nowrap rounded bg-neutral-100 px-2 py-1 font-mono text-xs dark:bg-neutral-950">
+                  {c.command}
+                </code>
+                <CopyButton text={c.command} />
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-neutral-500">None yet: the run is still moving.</p>
+      )}
+    </section>
+  );
+}
+
+/** Copies a command to the clipboard, and says so for a moment — or that it could not, so a person selects the line instead. */
+export function CopyButton({ text }: { text: string }) {
+  const [said, setSaid] = useState<'copy' | 'copied' | 'failed'>('copy');
+  useEffect(() => {
+    if (said === 'copy') return;
+    const timer = setTimeout(() => setSaid('copy'), 1_500);
+    return () => clearTimeout(timer);
+  }, [said]);
+  const copy = () => {
+    // Undefined outside a secure context: said, rather than thrown.
+    const written = navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject(new Error('no clipboard'));
+    written.then(
+      () => setSaid('copied'),
+      () => setSaid('failed'),
+    );
+  };
+  return (
+    <button
+      type="button"
+      data-copy
+      onClick={copy}
+      aria-label={`Copy: ${text}`}
+      title={said === 'failed' ? 'Could not copy: select the line and copy it' : said === 'copied' ? 'Copied' : 'Copy the command'}
+      className="shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
+    >
+      {said === 'copied' ? <Done aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}
+    </button>
+  );
+}

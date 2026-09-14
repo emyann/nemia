@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { Decide } from '../components/Decide';
 import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { runQuery, type RunDetail } from '../lib/api';
+import { decidableRun } from '../lib/decide';
 
 export const Route = createFileRoute('/runs/$runId')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(runQuery(params.runId)),
@@ -54,6 +56,9 @@ function Run({ run }: { run: RunDetail }) {
       )}
 
       <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
+
+      {/* Between the banner and the canvas, for a run with something to decide: never while it runs. */}
+      {decidableRun(run) && <Decide run={run} />}
 
       <section aria-label="The run's steps as a graph" className="flex flex-col gap-4 md:flex-row">
         <div className="min-w-0 flex-1">
@@ -108,6 +113,9 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
         rows={[
           ['branch', code(step.branch)],
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
+          // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0.
+          ['used', step.used?.used],
+          ['cost', step.used?.cost],
         ]}
       />
 

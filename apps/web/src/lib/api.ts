@@ -90,8 +90,67 @@ export type RunDetail = {
     /** Null for a step with no `check:`. */
     check: StepCheck | null;
     attempts: StepAttempts;
+    /** What its current try consumed, in `wf decide`'s words; null for a step not filed. */
+    used: StepUsed | null;
   }>;
 };
+
+/** Mirrors `Usage` in apps/api/src/app.ts: a count nobody measured is absent, never 0. */
+export type Usage = { turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number };
+
+/** Mirrors `StepUsed` in apps/api/src/app.ts: the usage, and `wf decide`'s words for it — `used` and `cost`, `not measured` where nobody counted. */
+export type StepUsed = { usage: Usage | null; used: string; cost: string };
+
+/** Mirrors `Change` in agent-workflows' radius.ts: a file a branch changed. A binary file has null counts, never 0. */
+export type Change = { path: string; from?: string; added: number | null; removed: number | null };
+
+/** Mirrors `Group` in agent-workflows' radius.ts: a workspace package, a top-level directory, or `(root)`. */
+export type Group = { name: string; files: number; added: number; removed: number; binary: number };
+
+/** Mirrors `Radius` in agent-workflows' radius.ts: what a branch touched, and among it what an agent reads and what decides a check. */
+export type Radius = { changes: Change[]; groups: Group[]; agentFacing: string[]; checkAffecting: string[]; lessons: Change[] };
+
+/** Mirrors `Touched` in apps/api/src/app.ts: a branch, and its radius or why git could not read it. */
+export type Touched = { branch: string; radius: Radius | { error: string } };
+
+/** Mirrors `DiffFile` in apps/api/src/app.ts: one file's unified diff, cut to the api's cap, and how many lines were cut. */
+export type DiffFile = { path: string; lines: string[]; cut: number };
+
+/** Mirrors `SensitiveDiff` in apps/api/src/app.ts. */
+export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string | null };
+
+/** Mirrors `Lesson` in apps/api/src/app.ts: `wf decide`'s lesson line without its label, and which of its three it is. */
+export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
+
+/** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints and runs none of. */
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more'; command: string; said: string | null };
+
+/** Mirrors `Decidable` in apps/api/src/app.ts. */
+export type Decidable = {
+  touched: Touched[];
+  lesson: Lesson;
+  sensitive: SensitiveDiff[];
+  used: Record<string, StepUsed>;
+  total: StepUsed;
+  commands: DecideCommand[];
+};
+
+/** Mirrors `RunDecision` in apps/api/src/app.ts: `running` while nobody is waited on, `nothing` for a run called off or shipped. */
+export type RunDecision = { running: true } | { nothing: string } | Decidable;
+
+/**
+ * What `wf decide` shows a person about a run. Read once for each state of the run, never on the page's beat: the api
+ * runs `git diff` for it. `stamp` is the run's state (`decisionStamp`), so a step that moves — a retry filed and settled,
+ * a round gone — reads it again, once.
+ */
+export const decisionQuery = (id: string, stamp: string) =>
+  queryOptions({
+    queryKey: ['runs', id, 'decision', stamp],
+    queryFn: () => get<RunDecision>(`/api/runs/${encodeURIComponent(id)}/decision`),
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+  });
 
 /**
  * Mirrors `StepAttempts` in apps/api/src/app.ts. `endedAt` is when the latest attempt ended — the

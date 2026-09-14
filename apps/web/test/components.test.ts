@@ -48,6 +48,7 @@ const { StepInspector } = await import('../src/components/StepInspector.tsx');
 const { StepNode } = await import('../src/components/StepNode.tsx');
 const { cardEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
 const { LoopEdge } = await import('../src/components/LoopEdge.tsx');
+const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch } = await import('../src/components/Decide.tsx');
 const { LOOP_SOURCE, LOOP_TARGET } = await import('../src/lib/canvas.ts');
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { stateMeaning } = await import('../src/lib/status.ts');
@@ -88,6 +89,7 @@ function runWith(note: string | null): RunDetail {
       name: 'review', spec: null, body: 'Review it.', told: null, taskId: 't-1', workspace: null, branch: 'wf/r-1/implement',
       status: 'rounds exhausted', note, closeout: null, check: null,
       attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+      used: { usage: null, used: 'not measured', cost: 'not measured' },
     }],
   };
 }
@@ -236,3 +238,150 @@ test("the inspector's Details show `loop` and `rounds` beside `after` on a loopi
   assert.doesNotMatch(without, />loop<\/dt>|>rounds<\/dt>/);
   assert.match(without, />after<\/dt>/);
 });
+
+// ─── the decision ────────────────────────────────────────────────────────────
+
+/** Each bar's added and removed widths, in the order the bars are drawn. */
+const barsOf = (html: string): Array<[number, number]> =>
+  [...html.matchAll(/<span data-added="true"[^>]*style="width:([\d.]+)%"[^>]*><\/span><span data-removed="true"[^>]*style="width:([\d.]+)%"/g)].map((m) => [Number(m[1]), Number(m[2])]);
+
+const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
+
+/** A branch that touched a package and a test in it, the root's CLAUDE.md and package.json, and a binary logo. */
+function radiusWith(lists: { agentFacing?: string[]; checkAffecting?: string[] } = {}) {
+  return {
+    changes: [
+      { path: 'CLAUDE.md', added: 2, removed: 0 },
+      { path: 'logo.png', added: null, removed: null },
+      { path: 'packages/x/test/add.test.ts', added: 450, removed: 0 },
+    ],
+    groups: [group('(root)', 2, 2, 0, 1), group('assets', 1, 0, 0, 1), group('packages/x', 2, 453, 1)],
+    agentFacing: lists.agentFacing ?? [],
+    checkAffecting: lists.checkAffecting ?? [],
+    lessons: [],
+  };
+}
+
+test("each group's bar is its share of the most lines a group changed: the largest fills the track, a binary-only group draws none", () => {
+  assert.deepEqual(barsOf(renderToStaticMarkup(createElement(GroupBar, { group: { added: 30, removed: 10 }, most: 80 }))), [[37.5, 12.5]]);
+
+  const html = renderToStaticMarkup(createElement(TouchedBranch, { touched: { branch: 'wf/r-1/implement', radius: radiusWith() } }));
+  // (root) +2 −0, assets binary only, packages/x +453 −1 — which is the most, and fills the track.
+  assert.deepEqual(barsOf(html), [[0.44, 0], [0, 0], [99.78, 0.22]]);
+  assert.match(html, /data-group="packages\/x"[\s\S]*?>2 files<[\s\S]*?>\+453<\/span> <span[^>]*>−1<\/span>/);
+  assert.match(html, /data-group="assets"[\s\S]*?>binary<\/span>/);
+  assert.match(html, /data-group="\(root\)"[\s\S]*?>−0<\/span><span[^>]*> · 1 binary<\/span>/);
+});
+
+test('the agent-facing chips are amber and the check-affecting ones outlined red, each titled with why — and neither is drawn when there are none', () => {
+  const both = renderToStaticMarkup(createElement(Chips, { agentFacing: ['CLAUDE.md'], checkAffecting: ['package.json', 'packages/x/test/add.test.ts'] }));
+  const chips = [...both.matchAll(/<span data-chip="([^"]+)" title="([^"]+)" class="([^"]+)">([^<]+)<\/span>/g)].map((m) => ({ kind: m[1], title: m[2], cls: m[3], file: m[4] }));
+  assert.deepEqual(chips.map(({ kind, title, file }) => [kind, title, file]), [
+    ['agent-facing', 'the next agent reads this', 'CLAUDE.md'],
+    ['check-affecting', 'could make its check pass', 'package.json'],
+    ['check-affecting', 'could make its check pass', 'packages/x/test/add.test.ts'],
+  ]);
+  assert.match(chips[0]!.cls, /\bbg-amber-100\b/);
+  for (const chip of chips.slice(1)) {
+    assert.match(chip.cls, /\bring-red-400\b/);
+    assert.doesNotMatch(chip.cls, /\bbg-/, 'an outline, not a fill');
+  }
+
+  assert.equal(renderToStaticMarkup(createElement(Chips, { agentFacing: [], checkAffecting: [] })), '');
+  const onlyCheck = renderToStaticMarkup(createElement(Chips, { agentFacing: [], checkAffecting: ['package.json'] }));
+  assert.doesNotMatch(onlyCheck, /agent-facing/);
+  assert.match(onlyCheck, /data-chip="check-affecting"/);
+  // On a branch with neither, the branch's rows are drawn and no chip is.
+  const plain = renderToStaticMarkup(createElement(TouchedBranch, { touched: { branch: 'wf/r-1/implement', radius: radiusWith() } }));
+  assert.doesNotMatch(plain, /data-chip|agent-facing|check-affecting/);
+  // A branch git could not read says so, and draws no row.
+  const unread = renderToStaticMarkup(createElement(TouchedBranch, { touched: { branch: 'wf/gone', radius: { error: 'git could not diff abc...wf/gone' } } }));
+  assert.match(unread, />not read: git could not diff abc\.\.\.wf\/gone</);
+  assert.doesNotMatch(unread, /data-bar|data-group/);
+});
+
+test('the lesson chip is green with what was written, amber when nothing was, and dashed when a branch could not be read', () => {
+  const chip = (lesson: { said: string; state: 'written' | 'nothing' | 'unknown' }) => {
+    const m = /<span data-lesson="(\w+)" title="[^"]*" class="([^"]+)">([^<]+)<\/span>/.exec(renderToStaticMarkup(createElement(LessonChip, { lesson })));
+    assert.ok(m, lesson.state);
+    return { state: m[1], cls: m[2]!, text: m[3] };
+  };
+  const written = chip({ said: 'CLAUDE.md +2 −0', state: 'written' });
+  assert.deepEqual([written.state, written.text], ['written', 'lesson · CLAUDE.md +2 −0']);
+  assert.match(written.cls, /\bbg-emerald-100\b/);
+  assert.doesNotMatch(written.cls, /amber/);
+
+  const nothing = chip({ said: 'nothing written where the next agent reads', state: 'nothing' });
+  assert.deepEqual([nothing.state, nothing.text], ['nothing', 'nothing written where the next agent reads']);
+  assert.match(nothing.cls, /\bbg-amber-100\b/);
+  assert.doesNotMatch(nothing.cls, /emerald/);
+
+  const unknown = chip({ said: 'not known — wf/gone could not be read', state: 'unknown' });
+  assert.equal(unknown.text, 'lesson not known — wf/gone could not be read');
+  assert.match(unknown.cls, /\bborder-dashed\b/);
+  assert.doesNotMatch(unknown.cls, /emerald|amber/);
+});
+
+test('a diff is folded under its file, coloured by line, and a capped one says how many more lines `wf decide` prints', () => {
+  const lines = ['diff --git a/package.json b/package.json', '--- a/package.json', '+++ b/package.json', '@@ -1 +1 @@', '-{"a":1}', '+{"a":2}', ' }'];
+  const capped = renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 26 }, counts: { added: 1, removed: 1 } }));
+  assert.match(capped, /^<details data-diff="package\.json"/, 'collapsed: a details element with no open attribute');
+  assert.doesNotMatch(capped, /<details[^>]*\bopen\b/);
+  assert.match(capped, /<summary[^>]*>.*package\.json.*\+1<\/span> <span[^>]*>−1<\/span>/);
+  assert.deepEqual([...capped.matchAll(/data-line="(\w+)"/g)].map((m) => m[1]), ['meta', 'meta', 'meta', 'hunk', 'removed', 'added', 'context']);
+  assert.match(capped, /<p data-cut="26"[^>]*>26 more lines — <code>wf decide<\/code> prints all<\/p>/);
+
+  const whole = renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 0 } }));
+  assert.doesNotMatch(whole, /data-cut|more line/);
+  assert.match(renderToStaticMarkup(createElement(DiffFileView, { file: { path: 'package.json', lines, cut: 1 } })), />1 more line — <code>/);
+});
+
+test('the Decide section copies its commands and runs none: a button per command, and each only copies', () => {
+  const commands = [
+    { label: 'once more', command: 'wf retry r-1 implement', said: 'implement: succeeded · BLOCKED. Continue its session, told what happened:  wf retry r-1 implement  (--fresh, or --model <m>, for a new session)' },
+    { label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null },
+    { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null },
+  ] as const;
+  const decision = {
+    touched: [{ branch: 'wf/r-1/implement', radius: radiusWith({ agentFacing: ['CLAUDE.md'] }) }],
+    lesson: { said: 'CLAUDE.md +2 −0', state: 'written' as const },
+    sensitive: [{ branch: 'wf/r-1/implement', files: [{ path: 'packages/x/test/add.test.ts', lines: ['@@ -1 +1,451 @@'], cut: 3 }], error: null }],
+    used: {},
+    total: { usage: { toolCalls: 34 }, used: 'turns not measured · 34 tool calls · tokens in not measured · tokens out not measured', cost: 'not measured' },
+    commands: [...commands],
+  };
+  const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
+  assert.match(html, /^<section aria-label="Decide"/);
+  const buttons = [...html.matchAll(/<button [^>]*>/g)].map((m) => m[0]);
+  assert.equal(buttons.length, commands.length, html);
+  for (const [i, button] of buttons.entries()) {
+    assert.match(button, /\bdata-copy="true"/);
+    assert.ok(button.includes(`aria-label="Copy: ${commands[i]!.command}"`), button);
+  }
+  for (const { command } of commands) assert.ok(html.includes(`>${command}</code>`), command);
+  // The once-more line's words, without the command it is followed by on the line below.
+  assert.match(html, />implement: succeeded · BLOCKED\. Continue its session, told what happened {2}\(--fresh, or --model &lt;m&gt;, for a new session\)</);
+  // The run's total, in `wf decide`'s words: never a 0 for what nobody measured.
+  assert.match(html, /<dt[^>]*>used<\/dt><dd[^>]*>turns not measured · 34 tool calls/);
+  assert.match(html, /<dt[^>]*>cost<\/dt><dd[^>]*>not measured<\/dd>/);
+  // The capped file, and the file's lines off the branch's radius in its summary.
+  assert.match(html, /data-diff="packages\/x\/test\/add\.test\.ts"[\s\S]*?\+450<\/span> <span[^>]*>−0<\/span>[\s\S]*?3 more lines/);
+});
+
+test("the inspector's Details say what a step used and what it cost beside its attempts — `not measured`, never 0", () => {
+  const run = runWith(null);
+  const rows = (step: RunDetail['steps'][number]) =>
+    [...renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)]
+      .map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
+  const labels = rows(run.steps[0]!);
+  const at = (label: string) => labels.findIndex(([l]) => l === label);
+  assert.deepEqual(labels.slice(at('latest took'), at('latest took') + 3).map(([l, v]) => [l, l === 'latest took' ? '…' : v]), [['latest took', '…'], ['used', 'not measured'], ['cost', 'not measured']]);
+
+  const measured = { ...run.steps[0]!, used: { usage: { turns: 12, costUsd: 0.004 }, used: '12 turns · tool calls not measured · tokens in not measured · tokens out not measured', cost: '$0.004' } };
+  const said = Object.fromEntries(rows(measured));
+  assert.deepEqual([said.used, said.cost], ['12 turns · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004']);
+  // A step not filed consumed nothing: a dash, not a count.
+  const unfiled = Object.fromEntries(rows({ ...run.steps[0]!, taskId: null, used: null }));
+  assert.deepEqual([unfiled.used, unfiled.cost], ['—', '—']);
+});
+

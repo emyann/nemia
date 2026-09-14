@@ -112,6 +112,9 @@ function Details({ step, state, runCancelled }: { step: Step; state: StepState; 
           ['latest ended', latest && (latest.ended ? <Ended at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
           // Only with an end on the record: one from before the engine kept it says how, and not when.
           ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
+          // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0. A dash for a step not filed.
+          ['used', step.used?.used],
+          ['cost', step.used?.cost],
           ['branch', code(step.branch)],
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
         ]}

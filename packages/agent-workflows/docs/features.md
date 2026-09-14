@@ -8,7 +8,8 @@ State as of 2026-09-13: the check (package C of `docs/plan-hold-the-bar.md`, hkb
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
-`rounds:` and `wf round` (§4 R), and a step's `tools:` and `effort:` (§4 I) have shipped.
+`rounds:` and `wf round` (§4 R), a step's `tools:` and `effort:` (§4 I), and the decider screen
+(§4 G) have shipped.
 
 ## Shipped: the check
 
@@ -23,8 +24,7 @@ closeout it was asked for is `unsigned` and files nothing; failed and stopped st
 What it leaves for wave 2 of the plan, in its order:
 
 - **Retries** (§4 F). Shipped: *Shipped: trying again*, below.
-- **The decider screen** (§4 G): what a branch touched, grouped; the full diff of check-affecting files
-  such as `package.json`; whether a lesson was written where the next agent reads.
+- **The decider screen** (§4 G). Shipped: *Shipped: the decider screen*, below.
 - **Rounds** (§4 R, which absorbed §4 H). Shipped: *Shipped: going round again*, below.
 
 ## Shipped: declared outputs and inputs
@@ -293,6 +293,43 @@ What it leaves:
   exports, in a follow-up.
 - **Codex's tool-list fence in the engine is unused.** The engine runs a codex task `read-only` when its list has
   none of Bash, Write or Edit. No step reaches that now, and `permissionMode: read-only` says the same plainly.
+
+## Shipped: the decider screen
+
+Plan §4 G. On a run waiting on you, `wf decide` prints three things between the verdicts and the closeouts:
+what the result branch touched, the lesson line, and the whole diff of the check-affecting files. Beside
+each step's check it prints what the step's session consumed. `src/radius.ts` is the pure part. `touchedBy`,
+`sensitiveDiff` and `consumption` in `src/runner.ts` ask git and the engine. The README section *What the
+screen puts in front of you* is the account.
+
+- `radius` reads `git diff --numstat <base>...<branch>`: a rename in its brace or plain form, a binary file's
+  `-` counts as no lines, and a quoted path as its name. It refuses a line it cannot read, and the screen says
+  that branch was not read. Groups are the base's npm `workspaces`, else top-level directories, else `(root)`.
+- The agent-facing, check-affecting and lesson lists are globs written once and printed by `wf decide --help`.
+  `--sensitive <globs>` replaces the check-affecting list for the files printed in full. It is refused when
+  mistyped, when it has no glob, and when given twice.
+- `used` sums the current task's attempts, a count only when every attempt measured it. It leaves out an
+  attempt that never started, and reads the one in flight off the view. `cost` prints a number only when a
+  runner was told one.
+- `main(argv, e)` takes an engine, so `test/decide.test.ts` prints the whole screen over a real repository and
+  a board settled by hand.
+
+What it leaves:
+
+- **A lockfile diff is long.** `package-lock.json` is check-affecting, so a branch that adds a dependency prints
+  its whole lockfile diff above the closeouts. `--sensitive` narrows one screen. A default that names the
+  packages a lockfile changed would read better, and is not built.
+- **Only the current try is counted.** A step tried again or gone round consumed its earlier tries as well,
+  under their own task ids (`tries` on the step's record). The line says what the try beside it used, not
+  what the step cost in all.
+- **No runner `wf` files on reports cost.** The engine's SDK runner does (`total_cost_usd`). The claude-bg,
+  claude-detached and codex runners read transcripts and streams, which hold none.
+- **The board shows none of it.** `apps/api` returns no radius, lesson or usage. Each is a call to the
+  functions above.
+- **The lesson line counts any change**, a deletion included. `CLAUDE.md +0 −12` is printed as what it is, and
+  a person reads whether that is a lesson.
+- **Steps are still listed in file order** (plan §4b sends a topological order in `workflow.ts` to G). The
+  screen's steps read in `run.steps` order as before. Sorting at `wf start` is `workflow.ts`'s, not this screen's.
 
 ## 1. Forgetting a run (`wf rm`)
 

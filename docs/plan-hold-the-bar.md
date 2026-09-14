@@ -681,6 +681,10 @@ owner is not mid-run.
 
 **Open** — what is still to do, oldest first; each names its owner.
 
+### Settled
+
+Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+
 - **agent-workflows and the board (step order):** `run.steps` is keyed in the folder's file order —
   alphabetical — so `wf ls` and the board show `implement · respond · review` for a workflow that
   runs implement → review → respond. Order steps by `after` (a topological sort in `workflow.ts`,
@@ -702,6 +706,7 @@ owner is not mid-run.
   `node --test apps/web/test/e2e/run.ts` runs the e2e, and a deny cannot close an allow that runs any task or any file
   (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
   and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
+  *W5, `d69a5fd`.*
 
 - **a stale ask on a harness-blocked step that resumes by itself (W4's review, 2026-09-14):** `wf retry` on a step
   whose session the harness blocked is due only while the engine says `needs-human`; if the session starts working
@@ -709,10 +714,7 @@ owner is not mid-run.
   nothing — and files try 2 at once if the step later fails, stops or is unsigned, ahead of `retries:`. A task with
   no `stopRequested` tells it apart. Stop the session anyway, or name it in `wf ls`/`wf decide`. → agent-workflows,
   small (§6 item 24).
-
-### Settled
-
-Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+  *W5, `d69a5fd`.*
 
 - **steering by message leaves no trace on the run (F2's review, finding 2):** the operator widened
   a step's scope and added an ask through cross-session messages; the run's record shows only two
@@ -939,8 +941,8 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4 all done; W5 (items 6, 7, 8, 9, 24, 25 in one) filed 2026-09-14 as
-`six-small-items-in-agent-wor-vrm2`, from `./workflows/dev`; then the apps and engine bundles.
+Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done; nothing in flight. Left: the apps bundle (11–15), the engine
+bundle (16–18), and item 20 (settings, the owner's call).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -970,10 +972,11 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 **agent-workflows, small**
 4. Per-step `disallow:` → `--disallowedTools`, a field on the task. *Done, D1, `825be29`.*
 5. `wf decide` prints a nested `where` as JSON — `itemLines`. *Done, D1, `825be29`.*
-6. `radius` and workspace globs (`./packages/*`, `**`). *W5.*
-7. Step order: `run.steps` alphabetical; order by `after` at `wf start`. *W5.*
-8. `wf start --input <file>` into `runs/<id>/inputs/`, named in every brief. *W5.*
-9. The artifacts directory carried on the task (reviewer reads screenshots portably; Codex's unwritable dir). *W5: collected from the workspace at hand-off.*
+6. `radius` and workspace globs (`./packages/*`, `**`). *Done, W5, `d69a5fd`.*
+7. Step order: `run.steps` alphabetical; order by `after` at `wf start`. *Done, W5, `d69a5fd` (`orderSteps`, on read too).*
+8. `wf start --input <file>` into `runs/<id>/inputs/`, named in every brief. *Done, W5, `d69a5fd`.*
+9. The artifacts directory carried on the task (reviewer reads screenshots portably; Codex's unwritable dir). *Done, W5,
+    `d69a5fd`: a relative path in a closeout's `artifacts` is collected from the workspace at hand-off.*
 10. The login-refresh race: `wf retry` on a step whose session the harness marked blocked with no closeout — the
     tick stops the task, then files the nudge (Q2 measured that the package reads such a step as running and refuses
     every try). *Done, W4, `406a510`; the board's POST passes `stopBlocked` since B8.* A Claude Code report for the
@@ -992,11 +995,11 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 24. A stale ask: `wf retry` on a harness-blocked step, then the session resumes by itself before a tick stops it
     (a cross-session nudge, or no `wf up`). The ask is neither due nor spent, `wf ls` shows nothing, and it files
     try 2 at once if the step later fails (W4's review). Stop the session anyway, or name it in `wf ls`. agent-
-    workflows, small. *W5.*
+    workflows, small. *Done, W5, `d69a5fd`.*
 25. A plan that stops part-way prints `wf start <plan>/<card>.md --after …` for the rest, and `wf start` takes a
     file's whole text as the brief, frontmatter included — the run's id and brief carry `workflow: dev` (P3's
     review; recorded as left in features.md). Print a command that starts the card's body, or let `wf start`
-    drop a settings block that parses as a card. agent-workflows, small. *W5.*
+    drop a settings block that parses as a card. agent-workflows, small. *Done, W5, `d69a5fd`.*
 
 **apps, small**
 11. The timeline — per try and per check, on the run page and in `wf decide`; `effort`/`tools` on the Workflows page's node.

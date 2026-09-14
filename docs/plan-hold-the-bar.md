@@ -891,18 +891,43 @@ No mid-run human gate (REPORT G10, refuted: the run boundary is the gate). No `g
 steps, no hkb migration — planned, off the four points (`packages/agent-workflows/docs/features.md`).
 No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
-## 6. What is gained, wave by wave
 
-**After wave 1.** Every step of this repository's own workflows is verified by a command the run
-executes — a step that breaks the suite blocks its followers and the decider says `failed ✗ check`
-instead of `succeeded`. A step that goes quiet without its closeout is `unsigned`, not done. A
-mistyped key refuses instead of silently rerouting the DAG. The reviewer on codex is read-only,
-and any step can be narrowed with `tools:` once I lands. Both READMEs describe the code that
-exists, and a test keeps it so. Every session, human or agent, reads the commands and the rules
-from `CLAUDE.md`. In the post's terms: point 2 is met by machinery; point 1's *done* half is met;
-point 3 has its enforcement field; point 4 has the file the lesson goes in.
+## 6. The queue
 
-**After wave 2.** A failed check retries with the verdict as data, then hands the person a
-choice rather than a log; `wf decide` sizes the reading by blast radius and shows whether a lesson
-was written where the next agent reads; "no" has a representation (`wf round`), so a rejection is
-no longer `branch -D` on the only copy of `REVIEW.md`.
+Everything left, in one list, as of 2026-09-14 — the order to file is 4–5 (D1, filed), then Q, then P.
+A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
+
+**Packages (§4), not started**
+1. **P — Cards with edges** (§4 P): `after: [runId]` on the record, `wf start --after`, a pure
+   `runReady(run, shipped)` gating roots on shipped parents, `wf ls` saying `waiting on <run>`; the Factory
+   as a graph of cards; then `wf plan <folder>`. workflows + board. *Next after Q.*
+2. **Q — A step that asks, and a step that plans** (§4 Q): `wf retry --nudge --message`, the answer box
+   on a blocked step (the board's second write), a `plan` step and a `dev-planned` variant. *Next after D1.*
+3. **The steering channel** (deferred from §4 S): a prompt box on the session page that sends into a
+   running session, the message recorded on the run. api + engine (a `say` op).
+
+**agent-workflows, small**
+4. Per-step `disallow:` → `--disallowedTools`, a field on the task. *D1, filed 2026-09-14.*
+5. `wf decide` prints a nested `where` as JSON — `itemLines`. *D1.*
+6. `radius` and workspace globs (`./packages/*`, `**`).
+7. Step order: `run.steps` alphabetical; order by `after` at `wf start`.
+8. `wf start --input <file>` into `runs/<id>/inputs/`, named in every brief.
+9. The artifacts directory carried on the task (reviewer reads screenshots portably; Codex's unwritable dir).
+10. The login-refresh race: a tick that resumes a session blocked on that one harness message; a Claude Code report.
+
+**apps, small**
+11. The timeline — per try and per check, on the run page and in `wf decide`; `effort`/`tools` on the Workflows page's node.
+12. The card's touched line double-counts a fan-out.
+13. The session stream after a reconnect (clear the retry error on `open`).
+14. The Capabilities page per step: what a step gets, measured.
+15. api tests off the live registry.
+
+**agent-engine, small**
+16. `resume.test.ts`'s usage assertion (the retry writes a different count).
+17. A runner verb that finds one session by name (an open stream is two `claude agents` calls a second).
+18. Bug 1 of the evaluation — `decide` stalled — half-verified in open-issues since day one.
+
+**Documentation**
+19. The ledger reordered: open first, settled below. *Done, `55acbde`.*
+
+**Not doing** (§5): no LLM in a tick or in `wf decide`; no `labels:`/`risk:`/`guide:` keys; no gate inside a step; no lint tool yet.

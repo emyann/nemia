@@ -28,7 +28,18 @@ export type StepSpec = {
   permissionMode: string | null;
   deadlineSeconds: number | null;
   maxAttempts: number | null;
+  /** The step a round runs again, for a looping step; and how many rounds its loop may run, the first included. */
+  loop: string | null;
+  rounds: number | null;
 };
+
+/** Mirrors `GraphEdge` in apps/api/src/graph.ts: `after`, `to` waits on `from`; `loop`, `from` runs `to` again. */
+export type GraphEdge =
+  | { from: string; to: string; kind: 'after' }
+  | { from: string; to: string; kind: 'loop'; rounds: number };
+
+/** Mirrors `RunGraph` in apps/api/src/graph.ts: the steps the run's card leads to, and every edge between steps. */
+export type RunGraph = { roots: string[]; edges: GraphEdge[] };
 
 /** Mirrors `StepCloseout` in apps/api/src/app.ts. */
 export type StepCloseout = {
@@ -62,6 +73,8 @@ export type RunDetail = {
   moving: boolean;
   waitingOnYou: string[];
   warning: string | null;
+  /** The steps as a graph, from the workflow the run froze: what the canvases draw, so none derives it from `after`. */
+  graph: RunGraph;
   steps: Array<{
     name: string;
     spec: StepSpec | null;

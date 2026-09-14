@@ -84,6 +84,25 @@
       --xy-edge-label-color: var(--color-neutral-300);
     }
   }
+  /*
+   * An edge work is moving along now (`CanvasEdge.pulsing`): into a step at work, or back round a loop whose next round is
+   * due. Without motion, drawn heavier instead.
+   */
+  @keyframes edge-pulse {
+    50% {
+      stroke-opacity: 0.3;
+    }
+  }
+  .react-flow__edge.pulsing .react-flow__edge-path {
+    animation: edge-pulse 1.4s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .react-flow__edge.pulsing .react-flow__edge-path {
+      animation: none;
+      stroke-width: 2.5;
+    }
+  }
+
   * {
     @apply border-border outline-ring/50;
   }

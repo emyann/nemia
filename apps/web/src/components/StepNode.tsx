@@ -1,6 +1,6 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { RunDetail } from '../lib/api';
-import { attemptLine, isLive } from '../lib/canvas';
+import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { isGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
@@ -67,7 +67,7 @@ export function StepNode({
           {step.name}
         </p>
         <p className="mt-0.5 truncate font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
-          {spec ? `${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}` : 'no spec in the folder'}
+          {spec ? `${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}` : 'no spec'}
         </p>
       </div>
 
@@ -85,6 +85,12 @@ export function StepNode({
       )}
 
       <Handle type="source" position={sourcePosition} isConnectable={false} className="opacity-0" />
+      {/*
+        Under the node, where the edge back that `loop:` makes leaves its looping step and comes into its target (`LoopEdge`).
+        Last, so an edge that names no handle takes the one on the side: React Flow takes the first of a type.
+      */}
+      <Handle id={LOOP_SOURCE} type="source" position={Position.Bottom} isConnectable={false} className="opacity-0" />
+      <Handle id={LOOP_TARGET} type="target" position={Position.Bottom} isConnectable={false} className="opacity-0" />
     </div>
   );
 }

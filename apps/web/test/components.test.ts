@@ -46,7 +46,9 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { StatusChip, StepNote } = await import('../src/components/StatusChip.tsx');
 const { StepInspector } = await import('../src/components/StepInspector.tsx');
 const { StepNode } = await import('../src/components/StepNode.tsx');
-const { stepData } = await import('../src/components/stepGraph.ts');
+const { cardEdges, stepData, stepEdges } = await import('../src/components/stepGraph.ts');
+const { LoopEdge } = await import('../src/components/LoopEdge.tsx');
+const { LOOP_SOURCE, LOOP_TARGET } = await import('../src/lib/canvas.ts');
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { stateMeaning } = await import('../src/lib/status.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
@@ -81,6 +83,7 @@ function runWith(note: string | null): RunDetail {
   return {
     id: 'r-1', brief: 'Go round again', repo: '/code/app', workflowDir: '/code/app/workflow', baseRef: 'abc123', branch: 'main',
     isolate: true, createdAt: at, cancelledAt: null, status: 'failed', moving: false, waitingOnYou: ['review'], warning: null,
+    graph: { roots: ['review'], edges: [] },
     steps: [{
       name: 'review', spec: null, body: 'Review it.', told: null, taskId: 't-1', workspace: null, branch: 'wf/r-1/implement',
       status: 'rounds exhausted', note, closeout: null, check: null,
@@ -154,4 +157,82 @@ test('a step a person has sent round or asked to retry is no gate from the momen
     // The same step with nothing asked yet is the gate: the one fact that differs is the api's.
     assert.equal(gateDrawn(nodeMarkup(runOf(status, { note, waitingOnYou: ['review'] }))), true, `${status}, nothing asked`);
   }
+});
+
+/**
+ * A loop as the api gives it: review loops back to implement, both signed off, with the notes `wf ls` prints. Neither step
+ * has a spec — as when the api could not read one — so what is drawn is the api's graph, and nothing a step's spec says.
+ */
+function loopRun(notes: { implement: string | null; review: string | null }): RunDetail {
+  const base = runWith(null);
+  const step = { ...base.steps[0]!, status: 'unverified · done', spec: null };
+  return {
+    ...base, status: 'running', waitingOnYou: [],
+    graph: {
+      roots: ['implement'],
+      edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 3 }],
+    },
+    steps: [{ ...step, name: 'implement', note: notes.implement }, { ...step, name: 'review', note: notes.review }],
+  };
+}
+
+test("the card's edge reaches only the root, and the loop's edge goes back to its target, whatever the steps' specs lack", () => {
+  const run = loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' });
+
+  assert.deepEqual(cardEdges(run, 'r-1', 'r-1/').map(({ id, source, target }) => ({ id, source, target })), [
+    { id: 'r-1/->implement', source: 'r-1', target: 'r-1/implement' },
+  ]);
+
+  const edges = stepEdges(run, 'r-1/');
+  assert.deepEqual(edges.map(({ id, source, target, type, sourceHandle, targetHandle, label }) => ({ id, source, target, type, sourceHandle, targetHandle, label })), [
+    // An `after` edge takes each node's handle on its side: no type, no handle named.
+    { id: 'r-1/implement->review', source: 'r-1/implement', target: 'r-1/review', type: undefined, sourceHandle: undefined, targetHandle: undefined, label: undefined },
+    { id: 'r-1/loop:review->implement', source: 'r-1/review', target: 'r-1/implement', type: 'loop', sourceHandle: LOOP_SOURCE, targetHandle: LOOP_TARGET, label: 'round 3 of 3' },
+  ]);
+  // Out of rounds, nothing is due: the edge back is still.
+  assert.equal(edges[1]!.className, undefined);
+
+  const due = stepEdges(loopRun({ implement: null, review: 'round 2 of 3 due — review asked again, and the next tick files implement' }));
+  assert.deepEqual([due[1]!.label, due[1]!.className], ['round 2 of 3', 'pulsing']);
+  const first = stepEdges(loopRun({ implement: null, review: null }));
+  assert.deepEqual([first[1]!.type, first[1]!.label, first[1]!.className], ['loop', undefined, undefined]);
+
+  // A run with no loop draws no edge back, and its card still reaches every root it has.
+  const chain = { ...run, graph: { roots: ['implement', 'review'], edges: [] } };
+  assert.deepEqual(stepEdges(chain), []);
+  assert.deepEqual(cardEdges(chain, 'r-1', 'r-1/').map((e) => e.target), ['r-1/implement', 'r-1/review']);
+});
+
+test("a loop's edge is drawn from under its looping step, dashed, into its target with the arrow and the round beside it", () => {
+  const props = {
+    id: 'loop:review->implement', source: 'review', target: 'implement', sourceX: 524, sourceY: 110, targetX: 112, targetY: 110,
+    sourcePosition: 'bottom', targetPosition: 'bottom', markerEnd: "url('#arrow')", label: 'round 3 of 3', selectable: false, deletable: false,
+  } as unknown as Parameters<typeof LoopEdge>[0];
+  const html = renderToStaticMarkup(createElement('svg', null, createElement(LoopEdge, props)));
+  const d = /<path [^>]*\bd="([^"]+)"[^>]*class="react-flow__edge-path"/.exec(html)?.[1];
+  assert.ok(d?.startsWith('M 524,110 C 524,'), html);
+  assert.ok(d?.endsWith(' 112,110'), `it ends at implement, where the arrow is: ${d}`);
+  assert.match(html, /marker-end="url\(&#x27;#arrow&#x27;\)"/);
+  assert.match(html, /stroke-dasharray:5 4/);
+  assert.match(html, />round 3 of 3<\/text>/);
+
+  // On each node, the handles under it come after the ones on its sides, which an edge naming no handle takes.
+  const node = nodeMarkup(runOf('unverified · done', { waitingOnYou: [] }));
+  const handles = [...node.matchAll(/<div (?:data-handleid="([^"]*)" )?data-handlepos="(\w+)"[^>]*class="[^"]*\b(source|target)\b/g)].map((m) => [m[3], m[2], m[1] ?? null]);
+  assert.deepEqual(handles, [['target', 'left', null], ['source', 'right', null], ['source', 'bottom', LOOP_SOURCE], ['target', 'bottom', LOOP_TARGET]], node);
+});
+
+test("the inspector's Details show `loop` and `rounds` beside `after` on a looping step, and not on another", () => {
+  const run = runWith(null);
+  const spec = { harness: 'codex', model: null, after: ['implement'], resume: null, permissionMode: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 3 };
+  const looping = { ...run.steps[0]!, spec };
+  const html = renderToStaticMarkup(createElement(StepInspector, { run, step: looping, onClose: () => {} }));
+  const labels = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]);
+  const at = (label: string) => labels.findIndex(([l]) => l === label);
+  assert.deepEqual(labels.slice(at('after'), at('after') + 4), [['after', 'implement'], ['loop', 'implement'], ['rounds', '3'], ['resume', '—']], html);
+
+  const plain = { ...looping, spec: { ...spec, loop: null, rounds: null } };
+  const without = renderToStaticMarkup(createElement(StepInspector, { run, step: plain, onClose: () => {} }));
+  assert.doesNotMatch(without, />loop<\/dt>|>rounds<\/dt>/);
+  assert.match(without, />after<\/dt>/);
 });

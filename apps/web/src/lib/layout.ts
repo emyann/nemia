@@ -14,6 +14,15 @@
 export type StepEdges = { name: string; after: readonly string[] };
 export type Point = { x: number; y: number };
 
+/**
+ * A run's steps for the layering, off the graph the api gives: each step, in the run's order, with the steps its `after`
+ * edges come from. A `loop` edge is left out: it points back, so laid out it would open a column right of the step it
+ * returns to — or read as a cycle — for an edge that orders nothing.
+ */
+export function stepsOf(names: readonly string[], edges: ReadonlyArray<{ from: string; to: string; kind: string }>): StepEdges[] {
+  return names.map((name) => ({ name, after: edges.filter((e) => e.kind === 'after' && e.to === name).map((e) => e.from) }));
+}
+
 /** Room for one node and the arrow to the next column. The nodes are drawn a fixed width to fit. */
 export const COLUMN_WIDTH = 300;
 /** Room for one node and the gap below it, within a column. */

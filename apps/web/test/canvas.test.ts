@@ -7,6 +7,9 @@ import {
   forgetFactoryLayout,
   forgetFactoryOpen,
   forgetLayout,
+  LOOP_DEPTH,
+  loopLabel,
+  loopPath,
   parseLayout,
   parseOpen,
   place,
@@ -16,7 +19,15 @@ import {
   saveFactoryLayout,
   saveFactoryOpen,
   saveLayout,
+  type EdgeStep,
 } from '../src/lib/canvas.ts';
+import type { GraphEdge, RunGraph } from '../src/lib/api.ts';
+import type { StepState } from '../src/lib/status.ts';
+
+const after = (from: string, to: string): GraphEdge => ({ from, to, kind: 'after' });
+const loop = (from: string, to: string, rounds = 3): GraphEdge => ({ from, to, kind: 'loop', rounds });
+const graphOf = (...edges: GraphEdge[]): RunGraph => ({ roots: [], edges });
+const step = (name: string, state: StepState, note: string | null = null): EdgeStep => ({ name, state, note });
 
 test('a duration reads in its two largest units', () => {
   const s = 1000;
@@ -57,14 +68,14 @@ test('an attempt that is over says how long it took, once the record keeps when 
 });
 
 test('an edge is complete only when the work at both of its ends is done: verified, or on its own word', () => {
-  const edges = edgesOf([
-    { name: 'implement', after: [], state: 'verified' },
-    { name: 'review', after: ['implement'], state: 'unverified' },
-    { name: 'respond', after: ['review', 'implement'], state: 'working' },
+  const edges = edgesOf(graphOf(after('implement', 'review'), after('review', 'respond'), after('implement', 'respond'), after('implement', 'gate'), after('review', 'deploy')), [
+    step('implement', 'verified'),
+    step('review', 'unverified'),
+    step('respond', 'working'),
     // Signed off blocked: not done, so the edge into it is not complete.
-    { name: 'gate', after: ['implement'], state: 'blocked' },
+    step('gate', 'blocked'),
     // Refused by its check: the session ended, and the work is not done.
-    { name: 'deploy', after: ['review'], state: 'failed-check' },
+    step('deploy', 'failed-check'),
   ]);
   assert.deepEqual(edges.map((e) => [e.source, e.target, e.complete]), [
     ['implement', 'review', true],
@@ -75,8 +86,81 @@ test('an edge is complete only when the work at both of its ends is done: verifi
   ]);
 });
 
-test('an `after` naming a step the run does not have draws no edge', () => {
-  assert.deepEqual(edgesOf([{ name: 'review', after: ['gone', 'gone'], state: 'waiting' }]), []);
+test('an edge naming a step the run does not have draws nothing, and an edge given twice is drawn once', () => {
+  assert.deepEqual(edgesOf(graphOf(after('gone', 'review'), after('gone', 'review'), loop('review', 'gone')), [step('review', 'waiting')]), []);
+  assert.deepEqual(edgesOf(graphOf(after('a', 'b'), after('a', 'b')), [step('a', 'verified'), step('b', 'waiting')]).map((e) => e.id), ['a->b']);
+});
+
+test("a loop's edge goes from the looping step back to its target, beside the `after` edge it returns along, and is never complete", () => {
+  const edges = edgesOf(graphOf(after('implement', 'review'), loop('review', 'implement')), [step('implement', 'verified'), step('review', 'verified')]);
+  assert.deepEqual(edges.map(({ id, source, target, kind, complete }) => ({ id, source, target, kind, complete })), [
+    { id: 'implement->review', source: 'implement', target: 'review', kind: 'after', complete: true },
+    // A round that may yet come: drawn dashed whatever its ends say.
+    { id: 'loop:review->implement', source: 'review', target: 'implement', kind: 'loop', complete: false },
+  ]);
+});
+
+test("a loop's edge is labelled with the round it is on past the first — the looping step's note first, then its target's", () => {
+  const cases: Array<[review: string | null, implement: string | null, rounds: number, label: string | null]> = [
+    // On its first round `wf ls` prints no note, and neither does the edge.
+    [null, null, 3, null],
+    ['try 2, by retries: 1', null, 3, null],
+    ['try 2 due — retries: 1, 0 spent', null, 3, null],
+    ['round 3 of 3, and it asked again — once more: wf round r-1 review', 'round 3 of 3', 3, 'round 3 of 3'],
+    ['round 2 of 5 due — review asked again, and the next tick files implement', null, 5, 'round 2 of 5'],
+    // Filed first in a round, so the target's note says it before the looping step's does.
+    [null, 'round 2 of 3', 3, 'round 2 of 3'],
+    ['round 2 of 3, try 3, by retries: 1', 'round 2 of 3', 3, 'round 2 of 3'],
+    // Past the cap on a person's word: the note has no `of`, and the edge says the cap it went past.
+    ['round 4 asked (wf round) — the next tick files implement', 'round 3 of 3', 3, 'round 4 of 3'],
+    ['round 4, past rounds: 3, on your word', 'round 4, past rounds: 3, on your word', 3, 'round 4 of 3'],
+  ];
+  for (const [review, implement, rounds, label] of cases) {
+    const [, back] = edgesOf(graphOf(after('implement', 'review'), loop('review', 'implement', rounds)), [step('implement', 'unverified', implement), step('review', 'unverified', review)]);
+    assert.equal(back!.label, label, `review: ${review}; implement: ${implement}`);
+    assert.equal(loopLabel([review, implement], rounds), label);
+  }
+});
+
+test("an edge pulses while work moves along it — into a step at work, or back round a loop whose next round is due — and not otherwise", () => {
+  const loopPulses = (review: string | null, implement: string | null = null) =>
+    edgesOf(graphOf(loop('review', 'implement')), [step('implement', 'unverified', implement), step('review', 'unverified', review)])[0]!.pulsing;
+  assert.equal(loopPulses('round 2 of 3 due — review asked again, and the next tick files implement'), true, 'asked again with rounds left');
+  assert.equal(loopPulses('round 4 asked (wf round) — the next tick files implement'), true, 'a person sent it round');
+  const still: Array<[string | null, string | null]> = [
+    [null, null],
+    ['round 3 of 3, and it asked again — once more: wf round r-1 review', 'round 3 of 3'],
+    ['round 2 of 3', 'round 2 of 3'],
+    // A try due is not a round due, on the looping step or its target.
+    ['try 2 due — retries: 1, 0 spent', null],
+    [null, 'round 2 of 3 due — review asked again, and the next tick files implement'],
+  ];
+  for (const [review, implement] of still) assert.equal(loopPulses(review, implement), false, `review: ${review}; implement: ${implement}`);
+
+  const into = (state: StepState, from: StepState = 'verified') => edgesOf(graphOf(after('a', 'b')), [step('a', from), step('b', state)])[0]!.pulsing;
+  assert.equal(into('working'), true);
+  for (const state of ['waiting', 'needs-human', 'checking', 'verified', 'failed'] as const) assert.equal(into(state), false, state);
+  assert.equal(into('waiting', 'working'), false, 'out of a step at work, nothing has reached the next one yet');
+});
+
+test("a loop's path runs from under the looping step, beneath both, and up into its target, its label at the lowest point", () => {
+  const [review, implement] = [{ x: 524, y: 110 }, { x: 112, y: 110 }];
+  const { path, labelX, labelY } = loopPath(review, implement);
+  const m = /^M ([\d.-]+),([\d.-]+) C ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+) ([\d.-]+),([\d.-]+)$/.exec(path);
+  assert.ok(m, path);
+  const [x0, y0, x1, y1, x2, y2, x3, y3] = m.slice(1).map(Number) as [number, number, number, number, number, number, number, number];
+  assert.deepEqual([x0, y0, x3, y3], [review.x, review.y, implement.x, implement.y], 'it ends at the target, where the arrow goes');
+  assert.ok(y1 > review.y && y2 > implement.y, `its control points are below both ends: ${path}`);
+  assert.deepEqual([x1, x2], [review.x, implement.x], 'it leaves straight down and arrives straight up');
+  // The cubic's middle is where the label sits: `LOOP_DEPTH` below the row.
+  const mid = (a: number, b: number, c: number, d: number) => (a + 3 * b + 3 * c + d) / 8;
+  assert.deepEqual([mid(x0, x1, x2, x3), mid(y0, y1, y2, y3)], [labelX, labelY]);
+  assert.equal(labelY, review.y + LOOP_DEPTH);
+
+  // Nodes of different heights: beneath the lower end.
+  const uneven = loopPath({ x: 300, y: 140 }, { x: 0, y: 100 }, 40);
+  assert.equal(uneven.labelY, 180);
+  assert.ok(uneven.path.endsWith(' 0,100'), uneven.path);
 });
 
 test('a step goes where a person left it, and a step they never moved where the layering puts it', () => {

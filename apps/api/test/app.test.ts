@@ -104,7 +104,7 @@ test('runs are read from the workflow store and summarized, with what each step 
 
   const res = await app.request('/api/runs');
   assert.deepEqual(await res.json(), [{
-    id: 'r-1', repo: '/code/app', brief: 'Do the thing', createdAt: '2026-09-12T00:00:00.000Z',
+    id: 'r-1', repo: '/code/app', brief: 'Do the thing', workflowDir: '/code/app/workflows', createdAt: '2026-09-12T00:00:00.000Z',
     cancelledAt: '2026-09-12T01:00:00.000Z',
     status: 'cancelled',
     moving: false,

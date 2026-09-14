@@ -5,6 +5,7 @@ import { assess, composeBrief, inFlight, listing, type Assessment, type Run } fr
 import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
+import { workflows } from './workflows.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
 export type RunStatus = Assessment['status'];
@@ -14,6 +15,8 @@ export type RunSummary = {
   id: string;
   repo: string;
   brief: string;
+  /** The workflow folder the run was started from, as `wf start` resolved it: its last segment names the workflow. */
+  workflowDir: string;
   createdAt: string;
   cancelledAt: string | null;
   status: RunStatus;
@@ -329,6 +332,7 @@ function summarize(run: Run, views: Views): RunSummary {
     id: run.id,
     repo: run.repo,
     brief: run.brief,
+    workflowDir: run.workflowDir,
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     status: judged.status,
@@ -497,6 +501,8 @@ export const app = new Hono()
   // the settings enable is started and asked for its tools once while the api runs; one that fails is an `error`
   // on its entry, never a failed request.
   .get('/api/capabilities', async (c) => c.json(await capabilitiesOf(repoOf())))
+  // A repository's workflows, listed, and a run of one started — the board's one write (workflows.ts).
+  .route('/', workflows)
   .get('/api/runs', async (c) => {
     // What one request costs, however many runs there are: one harness observation (one
     // `claude agents --json`, one scan of the detached runs' files), a read of every task journal in

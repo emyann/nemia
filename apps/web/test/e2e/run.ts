@@ -2,8 +2,8 @@
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
  *  1. Builds the web app.
- *  2. Seeds a store in a temporary WF_ROOT with three fake runs, and beside it a checkout for the api to serve
- *     (`HKB_REPO`) on the Capabilities page (seed.ts).
+ *  2. Seeds a store in a temporary WF_ROOT with three fake runs, the first with a real repository and branch to decide
+ *     on, and beside it a checkout for the api to serve (`HKB_REPO`) on the Capabilities page (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
  *     as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers and beside
@@ -123,6 +123,7 @@ const PAGES: PageSpec[] = [
       // the other run's card is in, which moves aside.
       await card.locator('time').click();
       await expectCount(steps, FAKE.steps.length, `the card opens into a node per step (${FAKE.steps.join(', ')})`);
+      await expectVisible(card.getByText(FAKE.touched, { exact: true }), `the open card of a run waiting on you says what its branch touched (${FAKE.touched})`);
       for (const name of FAKE.steps) await expectVisible(step(name), `the open run draws ${name}`);
       await expectVisible(step(FAKE.blocked).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate on the Factory`);
       await expectVisible(
@@ -232,6 +233,50 @@ const PAGES: PageSpec[] = [
       await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"]`).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate`);
       await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.refused}"] [data-state="failed-check"]`), `${FAKE.refused}'s refused check is a red chip on the run's graph`);
       await expectVisible(page.locator('section[aria-label="Check"]').getByText(FAKE.said), `the run's page shows how ${FAKE.refused}'s check's output ended`);
+
+      // What `wf decide` shows, between the banner and the canvas, read out of the run's real repository.
+      await expectVisible(
+        page.locator(`article > h1 + section[aria-label="Decide"] + section[aria-label="The run's steps as a graph"]`),
+        'the Decide section sits between the banner and the canvas',
+      );
+      const decide = page.locator('section[aria-label="Decide"]');
+      await expectVisible(decide.locator(`[data-touched="${FAKE.branch}"]`), `the Decide section reads the run's result branch (${FAKE.branch})`);
+      for (const group of ['(root)', 'apps/web']) {
+        await expectVisible(decide.locator(`[data-group="${group}"] [data-bar]`), `a row for ${group}, with its +/− bar`);
+      }
+      for (const file of FAKE.agentFacing) {
+        await expectVisible(decide.locator('[data-chip="agent-facing"][title="the next agent reads this"]', { hasText: file }), `${file} is an agent-facing chip`);
+      }
+      for (const file of FAKE.checkAffecting) {
+        await expectVisible(decide.locator('[data-chip="check-affecting"][title="could make its check pass"]', { hasText: file }), `${file} is a check-affecting chip`);
+      }
+      await expectVisible(decide.locator('[data-lesson="written"]', { hasText: FAKE.lesson }), `the lesson chip says what the run wrote (${FAKE.lesson})`);
+      // Each check-affecting file folded, until a person opens it: then a coloured diff, cut where the api cut it.
+      await expectCount(decide.locator('details[open]'), 0, 'every check-affecting diff is folded until opened');
+      const capped = decide.locator(`details[data-diff="${FAKE.capped}"]`);
+      await capped.locator('summary').click();
+      await expectVisible(capped.locator('[data-line="hunk"]'), `${FAKE.capped}'s diff opens on a click, a hunk's header in it`);
+      await expectVisible(capped.locator('[data-line="added"]'), `${FAKE.capped}'s diff shows its added lines`);
+      await expectVisible(capped.locator('[data-cut]', { hasText: /^\d+ more lines — wf decide prints all$/ }), `${FAKE.capped}'s diff is capped, and says so`);
+      const manifest = decide.locator('details[data-diff="package.json"]');
+      await manifest.locator('summary').click();
+      await expectVisible(manifest.locator('[data-line="removed"]'), "package.json's diff shows the line it removed");
+      await expectCount(manifest.locator('[data-cut]'), 0, "package.json's diff is shown whole");
+      await expectVisible(decide.locator('section[aria-label="Used"] dd', { hasText: 'not measured' }), 'the run total says not measured, since not every step was');
+      // The commands as lines to copy, and nothing that runs one.
+      await expectVisible(decide.locator('[data-command="ship it"] code', { hasText: `merge --no-ff ${FAKE.branch}` }), 'ship it: the merge, as a line');
+      await expectVisible(decide.locator('[data-command="drop it"] code', { hasText: `branch -D ${FAKE.branch}` }), 'drop it: the branch deleted, as a line');
+      await expectVisible(decide.locator('[data-command="once more"] code', { hasText: `wf retry ${FAKE.id} ${FAKE.refused}` }), `once more: ${FAKE.refused} tried again, as a line`);
+      await expectCount(decide.locator('button[data-copy]'), await decide.locator('[data-command]').count(), 'a copy button beside each command');
+      await expectCount(decide.locator('button:not([data-copy])'), 0, 'no button in the Decide section but one that copies');
+
+      // What a step consumed, in its section and in the inspector's Details, in `wf decide`'s words.
+      const tokens = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.unverified, exact: true }) });
+      await expectVisible(tokens.locator('dd', { hasText: FAKE.used }), `${FAKE.unverified}'s section says what its session used (${FAKE.used})`);
+      await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
+      const inspected = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
+      await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);
+
       await graph.locator('.react-flow__node[data-id="review"]').click();
       await expectVisible(page.locator('aside[aria-label="Step review"]'), 'the step inspector opens on a click on review');
       // The canvas narrows for the inspector and fits itself again; judged once it has.
@@ -247,6 +292,14 @@ const PAGES: PageSpec[] = [
       // The folder beside the record reads as the loop the run froze: nothing has drifted, and nothing is unread.
       await expectCount(page.getByText(/no longer reads as a workflow|has changed since this run started/), 0, 'no warning about the workflow folder');
       await expectVisible(page.getByText(`Waiting on you: ${LOOPING.exhausted}`), `the run's page says ${LOOPING.exhausted} is waiting on you`);
+      // Its record names a repository that is not on this machine: a branch git could not read, said, and the page renders.
+      const decide = page.locator('section[aria-label="Decide"]');
+      await expectVisible(decide.getByText(/^not read: git could not diff /).first(), `the Decide section says ${LOOPING.id}'s branch could not be read`);
+      await expectVisible(decide.locator('[data-lesson="unknown"]'), 'the lesson chip says nobody can know, not that nothing was written');
+      await expectVisible(
+        decide.locator('[data-command="once more"] code', { hasText: `wf round ${LOOPING.id} ${LOOPING.exhausted}` }),
+        `once more: the wf round that takes ${LOOPING.exhausted}'s loop round again, as a line`,
+      );
       const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
       const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);
       await expectCount(graph.locator('.react-flow__node'), LOOPING.steps.length, `the loop's graph has a node per step (${LOOPING.steps.join(', ')})`);

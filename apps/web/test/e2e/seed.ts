@@ -177,7 +177,8 @@ export const LOOPING = {
  * A fourth run, started last: `implement`'s session is one the harness marked blocked, and it gave no closeout — Q1's round-2
  * implement on 2026-09-14, stopped by the login refresh race — and `review` waits on it. The engine reads it `needs-human`, so the
  * run is running and moves, and in the package's words nobody is waiting on you: the step asked nothing. On the floor by default,
- * in the cell after NEIGHBOUR's. The board names the harness, and what the session said last (`line`).
+ * in the cell after NEIGHBOUR's. The board names the harness, and what the session said last (`line`), and continues the session as
+ * `wf retry` does: the `held` page presses Continue, and takes its ask back.
  */
 export const HELD = {
   id: 'blocked-by-the-harness-e2e3',

@@ -955,34 +955,46 @@ test('the tries say `your answer` beside a try a person answered, and above its 
   assert.doesNotMatch(/<details data-try="1"[\s\S]*?<\/details>/.exec(folded)![0], /your answer/);
 });
 
-test("REFUSED: the banner offers no try of a session the harness blocked — it says the board cannot continue it, and gives the two commands that can, each only copied", () => {
+/** The banner, rendered inside the query client its Continue asks with. */
+const bannerMarkup = (run: RunDetail) =>
+  renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(NeedsBanner, { run })));
+
+test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
   const base = needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] });
   const asks = { ...base.steps[0]!, name: 'implement', taskId: 't-2', status: 'succeeded · BLOCKED', needs: 'Which database?', blockedByHarness: false, lastLine: null };
   const run: RunDetail = { ...base, waitingOnYou: ['implement'], steps: [asks, base.steps[0]!] };
-  const html = renderToStaticMarkup(createElement(NeedsBanner, { run }));
+  const html = bannerMarkup(run);
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
   const texts = textsOf(html);
   assert.ok(texts.includes('asks: Which database?'), html);
   // After the step's name, which is a tag of its own.
   assert.ok(texts.includes(`is blocked by the harness: ${LOGIN}`), html);
-  // For the session the harness blocked alone: what the board cannot do, and the commands, in order.
-  assert.equal([...html.matchAll(/data-unblock/g)].length, 1);
-  assert.match(html, /<li data-need="harness" data-step="review"[^>]*><p [^>]*>[\s\S]*?<\/p><div data-unblock="true"/);
-  assert.match(html, /The board cannot continue it: its session has not ended/);
-  assert.deepEqual([...html.matchAll(/<li class="flex[^"]*"><code [^>]*>([^<]*)<\/code>/g)].map((m) => unescaped(m[1]!)), [
-    'AE_ROOT="${WF_ROOT:-$HOME/.agent-workflows}/engine" ae stop t-1',
-    'wf retry r-1 review',
-  ]);
-  // Nothing on it asks for a try: each button copies a command, and there is nothing to type.
-  const buttons = [...html.matchAll(/<button [^>]*>/g)].map((m) => m[0]);
-  assert.equal(buttons.length, 2);
-  assert.ok(buttons.every((button) => /data-copy="true"/.test(button)), html);
-  // Nor the call to continue it, which the board cannot answer.
-  assert.doesNotMatch(html, /<textarea|<form|— continue it/);
+  const items = new Map([...html.matchAll(/<li data-need="(\w+)" data-step="(\w+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, m[3]!]));
+  assert.doesNotMatch(items.get('implement')!, /<form|<button|<textarea/, 'a question is answered from the Decide section, not the banner');
+  // For the session the harness blocked, after what it said last: a form that asks, its box optional, and one button, enabled with nothing written.
+  const review = items.get('review')!;
+  assert.match(review, /^<p [^>]*>[\s\S]*?<\/p><div data-continue="true"[^>]*><form aria-label="Continue review"/);
+  assert.deepEqual([...review.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]), [['submit', false, 'Continue']]);
+  assert.match(review, /<label for="[^"]+" class="sr-only">What to tell review, if anything<\/label>/);
+  assert.match(review, /<textarea [^>]*placeholder="Anything to tell it \(optional\): the next try is told it\."/);
+  assert.ok(textsOf(review).includes('wf retry r-1 review'), review);
+  // The commands are gone, and so is the sentence that said the board could not continue it.
+  assert.doesNotMatch(html, /data-copy|data-unblock|ae stop|cannot continue/);
 
-  // Called off: nobody waits for either.
-  assert.equal(renderToStaticMarkup(createElement(NeedsBanner, { run: { ...run, cancelledAt: at, waitingOnYou: [] } })), '');
+  // Asked: what the tick does with it, in `wf ls`'s words, and nothing to press.
+  const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';
+  const held = { ...base.steps[0]!, note, asked: { try: 2, mode: 'nudge' as const, model: null, message: null, stopFirst: true } };
+  const asked = bannerMarkup({ ...run, steps: [asks, held] });
+  assert.ok(asked.includes(`<p data-note="true" class="font-mono text-xs">${note}</p></li>`), asked);
+  assert.doesNotMatch(/<li data-need="harness"[\s\S]*?<\/li>/.exec(asked)![0], /<form|<button|<textarea/);
+});
+
+test('REFUSED: the banner offers no Continue for a session still at work, which the harness did not block, nor on a run called off', () => {
+  assert.equal(bannerMarkup(needing('running (working)', {}, { waitingOnYou: [] })), '', 'nothing needed: no banner');
+  const held = needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] });
+  assert.match(bannerMarkup(held), /<form aria-label="Continue review"/);
+  assert.equal(bannerMarkup({ ...held, cancelledAt: at }), '', 'called off: nobody waits for the session');
 });
 
 test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits on a run — and a run's page's legend does not", () => {

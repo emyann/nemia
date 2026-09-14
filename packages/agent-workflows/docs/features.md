@@ -693,11 +693,9 @@ What was built:
   - The pass that asks for the stop says so in its notes, once.
   - `wf retry` prints that the next tick stops the session and files the try once it has stopped.
   - `wf decide` names the step once in `still running`.
-- **Only `wf retry` opts in.** `retry()` takes the harness's word only when its caller passes `{ stopBlocked: true }`,
-  and the CLI does. The board's `POST …/retry` calls `retry()` without it, and `apps/api/test/asks.test.ts` holds that
-  call to a 409: its `held` case expects "held is still running", with a comment that names this item. Flipping the
-  default would have failed that test, and apps/ was not this change's to edit. So the board refuses what `wf retry`
-  now takes, until apps takes the same word (below).
+- **A caller opts in.** `retry()` takes the harness's word only when its caller passes `{ stopBlocked: true }`. The
+  CLI does, and since B8 (apps, 2026-09-14) so does the board's `POST …/retry`, whose `held` test now expects the 202
+  and `stopFirst: true`; a caller that leaves the option out is refused as before, and a test holds that.
 
 ### `decision` no longer says `shipped` for a branch with nothing past its base
 
@@ -768,13 +766,8 @@ What was measured:
 
 What it leaves:
 
-- **The board refuses what `wf retry` takes.** Taking the same word in apps is four edits:
-  - `retry(e, id, step, how, { stopBlocked: true })` in the POST handler;
-  - the `held` case in `asks.test.ts` turned to a 202;
-  - `unblockCommands` in `apps/web/src/lib/asks.ts` without its `ae stop`, or an answer box offered for the
-    harness's need;
-  - `judge` handing `assess` the package's `harnessBlocked(views)`, so the board's `asked` and `moving` see the try.
-    Until then the api's `listing` already shows the note: it reads the engine's word.
+- ~~**The board refuses what `wf retry` takes.**~~ Done by B8 (apps, 2026-09-14): the POST passes the option, the
+  banner offers Continue, and `judge` hands `assess` and `decision` the package's `harnessBlocked(views)`.
 - **`wf decide` offers no `wf retry` for such a step.** A run it keeps running reads `still running`. In a fan-out
   whose sibling failed, `retryLines` is not given the harness's word, so `wf ls` is where the step says it can be tried.
 - **`waitingOnYou` does not name a harness-blocked step.** The board says "blocked by the harness" from its own field.

@@ -1816,7 +1816,7 @@ test("REFUSED before, now accepted at shipped defaults: `wf retry` on a step who
   b.settle(taskId, 'needs-human' as TaskPhase);
   const e = recordingStops(b);
 
-  // Asked for without the harness's word — the board's POST, today — it is still running, and refused.
+  // Asked for without the harness's word, it is still running, and refused.
   await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge' }), refusedWith(/^implement is still running/));
   assert.deepEqual(asksOf(run.id), []);
 

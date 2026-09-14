@@ -10,7 +10,7 @@ import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runQuery, type RunDetail } from '../lib/api';
-import { offersOf } from '../lib/asks';
+import { answersOf } from '../lib/asks';
 import { decidableRun } from '../lib/decide';
 
 export const Route = createFileRoute('/runs/$runId')({
@@ -61,8 +61,9 @@ function Run({ run }: { run: RunDetail }) {
         <WorkflowLink dir={run.workflowDir} />
       </header>
 
-      {/* Between the banner and the canvas, for a run with something to decide — never while it runs — or a try a person has asked for. */}
-      {(decidableRun(run) || offersOf(run).length > 0) && <Decide run={run} />}
+      {/* Between the banner and the canvas, for a run with something to decide — never while it runs — an answer to give, or a try a person
+          has asked for. A session the harness blocked is continued from the banner, and draws it only once its try is asked. */}
+      {(decidableRun(run) || answersOf(run).length > 0) && <Decide run={run} />}
 
       <section aria-label="The run's steps as a graph" className="flex flex-col gap-4 md:flex-row">
         <div className="min-w-0 flex-1">

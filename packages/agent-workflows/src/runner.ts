@@ -1205,8 +1205,8 @@ export type Asked = { run: Run; ask: RetryAsk; file: string; stopFirst: boolean 
  * the person said goes in the ask, `message`, and nowhere else: the tick carries it into the try's brief.
  *
  * `stopBlocked` takes a step whose session its harness blocked, with nothing signed (`retryable`): the ask is written as any other, and
- * the tick stops that session before it files the try. `wf retry` passes it. Left out, such a step is running and refused as one — the
- * board's `POST …/retry` calls this without it, and apps/api's tests hold that refusal to a 409 until the board takes the same word.
+ * the tick stops that session before it files the try. `wf retry` passes it, and so does the board's `POST …/retry`. Left out, such a
+ * step is running and refused as one: a caller takes the harness's word on purpose, never by default.
  */
 export async function retry(e: Engine, id: string, stepName: string, how: RetryHow, { stopBlocked = false }: { stopBlocked?: boolean } = {}): Promise<Asked> {
   const run = readRun(id);

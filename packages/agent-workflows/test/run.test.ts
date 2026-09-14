@@ -871,7 +871,7 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
     "--recheck runs a step's check again, and implement is running, its session blocked by its harness with nothing signed off: no check of it failed. Ask for another session instead: wf retry r-1 implement (or --fresh).");
   assert.match(refusal({ mode: 'nudge' }, () => false)!, /^implement is still running, so there is nothing to try again until it ends/, 'a session still working');
   assert.match(refusal({ mode: 'nudge' }, needsHuman, signedDone)!, /^implement is still running/, 'a session that signed off and runs on');
-  assert.match(retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, p, nothingSigned, asked)!, /^implement is still running/, "a caller with no word of the harness — the board's POST, today");
+  assert.match(retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, p, nothingSigned, asked)!, /^implement is still running/, "a caller with no word of the harness");
 
   // The tick's reading: the ask is due, to stop the session first, and the run is still going, waiting on nobody.
   const a = assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman);

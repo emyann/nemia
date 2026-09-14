@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, retry, sensitiveDiff, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Wait } from 'agent-workflows';
+import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, retry, sensitiveDiff, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Wait } from 'agent-workflows';
 import { answerOf, assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
@@ -74,10 +74,12 @@ export type RunWaiting = {
 export type StepNeeds = { needs: string | null; blockedByHarness: boolean };
 
 /**
- * A try a person asked for — with `wf retry`, or the board's answer box — that the next tick files: `assess`'s, off their ask
- * file. `model` is the one a `--model` named, and `message` what they said with it; each null where the ask has none.
+ * A try a person asked for — with `wf retry`, or the board's answer box or Continue — that the next tick files: `assess`'s, off their
+ * ask file. `model` is the one a `--model` named, and `message` what they said with it; each null where the ask has none. `stopFirst`
+ * is the package's (`Retry.stopFirst`): the harness blocked the step's session, so a tick stops that session first, and a later one files
+ * the try, once it has stopped.
  */
-export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null };
+export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null; stopFirst: boolean };
 
 /** A step's frontmatter, from the workflow the run is judged by. `null` where the step does not set it. */
 export type StepSpec = {
@@ -539,7 +541,9 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
   // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
-  const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds);
+  // And the harness's word, as the tick has it (`harnessBlocked`): a person's try of a step whose session the harness blocked is due, the
+  // session stopped first. Without it that try is in `listing`'s note, which reads the engine's word, and neither `asked` nor `moving`.
+  const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views));
   // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
   // for it, whatever its bare steps would make ready: the tick fails on it.
   const tickReads = Boolean(run.workflow ?? folder);
@@ -649,7 +653,7 @@ async function lastLineOf(view: TaskView): Promise<string | null> {
 
 /** A try asked for, as the page says it (`StepAsked`). */
 const askedOf = (r: Retry | undefined): StepAsked | null =>
-  r ? { try: r.try, mode: r.mode, model: r.model ?? null, message: r.message ?? null } : null;
+  r ? { try: r.try, mode: r.mode, model: r.model ?? null, message: r.message ?? null, stopFirst: r.stopFirst === true } : null;
 
 const specOf = (step: Workflow): StepSpec => ({
   harness: step.harness ?? null,
@@ -1002,7 +1006,8 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const { asks, rounds } = readAsks(run.id);
-  const d = decision(steps, run, phase, (branch) => isShipped(run, branch), reader, asked, exitVerdicts(views, run), asks, rounds);
+  // With the harness's word, as `wf decide` reads it: a person's try of a session the harness blocked is waited on too.
+  const d = decision(steps, run, phase, (branch) => isShipped(run, branch), reader, asked, exitVerdicts(views, run), asks, rounds, harnessBlocked(views));
   if (d.kind === 'cancelled') return { nothing: `cancelled at ${d.at} — nothing to decide` };
   if (d.kind === 'shipped') return { nothing: `shipped — ${d.branches.join(', ')} is already on ${run.branch}` };
 
@@ -1291,6 +1296,8 @@ export const app = new Hono()
   // recheck — made by the package's `retry()`, `wf retry`'s own, which writes the ask file and nothing else; the next tick honours it
   // once. Guarded as a start is (guard.ts). Refused in the package's words, verbatim: a message that cannot ride on the ask
   // (`messageRefusal`, 422) before the run is read, and a step that may not be tried again that way (`retryRefusal`, 409) after.
+  // A step whose session its harness blocked, with nothing signed, is taken as `wf retry` takes it (`stopBlocked`): the ask is written as
+  // any other, and the tick stops the session before it files the try — which the answer's `stopFirst` says, for the board to word.
   .post('/api/runs/:id/steps/:step/retry', async (c) => {
     const id = c.req.param('id');
     const step = c.req.param('step');
@@ -1309,9 +1316,10 @@ export const app = new Hono()
     const wrong = messageRefusal(how, `wf retry ${id} ${step}`);
     if (wrong) return c.json({ error: wrong }, 422);
     try {
-      const { ask, file } = await retry(e, id, step, how);
-      // Accepted, and not yet done: the try is filed by the next tick, as one asked for at the command line is.
-      return c.json({ try: ask.try, file }, 202);
+      const { ask, file, stopFirst } = await retry(e, id, step, how, { stopBlocked: true });
+      // Accepted, and not yet done: the try is filed by the next tick, as one asked for at the command line is — or, where `stopFirst`, by
+      // a tick after the one that stops the step's blocked session.
+      return c.json({ try: ask.try, file, stopFirst }, 202);
     } catch (err) {
       const said = err instanceof Error ? err.message : String(err);
       if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);

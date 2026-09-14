@@ -610,9 +610,9 @@ retries: 1
   engine then says `needs-human`, and the step has no closeout. `wf retry` takes such a step with `--nudge` or
   `--fresh`, and refuses `--recheck`. The ask is written as any other. The next tick asks the engine to stop the
   session and files nothing, and a later pass, once the session has stopped, files the try as it files one for a
-  stopped step: a nudge continues the session. A step whose session is still working is refused as before. Only
-  the verb takes the harness's word (`retry(…, { stopBlocked: true })`): the board's `POST …/retry` still refuses
-  such a step as running.
+  stopped step: a nudge continues the session. A step whose session is still working is refused as before. A
+  caller takes the harness's word by passing it (`retry(…, { stopBlocked: true })`): `wf retry` does, and so does
+  the board's `POST …/retry` (its banner's Continue); a caller that leaves it out is refused as before.
 - **An ask is a file, like a cancellation.** `wf retry` writes `runs/<id>.asks/retry-<step>-<n>`, whole and
   exclusively, and never writes the run's json. Every pass reads the directory. The next pass files try `n`,
   writes the record, then moves the ask into `done/`. The ask names its try, and a try's ids are derived

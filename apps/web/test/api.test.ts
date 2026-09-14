@@ -190,22 +190,27 @@ function asking(t: { after: (fn: () => void) => void }, status: number, body: st
   });
 }
 
-test('an answer is asked for as the api takes it — POST, JSON, the step by name — and resolves with the try and its ask file', async (t) => {
+test("an answer is asked for as the api takes it — POST, JSON, the step by name — and resolves with the try, its ask file and the package's `stopFirst`", async (t) => {
   const sent: Array<{ url: string; init: RequestInit }> = [];
-  asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r 1.asks/retry-implement-2' }), sent);
-  assert.deepEqual(await askTry('r 1', 'implement', { mode: 'nudge', message: '--flag stays' }), { try: 2, file: '/store/runs/r 1.asks/retry-implement-2' });
+  asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r 1.asks/retry-implement-2', stopFirst: false }), sent);
+  assert.deepEqual(await askTry('r 1', 'implement', { mode: 'nudge', message: '--flag stays' }), { try: 2, file: '/store/runs/r 1.asks/retry-implement-2', stopFirst: false });
   assert.equal(sent.length, 1);
   assert.equal(sent[0]!.url, '/api/runs/r%201/steps/implement/retry');
   assert.equal(sent[0]!.init.method, 'POST');
   assert.deepEqual(sent[0]!.init.headers, { 'content-type': 'application/json' });
   assert.deepEqual(JSON.parse(String(sent[0]!.init.body)), { mode: 'nudge', message: '--flag stays' });
+
+  // Continue on a session the harness blocked: the tick stops it before it files the try, and the api says so.
+  asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true }), sent);
+  assert.deepEqual(await askTry('r-1', 'held', { mode: 'nudge' }), { try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true });
+  assert.deepEqual(JSON.parse(String(sent[1]!.init.body)), { mode: 'nudge' });
 });
 
 test("REFUSED: an ask the api refuses rejects with the api's words, verbatim; an answer without the try it asked for, or without JSON, says so", async (t) => {
-  const refusal = "held is still running, so there is nothing to try again until it ends. Wait for it: wf ls r-1 (or stop the run: wf cancel r-1).";
+  const refusal = "working is still running, so there is nothing to try again until it ends. Wait for it: wf ls r-1 (or stop the run: wf cancel r-1).";
   const sent: Array<{ url: string; init: RequestInit }> = [];
   asking(t, 409, JSON.stringify({ error: refusal }), sent);
-  await assert.rejects(askTry('r-1', 'held', { mode: 'nudge' }), (err: Error) => err.message === refusal);
+  await assert.rejects(askTry('r-1', 'working', { mode: 'nudge' }), (err: Error) => err.message === refusal);
 
   globalThis.fetch = (async () => new Response(JSON.stringify({ ok: true }), { status: 202 })) as typeof fetch;
   await assert.rejects(askTry('r-1', 'implement', { mode: 'nudge' }), (err: Error) =>

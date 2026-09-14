@@ -2,20 +2,21 @@ import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check as Done, ChevronRight, Copy } from 'lucide-react';
 import { askTry, decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RetryMode, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
-import { offersOf, type Offer } from '../lib/asks';
+import { answersOf, askedSaid, type Answer } from '../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
 import { Facts } from './Facts';
 
 /**
- * The Decide section of a run's page: the answer each step waiting on you can be given (`offersOf`), then what `wf decide` shows a
+ * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what `wf decide` shows a
  * person — read once for the run's state (`decisionQuery`), only while the run has something to decide, and shown when the api says
- * there is. A run that still runs with a session the harness blocked has an answer and nothing to decide. An api that refuses says why, here.
+ * there is. A run that still runs with a try asked — of a session the harness blocked, continued from the banner — has that try's note
+ * and nothing to decide. An api that refuses says why, here.
  */
 export function Decide({ run }: { run: RunDetail }) {
   const decidable = decidableRun(run);
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
-  const offers = offersOf(run);
+  const offers = answersOf(run);
   const answers = offers.length > 0 ? <Offers runId={run.id} offers={offers} /> : null;
   if (decidable && error) {
     return (
@@ -39,7 +40,7 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
         <h2 className="font-semibold">Decide</h2>
         <p className="text-xs text-neutral-500">
           What <code>wf decide {runId}</code> shows. The board runs none of its commands: copy one to run it yourself. An answer given
-          here asks for a try as <code>wf retry</code> does, and the next tick files it.
+          here asks for a try as <code>wf retry</code> does; each row says what the tick does with it.
         </p>
       </div>
       {children}
@@ -95,11 +96,11 @@ const TEXTAREA =
  * What the board can ask for each step waiting on you (`offersOf`), a row a step. Each ask is `wf retry`'s, made by the api through the
  * package's `retry()`, which writes the ask and nothing else; the next tick files the try.
  */
-export function Offers({ runId, offers }: { runId: string; offers: readonly Offer[] }) {
+export function Offers({ runId, offers }: { runId: string; offers: readonly Answer[] }) {
   return (
     <section aria-label="Answer" className="space-y-2">
       <h3 className="text-xs font-medium text-neutral-500">
-        Answer — each asks for a try as <code>wf retry {runId} &lt;step&gt;</code> does, and the next tick files it
+        Answer — each asks for a try as <code>wf retry {runId} &lt;step&gt;</code> does
       </h3>
       <ul className="space-y-3">
         {offers.map((offer) => (
@@ -111,7 +112,7 @@ export function Offers({ runId, offers }: { runId: string; offers: readonly Offe
 }
 
 /** What a step needs, as its row says it after its name. */
-function offerSaid(offer: Exclude<Offer, { kind: 'asked' }>): string {
+function offerSaid(offer: Exclude<Answer, { kind: 'asked' }>): string {
   switch (offer.kind) {
     case 'answer':
       return offer.needs ? `asks: ${offer.needs}` : 'signed off blocked, and said nothing of what it needs';
@@ -125,22 +126,14 @@ function offerSaid(offer: Exclude<Offer, { kind: 'asked' }>): string {
  * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the run is read again and the
  * row says what `wf ls` says: `try 2 asked (…) — the next tick files it`.
  */
-export function OfferRow({ runId, offer }: { runId: string; offer: Offer }) {
-  const queryClient = useQueryClient();
+export function OfferRow({ runId, offer }: { runId: string; offer: Answer }) {
   const [message, setMessage] = useState('');
   // A check that did not finish is run again first, as `wf decide` offers it: the run spent no retry on it.
   const [mode, setMode] = useState<RetryMode>(offer.kind === 'try-again' && offer.unfinished ? 'recheck' : 'nudge');
   const field = useId();
   // A recheck files no session, so it carries no message — `messageRefusal` refuses one — and the box is closed while it is chosen.
   const rechecking = mode === 'recheck';
-  const ask = useMutation({
-    mutationFn: (how: { mode: RetryMode; message?: string }) => askTry(runId, offer.step, how),
-    onSuccess: () => {
-      setMessage('');
-      // The run as the api has it now: the step's note says the try is asked, and the step waits on nobody.
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
-    },
-  });
+  const ask = useAsk(runId, offer.step, () => setMessage(''));
   // Once the api says the try is asked, its words show rather than this row's; a step waiting on you again later starts afresh.
   const { reset } = ask;
   useEffect(() => {
@@ -152,7 +145,7 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Offer }) {
       <li data-offer="asked" data-step={offer.step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
         <strong>{offer.step}</strong>{' '}
         <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
-          {offer.kind === 'asked' ? (offer.note ?? `try ${offer.try} asked`) : `try ${ask.data?.try} asked — the next tick files it`}
+          {offer.kind === 'asked' ? (offer.note ?? `try ${offer.try} asked`) : ask.isSuccess ? askedSaid(ask.data) : null}
         </span>
       </li>
     );
@@ -213,13 +206,84 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Offer }) {
           </fieldset>
         </div>
       </form>
-      {ask.isError && (
-        <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Not asked. The api refused it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{ask.error.message}</p>
-        </div>
-      )}
+      {ask.isError && <Refusal error={ask.error} />}
     </li>
+  );
+}
+
+/**
+ * Continue a session the harness blocked, from the banner beside what it said last, as `wf retry` continues it: a nudge — with something to
+ * tell it, if you like — which the package's `retry()` takes for such a step, and the tick honours by stopping the session, then filing the
+ * try, which continues it told what happened. The api's refusal shows beside the button, verbatim. Once the api has the ask, what the tick
+ * does with it (`askedSaid`), until the run is read again and the banner says it in `wf ls`'s words.
+ */
+export function Continue({ runId, step }: { runId: string; step: string }) {
+  const [message, setMessage] = useState('');
+  const field = useId();
+  const ask = useAsk(runId, step, () => setMessage(''));
+  if (ask.isSuccess) {
+    return (
+      <p data-asked className="font-mono text-xs">
+        {askedSaid(ask.data)}
+      </p>
+    );
+  }
+  return (
+    <div data-continue className="space-y-2">
+      <form
+        aria-label={`Continue ${step}`}
+        className="space-y-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          // Nothing written is a nudge with no message, as `wf retry` sends one; something written goes as it was typed, as `--message` takes it.
+          ask.mutate({ mode: 'nudge', ...(message.trim() ? { message } : {}) });
+        }}
+      >
+        <label htmlFor={field} className="sr-only">
+          {`What to tell ${step}, if anything`}
+        </label>
+        <textarea
+          id={field}
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          rows={2}
+          placeholder="Anything to tell it (optional): the next try is told it."
+          className={TEXTAREA}
+        />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button type="submit" disabled={ask.isPending} className={BUTTON}>
+            {ask.isPending ? 'Asking…' : 'Continue'}
+          </button>
+          <p className="text-xs">
+            as <code>{`wf retry ${runId} ${step}`}</code> asks it: the next tick stops its session, and files the try once it has stopped
+          </p>
+        </div>
+      </form>
+      {ask.isError && <Refusal error={ask.error} />}
+    </div>
+  );
+}
+
+/** An ask for a step's next try through the api (`askTry`), and the run read again once the api has it. */
+function useAsk(runId: string, step: string, onAsked: () => void) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (how: { mode: RetryMode; message?: string }) => askTry(runId, step, how),
+    onSuccess: () => {
+      onAsked();
+      // The run as the api has it now: the step's note says the try is asked, and the step waits on nobody.
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+    },
+  });
+}
+
+/** The api's refusal of an ask, beside what made it, verbatim: the package's sentence, or the api's own about the request. */
+function Refusal({ error }: { error: Error }) {
+  return (
+    <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">Not asked. The api refused it:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error.message}</p>
+    </div>
   );
 }
 

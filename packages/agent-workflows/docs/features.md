@@ -975,6 +975,61 @@ What it leaves:
   `packages/x/plugins/*` puts `packages/x/plugins/p/src/a.ts` under `packages/x`. A lesson in the inner package's `docs/`
   still counts, through `lessonGlobs`; with `**` it does not.
 
+### A run lists its steps in the order they run
+
+`run.steps` was keyed in the folder's file order, which is alphabetical. So `wf start` printed `3 step(s): implement → plan →
+review` for `plan → implement ⇄ review`, and `wf ls`, `wf decide` and the board's step list read that workflow backwards.
+
+What was built:
+
+- `orderSteps(steps)` in `workflow.ts`, pure. Each step comes after every step its `after` names, and otherwise keeps the
+  order it was given. `loadWorkflows` hands it a folder's files sorted by name, so a folder's siblings come by name, as §6 asked.
+  A workflow frozen in an order that already runs forward is kept as frozen: the board lists a run's steps in its record's
+  order, and apps/api holds that to `list`'s. `resume:` is already in `after`, and `loop:`, the edge back, orders nothing. It
+  ends on any input, since a record read back is not validated again: an `after` naming a step that is not there orders
+  nothing, and steps waiting on each other go last, as given.
+- `loadWorkflows` returns steps in that order. So `start` freezes `workflow` and keys `run.steps` in it, and the api's
+  Workflows page gets it too.
+- `stepsOf` orders what it reads back, so a record keyed alphabetically lists in run order, whether its workflow was frozen
+  alphabetically or never frozen.
+- `namesInOrder(run, steps)` in `run.ts`, pure: the record's steps in that order, then any the workflow no longer has. `wf
+  decide` prints each step's section in it, and reads the branches steps worked on in it when no terminal step has one yet.
+
+What was measured:
+
+- `test/workflow.test.ts` (2):
+  - `orderSteps`: `plan → implement ⇄ review` given alphabetically; a fan-out's siblings by name as a folder lists them; two
+    roots and a follower whose name sorts first; an order that already runs forward kept as given, `r-20`'s shape among them;
+    a fan-out given out of order, which comes out root first, siblings as given, join last; `resume:`; an `after` naming a step
+    that is not there; a cycle last, as given; and its input left as it was.
+  - A folder `plan → implement ⇄ review` loads as plan, implement, review.
+- `test/planned-workflow.test.ts`: the repository's `workflows/dev-planned` is now held to plan, implement, review. Before, it
+  was sorted, then compared.
+- `test/run.test.ts` (1): `namesInOrder` on a record keyed alphabetically, with a step the workflow no longer has.
+- `test/store.test.ts` (2), on a real repository with `start`, `advance` and `main` run for real:
+  - `wf start` prints `3 step(s): plan → implement → review`, and freezes the workflow and keys the record in that order.
+    `wf ls` prints the rows in it.
+  - Two records rewritten in the folder's order, one frozen that way and one with no workflow: `stepsOf`, `list` and
+    `wf ls` read plan, implement, review.
+  - `wf decide` on a run waiting on you, its review unsigned, prints the plan, implement and review sections in that order,
+    before and after its record is rewritten in the folder's order.
+- Each guard was broken on purpose and the tests rerun. With `loadWorkflows` and `stepsOf` unordered, 4 tests fail. With
+  `stepsOf` alone unordered, 2 fail: the old records. With `wf decide` reading the record's keys, 1 fails. With ties broken by
+  name again, 1 fails: the order kept as given.
+- The first version broke ties by name, and the root suite failed one apps/api test, *the api's words, and who it says is
+  waited on, are `list`'s*. Its fixture `r-20` froze seven roots and then `ship`, out of name order. The api lists them as
+  frozen, and `list` had sorted them. Ties now go by the order given, and apps/ is unchanged.
+- agent-workflows: 356 tests, 355 passed, and one was skipped, the live browser test. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 356 (355 passed, 1 skipped), api 114 and web 158, all passing.
+
+What it leaves:
+
+- **The board reads an old record in its keys' order.** The api takes a run's steps from `run.workflow`, else the folder, else
+  the record's keys, and does not order them. A run started before this lists alphabetically on its page, though `wf ls` lists
+  it in order. Every run started since is keyed in order, so it lists in order everywhere.
+- **`wf cancel` names what it asked to stop in the record's order.** `inFlight` has no workflow to order by, and `wf show`
+  prints the record as it was written.
+
 ## 1. Forgetting a run (`wf rm`)
 
 **Why.** Runs, worktrees and branches accumulate, and clearing them is manual: `git worktree

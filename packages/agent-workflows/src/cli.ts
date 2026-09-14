@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, decide, diffStat, dueNote, engine, inFullLines, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
 import { workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -415,7 +415,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // whether among them are the files an agent reads as instructions or those that decide what its
       // check means. Then the lesson — CLAUDE.md's "When you miss", held to — and those check files in
       // full, because a check that passed says nothing about a check that was changed to pass.
-      const touched = branchesToRead(decision.branches, Object.values(run.steps).map((s) => s.branch))
+      const touched = branchesToRead(decision.branches, namesInOrder(run, steps).map((name) => run.steps[name]!.branch))
         .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
       if (touched.length) {
         console.log();
@@ -432,7 +432,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // what the run's check of the step said: the machine's word before the agent's. Below it, what the
       // step declared for the steps after it — read off the engine's record, not a branch, so dropping
       // the branch does not drop the review.
-      for (const name of Object.keys(run.steps)) {
+      // In the order the steps run, whatever order the record is keyed in.
+      for (const name of namesInOrder(run, steps)) {
         const c = closeouts[name];
         const check = checks[name];
         // A step the run filed consumed something, closeout or not; one never filed has nothing to say.

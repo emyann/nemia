@@ -17,9 +17,9 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export { artifactLines, dueNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Wait } from './run.ts';
-import { fansOut, loadWorkflows, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
+import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
@@ -58,12 +58,14 @@ export const readRun = (id: string): Run => {
 };
 
 /**
- * The run's steps: the workflow it froze at `wf start`.
+ * The run's steps: the workflow it froze at `wf start`, in the order they run (`orderSteps`).
  *
  * The folder is read only for a record from before the run froze its workflow — and a run started
  * today never reaches that branch, so nothing written into the folder after `wf start` reaches it.
+ * Ordered on the way out too, so a record frozen before steps were ordered — in the folder's order,
+ * alphabetical — reads in the order its steps run, as one written since does.
  */
-export const stepsOf = (run: Run): Workflow[] => run.workflow ?? loadWorkflows(run.workflowDir);
+export const stepsOf = (run: Run): Workflow[] => orderSteps(run.workflow ?? loadWorkflows(run.workflowDir));
 
 /**
  * Write down that this run is cancelled, and answer with the time that now stands.
@@ -743,6 +745,7 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
     workflow: steps,
     ...(after.length ? { after: [...after] } : {}),
     branch,
+    // Keyed in the order the steps run, as `loadWorkflows` gives them: what `wf ls`, `wf decide` and the board list a run's steps in.
     steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
     createdAt: new Date().toISOString(),
   };

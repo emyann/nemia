@@ -82,6 +82,13 @@ workflow folder works too, looked at first. The board lists them, and the folder
 `~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
 `GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
 
+A run lists its steps in the order they run, not in the folder's. Each step comes after every step its `after` names, and
+otherwise keeps the order it was given, which for a folder is by name; a loop's edge back orders nothing (`orderSteps`). So
+`wf start` on `plan → implement ⇄ review`, whose files sort implement, plan, review, prints `3 step(s): plan → implement → review`.
+The run's record is keyed in that order, and `wf ls`, `wf decide` and the board read it so. A record from before the order,
+keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf decide`; one whose order already runs forward
+reads as it was written.
+
 A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `effort`,
 `permissionMode`, `tools`, `disallow`, `deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value

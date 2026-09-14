@@ -404,6 +404,16 @@ export const stepTaskId = (run: Pick<Run, 'id'>, step: string, n = 1): string =>
   n <= 1 ? `${run.id}-${step}` : `${run.id}-${step}-try${n}`;
 
 /**
+ * The names on a run's record in the order its steps run — `steps` as `stepsOf` gives them (`orderSteps`) — then any the record has that
+ * the workflow does not, in the record's order. Pure. What `wf decide` prints each step in: a record written before steps were ordered is
+ * keyed in the folder's order, and read by its keys a `plan → implement ⇄ review` run printed implement first.
+ */
+export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<Workflow, 'name'>[]): string[] => [
+  ...steps.map((s) => s.name).filter((name) => Object.hasOwn(run.steps, name)),
+  ...Object.keys(run.steps).filter((name) => !steps.some((s) => s.name === name)),
+];
+
+/**
  * The steps whose leftovers the run commits on this pass. Pure.
  *
  * Every FINISHED step — succeeded, failed or stopped. A failed step still blocks what follows; handing

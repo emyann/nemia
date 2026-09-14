@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -24,6 +24,14 @@ test('a fresh run files only the step with nothing in front of it', () => {
   const a = assess(STEPS, run({ implement: null, review: null }), phases({}));
   assert.deepEqual(a.ready, ['implement']);
   assert.equal(a.status, 'running');
+});
+
+test("`namesInOrder`: a record's steps in the order they run — a record keyed in the folder's order too — then any the workflow does not have, as the record has them", () => {
+  const planned = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
+  const legacy = run({ implement: 't2', plan: 't1', review: null, 'gone-step': 't0' });
+  assert.deepEqual(Object.keys(legacy.steps), ['implement', 'plan', 'review', 'gone-step']);
+  assert.deepEqual(namesInOrder(legacy, planned), ['plan', 'implement', 'review', 'gone-step']);
+  assert.deepEqual(namesInOrder(run({ implement: 't1' }), planned), ['implement'], 'a step the record does not have is not named');
 });
 
 test('the next step waits while the first one runs', () => {

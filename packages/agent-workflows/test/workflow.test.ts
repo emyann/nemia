@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fansOut, loadWorkflows, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
+import { fansOut, loadWorkflows, orderSteps, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
@@ -167,6 +167,44 @@ test('resuming a step on a different harness is refused', () => {
     { name: 'respond', after: ['implement'], body: 'y', harness: 'codex', resume: 'implement' },
   ];
   assert.throws(() => validate(steps), /different harness/);
+});
+
+test("`orderSteps`: every step after each step its `after` names, and otherwise as given — by name, as a folder lists them — so an order that already runs forward is kept, and a loop's edge back orders nothing", () => {
+  const names = (steps: readonly Workflow[]) => orderSteps(steps).map((s) => s.name);
+  const byName = (steps: readonly Workflow[]) => [...steps].sort((a, b) => (a.name < b.name ? -1 : 1));
+  // plan → implement ⇄ review, given in the folder's order: alphabetical.
+  assert.deepEqual(names([step('implement', ['plan']), step('plan'), { ...step('review', ['implement']), loop: 'implement' }]), ['plan', 'implement', 'review']);
+  // A fan-out as a folder lists it: the siblings by name, and the join after both.
+  const fan = [step('m', ['b', 'z']), step('z', ['a']), step('b', ['a']), step('a')];
+  assert.deepEqual(names(byName(fan)), ['a', 'b', 'z', 'm']);
+  // Two roots and a follower as a folder lists them: the follower once its root is placed, though its name sorts first.
+  assert.deepEqual(names(byName([step('x'), step('b', ['x']), step('c')])), ['c', 'x', 'b']);
+  // An order that already runs forward — a workflow frozen so, which the board lists as its record has it — is kept as given, not sorted.
+  const frozen = [step('build'), step('test'), step('e2e'), step('lint'), step('docs'), step('notes'), step('plan'), step('ship', ['test'])];
+  assert.deepEqual(names(frozen), frozen.map((s) => s.name));
+  assert.deepEqual(names([step('a'), step('z', ['a']), step('b', ['a']), step('m', ['b', 'z'])]), ['a', 'z', 'b', 'm']);
+  // Given out of order, only what comes before what it waits on moves: the root first, the siblings as given, the join after both.
+  assert.deepEqual(names(fan), ['a', 'z', 'b', 'm']);
+  // `resume:` is in `after` already.
+  assert.deepEqual(names([parseWorkflow('respond', '---\nresume: implement\n---\nanswer it\n'), step('implement')]), ['implement', 'respond']);
+  // It ends on what `validate` refuses, for a record read back: an `after` naming no step here orders nothing, and steps waiting on each other go last, as given.
+  assert.deepEqual(names([step('b', ['ghost']), step('a', ['b'])]), ['b', 'a']);
+  assert.deepEqual(names([step('y', ['x']), step('x', ['y']), step('a')]), ['a', 'y', 'x']);
+  // Pure: what it was given is left as it was.
+  const given = [step('b', ['a']), step('a')];
+  orderSteps(given);
+  assert.deepEqual(given.map((s) => s.name), ['b', 'a']);
+});
+
+test("REFUSED before, now in order: a folder `plan → implement ⇄ review` loads as plan, implement, review — not in its files' order, implement, plan, review", () => {
+  const dir = folder({
+    'implement.md': '---\nafter: plan\n---\nImplement it.\n',
+    'plan.md': 'Plan it.\n',
+    'review.md': '---\nafter: implement\nloop: implement\noutput: review.schema.json\n---\nReview it.\n',
+    'review.schema.json': JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }),
+  });
+  assert.deepEqual(fs.readdirSync(dir).filter((f) => f.endsWith('.md')).sort(), ['implement.md', 'plan.md', 'review.md'], 'the folder alone reads backwards');
+  assert.deepEqual(loadWorkflows(dir).map((s) => s.name), ['plan', 'implement', 'review']);
 });
 
 test('resuming a step that does not exist is refused', () => {

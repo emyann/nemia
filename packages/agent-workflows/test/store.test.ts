@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan, stepsOf } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -2242,4 +2242,84 @@ test("a round that continues the loop's target hands it what was said to its las
   const at = brief.indexOf('## Said to your session');
   assert.ok(at > 0 && at < brief.indexOf('## From review'), brief);
   assert.ok(brief.includes('```text\nLeave the parser alone.\n```'), brief);
+});
+
+// ─── the order a run's steps are listed in ──────────────────────────────────
+
+/** `plan → implement ⇄ review`, whose files sort implement, plan, review. */
+const plannedFolder = () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'planned-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'plan.md'), 'plan it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nloop: implement\noutput: review.schema.json\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }));
+  return dir;
+};
+
+test("REFUSED before, now in order: `wf start` on `plan → implement ⇄ review` says plan → implement → review, keys the record so and `wf ls` lists it so — and a record written in the folder's order, frozen or not, reads in the steps' order", async (t) => {
+  const repo = aRepo();
+  const b = board();
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['start', 'plan the flag', '--workflows', plannedFolder(), '--repo', repo], b.e);
+  const [id, said] = printed[0]!.split('  ');
+  assert.equal(said, '3 step(s): plan → implement → review');
+  const run = readRun(id!);
+  assert.deepEqual([Object.keys(run.steps), run.workflow?.map((s) => s.name)], [['plan', 'implement', 'review'], ['plan', 'implement', 'review']]);
+
+  /** The step names `wf ls <run>` prints, in the order it prints them. */
+  const rows = async (runId: string) => {
+    printed.length = 0;
+    await main(['ls', runId], b.e);
+    return printed.slice(1).map((line) => /^ {3}([a-z][\w-]*) /.exec(line)?.[1]).filter(Boolean);
+  };
+  assert.deepEqual(await rows(id!), ['plan', 'implement', 'review']);
+
+  // Written before steps were ordered: keyed in the folder's order, with its workflow frozen in that order or not frozen at all.
+  const folderOrder = ['implement', 'plan', 'review'];
+  for (const frozen of [true, false]) {
+    const legacyId = `${id}-${frozen ? 'frozen' : 'unfrozen'}`;
+    const { workflow, steps, ...rest } = run;
+    fs.writeFileSync(path.join(ROOT, 'runs', `${legacyId}.json`), JSON.stringify({
+      ...rest, id: legacyId,
+      ...(frozen ? { workflow: folderOrder.map((name) => workflow!.find((s) => s.name === name)) } : {}),
+      steps: Object.fromEntries(folderOrder.map((name) => [name, steps[name]])),
+    }, null, 2));
+    const legacy = readRun(legacyId);
+    assert.deepEqual([Object.keys(legacy.steps), legacy.workflow?.map((s) => s.name)], [folderOrder, frozen ? folderOrder : undefined], 'as it was written');
+    assert.deepEqual(stepsOf(legacy).map((s) => s.name), ['plan', 'implement', 'review'], legacyId);
+    assert.deepEqual((await list(b.e, legacy)).steps.map((s) => s.name), ['plan', 'implement', 'review'], legacyId);
+    assert.deepEqual(await rows(legacyId), ['plan', 'implement', 'review'], legacyId);
+  }
+});
+
+test("`wf decide` prints each step in the order the steps run — on a record keyed in the folder's order too", async (t) => {
+  const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: plannedFolder(), isolate: false });
+  const b = board();
+  // plan and implement sign off with no check; review signs off without the `again` it declares, so the run waits on you.
+  for (const name of ['plan', 'implement', 'review']) {
+    assert.deepEqual((await advance(b.e, readRun(run.id))).filed, [name]);
+    b.settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  }
+  const { main } = await import('../src/cli.ts');
+  const sections = async () => {
+    const out: string[] = [];
+    const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.map(String).join(' ')); });
+    try { await main(['decide', run.id], b.e); } finally { log.mock.restore(); }
+    const lines = out.join('\n').split('\n');
+    assert.ok(lines.some((l) => l.startsWith('  UNSIGNED: review')), lines.join('\n'));
+    return lines.filter((l) => /^ {2}(plan|implement|review)$/.test(l)).map((l) => l.trim());
+  };
+  assert.deepEqual(await sections(), ['plan', 'implement', 'review']);
+
+  const record = readRun(run.id);
+  const folderOrder = ['implement', 'plan', 'review'];
+  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify({
+    ...record,
+    workflow: folderOrder.map((name) => record.workflow!.find((s) => s.name === name)),
+    steps: Object.fromEntries(folderOrder.map((name) => [name, record.steps[name]])),
+  }, null, 2));
+  assert.deepEqual(Object.keys(readRun(run.id).steps), folderOrder);
+  assert.deepEqual(await sections(), ['plan', 'implement', 'review']);
 });

@@ -681,25 +681,12 @@ owner is not mid-run.
 
 **Open** — what is still to do, oldest first; each names its owner.
 
-### Settled
-
-Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
-
-- **agent-workflows and the board (step order):** `run.steps` is keyed in the folder's file order —
-  alphabetical — so `wf ls` and the board show `implement · respond · review` for a workflow that
-  runs implement → review → respond. Order steps by `after` (a topological sort in `workflow.ts`,
-  applied at `wf start`) so a row reads as the DAG runs. → G, with the decider screen.
 - **apps/api tests hit the live registry.** Every `e.view` runs `claude agents --json` against this
   machine; under parallel turbo the api test process dies with "Promise resolution is still pending
   but the event loop has already resolved" while other packages' tests run beside it (seen at C's
   merge, twice; serial runs pass every time, ~23 s). The api's `engine()` should take a fake
   harness under test (`createEngine({ harnesses })` accepts a `PromiseRunner`); until then verify
   merges with `npx turbo run test --concurrency=1`. → the next apps package.
-- **the artifacts directory and Codex (U1's review):** every brief now names
-  `runs/<id>/artifacts/<step>/`, and a Codex step in `workspace-write` cannot write there (only the
-  worktree and tmp; the engine passes no `--add-dir`). Latent while the reviewer is Opus. The fix is
-  hkb's `exports`: a step lists a relative path under `artifacts` and the run *collects* it into the
-  directory at hand-off, before the check — then no step needs to write outside its workspace. → with R.
 - **the settings' prefix allows reach the build and the e2e by other names (D1's round-2 review, 2026-09-14):** the
   reviewers are denied `Bash(npm run build)` and `Bash(npm run e2e)` by machinery now, but `.claude/settings.json`
   allows `Bash(npx turbo run test:*)` and `Bash(node --test:*)`, so `npx turbo run test build` builds the web app and
@@ -707,26 +694,6 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
   and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
   *W5, `d69a5fd`.*
-
-- **a stale ask on a harness-blocked step that resumes by itself (W4's review, 2026-09-14):** `wf retry` on a step
-  whose session the harness blocked is due only while the engine says `needs-human`; if the session starts working
-  again before a tick stops it (a cross-session nudge, no `wf up`), the ask is neither due nor spent — `wf ls` shows
-  nothing — and files try 2 at once if the step later fails, stops or is unsigned, ahead of `retries:`. A task with
-  no `stopRequested` tells it apart. Stop the session anyway, or name it in `wf ls`/`wf decide`. → agent-workflows,
-  small (§6 item 24).
-  *W5, `d69a5fd`.*
-
-- **steering by message leaves no trace on the run (F2's review, finding 2):** the operator widened
-  a step's scope and added an ask through cross-session messages; the run's record shows only two
-  commit messages and a closeout, and the reviewer rightly could not tell an authorised change from
-  a step overstepping. A mid-flight instruction to a step should be written on the run — an
-  `asks/` file the tick composes into the record and `wf decide` prints — the same one-writer
-  shape as `.cancelled`. → with F's ask files.
-- **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
-  a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
-  for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running
-  session by hand. A small convention would do: `wf start --input <file>` copies into
-  `runs/<id>/inputs/` and every brief gains one line naming the directory. → with J.
 - **a login refresh race blocks concurrent sessions (2026-09-13, B3 and I):** both `implement` sessions
   stopped within two minutes of each other on *"Could not refresh your login because another Claude Code
   process is refreshing it (or exited mid-refresh) · Try again in a minute"* — an OAuth refresh raced between
@@ -740,11 +707,6 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   `packages/agent-engine/test/resume.test.ts:134` expects the same usage the first try recorded, so the
   refusal rests on the view assertion alone; have the retry write a different number of responses. → the
   next engine run, with anything else that opens `resume.test.ts`.
-- **`radius` takes the base's `workspaces` globs as written (G's round-2 review):** `./packages/*` yields a
-  regexp that never matches `packages/x`, so every package's changes fall into one `packages` group and
-  `./packages/*/docs/` never counts a lesson; `packages/**` would count `packages/x/src/docs/` again. This
-  repo uses `packages/*` and `apps/*`, so unaffected. Strip a leading `./` when the workspaces are read,
-  refuse or note `**`, and a radius test with `['./packages/*']`. → agent-workflows, small.
 - **where a run's hour goes is not on the board (operator, 2026-09-13):** measured off the engine journals
   for B4 (two rounds, 40 min wall): implement 19m42s + 5m35s, its checks 58s + 57s, reviews 6m10s + 3m24s;
   sessions and checks 36m47s, slot waits 1m13s, ticks and worktrees 1m56s. S2's implement alone 39m11s
@@ -768,13 +730,51 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   them; `wf decide` prints them under the step, a continued session is handed them again, and the session page has the
   prompt box. The ask-file shape was not needed: the engine's journal is the one record.*
 
+### Settled
+
+Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+
+- **agent-workflows and the board (step order):** `run.steps` is keyed in the folder's file order —
+  alphabetical — so `wf ls` and the board show `implement · respond · review` for a workflow that
+  runs implement → review → respond. Order steps by `after` (a topological sort in `workflow.ts`,
+  applied at `wf start`) so a row reads as the DAG runs. → G, with the decider screen.
+- **the artifacts directory and Codex (U1's review):** every brief now names
+  `runs/<id>/artifacts/<step>/`, and a Codex step in `workspace-write` cannot write there (only the
+  worktree and tmp; the engine passes no `--add-dir`). Latent while the reviewer is Opus. The fix is
+  hkb's `exports`: a step lists a relative path under `artifacts` and the run *collects* it into the
+  directory at hand-off, before the check — then no step needs to write outside its workspace. → with R.
+  *W5, `d69a5fd`.*
+- **a stale ask on a harness-blocked step that resumes by itself (W4's review, 2026-09-14):** `wf retry` on a step
+  whose session the harness blocked is due only while the engine says `needs-human`; if the session starts working
+  again before a tick stops it (a cross-session nudge, no `wf up`), the ask is neither due nor spent — `wf ls` shows
+  nothing — and files try 2 at once if the step later fails, stops or is unsigned, ahead of `retries:`. A task with
+  no `stopRequested` tells it apart. Stop the session anyway, or name it in `wf ls`/`wf decide`. → agent-workflows,
+  small (§6 item 24).
+  *W5, `d69a5fd`.*
+- **steering by message leaves no trace on the run (F2's review, finding 2):** the operator widened
+  a step's scope and added an ask through cross-session messages; the run's record shows only two
+  commit messages and a closeout, and the reviewer rightly could not tell an authorised change from
+  a step overstepping. A mid-flight instruction to a step should be written on the run — an
+  `asks/` file the tick composes into the record and `wf decide` prints — the same one-writer
+  shape as `.cancelled`. → with F's ask files.
+- **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
+  a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
+  for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running
+  session by hand. A small convention would do: `wf start --input <file>` copies into
+  `runs/<id>/inputs/` and every brief gains one line naming the directory. → with J.
+  *W5, `d69a5fd`.*
+- **`radius` takes the base's `workspaces` globs as written (G's round-2 review):** `./packages/*` yields a
+  regexp that never matches `packages/x`, so every package's changes fall into one `packages` group and
+  `./packages/*/docs/` never counts a lesson; `packages/**` would count `packages/x/src/docs/` again. This
+  repo uses `packages/*` and `apps/*`, so unaffected. Strip a leading `./` when the workspaces are read,
+  refuse or note `**`, and a radius test with `['./packages/*']`. → agent-workflows, small.
+  *W5, `d69a5fd`.*
 - **workers could not search the web (S3's plan step, 2026-09-14):** its risks said WebSearch and `claude agents
   --help` were denied to it. Measured with `claude -p` from this checkout: `WebSearch` denied in `dontAsk` and in
   `auto` without an allow rule, `WebFetch` of code.claude.com allowed in both. `.claude/settings.json` now allows
   `WebSearch` and `WebFetch` (a bare rule each); re-measured allowed in `dontAsk`. The operator's own facts about
   the attach primitive and the inbox socket went to S3's implement by message (no trace on the run — `say` is
   what S3 builds). → settings, done by hand (§6 item 26).
-
 - **`decision` says shipped for a branch with nothing past its base (P1's round-3 review, 2026-09-14):** a
   result branch is cut at the run's base, so a terminal step that ended failed, blocked or unsigned with nothing
   committed leaves its branch on the base, and `decision` calls the run shipped — `wf decide` hides the failure, and
@@ -783,7 +783,6 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   → agent-workflows, W4 (§6 item 21).
   *W4, `406a510`: `isShipped` says which yes it is (`Shipped`), and `decision` takes `'unchanged'` only for a run whose
   steps all succeeded.*
-
 - **`needs-human` on the board says nothing about what is needed (operator, 2026-09-14, on Q1):** the card and the
   node show the chip and nothing else. Two cases hide behind it. A step that signed off `blocked` has its question in
   `needs`, which only the inspector's closeout shows (`Needs:`), two clicks away — the card, the node and a banner on
@@ -795,7 +794,6 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   *Q2, `1e471b7`: the question is on the card, the node and a banner; a harness-blocked session is named with its
   last line; the answer box posts to the package's `retry()`. B8, `8871981`: the banner's Continue stops the blocked
   session and files the nudge, through the package (W4).*
-
 - **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
   mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
   `bypassPermissions`). What remains is that A's `PERMISSION_MODES` in `workflow.ts` is a copy of

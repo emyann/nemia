@@ -808,6 +808,11 @@ owner is not mid-run.
   `tools` are not rows; the Output tab's artifacts cannot be opened. B7: `tries` on the api's step, effective
   values marked `default`, a Rounds section and per-try Output, and an artifacts route serving a listed
   file by name (inside the run-owned directory, never a path) with images inline. → apps, filed after B6/S2.
+- **the session stream after a reconnect (S2's round-2 review):** only a `readable` event clears the retry
+  error on the page, and a fresh server stream never sends one, so after an api restart the red "reading
+  again" line stays until the task settles while events flow. Clear it on the EventSource `open`. → apps,
+  with B7. Also from S2, measured: one open stream on a running Claude step is two `claude agents` calls a
+  second (~0.22 s each); the engine's open-issues names the fix (a runner verb that finds one session).
 
 ## 5. What the plan does not do
 

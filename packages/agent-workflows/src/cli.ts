@@ -415,9 +415,11 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'retry': {
       const [runId, stepName] = rest;
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
-      const { ask, file } = await retry(e, runId, stepName, retryHow(rest.slice(2)));
+      // A step whose session its harness blocked is taken too: the tick stops that session, then files the try.
+      const { ask, file, stopFirst } = await retry(e, runId, stepName, retryHow(rest.slice(2)), { stopBlocked: true });
       const how = ask.model ? `--model ${ask.model}` : `--${ask.mode}`;
-      console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — the next tick files it, once`);
+      const then = stopFirst ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped' : 'the next tick files it, once';
+      console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`);
       console.log(`   ${file}`);
       return;
     }

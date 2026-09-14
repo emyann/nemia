@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -342,6 +342,46 @@ test('a run that worked directly on its base branch is never read as shipped', (
 test('a run that never filed anything has no branch to ship, and is not "shipped"', () => {
   const d = decision(STEPS, run({ implement: null, review: null }), phases({}), () => true);
   assert.equal(d.kind, 'running');
+});
+
+test("REFUSED: a result branch with nothing past the base is shipped only when every step succeeded — failed, blocked, unsigned or refused by its check, the run is decided; work past the base on the base branch is shipped whatever the steps said", () => {
+  // A result branch is cut at the run's base, so git calls one nobody committed to "on the base branch". Read as shipped, a run whose
+  // last step failed said `shipped`: `wf decide` hid the failure, and a run waiting on it started.
+  const unchanged = () => 'unchanged' as const;
+  const says = (outcome: Closeout['outcome']) => (): Closeout => ({ outcome, summary: 's', artifacts: [] });
+  const cases: Array<[string, Decision, string, string[]]> = [
+    ['failed', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), unchanged), 'failed', ['review']],
+    ['stopped', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'stopped' }), unchanged), 'failed', ['review']],
+    ['blocked', decision(STEPS, finished(), DONE, unchanged, says('blocked')), 'blocked', []],
+    ['unsigned', decision(STEPS, finished(), DONE, unchanged, () => undefined, () => true), 'blocked', []],
+  ];
+  for (const [why, d, outcome, failed] of cases) {
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed, d.branches], [outcome, failed, ['wf/r-1/review']], why);
+  }
+  const checked: Workflow[] = [step('implement'), { ...step('review', ['implement']), check: 'npm test' }];
+  const refused = decision(checked, run({}, { steps: { implement: { taskId: 't1', branch: 'wf/r-1/implement' }, review: { taskId: 't2', branch: 'wf/r-1/review', check: { taskId: 'c2' } } } }),
+    phases({ t1: 'succeeded', t2: 'succeeded', c2: 'failed' }), unchanged, says('done'), () => true, () => 1);
+  assert.deepEqual(refused.kind === 'awaiting' && [refused.outcome, refused.failedCheck], ['failed', ['review']], 'refused by its check');
+
+  // Every step succeeded, with nothing to commit: shipped, as before.
+  assert.deepEqual(decision(STEPS, finished(), DONE, unchanged), { kind: 'shipped', branches: ['wf/r-1/review'] });
+  assert.deepEqual(decision(STEPS, finished(), DONE, unchanged, says('done'), () => true), { kind: 'shipped', branches: ['wf/r-1/review'] });
+  // Work past the base, merged by a person: shipped though a step failed.
+  assert.deepEqual(decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), () => true), { kind: 'shipped', branches: ['wf/r-1/review'] });
+
+  // A fan-out ships on its work only when every branch has some on the base; one that never moved leaves a failed run decided.
+  const fan = [step('implement'), step('docs', ['implement']), step('tests', ['implement'])];
+  const r = run({}, { steps: { implement: { taskId: 't1', branch: 'wf/r-1/implement' }, docs: { taskId: 't2', branch: 'wf/r-1/docs' }, tests: { taskId: 't3', branch: 'wf/r-1/tests' } } });
+  const half = (b: string) => (b === 'wf/r-1/docs' ? true : 'unchanged' as const);
+  const failing = decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), half);
+  assert.deepEqual(failing.kind === 'awaiting' && [failing.outcome, failing.failed], ['failed', ['tests']]);
+  assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), half).kind, 'shipped');
+  assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), () => true).kind, 'shipped');
+
+  // Git is asked once a branch, and not past the first branch that is not on the base.
+  const asked: string[] = [];
+  decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), (b) => { asked.push(b); return b !== 'wf/r-1/docs' && 'unchanged'; });
+  assert.deepEqual(asked, ['wf/r-1/docs']);
 });
 
 // ─── the closeout ───────────────────────────────────────────────────────────
@@ -814,6 +854,38 @@ test('`wf retry` is refused, saying what to do instead: a step still running, a 
   assert.equal(refusal(onTry(SPENT), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1), null, 'a refusal past retries');
   assert.equal(refusal(run({ implement: 't1', review: null }), { t1: 'stopped' }), null, 'a session the harness stopped');
   assert.equal(retryRefusal(RETRIED, run({ implement: 't1', review: null }), 'implement', { mode: 'fresh' }, phases({ t1: 'succeeded' }), blocked, asked), null, 'blocked, and settled');
+});
+
+test("REFUSED before, now accepted: a step whose session its harness blocked, with nothing signed, may be asked a nudge or a fresh session when the harness's word is given — a try due that stops the session first; --recheck, a session still working, one that signed off, and a caller with no word of the harness are refused as before", () => {
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'running' });
+  const needsHuman = (id: string) => id === 't1';
+  const nothingSigned = () => undefined;
+  const refusal = (how: RetryHow, blockedOf: (id: string) => boolean = needsHuman, closeout: (s: string) => Closeout | undefined = nothingSigned) =>
+    retryRefusal(STEPS, r, 'implement', how, p, closeout, asked, () => undefined, [], blockedOf);
+
+  for (const how of [{ mode: 'nudge' }, { mode: 'fresh' }, { mode: 'fresh', model: 'opus' }, { mode: 'nudge', message: 'logged in again: carry on' }] as RetryHow[]) {
+    assert.equal(refusal(how), null, JSON.stringify(how));
+  }
+  assert.equal(refusal({ mode: 'recheck' }),
+    "--recheck runs a step's check again, and implement is running, its session blocked by its harness with nothing signed off: no check of it failed. Ask for another session instead: wf retry r-1 implement (or --fresh).");
+  assert.match(refusal({ mode: 'nudge' }, () => false)!, /^implement is still running, so there is nothing to try again until it ends/, 'a session still working');
+  assert.match(refusal({ mode: 'nudge' }, needsHuman, signedDone)!, /^implement is still running/, 'a session that signed off and runs on');
+  assert.match(retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, p, nothingSigned, asked)!, /^implement is still running/, "a caller with no word of the harness — the board's POST, today");
+
+  // The tick's reading: the ask is due, to stop the session first, and the run is still going, waiting on nobody.
+  const a = assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman);
+  assert.deepEqual([a.retry, a.ready, a.blocked, a.status], [[{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }], [], [], 'running']);
+  assert.deepEqual(assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)]).retry, [], "without the harness's word, nothing is due");
+  assert.deepEqual(decision(STEPS, r, p, nothingShipped, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman), { kind: 'running', waiting: ['implement'] }, 'live and due, named once');
+  const l = listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]);
+  assert.deepEqual([l.steps[0], l.waitingOnYou], [{ name: 'implement', status: 'needs-human', branch: null, note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' }, []]);
+  assert.equal(listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, undefined, 'a session still working: nothing due, nothing said');
+
+  // Once the session has settled, the same ask is due as any stopped step's, and filed.
+  assert.deepEqual(assess(STEPS, r, phases({ t1: 'stopped' }), nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman).retry,
+    [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }]);
+  assert.equal(listing(STEPS, r, shown({ t1: 'stopped' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, 'try 2 asked (--nudge) — the next tick files it');
 });
 
 test('a step tried again is told what became of the last try: continued, that and no more; a new session, the whole brief — and what the check said, as data', () => {

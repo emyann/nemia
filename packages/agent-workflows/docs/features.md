@@ -10,8 +10,9 @@ step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.work
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
 `rounds:` and `wf round` (§4 R), a step's `tools:` and `effort:` (§4 I) and its `disallow:` (§4b), the decider screen
 (§4 G), looking as a skill with `workflows/ui/` as implement ⇄ review (§4 U2), an answer for a step
-that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planned/`, §4 Q), and a run
-that waits on a run (`wf start --after`, the first half of §4 P) have shipped.
+that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planned/`, §4 Q), a run
+that waits on a run (`wf start --after`, the first half of §4 P), and three guards made to hold (a session
+the harness blocked tried again, `shipped` with nothing past the base, an ask file that is not an ask) have shipped.
 
 ## Shipped: the check
 
@@ -656,14 +657,135 @@ What it leaves:
   pass saw it finish has no tip, and its children read `(<branch> gone)` until a person starts them again
   without that `--after`. The same happens to a result branch rewritten after its tip was recorded and then
   deleted. With `wf up` running, a run is seen within a pass of finishing.
-- **A parent that finished failed with nothing committed has shipped.** That is `wf decide`'s reading, and the gate
-  shares it: a run that is not running, whose result branches are on the base branch, says `shipped` whatever its
-  steps ended as. It is rare, since a terminal step that never got a branch keeps a run awaiting. A fix belongs in
-  `decision`, where the board's decide would get it too.
+- **A parent that finished failed with nothing committed has shipped.** Fixed in `decision`, below (*Shipped: three
+  guards made to hold*): a branch with nothing past its base ships only a run whose steps all succeeded, so such a
+  parent is decided, and its child waits.
 - **A parent's tasks are viewed twice a pass** while a child waits on it and its branches are on the base: once for
   its own pass, and once for the gate.
 - **A parent is read once, on the way in.** A parent that ships a second change after its child started is
   not waited on again, by design. Later work is a new run with its own `--after`.
+
+## Shipped: three guards made to hold
+
+Plan §6 item 10 and two findings of §4b. Each was a guard that was inert or wrong.
+
+### A session the harness blocked can be tried again
+
+On 2026-09-13 and again on 2026-09-14, a `--bg` session stopped on "Could not refresh your login because another
+Claude Code process is refreshing it". The engine read it `needs-human`, and the step had no closeout. `stepStatus`
+called it `running`, `retryable` offered nothing, and `wf retry` refused it as still running. The only remedy was a
+hand `ae stop` and then `wf retry`, and the board could only print those two commands.
+
+What was built:
+
+- `retryable` takes the harness's word: `harnessBlocked`, the engine's `needs-human`, read off the views the pass
+  already has. A step that reads `running`, whose session is blocked and which signed nothing, may be asked
+  `--nudge` or `--fresh`, with a model or an answer if you like. `--recheck` stays refused, in words of its own,
+  since nothing of the step was checked. A session still working, and one that signed off and runs on, are refused
+  as before. `stepStatus` and the vocabulary are unchanged: the step still reads the engine's `needs-human`.
+- `wf retry` writes the ask as it writes any other. The tick reads the try as due, with `stopFirst`. It calls
+  `e.stop` on the step's task, unless the engine already holds a stop request for it, and files nothing. On a later
+  pass the engine has settled the task `stopped`, the same ask is due as a stopped step's, and the try is filed. A
+  nudge continues the session, since the settled task keeps the session's id. Nothing is carried between the passes:
+  the stop request is on the engine's record, and the ask is in its file.
+- What each command says:
+  - `wf ls` puts `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside the step's
+    `needs-human`.
+  - The pass that asks for the stop says so in its notes, once.
+  - `wf retry` prints that the next tick stops the session and files the try once it has stopped.
+  - `wf decide` names the step once in `still running`.
+- **Only `wf retry` opts in.** `retry()` takes the harness's word only when its caller passes `{ stopBlocked: true }`,
+  and the CLI does. The board's `POST …/retry` calls `retry()` without it, and `apps/api/test/asks.test.ts` holds that
+  call to a 409: its `held` case expects "held is still running", with a comment that names this item. Flipping the
+  default would have failed that test, and apps/ was not this change's to edit. So the board refuses what `wf retry`
+  now takes, until apps takes the same word (below).
+
+### `decision` no longer says `shipped` for a branch with nothing past its base
+
+A result branch is cut at the run's base, so git calls a branch nobody committed to "on the base branch". A terminal
+step that ended failed, blocked or unsigned with nothing committed left its branch there, and `decision` called the
+run shipped. `wf decide` hid the failure, and a run waiting on it with `--after` started.
+
+- `isShipped` now says which yes it is (`Shipped`). It returns `false` when the branch is not on the base branch,
+  `true` when commits past the run's base are on it, and `'unchanged'` when there are none. The last is asked with
+  `git merge-base --is-ancestor <branch> <baseRef>`, and a base git cannot read counts as `'unchanged'`, so such a
+  run goes to a person. A deleted branch is asked by its recorded tip, as before.
+- `decision` calls a run shipped on `true` whatever its steps said: a person merged real work. On `'unchanged'` it
+  calls it shipped only when the run's outcome is `succeeded`. It stays pure, and asks each branch once, stopping at
+  the first that is not on the base.
+- The api's call, `(branch) => isShipped(run, branch)`, compiles unchanged and gets the fix: the board's decide, a
+  parent's own `wf decide` and a child's gate read the same.
+
+### An ask file that is not an ask is refused by name
+
+A file at `runs/<id>.asks/retry-<step>-<n>` that does not read as an ask, such as `{}`, is honoured by no pass, and
+`wf ls` shows nothing asked. Yet `retry()` refused to write over it with "try n of step is already asked for. Wait
+for it", and the wait would have been for ever. Now `retry()` names the file, says why it is not an ask, and says to
+delete it and ask again. `wf round` had the same shape with `round-<step>-<n>` and got the same fix.
+
+What was measured:
+
+- Pure tests in `test/run.test.ts`:
+  - A step whose task runs, harness-blocked and unsigned, is accepted for `--nudge`, `--fresh`, `--model` and
+    `--message`, and refused for `--recheck` with the exact sentence.
+  - Refused as before: a session still working, one that signed off and runs on, and a caller that gives no word
+    of the harness.
+  - `assess` has the try due with `stopFirst`, and without the harness's word nothing is due. `decision` names the
+    step once. `listing` says the words above for `needs-human` and nothing for `running (working)`.
+  - Once the task is `stopped`, the same ask is due without `stopFirst`.
+  - `decision` on a branch with nothing past its base reads failed for a step failed or stopped, and blocked for one
+    that signed off blocked or ended unsigned. It reads failed for a check that refused, and shipped once every step
+    succeeded. Merged work is shipped though a step failed.
+  - A fan-out with one branch merged and one unchanged is decided when a step failed, and shipped when none did.
+    Git is asked once per branch, and not past the first branch off the base.
+- Store tests in `test/store.test.ts`, at shipped defaults on the fake board, with `start`, `advance`, `retry` and
+  `main` run for real:
+  - A step whose view says `needs-human`, with no closeout: `retry()` without the option refuses it as still running,
+    and writes nothing. `wf retry` through `main` writes the ask and prints that the tick stops the session first, and
+    `wf ls` carries the note.
+  - The first pass stops the task once, files nothing, leaves the record byte for byte, and keeps the ask.
+  - Two more passes, one on a board read afresh as after a restart, stop nothing more and file nothing.
+  - Settled `stopped`, the next pass files try 2 with `resumeFrom` the session, a brief that starts `## Try 2` and
+    says `wf retry --nudge`, and the ask consumed. A fourth pass files nothing.
+  - Through `main`, `wf retry` refuses a session still working (nudge and fresh), `--recheck` on a harness-blocked
+    step, and one that signed off and runs on. Each is exit 2, with no ask and no stop.
+  - A one-step parent whose step failed with nothing committed: git says its branch is on the base, and its
+    `wf decide` says `failed`. `parentOf` says not shipped, and its child files nothing for three passes.
+  - A parent whose step failed after committing, merged by a person with `--no-ff`: its `wf decide` says
+    `shipped`, and its child files its roots. The existing test of a parent that signed off with nothing to commit
+    still passes: shipped, and its child starts.
+  - `{}` at `retry-implement-2`: `wf ls` shows nothing and a pass honours nothing. `retry()` refuses with the file's
+    path, why and `rm`, and leaves the file as it was. Once the file is deleted, the ask is written and honoured. `[]`
+    at `round-review-2` on a loop out of rounds is refused by `round()` the same way.
+- `apps/api`'s decision and asks tests pass against these changes, and `apps/api` typechecks unchanged.
+- `npm test && npm run typecheck` from the root exited 0. agent-workflows ran 323 tests, 6 of them new: 322 passed,
+  and one was skipped, the live browser test that needs `AE_LIVE=1`. agent-engine ran 239 (235 passed, 4 live tests
+  skipped), api 98 and web 126, all passing. The log is `root-check.txt` in the step's artifacts.
+- No real session has been blocked and then tried again: the refresh race cannot be reproduced on demand. So the
+  stop and the filing are measured on the fake board only, with a view that carries `stopRequested` once a stop is
+  asked. Nobody has measured what `claude-bg` reports between `claude stop` and the engine's settle. If its word is
+  not `needs-human` for a pass, the ask is not due on that pass, `wf ls` shows no note, and the pass after it files
+  the try.
+
+What it leaves:
+
+- **The board refuses what `wf retry` takes.** Taking the same word in apps is four edits:
+  - `retry(e, id, step, how, { stopBlocked: true })` in the POST handler;
+  - the `held` case in `asks.test.ts` turned to a 202;
+  - `unblockCommands` in `apps/web/src/lib/asks.ts` without its `ae stop`, or an answer box offered for the
+    harness's need;
+  - `judge` handing `assess` the package's `harnessBlocked(views)`, so the board's `asked` and `moving` see the try.
+    Until then the api's `listing` already shows the note: it reads the engine's word.
+- **`wf decide` offers no `wf retry` for such a step.** A run it keeps running reads `still running`. In a fan-out
+  whose sibling failed, `retryLines` is not given the harness's word, so `wf ls` is where the step says it can be tried.
+- **`waitingOnYou` does not name a harness-blocked step.** The board says "blocked by the harness" from its own field.
+- **The try's brief says its session "was stopped before it signed off".** On the pass that files it, the tick cannot
+  tell that the harness had blocked the session, since nothing is carried.
+- **Only a person's ask stops a blocked session.** The tick does not recognise the login message and resume the
+  session by itself, which was §4b's first idea, and nobody has filed a Claude Code report on the refresh race.
+- **A child of a failed parent with nothing committed waits with no reason given.** It says `waiting on <parent>`
+  and "nothing to decide yet", though the parent's own `wf decide` has something to decide: `waitAdvice` does not
+  read a parent's outcome.
 
 ## 1. A waiting run handed its parents' closeouts
 

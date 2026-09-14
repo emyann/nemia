@@ -409,7 +409,8 @@ const PAGES: PageSpec[] = [
 
       // Refused first, in a page of its own whose one refusal is the point. A file already at the name try 2's ask goes under, which
       // `wf retry` did not write: no tick honours it, so the step still waits on you and its box is there — and the package refuses to
-      // write over it. Its sentence must be beside the box, word for word, the answer still in the box, and nothing written.
+      // write over it, naming the file and saying it is not an ask (`strayAsk`). Its sentence must be beside the box, word for word,
+      // the answer still in the box, and nothing written.
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(file, '{}\n');
       const refused = await page.context().newPage();
@@ -425,7 +426,7 @@ const PAGES: PageSpec[] = [
           refusedRow.getByRole('button', { name: 'Answer and continue' }).click(),
         ]);
         const { error } = (await answered.json()) as { error?: string };
-        if (answered.status() !== 409 || !error?.startsWith(`try 2 of ${FAKE.blocked} is already asked for`)) {
+        if (answered.status() !== 409 || !error?.startsWith(`try 2 of ${FAKE.blocked} cannot be asked for: `) || !error.includes('it is not an ask')) {
           throw new Refused(`the package refuses to write over the file at try 2's name — the api answered ${answered.status()}: ${JSON.stringify(error)}`);
         }
         await expectVisible(refusedRow.locator('[data-refused]'), 'the refusal is shown beside the box, not swallowed');

@@ -137,6 +137,11 @@ const PAGES: PageSpec[] = [
         await expectCount(page.locator(`.react-flow__edge[data-id="${FAKE.id}/->${first}"]`), 1, `one dashed edge from the card into ${first}`);
       }
       await expectCount(page.locator('.react-flow__edge'), FAKE.edges + FAKE.first.length, "the run's edges, and the card's into each first step");
+      await expectCount(
+        page.locator(`.react-flow__edge[data-id^="${FAKE.id}/"] animateMotion`),
+        0,
+        `no dot travels the fake run's edges: nothing moves into ${FAKE.blocked}, a human gate, nor into ${FAKE.refused}, whose check refused`,
+      );
       await expectVisible(card.getByRole('button', { name: 'Hide steps' }), "the open card's chevron hides the steps");
       await expectApart(beside, run, 'the card beside it moves out from under the unfolded graph');
       await settled(page);
@@ -202,6 +207,15 @@ const PAGES: PageSpec[] = [
       await expectVisible(check.getByText(FAKE.said), `the inspector of ${FAKE.refused} shows the last lines of its check's output`);
       await settled(page);
       await expectInside(run, floor, `the run is on the floor beside ${FAKE.refused}'s inspector`);
+
+      // The run beside it opened too: a dot travels the one edge into a step at work, and no other edge on the floor moves.
+      await beside.locator('time').click();
+      const moving = page.locator(`.react-flow__edge[data-id="${NEIGHBOUR.id}/${NEIGHBOUR.running}"]`);
+      await expectCount(moving.locator('.react-flow__edge-path[data-state="running"]'), 1, `the edge ${NEIGHBOUR.running} on the Factory runs: draft's session is at work`);
+      await expectCount(moving.locator('animateMotion'), 1, `a dot travels ${NEIGHBOUR.running} on the Factory`);
+      await expectCount(page.locator('.react-flow__edge animateMotion'), 1, 'and no other edge on the floor moves');
+      await expectCount(page.locator('.react-flow__panel[aria-label="Legend"] animateMotion'), 1, "the Factory's legend shows the running edge moving as it moves");
+      await settled(page);
     },
   },
   {
@@ -232,6 +246,7 @@ const PAGES: PageSpec[] = [
       await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"]`).getByText('waiting on you'), `${FAKE.blocked} is drawn as a human gate`);
       await expectVisible(graph.locator(`.react-flow__node[data-id="${FAKE.refused}"] [data-state="failed-check"]`), `${FAKE.refused}'s refused check is a red chip on the run's graph`);
       await expectVisible(page.locator('section[aria-label="Check"]').getByText(FAKE.said), `the run's page shows how ${FAKE.refused}'s check's output ended`);
+      await expectCount(graph.locator('.react-flow__edge animateMotion'), 0, `no dot travels the run's edges: nothing moves into ${FAKE.refused}, whose check refused`);
       await graph.locator('.react-flow__node[data-id="review"]').click();
       await expectVisible(page.locator('aside[aria-label="Step review"]'), 'the step inspector opens on a click on review');
       // The canvas narrows for the inspector and fits itself again; judged once it has.
@@ -257,6 +272,7 @@ const PAGES: PageSpec[] = [
       const back = edge(`loop:${LOOPING.exhausted}->${LOOPING.target}`);
       await expectVisible(back.locator('.react-flow__edge-path'), `the edge back from ${LOOPING.exhausted} to ${LOOPING.target}, drawn as a loop`);
       await expectVisible(back.getByText(LOOPING.round, { exact: true }), `the edge back says the round the loop is on (${LOOPING.round})`);
+      await expectCount(graph.locator('.react-flow__edge animateMotion'), 0, 'out of rounds, nothing of the loop moves: no dot on either edge');
       await settled(page);
       await expectBeneath(back.locator('.react-flow__edge-path'), graph.locator('.react-flow__node'), 'the edge back runs beneath the row, under both steps');
       // On the canvas there is no room under a chip: the note follows what the state means, on hover.
@@ -283,6 +299,32 @@ const PAGES: PageSpec[] = [
       await expectVisible(inspector.locator('[data-note]', { hasText: LOOPING.notes.review }), `the inspector's Details show ${LOOPING.exhausted}'s note under its chip`);
       await settled(page);
       await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas beside the open inspector');
+    },
+  },
+  {
+    name: 'moving',
+    route: `/runs/${NEIGHBOUR.id}`,
+    expect: async (page) => {
+      await sidebar(page);
+      const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
+      await expectCount(graph.locator('.react-flow__node'), NEIGHBOUR.steps.length, `the run's graph has a node per step (${NEIGHBOUR.steps.join(', ')})`);
+      const edge = (id: string) => graph.locator(`.react-flow__edge[data-id="${id}"]`);
+      const running = edge(NEIGHBOUR.running);
+      // Counted, not seen: a straight edge's path has no height, which Playwright takes for hidden.
+      await expectCount(running.locator('.react-flow__edge-path[data-state="running"]'), 1, `the edge ${NEIGHBOUR.running} runs: draft's session is at work`);
+      await expectCount(running.locator('animateMotion'), 1, `a dot travels ${NEIGHBOUR.running}`);
+      await expectCount(edge(NEIGHBOUR.still).locator('.react-flow__edge-path[data-state="to-come"]'), 1, `${NEIGHBOUR.still} is to come: ship will not be filed`);
+      await expectCount(graph.locator('.react-flow__edge animateMotion'), 1, 'and no other edge moves');
+      const legend = graph.locator('.react-flow__panel[aria-label="Legend"]');
+      await expectCount(legend.locator('animateMotion'), 1, "the legend's running sample moves as the running edge does");
+
+      // A person who asks for reduced motion, with the page open: nothing travels, and the running edge is still drawn running.
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await expectCount(graph.locator('animateMotion'), 0, 'with reduced motion asked for, no dot travels — on an edge or in the legend');
+      await expectCount(running.locator('.react-flow__edge-path[data-state="running"][marker-end]'), 1, 'the running edge keeps its colour and its arrow');
+      await page.emulateMedia({ reducedMotion: 'no-preference' });
+      await expectCount(running.locator('animateMotion'), 1, 'the dot travels again once the person no longer asks, without a reload');
+      await settled(page);
     },
   },
   {

@@ -41,7 +41,7 @@ function writesBy(step: Workflow): string[] {
 }
 
 test('dev-planned loads, at shipped defaults, as plan → implement ⇄ review: the plan first, implement reading it, and dev\'s loop after', () => {
-  assert.deepEqual(planned.map((s) => s.name).sort(), ['implement', 'plan', 'review']);
+  assert.deepEqual(planned.map((s) => s.name), ['plan', 'implement', 'review'], "in the order the steps run, not the folder's");
   assert.deepEqual([steps.plan!.after, steps.implement!.after, steps.review!.after], [[], ['plan'], ['implement']]);
   assert.deepEqual([steps.plan!.input, steps.implement!.input, steps.review!.input], [undefined, ['plan'], undefined]);
   assert.deepEqual([steps.review!.loop, steps.review!.rounds], ['implement', 3]);

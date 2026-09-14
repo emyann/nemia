@@ -567,7 +567,8 @@ const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) =
 
 /**
  * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
- * describes the workflow (`workflowDescription`) and is not a step.
+ * describes the workflow (`workflowDescription`) and is not a step. The steps come back in the order they run
+ * (`orderSteps`), not the folder's.
  */
 export function loadWorkflows(dir: string): Workflow[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
@@ -580,7 +581,7 @@ export function loadWorkflows(dir: string): Workflow[] {
   };
   const steps = files.map((f) => parseWorkflow(path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8'), read));
   validate(steps);
-  return steps;
+  return orderSteps(steps);
 }
 
 /**
@@ -705,6 +706,32 @@ export function validate(steps: readonly Workflow[]): void {
   if (pending.size) throw new WorkflowError(`these steps wait on each other: ${[...pending.keys()].sort().join(', ')}`);
 
   validateLoops(steps);
+}
+
+/**
+ * The steps in the order they run: every step after each step its `after` names, and otherwise in the order they are given — by name,
+ * for the steps `loadWorkflows` reads, since a folder lists them so. `resume:` is in `after` already, and `loop:` is the edge back, which
+ * orders nothing. Pure.
+ *
+ * What a run's steps are listed in. In the folder's order, alphabetical, `wf start`, `wf ls`, `wf decide` and the board read a
+ * `plan → implement ⇄ review` workflow as implement, plan, review. The order given breaks a tie, not the name, so a workflow frozen in an
+ * order that already runs forward reads as it was frozen: the board lists a run's steps in its record's order, and holds that to `list`'s.
+ * It ends on any input, because a record read back is not validated again: an `after` naming a step that is not here orders nothing, and
+ * steps that wait on each other go last, as given, rather than nowhere.
+ */
+export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: readonly S[]): S[] {
+  const names = new Set(steps.map((s) => s.name));
+  const order: S[] = [];
+  const placed = new Set<string>();
+  let pending = [...steps];
+  for (;;) {
+    const next = pending.find((s) => s.after.every((a) => placed.has(a) || !names.has(a)));
+    if (!next) break;
+    order.push(next);
+    placed.add(next.name);
+    pending = pending.filter((s) => s !== next);
+  }
+  return [...order, ...pending];
 }
 
 /** Every step `name` waits on, directly or through another. */

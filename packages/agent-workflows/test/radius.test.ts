@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  AGENT_FACING, CHECK_AFFECTING, LESSON, ROOT_GROUP, branchesToRead, count, groupOf, inFullLines, lessonGlobs, lessonLine, matches,
+  AGENT_FACING, CHECK_AFFECTING, LESSON, ROOT_GROUP, branchesToRead, count, deepWorkspaces, groupOf, inFullLines, isLesson, lessonGlobs, lessonLine, matches,
   parseGlobs, parseNumstat, radius, radiusLines, sensitiveHeading, sensitivePaths, sumUsage, touchedLines, usedLines,
 } from '../src/radius.ts';
 
@@ -188,6 +188,40 @@ test('attempts sum only what every one of them measured', () => {
 test('a count reads to three figures', () => {
   assert.deepEqual([0, 999, 1_000, 1_234, 20_400, 112_000, 999_499, 999_999, 6_350_000, 2_500_000_000].map(count),
     ['0', '999', '1k', '1.23k', '20.4k', '112k', '999k', '1M', '6.35M', '2.5B']);
+});
+
+test("REFUSED before, now read: `./packages/*` from the base's package.json groups by package and counts a package's docs as a lesson, as `packages/*` does", () => {
+  const same = numstat('3\t1\tpackages/x/src/a.ts', '2\t0\tpackages/x/docs/notes.md', '1\t0\tpackages/y/src/docs/b.md', '1\t0\tpackages/README.md');
+  const r = radius(same, ['./packages/*']);
+  assert.deepEqual(r.groups.map((g) => [g.name, g.files]), [['packages', 1], ['packages/x', 2], ['packages/y', 1]]);
+  assert.deepEqual(r.lessons.map((c) => c.path), ['packages/x/docs/notes.md'], "a package's own docs/, and no docs/ in its source");
+  assert.equal(lessonLine([{ branch: 'wf/a', radius: r }]), 'lesson  packages/x/docs/notes.md +2 −0');
+  assert.equal(groupOf('packages/x/src/a.ts', ['./packages/*']), 'packages/x');
+  // As written, `./packages/*` matched no path git prints: every package in one `packages` group, and nothing read as a lesson.
+  for (const written of ['./packages/*', './packages/*/', './/packages/*', 'packages/*/']) assert.deepEqual(radius(same, [written]).groups, radius(same, ['packages/*']).groups, written);
+  assert.deepEqual(lessonGlobs(['./packages/*', './apps/*/']), [...LESSON, 'packages/*/docs/', 'apps/*/docs/']);
+  assert.deepEqual(radius(same, ['./packages/*']).deepWorkspaces, [], 'no ** glob, so nothing to name');
+  assert.ok(!radiusLines(r).some((l) => l.startsWith('workspaces')), 'and the screen names none');
+});
+
+test('a workspace glob with `**` is not refused but named on the screen — and each file counts once: in the outermost package on its way, and as a lesson only in its docs/', () => {
+  const r = radius(numstat('1\t0\tpackages/x/src/docs/a.md', '2\t0\tpackages/x/docs/notes.md', '1\t1\tpackages/x/y/z.ts', '4\t0\tpackages/docs/c.md', '5\t0\tsrc/index.ts'), ['packages/**', 'apps/*']);
+  assert.deepEqual(r.groups, [
+    { name: 'packages/docs', files: 1, added: 4, removed: 0, binary: 0 },
+    { name: 'packages/x', files: 3, added: 4, removed: 1, binary: 0 },
+    { name: 'src', files: 1, added: 5, removed: 0, binary: 0 },
+  ]);
+  assert.equal(r.groups.reduce((n, g) => n + g.files, 0), r.changes.length, 'every file in one group');
+  // `packages/**/docs/` would have taken the source's docs/ and a docs/ directly under packages/ as lessons too.
+  assert.deepEqual(r.lessons.map((c) => c.path), ['packages/x/docs/notes.md']);
+  assert.ok(matches('packages/x/src/docs/a.md', ['packages/**/docs/']), 'the glob a ** workspace would have made');
+  assert.equal(isLesson('packages/x/src/docs/a.md', ['packages/**']), false);
+  assert.equal(isLesson('packages/x/docs/notes.md', ['./packages/**/']), true);
+  assert.deepEqual(lessonGlobs(['packages/**', 'apps/*']), [...LESSON, 'apps/*/docs/']);
+  assert.deepEqual(deepWorkspaces(['./packages/**', 'apps/*']), ['./packages/**'], 'named as written');
+  assert.equal(radiusLines(r).at(-1),
+    "workspaces       packages/** in the base's package.json crosses directories: a file counts once, in the outermost package on its way, and as a lesson only in that package's docs/");
+  assert.deepEqual(touchedLines([{ branch: 'wf/a', radius: r }]).filter((l) => l.includes('packages/**')).length, 1);
 });
 
 test('the screen reads the result branches, or — before a terminal step has one — every branch a step worked on', () => {

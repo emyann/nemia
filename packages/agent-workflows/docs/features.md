@@ -14,7 +14,9 @@ that asks (`wf retry --message`) beside a step that plans (`workflows/dev-planne
 that waits on a run (`wf start --after`, the first half of §4 P), and three guards made to hold (a session
 the harness blocked tried again, `shipped` with nothing past the base, an ask file that is not an ask), and a plan as a folder of cards whose waiting runs are handed their parents'
 closeouts (`wf plan`, the rest of §4 P), and telling a running step something (`wf say`, with its route and the session page's
-prompt box: the steering channel's upper half) have shipped.
+prompt box: the steering channel's upper half), and six small items — `radius` reading workspace globs as npm does, a run's steps
+in the order they run, `wf start --input`, artifacts collected from the workspace, a stale ask honoured, and `wf start` on a card
+file (§6 items 6–9, 24, 25) — have shipped.
 
 ## Shipped: the check
 
@@ -924,8 +926,8 @@ What it leaves:
 - **The Factory's graph is P2's** (apps): the api does not carry `after` yet (the `--after` section above says what it
   needs), and a plan is drawn only once it does. **A plan's own page on the board** is later: today a plan is its runs,
   and nothing groups them.
-- **A card started by hand carries its frontmatter.** After a part-way stop, the commands `wf plan` prints give the card
-  file to `wf start`, which reads a file's whole text as the brief, the `workflow:` and `after:` lines included.
+- ~~**A card started by hand carries its frontmatter.**~~ Done by the six small items (§6 item 25, below): `wf start` on a card
+  file starts its body, and `planStopped` quotes the paths it prints.
 - **A card cannot wait on a run outside its folder.** `after:` names cards; to wait on a run already started, start that
   card by hand with `--after`, as the refusal of `wf plan --after` says.
 - **The parents' closeouts reach only each root's first try.** A try `wf retry --fresh` files later, or a new session a
@@ -933,6 +935,347 @@ What it leaves:
 - **Only a parent's terminal steps are read.** What an earlier step of the parent declared, a plan its implementer
   consumed say, is not handed on.
 - **Starting a plan twice starts every card twice.** Nothing records that a folder was started.
+
+## Shipped: six small items
+
+Plan §6 items 6, 7, 8, 9, 24 and 25, one commit each, with the §4b findings they came from. Nothing in the engine, and
+nothing in apps/.
+
+### `radius` reads the base's `workspaces` as npm does
+
+G's round-2 review found that the decider screen took the base's `workspaces` globs as written. `./packages/*` became a
+regexp that no path git prints could match, so every package's changes fell into one `packages` group, and nothing under
+`./packages/*/docs/` counted as a lesson. This repository writes `packages/*`, so it never showed here.
+
+What was built:
+
+- `workspaceGlob` drops a leading `./` and a trailing `/`, and everything in `radius.ts` that reads a workspace goes through
+  it: `groupOf` (now `packageOf`, then a top-level directory), `lessonGlobs` and the new `isLesson`.
+- A glob with `**` is not refused, since the repository's `package.json` is not ours. `deepWorkspaces` names such globs as
+  written, `radius` carries them, and `radiusLines` adds a `workspaces` line under the branch that names each one. Each file
+  still counts once. Its group is the outermost directory a glob names. It counts as a lesson only in that package's own
+  `docs/`, since `packages/**/docs/` would also take a `docs/` in a package's source, or one directly under `packages/`.
+- `wf decide --help` says both, under the lists.
+
+What was measured:
+
+- Two pure tests in `test/radius.test.ts`:
+  - `./packages/*` groups `packages/x/src/a.ts` under `packages/x` and counts `packages/x/docs/notes.md` as a lesson, but not
+    a `docs/` in a package's source. `./packages/*`, `./packages/*/`, `.//packages/*` and `packages/*/` each group exactly as
+    `packages/*` does. No `workspaces` line is printed.
+  - `['packages/**', 'apps/*']`: five files in three groups, the group counts summing to five. The one lesson is the
+    package's own `docs/`. The screen's last line names `packages/**`, once per branch.
+- Each guard was broken on purpose and the tests rerun: leaving `./` in place fails the first test, and turning a `**`
+  glob into a `docs/` glob fails the second.
+- agent-workflows: 351 tests, 350 passed, and one was skipped, the live browser test that needs `AE_LIVE=1`. Typecheck clean.
+
+What it leaves:
+
+- **The board does not draw the `workspaces` line.** The api hands on the package's radius, `deepWorkspaces` included, but
+  the decide panel on the run page draws only the groups and the chips.
+- **A package nested inside another counts in the outer one**, with or without `**`, as before: `packages/*` plus
+  `packages/x/plugins/*` puts `packages/x/plugins/p/src/a.ts` under `packages/x`. A lesson in the inner package's `docs/`
+  still counts, through `lessonGlobs`; with `**` it does not.
+
+### A run lists its steps in the order they run
+
+`run.steps` was keyed in the folder's file order, which is alphabetical. So `wf start` printed `3 step(s): implement → plan →
+review` for `plan → implement ⇄ review`, and `wf ls`, `wf decide` and the board's step list read that workflow backwards.
+
+What was built:
+
+- `orderSteps(steps)` in `workflow.ts`, pure. Each step comes after every step its `after` names, and otherwise keeps the
+  order it was given. `loadWorkflows` hands it a folder's files sorted by name, so a folder's siblings come by name, as §6 asked.
+  A workflow frozen in an order that already runs forward is kept as frozen: the board lists a run's steps in its record's
+  order, and apps/api holds that to `list`'s. `resume:` is already in `after`, and `loop:`, the edge back, orders nothing. It
+  ends on any input, since a record read back is not validated again: an `after` naming a step that is not there orders
+  nothing, and steps waiting on each other go last, as given.
+- `loadWorkflows` returns steps in that order. So `start` freezes `workflow` and keys `run.steps` in it, and the api's
+  Workflows page gets it too.
+- `stepsOf` orders what it reads back, so a record keyed alphabetically lists in run order, whether its workflow was frozen
+  alphabetically or never frozen.
+- `namesInOrder(run, steps)` in `run.ts`, pure: the record's steps in that order, then any the workflow no longer has. `wf
+  decide` prints each step's section in it, and reads the branches steps worked on in it when no terminal step has one yet.
+
+What was measured:
+
+- `test/workflow.test.ts` (2):
+  - `orderSteps`: `plan → implement ⇄ review` given alphabetically; a fan-out's siblings by name as a folder lists them; two
+    roots and a follower whose name sorts first; an order that already runs forward kept as given, `r-20`'s shape among them;
+    a fan-out given out of order, which comes out root first, siblings as given, join last; `resume:`; an `after` naming a step
+    that is not there; a cycle last, as given; and its input left as it was.
+  - A folder `plan → implement ⇄ review` loads as plan, implement, review.
+- `test/planned-workflow.test.ts`: the repository's `workflows/dev-planned` is now held to plan, implement, review. Before, it
+  was sorted, then compared.
+- `test/run.test.ts` (1): `namesInOrder` on a record keyed alphabetically, with a step the workflow no longer has.
+- `test/store.test.ts` (2), on a real repository with `start`, `advance` and `main` run for real:
+  - `wf start` prints `3 step(s): plan → implement → review`, and freezes the workflow and keys the record in that order.
+    `wf ls` prints the rows in it.
+  - Two records rewritten in the folder's order, one frozen that way and one with no workflow: `stepsOf`, `list` and
+    `wf ls` read plan, implement, review.
+  - `wf decide` on a run waiting on you, its review unsigned, prints the plan, implement and review sections in that order,
+    before and after its record is rewritten in the folder's order.
+- Each guard was broken on purpose and the tests rerun. With `loadWorkflows` and `stepsOf` unordered, 4 tests fail. With
+  `stepsOf` alone unordered, 2 fail: the old records. With `wf decide` reading the record's keys, 1 fails. With ties broken by
+  name again, 1 fails: the order kept as given.
+- The first version broke ties by name, and the root suite failed one apps/api test, *the api's words, and who it says is
+  waited on, are `list`'s*. Its fixture `r-20` froze seven roots and then `ship`, out of name order. The api lists them as
+  frozen, and `list` had sorted them. Ties now go by the order given, and apps/ is unchanged.
+- agent-workflows: 356 tests, 355 passed, and one was skipped, the live browser test. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 356 (355 passed, 1 skipped), api 114 and web 158, all passing.
+
+What it leaves:
+
+- **The board reads an old record in its keys' order.** The api takes a run's steps from `run.workflow`, else the folder, else
+  the record's keys, and does not order them. A run started before this lists alphabetically on its page, though `wf ls` lists
+  it in order. Every run started since is keyed in order, so it lists in order everywhere.
+- **`wf cancel` names what it asked to stop in the record's order.** `inFlight` has no workflow to order by, and `wf show`
+  prints the record as it was written.
+
+### `wf start --input`: files a person gives the run
+
+§4b's *inputs for a step*: a brief is text, and nothing told a step where a file for it was. For one run, reference
+screenshots were copied by hand, and their paths sent to the running session.
+
+What was built:
+
+- `wf start --input <file>`, once per file, also as `--input=<file>`. `start()` takes `inputs`, paths from where `wf start`
+  is typed. Before anything is written, it looks at each and asks the pure `inputRefusal` in `run.ts`, which refuses by name,
+  with the fix:
+  - a file that is not there;
+  - a directory, or anything else that is not a regular file;
+  - two inputs with the same name, which would share `inputs/`;
+  - one file given twice.
+
+  `readFlags` already refuses `--input` with no value, as it does every value flag.
+- The files are copied into `runs/<id>/inputs/` (`inputsDir`), the run's own directory beside `artifacts/`. The copy happens
+  before the record is written, so a record never names a file that is not there. The names are frozen on the record as
+  `inputs`, in the order given. A run given none has no key and no directory.
+- `composeBrief` takes the directory as its last argument. Every brief that carries *What was asked for* gains one line under
+  the request (`inputsLine`), and the tick passes it on every filing: a step, a try, a round. A brief that continues a session
+  carries neither the request nor the line, since that session was handed both. A run given none composes byte for byte as
+  before.
+- `wf start` prints where the inputs went, and `wf decide` names them under the run's line on every screen (`inputsNote`).
+- `wf plan` refuses `--input` by name: a card's inputs are later.
+
+What was measured:
+
+- `test/run.test.ts` (3):
+  - `inputRefusal`'s refusals, compared whole, and a missing file named before a clash of names; files that are there, each
+    of its own name, pass.
+  - `composeBrief` with no `inputs`, with `[]`, and with inputs but no directory: exactly the plain brief. With both, the
+    plain brief with the one line under the request. A step after another, a fan-in and a fresh try carry the line once; a
+    `resume:` step and a nudge do not.
+  - `inputsNote`, with names and without.
+- `test/store.test.ts` (2), on a real repository through `main`:
+  - `--input` and `--input=`, one name holding a space: both copied byte for byte, the names on the record in order, and
+    `git status` in the workspace empty. The `implement` and `review` briefs carry the line under the request, and
+    `wf decide` prints it under the run's line. A run with none has no `inputs` key, no run directory and no line.
+  - Refused by `start()` with nothing written to the store: a missing file named after a good one, a directory, two
+    `notes.md` from two folders, and one file given twice as `b/../a/notes.md`. Through `main`: `--input` with no value,
+    `--input=`, `--input` followed by a flag, a directory, `--inputs`, and `wf plan --input`.
+- Each guard was broken on purpose and the tests rerun: `inputRefusal` refusing nothing fails 2 tests, `composeBrief` ignoring
+  inputs fails 2, `--input` taken only once fails 1, and `wf plan` without its own refusal of `--input` fails 1.
+- agent-workflows: 361 tests, 360 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 361 (360 passed, 1 skipped), api 114 and web 158, all passing.
+
+What it leaves:
+
+- **The board neither starts a run with files nor shows them.** Its start form takes none, and for a step not yet filed the
+  api previews `composeBrief(step, run, workflows)`, with no directory, so the preview has no line. The api would pass
+  `inputsDir(run)`.
+- **The files are copied once, whole, and kept.** A file changed after `wf start` is not seen, nothing limits a file's size,
+  and nothing removes `runs/<id>/`, as nothing removes a run's artifacts.
+- **A card has no inputs** (`wf plan`), as §6 left it.
+
+### Artifacts collected from the workspace
+
+§4b's *the artifacts directory and Codex*, from U1's review. Every brief names `runs/<id>/artifacts/<step>/`, and a Codex step
+in `workspace-write` cannot write there: it writes only its worktree and tmp, and the engine passes no `--add-dir`. The fix is
+the one hkb's `exports` had. The step names a path in its workspace, and the run collects it.
+
+What was built:
+
+- `artifactPlace` tells four places apart, reading only the path:
+  - `workspace`: a path from the workspace root;
+  - `escapes`: one that climbs out of it, such as `../notes.md`;
+  - `files`: an absolute path in the step's directory;
+  - `outside`: any other absolute path.
+- `collectArtifacts` in `runner.ts` runs on every pass that hands a step off: before its check is filed, and before a step after it
+  works in its workspace. It copies each `workspace` file into the step's directory at the same path, and the pass's note names
+  what it copied. It is level-triggered, so a pass that dies halfway loses nothing: the next copies only what changed, by size
+  and by time within a millisecond. Nothing is copied for:
+  - a path that climbs out of the workspace, which is never read;
+  - a link that leads out of the workspace, which is not followed;
+  - a directory, or a file that is not there.
+
+  Nor is a copy ever written through a link a step made in its files directory, whether on the way to it or in its place.
+- `missingArtifacts` now says why, as `MissingArtifact`. A file named from the workspace is read from the directory first. Where
+  it is not there, the workspace names a link that leads out of it and a directory, and names `not collected` for a file whose
+  copy something the step made in its files directory refused (`copyBlocked`), even when the file is on the branch. Any other
+  file is the branch's to answer, as before collection, so a run from before it reads as it did. `artifactLines` gives each reason its own line on `wf decide`'s screen: not in the
+  workspace, a directory, not collected, not in the directory, outside the workspace, outside the directory.
+- `artifactsContract`, on every brief, says both ways. Put a file in the directory and name it by absolute path, or leave it in
+  the workspace and name it by its path from the root.
+
+What was measured:
+
+- `test/run.test.ts`:
+  - `artifactPlace` on workspace paths, `docs/../RESPONSE.md` and `..notes.md` among them, and on five spellings of climbing out;
+  - `artifactLines` with every reason, compared whole;
+  - the contract's two ways and its refusals.
+- `test/store.test.ts` (4 new), on a real repository with `start`, `advance` and `main`:
+  - A step names `RESPONSE.md`, `./.e2e/shot.png` (which git ignores) and an absolute path in its directory. A pass hands off,
+    collects both workspace files, and dies filing the check. `RESPONSE.md` is then amended, and the next pass copies only it,
+    files the check, and `missingArtifacts` is empty. Once the check is filed, a change in the workspace is not collected.
+  - A path that climbs out to a real file, a link in the workspace to that file, a directory, and a file never written. Nothing is
+    collected. With `fs` spied, neither the tick nor `wf decide` passes the outside file's path to any call. `wf decide` prints
+    the three lines under the step.
+  - A link in the files directory on the way to a copy, and another in a copy's place. What they lead to is left as it was, and
+    `wf decide` names both files not collected, though both are on the branch.
+  - A run from before collection, its step past hand-off with its check on the record, its worktree still there, `docs/RESPONSE.md`
+    committed on the branch and nothing in its files directory: `missingArtifacts` names only a file git ignores, which is on no
+    branch, as `not collected`, and a pass collects nothing.
+  - The earlier tests of absolute paths inside and outside the directory now expect a reason, `missing` or `outside`, and are
+    otherwise unchanged.
+- Each guard was broken on purpose and the tests rerun:
+  - collecting nothing fails 1 test;
+  - reading a climbing path as the workspace fails 3;
+  - following a link out of the workspace fails 2;
+  - copying on every pass fails 1;
+  - passing a link on the way to a copy fails 1;
+  - writing through a link in a copy's place fails 1.
+- The collection test at first failed intermittently. A copy's time, set through a `Date`, read back a fraction of a millisecond
+  off its source's, so an unchanged file was copied again, and its pass's note named it. The comparison is now within a
+  millisecond, and the store tests passed five runs in a row.
+- The first version counted a file as present whenever it was on the branch, and the link test showed that hid a file the run
+  had refused to copy. The second asked the branch only when the workspace had nothing at the path, and round 2's review found
+  what that broke: no code removes a worktree, so every run from before collection would print `not collected`, for good, for
+  each file its steps named from the workspace root. Those steps are past hand-off, and nothing collects for them. The branch
+  now answers unless the copy was refused. The reviewer proposed asking the branch only once hand-off is past. I left that
+  condition out: a step whose engine task is gone never hands off, and would still read `not collected` for good.
+- Round 2's guards, each broken on purpose: round 1's rule back fails the new legacy test; passing over a refused copy that is on
+  the branch fails the link test; a link on the way to a copy, or in its place, written through each fail the link test; copying
+  on every pass fails the collection test.
+- After round 2, `npm test && npm run typecheck` from the root exited 0: agent-engine 267 (262 passed, 5 live tests skipped),
+  agent-workflows 369 (368 passed, 1 skipped), api 114 and web 158, all passing. The log is `root-check-round2.txt` in the step's artifacts.
+- agent-workflows: 364 tests, 363 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 364 (363 passed, 1 skipped), api 114 and web 158, all passing.
+
+What it leaves:
+
+- **The board serves only a file directly in the directory, named by an absolute path.** The api's artifacts route requires
+  `artifactPlace(...) === 'files'`, so a collected file named from the workspace shows as a bare path on the Output tab. The api
+  would look for it at `path.join(dir, file)`.
+- **A directory is not collected.** A step names each file in it, and a directory named whole is named on the screen.
+- **A copy that fails for another reason is not named when the file is on the branch.** `collectArtifacts` swallows the error
+  (a full disk, a permission), and the branch then answers. The file is there to read, on the branch.
+- **A file rewritten at the same size within a millisecond of its copy is not copied again.** Collection runs once the step has
+  finished, so only something else writing the workspace could do that.
+
+### A stale ask on a harness-blocked step is honoured
+
+From W4's review. `wf retry` on a step whose session the harness had blocked writes the ask, and the tick stopped that session
+only while the engine said `needs-human`. A session can work again before a tick stops it, told something by a peer with no
+`wf up` running. The ask was then neither due nor spent, and `wf ls` said nothing of it. When the step later failed or stopped,
+it filed try 2 at once, ahead of `retries:`.
+
+What was built:
+
+- `retriesDue` reads the engine's record of the task, not what the harness said when the ask was written. An unspent `--nudge`
+  or `--fresh` ask for a step whose task has not settled (`pending` or `running`) is due with `stopFirst`, whether or not the
+  harness still says blocked, and `runsOn` marks a session the harness no longer calls blocked. The tick then does what W4
+  built: it asks the engine to stop the session once, since a task with `stopRequested` is not asked again, and files the try
+  once the task has settled.
+- `wf ls` notes it: `try 2 asked (--nudge) — stopping its session, then the tick files it`. While the harness still says blocked,
+  the words stay `stopping its blocked session`, which apps/api and apps/web pin. The pass's note says the session runs on.
+- `listing` now reads `unknown`, a task the engine has no record of, as that and not as running: the tick stops nothing of such a
+  task, and `wf ls` does not say it would.
+- `wf retry` is unchanged, and `retryable` still refuses a working step at the verb. A `--recheck` ask on a working step is not
+  honoured, since no session could have been asked for one.
+
+What was measured:
+
+- `test/run.test.ts` (1 new):
+  - Due, with `stopFirst` and `runsOn`: an ask for a step whose task runs, whether the harness's word is left out or given as
+    no, for `--nudge` and for `--fresh --model`; and likewise a task still `pending`, and one signed off and running on.
+  - Still blocked by its harness, the ask is due exactly as before, without `runsOn`, and `decision` names the step once.
+    `listing` gives each wording, beside `running (working)` and beside `needs-human`.
+  - Not due: an ask on a task the engine has no record of, a `--recheck` ask, and an ask for a try past the next.
+  - Settled `stopped`, the ask is due as any stopped step's.
+  - `retryRefusal` still refuses a working step, with the harness's word and without it. With no asks, nothing is due of a
+    working step, and a refused check `retries:` covers is due as before.
+- W4's test had held the old behaviour in two assertions: "without the harness's word, nothing is due", and nothing said beside
+  `running (working)`. Both now expect the ask due and noted.
+- `test/store.test.ts` (1 new), with `main` and `advance` run for real. `wf retry` on a `needs-human` step, then the task reads
+  `running`, and `wf ls` says `stopping its session`. The first pass stops the task once, files nothing, leaves the record byte
+  for byte, and keeps the ask. Two more passes, one on a board read afresh, stop nothing more. Once settled `stopped`, the next
+  pass files try 2, continuing the session, and consumes the ask; a later pass files nothing more.
+- Each rule was broken on purpose and the tests rerun:
+  - the old rule, due only while the harness says blocked, fails 3 tests;
+  - the note always saying `blocked` fails 3;
+  - `wf ls` reading an unknown task as running fails 1.
+- agent-workflows: 366 tests, 365 passed, 1 skipped. Typecheck clean.
+- `npm test && npm run typecheck` from the root exited 0. agent-engine ran 267 (262 passed, 5 live tests skipped), agent-workflows 366 (365 passed, 1 skipped), api 114 and web 158, all passing.
+
+What it leaves:
+
+- **A session that works again and settles with no tick in between still leaves its ask.** The ask is not due while the step
+  is verified, and it files try 2 the moment the step waits on a person. Nothing in `wf ls` says an ask is waiting on a verified
+  step.
+- **The web's own words say `stopping its blocked session` for both.** The api's `note` is `listing`'s and tells them apart, but
+  the web words a try asked from `stopFirst` alone.
+
+### `wf start` on a card file
+
+From P3's review, and recorded as left in the plan section above. A plan that stops part-way prints `wf start <plan>/<card>.md
+--workflows … --after …` for each card left, and `wf start` took the file's whole text as the brief. The run's id, and every
+step's brief, then carried the card's `workflow:` line.
+
+What was built:
+
+- `cardToStart(file, text, after)` in `plan.ts`, pure. A file is a card when every line of its frontmatter, comments aside, is
+  `workflow:` or `after:`. It is held to what `wf plan` holds a card to, through checks `parseCard` now shares (`bodyOf`,
+  `afterOf`): a key set twice or to nothing, an empty body, an `after:` naming no card or one twice. A card whose `after:` names
+  cards is refused when `wf start` was given no `--after`, and the refusal gives an `--after <card's run id>` per card, from
+  `wf ls`.
+- Any other file gives null, and its whole text stays the brief: no frontmatter; one with any other key, or a line of prose; an
+  empty block; and a `---` that never closes, which `splitFrontmatter` refuses for a step or a card but a brief may start with.
+- `wf start` uses a card's body as the brief, so the run's id comes from the body. `--workflows` comes from the flag or else from
+  the card's `workflow:`, found from the card's folder as `wf plan` finds it. The `--after` ids given are checked as any
+  `--after` is.
+- `planStopped` quotes each path it prints for the shell, with a quote inside closed, escaped and opened again.
+
+What was measured:
+
+- `test/plan.test.ts`:
+  - `cardToStart` reads three cards: one with both keys and a body of two paragraphs, one saved on Windows with a comment, and
+    one with only `after:`.
+  - It gives null for six briefs that are not cards.
+  - It refuses by name an `after:` with no `--after`, naming one card, two and three, and each thing `wf plan` refuses of a card.
+  - `planStopped` compared whole with quoted paths, and with a space and a quote in them.
+- `test/store.test.ts` (1 new), through `main` on a real repository with a `workflows/dev`:
+  - A card naming `workflow: dev` starts its body, its id from the body, on `<repo>/workflows/dev`. One naming a path from its
+    plan folder starts on that folder, and `--workflows` wins over a card.
+  - A card with `after: a, b` and no `--after` is refused by name and writes no run; with both `--after`s, it starts.
+  - A brief whose frontmatter has `title:` beside `workflow:` is taken whole, and so is one that opens with a `---` it never
+    closes.
+- Each guard was broken on purpose and the tests rerun:
+  - starting a card with `after:` and no `--after` fails 2 tests;
+  - reading any frontmatter as a card's fails 2;
+  - refusing a `---` that never closes fails 2;
+  - `wf start` taking a card's whole text fails 1;
+  - ignoring the card's `workflow:` fails 1;
+  - printing the paths bare fails 1.
+- agent-workflows: 368 tests, 367 passed, 1 skipped. Typecheck clean.
+
+What it leaves:
+
+- **Which runs `--after` names is not checked against the card.** `wf start` refuses a card with `after:` and no `--after`, but
+  given ids, it checks each as any `--after` is, not whether they are the runs of the cards the card names.
+- **A card's `workflow:` is read from the folder the card is in.** A card copied out of its plan folder reads a relative
+  `workflow:` from where it is now.
+- **The board's start form takes no card.** `wf plan` and `wf start` are how a card is started.
 
 ## 1. Forgetting a run (`wf rm`)
 

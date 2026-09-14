@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan, stepsOf } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -646,7 +646,7 @@ test('a step is told where its files go — a directory the run made for it, out
     assert.ok(!files.startsWith(run.repo + path.sep), `${name}: not in the workspace, where it would ride the branch`);
     const told = brief.indexOf('\n## Files for the steps after you\n');
     assert.ok(told >= 0, `${name}: ${brief}`);
-    assert.ok(brief.includes(`Put them in \`${files}\`; name them in \`artifacts\` by absolute path.`), `${name}: ${brief}`);
+    assert.ok(brief.includes(`- Put it in \`${files}\`, and name it in \`artifacts\` by absolute path.`), `${name}: ${brief}`);
     assert.ok(told < brief.indexOf('\n## When you are finished\n'), `${name}: beside the closeout, which stays last`);
   }
 });
@@ -660,7 +660,7 @@ test("a declared file in the step's files directory counts when it is there, is 
   fs.writeFileSync(path.join(files, 'shots', 'run-dark.png'), 'a png');
   const declared = [path.join(files, 'factory-light.png'), path.join(files, 'shots', 'run-dark.png'), path.join(files, 'never-written.png'), path.join(files, 'shots')];
 
-  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(declared)), [path.join(files, 'never-written.png'), path.join(files, 'shots')], 'a directory is not a file');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(declared)), [{ path: path.join(files, 'never-written.png'), why: 'missing' }, { path: path.join(files, 'shots'), why: 'missing' }], 'a directory is not a file');
   assert.deepEqual(artifactFiles(run, 'implement'), [
     { path: path.join(files, 'factory-light.png'), bytes: 3 },
     { path: path.join(files, 'shots', 'run-dark.png'), bytes: 5 },
@@ -684,14 +684,14 @@ test("an absolute path outside the step's files directory is refused, and never 
 
   const spies = ['existsSync', 'statSync', 'lstatSync', 'realpathSync', 'readFileSync', 'openSync', 'accessSync', 'readdirSync']
     .map((method) => t.mock.method(fs, method as 'statSync'));
-  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(outside)), outside);
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(outside)), outside.map((p) => ({ path: p, why: 'outside' })));
   const looked = spies.flatMap((spy) => spy.mock.calls.map((call) => String(call.arguments[0])))
     .filter((p) => outside.some((o) => path.resolve(p) === path.resolve(o)));
   assert.deepEqual(looked, [], 'refused without being opened, stat-ed or resolved');
 
   // A link inside the directory that leads out is as outside as where it leads, and is not listed.
   fs.symlinkSync(secret, path.join(files, 'link.txt'));
-  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])), [path.join(files, 'link.txt')]);
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring([path.join(files, 'link.txt')])), [{ path: path.join(files, 'link.txt'), why: 'missing' }]);
   assert.deepEqual(artifactFiles(run, 'implement'), []);
 });
 
@@ -2242,4 +2242,366 @@ test("a round that continues the loop's target hands it what was said to its las
   const at = brief.indexOf('## Said to your session');
   assert.ok(at > 0 && at < brief.indexOf('## From review'), brief);
   assert.ok(brief.includes('```text\nLeave the parser alone.\n```'), brief);
+});
+
+// ─── the order a run's steps are listed in ──────────────────────────────────
+
+/** `plan → implement ⇄ review`, whose files sort implement, plan, review. */
+const plannedFolder = () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'planned-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nafter: plan\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'plan.md'), 'plan it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\nloop: implement\noutput: review.schema.json\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }));
+  return dir;
+};
+
+test("REFUSED before, now in order: `wf start` on `plan → implement ⇄ review` says plan → implement → review, keys the record so and `wf ls` lists it so — and a record written in the folder's order, frozen or not, reads in the steps' order", async (t) => {
+  const repo = aRepo();
+  const b = board();
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['start', 'plan the flag', '--workflows', plannedFolder(), '--repo', repo], b.e);
+  const [id, said] = printed[0]!.split('  ');
+  assert.equal(said, '3 step(s): plan → implement → review');
+  const run = readRun(id!);
+  assert.deepEqual([Object.keys(run.steps), run.workflow?.map((s) => s.name)], [['plan', 'implement', 'review'], ['plan', 'implement', 'review']]);
+
+  /** The step names `wf ls <run>` prints, in the order it prints them. */
+  const rows = async (runId: string) => {
+    printed.length = 0;
+    await main(['ls', runId], b.e);
+    return printed.slice(1).map((line) => /^ {3}([a-z][\w-]*) /.exec(line)?.[1]).filter(Boolean);
+  };
+  assert.deepEqual(await rows(id!), ['plan', 'implement', 'review']);
+
+  // Written before steps were ordered: keyed in the folder's order, with its workflow frozen in that order or not frozen at all.
+  const folderOrder = ['implement', 'plan', 'review'];
+  for (const frozen of [true, false]) {
+    const legacyId = `${id}-${frozen ? 'frozen' : 'unfrozen'}`;
+    const { workflow, steps, ...rest } = run;
+    fs.writeFileSync(path.join(ROOT, 'runs', `${legacyId}.json`), JSON.stringify({
+      ...rest, id: legacyId,
+      ...(frozen ? { workflow: folderOrder.map((name) => workflow!.find((s) => s.name === name)) } : {}),
+      steps: Object.fromEntries(folderOrder.map((name) => [name, steps[name]])),
+    }, null, 2));
+    const legacy = readRun(legacyId);
+    assert.deepEqual([Object.keys(legacy.steps), legacy.workflow?.map((s) => s.name)], [folderOrder, frozen ? folderOrder : undefined], 'as it was written');
+    assert.deepEqual(stepsOf(legacy).map((s) => s.name), ['plan', 'implement', 'review'], legacyId);
+    assert.deepEqual((await list(b.e, legacy)).steps.map((s) => s.name), ['plan', 'implement', 'review'], legacyId);
+    assert.deepEqual(await rows(legacyId), ['plan', 'implement', 'review'], legacyId);
+  }
+});
+
+test("`wf decide` prints each step in the order the steps run — on a record keyed in the folder's order too", async (t) => {
+  const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: plannedFolder(), isolate: false });
+  const b = board();
+  // plan and implement sign off with no check; review signs off without the `again` it declares, so the run waits on you.
+  for (const name of ['plan', 'implement', 'review']) {
+    assert.deepEqual((await advance(b.e, readRun(run.id))).filed, [name]);
+    b.settle(`${run.id}-${name}`, 'succeeded', SIGNED);
+  }
+  const { main } = await import('../src/cli.ts');
+  const sections = async () => {
+    const out: string[] = [];
+    const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.map(String).join(' ')); });
+    try { await main(['decide', run.id], b.e); } finally { log.mock.restore(); }
+    const lines = out.join('\n').split('\n');
+    assert.ok(lines.some((l) => l.startsWith('  UNSIGNED: review')), lines.join('\n'));
+    return lines.filter((l) => /^ {2}(plan|implement|review)$/.test(l)).map((l) => l.trim());
+  };
+  assert.deepEqual(await sections(), ['plan', 'implement', 'review']);
+
+  const record = readRun(run.id);
+  const folderOrder = ['implement', 'plan', 'review'];
+  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify({
+    ...record,
+    workflow: folderOrder.map((name) => record.workflow!.find((s) => s.name === name)),
+    steps: Object.fromEntries(folderOrder.map((name) => [name, record.steps[name]])),
+  }, null, 2));
+  assert.deepEqual(Object.keys(readRun(run.id).steps), folderOrder);
+  assert.deepEqual(await sections(), ['plan', 'implement', 'review']);
+});
+
+// ─── files for a run: wf start --input ──────────────────────────────────────
+
+test("`wf start --input` copies each file into the run's own inputs/, freezes their names on the record and names them on every step's brief, under what was asked for — nothing in the workspace; `wf decide` names them under the run's line", async (t) => {
+  const repo = aRepo();
+  const given = fs.mkdtempSync(path.join(ROOT, 'given-'));
+  fs.writeFileSync(path.join(given, 'mock.png'), 'png bytes');
+  fs.mkdirSync(path.join(given, 'notes'));
+  fs.writeFileSync(path.join(given, 'notes', 'brief notes.md'), '# what the person meant\n');
+  const b = board();
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['start', 'add a flag', '--workflows', folder(), '--repo', repo, '--no-worktree', '--input', path.join(given, 'mock.png'), `--input=${path.join(given, 'notes', 'brief notes.md')}`], b.e);
+  const id = printed[0]!.split(' ')[0]!;
+  const dir = path.join(ROOT, 'runs', id, 'inputs');
+  assert.deepEqual(readRun(id).inputs, ['mock.png', 'brief notes.md'], 'by name, in the order given');
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['brief notes.md', 'mock.png']);
+  assert.equal(fs.readFileSync(path.join(dir, 'mock.png'), 'utf8'), 'png bytes');
+  assert.ok(printed.includes(`inputs: mock.png, brief notes.md — copied into ${dir}`), printed.join('\n'));
+  assert.equal(execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }), '', 'nothing written into the workspace');
+
+  const line = `Files given with it (\`wf start --input\`), in \`${dir}\`: \`mock.png\`, \`brief notes.md\`.`;
+  await advance(b.e, readRun(id));
+  b.settle(`${id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(id));
+  for (const name of ['implement', 'review']) {
+    const brief = b.tasks.get(`${id}-${name}`)!.spec.brief;
+    assert.ok(brief.includes(`## What was asked for\n\nadd a flag\n\n${line}\n`), `${name}:\n${brief}`);
+  }
+  printed.length = 0;
+  await main(['decide', id], b.e);
+  assert.deepEqual(printed[0]!.split('\n').slice(0, 2), [`${id}  add a flag`, `  inputs  mock.png, brief notes.md  —  in ${dir}`]);
+
+  // A run given none: no directory, no key on the record, and a brief without the line.
+  const plain = start({ brief: 'add a flag', repo, workflowDir: folder(), isolate: false });
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${plain.id}.json`), 'utf8')), 'inputs'), false);
+  assert.equal(fs.existsSync(path.join(ROOT, 'runs', plain.id)), false);
+  await advance(b.e, readRun(plain.id));
+  assert.doesNotMatch(b.tasks.get(`${plain.id}-implement`)!.spec.brief, /wf start --input/);
+});
+
+test('REFUSED at `wf start`, before a run is written: an --input that is not there, a directory, two of one name and one file given twice — and the CLI refuses --input with no file and a misspelt --input; `wf plan --input` is refused by name', async () => {
+  const repo = aRepo();
+  const given = fs.mkdtempSync(path.join(ROOT, 'given-'));
+  for (const d of ['a', 'b']) {
+    fs.mkdirSync(path.join(given, d));
+    fs.writeFileSync(path.join(given, d, 'notes.md'), `${d}\n`);
+  }
+  const before = runsWritten();
+  const starting = (...inputs: string[]) => () => start({ brief: 'a run with files', repo, workflowDir: folder(), isolate: false, inputs });
+  assert.throws(starting(path.join(given, 'a', 'notes.md'), path.join(given, 'nope.png')),
+    refusedWith(new RegExp(`^--input ${escaped(path.join(given, 'nope.png'))}: there is no file at ${escaped(path.join(given, 'nope.png'))}\\.`)));
+  assert.throws(starting(path.join(given, 'a')), refusedWith(new RegExp(`^--input ${escaped(path.join(given, 'a'))}: ${escaped(path.join(given, 'a'))} is a directory, and --input copies one file\\.`)));
+  assert.throws(starting(path.join(given, 'a', 'notes.md'), path.join(given, 'b', 'notes.md')),
+    refusedWith(new RegExp(`^--input ${escaped(path.join(given, 'a', 'notes.md'))} and --input ${escaped(path.join(given, 'b', 'notes.md'))} are both named notes\\.md`)));
+  assert.throws(starting(path.join(given, 'a', 'notes.md'), `${given}/b/../a/notes.md`), refusedWith(/is given twice\. Each file is copied once: give it one --input\.$/));
+  assert.equal(runsWritten(), before, 'no run written, and no inputs directory');
+
+  const { main } = await import('../src/cli.ts');
+  const typed = (...flags: string[]) => main(['start', 'a run with files', '--workflows', folder(), '--repo', repo, '--no-worktree', ...flags]);
+  await assert.rejects(typed('--input'), refusedWith(/^--input takes a file to hand the run's steps: wf start <brief> --input <file>/));
+  await assert.rejects(typed('--input='), refusedWith(/^--input takes a file to hand the run's steps/));
+  await assert.rejects(typed('--input', '--after', 'r-xyz'), refusedWith(/^--input takes a file to hand the run's steps/));
+  await assert.rejects(typed('--input', path.join(given, 'a')), refusedWith(/ is a directory, and --input copies one file\./));
+  await assert.rejects(typed('--inputs', path.join(given, 'a', 'notes.md')), refusedWith(/^wf start does not take --inputs\. .*; --input <file> once per file to hand its steps\.$/));
+  const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
+  await assert.rejects(main(['plan', plan, '--repo', repo, '--input', path.join(given, 'a', 'notes.md')]), refusedWith(/^wf plan does not take --input: a card's inputs are not a thing yet\./));
+  assert.equal(runsWritten(), before, 'nor by the CLI');
+});
+
+// ─── files named from the workspace, collected ──────────────────────────────
+
+test("a file `artifacts` names from the workspace root is collected into the step's files directory when the step hands off, before its check is filed — again, only what changed, after a pass that died — and read from there; an absolute path in the directory is read where it is", async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  // What a step that can write only its workspace leaves — a file for the branch, and one git ignores — and one written into the directory by absolute path.
+  fs.writeFileSync(path.join(run.repo, '.gitignore'), '.e2e/\n');
+  fs.mkdirSync(path.join(run.repo, '.e2e'));
+  fs.writeFileSync(path.join(run.repo, '.e2e', 'shot.png'), 'png');
+  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# response\n');
+  fs.writeFileSync(path.join(files, 'trace.zip'), 'zip');
+  const named = ['RESPONSE.md', './.e2e/shot.png', path.join(files, 'trace.zip')];
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
+
+  // A pass that hands off, collects, and dies filing the check.
+  const dying = { ...b.e, file: async (spec: { id: string }) => { if (spec.id.endsWith('-check')) throw new Error('the pass died'); return b.e.file(spec as never); } } as unknown as Engine;
+  await assert.rejects(advance(dying, readRun(run.id)), /the pass died/);
+  assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response\n');
+  assert.equal(fs.readFileSync(path.join(files, '.e2e', 'shot.png'), 'utf8'), 'png', 'a file git ignores, which never reaches the branch');
+
+  // The next pass collects again — only what changed since — and files the check.
+  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# response, amended\n');
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.checked, pass.notes], [['implement'], [`implement: collected RESPONSE.md into ${files}`]]);
+  assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
+  assert.equal(fs.readFileSync(path.join(files, 'trace.zip'), 'utf8'), 'zip', 'an absolute path in the directory, where it is');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), []);
+  assert.deepEqual(artifactFiles(run, 'implement').map((f) => path.relative(files, f.path)).sort(), ['.e2e/shot.png', 'RESPONSE.md', 'trace.zip']);
+
+  // Once its check is filed, the workspace is the check's: nothing more is collected.
+  fs.writeFileSync(path.join(run.repo, 'RESPONSE.md'), '# rewritten while the check ran\n');
+  assert.deepEqual((await advance(b.e, readRun(run.id))).notes, []);
+  assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
+});
+
+test("REFUSED as findings on the screen, never silently: a path that climbs out of the workspace is never read, a link that leads out is not followed, and a directory and a file not there are not collected — `wf decide` names each", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  const secret = path.join(path.dirname(run.repo), `secret-${run.id}.txt`);
+  fs.writeFileSync(secret, "not a step's to name\n");
+  fs.mkdirSync(path.join(run.repo, 'shots'));
+  fs.writeFileSync(path.join(run.repo, 'shots', 'a.png'), 'png');
+  fs.symlinkSync(secret, path.join(run.repo, 'leak.txt'));
+  const climbs = `../${path.basename(secret)}`;
+  b.settle(`${run.id}-implement`, 'succeeded', declaring([climbs, 'never-written.md', 'shots', 'leak.txt']));
+
+  const spies = ['existsSync', 'statSync', 'lstatSync', 'realpathSync', 'readFileSync', 'openSync', 'accessSync', 'readdirSync', 'copyFileSync', 'cpSync']
+    .map((method) => t.mock.method(fs, method as 'statSync'));
+  const looked = () => spies.flatMap((spy) => spy.mock.calls.flatMap((call) => call.arguments.slice(0, 2).filter((a) => typeof a === 'string') as string[]))
+    .filter((p) => path.resolve(p) === secret);
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.filed, pass.notes], [['review'], []], 'review filed, and nothing collected');
+  assert.deepEqual(artifactFiles(run, 'implement'), []);
+  assert.deepEqual(looked(), [], 'the file outside the workspace is neither opened, stat-ed nor resolved by the tick');
+
+  b.settle(`${run.id}-review`, 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs: 'a person' });
+  const out: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.map(String).join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  try { await main(['decide', run.id], b.e); } finally { log.mock.restore(); }
+  const lines = out.join('\n').split('\n');
+  const at = lines.indexOf('  implement');
+  assert.ok(at >= 0, lines.join('\n'));
+  assert.deepEqual(lines.slice(at).filter((l) => l.startsWith('    !! ')), [
+    '    !! declared but not in the workspace: never-written.md  — nothing to collect',
+    '    !! declared a directory, not collected: shots  — a step names each file',
+    `    !! declared outside the workspace, and not read: ${climbs}, leak.txt  — name a file from the workspace root, or put it in ${files}`,
+  ]);
+  assert.deepEqual(looked(), [], 'nor by wf decide');
+});
+
+test("REFUSED at shipped defaults: a copy is never written through a link a step made in its files directory — on the way to it, or in its place — what the link leads to is left as it was, and `wf decide` names the file not collected, though it is on the branch", async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  const elsewhere = fs.mkdtempSync(path.join(ROOT, 'elsewhere-'));
+  fs.writeFileSync(path.join(elsewhere, 'shot.png'), 'what was there');
+  fs.writeFileSync(path.join(elsewhere, 'report.md'), 'what was there');
+  // A step that can write its files directory makes links in it, then names workspace files whose copies would go through them.
+  fs.symlinkSync(elsewhere, path.join(files, 'shots'));
+  fs.symlinkSync(path.join(elsewhere, 'report.md'), path.join(files, 'report.md'));
+  fs.mkdirSync(path.join(run.repo, 'shots'));
+  fs.writeFileSync(path.join(run.repo, 'shots', 'shot.png'), 'png');
+  fs.writeFileSync(path.join(run.repo, 'report.md'), '# report\n');
+  const named = ['shots/shot.png', 'report.md'];
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(named));
+
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([pass.checked, pass.notes], [['implement'], []], 'its check filed, and nothing collected');
+  assert.deepEqual(Object.fromEntries(fs.readdirSync(elsewhere).map((f) => [f, fs.readFileSync(path.join(elsewhere, f), 'utf8')])),
+    { 'report.md': 'what was there', 'shot.png': 'what was there' });
+  // Handed off, both are on the branch. The run reads a step's files from its directory, and says what it did not collect.
+  assert.equal(execFileSync('git', ['cat-file', '-t', `${run.branch}:report.md`], { cwd: run.repo, encoding: 'utf8' }).trim(), 'blob');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(named)), [{ path: 'shots/shot.png', why: 'not collected' }, { path: 'report.md', why: 'not collected' }]);
+});
+
+// ─── a stale ask ────────────────────────────────────────────────────────────
+
+test("REFUSED before, now honoured at shipped defaults: `wf retry` on a step whose harness blocked its session, and the session works again before any tick — the tick stops it once, files nothing while it stops, and files the try once it has; `wf ls` says so meanwhile", async (t) => {
+  const run = started(folder());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const taskId = `${run.id}-implement`;
+  b.settle(taskId, 'needs-human' as TaskPhase);
+  const e = recordingStops(b);
+  t.mock.method(console, 'log', () => {});
+  const { main } = await import('../src/cli.ts');
+  await main(['retry', run.id, 'implement'], e);
+  assert.deepEqual(asksOf(run.id), ['retry-implement-2']);
+
+  // A peer's message, and the session works again: no tick ran in between.
+  b.settle(taskId, 'running');
+  assert.deepEqual((await list(e, readRun(run.id))).steps[0], { name: 'implement', status: 'running', branch: run.branch, note: 'try 2 asked (--nudge) — stopping its session, then the tick files it' });
+
+  const record = fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8');
+  const first = await advance(e, readRun(run.id));
+  assert.deepEqual([b.stopped, first.tried, first.filed, first.status], [[taskId], [], [], 'running'], 'the session asked to stop, and nothing filed');
+  assert.ok(first.notes.includes(`implement: try 2 — wf retry --nudge; its session runs on, asked for while its harness had blocked it, so the engine is asked to stop it, and the try is filed once it has`), first.notes.join('\n'));
+  assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8'), record, 'the record untouched');
+  assert.deepEqual(asksOf(run.id), ['retry-implement-2'], 'the ask waits for its try');
+
+  // Passes while the engine stops it — the second on a board read afresh, as after a restart: no second stop, nothing filed.
+  for (const engineOf of [() => e, () => recordingStops(b)]) {
+    const again = await advance(engineOf(), readRun(run.id));
+    assert.deepEqual([b.stopped, again.tried, again.filed, again.notes], [[taskId], [], [], []]);
+  }
+
+  // Settled stopped: the next pass files try 2, a nudge that continues the session, once.
+  b.settle(taskId, 'stopped');
+  const try2 = `${run.id}-implement-try2`;
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  assert.equal(b.tasks.get(try2)!.spec.resumeFrom, `native-${taskId}`);
+  assert.deepEqual(asksOf(run.id), [], 'consumed');
+  await advance(e, readRun(run.id));
+  assert.deepEqual([b.stopped, b.filings.filter((f) => f === try2).length], [[taskId], 1], 'once');
+});
+
+// ─── wf start on a card file ────────────────────────────────────────────────
+
+test("`wf start <card>.md` starts the card's body — its id from the body, its `workflow:` found from its plan folder, --workflows over it — and a card whose `after:` names cards starts only with --after; a brief whose frontmatter is not a card's is taken whole, as before", async (t) => {
+  const { repo, dir: dev } = aRepoWith('dev');
+  const other = oneStep();
+  const b = board();
+  const plan = aPlan((d) => ({
+    'a.md': cardText('workflow: dev', 'Parse the flag option in cli'),
+    'b.md': cardText(`# by a path from the plan folder\nworkflow: ${path.relative(d, other)}`, 'Document the flag'),
+    'd.md': cardText('workflow: dev\nafter: a, b', 'Show the flag'),
+  }));
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  const startedBy = async (...argv: string[]) => {
+    printed.length = 0;
+    await main(['start', ...argv], b.e);
+    return readRun(printed[0]!.split(' ')[0]!);
+  };
+
+  const a = await startedBy(path.join(plan, 'a.md'), '--repo', repo);
+  assert.deepEqual([a.brief, a.workflowDir], ['Parse the flag option in cli', dev], 'the body, and workflow: dev found as wf plan finds it');
+  assert.match(a.id, /^parse-the-flag-option-in-cli-[a-z0-9]{4}$/);
+  const second = await startedBy(path.join(plan, 'b.md'), '--repo', repo);
+  assert.deepEqual([second.brief, second.workflowDir], ['Document the flag', other], 'a path from the plan folder, not from where wf start is typed');
+  assert.equal((await startedBy(path.join(plan, 'a.md'), '--repo', repo, '--workflows', other)).workflowDir, other, '--workflows over the card');
+
+  const before = runsWritten();
+  await assert.rejects(main(['start', path.join(plan, 'd.md'), '--repo', repo], b.e),
+    refusedWith(new RegExp(`^${escaped(path.join(plan, 'd.md'))}: \`after: a, b\` — this card waits on the runs of a and b, and wf start was given no --after, so it would start at once`)));
+  assert.equal(runsWritten(), before, 'no run written');
+  const d = await startedBy(path.join(plan, 'd.md'), '--workflows', dev, '--repo', repo, '--after', a.id, '--after', second.id);
+  assert.deepEqual([d.brief, d.after], ['Show the flag', [a.id, second.id]]);
+
+  // Not a card: a brief whose frontmatter has a key a card does not have is taken whole, and so is one that opens with a rule and never closes it.
+  const brief = path.join(fs.mkdtempSync(path.join(ROOT, 'brief-')), 'brief.md');
+  fs.writeFileSync(brief, '---\ntitle: the flag\nworkflow: dev\n---\nParse the flag.\n');
+  assert.equal((await startedBy(brief, '--repo', repo, '--workflows', dev)).brief, '---\ntitle: the flag\nworkflow: dev\n---\nParse the flag.');
+  fs.writeFileSync(brief, '---\nA brief that opens with a rule.\n');
+  assert.equal((await startedBy(brief, '--repo', repo, '--workflows', dev)).brief, '---\nA brief that opens with a rule.');
+});
+
+test("REFUSED before, now read as it was: a run from before collection — its step past hand-off, its worktree still there, its files on the branch and none in its files directory — has nothing missing, and no pass collects it; a file on no branch still reads not collected", async () => {
+  const run = started(folder('check: npm test'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  const files = artifactsDir(run, 'implement');
+  fs.writeFileSync(path.join(run.repo, '.gitignore'), '.e2e/\n');
+  fs.mkdirSync(path.join(run.repo, '.e2e'));
+  fs.writeFileSync(path.join(run.repo, '.e2e', 'shot.png'), 'png');
+  fs.mkdirSync(path.join(run.repo, 'docs'));
+  fs.writeFileSync(path.join(run.repo, 'docs', 'RESPONSE.md'), '# response\n');
+  gitIn(run.repo, 'add', '-A');
+  gitIn(run.repo, 'commit', '-q', '-m', 'the step, handed off');
+  // As a run from before collection left it: its check filed, and nothing in its files directory.
+  const record = readRun(run.id);
+  record.steps.implement = { ...record.steps.implement!, check: { taskId: `${run.id}-implement-check` } };
+  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  b.settle(`${run.id}-implement`, 'succeeded', declaring(['docs/RESPONSE.md', '.e2e/shot.png']));
+  fs.rmSync(files, { recursive: true, force: true });
+
+  assert.equal(execFileSync('git', ['cat-file', '-t', `${run.branch}:docs/RESPONSE.md`], { cwd: run.repo, encoding: 'utf8' }).trim(), 'blob');
+  assert.ok(fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'the worktree is still there');
+  assert.deepEqual(missingArtifacts(readRun(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
+    [{ path: '.e2e/shot.png', why: 'not collected' }], 'the branch has RESPONSE.md; a file git ignores is on no branch');
+  // Past hand-off, so no pass collects it: the branch is where the run reads it.
+  assert.deepEqual((await advance(b.e, readRun(run.id))).notes, []);
+  assert.deepEqual(artifactFiles(run, 'implement'), []);
 });

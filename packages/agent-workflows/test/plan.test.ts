@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { CARD_KEYS, parsePlan, planLines, planOrder, planStopped, type PlanFile, type Planned } from '../src/plan.ts';
+import { CARD_KEYS, cardToStart, parsePlan, planLines, planOrder, planStopped, type PlanFile, type Planned } from '../src/plan.ts';
 
 const card = (name: string, keys: string, body = `do ${name}`): PlanFile => ({ file: `${name}.md`, text: `---\n${keys}\n---\n${body}\n` });
 
@@ -106,13 +106,43 @@ test('a plan stopped part-way says which card refused and why, names the runs th
     'wf plan stopped at c.md: the disk is full',
     'The runs it started stand, and the tick files each as its edges allow: a (parse-the-flag-1x2y), b (document-it-3z4w). Cancel one with wf cancel <runId>.',
     'Start the rest by hand, parents first, once what stopped c.md is fixed — each --after the run of a card it waits on:',
-    '  wf start /plans/q3/c.md --workflows /repo/workflows/ui --repo /repo --after parse-the-flag-1x2y',
-    "  wf start /plans/q3/d.md --workflows /repo/workflows/dev --repo /repo --after document-it-3z4w --after <c's run id>",
+    "  wf start '/plans/q3/c.md' --workflows '/repo/workflows/ui' --repo '/repo' --after parse-the-flag-1x2y",
+    "  wf start '/plans/q3/d.md' --workflows '/repo/workflows/dev' --repo '/repo' --after document-it-3z4w --after <c's run id>",
   ]);
   assert.deepEqual(planStopped({ card: cards[0]!, why: 'not a git repository', rest: cards.slice(1) }, [], opts).split('\n').slice(0, 4), [
     'wf plan stopped at a.md: not a git repository',
     'It started no run.',
     'Start the rest by hand, parents first, once what stopped a.md is fixed — each --after the run of a card it waits on:',
-    '  wf start /plans/q3/a.md --workflows /repo/workflows/dev --repo /repo',
+    "  wf start '/plans/q3/a.md' --workflows '/repo/workflows/dev' --repo '/repo'",
   ]);
+  // Quoted for the shell: a space, and a quote, in a path.
+  const spaced = { dir: "/home/me/plans/q3 it's", repo: '/code/my app', folderOf: () => '/code/my app/workflows/dev' };
+  assert.equal(planStopped({ card: cards[0]!, why: 'x', rest: [] }, [], spaced).split('\n').at(-1),
+    `  wf start '/home/me/plans/q3 it'\\''s/a.md' --workflows '/code/my app/workflows/dev' --repo '/code/my app'`);
+});
+
+test("`cardToStart`: a card file starts its body, with its `workflow:` and `after:` — a file whose frontmatter is not a card's, or that has none, is not a card and is taken whole; a card naming `after:` with no --after is refused, naming the ids to give", () => {
+  assert.deepEqual(cardToStart('plans/q3/c.md', '---\nworkflow: ui\nafter: a\n---\nStore the flag.\n\nIn the settings file.\n', ['r-a']),
+    { file: 'plans/q3/c.md', workflow: 'ui', after: ['a'], body: 'Store the flag.\n\nIn the settings file.' });
+  assert.deepEqual(cardToStart('a.md', '\uFEFF---\r\n# what runs it\r\nworkflow: dev\r\n\r\n---\r\nParse the flag.\r\n', []), { file: 'a.md', workflow: 'dev', after: [], body: 'Parse the flag.' });
+  assert.deepEqual(cardToStart('b.md', '---\nafter: a\n---\nDocument it.\n', ['r-a']), { file: 'b.md', after: ['a'], body: 'Document it.' }, 'no workflow: — --workflows says, or the default');
+
+  // Not a card, so the whole text is the brief: no frontmatter, a key a card does not have beside a card's, prose between two rules, one that
+  // never closes, and an empty block.
+  for (const text of ['Parse the flag.\n', '---\ntitle: the flag\nworkflow: dev\n---\nParse it.\n', '---\nSome prose between two rules\n---\nParse it.\n',
+    '---\nA brief that opens with a rule, and never closes one.\n', '---\n---\nParse it.\n', '---\n\n# only a comment\n---\nParse it.\n']) {
+    assert.equal(cardToStart('brief.md', text, []), null, JSON.stringify(text));
+  }
+
+  // REFUSED at shipped defaults, by name: a card whose after: names cards, started with no --after — whatever the rest of it says.
+  assert.throws(() => cardToStart('plans/q3/d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', []),
+    refusedWith(/^plans\/q3\/d\.md: `after: b, c` — this card waits on the runs of b and c, and wf start was given no --after, so it would start at once, beside the work it was written to wait for\. Give the id of each, from wf ls: wf start plans\/q3\/d\.md --after <b's run id> --after <c's run id>\.$/));
+  assert.throws(() => cardToStart('e.md', '---\nafter: a, b, c\n---\nx\n', []), refusedWith(/waits on the runs of a, b and c,/));
+  assert.throws(() => cardToStart('e.md', '---\nafter: a\n---\nx\n', []), refusedWith(/^e\.md: `after: a` — this card waits on the run of a,.* wf start e\.md --after <a's run id>\.$/));
+  // And what wf plan refuses of a card: an empty body, a key set twice or to nothing, an after: naming no card, or one twice.
+  assert.throws(() => cardToStart('a.md', '---\nworkflow: dev\n---\n', []), refusedWith(/^a\.md: the body is empty\./));
+  assert.throws(() => cardToStart('a.md', '---\nworkflow: dev\nworkflow: ui\n---\nx\n', []), refusedWith(/^a\.md: `workflow` is set twice/));
+  assert.throws(() => cardToStart('a.md', '---\nworkflow:\n---\nx\n', []), refusedWith(/^a\.md: `workflow` has no value\./));
+  assert.throws(() => cardToStart('a.md', '---\nafter: ,\n---\nx\n', ['r-b']), refusedWith(/^a\.md: `after: ,` names no card\./));
+  assert.throws(() => cardToStart('a.md', '---\nafter: b, b\n---\nx\n', ['r-b']), refusedWith(/^a\.md: `after: b, b` names b twice\./));
 });

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, messageRefusal, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -24,6 +24,14 @@ test('a fresh run files only the step with nothing in front of it', () => {
   const a = assess(STEPS, run({ implement: null, review: null }), phases({}));
   assert.deepEqual(a.ready, ['implement']);
   assert.equal(a.status, 'running');
+});
+
+test("`namesInOrder`: a record's steps in the order they run — a record keyed in the folder's order too — then any the workflow does not have, as the record has them", () => {
+  const planned = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
+  const legacy = run({ implement: 't2', plan: 't1', review: null, 'gone-step': 't0' });
+  assert.deepEqual(Object.keys(legacy.steps), ['implement', 'plan', 'review', 'gone-step']);
+  assert.deepEqual(namesInOrder(legacy, planned), ['plan', 'implement', 'review', 'gone-step']);
+  assert.deepEqual(namesInOrder(run({ implement: 't1' }), planned), ['implement'], 'a step the record does not have is not named');
 });
 
 test('the next step waits while the first one runs', () => {
@@ -876,11 +884,14 @@ test("REFUSED before, now accepted: a step whose session its harness blocked, wi
   // The tick's reading: the ask is due, to stop the session first, and the run is still going, waiting on nobody.
   const a = assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman);
   assert.deepEqual([a.retry, a.ready, a.blocked, a.status], [[{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }], [], [], 'running']);
-  assert.deepEqual(assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)]).retry, [], "without the harness's word, nothing is due");
+  // Without the harness's word, due all the same: the task has not settled, so its session is stopped first (plan §6 item 24).
+  assert.deepEqual(assess(STEPS, r, p, nothingSigned, asked, () => undefined, [askFor(2)]).retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true, runsOn: true }],
+    "without the harness's word, due as a session that runs on");
   assert.deepEqual(decision(STEPS, r, p, nothingShipped, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman), { kind: 'running', waiting: ['implement'] }, 'live and due, named once');
   const l = listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]);
   assert.deepEqual([l.steps[0], l.waitingOnYou], [{ name: 'implement', status: 'needs-human', branch: null, note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it' }, []]);
-  assert.equal(listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, undefined, 'a session still working: nothing due, nothing said');
+  assert.equal(listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note,
+    'try 2 asked (--nudge) — stopping its session, then the tick files it', 'a session working again: stopped first, and said so');
 
   // Once the session has settled, the same ask is due as any stopped step's, and filed.
   assert.deepEqual(assess(STEPS, r, phases({ t1: 'stopped' }), nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman).retry,
@@ -1265,16 +1276,20 @@ test('a step is told where its files go, before its closeout — a fresh step, a
   for (const brief of briefs) {
     const told = brief.indexOf('\n## Files for the steps after you\n');
     assert.ok(told >= 0, brief);
-    assert.ok(brief.includes(`Put them in \`${FILES}\`; name them in \`artifacts\` by absolute path.`), brief);
+    assert.ok(brief.includes(`- Put it in \`${FILES}\`, and name it in \`artifacts\` by absolute path.`), brief);
+    assert.ok(brief.includes('- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root'), brief);
     assert.ok(told < brief.indexOf('\n## When you are finished\n'), 'the closeout stays last');
   }
   // What it will be judged by, then where its files go, then how to finish.
   assert.ok(briefs[2]!.indexOf('\n## Before you sign off\n') < briefs[2]!.indexOf('\n## Files for the steps after you\n'));
-  assert.match(artifactsContract(FILES), /given the same\ndirectory as `WF_ARTIFACTS`/);
+  assert.match(artifactsContract(FILES), /given the same directory as `WF_ARTIFACTS`/);
+  assert.match(artifactsContract(FILES), /the run copies each such file into that directory, at the\n  same path, before it checks your work/);
+  assert.match(artifactsContract(FILES), /Refused, and not read: an absolute\npath anywhere else, and a path that climbs out of the workspace with `\.\.`/);
 });
 
-test('a declared artifact is on the branch by a relative path, in the files directory by an absolute one inside it, and outside anywhere else', () => {
-  for (const f of ['RESPONSE.md', 'docs/notes.md', '../outside.md']) assert.equal(artifactPlace(f, FILES), 'branch', f);
+test('a declared artifact is from the workspace by a relative path — refused when it climbs out of it — in the files directory by an absolute one inside it, and outside anywhere else', () => {
+  for (const f of ['RESPONSE.md', 'docs/notes.md', './docs/notes.md', 'docs/../RESPONSE.md', '.e2e/shot.png', '..notes.md']) assert.equal(artifactPlace(f, FILES), 'workspace', f);
+  for (const f of ['../outside.md', '..', '../', 'docs/../../outside.md', './../outside.md']) assert.equal(artifactPlace(f, FILES), 'escapes', f);
   for (const f of [`${FILES}/factory-light.png`, `${FILES}/shots/run-dark.png`, `${FILES}/shots/../factory-light.png`, `${FILES}/..hidden.png`]) {
     assert.equal(artifactPlace(f, FILES), 'files', f);
   }
@@ -1283,15 +1298,21 @@ test('a declared artifact is on the branch by a relative path, in the files dire
   }
 });
 
-test("`wf decide` tells apart why a declared file is missing, then lists the step's files with their sizes", () => {
-  const lines = artifactLines(FILES, ['NOTES.md', `${FILES}/gone.png`, '/etc/passwd'], [
+test("`wf decide` tells apart why a declared file is missing — each refusal named, never passed over — then lists the step's files with their sizes", () => {
+  const lines = artifactLines(FILES, [
+    { path: 'NOTES.md', why: 'not there' }, { path: `${FILES}/gone.png`, why: 'missing' }, { path: '/etc/passwd', why: 'outside' },
+    { path: 'shots', why: 'directory' }, { path: '../secret.txt', why: 'escapes' }, { path: 'leak.txt', why: 'escapes' }, { path: '.e2e/shot.png', why: 'not collected' },
+  ], [
     { path: `${FILES}/factory-light.png`, bytes: 512 },
     { path: `${FILES}/shots/run-dark.png`, bytes: 48_230 },
     { path: `${FILES}/trace.zip`, bytes: 3 * 1024 * 1024 },
   ]);
   assert.deepEqual(lines, [
-    '!! declared but not on the branch: NOTES.md  — it did not travel',
+    '!! declared but not in the workspace: NOTES.md  — nothing to collect',
+    '!! declared a directory, not collected: shots  — a step names each file',
+    `!! declared and not collected: .e2e/shot.png  — in the workspace, and not in ${FILES}`,
     `!! declared but not in ${FILES}: ${FILES}/gone.png`,
+    `!! declared outside the workspace, and not read: ../secret.txt, leak.txt  — name a file from the workspace root, or put it in ${FILES}`,
     `!! declared outside ${FILES}, and not read: /etc/passwd  — a step's files go in its own directory`,
     'files:',
     `  ${FILES}/factory-light.png  512 B`,
@@ -1813,4 +1834,104 @@ test('a round that continues the loop\'s target carries what was said to its las
   assert.ok(resumed.includes('At 2026-09-14T16:06:19.851Z:\n\n```text\nLeave the parser alone.\n```'), resumed);
   assert.equal(briefOf({ ...round, said: [] }), briefOf(round), 'nothing said, nothing added');
   assert.equal(briefOf({ ...round, resumed: false, said }), briefOf({ ...round, resumed: false }), 'a new session is given none');
+});
+
+// ─── files a person gave the run ────────────────────────────────────────────
+
+test('REFUSED by name: an --input that is not there, a directory, not a regular file, two of one name and one file given twice — and files that are there, each of its own name, are not', () => {
+  const f = (given: string, kind: InputFile['kind'] = 'file', resolved = `/work/${given}`): InputFile => ({ given, resolved, kind });
+  assert.equal(inputRefusal([]), null);
+  assert.equal(inputRefusal([f('mock.png'), f('notes/brief.md'), f('notes/mock.png.md')]), null);
+  assert.equal(inputRefusal([f('mock.png'), f('gone.png', 'missing')]),
+    "--input gone.png: there is no file at /work/gone.png. Give the path to a file to hand the run's steps, from where wf start is typed or absolute.");
+  assert.equal(inputRefusal([f('shots', 'directory')]), '--input shots: /work/shots is a directory, and --input copies one file. Give each file its own --input.');
+  assert.equal(inputRefusal([f('pipe', 'other')]), '--input pipe: /work/pipe is not a regular file, so there is nothing to copy. Give the path to a file.');
+  assert.equal(inputRefusal([f('a/notes.md'), f('b/notes.md')]),
+    '--input a/notes.md and --input b/notes.md are both named notes.md, and the run keeps its inputs by name, in one directory. Rename one of them, or give only one.');
+  assert.equal(inputRefusal([f('notes.md'), f('./notes.md', 'file', '/work/notes.md')]), '--input ./notes.md is given twice. Each file is copied once: give it one --input.');
+  // A file that is not there is named before a clash of names, whatever order they were given in.
+  assert.match(inputRefusal([f('a/notes.md'), f('b/notes.md'), f('gone.png', 'missing')])!, /^--input gone\.png: there is no file/);
+});
+
+test('a run given inputs names them once, under what was asked for, on every brief that carries it — and a run given none composes exactly as before', () => {
+  const DIR = '/wf/runs/r-1/inputs';
+  const line = 'Files given with it (`wf start --input`), in `/wf/runs/r-1/inputs`: `mock.png`, `brief notes.md`.';
+  const inputs = ['mock.png', 'brief notes.md'];
+  const brief = (s: Workflow, r: Run, steps: readonly Workflow[], retry?: RetryBriefing, dir: string | undefined = DIR) =>
+    composeBrief(s, r, steps, undefined, undefined, undefined, retry, undefined, undefined, dir);
+  const r = run({ implement: null, review: null });
+  const plain = composeBrief(step('implement'), r, STEPS);
+  for (const [why, given] of [['no inputs on the record', r], ['an empty list', { ...r, inputs: [] }]] as const) {
+    assert.equal(brief(step('implement'), given, STEPS), plain, why);
+  }
+  // `undefined` would not skip `brief`'s default directory: composed with none at all.
+  assert.equal(composeBrief(step('implement'), { ...r, inputs }, STEPS), plain, 'no directory to name: nothing said');
+  assert.equal(brief(step('implement'), { ...r, inputs }, STEPS), plain.replace('\n\nadd a flag\n', `\n\nadd a flag\n\n${line}\n`));
+  assert.equal(inputsLine(DIR, inputs), line);
+
+  // A step after another, a fan-in, and a new session tried again carry it; each exactly once.
+  const fanIn = step('integrate', ['a', 'b']);
+  const carried = [
+    brief(step('review', ['implement']), run({ implement: 't1', review: null }, { inputs }), STEPS),
+    brief(fanIn, run({ a: 't1', b: 't2', integrate: null }, { inputs }), [step('a'), step('b'), fanIn]),
+    brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], { try: 2, by: 'ask', mode: 'fresh', resumed: false, status: 'stopped' }),
+  ];
+  for (const b of carried) {
+    assert.equal(b.split(line).length, 2, b);
+    assert.ok(b.indexOf('## What was asked for') < b.indexOf(line), 'under the request');
+  }
+  // What continues a session was handed the request and its files already: a nudge, and a step that resumes another.
+  const resumed: Workflow = { name: 'respond', after: ['implement'], resume: 'implement', body: 'answer it' };
+  assert.doesNotMatch(brief(resumed, run({ implement: 't1', respond: null }, { inputs }), [step('implement'), resumed]), /wf start --input/);
+  assert.doesNotMatch(brief(step('implement'), run({ implement: 't1' }, { inputs }), [step('implement')], { try: 2, by: 'ask', mode: 'nudge', resumed: true, status: 'stopped' }), /wf start --input/);
+});
+
+test("`wf decide` names a run's inputs under its line, and a run given none says nothing of them", () => {
+  assert.equal(inputsNote('/wf/runs/r-1/inputs', ['mock.png', 'brief notes.md']), 'inputs  mock.png, brief notes.md  —  in /wf/runs/r-1/inputs');
+  assert.equal(inputsNote('/wf/runs/r-1/inputs', []), undefined);
+  assert.equal(inputsNote('/wf/runs/r-1/inputs', undefined), undefined);
+});
+
+// ─── a stale ask ────────────────────────────────────────────────────────────
+
+test("REFUSED before, now honoured: an ask written while the harness blocked a step's session, whose session then works again, is due all the same — stopped first, and said so by `wf ls` — and filed as a stopped step's once the task settles; the verb still refuses a working step, and `retries:` and a run without asks are as they were", () => {
+  const r = run({ implement: 't1', review: null });
+  const nothingSigned = () => undefined;
+  const working = phases({ t1: 'running' });
+  const stale = (extra: Partial<RetryAsk> = {}) => ({ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true, runsOn: true, ...extra });
+
+  // The harness no longer says blocked, whether its word is left out or given as no: due, the session stopped first.
+  const a = assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2)]);
+  assert.deepEqual([a.retry, a.ready, a.blocked, a.status], [[stale()], [], [], 'running']);
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2, 'fresh', 'opus')], [], () => false).retry, [stale({ mode: 'fresh', model: 'opus' })]);
+  // Filed and waiting for a slot, and signed off and running on: the same — the ask was written before either.
+  assert.deepEqual(assess(STEPS, r, phases({ t1: 'pending' }), nothingSigned, asked, () => undefined, [askFor(2)]).retry, [stale()]);
+  assert.deepEqual(assess(STEPS, r, working, signedDone, asked, () => undefined, [askFor(2)]).retry, [stale()]);
+  // Still blocked by its harness: exactly as before, no `runsOn`.
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2)], [], (id) => id === 't1').retry,
+    [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }]);
+  assert.deepEqual(decision(STEPS, r, working, nothingShipped, nothingSigned, asked, () => undefined, [askFor(2)]), { kind: 'running', waiting: ['implement'] }, 'live and due, named once');
+
+  // `wf ls` says so, in words of its own beside a session that works, and in the harness-blocked words beside `needs-human`.
+  const l = listing(STEPS, r, shown({ t1: 'running (working)' }), signedOff({}), asked, () => undefined, [askFor(2)]);
+  assert.deepEqual([l.steps[0], l.waitingOnYou], [{ name: 'implement', status: 'running (working)', branch: null, note: 'try 2 asked (--nudge) — stopping its session, then the tick files it' }, []]);
+  assert.equal(listing(STEPS, r, shown({ t1: 'needs-human' }), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it');
+
+  // Refused as before: a task the engine has no record of is stopped for no ask, and `wf ls` says nothing of one; a recheck, which no
+  // session could have been asked for, is not honoured on a working step.
+  assert.deepEqual(assess(STEPS, r, phases({}), nothingSigned, asked, () => undefined, [askFor(2)]).retry, []);
+  assert.equal(listing(STEPS, r, shown({}), signedOff({}), asked, () => undefined, [askFor(2)]).steps[0]!.note, undefined);
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(2, 'recheck')]).retry, []);
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked, () => undefined, [askFor(3)]).retry, [], 'an ask for another try than the next');
+
+  // Once the task has settled, the same ask is due as any stopped step's, and filed.
+  assert.deepEqual(assess(STEPS, r, phases({ t1: 'stopped' }), nothingSigned, asked, () => undefined, [askFor(2)]).retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }]);
+
+  // The verb is unchanged: a working step is refused, with the harness's word or without it.
+  for (const blockedOf of [undefined, () => false]) {
+    assert.match(retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, working, nothingSigned, asked, () => undefined, [], blockedOf)!, /^implement is still running, so there is nothing to try again until it ends/);
+  }
+  // Without asks, nothing is due of a working step; and a refused check `retries:` covers is due as it was, with no stop.
+  assert.deepEqual(assess(STEPS, r, working, nothingSigned, asked).retry, []);
+  assert.deepEqual(assess(RETRIED, withCheck('c1'), phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked, () => 1).retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'retries' }]);
 });

@@ -7,7 +7,9 @@ package uses `createEngine`, `file`, `tick`, `view`, `stop`, `logs` and nothing 
 ```bash
 wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it until r-xyz has shipped
+wf start ./ui.md --repo ~/code/myapp --input ./mock.png   # copied into the run's inputs/, named on every step's brief
 wf plan ./plans/flag --repo ~/code/myapp               # a folder of cards: a run each, parents first, with their edges
+wf start ./plans/flag/d.md --repo ~/code/myapp --after r-b --after r-c   # one card by hand: its body is the brief
 wf up
 wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
@@ -81,6 +83,13 @@ A repository carries its workflows checked in, one folder each under `<repo>/wor
 workflow folder works too, looked at first. The board lists them, and the folders under
 `~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
 `GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
+
+A run lists its steps in the order they run, not in the folder's. Each step comes after every step its `after` names, and
+otherwise keeps the order it was given, which for a folder is by name; a loop's edge back orders nothing (`orderSteps`). So
+`wf start` on `plan → implement ⇄ review`, whose files sort implement, plan, review, prints `3 step(s): plan → implement → review`.
+The run's record is keyed in that order, and `wf ls`, `wf decide` and the board read it so. A record from before the order,
+keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf decide`; one whose order already runs forward
+reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `effort`,
 `permissionMode`, `tools`, `disallow`, `deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`,
@@ -180,7 +189,8 @@ A run cuts one git worktree and every step works in it, so the handoff is the wo
 it is between two engineers. A later step is told:
 
 - its own prose
-- **the original request** (the spec — you cannot judge completeness without it)
+- **the original request** (the spec — you cannot judge completeness without it), and the files a person gave
+  the run with it (`wf start --input`), by name, in one line under it
 - where to look: `git diff <baseRef>`, and who was there before it
 - what a step it waits on declared in its closeout — **only if it asks**, with `input:` (below)
 - in a round of a loop, what the loop hands on: the reviewer's findings to the step it loops back to,
@@ -484,9 +494,9 @@ A step with no closeout — still running, never filed, or from a run older than
 with nothing: a settled one reads `unverified`, never `succeeded · done`. The summary is left off that
 screen on purpose: it was written for `wf decide`.
 
-*It makes a lost artifact visible.* `artifacts` are checked against the branch, and a declared file
-that is not there is reported. The first real run lost a reviewer's entire output to exactly that,
-silently.
+*It makes a lost artifact visible.* `artifacts` are checked against the step's files directory, where a
+file named from the workspace root is collected (*A step's files*, below), and a declared file the run
+does not have is reported. The first real run lost a reviewer's entire output to exactly that, silently.
 
 **Committing is the run's job.** Every brief tells the step that the run commits whatever it leaves,
 and that being unable to commit is not a reason to block. That is not generosity. Codex's sandbox
@@ -614,6 +624,9 @@ retries: 1
   stopped step: a nudge continues the session. A step whose session is still working is refused as before. A
   caller takes the harness's word by passing it (`retry(…, { stopBlocked: true })`): `wf retry` does, and so does
   the board's `POST …/retry` (its banner's Continue); a caller that leaves it out is refused as before.
+  The session can work again before a tick stops it, told something by a peer with no `wf up` running. The ask
+  stands all the same: while the step's task has not settled, the tick stops its session, once, and files the try
+  when it has, whatever the harness says by then. `wf retry` itself still refuses a step whose session works.
 - **An ask is a file, like a cancellation.** `wf retry` writes `runs/<id>.asks/retry-<step>-<n>`, whole and
   exclusively, and never writes the run's json. Every pass reads the directory. The next pass files try `n`,
   writes the record, then moves the ask into `done/`. The ask names its try, and a try's ids are derived
@@ -641,7 +654,8 @@ retries: 1
   model) or `recheck`. A person's tries do not spend the step's `retries`.
 - **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
   0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`,
-  `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human`, and
+  `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
+  `stopping its session` beside a session that works again since it was asked), and
   once filed `try 2, by retries: 1` or `try 2, nudged on your word, answered`. A step with a try due is not
   waiting on you. **`wf decide`** names the try each closeout and check belong to — for a try you answered,
   with what the try before it needed and your answer under it — and under *try again* gives the `wf retry` for
@@ -744,6 +758,30 @@ round: a round is new work, and its check may refuse it afresh.
 This repository's `workflows/` is implement ⇄ review: `review.md` loops back to `implement` with
 `rounds: 3`. `respond.md` is gone, and its three answers are the loop contract.
 
+## Files a person gives the run: `wf start --input`
+
+A brief is text, and a step can read a screenshot or a spec from disk, but nothing told it where one was. For one run the
+reference screenshots were copied by hand and their paths sent to the running session (plan §4b, *inputs for a step*).
+
+```bash
+wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
+```
+
+- **Each file is copied into `runs/<id>/inputs/`**: the run's own directory, beside its artifacts, never the workspace, so no
+  file rides a branch. The names are frozen on the record as `inputs`, in the order given.
+- **Every step's brief names them, in one line under *What was asked for***:
+
+  ```text
+  Files given with it (`wf start --input`), in `/home/you/.agent-workflows/runs/give-the-factory-a-leg-x1y2/inputs`: `mock.png`, `api.md`.
+  ```
+
+  A brief that continues a session is not told again, as it is not told the request again: a step that `resume:`s
+  another, a nudge, a round that continues its target. A run given none composes exactly as before.
+- **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.
+- **Refused before anything is written**, by name and with the fix: a file that is not there, a directory, anything else
+  that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.
+- **`wf plan` refuses `--input`.** A card's inputs are not a thing yet; start that card by hand with its files.
+
 ## A step's files: `runs/<id>/artifacts/<step>/`
 
 Some of what a step makes is for the steps after it and the person who decides, and does not belong on
@@ -752,17 +790,27 @@ rides the branch into what ships; gitignored, it never reaches the next step's w
 makes a directory per step, beside the run's record under `WF_ROOT` and outside every workspace, before
 it files the step.
 
-- **The step is told where it is**, on its brief, beside the closeout contract (`artifactsContract`):
-  *put them in `<dir>`; name them in `artifacts` by absolute path*. Mechanism, like the closeout: no
-  workflow author has to remember to say it.
+- **The step is told both ways**, on its brief, beside the closeout contract (`artifactsContract`): put a
+  file in `<dir>` and name it by absolute path, or leave it in the workspace and name it by its path from
+  the workspace root. Mechanism, like the closeout: no workflow author has to remember to say it.
+- **A file named from the workspace root is collected.** On the pass that hands the step off, before its
+  check is filed, the tick copies each such file into `<dir>` at the same path (`collectArtifacts`), and
+  the run reads it from there. So a step that cannot write outside its worktree — Codex in
+  `workspace-write`, which the engine gives no other directory — hands its files over too, and so does a
+  file git ignores, which never reaches the branch. Every pass until the check is filed copies only what
+  changed, so a pass that dies halfway loses nothing, and nothing is written through a link a step made in
+  its directory.
 - **The step's check is given it** as `WF_ARTIFACTS`.
 - **A declared artifact is looked for where its path says** (`artifactPlace`). A path from the workspace
-  root is looked for on the branch, as before. An absolute path is looked for in the step's own
-  directory, on disk, with links followed. Any other absolute path — another step's directory, a `..`
-  that climbs out, a link inside that leads out, `/etc/passwd` — is reported and never opened, stat-ed or
-  resolved: a closeout is an agent's text.
-- **`wf decide` lists the directory** after the step's closeout, each file by absolute path with its
-  size, below whatever it declared that is not where it says.
+  root is read from `<dir>`, where it was collected, or else from the branch, as before collection — so a run
+  from before it reads as it did, worktree or not. A file whose copy something the step made in `<dir>` refused
+  is named, even when it is on the branch. An absolute path is looked for in the step's own directory, on disk, with
+  links followed. Any other absolute path — another step's directory, a `..` that climbs out, a link inside
+  that leads out, `/etc/passwd` — is reported and never opened, stat-ed or resolved: a closeout is an
+  agent's text. So is a path from the workspace root that climbs out of it, as written or through a link.
+- **`wf decide` names each refusal** under the step's closeout, never passing one over: a path outside the
+  workspace or the directory, a directory, a file that is not there, and a file in the workspace that was
+  not collected. Then it lists the directory, each file by absolute path with its size.
 
 A file reaches a later step by its path, declared. `workflows/ui/implement.md` declares `screenshots`,
 the absolute paths of its PNGs, and `review` reads them with `input: implement`.
@@ -873,7 +921,10 @@ screen shows what the branch touched, read out of git:
 ```
 
 - **touched** is `git diff --numstat` against the run's base, grouped by workspace package (the base's
-  own `workspaces`, which no step could edit) or else by top-level directory. A move counts in both
+  own `workspaces`, which no step could edit, read as npm reads them: `./packages/*` is `packages/*`) or
+  else by top-level directory. A `workspaces` glob with `**` is not refused, since the repository's file is
+  not ours, but a `workspaces` line names it: a file still counts once, in the outermost package on its
+  way. A move counts in both
   places it touched, a binary file as a file with no lines. Then, each only when true, the
   *agent-facing* files — what an agent reads as instructions: `CLAUDE.md`, `AGENTS.md`, `.claude/`,
   `.codex/`, `.mcp.json`, a `README.md` — and the *check-affecting* ones: every `package.json`, the
@@ -885,7 +936,7 @@ screen shows what the branch touched, read out of git:
   files in full, for one screen; the touched lines still say which files are check-affecting. The
   heading with `none` under it means nothing on the list changed, not that nobody looked.
 - **lesson** says whether the run changed a file where the next agent reads — `CLAUDE.md`,
-  `AGENTS.md`, the root's `docs/` or a workspace package's — or that it wrote nothing there. Not any
+  `AGENTS.md`, the root's `docs/` or a workspace package's own — or that it wrote nothing there. Not any
   `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. CLAUDE.md's *When you miss* is a rule, and
   this line holds a person to it.
 - **used** and **cost** are the engine's `usage` for the step's current try, summed over its attempts.
@@ -1014,7 +1065,14 @@ run 'wf tick' (or 'wf up') to start them
   says each, and anything else is refused as `wf start` refuses it.
 - **A `wf start` that refuses part-way stops the plan.** Every card was checked first, so this is something that
   changed underneath, or git. The runs it started stand, and it names them. Then it prints a `wf start --after` for
-  each card left, parents first, with the run ids it has and `<c's run id>` for a parent not started yet.
+  each card left, parents first, with the run ids it has and `<c's run id>` for a parent not started yet, each path
+  quoted for the shell.
+- **`wf start` on a card file starts the card**, as the stopped plan's commands do. The brief is the card's body, below its
+  frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
+  card's `workflow:`, found from its plan folder as `wf plan` finds it. A card whose `after:` names cards is refused
+  without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
+  A file is a card only when every line of its frontmatter is `workflow:` or `after:`. A brief with any other key, or one
+  that opens with a `---` it never closes, is taken whole, as before.
 
 ## Calling a run off
 

@@ -79,14 +79,54 @@ function parseCard(file: string, text: string): Card {
   if (keys.workflow === undefined) {
     refuse(`${file}: no \`workflow:\`, so nothing says what runs this card. Name it in the frontmatter: \`workflow: dev\`, a folder under the repository's workflows/, or a path to a workflow folder, relative to the plan folder.`);
   }
+  const brief = bodyOf(file, body);
+  return { name: file.slice(0, -'.md'.length), file, workflow: keys.workflow!, after: afterOf(file, keys.after), body: brief };
+}
+
+/** A card's body, its run's brief — refused when empty, since a card with nothing to ask is not a card. */
+function bodyOf(file: string, body: string): string {
   if (!body) refuse(`${file}: the body is empty. A card's body is its run's brief — what the run is asked to do — and a card with nothing to ask is not a card. Write it below the frontmatter.`);
-  const after = keys.after === undefined ? [] : keys.after.split(',').map((s) => s.trim()).filter(Boolean);
-  if (keys.after !== undefined && !after.length) {
-    refuse(`${file}: \`after: ${keys.after}\` names no card. List the cards whose runs ship first, comma-separated — \`after: a, b\` — or delete the line, and the card starts at once.`);
+  return body;
+}
+
+/** A card's `after:`, as the cards it names — refused when it names none, or one twice. `[]` for a card with no `after:`. */
+function afterOf(file: string, after: string | undefined): string[] {
+  const names = after === undefined ? [] : after.split(',').map((s) => s.trim()).filter(Boolean);
+  if (after !== undefined && !names.length) {
+    refuse(`${file}: \`after: ${after}\` names no card. List the cards whose runs ship first, comma-separated — \`after: a, b\` — or delete the line, and the card starts at once.`);
   }
-  const twice = after.find((a, i) => after.indexOf(a) !== i);
-  if (twice) refuse(`${file}: \`after: ${keys.after}\` names ${twice} twice. A card waits on another once: name each card once.`);
-  return { name: file.slice(0, -'.md'.length), file, workflow: keys.workflow!, after, body };
+  const twice = names.find((a, i) => names.indexOf(a) !== i);
+  if (twice) refuse(`${file}: \`after: ${after}\` names ${twice} twice. A card waits on another once: name each card once.`);
+  return names;
+}
+
+/** A card `wf start` is given as its brief: its `workflow:` when it names one, the cards its `after:` names, and its body. */
+export type StartCard = { file: string; workflow?: string; after: string[]; body: string };
+
+/**
+ * A file `wf start` is given, read as a card when its frontmatter is a card's — every line of it `workflow:` or `after:` — or null when it is
+ * not: no frontmatter, one with any other key or a line that is not a key, one with nothing in it, or one that never closes. Null means the
+ * file's whole text is the brief, as it always was, so a brief that happens to start with `---` is not eaten. Pure.
+ *
+ * `wf plan` prints `wf start <card> --after …` for each card it did not start, and this is what makes that command start the card's body.
+ * Read as a card, a file is held to what `wf plan` holds a card to — a key set twice or to nothing, an empty body, an `after:` naming no card or
+ * one twice — and refused, naming the file and the ids to give, when its `after:` names cards and `wf start` was given no `--after` (`after`):
+ * started so, it would not wait for the runs it was written to wait for. Which runs those are is `wf start --after`'s to check, as it does.
+ */
+export function cardToStart(file: string, text: string, after: readonly string[]): StartCard | null {
+  let split: { block: string | null; body: string };
+  try { split = splitFrontmatter(file, text); } catch { return null; }
+  const lines = (split.block ?? '').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  const isCardLine = (line: string) => line.indexOf(':') > 0 && isCardKey(line.slice(0, line.indexOf(':')).trim());
+  if (!lines.length || !lines.every(isCardLine)) return null;
+  const keys = readCardKeys(file, split.block!);
+  const body = bodyOf(file, split.body);
+  const waits = afterOf(file, keys.after);
+  if (waits.length && !after.length) {
+    const named = waits.length === 1 ? waits[0] : `${waits.slice(0, -1).join(', ')} and ${waits.at(-1)}`;
+    refuse(`${file}: \`after: ${keys.after}\` — this card waits on the ${waits.length === 1 ? 'run' : 'runs'} of ${named}, and wf start was given no --after, so it would start at once, beside the work it was written to wait for. Give the id of each, from wf ls: wf start ${file} ${waits.map((a) => `--after <${a}'s run id>`).join(' ')}.`);
+  }
+  return { file, ...(keys.workflow !== undefined ? { workflow: keys.workflow } : {}), after: waits, body };
 }
 
 /** A card's frontmatter as key → value: every line a key a card has, set once, to something. */
@@ -176,10 +216,14 @@ export function planLines(started: readonly Planned[]): string[] {
   });
 }
 
+/** A path as a shell reads it back whatever is in it: in single quotes, and a quote inside closed, escaped and opened again. */
+const quoted = (p: string): string => `'${p.replace(/'/g, `'\\''`)}'`;
+
 /**
  * Why `wf plan` stopped part-way, and what to do: the card whose `wf start` refused and its refusal, the runs already started — which
  * stand, and the tick files as their edges allow — and a `wf start` for each card not started, parents first, with `--after` the runs its
- * parents have or will have. `folderOf` is the workflow folder each card's `workflow:` was found at; `dir` is the plan folder.
+ * parents have or will have, each path quoted for the shell. `folderOf` is the workflow folder each card's `workflow:` was found at; `dir` is
+ * the plan folder. `wf start` on a card file starts its body (`cardToStart`).
  */
 export function planStopped(
   stopped: { card: Card; why: string; rest: readonly Card[] },
@@ -192,7 +236,7 @@ export function planStopped(
     : 'It started no run.';
   const commands = [stopped.card, ...stopped.rest].map((card) => {
     const after = card.after.map((a) => ` --after ${idOf.get(a) ?? `<${a}'s run id>`}`).join('');
-    return `  wf start ${opts.dir.replace(/\/$/, '')}/${card.file} --workflows ${opts.folderOf(card)} --repo ${opts.repo}${after}`;
+    return `  wf start ${quoted(`${opts.dir.replace(/\/$/, '')}/${card.file}`)} --workflows ${quoted(opts.folderOf(card))} --repo ${quoted(opts.repo)}${after}`;
   });
   return [
     `wf plan stopped at ${stopped.card.file}: ${stopped.why}`,

@@ -50,6 +50,12 @@ export type Run = {
    */
   after?: string[];
   /**
+   * The files `wf start --input` copied into the run's own `inputs/` directory (`inputsDir` in runner.ts), by name, in the order given.
+   * Named on every step's brief that carries what was asked for (`inputsLine`), and under the run's line in `wf decide`. Absent on a run
+   * given none, and on every record from before there were inputs.
+   */
+  inputs?: string[];
+  /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (`isShipped` in runner.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished, and on
@@ -404,6 +410,16 @@ export const stepTaskId = (run: Pick<Run, 'id'>, step: string, n = 1): string =>
   n <= 1 ? `${run.id}-${step}` : `${run.id}-${step}-try${n}`;
 
 /**
+ * The names on a run's record in the order its steps run — `steps` as `stepsOf` gives them (`orderSteps`) — then any the record has that
+ * the workflow does not, in the record's order. Pure. What `wf decide` prints each step in: a record written before steps were ordered is
+ * keyed in the folder's order, and read by its keys a `plan → implement ⇄ review` run printed implement first.
+ */
+export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<Workflow, 'name'>[]): string[] => [
+  ...steps.map((s) => s.name).filter((name) => Object.hasOwn(run.steps, name)),
+  ...Object.keys(run.steps).filter((name) => !steps.some((s) => s.name === name)),
+];
+
+/**
  * The steps whose leftovers the run commits on this pass. Pure.
  *
  * Every FINISHED step — succeeded, failed or stopped. A failed step still blocks what follows; handing
@@ -478,10 +494,12 @@ export type RetryHow = { mode: RetryMode; model?: string; message?: string };
 /**
  * A try to file on this pass: of which step, its number, how, on whose word — and, for a person's, what they said with it.
  *
- * `stopFirst` on a person's try of a step whose session its harness blocked (`retryable`): the pass asks the engine to stop that session
- * and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped step, and files it.
+ * `stopFirst` on a person's try of a step whose task has not settled (`retriesDue`): the pass asks the engine to stop that session — once,
+ * as the engine's `stopRequested` says — and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped
+ * step, and files it. `runsOn` beside it when the harness no longer says the session is blocked: asked for while it was, the session has
+ * worked again since.
  */
-export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; by: 'retries' | 'ask'; stopFirst?: true };
+export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; by: 'retries' | 'ask'; stopFirst?: true; runsOn?: true };
 
 /**
  * Why a message cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the
@@ -571,10 +589,15 @@ export function retryable(
  * The tries due now. Pure, and blind to cancellation on purpose: `assess` answers for a cancelled run, and
  * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
  *
- * A person's ask for a step's next try, when the step may be tried again that way — with `stopFirst` for a step
- * whose session its harness blocked (`retryable`), since that session is still there to stop. Otherwise a check that
- * REFUSED (`refusedCheck`), while `retries:` has tries left: the step re-filed as a nudge. Past them, or for a
- * check that did not finish, nothing is due — the step waits on the person, as it always has.
+ * A person's ask for a step's next try, when the step may be tried again that way. For a step whose task has not settled, with
+ * `stopFirst`, since its session is still there to stop — `--nudge` or `--fresh`, the ways `wf retry` takes for a session its harness
+ * blocked (`retryable`), whether or not the harness still says so. An ask can only be written for such a step while its harness blocks
+ * the session, and the session can work again before a tick stops it, told something by a peer with no `wf up` running. Left for its
+ * task to settle, that ask was neither due nor spent, `wf ls` said nothing of it, and the step's next failure filed it at once, ahead of
+ * `retries:`. So the engine's record of the task decides, as it does everywhere here, not what the harness said when the ask was written;
+ * `runsOn` marks a session the harness no longer calls blocked. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has
+ * tries left: the step re-filed as a nudge. Past them, or for a check that did not finish, nothing is due — the step waits on the
+ * person, as it always has.
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
@@ -594,13 +617,17 @@ export function retriesDue(
   for (const step of steps) {
     const record = run.steps[step.name];
     const { status, modes, blockedByHarness } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked);
-    if (!record?.taskId || !modes.length) continue;
+    if (!record?.taskId) continue;
+    const phase = phaseOf(record.taskId);
+    const unsettled = phase === 'pending' || phase === 'running';
+    const ways = unsettled ? STOPPED_FIRST : modes;
+    if (!ways.length) continue;
     const next = tryOf(run, step.name) + 1;
-    const ask = asks.find((a) => a.step === step.name && a.try === next && modes.includes(a.mode));
+    const ask = asks.find((a) => a.step === step.name && a.try === next && ways.includes(a.mode));
     if (ask) {
       due.push({
         step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), ...(ask.message !== undefined ? { message: ask.message } : {}), by: 'ask',
-        ...(blockedByHarness ? { stopFirst: true as const } : {}),
+        ...(unsettled ? { stopFirst: true as const, ...(blockedByHarness ? {} : { runsOn: true as const }) } : {}),
       });
     } else if (status === 'failed (check)' && record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name))
       && retriesSpent(record) < (step.retries ?? 0)) {
@@ -609,6 +636,9 @@ export function retriesDue(
   }
   return due;
 }
+
+/** The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked. */
+const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
 
 /**
  * A step's record once a try is filed: the current try moved behind, with what replaced it, and the new one in
@@ -708,9 +738,12 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   return [inRound, `try ${record!.tries!.length + 1}, ${how}`, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
 
-/** A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session its harness blocked, that the session is stopped first. */
+/**
+ * A try due now, as `wf ls` and `wf decide` say it — and, for a step whose session the tick stops first, that it does: `its blocked session`
+ * while its harness says so, and `its session` once it works again (`runsOn`).
+ */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => (r.by === 'ask'
-  ? `try ${r.try} asked (${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? 'stopping its blocked session, then the tick files it' : 'the next tick files it'}`
+  ? `try ${r.try} asked (${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
   : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`);
 
 /**
@@ -1329,6 +1362,49 @@ export const closeoutContract = (step?: Workflow, replies = false): string => {
   ].join('\n');
 };
 
+// ─── files a person gave the run ────────────────────────────────────────────
+
+/**
+ * A file `wf start --input` was given, as runner.ts found it: the path as typed, where it resolves, and what is there. What `inputRefusal`
+ * judges; runner.ts looks, and this file does not.
+ */
+export type InputFile = { given: string; resolved: string; kind: 'file' | 'directory' | 'missing' | 'other' };
+
+/**
+ * Why `wf start --input` will not copy these files into the run, in words that name the fix — or null. Pure, and asked before anything is
+ * written: a file that is not there, a directory, anything else that is not a regular file, and two inputs that would take one name in the
+ * run's `inputs/` — one file given twice, or two files of the same name.
+ */
+export function inputRefusal(inputs: readonly InputFile[]): string | null {
+  for (const f of inputs) {
+    if (f.kind === 'missing') return `--input ${f.given}: there is no file at ${f.resolved}. Give the path to a file to hand the run's steps, from where wf start is typed or absolute.`;
+    if (f.kind === 'directory') return `--input ${f.given}: ${f.resolved} is a directory, and --input copies one file. Give each file its own --input.`;
+    if (f.kind === 'other') return `--input ${f.given}: ${f.resolved} is not a regular file, so there is nothing to copy. Give the path to a file.`;
+  }
+  const named = new Map<string, InputFile>();
+  for (const f of inputs) {
+    const name = path.basename(f.resolved);
+    const other = named.get(name);
+    if (other?.resolved === f.resolved) return `--input ${f.given} is given twice. Each file is copied once: give it one --input.`;
+    if (other) {
+      return `--input ${other.given} and --input ${f.given} are both named ${name}, and the run keeps its inputs by name, in one directory. Rename one of them, or give only one.`;
+    }
+    named.set(name, f);
+  }
+  return null;
+}
+
+/**
+ * The line a step's brief carries under what was asked for when `wf start --input` gave the run files: the directory the run copied them
+ * into, and each by name. Undefined for a run given none, or with no directory to name.
+ */
+export const inputsLine = (dir: string | undefined, names: readonly string[] | undefined): string | undefined =>
+  (dir && names?.length ? `Files given with it (\`wf start --input\`), in \`${dir}\`: ${names.map((n) => `\`${n}\``).join(', ')}.` : undefined);
+
+/** What `wf decide` says under a run's line when `wf start --input` gave it files: each by name, and where they are. Undefined for a run given none. */
+export const inputsNote = (dir: string, names: readonly string[] | undefined): string | undefined =>
+  (names?.length ? `inputs  ${names.join(', ')}  —  in ${dir}` : undefined);
+
 // ─── files for the steps after it ───────────────────────────────────────────
 
 /**
@@ -1339,31 +1415,45 @@ export const closeoutContract = (step?: Workflow, replies = false): string => {
  * step's worktree at all. So the run makes a directory per step, beside the run's record and outside
  * every workspace (`artifactsDir` in runner.ts), and says where it is. Mechanism, like the closeout: a
  * step does not have to find somewhere, and a workflow author does not have to remember to say where.
+ *
+ * Both ways are said, because not every step can use the first: Codex in `workspace-write` writes only its
+ * worktree, and the engine gives it no other directory. A file named from the workspace root is collected into
+ * the directory at hand-off, before the check (`collectArtifacts` in runner.ts), so such a step hands it over too.
  */
 export const artifactsContract = (dir: string): string => [
   '', '## Files for the steps after you', '',
-  `Put them in \`${dir}\`; name them in \`artifacts\` by absolute path.`,
+  'A screenshot, a log or a report reaches the steps after you and the person who decides in either of two ways.',
   '',
-  'The run made that directory for this step, outside every workspace, so a file there reaches the',
-  'steps after you and the person who decides without riding the branch: a screenshot, a log, a',
-  'report. A file that belongs on the branch, such as `RESPONSE.md`, stays in the workspace and is',
-  "named by its path from the workspace root. The run's check of this step is given the same",
-  'directory as `WF_ARTIFACTS`. An absolute path anywhere else is refused, and not read.',
+  `- Put it in \`${dir}\`, and name it in \`artifacts\` by absolute path. The run made that directory for`,
+  '  this step, outside every workspace, so a file there does not ride the branch.',
+  '- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root, such as',
+  '  `RESPONSE.md` or `.e2e/shot.png`. When you finish, the run copies each such file into that directory, at the',
+  '  same path, before it checks your work, so a step that cannot write outside its workspace hands its files over',
+  '  all the same. A file left in the workspace is committed with the rest too, unless git ignores it.',
+  '',
+  "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
+  'path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a',
+  'file that is not there: name each file.',
 ].join('\n');
 
 /**
  * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
  *
- *   branch   a path from the workspace root — on the step's branch, where it travelled
- *   files    an absolute path inside the step's files directory — on disk, where the run keeps it
- *   outside  any other absolute path — refused. A closeout is an agent's text, and the run does not
- *            look at a file on this machine because a step named it. `..` is resolved first, so a path
- *            that climbs out of the directory is outside however it is spelled.
+ *   workspace  a path from the workspace root — collected from the workspace into the step's files directory
+ *              when the step hands off (`collectArtifacts` in runner.ts), and read from there
+ *   files      an absolute path inside the step's files directory — on disk, where the run keeps it
+ *   escapes    a path from the workspace root that climbs out of it, `../notes.md` — refused, and never read
+ *   outside    any other absolute path — refused. A closeout is an agent's text, and the run does not
+ *              look at a file on this machine because a step named it. `..` is resolved first, so a path
+ *              that climbs out of the directory is outside however it is spelled.
  */
-export type ArtifactPlace = 'branch' | 'files' | 'outside';
+export type ArtifactPlace = 'workspace' | 'files' | 'escapes' | 'outside';
 
 export function artifactPlace(file: string, dir: string): ArtifactPlace {
-  if (!path.isAbsolute(file)) return 'branch';
+  if (!path.isAbsolute(file)) {
+    const rel = path.normalize(file);
+    return rel === '..' || rel.startsWith(`..${path.sep}`) ? 'escapes' : 'workspace';
+  }
   const within = path.relative(path.resolve(dir), path.resolve(file));
   // Empty is the directory itself, which is not a file in it.
   return within && within !== '..' && !within.startsWith(`..${path.sep}`) && !path.isAbsolute(within) ? 'files' : 'outside';
@@ -1373,16 +1463,34 @@ export function artifactPlace(file: string, dir: string): ArtifactPlace {
 export type ArtifactFile = { path: string; bytes: number };
 
 /**
- * What `wf decide` prints about a step's files, after its closeout: each declared file that is not where
- * it says, told apart by why, and then every file in the step's directory with its size.
+ * A declared artifact the run does not have, and why (`missingArtifacts` in runner.ts):
+ *
+ *   not there      a path from the workspace root with nothing at it, nor on the branch
+ *   directory      a path from the workspace root that is a directory: not collected, since a step names each file
+ *   not collected  a file in the workspace that is not in the step's files directory, and whose copy something in that directory refused
+ *                  — or that is on no branch either: git ignores it, and its step has not handed off
+ *   missing        an absolute path in the step's files directory that is not a file there
+ *   escapes        a path that climbs out of the workspace, as written or through a link in it: refused, and not read
+ *   outside        an absolute path outside the step's files directory: refused, and not read
  */
-export function artifactLines(dir: string, missing: readonly string[], files: readonly ArtifactFile[]): string[] {
-  const at = (place: ArtifactPlace) => missing.filter((f) => artifactPlace(f, dir) === place);
-  const [onBranch, inFiles, outside] = [at('branch'), at('files'), at('outside')];
+export type MissingArtifact = { path: string; why: 'not there' | 'directory' | 'not collected' | 'missing' | 'escapes' | 'outside' };
+
+/**
+ * What `wf decide` prints about a step's files, after its closeout: each declared file the run does not have, told apart by why —
+ * a refusal is named as one, never passed over — and then every file in the step's directory, collected or written there, with its size.
+ */
+export function artifactLines(dir: string, missing: readonly MissingArtifact[], files: readonly ArtifactFile[]): string[] {
+  const line = (why: MissingArtifact['why'], say: (names: string) => string): string[] => {
+    const names = missing.filter((m) => m.why === why).map((m) => m.path);
+    return names.length ? [say(names.join(', '))] : [];
+  };
   return [
-    ...(onBranch.length ? [`!! declared but not on the branch: ${onBranch.join(', ')}  — it did not travel`] : []),
-    ...(inFiles.length ? [`!! declared but not in ${dir}: ${inFiles.join(', ')}`] : []),
-    ...(outside.length ? [`!! declared outside ${dir}, and not read: ${outside.join(', ')}  — a step's files go in its own directory`] : []),
+    ...line('not there', (names) => `!! declared but not in the workspace: ${names}  — nothing to collect`),
+    ...line('directory', (names) => `!! declared a directory, not collected: ${names}  — a step names each file`),
+    ...line('not collected', (names) => `!! declared and not collected: ${names}  — in the workspace, and not in ${dir}`),
+    ...line('missing', (names) => `!! declared but not in ${dir}: ${names}`),
+    ...line('escapes', (names) => `!! declared outside the workspace, and not read: ${names}  — name a file from the workspace root, or put it in ${dir}`),
+    ...line('outside', (names) => `!! declared outside ${dir}, and not read: ${names}  — a step's files go in its own directory`),
     ...(files.length ? ['files:', ...files.map((f) => `  ${f.path}  ${sizeOf(f.bytes)}`)] : []),
   ];
 }
@@ -1577,10 +1685,11 @@ export function listing(
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run.
   const waiting = gated(run) ? [...waits] : [];
-  // The engine's word for a settled task IS its outcome; any other word is a task still going.
+  // The engine's word for a settled task IS its outcome, and `unknown` a task it has no record of, which the tick stops nothing of; any other
+  // word is a task still going.
   const settledOf = (taskId: string): TaskPhase => {
     const word = phaseOf(taskId);
-    return word === 'succeeded' || word === 'failed' || word === 'stopped' ? word : 'running';
+    return word === 'succeeded' || word === 'failed' || word === 'stopped' || word === 'unknown' ? word : 'running';
   };
   const readable = (name: string): Closeout | undefined => {
     const c = closeoutOf(name);
@@ -1679,6 +1788,8 @@ export function composeBrief(
    * gathered by runner.ts. Given to no other step: a run without `after`, and every step after a root, is composed as it always was.
    */
   parents?: readonly ParentCloseout[],
+  /** The directory the run copied `wf start --input` files into (`inputsDir` in runner.ts): named, with `run.inputs`, under what was asked for. */
+  inputsDir?: string,
 ): string {
   // What finishing means, on every brief: the command this step will be judged by, when it has one,
   // where its files for the steps after it go, and then the closeout — last, because it says to give it
@@ -1712,11 +1823,14 @@ export function composeBrief(
     ? step.after
     : steps.filter((s) => s.name !== step.name && run.steps[s.name]?.taskId).map((s) => s.name);
 
-  const parts = [step.body, '', '## What was asked for', '', run.brief, ...handed];
+  // What was asked for, and the files that came with it: one line, only when there are any, so a run given none composes as it always did.
+  const inputs = inputsLine(inputsDir, run.inputs);
+  const request = [run.brief, ...(inputs ? ['', inputs] : [])];
+  const parts = [step.body, '', '## What was asked for', '', ...request, ...handed];
 
   if (step.after.length > 1) {
     return [
-      step.body, '', '## What was asked for', '', run.brief, ...handed, '',
+      step.body, '', '## What was asked for', '', ...request, ...handed, '',
       '## What is in this workspace', '',
       `The work of ${step.after.join(' and ')} has been merged into this branch.`,
       'If the merge left conflicts, they are yours to resolve — that is what a step waiting on',

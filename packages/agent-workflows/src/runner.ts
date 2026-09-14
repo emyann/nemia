@@ -17,14 +17,14 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, dueNote, messageRefusal, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export { artifactLines, dueNote, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Wait } from './run.ts';
-import { fansOut, loadWorkflows, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
-export { planLines, planStopped } from './plan.ts';
+import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
+export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -58,12 +58,14 @@ export const readRun = (id: string): Run => {
 };
 
 /**
- * The run's steps: the workflow it froze at `wf start`.
+ * The run's steps: the workflow it froze at `wf start`, in the order they run (`orderSteps`).
  *
  * The folder is read only for a record from before the run froze its workflow — and a run started
  * today never reaches that branch, so nothing written into the folder after `wf start` reaches it.
+ * Ordered on the way out too, so a record frozen before steps were ordered — in the folder's order,
+ * alphabetical — reads in the order its steps run, as one written since does.
  */
-export const stepsOf = (run: Run): Workflow[] => run.workflow ?? loadWorkflows(run.workflowDir);
+export const stepsOf = (run: Run): Workflow[] => orderSteps(run.workflow ?? loadWorkflows(run.workflowDir));
 
 /**
  * Write down that this run is cancelled, and answer with the time that now stands.
@@ -426,6 +428,12 @@ export const checkStderr = (taskId: string): string => path.join(HOME, 'checks',
  */
 export const artifactsDir = (run: Pick<Run, 'id'>, step: string): string => path.join(runsDir(), run.id, 'artifacts', step);
 
+/**
+ * The directory `wf start --input` copies a run's files into: the run's own, beside its artifacts and outside every workspace, so a file a
+ * person gave the run reaches each step without riding a branch. Named on each brief (`inputsLine`) with the names on the record.
+ */
+export const inputsDir = (run: Pick<Run, 'id'>): string => path.join(runsDir(), run.id, 'inputs');
+
 /** How long `npm ci` may take in a worktree before the run stops waiting and tells the step. */
 const NPM_CI_TIMEOUT_MS = 10 * 60_000;
 
@@ -721,11 +729,22 @@ function refuseInclude(repo: string, isolate: boolean): void {
 /**
  * `after` names the runs this one waits on (`wf start --after`): refused before anything is written when one could never ship onto
  * this run's base (`afterRefusal`), and frozen on the record. Left out, the record is what it was before there was an `after`.
+ *
+ * `inputs` are files to hand every step (`wf start --input`), by path from where `wf start` is typed: refused before anything is written
+ * when one is not a file or two would take one name (`inputRefusal`), then copied into the run's own `inputs/` (`inputsDir`), and their
+ * names frozen on the record. Left out, no directory is made, and the record is what it was before there were inputs.
  */
-export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[] }): Run {
+export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[]; inputs?: readonly string[] }): Run {
   const isolate = opts.isolate ?? true;
   const steps = stepsToStart(opts.workflowDir, isolate);
   refuseInclude(opts.repo, isolate);
+  const inputs = (opts.inputs ?? []).map((given): InputFile => {
+    const resolved = path.resolve(given);
+    const at = fs.statSync(resolved, { throwIfNoEntry: false });
+    return { given, resolved, kind: !at ? 'missing' : at.isFile() ? 'file' : at.isDirectory() ? 'directory' : 'other' };
+  });
+  const refusedInputs = inputRefusal(inputs);
+  if (refusedInputs) throw Object.assign(new Error(refusedInputs), { exitCode: 2 });
   const id = runId(opts.brief);
   const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
   const after = opts.after ?? [];
@@ -742,10 +761,23 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
     workflowDir: path.resolve(opts.workflowDir),
     workflow: steps,
     ...(after.length ? { after: [...after] } : {}),
+    ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
     branch,
+    // Keyed in the order the steps run, as `loadWorkflows` gives them: what `wf ls`, `wf decide` and the board list a run's steps in.
     steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
     createdAt: new Date().toISOString(),
   };
+  // Copied before the record is written, so a record never names a file that is not there. A copy that fails takes the directory back with it.
+  if (inputs.length) {
+    const dir = inputsDir(run);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      for (const f of inputs) fs.copyFileSync(f.resolved, path.join(dir, path.basename(f.resolved)), fs.constants.COPYFILE_EXCL);
+    } catch (err) {
+      fs.rmSync(path.dirname(dir), { recursive: true, force: true });
+      throw Object.assign(new Error(`--input: the run's files could not be copied into ${dir} — ${(err as Error).message}. Nothing was started: start it again once that directory can be written.`), { exitCode: 1 });
+    }
+  }
   writeRun(run);
   return run;
 }
@@ -892,7 +924,13 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // Every finished step, failed and stopped too, until its check is filed or a later step works in its
   // workspace: the check judges the committed tree, and nothing it leaves behind — nor the next step's
   // work in progress — is committed under this step's name (`handOffDue`).
-  for (const name of handOffDue(steps, run, phaseOf)) handOff(run.steps[name]!.workspace!, name);
+  //
+  // And on the same passes, what a finished step named from its workspace root is collected into its files directory: before its check
+  // is filed, and before a step after it works in its workspace (`collectArtifacts`).
+  const collected = handOffDue(steps, run, phaseOf).flatMap((name) => {
+    handOff(run.steps[name]!.workspace!, name);
+    return collectArtifacts(run, name, signedOff(name));
+  });
 
   const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked);
   const { check, retry, round, blocked, status } = assessed;
@@ -908,17 +946,19 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // it on the record. Nothing about the engine changes: to it, this is one more task.
   const tried: string[] = [];
   const rechecked: string[] = [];
-  const notes: string[] = [...askNotes];
+  const notes: string[] = [...askNotes, ...collected];
   for (const r of retry) {
     const step = steps.find((s) => s.name === r.step)!;
     const record = run.steps[r.step]!;
-    // A try of a step whose session its harness blocked: the session is stopped first, and nothing is filed. Asked once — a task the engine
-    // already holds the request for is not asked again — and a later pass, once the task has settled, reads the try due as one of a stopped
-    // step, and files it. Nothing is carried between the two: a pass after a restart reads the same engine record, and does the same.
+    // A try of a step whose task has not settled — its session blocked by its harness, or asked for while it was and working again since: the
+    // session is stopped first, and nothing is filed. Asked once — a task the engine already holds the request for is not asked again — and a
+    // later pass, once the task has settled, reads the try due as one of a stopped step, and files it. Nothing is carried between the two: a
+    // pass after a restart reads the same engine record, and does the same.
     if (r.stopFirst) {
       if (!views.get(record.taskId!)?.state.stopRequested) {
         await e.stop(record.taskId!);
-        notes.push(`${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; its harness blocked its session, so the engine is asked to stop it, and the try is filed once it has`);
+        const why = r.runsOn ? 'its session runs on, asked for while its harness had blocked it' : 'its harness blocked its session';
+        notes.push(`${r.step}: try ${r.try} — wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}; ${why}, so the engine is asked to stop it, and the try is filed once it has`);
       }
       continue;
     }
@@ -956,7 +996,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
           // What was said to the session a nudge continues: it may never have read it (agent-engine open issue 16).
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
           status: stepStatus(step, run, phaseOf, signedOff, asked, steps), ...(refusal ? { refusal } : {}),
-        }),
+        }, undefined, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
         model: r.model ?? step.model,
@@ -998,7 +1038,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         brief: composeBrief(target, run, steps, signedOff, files, undefined, undefined, {
           loop: r.step, round: r.round, rounds: capOf(looping), by: r.by, resumed: Boolean(resumeFrom),
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-        }),
+        }, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
         model: target.model,
@@ -1084,7 +1124,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       // assessment that made it ready just read, so it is handed what it was filed on.
       // And, when the run installed its `node_modules` or could not, why its start was slow or what to run. And, on a root of a run
       // that waited on runs, what they concluded.
-      brief: composeBrief(step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents),
+      brief: composeBrief(step, run, steps, signedOff, files, place.deps, undefined, undefined, step.after.length ? undefined : parents, inputsDir(run)),
       cwd: place.workspace,
       harness: step.harness,
       model: step.model,
@@ -1388,30 +1428,122 @@ export const closeoutReader = (views: ReadonlyMap<string, TaskView>, run: Run) =
 };
 
 /**
- * Artifacts a step DECLARED that are not where it says they are.
+ * Artifacts a step DECLARED that the run does not have, and why (`MissingArtifact`).
  *
  * The whole point of declaring them. The first real run lost the reviewer's entire output because
  * REVIEW.md was written and never committed, and nothing anywhere noticed — the merge was clean
- * and empty. A declared file that is not on the branch is now a mismatch somebody can see. Since
- * the run commits whatever a step leaves, a missing one was never written — or was written where
- * git will not take it, like a gitignored path.
+ * and empty. A declared file the run does not have is now a mismatch somebody can see.
  *
- * An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
- * on disk: present when it is a file inside the directory once every link on the way is followed, so a
- * link that leads out is as missing as where it leads. Any other absolute path is reported without being
- * looked at (`artifactPlace`).
+ * A path from the workspace root is read where the tick collected it (`collectArtifacts`), and the workspace says why when it is not
+ * there (`workspaceArtifact`). An absolute path names a file in the step's files directory (`artifactsDir`), and is looked for there,
+ * on disk: present when it is a file inside the directory once every link on the way is followed, so a link that leads out is as missing
+ * as where it leads. Any other absolute path, and a path that climbs out of the workspace as written, are reported without being looked
+ * at (`artifactPlace`).
  */
-export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): string[] {
+export function missingArtifacts(run: Run, stepName: string, closeout: Closeout | { error: string } | undefined): MissingArtifact[] {
   if (!closeout || 'error' in closeout) return [];
-  const branch = run.steps[stepName]?.branch;
   const dir = artifactsDir(run, stepName);
-  return closeout.artifacts.filter((f) => {
-    const place = artifactPlace(f, dir);
-    if (place === 'outside') return true;
-    if (place === 'files') return !isFileIn(f, dir);
-    if (!branch) return false;
-    try { git(run.repo, 'cat-file', '-e', `${branch}:${f}`); return false; } catch { return true; }
-  });
+  const missing: MissingArtifact[] = [];
+  for (const file of closeout.artifacts) {
+    const place = artifactPlace(file, dir);
+    const why = place === 'outside' || place === 'escapes' ? place
+      : place === 'files' ? (isFileIn(file, dir) ? undefined : 'missing')
+      : workspaceArtifact(run, stepName, file, dir);
+    if (why) missing.push({ path: file, why });
+  }
+  return missing;
+}
+
+/**
+ * Why a file named from the workspace root is not one the run has — or undefined when it is: collected into `dir`, which answers first,
+ * whatever the workspace holds since. Otherwise the workspace says why, where the record names one: a link that leads out of it, or a
+ * directory. A file in the workspace whose copy something a step made in `dir` refuses (`copyBlocked`) is `not collected`, even when it is
+ * on the branch too: the run does not pass over a copy it refused. Any other file is the branch's to answer, as it was before collection —
+ * so a run from before it, whose worktree is still there and whose steps are past hand-off, reads as it did — and one on no branch either,
+ * a file git ignores that its step has not handed off yet, is `not collected`. With nothing in the workspace, the branch answers too.
+ */
+function workspaceArtifact(run: Run, stepName: string, file: string, dir: string): MissingArtifact['why'] | undefined {
+  const rel = path.normalize(file);
+  if (isFileIn(path.join(dir, rel), dir)) return undefined;
+  const { workspace, branch } = run.steps[stepName] ?? {};
+  const at = workspace ? inWorkspace(workspace, rel) : { kind: 'absent' as const };
+  if (at.kind === 'outside') return 'escapes';
+  if (at.kind === 'directory') return 'directory';
+  if (at.kind === 'file' && copyBlocked(dir, rel)) return 'not collected';
+  const onBranch = branch ? gitSays(run.repo, 'cat-file', '-t', `${branch}:${rel}`)?.trim() : undefined;
+  if (at.kind === 'file') return onBranch === 'blob' ? undefined : 'not collected';
+  return onBranch === 'blob' ? undefined : onBranch === 'tree' ? 'directory' : 'not there';
+}
+
+/**
+ * What is at a path from a workspace's root, every link on the way followed: a file, and where it really is; a directory; something else;
+ * nothing — or `outside`, when a link leads out of the workspace, which is not looked at further.
+ */
+function inWorkspace(workspace: string, rel: string): { kind: 'file'; real: string } | { kind: 'directory' | 'other' | 'absent' | 'outside' } {
+  let root: string;
+  let real: string;
+  try {
+    root = fs.realpathSync(workspace);
+    real = fs.realpathSync(path.join(workspace, rel));
+  } catch { return { kind: 'absent' }; }
+  if (real !== root && !inside(root, real)) return { kind: 'outside' };
+  const at = fs.statSync(real, { throwIfNoEntry: false });
+  return at?.isFile() ? { kind: 'file', real } : at?.isDirectory() ? { kind: 'directory' } : { kind: at ? 'other' : 'absent' };
+}
+
+/**
+ * Copy each file a step's closeout names from its workspace root into the step's files directory, at the same path — so a step that cannot
+ * write outside its worktree (Codex in `workspace-write`, which the engine gives no other directory) still hands its files over, and the
+ * steps after it and `wf decide` read them from one place (`missingArtifacts`, `artifactFiles`).
+ *
+ * `advance` runs it on each pass that hands a step off (`handOffDue`): until its check is filed, and until a step after it works in its
+ * workspace. Level-triggered and idempotent, so a pass that dies halfway loses nothing: a copy with its source's size and time is left as
+ * it is. Nothing is copied, and `wf decide` says why, for a path that climbs out of the workspace (never read), a link that leads out of it
+ * (not followed), a directory, and a file that is not there. Nothing is written through a link in the files directory, which a step may
+ * have made. It never throws, as a hand-off does not. The pass's note names what was copied.
+ */
+function collectArtifacts(run: Run, stepName: string, closeout: Closeout | undefined): string[] {
+  const workspace = run.steps[stepName]?.workspace;
+  if (!closeout || !workspace) return [];
+  const dir = artifactsDir(run, stepName);
+  const copied: string[] = [];
+  for (const file of closeout.artifacts) {
+    if (artifactPlace(file, dir) !== 'workspace') continue;
+    const rel = path.normalize(file);
+    const at = inWorkspace(workspace, rel);
+    if (at.kind !== 'file') continue;
+    try {
+      if (copyBlocked(dir, rel)) continue;
+      const to = path.join(dir, rel);
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      const from = fs.statSync(at.real);
+      const there = lstatOf(to);
+      // Within a millisecond: the time a copy is given goes through a `Date` and a float of seconds, and reads back a hair off the source's.
+      if (there && there.size === from.size && Math.abs(there.mtimeMs - from.mtimeMs) < 1) continue;
+      fs.copyFileSync(at.real, to);
+      fs.utimesSync(to, from.atime, from.mtime);
+      copied.push(rel);
+    } catch { /* not collected, and `wf decide` says so */ }
+  }
+  return copied.length ? [`${stepName}: collected ${copied.join(', ')} into ${dir}`] : [];
+}
+
+/**
+ * Whether a copy of `rel` into `dir` would go through something a step may have made there: `dir`, or a directory on the way to the copy,
+ * that is there and is not a plain directory — a link, a file — or something in the copy's place that is not a regular file. Looks, and
+ * makes nothing: what `collectArtifacts` refuses to write through, and what `missingArtifacts` names as the copy refused.
+ */
+function copyBlocked(dir: string, rel: string): boolean {
+  let at = dir;
+  for (const part of ['.', ...path.dirname(rel).split(path.sep).filter((p) => p && p !== '.')]) {
+    at = path.join(at, part);
+    const st = lstatOf(at);
+    // Nothing there yet: made as a plain directory, and nothing below it can be in the way.
+    if (!st) return false;
+    if (!st.isDirectory()) return true;
+  }
+  const there = lstatOf(path.join(dir, rel));
+  return Boolean(there && !there.isFile());
 }
 
 /** Whether `file` is a regular file inside `dir`, with every link on the way to either followed. */
@@ -1638,7 +1770,10 @@ export function touchedBy(run: Run, branch: string): Radius | { error: string } 
   try { return radius(numstat, workspacesOf(run)); } catch (err) { return { error: (err as Error).message }; }
 }
 
-/** The base's npm `workspaces`, which `radius` groups a change by — read at the base, where no step could have edited them. */
+/**
+ * The base's npm `workspaces`, which `radius` groups a change by — read at the base, where no step could have edited them, and handed on
+ * as written: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` on the screen (`workspaceGlob`, `deepWorkspaces`).
+ */
 function workspacesOf(run: Run): string[] {
   try {
     const { workspaces } = JSON.parse(gitSays(run.repo, 'show', `${run.baseRef}:package.json`) ?? '{}');

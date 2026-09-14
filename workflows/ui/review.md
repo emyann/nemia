@@ -8,7 +8,7 @@ input: implement
 # Bash command .claude/settings.json does not allow is denied without a prompt. These are Claude Code's built-in tools
 # (`--tools`); the browser's `browser_*` tools, which the look skill drives, come from the checkout's `.mcp.json` and
 # are not on this line. Skill is, so the step can invoke the look skill; the body names its file too, for Read.
-tools: Read, Grep, Glob, Bash, Skill
+tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch
 permissionMode: dontAsk
 # The review travels as this step's closeout — `findings` and `again`, in the shape review.schema.json declares. A
 # finding names where it is: a file and a line, or a page and a theme.

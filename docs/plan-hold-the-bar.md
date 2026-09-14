@@ -848,6 +848,16 @@ owner is not mid-run.
   which prints as `- where: {"file":…}`. Teach `itemLines` a `where` object: `file:line` or `page · theme`.
   Also learned: `tools:` names Claude Code's built-in tools and `Skill` is one, so a step that should
   invoke a skill lists `Skill` — the review fence becomes `Read, Grep, Glob, Bash, Skill`. → agent-workflows, small.
+- **what a worker gets, measured (2026-09-14, `claude -p` with the engine's flags):** an `implement` step with
+  no `tools:` has the operator's built-in set — `WebFetch`, `WebSearch`, `Agent`, `Monitor`, `Workflow`,
+  `SendMessage`, `Cron*`, `RemoteTrigger`, `Task*`, `NotebookEdit`, `ScheduleWakeup` — plus `.mcp.json`'s 23
+  `browser_*` tools, and every skill the operator has except those bound to tools it lacks (`design`,
+  `artifact-*`, `claude-in-chrome`); it lacks `Artifact`, `AskUserQuestion` and the operator's user-scope MCP
+  servers (withheld by `--strict-mcp-config`, on purpose). The fenced reviewer had `Bash, Glob, Grep, Read,
+  Skill` and the browser only: no way to read a library's docs. Reviewers now get `WebFetch, WebSearch` too
+  (read-only). Left for `disallow:` (above): an unattended step can message sessions, schedule cron jobs and
+  fire remote triggers, which no step needs. The Capabilities page could show this per-step set. → I's
+  follow-up; B1's page.
 
 ## 5. What the plan does not do
 

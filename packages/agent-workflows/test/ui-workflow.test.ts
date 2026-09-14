@@ -106,7 +106,7 @@ test('implement declares the screenshots it looked at and the pages they show, a
 test('review writes nothing by machinery: on Claude, tools that read and Bash, in dontAsk — and implement has every tool', () => {
   const { harness, after, input, tools, permissionMode, output, loop, rounds } = steps.review!;
   assert.deepEqual({ harness, after, input, tools, permissionMode, output: output?.file, loop, rounds }, {
-    harness: 'claude', after: ['implement'], input: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill'], permissionMode: 'dontAsk',
+    harness: 'claude', after: ['implement'], input: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], permissionMode: 'dontAsk',
     output: 'review.schema.json', loop: 'implement', rounds: 3,
   });
   assert.deepEqual(tools?.filter((t) => ['Edit', 'Write', 'NotebookEdit'].includes(t)), [], 'nothing that edits');

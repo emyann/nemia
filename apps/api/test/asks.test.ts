@@ -1,7 +1,7 @@
 /**
  * What a step needs from a person, and the board's answer to it: `needs` and `blockedByHarness` on each step, `answer` on a try a
  * person answered, and POST /api/runs/:id/steps/:step/retry, which asks for another try as `wf retry` does — through the package's
- * `retry()`, refused in the package's words.
+ * `retry()`, given the harness's word as `wf retry` gives it, and refused in the package's words.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, reading transcripts where Claude Code keeps them
  * (CLAUDE_CONFIG_DIR). A fake `claude` is first on PATH, listing the sessions this file says are running and noting every call, so the
@@ -35,6 +35,8 @@ if (process.argv[2] === 'agents') process.stdout.write(fs.readFileSync(${JSON.st
 
 /** How many times `claude agents` has been run: an observation of the harness each. */
 const observations = () => fs.readFileSync(calls, 'utf8').split('\n').filter((line) => line.startsWith('agents')).length;
+/** How many times `claude stop` has been run: a session stopped, which is the tick's to do, and never the api's. */
+const stops = () => fs.readFileSync(calls, 'utf8').split('\n').filter((line) => line.startsWith('stop')).length;
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 
 const { app } = await import('../src/app.ts');
@@ -100,6 +102,7 @@ fs.writeFileSync(recordFile, JSON.stringify({
     { name: 'held', after: [], body: 'Hold on.' },
     { name: 'idle', after: [], body: 'Idle on.' },
     { name: 'silent', after: [], body: 'Say nothing.' },
+    { name: 'working', after: [], body: 'Work on.' },
     { name: 'review', after: ['implement'], body: 'Review it.' },
   ],
   steps: {
@@ -109,6 +112,7 @@ fs.writeFileSync(recordFile, JSON.stringify({
     held: { taskId: 't-held' },
     idle: { taskId: 't-idle' },
     silent: { taskId: 't-silent' },
+    working: { taskId: 't-working' },
     review: { taskId: null },
   },
 }));
@@ -139,6 +143,12 @@ blockedSession('t-idle', (id) => [
   said(id, 'assistant', 'a-1', 4, [{ type: 'tool_use', id: 'toolu_2', name: 'Read', input: { file_path: '/code/app/README.md' } }]),
 ]);
 blockedSession('t-silent');
+// working: a Claude Code task whose session the harness lists as still at work, with nothing signed — the engine's `running (working)`.
+journal('t-working', started('claude'));
+fs.writeFileSync(registry, JSON.stringify([
+  ...JSON.parse(fs.readFileSync(registry, 'utf8')) as object[],
+  { name: 'ae/t-working/1', sessionId: randomUUID(), kind: 'background', state: 'working', status: 'busy', startedAt: T0 },
+]));
 
 const record = fs.readFileSync(recordFile, 'utf8');
 
@@ -160,10 +170,10 @@ const nothingWritten = (why: string) => {
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
 };
 
-/** What the package's `retry()` refuses `how` for, word for word — what `wf retry` prints. */
+/** What the package's `retry()` refuses `how` for, word for word — given the harness's word, as `wf retry` gives it: what `wf retry` prints. */
 const retryRefuses = async (step: string, how: RetryHow): Promise<string> => {
   try {
-    await retry(engine(), R, step, how);
+    await retry(engine(), R, step, how, { stopBlocked: true });
   } catch (err) {
     return (err as Error).message;
   }
@@ -184,6 +194,8 @@ test("a step says what a person has to know to act — the question of one signe
     { name: 'idle', needs: null, blockedByHarness: true },
     // No conversation to read: blocked by the harness all the same.
     { name: 'silent', needs: null, blockedByHarness: true },
+    // Its session still at work: nothing needed.
+    { name: 'working', needs: null, blockedByHarness: false },
     { name: 'review', needs: null, blockedByHarness: false },
   ];
   const lines: Record<string, string | null> = {
@@ -205,7 +217,7 @@ test("a step says what a person has to know to act — the question of one signe
   // The engine's word, which is all the board had before: `needs-human`, and waiting on nobody the package names.
   assert.deepEqual(run.steps.filter((s: Needs) => s.blockedByHarness).map((s: { status: string }) => s.status), ['needs-human', 'needs-human', 'needs-human']);
   assert.deepEqual(run.waitingOnYou, ['implement', 'theme']);
-  assert.deepEqual(run.steps.map((s: { asked: unknown }) => s.asked), [null, null, null, null, null, null, null]);
+  assert.deepEqual(run.steps.map((s: { asked: unknown }) => s.asked), [null, null, null, null, null, null, null, null]);
 });
 
 test('REFUSED at shipped defaults: the list observes the harness once however many sessions it blocked — only a run\'s detail reads their last lines, an observation each', async () => {
@@ -263,12 +275,15 @@ test("REFUSED at shipped defaults: an empty message, and a message on a recheck,
   nothingWritten('a message the package refuses');
 });
 
-test("REFUSED at shipped defaults: a step not waiting on a person, a session the harness blocked, and a recheck with no check that failed are 409s in `retryRefusal`'s words — and nothing is written", async () => {
+test("REFUSED at shipped defaults: a step not waiting on a person, a session still working, a recheck of a session the harness blocked, and a recheck with no check that failed are 409s in `retryRefusal`'s words — and nothing is written, and no session stopped", async () => {
   const cases: Array<[string, RetryHow, RegExp]> = [
     ['tokens', { mode: 'nudge' }, /^tokens signed off done and declares no check/],
     ['review', { mode: 'nudge', message: 'Start.' }, /^review has not been filed yet/],
-    // Not final to the package: its attempt never ended, so there is no try to replace — the §6 item 10 tick's to resume.
-    ['held', { mode: 'nudge' }, /^held is still running/],
+    // The harness's word opens a session it blocked, and nothing else: an attempt still at work has no try to replace, however it is asked.
+    ['working', { mode: 'nudge' }, /^working is still running, so there is nothing to try again until it ends/],
+    ['working', { mode: 'fresh', message: 'Start again.' }, /^working is still running, so there is nothing to try again until it ends/],
+    // Nothing of a session the harness blocked was checked.
+    ['held', { mode: 'recheck' }, /^--recheck runs a step's check again, and held is running, its session blocked by its harness with nothing signed off: no check of it failed/],
     ['implement', { mode: 'recheck' }, /^--recheck runs a step's check again, and implement is blocked: no check of it failed/],
   ];
   for (const [step, how, words] of cases) {
@@ -278,6 +293,7 @@ test("REFUSED at shipped defaults: a step not waiting on a person, a session the
     assert.equal(error, await retryRefuses(step, how));
     assert.match(error, words);
   }
+  assert.equal(stops(), 0, 'no session stopped');
   nothingWritten("a step the package will not try again");
 });
 
@@ -305,10 +321,10 @@ test('REFUSED: a body that is not an ask (400), and a run or a step that does no
   nothingWritten('a body that is not an ask');
 });
 
-test("an answer as the board sends it is the package's ask: 202 with the try and its file, the run's record untouched, and the step reads `try 2 asked` and waits on nobody — a second ask refused", async () => {
+test("an answer as the board sends it is the package's ask: 202 with the try, its file and no `stopFirst`, the run's record untouched, and the step reads `try 2 asked` and waits on nobody — a second ask refused", async () => {
   const res = await ask('implement', { mode: 'nudge', message: 'Postgres, the one in docker-compose.yml.' });
   assert.equal(res.status, 202, await res.clone().text());
-  assert.deepEqual(await res.json(), { try: 2, file: askFile(R, 'implement', 2) });
+  assert.deepEqual(await res.json(), { try: 2, file: askFile(R, 'implement', 2), stopFirst: false });
   const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(R, 'implement', 2), 'utf8'));
   assert.deepEqual(written, { step: 'implement', try: 2, mode: 'nudge', message: 'Postgres, the one in docker-compose.yml.' });
   assert.ok(!Number.isNaN(Date.parse(when)), when);
@@ -321,7 +337,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try and
   const implement = run.steps.find((s: { name: string }) => s.name === 'implement');
   assert.equal(implement.note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
   assert.equal(implement.note, words.steps.find((s) => s.name === 'implement')?.note);
-  assert.deepEqual(implement.asked, { try: 2, mode: 'nudge', model: null, message: 'Postgres, the one in docker-compose.yml.' });
+  assert.deepEqual(implement.asked, { try: 2, mode: 'nudge', model: null, message: 'Postgres, the one in docker-compose.yml.', stopFirst: false });
   assert.equal(implement.needs, blocked.needs, "the question is still the closeout's");
   assert.deepEqual(run.waitingOnYou, ['theme']);
   assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou);
@@ -335,8 +351,57 @@ test("an answer as the board sends it is the package's ask: 202 with the try and
   // A refused check, run again: no message, and no session.
   const recheck = await ask('theme', { mode: 'recheck' });
   assert.equal(recheck.status, 202, await recheck.clone().text());
-  assert.deepEqual(await recheck.json(), { try: 2, file: askFile(R, 'theme', 2) });
-  assert.deepEqual((await detail()).steps.find((s: { name: string }) => s.name === 'theme').asked, { try: 2, mode: 'recheck', model: null, message: null });
+  assert.deepEqual(await recheck.json(), { try: 2, file: askFile(R, 'theme', 2), stopFirst: false });
+  assert.deepEqual((await detail()).steps.find((s: { name: string }) => s.name === 'theme').asked, { try: 2, mode: 'recheck', model: null, message: null, stopFirst: false });
+});
+
+test("a session the harness blocked is continued as `wf retry` continues it: 202 with the package's `stopFirst`, the ask written with its mode and nothing else — no session stopped, the engine's journals and the run's record as they were — and the step reads `wf ls`'s `stopping its blocked session`", async () => {
+  const journalOf = (taskId: string) => fs.readFileSync(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), 'utf8');
+  const journals = { held: journalOf('t-held'), idle: journalOf('t-idle') };
+
+  // Continue, as the board's banner sends it with nothing written: a nudge, and no message.
+  const res = await ask('held', { mode: 'nudge' });
+  assert.equal(res.status, 202, await res.clone().text());
+  assert.deepEqual(await res.json(), { try: 2, file: askFile(R, 'held', 2), stopFirst: true });
+  const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(R, 'held', 2), 'utf8'));
+  assert.deepEqual(written, { step: 'held', try: 2, mode: 'nudge' });
+  assert.ok(!Number.isNaN(Date.parse(when)), when);
+  // A new session with something to tell it: the ask carries both, as `wf retry --fresh --message` writes them.
+  const fresh = await ask('idle', { mode: 'fresh', message: 'Sign in again first.' });
+  assert.equal(fresh.status, 202, await fresh.clone().text());
+  assert.deepEqual(await fresh.json(), { try: 2, file: askFile(R, 'idle', 2), stopFirst: true });
+  const { at: freshWhen, ...freshly } = JSON.parse(fs.readFileSync(askFile(R, 'idle', 2), 'utf8'));
+  assert.deepEqual(freshly, { step: 'idle', try: 2, mode: 'fresh', message: 'Sign in again first.' });
+  assert.ok(!Number.isNaN(Date.parse(freshWhen)), freshWhen);
+
+  // The api wrote the asks, and nothing else: stopping the session is the tick's.
+  assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
+  assert.deepEqual({ held: journalOf('t-held'), idle: journalOf('t-idle') }, journals, "nor of the engine's journals");
+  assert.equal(stops(), 0, 'and stopped no session');
+
+  // As `wf ls` has it until a tick stops the session: the note says the session is stopped first, and the step still reads `needs-human`.
+  const words = await list(engine(), readRun(R));
+  const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
+  const run = await detail();
+  const held = run.steps.find((s: { name: string }) => s.name === 'held');
+  assert.equal(held.note, 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it');
+  assert.equal(held.note, noteOf('held'));
+  assert.deepEqual(held.asked, { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true });
+  assert.deepEqual([held.status, held.blockedByHarness], ['needs-human', true], 'still blocked: no tick has stopped it');
+  const idle = run.steps.find((s: { name: string }) => s.name === 'idle');
+  assert.equal(idle.note, 'try 2 asked (--fresh, with your answer) — stopping its blocked session, then the tick files it');
+  assert.equal(idle.note, noteOf('idle'));
+  assert.deepEqual(idle.asked, { try: 2, mode: 'fresh', model: null, message: 'Sign in again first.', stopFirst: true });
+  const listed = (await summary()).steps.filter((s: { name: string }) => s.name === 'held' || s.name === 'idle');
+  assert.deepEqual(listed.map((s: { note: string }) => s.note), [noteOf('held'), noteOf('idle')], 'the list says it too');
+  assert.deepEqual(run.waitingOnYou, words.waitingOnYou);
+
+  // Asked once: a second Continue is refused in the package's words, and still nothing is stopped.
+  const again = await ask('held', { mode: 'nudge' });
+  assert.equal(again.status, 409);
+  const { error } = await again.json();
+  assert.ok(error.startsWith('try 2 of held is already asked for (--nudge, at '), error);
+  assert.equal(stops(), 0);
 });
 
 test("a try a person answered carries the answer, as `wf decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none", async () => {

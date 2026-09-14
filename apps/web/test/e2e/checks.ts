@@ -151,6 +151,20 @@ export async function expectApart(these: Locator, those: Locator, assertion: str
   if (found) throw new Refused(`${assertion} — ${found}`);
 }
 
+/**
+ * Every element matched shows its text whole: none is cut short by the room it was given (`truncate`, an ellipsis), within `timeout`.
+ * Nothing matched is refused too.
+ */
+export async function expectUncut(elements: Locator, assertion: string, timeout = WAIT_MS): Promise<void> {
+  await until(async () => {
+    const cut = await elements.evaluateAll((all) =>
+      all.flatMap((element, i) => ((element as HTMLElement).scrollWidth > (element as HTMLElement).clientWidth + 1 ? [(element as HTMLElement).dataset.id ?? element.textContent ?? `#${i + 1}`] : [])));
+    const found = await elements.count();
+    if (!found) return 'nothing to look at: 0 found';
+    return cut.length ? `${cut.join(', ')} ${cut.length > 1 ? 'are' : 'is'} cut short` : null;
+  }, assertion, timeout);
+}
+
 /** Polls `problem` until it says none or `timeout` passes, and refuses with what it said last: for a floor laid out a render after what moved it. */
 async function until(problem: () => Promise<string | null>, assertion: string, timeout: number): Promise<void> {
   const end = Date.now() + timeout;

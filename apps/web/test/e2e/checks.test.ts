@@ -6,7 +6,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
-import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTheme, expectVisible, Refused, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTheme, expectUncut, expectVisible, Refused, watch } from './checks.ts';
 
 let browser: Browser;
 before(async () => {
@@ -177,4 +177,17 @@ test('a card not level with the middle of the two it is joined to is refused, na
     (err: Error) => err instanceof Refused && err.message === 'd and f are between c and b — f is not between c and b');
   await assert.rejects(expectBetween(page.locator('.middle'), page.locator('#gone'), page.locator('#c'), 'd is between', 300),
     (err: Error) => err instanceof Refused && err.message === 'd is between — nothing to compare: 1, 0 and 1 found');
+});
+
+test('a name cut short by the room beside it is refused, naming it — and so is nothing to look at', async () => {
+  const { page } = await pageWith(`<p style="display:flex;width:120px">
+      <span class="whole" style="flex-shrink:0">implement</span>
+      <span class="cut" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0">implement</span>
+      <span style="flex-shrink:0">waiting on the-other-side-runs-e2e6</span>
+    </p>`);
+  await expectUncut(page.locator('.whole'), 'the name is whole');
+  await assert.rejects(expectUncut(page.locator('.cut'), 'the name is whole', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the name is whole — implement is cut short');
+  await assert.rejects(expectUncut(page.locator('.gone'), 'the name is whole', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the name is whole — nothing to look at: 0 found');
 });

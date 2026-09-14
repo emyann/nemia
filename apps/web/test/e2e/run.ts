@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
-import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { CHECKOUT, DIAMOND, DIAMOND_RUNS, FAKE, HELD, LOOPING, NEIGHBOUR, REGISTRY, seed, seedCheckout, seedDiamond, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
@@ -88,6 +88,16 @@ const cardOf = (page: Page, id: string): Locator => page.locator(`.react-flow__n
 const cardsOf = (page: Page, ...ids: string[]): Locator => page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
 const edgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`);
 
+/** The diamond's cards laid out as a diamond: every run left of each run that waits on it, and its top and bottom level with the middle of its sides. */
+async function expectDiamond(page: Page, when: string): Promise<void> {
+  const { top, shipped, running, bottom } = DIAMOND;
+  await settled(page);
+  await expectLeftOf(cardOf(page, top.id), cardsOf(page, shipped.id, running.id), `${when}: the top is left of both sides, which wait on it`);
+  await expectLeftOf(cardsOf(page, shipped.id, running.id), cardOf(page, bottom.id), `${when}: both sides are left of the bottom, which waits on them`);
+  await expectApart(cardOf(page, shipped.id), cardOf(page, running.id), `${when}: the two sides are laid out apart`);
+  await expectBetween(cardsOf(page, top.id, bottom.id), cardOf(page, shipped.id), cardOf(page, running.id), `${when}: the top and the bottom are level with the middle of the two sides`);
+}
+
 /** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
 const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
 
@@ -138,18 +148,16 @@ const PAGES: PageSpec[] = [
         );
       }
       await expectCount(page.locator('.react-flow__edge[data-id^="after:"]'), 4, 'the four edges of the diamond, and no other edge between cards');
-      await settled(page);
-      await expectLeftOf(cardOf(page, top.id), cardsOf(page, shipped.id, running.id), 'the top is left of both sides, which wait on it');
-      await expectLeftOf(cardsOf(page, shipped.id, running.id), cardOf(page, bottom.id), 'both sides are left of the bottom, which waits on them');
-      await expectApart(cardOf(page, shipped.id), cardOf(page, running.id), 'the two sides are laid out apart');
-      await expectBetween(cardOf(page, top.id), cardOf(page, shipped.id), cardOf(page, running.id), 'the top is level with the middle of the two sides');
-      await expectBetween(cardOf(page, bottom.id), cardOf(page, shipped.id), cardOf(page, running.id), 'and so is the bottom: the diamond reads as one');
+      await expectDiamond(page, 'on the default floor');
       // What each card waits on, in `wf ls`'s word: the bottom on the side still running alone, and not on you.
       await expectVisible(
         cardOf(page, bottom.id).locator('[data-waiting="on-runs"]', { hasText: DIAMOND.words.bottom }),
         `the bottom's card says ${DIAMOND.words.bottom}: the side that shipped is waited on no more`,
       );
       await expectCount(cardOf(page, bottom.id).getByText('waiting on you', { exact: true }), 0, 'and does not wait on you: the side it waits on may still ship');
+      // Its root's chip, beside the step's name, is cut short in the card; the name is not, and neither leaves the card.
+      await expectUncut(cardOf(page, bottom.id).locator('ul[aria-label="Steps"] li > span:first-child'), "the bottom card's step name is whole beside its root's waiting on chip");
+      await expectInside(cardOf(page, bottom.id).locator('ul[aria-label="Steps"] [data-state="waiting"]'), cardOf(page, bottom.id), "and the chip stays inside the card");
       for (const run of [top, shipped, running]) await expectCount(cardOf(page, run.id).locator('[data-waiting]'), 0, `${run.id} waits on no run`);
       await expectCount(page.locator('.react-flow__panel[aria-label="Legend"] [data-sample="cards"]'), 1, "the Factory's legend draws the edge between two cards");
       // Photographed as a person first finds it: the page's own photograph is taken at the end, after a graph unfolded over the diamond.
@@ -220,6 +228,9 @@ const PAGES: PageSpec[] = [
       );
       await expectVisible(card.getByRole('button', { name: 'Hide steps' }), "the open card's chevron hides the steps");
       await expectApart(beside, run, 'the card beside it moves out from under the unfolded graph');
+      // The graph unfolds over some of the diamond's cards and not others: they move aside together, and still read as a diamond.
+      await expectDiamond(page, "with the fake run's graph unfolded over the diamond");
+      for (const card of DIAMOND_RUNS) await expectApart(cardOf(page, card.id), run, `${card.id} moves out from under the unfolded graph`);
       await settled(page);
       await expectInside(run, floor, 'the open run, card and steps, is brought onto the screen');
 
@@ -291,6 +302,9 @@ const PAGES: PageSpec[] = [
       await expectCount(moving.locator('animateMotion'), 1, `a dot travels ${NEIGHBOUR.running} on the Factory`);
       await expectCount(page.locator('.react-flow__edge animateMotion'), 1, 'and no other edge on the floor moves');
       await expectCount(page.locator('.react-flow__panel[aria-label="Legend"] animateMotion'), 1, "the Factory's legend shows the running edge moving as it moves");
+      // Another graph unfolded, over whichever of the diamond's cards it reaches: still a diamond, and the run called off still left of the run waiting on it.
+      await expectDiamond(page, "with the run beside it unfolded too");
+      await expectLeftOf(cardOf(page, DIAMOND.cancelled.id), cardOf(page, DIAMOND.orphan.id), `${DIAMOND.cancelled.id} is still left of ${DIAMOND.orphan.id}`);
       await settled(page);
     },
   },
@@ -313,6 +327,13 @@ const PAGES: PageSpec[] = [
         page.locator(`li a[href="/runs/${DIAMOND.bottom.id}"] [data-state="waiting"]`, { hasText: DIAMOND.words.bottom }),
         `the row of a run waiting on a run says so on its root, as wf ls does (${DIAMOND.words.bottom}), a waiting chip`,
       );
+      // A run waiting on a run called off waits on you, as the Factory counts it: the row says so, in wf ls's words.
+      const orphanRow = page.locator(`li a[href="/runs/${DIAMOND.orphan.id}"]`);
+      await expectVisible(
+        orphanRow.locator('[data-waiting-on-you]', { hasText: `waiting on you: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: wf cancel ${DIAMOND.orphan.id}` }),
+        `the row of ${DIAMOND.orphan.id}, waiting on a run called off, says it waits on you, and what is yours to resolve`,
+      );
+      await expectCount(page.locator(`li a[href="/runs/${DIAMOND.bottom.id}"] [data-waiting-on-you]`), 0, `${DIAMOND.bottom.id}, waiting on a run that may still ship, does not wait on you`);
       const loop = page.locator(`li a[href="/runs/${LOOPING.id}"]`);
       await expectVisible(loop.getByText(`waiting on you: ${LOOPING.exhausted}`), `the runs list says ${LOOPING.exhausted}, out of rounds, is waiting on you`);
       await expectVisible(
@@ -783,6 +804,12 @@ const PAGES: PageSpec[] = [
       await expectCount(offered, DIAMOND_RUNS.length, `the start form offers the ${DIAMOND_RUNS.length} runs on this repository to wait on`);
       for (const run of DIAMOND_RUNS) await expectVisible(offered.filter({ hasText: run.title }).locator(`input[type="checkbox"][value="${run.id}"]`), `${run.id} is offered, by its title`);
       await expectCount(dev.locator(`[data-run="${FAKE.id}"]`), 0, `${FAKE.id}, on another repository, is not offered`);
+      // Each by where it stands: a run waiting on a run called off has filed nothing, and never will without you — not finished.
+      for (const [run, standing] of [
+        [DIAMOND.orphan, 'waiting on you'], [DIAMOND.cancelled, 'cancelled'], [DIAMOND.bottom, 'in flight'], [DIAMOND.running, 'in flight'], [DIAMOND.top, 'finished'],
+      ] as const) {
+        await expectVisible(offered.filter({ hasText: run.title }).locator('[data-standing]', { hasText: new RegExp(`^${standing}$`) }), `the picker says ${run.id} is ${standing}`);
+      }
 
       // A start that waits on a run the package will not wait on — one called off — through the board: refused in `afterRefusal`'s words,
       // beside the form, and nothing written. In a page of its own, whose one refusal is the point.

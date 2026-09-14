@@ -196,10 +196,10 @@ test('a task the engine has no record of is unknown on both endpoints, not queue
   assert.equal((await listed('r-5')).steps[0].status, 'pending');
 });
 
-test('where list words a step correctly, the api uses the same words', async () => {
-  // Not r-4: for a task the engine has no record of, `list` says `pending` and the api says `unknown`.
+test('the api words a step as list does — `unknown` for a task the engine has no record of, `pending` for one queued', async () => {
+  // r-4 too: `list` once passed the engine's `pending` through for a task nobody can find, and the api said `unknown`.
   const e = engine();
-  for (const id of ['r-2', 'r-5']) {
+  for (const id of ['r-2', 'r-4', 'r-5']) {
     const words = await list(e, readRun(id));
     const run = await listed(id);
     assert.deepEqual(run.steps.map(({ name, status, branch }: { name: string; status: string; branch: string | null }) => ({ name, status, branch })), words.steps, id);

@@ -5,8 +5,11 @@ import { isGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
 
-/** `index` is the step's place in the run's order, which is the order `wf ls` lists it in. */
-export type StepNodeData = { step: RunDetail['steps'][number]; index: number; runCancelled: boolean };
+/**
+ * `index` is the step's place in the run's order, which is the order `wf ls` lists it in. `waitingOnYou` is whether the
+ * run's `waitingOnYou` names the step: the api's word, which leaves out a step a person has already asked something of.
+ */
+export type StepNodeData = { step: RunDetail['steps'][number]; index: number; runCancelled: boolean; waitingOnYou: boolean };
 export type StepFlowNode = Node<StepNodeData, 'step'>;
 
 /**
@@ -15,7 +18,7 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
  * `w-56` is narrower than the layering's column, which leaves room for the arrow between columns.
  */
 export function StepNode({
-  data: { step, index, runCancelled },
+  data: { step, index, runCancelled, waitingOnYou },
   selected,
   sourcePosition = Position.Right,
   targetPosition = Position.Left,
@@ -25,8 +28,10 @@ export function StepNode({
   // Every second while the attempt's time is counting; otherwise only "started … ago" moves.
   const now = useNow(live ? 1_000 : 30_000);
   const running = state === 'working';
-  // The human gate: a step that signed off blocked, or a loop out of rounds.
-  const gate = isGate(state, runCancelled);
+  // The human gate: a step that signed off blocked, or a loop out of rounds — and that the api says waits on you. A step a
+  // person has sent round (`wf round`) or asked to retry (`wf retry`) keeps its word until the tick files what they asked
+  // for, and is no gate from the moment they ask: the page's banner reads the api, and so does the drawing.
+  const gate = waitingOnYou && isGate(state, runCancelled);
   const { spec } = step;
 
   return (

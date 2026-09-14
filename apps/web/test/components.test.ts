@@ -46,6 +46,7 @@ const { renderToStaticMarkup } = await import('react-dom/server');
 const { StatusChip, StepNote } = await import('../src/components/StatusChip.tsx');
 const { StepInspector } = await import('../src/components/StepInspector.tsx');
 const { StepNode } = await import('../src/components/StepNode.tsx');
+const { stepData } = await import('../src/components/stepGraph.ts');
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { stateMeaning } = await import('../src/lib/status.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
@@ -101,27 +102,56 @@ test("the inspector's Details show a step's note under its chip", () => {
   assert.doesNotMatch(renderToStaticMarkup(createElement(StepInspector, { run: bare, step: bare.steps[0]!, onClose: () => {} })), /data-note/);
 });
 
-/** A step's node on the canvas, as React Flow draws it: inside the provider its handles read. */
-function nodeMarkup(status: string, runCancelled: boolean): string {
-  const step = { ...runWith(null).steps[0]!, status };
+/** The run of one step, `review`, with the word and note `wf ls` gives it, and who the api says is waited on. */
+function runOf(status: string, { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
+  const run = runWith(note);
+  return { ...run, cancelledAt, waitingOnYou, steps: [{ ...run.steps[0]!, status }] };
+}
+
+/**
+ * The run's step as a canvas draws it — its node's data read off the run by `stepData`, as the run's page and the Factory
+ * both read it — inside the provider its handles read. A server render of the whole canvas draws no node: React Flow puts
+ * its nodes in its store in an effect.
+ */
+function nodeMarkup(run: RunDetail): string {
   const props = {
-    id: step.name, type: 'step' as const, data: { step, index: 1, runCancelled }, selected: false, dragging: false, zIndex: 0,
+    id: 'review', type: 'step' as const, data: stepData(run, 0), selected: false, dragging: false, zIndex: 0,
     isConnectable: false, positionAbsoluteX: 0, positionAbsoluteY: 0, selectable: false, deletable: false, draggable: false,
   };
   return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(StepNode, props)));
 }
 
+const gateDrawn = (html: string) => />human gate</.test(html) || />waiting on you</.test(html) || /border-amber-500/.test(html);
+
 test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked step is — and on a cancelled run, not', () => {
   for (const status of ['rounds exhausted', 'succeeded · BLOCKED']) {
-    const gate = nodeMarkup(status, false);
+    const gate = nodeMarkup(runOf(status, { waitingOnYou: ['review'] }));
     assert.match(gate, />human gate</, status);
     assert.match(gate, />waiting on you</, status);
     assert.match(gate, /border-amber-500/, status);
 
-    const cancelled = nodeMarkup(status, true);
-    assert.doesNotMatch(cancelled, /human gate|waiting on you/, `${status}, on a cancelled run`);
-    assert.match(cancelled, />step 02</, `${status}, on a cancelled run`);
+    // As the api gives a cancelled run, nobody waited on; and with the step still named, which the cancellation refuses all the same.
+    for (const waitingOnYou of [[], ['review']]) {
+      const cancelled = nodeMarkup(runOf(status, { waitingOnYou, cancelledAt: at }));
+      assert.equal(gateDrawn(cancelled), false, `${status}, on a cancelled run, waiting on [${waitingOnYou}]: ${cancelled}`);
+      assert.match(cancelled, />step 01</, `${status}, on a cancelled run`);
+    }
   }
   // Waiting on you too, but work to try again rather than a decision: not a gate.
-  for (const status of ['unsigned', 'failed ✗ check (exit 1)']) assert.doesNotMatch(nodeMarkup(status, false), /human gate|waiting on you/, status);
+  for (const status of ['unsigned', 'failed ✗ check (exit 1)']) assert.equal(gateDrawn(nodeMarkup(runOf(status, { waitingOnYou: ['review'] }))), false, status);
+});
+
+test('a step a person has sent round or asked to retry is no gate from the moment they ask: the canvas draws what the api says', () => {
+  // As the api gives the two while the ask waits for a tick: the step keeps its word, with a note, and nobody is waited on.
+  const asked: Array<[status: string, note: string]> = [
+    ['rounds exhausted', 'round 4 asked (wf round) — the next tick files implement'],
+    ['succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
+  ];
+  for (const [status, note] of asked) {
+    const pending = nodeMarkup(runOf(status, { note, waitingOnYou: [] }));
+    assert.equal(gateDrawn(pending), false, `${status}, an ask pending: ${pending}`);
+    assert.match(pending, />step 01</, `${status}, an ask pending`);
+    // The same step with nothing asked yet is the gate: the one fact that differs is the api's.
+    assert.equal(gateDrawn(nodeMarkup(runOf(status, { note, waitingOnYou: ['review'] }))), true, `${status}, nothing asked`);
+  }
 });

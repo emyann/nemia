@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
-import { checkStderr, closeoutOf, closeoutReader, engine, listRuns, readAsks, verdictWord } from 'agent-workflows';
-import { assess, composeBrief, inFlight, listing, type Assessment, type Run, type TaskPhase } from 'agent-workflows/run';
+import { checkStderr, closeoutAsked, closeoutOf, closeoutReader, engine, exitVerdicts, listRuns, phaseOfView, readAsks, verdictWord } from 'agent-workflows';
+import { assess, composeBrief, inFlight, listing, type Assessment, type Run } from 'agent-workflows/run';
 import { loadWorkflows, type Workflow } from 'agent-workflows/workflow';
 import { capabilitiesOf, repoOf } from './capabilities.ts';
 
@@ -226,46 +226,13 @@ const judgedSteps = (run: Run, folder: readonly Workflow[] | null): readonly Wor
 const bare = (name: string): Workflow => ({ name, after: [], body: '' });
 
 /**
- * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `wf ls` shows it.
- *
- * With one correction: a task the engine has no record of is `unknown`, the line `phaseOfView` in
- * runner.ts draws. `list` passes the engine's own `pending` through for it, so a task lost from the
- * engine's store would read as queued behind a slot.
+ * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `wf ls` shows it: `list`'s,
+ * which the package does not export. `unknown` where `phaseOfView` says so, for a task the engine has no record of: the
+ * engine folds it to the state of one filed and waiting for a slot, and calls it `pending`, which is in flight.
  */
 const wordOf = (views: Views) => (taskId: string): string => {
   const view = views.get(taskId);
-  // Every filed task has the brief it was filed with; only a task the engine never heard of has none.
-  return view?.state.brief ? view.phase : 'unknown';
-};
-
-/**
- * A task's phase as the run narrows the engine's view — `phaseOfView` in runner.ts, not exported. A task the
- * engine has no record of is `unknown`, not `pending`: `pending` is in flight, and a task nobody can find
- * never moves again.
- */
-const phaseOf = (views: Views) => (taskId: string): TaskPhase => {
-  const view = views.get(taskId);
-  if (view?.state.settled) return view.state.settled;
-  if (view?.state.attempts.length) return 'running';
-  return view?.state.brief ? 'pending' : 'unknown';
-};
-
-/** Whether a task was asked for a closeout: the schema on the engine's record of its filing. `closeoutAsked` in runner.ts, not exported. */
-const askedOf = (views: Views) => (taskId: string): boolean => Boolean(views.get(taskId)?.state.closeoutSchema);
-
-/**
- * What a step's check exited with: the exit code the engine recorded off the check's process, or
- * `unfinished` when it recorded none — killed at its deadline, stopped, or never started.
- *
- * `wf ls` reads the number off the `[wf check] exit N` line the check prints last (`readVerdict`), and
- * the check's shell exits with the code it prints, so the two agree. Reading the log here would cost a
- * `logs` call per refused check, and each call observes every harness again: the list of every run would
- * observe once more for each refused check on the board, every poll.
- */
-const verdictOf = (run: Run, views: Views) => (name: string): number | 'unfinished' => {
-  const taskId = run.steps[name]?.check?.taskId;
-  const exitCode = taskId ? views.get(taskId)?.state.attempts.at(-1)?.exitCode : null;
-  return typeof exitCode === 'number' ? exitCode : 'unfinished';
+  return view && phaseOfView(view) !== 'unknown' ? view.phase : 'unknown';
 };
 
 /** What the run established, over one read of its tasks: each step's word and note, who is waited on, where the run stands, and whether it still moves. */
@@ -281,8 +248,9 @@ type Judged = {
  * What `wf ls` says about each step, what `assess` says about the run, and whether the run still moves.
  *
  * The words are `listing`'s — `verified ✓`, `checking`, `unverified · done`, `failed ✗ check (exit 1)`,
- * `unsigned`, `succeeded · BLOCKED`, `rounds exhausted`, and the engine's own word while a step runs — with `wordOf`'s one
- * correction, and so are the notes beside them.
+ * `unsigned`, `succeeded · BLOCKED`, `rounds exhausted`, the engine's own word while a step runs, and `unknown` for a task it
+ * has no record of — and so are the notes beside them. A step and a check are read as the tick reads them, off the package's
+ * own `phaseOfView`, `closeoutAsked` and `exitVerdicts`.
  *
  * Given what people asked for with `wf retry` and `wf round`, read once, as the tick reads them (`readAsks`): without them a
  * step a person asked to try again, or a loop out of rounds a person sent round once more, reads as waiting on them, and the
@@ -294,12 +262,14 @@ type Judged = {
 function judge(run: Run, names: readonly string[], folder: readonly Workflow[] | null, views: Views): Judged {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
-  const asked = askedOf(views);
-  const verdicts = verdictOf(run, views);
+  const asked = closeoutAsked(views);
+  // Off the engine's record of each check, not the log `wf ls` reads (`readVerdict`): the check prints the code it exits with,
+  // so the two agree, and a `logs` call per refused check would observe every harness again, on every poll of the list.
+  const verdicts = exitVerdicts(views, run);
   // Unreadable ask files are `notes` the tick prints and does not honour; neither does the board.
   const { asks, rounds } = readAsks(run.id);
   const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds);
-  const phase = phaseOf(views);
+  const phase = (taskId: string) => phaseOfView(views.get(taskId));
   // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
   // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
   const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds);
@@ -462,7 +432,8 @@ async function checksOf(run: Run, steps: readonly Workflow[], views: Views): Pro
     }
     checks.set(step.name, {
       command: step.check,
-      refused: { exit: verdictWord(verdictOf(run, views)(step.name)), stdout, stderr: tailOf(endOf(checkStderr(taskId)), CHECK_LINES), unreadable },
+      // A check is filed for the step, so the engine's record has a verdict for it: an exit code, or `unfinished`.
+      refused: { exit: verdictWord(exitVerdicts(views, run)(step.name)!), stdout, stderr: tailOf(endOf(checkStderr(taskId)), CHECK_LINES), unreadable },
     });
   }
   return checks;

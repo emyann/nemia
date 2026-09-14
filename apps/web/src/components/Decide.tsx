@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Check as Done, Copy } from 'lucide-react';
+import { Check as Done, ChevronRight, Copy } from 'lucide-react';
 import { decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
 import { barOf, changeOf, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
@@ -207,8 +207,10 @@ const LINE_CLASS: Record<DiffLine, string> = {
 /** One file's unified diff, folded under its name, coloured by line; where the api cut it, how much more `wf decide` prints. */
 export function DiffFileView({ file, counts }: { file: DiffFile; counts?: { added: number | null; removed: number | null } }) {
   return (
-    <details data-diff={file.path} className="rounded border border-neutral-200 dark:border-neutral-800">
+    <details data-diff={file.path} className="group rounded border border-neutral-200 dark:border-neutral-800">
+      {/* A flex summary draws no marker of its own: the chevron says it opens, and turns when it has. */}
       <summary className="flex cursor-pointer items-center gap-2 px-2 py-1 text-xs hover:bg-neutral-50 dark:hover:bg-neutral-900">
+        <ChevronRight aria-hidden className="size-3.5 shrink-0 text-neutral-500 transition-transform group-open:rotate-90" />
         <span className="min-w-0 flex-1 truncate font-mono" title={file.path}>
           {file.path}
         </span>

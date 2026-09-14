@@ -26,9 +26,10 @@ export type RunSummary = {
 
 /**
  * Mirrors `StepNeeds` in apps/api/src/app.ts. `needs`: the closeout's, for a step whose current try signed off blocked. `blockedByHarness`:
- * set for a step whose session the harness marked blocked with no closeout — the engine's `needs-human` — with what it said last, or null.
+ * whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. What that session said last is
+ * on a run's detail alone (`lastLine`): the list reads no conversation.
  */
-export type StepNeeds = { needs: string | null; blockedByHarness: { lastLine: string | null } | null };
+export type StepNeeds = { needs: string | null; blockedByHarness: boolean };
 
 /** Mirrors `StepAsked` in apps/api/src/app.ts: a try a person asked for, which the next tick files. */
 export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null };
@@ -162,7 +163,9 @@ export type RunDetail = {
     /** As on `RunSummary`. */
     note: string | null;
     needs: string | null;
-    blockedByHarness: StepNeeds['blockedByHarness'];
+    blockedByHarness: boolean;
+    /** For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read. */
+    lastLine: string | null;
     /** The try a person asked for that the next tick files; null when none is. */
     asked: StepAsked | null;
     closeout: StepCloseout | null;

@@ -115,17 +115,15 @@ function offerSaid(offer: Exclude<Offer, { kind: 'asked' }>): string {
   switch (offer.kind) {
     case 'answer':
       return offer.needs ? `asks: ${offer.needs}` : 'signed off blocked, and said nothing of what it needs';
-    case 'continue':
-      return `is blocked by the harness${offer.lastLine ? `: ${offer.lastLine}` : ''} — continue it`;
     case 'try-again':
       return !offer.recheck ? 'ended without the closeout it was asked for' : offer.unfinished ? 'has a check that did not finish: no verdict on the work' : 'was refused by its check';
   }
 }
 
 /**
- * One step's answer: what it needs, then the box and the button that ask — an answer to a step that signed off blocked, `Continue` for a
- * session the harness blocked, `Try again` for a refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the
- * api has the ask, the run is read again and the row says what `wf ls` says: `try 2 asked (…) — the next tick files it`.
+ * One step's answer: what it needs, then the box and the button that ask — an answer to a step that signed off blocked, `Try again` for a
+ * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the run is read again and the
+ * row says what `wf ls` says: `try 2 asked (…) — the next tick files it`.
  */
 export function OfferRow({ runId, offer }: { runId: string; offer: Offer }) {
   const queryClient = useQueryClient();
@@ -133,6 +131,8 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Offer }) {
   // A check that did not finish is run again first, as `wf decide` offers it: the run spent no retry on it.
   const [mode, setMode] = useState<RetryMode>(offer.kind === 'try-again' && offer.unfinished ? 'recheck' : 'nudge');
   const field = useId();
+  // A recheck files no session, so it carries no message — `messageRefusal` refuses one — and the box is closed while it is chosen.
+  const rechecking = mode === 'recheck';
   const ask = useMutation({
     mutationFn: (how: { mode: RetryMode; message?: string }) => askTry(runId, offer.step, how),
     onSuccess: () => {
@@ -164,57 +164,55 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Offer }) {
       <p className="line-clamp-4 whitespace-pre-wrap break-words" title={offerSaid(offer)}>
         <strong>{offer.step}</strong> {offerSaid(offer)}
       </p>
-      {offer.kind === 'continue' ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <button type="button" onClick={() => ask.mutate({ mode: 'nudge' })} disabled={ask.isPending} className={BUTTON}>
-            {ask.isPending ? 'Asking…' : 'Continue'}
-          </button>
-          <span className="text-xs text-neutral-500">
-            a nudge, with nothing to say: <code>wf retry {runId} {offer.step}</code>
-          </span>
-        </div>
-      ) : (
-        <form
-          aria-label={offer.kind === 'answer' ? `Answer ${offer.step}` : `Try ${offer.step} again`}
-          className="space-y-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            // An answer goes as it was typed, as `--message` takes it. Something to tell a try is optional: none, when nothing was written.
-            const said = offer.kind === 'answer' || message.trim() ? { message } : {};
-            ask.mutate({ mode, ...said });
-          }}
-        >
-          <label htmlFor={field} className="sr-only">
-            {offer.kind === 'answer' ? `Your answer to ${offer.step}` : `What to tell ${offer.step}, if anything`}
-          </label>
-          <textarea
-            id={field}
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            rows={offer.kind === 'answer' ? 3 : 2}
-            placeholder={
-              offer.kind === 'answer'
-                ? 'Your answer: the next try is told it, under “Your answer”.'
+      <form
+        aria-label={offer.kind === 'answer' ? `Answer ${offer.step}` : `Try ${offer.step} again`}
+        className="space-y-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          // An answer goes as it was typed, as `--message` takes it. Something to tell a try is optional: none, when nothing was written,
+          // and none with a recheck, whatever the closed box still holds.
+          const said = !rechecking && (offer.kind === 'answer' || message.trim()) ? { message } : {};
+          ask.mutate({ mode, ...said });
+        }}
+      >
+        <label htmlFor={field} className="sr-only">
+          {offer.kind === 'answer' ? `Your answer to ${offer.step}` : `What to tell ${offer.step}, if anything`}
+        </label>
+        <textarea
+          id={field}
+          value={message}
+          onChange={(event) => setMessage(event.target.value)}
+          rows={offer.kind === 'answer' ? 3 : 2}
+          disabled={rechecking}
+          placeholder={
+            offer.kind === 'answer'
+              ? 'Your answer: the next try is told it, under “Your answer”.'
+              : rechecking
+                ? 'A recheck runs the check again and files no session: there is nobody to tell.'
                 : 'Anything to tell it (optional): the next try is told it.'
-            }
-            className={TEXTAREA}
-          />
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <button type="submit" disabled={ask.isPending || (offer.kind === 'answer' && !message.trim())} className={BUTTON}>
-              {ask.isPending ? 'Asking…' : offer.kind === 'answer' ? 'Answer and continue' : 'Try again'}
-            </button>
-            <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-              <legend className="sr-only">How to try {offer.step} again</legend>
-              {modes.map((m) => (
-                <label key={m} className="flex cursor-pointer items-center gap-1.5">
-                  <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
-                  {MODES[m]} <code className="text-neutral-500">--{m}</code>
-                </label>
-              ))}
-            </fieldset>
-          </div>
-        </form>
-      )}
+          }
+          className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
+        />
+        {rechecking && message.trim() && (
+          <p data-recheck-note className="text-xs text-neutral-500">
+            Not sent with a recheck: it files no session to read it. Choose a session to send it.
+          </p>
+        )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button type="submit" disabled={ask.isPending || (offer.kind === 'answer' && !message.trim())} className={BUTTON}>
+            {ask.isPending ? 'Asking…' : offer.kind === 'answer' ? 'Answer and continue' : 'Try again'}
+          </button>
+          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+            <legend className="sr-only">How to try {offer.step} again</legend>
+            {modes.map((m) => (
+              <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
+                {MODES[m]} <code className="text-neutral-500">--{m}</code>
+              </label>
+            ))}
+          </fieldset>
+        </div>
+      </form>
       {ask.isError && (
         <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
           <p className="text-sm font-medium text-red-800 dark:text-red-300">Not asked. The api refused it:</p>

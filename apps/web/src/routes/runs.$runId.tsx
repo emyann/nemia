@@ -3,13 +3,14 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Artifacts } from '../components/Closeout';
 import { Decide } from '../components/Decide';
+import { NeedsBanner } from '../components/Needs';
 import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runQuery, type RunDetail } from '../lib/api';
-import { needsOf, needText, offersOf } from '../lib/asks';
+import { offersOf } from '../lib/asks';
 import { decidableRun } from '../lib/decide';
 
 export const Route = createFileRoute('/runs/$runId')({
@@ -40,34 +41,12 @@ function Run({ run }: { run: RunDetail }) {
   const close = useCallback(() => setSelected(null), []);
   // A step the folder has lost since it was clicked is off the canvas, and its panel goes with it.
   const inspected = run.steps.find((s) => s.name === selected);
-  const needs = needsOf(run);
 
   return (
     <article className="space-y-6">
       <BackToRuns />
 
-      {(run.waitingOnYou.length > 0 || needs.length > 0) && (
-        <section aria-label="Waiting on you" className="space-y-1.5 rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          {run.waitingOnYou.length > 0 && (
-            <p>
-              Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, refused by its
-              check, or out of rounds —{' '}<code>wf decide {run.id}</code>
-            </p>
-          )}
-          {/* What each needs: a step's question, or a session the harness blocked, which the Decide section below continues. */}
-          {needs.length > 0 && (
-            <ul className="space-y-1">
-              {needs.map((need) => (
-                <li key={need.step} data-need={need.kind} data-step={need.step} className="line-clamp-4 whitespace-pre-wrap break-words" title={needText(need)}>
-                  <strong>{need.step}</strong> {need.kind === 'harness' ? 'is ' : ''}
-                  {needText(need)}
-                  {need.kind === 'harness' && ' — continue it'}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      )}
+      <NeedsBanner run={run} />
 
       {run.warning && (
         <p className="rounded border border-neutral-300 px-3 py-2 text-sm text-neutral-600 dark:border-neutral-700 dark:text-neutral-400">
@@ -80,10 +59,7 @@ function Run({ run }: { run: RunDetail }) {
         <WorkflowLink dir={run.workflowDir} />
       </header>
 
-      {/*
-        Between the banner and the canvas, for a run with something to decide — never while it runs — or a step to answer, which a
-        session the harness blocked can be while it does.
-      */}
+      {/* Between the banner and the canvas, for a run with something to decide — never while it runs — or a try a person has asked for. */}
       {(decidableRun(run) || offersOf(run).length > 0) && <Decide run={run} />}
 
       <section aria-label="The run's steps as a graph" className="flex flex-col gap-4 md:flex-row">

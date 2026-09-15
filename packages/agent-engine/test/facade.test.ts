@@ -407,6 +407,27 @@ test('file() refuses a budgetUsd that is not dollars above 0, and one on a harne
   assert.equal((await engine.view(id)).state.budgetUsd, 0.25);
 });
 
+test('a usage whose key has no value is not something new to write down — measured is written once a value arrives, not on every pass', async () => {
+  // Found in review: `{ costUsd: undefined }` type-checks, the files journal drops the key as it writes, and the key was
+  // then missing from the record on every pass — a `measured` entry each tick, for as long as the session was listed.
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-measured-'));
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({ root, harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake' });
+  const id = await engine.file({ brief: 'b', cwd: '/repo' });
+  await engine.tick();
+  const measured = async () => (await engine.feed(0)).entries.filter((e) => e.taskId === id && e.event.kind === 'measured').map((e) => e.event);
+
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'done', usage: { turns: 3, costUsd: undefined } });
+  for (let i = 0; i < 4; i++) await engine.tick();
+  assert.equal((await engine.view(id)).state.settled, 'succeeded');
+  assert.deepEqual(await measured(), [], 'the end already says turns, and nothing says a cost: nothing to write, on any pass');
+
+  for (const [k, v] of sessions) sessions.set(k, { ...v, usage: { turns: 3, costUsd: 0.5 } });
+  for (let i = 0; i < 3; i++) await engine.tick();
+  assert.equal((await measured()).length, 1, 'a cost that arrives is written once');
+  assert.deepEqual((await engine.view(id)).state.attempts[0]?.usage, { turns: 3, costUsd: 0.5 });
+});
+
 test('a PromiseRunner whose spawn rejects is not taken to have started nothing — unless it says so', async () => {
   const sessions = new Map<string, Sighting>();
   const launcher: PromiseRunner = {

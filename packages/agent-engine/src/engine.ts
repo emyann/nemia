@@ -244,7 +244,9 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, ob
       Effect.catchTag('RunnerError', () => Effect.succeed(undefined)),
     );
     const measured = typeof released === 'object' ? released : session.usage;
-    if (measured && Object.keys(measured).some((key) => !Object.hasOwn(attempt.usage ?? {}, key))) {
+    // By value, not by key: `{ costUsd: undefined }` measured nothing, and a journal that writes JSON drops the key, so
+    // asked by key it was new on every pass (found in review).
+    if (measured && (Object.keys(measured) as Array<keyof Usage>).some((key) => measured[key] !== undefined && attempt.usage?.[key] === undefined)) {
       yield* journal.append(state.taskId, { kind: 'measured', at: new Date().toISOString(), attempt: attempt.n, usage: measured });
     }
   }

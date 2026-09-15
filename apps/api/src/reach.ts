@@ -4,12 +4,16 @@
  * read, as the Workflows page reads them (`listWorkflows`); nothing here starts, asks or writes anything.
  *
  * What a Claude Code step has is read as the harness gives it, as far as it was measured: its `tools:` exactly, or the harness's own set
- * (`MEASURED_TOOLS`); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the settings enable, whatever its tools;
- * the settings' deny rules and its own `disallow:`, a deny beating an allow; and in `dontAsk`, only what the settings allow of what asks. Nothing
- * of a Codex step was measured, and its fence is its sandbox: the page says so, and does not guess.
+ * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the settings
+ * enable, whatever its tools; the settings' deny rules and its own `disallow:`; and in `dontAsk`, only what the settings allow of what asks.
+ * Rules are matched as Claude Code's permissions docs say it matches them (code.claude.com/docs/en/permissions, read 2026-09-14): deny before
+ * allow, whatever either's specificity, so a deny takes back every allow whose calls it matches; in a Bash rule `*` is any text, spaces included,
+ * and `:*` at the end is a trailing ` *`, which also matches the bare command; a rule naming a tool whole — `Bash`, or `Bash(*)` — as a deny,
+ * removes the tool. A Codex step reads no `.claude/settings.json`, and nothing of a Codex session was measured: its fence is its sandbox, and the
+ * page claims nothing else for it.
  */
 import { HARNESSES } from 'agent-workflows';
-import { capabilitiesOf, denyingRule, MEASURED_TOOLS, type Capabilities, type DeniedRule } from './capabilities.ts';
+import { capabilitiesOf, denyingRule, MEASURED_TOOLS, SETTINGS, type Capabilities, type DeniedRule } from './capabilities.ts';
 import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from './workflows.ts';
 
 /** The harnesses that are Claude Code, as the engine names them: its `--bg` sessions, and `claude -p` detached. */
@@ -24,6 +28,21 @@ export type RemovedTool = { name: string; rule: string; source: string; of: stri
 /** A server's tool as it reaches a step: the rule that denies it, and whether a rule allows it — which, in `dontAsk`, is whether it runs at all. */
 export type ReachedMcpTool = { name: string; denied: DeniedRule | null; allowed: boolean };
 
+/**
+ * What the settings' allow rules give a step. `rules` are those that stand: none a deny takes back (`takenBack`, with the deny), and none of a
+ * tool the step does not have (`unused`) — known only for a step whose `tools:` names its set. `bash` are the Bash rules that stand, each with its
+ * command as the rule writes it and the narrower deny rules that still refuse some of what it allows (`except`); none for a step with no Bash,
+ * which `why` says. `dontAsk` is whether the step runs in it, where anything that asks and no rule allows is denied without a prompt.
+ */
+export type AllowedFor = {
+  rules: string[];
+  takenBack: Array<{ rule: string; by: DeniedRule }>;
+  unused: string[];
+  bash: Array<{ rule: string; command: string; except: string[] }>;
+  dontAsk: boolean;
+  why: string | null;
+};
+
 export type StepReach = {
   workflow: string;
   from: WorkflowSource;
@@ -34,26 +53,71 @@ export type StepReach = {
   claudeCode: boolean;
   /** The fence as its file declares it, null where it declares none. A step names no MCP server: `mcp:` is not a key a step has. */
   fence: { tools: string[] | null; disallow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
-  /** The built-in tools it has: its `tools:` exactly (`declared`), or the harness's own set (`measured`), less what a deny rule names. */
-  tools: { from: 'declared' | 'measured'; names: string[]; removed: RemovedTool[] } | null;
+  /**
+   * The built-in tools it has: its `tools:` exactly (`declared`), or the harness's own set (`measured`), less what a deny rule removes. `inferred`
+   * are those of the measured set no measurement named (`MEASURED_TOOLS.inferred`); none for a step that declares its tools.
+   */
+  tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: RemovedTool[] } | null;
   /** The repository's skills it can load — every one, with the Skill tool; none without it, and why. */
   skills: { names: string[]; why: string | null } | null;
   /** Each server the checkout enables, with the tools it listed, or why there are none to show. */
   mcp: Array<{ server: string; tools: ReachedMcpTool[] | null; why: string | null }> | null;
-  /** Every deny rule that holds for it: the settings', then its own. */
+  /** Every deny rule that holds for it: the settings', then its own. None for a step whose harness reads no settings. */
   denied: DeniedRule[];
-  /**
-   * The settings' allow rules, less each one a deny of the same words takes back — a deny beats an allow — and `bash` the commands of its Bash
-   * rules. `dontAsk` is whether the step runs in it, where anything that asks and no rule allows is denied without a prompt.
-   */
-  allowed: { rules: string[]; bash: string[]; dontAsk: boolean };
+  allowed: AllowedFor;
 };
 
 /** What the Capabilities page reads: the repository's capabilities, the measured set a step without `tools:` has, and what each step gets. */
 export type CapabilitiesWithSteps = Capabilities & { measured: typeof MEASURED_TOOLS; steps: StepReach[] };
 
-/** A tool's name in a rule that names one whole tool: no parentheses, no server. */
-const WHOLE_TOOL = /^[A-Za-z][A-Za-z0-9]*$/;
+/**
+ * A permission rule as Claude Code reads one: the tool, and what its parentheses scope — null for a rule naming the tool whole, as `Bash` and
+ * `Bash(*)` both do. Null for a rule that names no built-in tool so, an MCP server's (`mcp__<server>__<tool>`) among them.
+ */
+function ruleOf(rule: string): { tool: string; scope: string | null } | null {
+  const m = /^([A-Za-z][A-Za-z0-9]*)(?:\(([\s\S]*)\))?$/.exec(rule);
+  if (!m) return null;
+  return { tool: m[1]!, scope: m[2] === undefined || m[2] === '*' ? null : m[2] };
+}
+
+/** A Bash rule's scope in one spelling: `:*` at its end is a trailing ` *`. Anywhere else a colon is a colon. */
+const bashPattern = (scope: string): string => (scope.endsWith(':*') ? `${scope.slice(0, -2)} *` : scope);
+
+/** The bare command a pattern whose only wildcard is a trailing ` *` matches too — `git log` for `git log *` — or null. */
+const bareOf = (pattern: string): string | null => (pattern.endsWith(' *') && pattern.indexOf('*') === pattern.length - 1 ? pattern.slice(0, -2) : null);
+
+/** Whether a Bash pattern matches a command, as Claude Code matches one: `*` any text, spaces included; with no `*`, that command exactly. */
+function bashMatches(pattern: string, command: string): boolean {
+  const glob = new RegExp(`^${pattern.split('*').map((part) => part.replace(/[.+?^${}()|[\]\\]/g, '\\$&')).join('[\\s\\S]*')}$`);
+  return glob.test(command) || bareOf(pattern) === command;
+}
+
+/**
+ * Whether the Bash rule scoped `outer` matches every command the rule scoped `inner` matches, each as its rule writes it (`git:*`, `git diff:*`,
+ * `npm run build`). Read off `inner`'s text with each `*` of it taken as written: `outer`'s own characters are never a `*`, so where `outer`
+ * matches that text, each `*` of `inner` falls inside a wildcard of `outer`, which matches whatever it stands for. And the bare command a
+ * trailing ` *` of `inner` matches, `outer` must match too.
+ */
+export function bashCovers(outer: string, inner: string): boolean {
+  const [o, i] = [bashPattern(outer), bashPattern(inner)];
+  const bare = bareOf(i);
+  return bashMatches(o, i) && (bare === null || bashMatches(o, bare));
+}
+
+/**
+ * The deny rule that takes an allow rule back whole, or undefined. Deny comes before allow whatever either's specificity, so a deny takes back
+ * the allow when it matches every call the allow does: one of the same words; one naming the allow's tool whole; a Bash deny that covers the
+ * allow's commands (`bashCovers`). A deny narrower than a Bash allow leaves it standing, with that exception (`AllowedFor.bash`).
+ */
+function takenBackBy(allow: string, denied: readonly DeniedRule[]): DeniedRule | undefined {
+  const a = ruleOf(allow);
+  return denied.find((d) => {
+    if (d.rule === allow) return true;
+    const r = ruleOf(d.rule);
+    if (!a || !r || r.tool !== a.tool) return false;
+    return r.scope === null || (a.tool === 'Bash' && a.scope !== null && bashCovers(r.scope, a.scope));
+  });
+}
 
 /** What each step of each workflow that reads gets. A folder the loader refuses has no step to give anything to. */
 export function reachOf(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'allowed'>, workflows: readonly WorkflowListing[]): StepReach[] {
@@ -62,31 +126,39 @@ export function reachOf(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'den
 
 function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' | 'allowed'>, workflow: WorkflowListing, step: string, spec: WorkflowStepSpec): StepReach {
   const harness = spec.harness ?? Object.keys(HARNESSES)[0]!;
-  const denied = [...capabilities.denied, ...spec.disallow.map((rule) => ({ rule, source: DISALLOW }))];
-  const deny = denied.map((d) => d.rule);
-  // A deny beats an allow: an allow rule a deny of the same words names is taken back. Matched as words, as the settings match an allow.
-  const rules = capabilities.allowed.map((a) => a.rule).filter((rule) => !deny.includes(rule));
-  const allowed = { rules, bash: rules.flatMap((rule) => /^Bash\((.+)\)$/.exec(rule)?.[1] ?? []), dontAsk: spec.permissionMode === 'dontAsk' };
+  const dontAsk = spec.permissionMode === 'dontAsk';
   const reach = {
     workflow: workflow.name, from: workflow.from, step, harness,
     fence: { tools: spec.tools, disallow: spec.disallow, permissionMode: spec.permissionMode, effort: spec.effort, mcp: null },
-    denied, allowed,
   };
-  if (!CLAUDE_CODE.has(harness)) return { ...reach, claudeCode: false, tools: null, skills: null, mcp: null };
+  if (!CLAUDE_CODE.has(harness)) {
+    return {
+      ...reach, claudeCode: false, tools: null, skills: null, mcp: null, denied: [],
+      allowed: { rules: [], takenBack: [], unused: [], bash: [], dontAsk, why: `${harness} reads no ${SETTINGS}, so none of its rules is claimed for this step.` },
+    };
+  }
 
-  const offered: readonly string[] = spec.tools ?? MEASURED_TOOLS.tools;
+  const denied = [...capabilities.denied, ...spec.disallow.map((rule) => ({ rule, source: DISALLOW }))];
+  const deny = denied.map((d) => d.rule);
+  const inferred: readonly string[] = MEASURED_TOOLS.inferred.map((t) => t.name);
+  const offered: readonly string[] = spec.tools ?? [...MEASURED_TOOLS.tools, ...inferred];
+  // A deny naming a tool whole — `Bash`, or `Bash(*)` — removes it from the session.
+  const wholly = (tool: string) => denied.find((d) => ruleOf(d.rule)?.tool === tool && ruleOf(d.rule)?.scope === null);
   const removed: RemovedTool[] = [];
   const names = offered.filter((name) => {
-    const by = denied.find((d) => d.rule === name);
+    const by = wholly(name);
     if (by) removed.push({ name, rule: by.rule, source: by.source, of: null });
     return !by;
   });
   // A rule naming one tool of a family the set names as one — `CronCreate` of `Cron*`: the family stays, and the tool is named as taken.
   for (const d of denied) {
-    if (!WHOLE_TOOL.test(d.rule) || offered.includes(d.rule)) continue;
-    const family = names.find((name) => name.endsWith('*') && d.rule.startsWith(name.slice(0, -1)));
-    if (family) removed.push({ name: d.rule, rule: d.rule, source: d.source, of: family });
+    const r = ruleOf(d.rule);
+    if (!r || r.scope !== null || offered.includes(r.tool) || removed.some((x) => x.name === r.tool)) continue;
+    const family = names.find((name) => name.endsWith('*') && r.tool.startsWith(name.slice(0, -1)));
+    if (family) removed.push({ name: r.tool, rule: d.rule, source: d.source, of: family });
   }
+  // Whether it has a tool: known for a set its `tools:` names; for the measured set, a tool the measurement did not name is not ruled out.
+  const has = (tool: string) => !spec.tools || names.includes(tool) || names.some((name) => name.endsWith('*') && tool.startsWith(name.slice(0, -1)));
 
   const skillTaken = removed.find((r) => r.name === 'Skill');
   const skills = names.includes('Skill')
@@ -98,16 +170,45 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
           : `Its tools have no \`Skill\`, so it cannot load a skill — its session still lists the repository's skills (measured, ${MEASURED_TOOLS.harness} ${MEASURED_TOOLS.version}).`,
       };
 
+  const allowed: AllowedFor = { rules: [], takenBack: [], unused: [], bash: [], dontAsk, why: null };
+  for (const { rule } of capabilities.allowed) {
+    const by = takenBackBy(rule, denied);
+    const tool = ruleOf(rule)?.tool;
+    if (by) allowed.takenBack.push({ rule, by });
+    else if (tool !== undefined && !has(tool)) allowed.unused.push(rule);
+    else allowed.rules.push(rule);
+  }
+  const bashTaken = removed.find((r) => r.name === 'Bash');
+  if (names.includes('Bash')) {
+    allowed.bash = allowed.rules.flatMap((rule) => {
+      const r = ruleOf(rule);
+      if (r?.tool !== 'Bash') return [];
+      const except = denied.filter((d) => {
+        const x = ruleOf(d.rule);
+        return x?.tool === 'Bash' && x.scope !== null && (r.scope === null || bashCovers(r.scope, x.scope));
+      });
+      return [{ rule, command: r.scope ?? '*', except: except.map((d) => d.rule) }];
+    });
+  } else {
+    allowed.why = bashTaken
+      ? `\`Bash\` is denied by ${bashTaken.rule} (${bashTaken.source}), so it runs no command, whatever the settings allow.`
+      : 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.';
+  }
+
   const mcp = capabilities.mcp.filter((server) => server.enabled).map((server) => ({
     server: server.name,
     tools: server.tools?.map((tool): ReachedMcpTool => {
       const rule = denyingRule(deny, server.name, tool.name);
-      return { name: tool.name, denied: rule === null ? null : denied.find((d) => d.rule === rule)!, allowed: denyingRule(rules, server.name, tool.name) !== null };
+      return { name: tool.name, denied: rule === null ? null : denied.find((d) => d.rule === rule)!, allowed: denyingRule(allowed.rules, server.name, tool.name) !== null };
     }) ?? null,
     why: server.tools ? null : server.error ?? server.notAsked ?? 'It did not list its tools.',
   }));
 
-  return { ...reach, claudeCode: true, tools: { from: spec.tools ? 'declared' : 'measured', names, removed }, skills, mcp };
+  return {
+    ...reach, claudeCode: true,
+    tools: { from: spec.tools ? 'declared' : 'measured', names, inferred: spec.tools ? [] : names.filter((name) => inferred.includes(name)), removed },
+    skills, mcp, denied, allowed,
+  };
 }
 
 /**

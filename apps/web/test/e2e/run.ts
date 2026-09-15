@@ -1170,10 +1170,14 @@ const PAGES: PageSpec[] = [
       await expectVisible(review.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`), `review's server tool the settings deny is marked denied (${server.denied})`);
       const implement = steps.locator(`li[data-step="${good.name}/implement"]`);
       await expectVisible(implement.locator('[data-measured="2026-09-14"]', { hasText: '2.1.270' }), "implement has the harness's own set, with the date and version it was measured on");
+      await expectVisible(implement.locator('[data-tool="WebFetch"]:not([data-inferred])'), 'a tool the measurement named is shown as measured (WebFetch)');
+      for (const tool of ['Edit', 'Bash']) await expectVisible(implement.locator(`[data-tool="${tool}"][data-inferred]`), `a tool no unfenced measurement named is marked inferred (${tool})`);
       await expectVisible(implement.locator(`[data-removed="${good.disallow}"]`), `implement's disallow: takes ${good.disallow} from it`);
       await expectCount(implement.locator(`[data-tool="${good.disallow}"]`), 0, `and ${good.disallow} is not among its tools`);
       await expectVisible(implement.locator(`[data-skill="${skill.name}"]`), `implement, with Skill, can load the repository's skill (${skill.name})`);
-      await expectVisible(steps.locator(`li[data-step="${yours.name}/${yours.steps[0]}"]`).getByText(/was not measured/), `yours, on Codex, claims no tool it was not measured to have`);
+      const codexed = steps.locator(`li[data-step="${yours.name}/${yours.steps[0]}"]`);
+      await expectVisible(codexed.locator('[data-not-claimed]', { hasText: /was not measured.*reads no \.claude\/settings\.json/ }), `yours, on Codex, claims no tool it was not measured to have, and no rule of settings it does not read`);
+      await expectCount(codexed.locator('[data-tool], [data-bash], [data-allowed]'), 0, 'and shows none');
     },
   },
 ];

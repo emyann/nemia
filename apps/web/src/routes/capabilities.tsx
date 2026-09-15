@@ -201,13 +201,18 @@ function DeniedRow({ rule, source, refuses }: { rule: string; source: string; re
 
 const OWN = "the harness's own";
 
+const PLAIN = 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
+const STRUCK = 'bg-red-50 text-red-800 line-through decoration-red-500 dark:bg-red-950/60 dark:text-red-300';
+
 /**
- * What one step of a workflow gets: the fence its file declares, then — on Claude Code, whose set was measured — the tools it has, the skills it
- * can load and the tools of each server the checkout enables; the deny rules that hold for it; and what the settings allow it. A Codex step is
- * its fence and nothing more: what a Codex session is given was not measured.
+ * What one step of a workflow gets: the fence its file declares, then — on Claude Code, whose set was measured — the tools it has (what was only
+ * inferred, dashed), the skills it can load, the tools of each server the checkout enables, the deny rules that hold for it, and what the settings
+ * allow it. A Codex step is its fence and nothing more: it reads no settings, and what a Codex session is given was not measured.
  */
 function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools }) {
   const { fence, tools, skills, mcp, denied, allowed } = step;
+  const whyInferred = new Map(measured.inferred.map((t) => [t.name, t.why]));
+  const exceptOf = (rule: string) => allowed.bash.find((b) => b.rule === rule)?.except ?? [];
 
   return (
     <li aria-label={`Step ${step.workflow} · ${step.step}`} data-step={`${step.workflow}/${step.step}`} className="space-y-3 px-3 py-3">
@@ -235,33 +240,40 @@ function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools 
       </dl>
 
       {!step.claudeCode ? (
-        <p className="text-sm text-neutral-500">
+        <p data-not-claimed className="text-sm text-neutral-500">
           Runs on {step.harness}, which has no tool list: its fence is the sandbox its permission mode names. What a {step.harness} session is given
-          was not measured, so no tool, skill or server is claimed for it.
+          was not measured, so no tool, skill or server is claimed for it. {allowed.why}
         </p>
       ) : (
         <>
           {tools && (
             <Reach label="Tools">
               <span className="flex flex-wrap gap-1">
-                {tools.names.map((name) => (
-                  <span key={name} data-tool={name} className={`${CHIP} bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300`}>{name}</span>
-                ))}
+                {tools.names.map((name) => {
+                  const inferred = tools.inferred.includes(name);
+                  return (
+                    <span
+                      key={name}
+                      data-tool={name}
+                      data-inferred={inferred || undefined}
+                      title={inferred ? `Inferred, not measured. ${whyInferred.get(name) ?? ''}` : undefined}
+                      className={`${CHIP} ${inferred ? 'border border-dashed border-neutral-400 text-neutral-600 dark:border-neutral-500 dark:text-neutral-400' : PLAIN}`}
+                    >
+                      {name}
+                    </span>
+                  );
+                })}
                 {tools.removed.map((r) => (
-                  <span
-                    key={r.name}
-                    data-removed={r.name}
-                    title={`Denied by ${r.rule} (${r.source})${r.of ? `, one of ${r.of}` : ''}`}
-                    className={`${CHIP} bg-red-50 text-red-800 line-through decoration-red-500 dark:bg-red-950/60 dark:text-red-300`}
-                  >
+                  <span key={r.name} data-removed={r.name} title={`Denied by ${r.rule} (${r.source})${r.of ? `, one of ${r.of}` : ''}`} className={`${CHIP} ${STRUCK}`}>
                     {r.name}
                   </span>
                 ))}
               </span>
               {tools.from === 'measured' && (
                 <p data-measured={measured.measuredAt} className="text-xs text-neutral-500">
-                  {measured.harness}'s own set, as measured on {measured.measuredAt} with {measured.version} ({measured.source}); without{' '}
-                  {measured.lacks.join(' or ')}. Not asked again: a later version may give another.
+                  {measured.harness}'s own set. The solid ones as measured on {measured.measuredAt} with {measured.version} ({measured.source}), which
+                  found it without {measured.lacks.join(' or ')}. The dashed ones are inferred, not measured: each says why. Not asked again: a later
+                  version may give another.
                 </p>
               )}
             </Reach>
@@ -273,7 +285,7 @@ function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools 
                 <p className="text-xs text-neutral-500">{skills.why}</p>
               ) : skills.names.length ? (
                 <span className="flex flex-wrap gap-1">
-                  {skills.names.map((name) => <span key={name} data-skill={name} className={`${CHIP} bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300`}>{name}</span>)}
+                  {skills.names.map((name) => <span key={name} data-skill={name} className={`${CHIP} ${PLAIN}`}>{name}</span>)}
                 </span>
               ) : (
                 <p className="text-xs text-neutral-500">The repository has no skill.</p>
@@ -304,13 +316,7 @@ function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools 
                                     ? 'No rule allows it, so dontAsk denies it without a prompt'
                                     : `mcp__${server.server}__${tool.name}`
                               }
-                              className={`${CHIP} ${
-                                tool.denied
-                                  ? 'bg-red-50 text-red-800 line-through decoration-red-500 dark:bg-red-950/60 dark:text-red-300'
-                                  : refused
-                                    ? 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300'
-                                    : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
-                              }`}
+                              className={`${CHIP} ${tool.denied ? STRUCK : refused ? 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300' : PLAIN}`}
                             >
                               {tool.name}
                             </span>
@@ -327,45 +333,71 @@ function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools 
               )}
             </Reach>
           )}
-        </>
-      )}
 
-      <Reach label="Denied">
-        {denied.length ? (
-          <span className="flex flex-wrap gap-x-3 gap-y-0.5">
-            {denied.map(({ rule, source }) => (
-              <span key={`${source}:${rule}`} className="font-mono text-xs" title={source}>
-                {rule} <span className="text-neutral-500">· {source}</span>
-              </span>
-            ))}
-          </span>
-        ) : (
-          <p className="text-xs text-neutral-500">Nothing: the settings deny nothing, and neither does the step.</p>
-        )}
-      </Reach>
-
-      <Reach label={allowed.dontAsk ? 'Bash it may run' : 'Allowed without asking'}>
-        {allowed.dontAsk ? (
-          <>
-            <p className="text-xs text-neutral-500">In dontAsk, a command no rule allows is denied without a prompt. The settings allow it:</p>
-            {allowed.bash.length ? (
-              <span className="flex flex-wrap gap-1">
-                {allowed.bash.map((command) => (
-                  <code key={command} data-bash={command} className={`${CHIP} bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300`}>{command}</code>
+          <Reach label="Denied">
+            {denied.length ? (
+              <span className="flex flex-wrap gap-x-3 gap-y-0.5">
+                {denied.map(({ rule, source }) => (
+                  <span key={`${source}:${rule}`} className="font-mono text-xs" title={source}>
+                    {rule} <span className="text-neutral-500">· {source}</span>
+                  </span>
                 ))}
               </span>
             ) : (
-              <p className="text-xs text-neutral-500">No Bash command at all.</p>
+              <p className="text-xs text-neutral-500">Nothing: the settings deny nothing, and neither does the step.</p>
             )}
-          </>
-        ) : allowed.rules.length ? (
-          <span className="flex flex-wrap gap-1">
-            {allowed.rules.map((rule) => <code key={rule} data-allowed={rule} className={`${CHIP} bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300`}>{rule}</code>)}
-          </span>
-        ) : (
-          <p className="text-xs text-neutral-500">Nothing: the settings allow nothing, so what asks is its permission mode's to decide.</p>
-        )}
-      </Reach>
+          </Reach>
+
+          <Reach label={allowed.dontAsk ? 'Bash it may run' : 'Allowed without asking'}>
+            {allowed.dontAsk ? (
+              allowed.why ? (
+                <p data-no-bash className="text-xs text-neutral-500">{allowed.why}</p>
+              ) : (
+                <>
+                  <p className="text-xs text-neutral-500">In dontAsk, a command no rule allows is denied without a prompt. The settings allow it:</p>
+                  {allowed.bash.length ? (
+                    <span className="flex flex-wrap gap-x-3 gap-y-1">
+                      {allowed.bash.map((b) => (
+                        <span key={b.rule} className="inline-flex flex-wrap items-center gap-1">
+                          <code data-bash={b.command} className={`${CHIP} bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300`}>{b.command}</code>
+                          {b.except.length > 0 && <span data-except={b.command} className="text-[11px] text-neutral-500">except {b.except.join(', ')}</span>}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    <p className="text-xs text-neutral-500">No Bash command at all.</p>
+                  )}
+                </>
+              )
+            ) : allowed.rules.length ? (
+              <span className="flex flex-wrap gap-x-3 gap-y-1">
+                {allowed.rules.map((rule) => (
+                  <span key={rule} className="inline-flex flex-wrap items-center gap-1">
+                    <code data-allowed={rule} className={`${CHIP} ${PLAIN}`}>{rule}</code>
+                    {exceptOf(rule).length > 0 && <span data-except={rule} className="text-[11px] text-neutral-500">except {exceptOf(rule).join(', ')}</span>}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <p className="text-xs text-neutral-500">Nothing: no allow rule of the settings reaches it, so what asks is its permission mode's to decide.</p>
+            )}
+            {allowed.takenBack.length > 0 && (
+              <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
+                Taken back by a deny, which beats an allow:
+                {allowed.takenBack.map(({ rule, by }) => (
+                  <code key={rule} data-taken-back={rule} title={`Denied by ${by.rule} (${by.source})`} className={`${CHIP} ${STRUCK}`}>{rule}</code>
+                ))}
+              </p>
+            )}
+            {allowed.unused.length > 0 && (
+              <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
+                Of a tool its tools: do not have:
+                {allowed.unused.map((rule) => <code key={rule} data-unused={rule} className={`${CHIP} ${PLAIN} opacity-60`}>{rule}</code>)}
+              </p>
+            )}
+          </Reach>
+        </>
+      )}
     </li>
   );
 }

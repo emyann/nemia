@@ -391,7 +391,17 @@ export type Rule = { rule: string; source: string };
  * Mirrors `MEASURED_TOOLS` in apps/api/src/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on `measuredAt` with
  * `version` — data, never claimed current.
  */
-export type MeasuredTools = { harness: string; version: string; measuredAt: string; source: string; tools: string[]; lacks: string[] };
+export type MeasuredTools = {
+  harness: string;
+  version: string;
+  measuredAt: string;
+  source: string;
+  /** What the measurement named. */
+  tools: string[];
+  /** What such a step is taken to have that no measurement named, each with why: inferred, never measured. */
+  inferred: Array<{ name: string; why: string }>;
+  lacks: string[];
+};
 
 /**
  * Mirrors `StepReach` in apps/api/src/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on Claude Code, the
@@ -405,11 +415,22 @@ export type StepReach = {
   harness: string;
   claudeCode: boolean;
   fence: { tools: string[] | null; disallow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
-  tools: { from: 'declared' | 'measured'; names: string[]; removed: Array<{ name: string; rule: string; source: string; of: string | null }> } | null;
+  tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: Array<{ name: string; rule: string; source: string; of: string | null }> } | null;
   skills: { names: string[]; why: string | null } | null;
   mcp: Array<{ server: string; tools: Array<{ name: string; denied: Rule | null; allowed: boolean }> | null; why: string | null }> | null;
   denied: Rule[];
-  allowed: { rules: string[]; bash: string[]; dontAsk: boolean };
+  /**
+   * Mirrors `AllowedFor`: the allow rules that stand, those a deny takes back and of a tool the step does not have; the Bash rules that stand,
+   * each with the narrower denies that still refuse some of it; and why there is no Bash command, for a step with no Bash.
+   */
+  allowed: {
+    rules: string[];
+    takenBack: Array<{ rule: string; by: Rule }>;
+    unused: string[];
+    bash: Array<{ rule: string; command: string; except: string[] }>;
+    dontAsk: boolean;
+    why: string | null;
+  };
 };
 
 /** Mirrors `CapabilitiesWithSteps` in apps/api/src/reach.ts: what the repository the api runs in offers a step, and what each step gets. */

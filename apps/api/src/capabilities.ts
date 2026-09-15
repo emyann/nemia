@@ -63,7 +63,7 @@ export const repoOf = (env: NodeJS.ProcessEnv = process.env): string => path.res
 /** How long a server has to start and list its tools before it is reported as not answering. */
 export const ASK_MS = 15_000;
 
-const SETTINGS = '.claude/settings.json';
+export const SETTINGS = '.claude/settings.json';
 const MCP_JSON = '.mcp.json';
 
 /** Everything the repository at `repo` offers. Never throws for what is on disk: an absent file is an empty list, a broken one a warning. */
@@ -117,23 +117,38 @@ export async function capabilitiesOf(
   };
 }
 
+/** Why a tool the fenced reviewer had is taken to be in the unfenced set: `tools:` narrows the harness's own set, and adds nothing to it. */
+const ON_THE_FENCED = "Not named by the unfenced measurement. The fenced reviewer had it the same day, and `tools:` only narrows the harness's own set.";
+/** Why Edit and Write are taken to be in it: nothing measured names them. */
+const EDITS_WITH = 'Not named by any measurement. Every implement step of this repository, filed with no `tools:`, changes files with it.';
+
 /**
  * What a Claude Code step with no `tools:` has: the harness's own set, as measured — `claude -p` spawned with the engine's flags, as an
  * `implement` step, on 2026-09-14, Claude Code 2.1.270 (docs/plan-hold-the-bar.md §4b, "what a worker gets, measured"). Data with its date and
  * version, and nothing here asks the harness again: a later Claude Code may give another set, so the page says when and on which version this
  * was measured, and never that it is current.
  *
- * `tools` are the built-in tools the measurement names, as it writes them — `Cron*` and `Task*` a family each — with those the same measurement
- * found on a fenced step, which an unfenced one has too (Bash, Glob, Grep, Read, Skill), and Edit and Write, which every `implement` of this
- * repository makes its change with. `lacks` are the ones it found absent. MCP tools are not in it: the checkout's servers reach a step whatever
- * its `tools:` (packages/agent-workflows/docs/features.md, measured), and each lists its own.
+ * `tools` are the built-in tools that measurement names, as it writes them (`Cron*` and `Task*` a family each), and nothing else: the api's test
+ * refuses a name the ledger's bullet does not write as a tool of its own. `inferred` are tools such a step is taken to have that no unfenced
+ * measurement names, each with why, which the page marks as inferred and never as measured. `lacks` are the ones the measurement found absent.
+ * MCP tools are in neither: the checkout's servers reach a step whatever its `tools:` (packages/agent-workflows/docs/features.md, measured),
+ * and each lists its own.
  */
 export const MEASURED_TOOLS = {
   harness: 'Claude Code',
   version: '2.1.270',
   measuredAt: '2026-09-14',
   source: 'docs/plan-hold-the-bar.md §4b, "what a worker gets, measured"',
-  tools: ['Agent', 'Bash', 'Cron*', 'Edit', 'Glob', 'Grep', 'Monitor', 'NotebookEdit', 'Read', 'RemoteTrigger', 'ScheduleWakeup', 'SendMessage', 'Skill', 'Task*', 'WebFetch', 'WebSearch', 'Workflow', 'Write'],
+  tools: ['Agent', 'Cron*', 'Monitor', 'NotebookEdit', 'RemoteTrigger', 'ScheduleWakeup', 'SendMessage', 'Task*', 'WebFetch', 'WebSearch', 'Workflow'],
+  inferred: [
+    { name: 'Bash', why: ON_THE_FENCED },
+    { name: 'Glob', why: ON_THE_FENCED },
+    { name: 'Grep', why: ON_THE_FENCED },
+    { name: 'Read', why: ON_THE_FENCED },
+    { name: 'Skill', why: ON_THE_FENCED },
+    { name: 'Edit', why: EDITS_WITH },
+    { name: 'Write', why: EDITS_WITH },
+  ],
   lacks: ['Artifact', 'AskUserQuestion'],
 } as const;
 

@@ -248,7 +248,11 @@ attempt — into the continuation's brief, as `wf retry --message` carries an an
   attempt in flight, `list`, `say` and a pass still observe, and a view still makes the runner's second pass over every
   idle `ae/` session it lists. So a board's open stream on a running step makes one `claude agents` call a second, not
   two. Verified with a fake `claude` that counts its calls and registration files the test writes
-  (`test/find.test.ts`, every guard made to refuse by taking it out); no board has been measured polling it.
+  (`test/find.test.ts`): each of the registration read's refusals — a symlink, another user's file, another name, an
+  interactive session, a pid other than the file's, an empty or missing session id, a dead process, a pid another
+  process has taken — was taken out once, and a test failed. The first version's tests never wrote a symlink or a
+  registration without a session id, so two of those passed with the check gone (found in review). The check that a
+  file is named for a pid is a shortcut: the pid check refuses what it skips. No board has been measured polling it.
 
 - **Releasing a quiet session, or one a person or a deadline stopped** (engine `c2ebd62`, `9c4221e`). A
   fake `claude` that keeps a registry, at shipped defaults. The live run released a session that had
@@ -415,8 +419,22 @@ attempt is continued under `interrupted` and `always`: its session is stopped if
 told a nudge instead of the brief, journalled on `starting`. Out of attempts, the task settles `failed` with a note that
 says so. Quiet is counted from the later of the last write and the session's own start, so a continuation over a cold
 transcript does not end as it begins. `decide` grew by a dozen lines and reads no tools, usage or exit codes (the source
-test holds). agent-workflows files one attempt unless a step says otherwise, so a run now sees such a step `failed`
-rather than `unsigned`; both are final, and both are offered a nudge and a fresh try (`agent-workflows/src/run.ts`).
+test holds).
+
+**What it changes in agent-workflows, left to that package.** This fix stayed in the engine. agent-workflows files one
+attempt unless a step says otherwise, so a step that goes quiet without its closeout now reads `failed` where it read
+`unsigned`. Both are final, and `wf decide` offers a nudge and a fresh try for either. They are not the same status,
+though, and four things change with the word (`agent-workflows/src/run.ts` as of `08bef91`, found in review):
+
+- the run's outcome is `failed`, not `blocked`: a failed step outranks an unsigned one (`run.ts:1625`);
+- the step drops out of `wf ls`'s "waiting on you", which names `unsigned` and not `failed` (`run.ts:1726`);
+- a nudged retry is told "The last try's session ended `failed` before it signed off" (`run.ts:1919`), not that it
+  gave no closeout, which is what it has to fix;
+- the `stepStatus` comment that says the engine settles such a session `succeeded` (`run.ts:345`) is no longer true.
+
+The engine records the difference: the attempt's `reason` is `unsigned`. If `stepStatus` read a failed task whose last
+attempt ended `unsigned` as `unsigned`, all four would stay as they were. → agent-workflows, small; the plan's queue
+should carry it.
 
 **Not measured.** How Claude Code itself ends a `--bg` session whose turn ends without the call. 2.1.271's bundle has a
 count of structured-output retries (`MAX_STRUCTURED_OUTPUT_RETRIES`) and an error for running out of them. If the harness

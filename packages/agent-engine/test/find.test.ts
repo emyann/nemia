@@ -150,7 +150,7 @@ test('a registration whose process has gone is not found, nor one whose pid anot
   });
 });
 
-test('a name no running session registered is not found — nor an interactive session, a file another user owns, or a file that names another pid', async () => {
+test('a name no running session registered is not found — nor an interactive session, a file another user owns, one that names another pid, a symlink, or one with no session id', async () => {
   const session = { name: `ae/t-${randomUUID().slice(0, 8)}/1`, sessionId: randomUUID() };
   assert.equal(await find(session.name), undefined, 'nothing registered under it');
   assert.equal(await Effect.runPromise(claudeOps({ sessionsDir: path.join(tmp('nowhere'), 'sessions') }).find!(session.name)), undefined, 'no sessions directory at all');
@@ -159,6 +159,22 @@ test('a name no running session registered is not found — nor an interactive s
   assert.equal(await find(session.name), undefined, 'an interactive session is never ours');
   register(session, process.pid, { pid: process.pid + 1 });
   assert.equal(await find(session.name), undefined, 'a file that names a pid other than the one it is named for');
+
+  // A session id that is no id: taken, `transcript` would read `''` for as long as the attempt runs, and never observe.
+  register(session, process.pid, { sessionId: '' });
+  assert.equal(await find(session.name), undefined, 'a registration whose session id is empty');
+  register(session, process.pid, { sessionId: undefined });
+  assert.equal(await find(session.name), undefined, 'a registration with no session id');
+
+  // A link in the registration's place, to a registration that would be found where it is: not followed.
+  const file = path.join(sessions, `${process.pid}.json`);
+  const elsewhere = path.join(tmp('elsewhere'), `${process.pid}.json`);
+  register(session);
+  fs.copyFileSync(file, elsewhere);
+  fs.rmSync(file);
+  fs.symlinkSync(elsewhere, file);
+  assert.equal(await find(session.name), undefined, 'a symlink, even to a good registration');
+  fs.rmSync(file);
   register(session);
   assert.equal(await find(session.name.replace(/\/1$/, '/2')), undefined, "the next attempt's name is not this attempt's");
   assert.equal(await claudeRegistered(sessions, session.name, { uid: (process.getuid?.() ?? 0) + 1 }), undefined, "a file another user owns is not this user's session");

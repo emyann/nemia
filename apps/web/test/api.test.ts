@@ -271,3 +271,30 @@ test("REFUSED: an ask the api refuses rejects with the api's words, verbatim; an
   globalThis.fetch = (async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' })) as typeof fetch;
   await assert.rejects(askTry('r-1', 'implement', { mode: 'nudge' }), (err: Error) => err.message === 'POST /api/runs/r-1/steps/implement/retry answered 502 Bad Gateway');
 });
+
+const { askRound } = await import('../src/lib/api.ts');
+
+test("a raise is posted as JSON beside the try's mode, or with the round's step, and resolves with what the api asked for; a refusal rejects with the package's words, verbatim, and an answer without the round says so", async (t) => {
+  const refusal = "--budget 4 is not above $4.25, what tokens's tries have cost: a try under it would read over budget again as soon as it ended. Give more than $4.25: wf retry r-1 tokens --budget <amount>.";
+  let answer = () => answered(202, { try: 3, file: '/store/runs/r-1.asks/retry-tokens-3', stopFirst: false });
+  const sent = starting(t, () => answer());
+  assert.deepEqual(await askTry('r-1', 'tokens', { mode: 'nudge', budget: 5 }), { try: 3, file: '/store/runs/r-1.asks/retry-tokens-3', stopFirst: false });
+  answer = () => answered(409, { error: refusal });
+  await assert.rejects(askTry('r-1', 'tokens', { mode: 'nudge', budget: 4 }), (err: Error) => err.message === refusal);
+
+  answer = () => answered(202, { step: 'review', round: 3, file: '/store/runs/r 1.asks/round-review-3' });
+  assert.deepEqual(await askRound('r 1', { step: 'review', budget: 3 }), { step: 'review', round: 3, file: '/store/runs/r 1.asks/round-review-3' });
+  const words = '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: wf round r-1 review --budget <amount>.';
+  answer = () => answered(409, { error: words });
+  await assert.rejects(askRound('r-1', { step: 'review', budget: 2 }), (err: Error) => err.message === words);
+  answer = () => answered(202, {});
+  await assert.rejects(askRound('r-1', { budget: 3 }), (err: Error) => /^POST \/api\/runs\/r-1\/round answered 202 +without the round it asked for/.test(err.message));
+
+  assert.deepEqual(sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]), [
+    ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'nudge', budget: 5 }],
+    ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'nudge', budget: 4 }],
+    ['/api/runs/r%201/round', 'POST', 'application/json', { step: 'review', budget: 3 }],
+    ['/api/runs/r-1/round', 'POST', 'application/json', { step: 'review', budget: 2 }],
+    ['/api/runs/r-1/round', 'POST', 'application/json', { budget: 3 }],
+  ]);
+});

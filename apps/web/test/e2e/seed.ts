@@ -1,5 +1,5 @@
 /**
- * The store `npm run e2e` serves: four fake runs, written the way `wf` and the engine write theirs.
+ * The store `npm run e2e` serves: five fake runs and the diamond's, written the way `wf` and the engine write theirs.
  *
  * FAKE has five steps in two lanes, frozen on the record as `wf start` freezes them, with the folder beside
  * it. `implement` signed off blocked, with its session's conversation on disk for the engine to read (SESSION),
@@ -235,6 +235,35 @@ export const HELD = {
   sessionId: '9c3e1d2a-7b4f-4e8a-b6d5-1f0a2c3b4d5e',
   /** What the harness wrote into the session last, word for word as Claude Code 2.1.270 wrote it that day. */
   line: 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute; if it keeps happening, close other Claude Code windows or sign in again with /login',
+} as const;
+
+/**
+ * A fifth run: what it cost. `tokens` has `budget: 3`, and its two tries — the second a person's nudge — cost $1.75 and $2.50, each refused by
+ * its check: `over budget $4.25 of $3`, raised with its try. `implement` has `budget: 2`, and `review` loops back to it: implement's two rounds
+ * cost $1.20 and $0.90, review's two sessions ran on Codex, which prices nothing, and review asked for a third round, which would file implement
+ * again past its cap — so both read `over budget`, raised with review's round. `palette` has `budget: 1`, and its one session cost $1.50 and
+ * signed off blocked with a question: `over budget $1.50 of $1`, answered with its raise. The run cost `≥$7.85`: review's sessions have no cost
+ * on them. Nothing of it moves, and it waits on you: finished, off the Factory's floor until finished runs are shown. Newer than every run but
+ * the diamond's.
+ */
+export const COSTLY = {
+  id: 'what-it-cost-e2e10',
+  title: 'What it cost',
+  steps: ['implement', 'review', 'tokens', 'palette'],
+  /** What the run cost, on its card, its row on Runs and its page's header: `≥`, since review's sessions were not priced. */
+  cost: '≥$7.85',
+  /** The step that signed off blocked past its budget, answered with its raise: its word, what it cost of its cap, its question, and where its raise starts. */
+  asks: { step: 'palette', status: 'over budget $1.50 of $1', of: '$1.50 of $1', needs: 'Warm colours for the dark theme, or cool ones?', startsAt: '2' },
+  /** The step over its own budget, raised with its try: its word, what its tries cost of its cap, and the amount its raise starts at. */
+  over: { step: 'tokens', status: 'over budget $4.25 of $3', of: '$4.25 of $3', startsAt: '5' },
+  /** A raise the package refuses: not above the $4.25 tokens' tries cost. */
+  refused: 4,
+  /** The loop held on implement's budget: its looping step, its word, the amount its round's raise starts at, and implement's own word. */
+  held: { step: 'review', status: 'over budget — implement $2.10 of $2', startsAt: '3', target: 'implement', targetStatus: 'over budget $2.10 of $2' },
+  /** What each try's session cost, on the timeline: implement's two rounds, review's two unpriced, and tokens' two tries. */
+  sessions: { implement: ['$1.20', '$0.90'], review: ['not measured', 'not measured'], tokens: ['$1.75', '$2.50'], palette: ['$1.50'] },
+  /** What each round of review's loop cost: implement's session and review's, which has no cost on it. */
+  rounds: ['≥$1.20', '≥$0.90'],
 } as const;
 
 /**
@@ -766,4 +795,88 @@ export function seed(root: string, now = Date.now()): void {
     { name: `ae/${SAYING.run}-${SAYING.step}/1`, sessionId: SAYING.sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: now - 2.5 * 60_000, pid: SAYING.pid },
   ]));
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${HELD.sessionId}.jsonl`), lines(heldConversation(ago)));
+
+  // COSTLY: tokens over its own budget, and review's loop held on implement's. Each session's attempt carries what the engine read of it —
+  // its cost, and the time its harness counted waiting on the model and running tools — except review's, on Codex, which prices nothing.
+  const costDir = path.join(root, 'workflow-cost');
+  write(path.join(costDir, 'implement.md'), '---\nharness: claude\nbudget: 2\n---\nImplement it.\n');
+  write(path.join(costDir, 'review.md'), '---\nharness: codex\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it, and say whether it needs another round.\n');
+  write(path.join(costDir, 'review.json'), `${JSON.stringify(again, null, 2)}\n`);
+  write(path.join(costDir, 'tokens.md'), '---\nharness: claude\nbudget: 3\ncheck: npm test\n---\nPick the colour tokens.\n');
+  write(path.join(costDir, 'palette.md'), '---\nharness: claude\nbudget: 1\n---\nPick the palette for the dark theme.\n');
+  const cost = (name: string) => `${COSTLY.id}-${name}`;
+  const costLane = path.join(root, 'worktrees', COSTLY.id, 'implement');
+  const tokensLane = path.join(root, 'worktrees', COSTLY.id, 'tokens');
+  const paletteLane = path.join(root, 'worktrees', COSTLY.id, 'palette');
+  write(path.join(root, 'runs', `${COSTLY.id}.json`), JSON.stringify({
+    id: COSTLY.id, repo: '/code/hkb-v2', workspace: '/code/hkb-v2', baseRef: '19c9365', branch: 'main', isolate: true,
+    brief: `${COSTLY.title}\n\nA fifth run seeded by npm run e2e: tokens' tries cost more than its budget, and review's loop would file implement again past its own.`,
+    workflowDir: costDir,
+    workflow: [
+      { name: 'implement', after: [], body: 'Implement it.', harness: 'claude', budget: 2 },
+      {
+        name: 'review', after: ['implement'], body: 'Review it, and say whether it needs another round.', harness: 'codex',
+        loop: 'implement', rounds: 3, output: { file: 'review.json', schema: again },
+      },
+      { name: 'tokens', after: [], body: 'Pick the colour tokens.', harness: 'claude', budget: 3, check: 'npm test' },
+      { name: 'palette', after: [], body: 'Pick the palette for the dark theme.', harness: 'claude', budget: 1 },
+    ],
+    createdAt: ago(1.5),
+    steps: {
+      implement: { taskId: cost('implement-2'), workspace: costLane, branch: `wf/${COSTLY.id}/implement`, tries: [{ taskId: cost('implement-1'), then: 'round' }] },
+      review: { taskId: cost('review-2'), workspace: costLane, branch: `wf/${COSTLY.id}/implement`, tries: [{ taskId: cost('review-1'), then: 'round' }] },
+      tokens: {
+        taskId: cost('tokens-try2'), workspace: tokensLane, branch: `wf/${COSTLY.id}/tokens`, check: { taskId: cost('tokens-try2-check') },
+        tries: [{ taskId: cost('tokens'), check: { taskId: cost('tokens-check') }, then: 'nudge' }],
+      },
+      palette: { taskId: cost('palette'), workspace: paletteLane, branch: `wf/${COSTLY.id}/palette` },
+    },
+  }, null, 2));
+  /** A session that ran once — filed, spawned and ended `at` minutes ago — and signed off with `closeout`, with the usage the engine read. */
+  const priced = (task: string, harness: string, cwd: string, brief: string, at: readonly [number, number, number], closeout: object, usage: object): void =>
+    write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
+      { kind: 'filed', at: ago(at[0]), brief, cwd, maxAttempts: 1, harness },
+      { kind: 'starting', at: ago(at[1]), attempt: 1 },
+      { kind: 'spawned', at: ago(at[1]), attempt: 1 },
+      { kind: 'ended', at: ago(at[2]), attempt: 1, sessionId: `ae/${task}/1`, observed: 'done', reason: 'harness', closeout, usage },
+      { kind: 'settled', at: ago(at[2]), outcome: 'succeeded' },
+    ]));
+  /** A check that ran to its end and exited 1, from `at[0]` to `at[1]` minutes ago: on the engine's record, and in the log its worker leaves. */
+  const refused = (task: string, cwd: string, at: readonly [number, number]): void => {
+    write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
+      { kind: 'filed', at: ago(at[0]), brief: JSON.stringify({ check: 'npm test', env: {} }), cwd, maxAttempts: 1, harness: 'check' },
+      { kind: 'starting', at: ago(at[0]), attempt: 1 },
+      { kind: 'spawned', at: ago(at[0]), attempt: 1 },
+      { kind: 'ended', at: ago(at[1]), attempt: 1, sessionId: `ae/${task}/1`, observed: 'failed', reason: 'harness', exitCode: 1 },
+      { kind: 'settled', at: ago(at[1]), outcome: 'failed' },
+    ]));
+    const name = `ae/${task}/1`;
+    const base = path.join(root, 'engine', 'runs', 'check', name.replace(/[^a-zA-Z0-9]+/g, '_'));
+    write(`${base}.json`, JSON.stringify({ name, state: 'done', pid: 0, heartbeatAt: ago(at[1]), logFile: `${base}.log`, exitCode: 1 }));
+    write(`${base}.log`, 'ok 1 - sky is a colour\nnot ok 2 - rose is a colour\n# tests 2\n# fail 1\n\n[wf check] exit 1\n');
+    write(path.join(root, 'checks', `${task}.stderr`), 'npm error Lifecycle script `test` failed with error:\nnpm error code 1\n');
+  };
+  const done = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], ...more });
+  const unpriced = { toolCalls: 12, inputTokens: 210_000, outputTokens: 3_100 };
+  priced(cost('implement-1'), 'claude', costLane, 'Implement it.', [1.49, 1.48, 1.35], done('Implemented it.'), {
+    turns: 22, toolCalls: 48, inputTokens: 1_840_000, outputTokens: 21_400, costUsd: 1.2, apiMs: 312_000, toolMs: 41_000,
+  });
+  priced(cost('review-1'), 'codex', costLane, 'Review it, and say whether it needs another round.', [1.35, 1.34, 1.25], done('Two findings.', { again: true }), unpriced);
+  // From round 2, a loop's target owes its answers to the findings it was handed: implement gives them, and signs off done.
+  priced(cost('implement-2'), 'claude', costLane, 'Implement it.', [1.25, 1.24, 1.1], done('Answered the review.', {
+    replies: [{ finding: 'apps/web/src/lib/cost.ts — a cost nobody measured reads $0.00', answer: 'fixed', why: 'It reads not measured now.' }],
+  }), { turns: 9, toolCalls: 17, inputTokens: 760_000, outputTokens: 8_900, costUsd: 0.9, apiMs: 118_000, toolMs: 12_000 });
+  priced(cost('review-2'), 'codex', costLane, 'Review it, and say whether it needs another round.', [1.1, 1.09, 1.0], done('One finding is still open.', { again: true }), unpriced);
+  priced(cost('tokens'), 'claude', tokensLane, 'Pick the colour tokens.', [1.49, 1.48, 1.3], done('Picked the colour tokens.'), {
+    turns: 14, toolCalls: 31, inputTokens: 1_120_000, outputTokens: 16_000, costUsd: 1.75, apiMs: 402_000, toolMs: 22_000,
+  });
+  refused(cost('tokens-check'), tokensLane, [1.3, 1.25]);
+  priced(cost('tokens-try2'), 'claude', tokensLane, 'Pick the colour tokens.', [1.24, 1.23, 1.0], done('Picked them again.'), {
+    turns: 18, toolCalls: 36, inputTokens: 1_530_000, outputTokens: 19_700, costUsd: 2.5, apiMs: 560_000, toolMs: 31_000,
+  });
+  refused(cost('tokens-try2-check'), tokensLane, [1.0, 0.95]);
+  // palette signed off blocked, having spent more than its cap to get there: a question for a person, and a budget to raise with the answer.
+  priced(cost('palette'), 'claude', paletteLane, 'Pick the palette for the dark theme.', [1.49, 1.48, 1.2], {
+    outcome: 'blocked', summary: 'Drafted a warm palette and a cool one, and cannot choose between them.', needs: COSTLY.asks.needs, artifacts: [],
+  }, { turns: 11, toolCalls: 19, inputTokens: 980_000, outputTokens: 12_300, costUsd: 1.5, apiMs: 290_000, toolMs: 9_000 });
 }

@@ -1,8 +1,8 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check as Done, ChevronRight, Copy } from 'lucide-react';
-import { askTry, decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RetryMode, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
-import { answersOf, askedSaid, type Answer } from '../lib/asks';
+import { askRound, askTry, decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RetryMode, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
+import { answersOf, askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
 import { Facts } from './Facts';
@@ -40,7 +40,7 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
         <h2 className="font-semibold">Decide</h2>
         <p className="text-xs text-neutral-500">
           What <code>wf decide {runId}</code> shows. The board runs none of its commands: copy one to run it yourself. An answer given
-          here asks for a try as <code>wf retry</code> does; each row says what the tick does with it.
+          here asks for a try as <code>wf retry</code> does, or a round as <code>wf round</code> does; each row says what the tick does with it.
         </p>
       </div>
       {children}
@@ -49,14 +49,22 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
 }
 
 /**
- * What there is to decide, in `wf decide`'s order: what each branch touched and the lesson line, the check-affecting
- * files in full, what the run consumed, and the commands — copyable, and none of them run from here. `offers` go first.
+ * What there is to decide, in `wf decide`'s order: the OVER BUDGET line where a step is held on its budget, what each branch touched and the
+ * lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run from
+ * here. `offers` go first.
  */
 export function DecideSection({ runId, decision, offers = null }: { runId: string; decision: Decidable; offers?: ReactNode }) {
-  const { touched, lesson, sensitive, total, commands } = decision;
+  const { touched, lesson, sensitive, total, cost, overBudget, commands } = decision;
   return (
     <DecideFrame runId={runId}>
       {offers}
+
+      {/* Why each step past its budget is held, as `wf decide` prints it first: its own amounts, or the step its loop's round would file. */}
+      {overBudget && (
+        <p data-over-budget className="rounded bg-amber-100 px-3 py-2 font-mono text-xs break-words text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+          {overBudget}
+        </p>
+      )}
 
       <div className="space-y-4">
         {touched.length ? (
@@ -70,8 +78,8 @@ export function DecideSection({ runId, decision, offers = null }: { runId: strin
       <InFull sensitive={sensitive} touched={touched} />
 
       <section aria-label="Used" className="space-y-1">
-        <h3 className="text-xs font-medium text-neutral-500">Used, over every step's current try</h3>
-        <Facts rows={[['used', total.used], ['cost', total.cost]]} />
+        <h3 className="text-xs font-medium text-neutral-500">Used, over every step's current try — and what every try of the run cost</h3>
+        <Facts rows={[['used', total.used], ['cost', total.cost], ['every try', cost]]} />
       </section>
 
       <Commands commands={commands} />
@@ -100,19 +108,19 @@ export function Offers({ runId, offers }: { runId: string; offers: readonly Answ
   return (
     <section aria-label="Answer" className="space-y-2">
       <h3 className="text-xs font-medium text-neutral-500">
-        Answer — each asks for a try as <code>wf retry {runId} &lt;step&gt;</code> does
+        Answer — each asks for a try as <code>wf retry {runId} &lt;step&gt;</code> does, or a round as <code>wf round</code> does
       </h3>
       <ul className="space-y-3">
-        {offers.map((offer) => (
-          <OfferRow key={offer.step} runId={runId} offer={offer} />
-        ))}
+        {offers.map((offer) =>
+          offer.kind === 'raise' ? <RaiseRow key={offer.step} runId={runId} offer={offer} /> : <OfferRow key={offer.step} runId={runId} offer={offer} />,
+        )}
       </ul>
     </section>
   );
 }
 
 /** What a step needs, as its row says it after its name. */
-function offerSaid(offer: Exclude<Answer, { kind: 'asked' }>): string {
+function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string {
   switch (offer.kind) {
     case 'answer':
       return offer.needs ? `asks: ${offer.needs}` : 'signed off blocked, and said nothing of what it needs';
@@ -126,7 +134,7 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' }>): string {
  * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the run is read again and the
  * row says what `wf ls` says: `try 2 asked (…) — the next tick files it`.
  */
-export function OfferRow({ runId, offer }: { runId: string; offer: Answer }) {
+export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answer, { kind: 'raise' }> }) {
   const [message, setMessage] = useState('');
   // A check that did not finish is run again first, as `wf decide` offers it: the run spent no retry on it.
   const [mode, setMode] = useState<RetryMode>(offer.kind === 'try-again' && offer.unfinished ? 'recheck' : 'nudge');
@@ -211,6 +219,144 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Answer }) {
   );
 }
 
+const AMOUNT =
+  'w-24 rounded border border-neutral-300 bg-white px-2 py-1 font-mono text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
+
+/**
+ * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes (`raise`):
+ * its word, with the amounts; a box for the cap to raise it to, started at the first whole dollar above what the package says it has to pass
+ * (`raiseTo`); and the button that asks — with its try, as `wf retry --budget` does, continuing its session or in a new one, or with its loop's
+ * round, as `wf round --budget` does. The box takes any amount: the package refuses one not above what was spent, and its sentence shows
+ * beside the box, verbatim, the amount still in it. Once the api has the ask, what the tick does with it, until the run is read again and the
+ * step's note says it.
+ *
+ * A try carries what an answer row's would, beside the raise. For a step that signed off blocked, its question and a box for the answer, which
+ * the button waits for — `wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it: once a try is asked, a second ask
+ * carrying the answer is refused as already asked. For any other, a box for anything to tell it. And where a check did not pass, its check
+ * again (`recheck`), which costs nothing and needs no raise — chosen first where it did not finish — with the amount and the box closed.
+ */
+export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answer, { kind: 'raise' }> }) {
+  const [amount, setAmount] = useState(() => String(raiseTo(offer.above)));
+  const [message, setMessage] = useState('');
+  const [mode, setMode] = useState<RetryMode>(offer.unfinished && offer.modes.includes('recheck') ? 'recheck' : 'nudge');
+  const field = useId();
+  const tried = useAsk(runId, offer.step, () => setMessage(''));
+  const rounded = useRound(runId);
+  const ask = offer.by === 'retry' ? tried : rounded;
+  const asks = offer.by === 'retry' && offer.own === 'blocked';
+  // A recheck files no session: it takes no budget, and `messageRefusal` refuses a message on one.
+  const rechecking = offer.by === 'retry' && mode === 'recheck';
+  const command = `wf ${offer.by} ${runId} ${offer.step} --budget <amount>${asks ? ' --message "<answer>"' : ''}`;
+
+  if (tried.isSuccess || rounded.isSuccess) {
+    return (
+      <li data-offer="asked" data-step={offer.step} className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
+        <strong>{offer.step}</strong>{' '}
+        <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
+          {tried.isSuccess ? askedSaid(tried.data) : rounded.isSuccess ? `round ${rounded.data.round} asked — the next tick files it` : null}
+        </span>
+      </li>
+    );
+  }
+
+  return (
+    <li data-offer="raise" data-step={offer.step} data-by={offer.by} className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
+      <p className="break-words">
+        <strong>{offer.step}</strong> <span className="font-mono text-xs">{offer.status}</span>
+      </p>
+      {asks && (
+        <p data-asks className="line-clamp-4 whitespace-pre-wrap break-words" title={offer.needs ?? undefined}>
+          {offer.needs ? `asks: ${offer.needs}` : 'signed off blocked, and said nothing of what it needs'}
+        </p>
+      )}
+      <p className="text-xs break-words text-neutral-600 dark:text-neutral-400">
+        The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
+        {offer.by === 'round' ? ", with its loop's next round" : ''}, as <code>{command}</code> raises it.
+        {offer.modes.includes('recheck') && ' Its check again costs nothing, and needs no raise.'}
+      </p>
+      <form
+        aria-label={`Raise ${offer.step}'s budget`}
+        className="space-y-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (offer.by === 'round') {
+            // As typed: an amount the package refuses is refused in its words, beside the box — and an empty box sends none, which it refuses too.
+            rounded.mutate({ step: offer.step, ...(amount.trim() === '' ? {} : { budget: Number(amount) }) });
+          } else if (rechecking) {
+            tried.mutate({ mode: 'recheck' });
+          } else {
+            // An answer goes as it was typed, as `--message` takes it; something to tell a try is optional, and none when nothing was written.
+            const said = asks || message.trim() ? { message } : {};
+            tried.mutate({ mode, ...(amount.trim() === '' ? {} : { budget: Number(amount) }), ...said });
+          }
+        }}
+      >
+        {offer.by === 'retry' && (
+          <>
+            <label htmlFor={`${field}-message`} className="sr-only">
+              {asks ? `Your answer to ${offer.step}` : `What to tell ${offer.step}, if anything`}
+            </label>
+            <textarea
+              id={`${field}-message`}
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              rows={asks ? 3 : 2}
+              disabled={rechecking}
+              placeholder={
+                rechecking
+                  ? 'A recheck runs the check again and files no session: there is nobody to tell.'
+                  : asks
+                    ? 'Your answer: the next try is told it, under “Your answer”.'
+                    : 'Anything to tell it (optional): the next try is told it.'
+              }
+              className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
+            />
+          </>
+        )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <label htmlFor={field} className="flex items-center gap-1 text-xs">
+            <span className="sr-only">{`The cap to raise ${offer.step} to, in dollars`}</span>
+            <span aria-hidden className="font-mono">$</span>
+            <input
+              id={field}
+              type="number"
+              step="any"
+              inputMode="decimal"
+              value={amount}
+              disabled={rechecking}
+              onChange={(event) => setAmount(event.target.value)}
+              className={cn(AMOUNT, 'disabled:cursor-not-allowed disabled:opacity-50')}
+            />
+          </label>
+          <button type="submit" disabled={ask.isPending || (asks && !message.trim())} className={BUTTON}>
+            {ask.isPending
+              ? 'Asking…'
+              : offer.by === 'round'
+                ? 'Raise the budget and go round again'
+                : rechecking
+                  ? 'Run its check again'
+                  : asks
+                    ? 'Raise the budget and answer'
+                    : 'Raise the budget and try again'}
+          </button>
+          {offer.by === 'retry' && (
+            <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              <legend className="sr-only">How to try {offer.step} again</legend>
+              {offer.modes.map((m) => (
+                <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                  <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
+                  {MODES[m]} <code className="text-neutral-500">--{m}</code>
+                </label>
+              ))}
+            </fieldset>
+          )}
+        </div>
+      </form>
+      {ask.isError && <Refusal error={ask.error} />}
+    </li>
+  );
+}
+
 /**
  * Continue a session the harness blocked, from the banner beside what it said last, as `wf retry` continues it: a nudge — with something to
  * tell it, if you like — which the package's `retry()` takes for such a step, and the tick honours by stopping the session, then filing the
@@ -268,10 +414,22 @@ export function Continue({ runId, step }: { runId: string; step: string }) {
 function useAsk(runId: string, step: string, onAsked: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (how: { mode: RetryMode; message?: string }) => askTry(runId, step, how),
+    mutationFn: (how: { mode: RetryMode; message?: string; budget?: number }) => askTry(runId, step, how),
     onSuccess: () => {
       onAsked();
       // The run as the api has it now: the step's note says the try is asked, and the step waits on nobody.
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+    },
+  });
+}
+
+/** An ask for another round of a run's loop through the api (`askRound`), and the run read again once the api has it. */
+function useRound(runId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (how: { step?: string; budget?: number }) => askRound(runId, how),
+    onSuccess: () => {
+      // The run as the api has it now: the looping step's note says the round is asked, and the loop waits on nobody.
       void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
     },
   });

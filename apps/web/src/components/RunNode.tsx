@@ -7,6 +7,7 @@ import { Card } from '@/components/ui/card';
 import { decisionQuery, type RunSummary } from '@/lib/api';
 import { needLine, needsOf } from '@/lib/asks';
 import { duration } from '@/lib/canvas';
+import { spentTitle } from '@/lib/cost';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
 import { repoName, titleOf, waitsOnYou } from '@/lib/factory';
 import { useNow } from '@/lib/useNow';
@@ -128,9 +129,17 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
       )}
 
       <div className="flex min-h-6 items-center justify-between gap-2 border-t px-3 pt-2">
-        <time dateTime={run.createdAt} title={new Date(run.createdAt).toLocaleString()} className="font-mono text-[11px] text-muted-foreground">
-          {finished ? `started ${since} ago` : run.waiting ? `waiting for ${since}` : `${since} since it started`}
-        </time>
+        <span className="flex min-w-0 items-baseline gap-1.5 font-mono text-[11px] text-muted-foreground">
+          <time dateTime={run.createdAt} title={new Date(run.createdAt).toLocaleString()} className="truncate">
+            {finished ? `started ${since} ago` : run.waiting ? `waiting for ${since}` : `${since} since it started`}
+          </time>
+          {/* What it has cost, beside its age, once a cost was measured: `≥` where an ended attempt has none on it. */}
+          {run.cost && (
+            <span data-cost title={spentTitle(run.cost, "the run's tries")} className="shrink-0 text-foreground">
+              · {run.cost.said}
+            </span>
+          )}
+        </span>
         <span className="flex gap-1">
           {waitsOnYou(run) && (
             <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>

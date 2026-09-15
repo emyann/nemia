@@ -23,17 +23,17 @@ const LOOP_ROOM = 70;
 export function unstartedRun(workflow: WorkflowListing): RunDetail {
   return {
     id: `${workflow.from}:${workflow.name}`, brief: '', repo: '', workflowDir: workflow.dir, baseRef: '', branch: '', isolate: true,
-    createdAt: '', cancelledAt: null, after: [], waiting: null, status: 'running', moving: false, waitingOnYou: [], warning: null,
+    createdAt: '', cancelledAt: null, after: [], waiting: null, status: 'running', moving: false, cost: null, waitingOnYou: [], warning: null,
     graph: workflow.graph,
     steps: workflow.steps.map(({ name }) => ({
       name, spec: null, filed: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', note: null,
       needs: null, blockedByHarness: false, lastLine: null, said: [], asked: null,
       closeout: null, check: null, attempts: { count: 0, latest: null },
-      used: null,
+      used: null, spent: null, budget: null, raise: null,
       tries: [{ try: 1, round: 1, then: null, current: true, taskId: null, note: null, status: 'waiting', attempts: { count: 0, latest: null }, check: null, closeout: null, answer: null }],
       timeline: [],
     })),
-    timeline: { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } },
+    timeline: { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known', cost: null } },
   };
 }
 

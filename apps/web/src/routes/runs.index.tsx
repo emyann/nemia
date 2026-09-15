@@ -3,6 +3,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { StatusChip } from '../components/StatusChip';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runsQuery, type RunSummary } from '../lib/api';
+import { spentTitle } from '../lib/cost';
 import { titleOf, waitsOnYou } from '../lib/factory';
 
 export const Route = createFileRoute('/runs/')({
@@ -69,6 +70,12 @@ function RunRow({ run }: { run: RunSummary }) {
         <time className="text-xs text-neutral-500" dateTime={run.createdAt}>
           {new Date(run.createdAt).toLocaleString()}
         </time>
+        {/* What it has cost, as `wf ls` puts it on the run's line, once a cost was measured. */}
+        {run.cost && (
+          <span data-cost title={spentTitle(run.cost, "the run's tries")} className="font-mono text-xs">
+            {run.cost.said}
+          </span>
+        )}
         <WorkflowLink dir={run.workflowDir} />
       </div>
     </li>

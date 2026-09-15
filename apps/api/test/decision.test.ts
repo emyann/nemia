@@ -119,7 +119,7 @@ writeRun({
 test('a finished run: what its result branch touched, the lesson, the check-affecting diffs cut per file, what each step consumed, and the commands', async () => {
   const { status, body } = await decisionOf('r-d1');
   assert.equal(status, 200);
-  assert.deepEqual(Object.keys(body), ['touched', 'lesson', 'sensitive', 'used', 'total', 'commands']);
+  assert.deepEqual(Object.keys(body), ['touched', 'lesson', 'sensitive', 'used', 'total', 'cost', 'overBudget', 'commands']);
 
   // The package and the root, each once, with the files an agent reads and those a check is decided by named.
   assert.equal(body.touched.length, 1);
@@ -151,14 +151,18 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
 
   // `wf decide`'s words beside each check: a count nobody measured says so, and so does the total that one step lacks.
   assert.deepEqual(body.used, {
-    implement: { usage: { turns: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 }, used: '12 turns · 30 tool calls · 112k in · 6.35k out', cost: 'not measured' },
-    review: { usage: { toolCalls: 4, inputTokens: 8_000, outputTokens: 650, costUsd: 0.004 }, used: 'turns not measured · 4 tool calls · 8k in · 650 out', cost: '$0.004' },
+    implement: { usage: { turns: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 }, used: '12 turns · 30 tool calls · 112k in · 6.35k out', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
+    review: { usage: { toolCalls: 4, inputTokens: 8_000, outputTokens: 650, costUsd: 0.004 }, used: 'turns not measured · 4 tool calls · 8k in · 650 out', cost: '$0.004', costUsd: 0.004, apiMs: null, toolMs: null },
   });
   assert.deepEqual(body.total, {
     usage: { toolCalls: 34, inputTokens: 120_000, outputTokens: 7_000 },
     used: 'turns not measured · 34 tool calls · 120k in · 7k out',
     cost: 'not measured',
+    costUsd: null, apiMs: null, toolMs: null,
   });
+  // The run's cost after its steps, as `wf decide` prints it: review's session was priced, implement's was not. And no step held on a budget.
+  assert.equal(body.cost, 'run $0.004 measured · 1 attempt not measured');
+  assert.equal(body.overBudget, null);
 
   // Printed, never run: the branch is still where it was, and main has not moved.
   assert.deepEqual(body.commands, [
@@ -179,7 +183,7 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
   const detail = await (await app.request('/api/runs/r-d2')).json();
   assert.deepEqual([detail.status, detail.waitingOnYou], ['running', []]);
   // A step not filed has consumed nothing, which is not `not measured`.
-  assert.deepEqual(detail.steps.map((s: { used: unknown }) => s.used), [{ usage: null, used: 'not measured', cost: 'not measured' }, null]);
+  assert.deepEqual(detail.steps.map((s: { used: unknown }) => s.used), [{ usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null }, null]);
 
   const before = gitCount();
   assert.deepEqual(await decisionOf('r-d2'), { status: 200, body: { running: true } });

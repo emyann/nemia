@@ -4,7 +4,7 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Artifacts } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { NeedsBanner } from '../components/Needs';
-import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
+import { Check, code, Facts, specRows, spentRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
@@ -12,6 +12,7 @@ import { Timeline } from '../components/Timeline';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runQuery, type RunDetail } from '../lib/api';
 import { answersOf } from '../lib/asks';
+import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
 
 export const Route = createFileRoute('/runs/$runId')({
@@ -59,7 +60,16 @@ function Run({ run }: { run: RunDetail }) {
 
       <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <h1 className="font-mono text-sm text-neutral-500">{run.id}</h1>
-        <WorkflowLink dir={run.workflowDir} />
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          {/* What the run has cost, every step's tries, once a cost was measured: `≥` where an ended attempt has none on it. */}
+          {run.cost && (
+            <p data-run-cost title={spentTitle(run.cost, "the run's tries")} className="text-sm">
+              <span className="text-neutral-500">cost </span>
+              <span className="font-mono">{run.cost.said}</span>
+            </p>
+          )}
+          <WorkflowLink dir={run.workflowDir} />
+        </div>
       </header>
 
       {/* Between the banner and the canvas, for a run with something to decide — never while it runs — an answer to give, or a try a person
@@ -124,6 +134,8 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
           // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0.
           ['used', step.used?.used],
           ['cost', step.used?.cost],
+          // What every try has cost together, and of its cap where it has one: red once past it.
+          ...spentRows(step),
         ]}
       />
 

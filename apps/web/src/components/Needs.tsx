@@ -15,8 +15,8 @@ export function NeedsBanner({ run }: { run: RunDetail }) {
     <section aria-label="Waiting on you" className="space-y-1.5 rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
       {run.waitingOnYou.length > 0 && (
         <p>
-          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, refused by its check, or out of
-          rounds —{' '}<code>wf decide {run.id}</code>
+          Waiting on you: <strong>{run.waitingOnYou.join(', ')}</strong> — signed off blocked, unsigned, refused by its check, out of
+          rounds, or past its budget —{' '}<code>wf decide {run.id}</code>
         </p>
       )}
       {needs.length > 0 && (

@@ -259,6 +259,14 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
   step's closeout: the run's artifacts hold the hand probe (`say-probe.md`, busy and idle sessions, and
   `say-blocked-probe.log`, issue 16), not the live test's own log.
 
+- **A spend cap, and a `--bg` session's cost** (engine `26020c1`, `9d075f7`). `test/live.test.ts` on Claude Code 2.1.272,
+  2026-09-15, `--model haiku`, told to read a 2000-line file fifty lines a call. On `claude-detached` at a $0.01 cap, with
+  `maxAttempts: 2` and `resume: always`, both attempts ended `failed`, reason `budget`, exit 1, at $0.0212 and $0.0154, and
+  the second did not continue the first. The same brief as a `claude --bg` session given `--max-budget-usd 0.01` (through
+  the Effect door) made 40 tool calls, ended `done` and settled `succeeded`, and its attempt recorded $0.3439, 125.6 s of API
+  time and 247 ms of tool time, read once its release had stopped it (issues 17, 18). The first version of this brief —
+  read one short file forty times — was declined by haiku as a waste, which Claude Code listed `blocked`.
+
 ## Verified by tests, not by a live run
 
 - **`say`'s refusals and the inbox's guards.** A fake `claude` that keeps a registry, a real Unix socket as
@@ -344,6 +352,14 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 - **Usage from a transcript** (engine `4db1213`). Counting a response once by its id, and counting
   only from the registry's `startedAt`, were measured on real transcripts, two of them resumed; no live
   attempt has recorded its usage end to end yet.
+- **An attempt's cost, and a spend cap** (engine `9d075f7`, `26020c1`). The `cost-state` reading was written against the
+  `--bg` transcripts on this machine (2.1.246 to 2.1.272), and is checked on lines shaped as they are — among them one
+  session continued twice, with its real totals: $28.3161, $43.0383 and $47.2087 read as its attempts' own $28.3161,
+  $14.7222 and $4.1704. The release that reads it is checked with a fake `claude` whose `stop` writes the pair, at shipped
+  defaults (`test/release.test.ts`); a `claude -p` stopped at its cap, and the flag reaching both Claude runners on a first
+  attempt and a retry, with fake `claude`s (`test/budget.test.ts`). Every new guard and refusal was taken out once, and a
+  test failed. Not measured: a `hasUnknownModelCost` of `true` — none of the 400 transcripts last written here has one —
+  and a resumed session's cost recorded by the engine end to end.
 
 ## Open questions
 

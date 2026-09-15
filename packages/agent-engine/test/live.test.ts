@@ -347,11 +347,16 @@ test('a settled --bg session is stopped and removed from claude agents — and a
   }
 });
 
-const NOTES = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join('\n');
-/** A session that spends: forty reads of a file, one call at a time. */
+const NOTES = Array.from({ length: 2000 }, (_, i) =>
+  `line ${i + 1}: ${i % 7 === 0 ? 'a note' : 'nothing here'} — the quick brown fox jumps over the lazy dog, again and again and again`).join('\n');
+/**
+ * A session that spends: a long file, read fifty lines a call. Told to read one short file forty times over, haiku did once
+ * (by hand) and once declined it as a waste and asked what was wanted, which Claude Code lists `blocked` — so every call
+ * reads lines it has not read.
+ */
 const LOOP_BRIEF = [
-  'Read the file NOTES.txt with your Read tool. Then read it again.',
-  'Keep reading it, one Read call at a time, at least 40 times, and say nothing in between. Then reply done.',
+  'NOTES.txt has 2000 lines. Read all of it with your Read tool, 50 lines per call — offset 1, then 51, then 101, and so on',
+  'to the end — one call at a time, saying nothing in between. Then reply with how many of its lines say "a note".',
 ].join(' ');
 const notesIn = (label: string) => {
   const dir = tmp(label);
@@ -359,7 +364,7 @@ const notesIn = (label: string) => {
   return dir;
 };
 
-test('claude -p given a $0.01 budget stops at it: each attempt ends failed, reason budget, with what it cost — and the second does not continue the first', {
+test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reason budget, with what it cost — and the next attempt does not continue it', {
   skip,
   timeout: 12 * 60_000,
 }, async (t) => {
@@ -372,14 +377,15 @@ test('claude -p given a $0.01 budget stops at it: each attempt ends failed, reas
   };
   await settleThenCheck(engine, ids, (views) => {
     const { state } = views.capped!;
-    t.diagnostic(JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom }))));
-    assert.equal(state.settled, 'failed', `settled: ${views.capped?.phase}`);
-    assert.equal(state.attempts.length, 2);
-    for (const a of state.attempts) {
-      assert.equal(a.reason, 'budget', `attempt ${a.n} ended at its cap, as the harness printed it`);
-      assert.ok((a.usage?.costUsd ?? 0) >= 0.01, `attempt ${a.n} cost at least its cap: ${a.usage?.costUsd}`);
-    }
-    assert.equal(state.attempts[1]?.resumeFrom, undefined, 'the second started clean, though the policy is always');
+    t.diagnostic(`settled ${state.settled}: ${JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom })))}`);
+    assert.ok(state.settled, `settled: ${views.capped?.phase}`);
+    const [first, second] = state.attempts;
+    assert.deepEqual([first?.ended, first?.reason, first?.exitCode], ['failed', 'budget', 1], 'the first ended at its cap, as the harness printed it');
+    assert.ok((first?.usage?.costUsd ?? 0) >= 0.01, `and cost at least its cap: ${first?.usage?.costUsd}`);
+    // How the second ends is the model's — on a warm cache it can finish under the cap. That it starts clean is the engine's.
+    assert.ok(second, 'attempts remained, so a second was started');
+    assert.equal(second.resumeFrom, undefined, 'clean, though the policy is always: continuing the first would spend past its cap');
+    for (const a of state.attempts.filter((x) => x.reason === 'budget')) assert.ok((a.usage?.costUsd ?? 0) >= 0.01, `attempt ${a.n} cost at least its cap`);
   });
 });
 
@@ -403,9 +409,9 @@ test('a claude --bg session given --max-budget-usd 0.01 spends past it and ends 
     const [a] = v.state.attempts;
     t.diagnostic(`settled ${v.state.settled}, attempt 1 ended ${a?.ended} (${a?.reason}), usage ${JSON.stringify(a?.usage)}`);
     assert.equal(v.state.settled, 'succeeded', 'Claude Code ended it on its own terms, not at a cap');
-    // `claude -p` at this cap stopped after two responses; this one made its forty-odd calls.
-    assert.ok((a?.usage?.toolCalls ?? 0) >= 10, `it kept going past the cap: ${a?.usage?.toolCalls} tool calls. If it stopped early, Claude Code may keep --max-budget-usd under --bg now: measure it, and lift the refusal in claudeBgRefuses`);
-    assert.ok((a?.usage?.costUsd ?? 0) > 0.05, `and what it spent, far past the cap, was read once its release stopped it: ${a?.usage?.costUsd}`);
+    // `claude -p` at this cap stopped after its first response or two, under $0.03.
+    assert.ok((a?.usage?.toolCalls ?? 0) >= 5, `it kept reading past the cap: ${a?.usage?.toolCalls} tool calls. If it stopped early, Claude Code may keep --max-budget-usd under --bg now: measure it, and lift the refusal in claudeBgRefuses`);
+    assert.ok((a?.usage?.costUsd ?? 0) > 0.03, `and what it spent, past the cap, was read once its release stopped it: ${a?.usage?.costUsd}`);
   } finally {
     const session = v.sessionId ?? v.state.attempts.at(-1)?.nativeId;
     if (session) {

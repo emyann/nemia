@@ -28,7 +28,7 @@ export function Timeline({ run }: { run: RunDetail }) {
         <table className="w-full text-left text-xs tabular-nums">
           <thead className="bg-neutral-50 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
             <tr>
-              {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'used', 'cost'].map((heading) => (
+              {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'cost', 'used'].map((heading) => (
                 <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">{heading}</th>
               ))}
             </tr>
@@ -80,8 +80,9 @@ function SpanRow({ step, label, task, span, used, cost }: { step: string; label:
           <td className={CELL}>{instant(span.endedAt, span.at === 'running' ? 'no end yet' : '—')}</td>
           <td data-cell="queued" className={`${CELL} font-mono`}>{span.queued}</td>
           <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-sky-700 dark:text-sky-400' : ''}`}>{span.ran}</td>
-          <td data-cell="used" className={`${CELL} font-mono text-neutral-500`}>{used ?? ''}</td>
+          {/* Before what it used, which runs long: a cost is a few characters, and in view without scrolling the table. */}
           <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-neutral-500' : ''}`}>{cost ?? ''}</td>
+          <td data-cell="used" className={`${CELL} font-mono text-neutral-500`}>{used ?? ''}</td>
         </>
       )}
     </tr>
@@ -97,12 +98,12 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
       <td colSpan={3} data-cell="wall" className={`${CELL} font-mono`}>wall {total.wall}</td>
       <td data-cell="queued" className={`${CELL} font-mono`}>{total.queued}</td>
       <td data-cell="ran" className={`${CELL} font-mono`}>{total.ran}</td>
-      <td className={CELL} />
       {total.cost ? (
         <td data-cell="cost" title={spentTitle(total.cost, what)} className={`${CELL} font-mono`}>{total.cost.said}</td>
       ) : (
         <td data-cell="cost" className={`${CELL} font-mono text-neutral-500`}>not measured</td>
       )}
+      <td className={CELL} />
     </tr>
   );
 }

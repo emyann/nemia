@@ -1182,7 +1182,8 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
     },
   };
   const html = renderToStaticMarkup(createElement(Timeline, { run }));
-  assert.match(html, /<th scope="col"[^>]*>cost<\/th><\/tr><\/thead>/);
+  // Before `used`, which runs long: in view without scrolling the table.
+  assert.match(html, /<th scope="col"[^>]*>ran<\/th><th scope="col"[^>]*>cost<\/th><th scope="col"[^>]*>used<\/th><\/tr><\/thead>/);
   const rows = [...html.matchAll(/<tr ([^>]*)>([\s\S]*?)<\/tr>/g)].map((m) => [
     /data-task="(\w+)"/.exec(m[1]!)?.[1] ?? /data-total="([^"]+)"/.exec(m[1]!)?.[1],
     /<td data-cell="cost"[^>]*>([^<]*)<\/td>/.exec(m[2]!)?.[1],

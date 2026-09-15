@@ -681,12 +681,6 @@ owner is not mid-run.
 
 **Open** — what is still to do, oldest first; each names its owner.
 
-- **apps/api tests hit the live registry.** Every `e.view` runs `claude agents --json` against this
-  machine; under parallel turbo the api test process dies with "Promise resolution is still pending
-  but the event loop has already resolved" while other packages' tests run beside it (seen at C's
-  merge, twice; serial runs pass every time, ~23 s). The api's `engine()` should take a fake
-  harness under test (`createEngine({ harnesses })` accepts a `PromiseRunner`); until then verify
-  merges with `npx turbo run test --concurrency=1`. → the next apps package.
 - **the settings' prefix allows reach the build and the e2e by other names (D1's round-2 review, 2026-09-14):** the
   reviewers are denied `Bash(npm run build)` and `Bash(npm run e2e)` by machinery now, but `.claude/settings.json`
   allows `Bash(npx turbo run test:*)` and `Bash(node --test:*)`, so `npx turbo run test build` builds the web app and
@@ -694,6 +688,7 @@ owner is not mid-run.
   (`node --test` takes a glob). The briefs name both, which is prose. Narrow the allows, or drop them for `npm test`
   and `cd packages/<p> && npm test`. → settings, by hand (§6 item 20).
   *W5, `d69a5fd`.*
+
 - **a login refresh race blocks concurrent sessions (2026-09-13, B3 and I):** both `implement` sessions
   stopped within two minutes of each other on *"Could not refresh your login because another Claude Code
   process is refreshing it (or exited mid-refresh) · Try again in a minute"* — an OAuth refresh raced between
@@ -703,14 +698,25 @@ owner is not mid-run.
   step is not final. A tick that recognises this one message on a `blocked` session and resumes it is the
   fix in the run; the harness's is a shared refresh lock across processes. → agent-workflows, small; and
   a Claude Code report.
+
 ### Settled
 
 Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+
+- **apps/api tests hit the live registry.** Every `e.view` runs `claude agents --json` against this
+  machine; under parallel turbo the api test process dies with "Promise resolution is still pending
+  but the event loop has already resolved" while other packages' tests run beside it (seen at C's
+  merge, twice; serial runs pass every time, ~23 s). The api's `engine()` should take a fake
+  harness under test (`createEngine({ harnesses })` accepts a `PromiseRunner`); until then verify
+  merges with `npx turbo run test --concurrency=1`. → the next apps package.
+  *B9, `26ebf0e`.*
 
 - **E6's usage assertion cannot tell the retry's count from the first try's (E6's review):**
   `packages/agent-engine/test/resume.test.ts:134` expects the same usage the first try recorded, so the
   refusal rests on the view assertion alone; have the retry write a different number of responses. → the
   next engine run, with anything else that opens `resume.test.ts`.
+  *E7, `9709867`.*
+
 - **where a run's hour goes is not on the board (operator, 2026-09-13):** measured off the engine journals
   for B4 (two rounds, 40 min wall): implement 19m42s + 5m35s, its checks 58s + 57s, reviews 6m10s + 3m24s;
   sessions and checks 36m47s, slot waits 1m13s, ticks and worktrees 1m56s. S2's implement alone 39m11s
@@ -720,28 +726,34 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   `effort` nor `tools`, so a person cannot see the effort a step runs at (none set here → the harness
   default). A **timeline** on the run page and in `wf decide` — per try and per check: filed, spawned,
   ended, queue and run time, `used` — and `effort`/`tools` in the spec rows. → apps + `wf decide`, small.
+  *B9, `26ebf0e`.*
+
 - **the session stream after a reconnect (S2's round-2 review):** only a `readable` event clears the retry
   error on the page, and a fresh server stream never sends one, so after an api restart the red "reading
   again" line stays until the task settles while events flow. Clear it on the EventSource `open`. → apps,
   with B7. Also from S2, measured: one open stream on a running Claude step is two `claude agents` calls a
   second (~0.22 s each); the engine's open-issues names the fix (a runner verb that finds one session).
+  *B9, `26ebf0e`.*
+
 - **the card's touched line double-counts a fan-out (B6's round-2 review):** `touchedSummary` sums `+a −r` over
   every result branch, and a follower in its own worktree starts from its parent's branch, so a parent's lines
   appear once per result branch; `wf decide` prints each branch on its own line and never sums. Count each
   file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
   last value only (`indexOf` on parsed objects is −1). → apps, with B7.
-  *E7, `9709867`.*
+  *B9, `26ebf0e`.*
 
 - **agent-workflows and the board (step order):** `run.steps` is keyed in the folder's file order —
   alphabetical — so `wf ls` and the board show `implement · respond · review` for a workflow that
   runs implement → review → respond. Order steps by `after` (a topological sort in `workflow.ts`,
   applied at `wf start`) so a row reads as the DAG runs. → G, with the decider screen.
+
 - **the artifacts directory and Codex (U1's review):** every brief now names
   `runs/<id>/artifacts/<step>/`, and a Codex step in `workspace-write` cannot write there (only the
   worktree and tmp; the engine passes no `--add-dir`). Latent while the reviewer is Opus. The fix is
   hkb's `exports`: a step lists a relative path under `artifacts` and the run *collects* it into the
   directory at hand-off, before the check — then no step needs to write outside its workspace. → with R.
   *W5, `d69a5fd`.*
+
 - **a stale ask on a harness-blocked step that resumes by itself (W4's review, 2026-09-14):** `wf retry` on a step
   whose session the harness blocked is due only while the engine says `needs-human`; if the session starts working
   again before a tick stops it (a cross-session nudge, no `wf up`), the ask is neither due nor spent — `wf ls` shows
@@ -749,30 +761,35 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   no `stopRequested` tells it apart. Stop the session anyway, or name it in `wf ls`/`wf decide`. → agent-workflows,
   small (§6 item 24).
   *W5, `d69a5fd`.*
+
 - **steering by message leaves no trace on the run (F2's review, finding 2):** the operator widened
   a step's scope and added an ask through cross-session messages; the run's record shows only two
   commit messages and a closeout, and the reviewer rightly could not tell an authorised change from
   a step overstepping. A mid-flight instruction to a step should be written on the run — an
   `asks/` file the tick composes into the record and `wf decide` prints — the same one-writer
   shape as `.cancelled`. → with F's ask files.
+
 - **inputs for a step:** a `wf` brief is text and the engine's task carries only a brief and a cwd;
   a worker can read an image or a file from disk but nothing tells it where. Reference screenshots
   for K were copied to `~/.agent-workflows/inputs/canvas/` and their paths messaged to the running
   session by hand. A small convention would do: `wf start --input <file>` copies into
   `runs/<id>/inputs/` and every brief gains one line naming the directory. → with J.
   *W5, `d69a5fd`.*
+
 - **`radius` takes the base's `workspaces` globs as written (G's round-2 review):** `./packages/*` yields a
   regexp that never matches `packages/x`, so every package's changes fall into one `packages` group and
   `./packages/*/docs/` never counts a lesson; `packages/**` would count `packages/x/src/docs/` again. This
   repo uses `packages/*` and `apps/*`, so unaffected. Strip a leading `./` when the workspaces are read,
   refuse or note `**`, and a radius test with `['./packages/*']`. → agent-workflows, small.
   *W5, `d69a5fd`.*
+
 - **workers could not search the web (S3's plan step, 2026-09-14):** its risks said WebSearch and `claude agents
   --help` were denied to it. Measured with `claude -p` from this checkout: `WebSearch` denied in `dontAsk` and in
   `auto` without an allow rule, `WebFetch` of code.claude.com allowed in both. `.claude/settings.json` now allows
   `WebSearch` and `WebFetch` (a bare rule each); re-measured allowed in `dontAsk`. The operator's own facts about
   the attach primitive and the inbox socket went to S3's implement by message (no trace on the run — `say` is
   what S3 builds). → settings, done by hand (§6 item 26).
+
 - **`decision` says shipped for a branch with nothing past its base (P1's round-3 review, 2026-09-14):** a
   result branch is cut at the run's base, so a terminal step that ended failed, blocked or unsigned with nothing
   committed leaves its branch on the base, and `decision` calls the run shipped — `wf decide` hides the failure, and
@@ -781,6 +798,7 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   → agent-workflows, W4 (§6 item 21).
   *W4, `406a510`: `isShipped` says which yes it is (`Shipped`), and `decision` takes `'unchanged'` only for a run whose
   steps all succeeded.*
+
 - **`needs-human` on the board says nothing about what is needed (operator, 2026-09-14, on Q1):** the card and the
   node show the chip and nothing else. Two cases hide behind it. A step that signed off `blocked` has its question in
   `needs`, which only the inspector's closeout shows (`Needs:`), two clicks away — the card, the node and a banner on
@@ -792,6 +810,7 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   *Q2, `1e471b7`: the question is on the card, the node and a banner; a harness-blocked session is named with its
   last line; the answer box posts to the package's `retry()`. B8, `8871981`: the banner's Continue stops the blocked
   session and files the nudge, through the package (W4).*
+
 - **agent-engine ↔ agent-workflows (two copies of the harness vocabulary):** B resolved the codex
   mapping (`sandboxOf` in `runner-detached.ts` honours `read-only`, `danger-full-access` and
   `bypassPermissions`). What remains is that A's `PERMISSION_MODES` in `workflow.ts` is a copy of
@@ -801,29 +820,36 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   may not import the engine (`runner.ts` is the only importer). Either the run validates modes
   through `e.file()`'s own refusal and the parser stops copying, or a test in agent-workflows pins
   the copy to the engine's exports. → I, with the `tools:`/`effort:` pass-through.
+
 - **agent-workflows (`list`, `runner.ts`):** `wf ls` prints `pending` for a task the engine has no
   record of; `phaseOfView` already draws the `unknown` line for the DAG, `listing`'s phase word does
   not. The board (run W) words it `unknown` itself and tests that it matches `list` wherever `list`
   is right. Fix in `list`, then delete the api's copy of the rule. Also: `list` throws when the
   workflow folder is gone, so a consumer must catch it; and each `view` is a `claude agents` call
   (~300 ms), so a consumer reads each task once per request. → F or G, whoever touches `runner.ts` first.
+
 - **the plan:** count fields need their least value stated (A's review); a "definition of done" that
   lists several things in one sentence gets read as one rule.
+
 - **agent-engine (`fold`, the `ended` case):** the `ended` event carries `at` and `fold` drops it, so
   `Attempt` has no end time and the board cannot say how long a finished attempt ran (K's review;
   the responder recommended the engine keep it — `batch/v1` `JobStatus.completionTime`). One line
   in `fold` plus `endedAt` on `Attempt`, then `endedAt` in the api's `latest` and a duration on the
   node. → a small engine run after E2, then an apps follow-up.
+
 - **the engine, found by C's run:** a session that gives its closeout and is then marked `blocked`
   never ends — `closedOut` handles `working` only. → E2 (`fix-one-gap-in-agent-engine-h35j`).
+
 - **the e2e script has no refusal test (U1's review):** nothing proves a page with a console error or a
   failed request makes `npm run e2e` exit non-zero. → F2's brief.
+
 - **the Factory's "in flight" rule (seen on U1's run):** a run whose step failed its check shows in
   flight, because its followers are `waiting` and will wait for ever. The run's overall status is
   already decided by `assess` (`running | succeeded | failed | cancelled`) and the api does not
   expose it; `/api/runs` should carry it and the Factory should read `status === 'running'`. A
   run merged by hand after a refused check stays `failed` on the record — true — until F's
   `wf retry --recheck` exists to re-run a check without a session. → the next apps run.
+
 - **F is next, and `--recheck` first (two refused checks in one day, both environmental):** U1's
   check died in the parallel-turbo api flake; M1's detached-worker test read an empty log with
   exit 4 while the machine was at 12 GB and 22 finished sessions were being stopped. Both times
@@ -832,6 +858,7 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   cleared with the daemon stopped, so the next tick re-filed it). That is `wf retry <run> <step>
   --recheck`, and it should not need surgery. Also: bug 3 was measured — finished `--bg` sessions
   at ~370 MB each, 22 of them, 7 GB; E5 fixes it.
+
 - **a branch's new dependency is invisible to its own check (M1, refused three times):** worktrees
   share the main checkout's `node_modules`; a package pinned on a branch is not installed there, and
   every `npm install` at a merge prunes whatever a step unpacked into the shared tree. M1's check
@@ -844,6 +871,7 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   (E5's `logs`), the branch's own check fails on tests it never touched. A step's check should run
   against the branch's packages — its own `node_modules` — or the run should say plainly that the
   check is stale against `main` and re-run it after a rebase.
+
 - **Playwright MCP, from M1's review (Opus, raw):** `browser_run_code_unsafe` is a core tool no
   flag removes — denied by name in `.claude/settings.json` at the merge; the server inherits the
   session's environment (`.mcp.json` sets no `env`, and Playwright reads config from env too);
@@ -851,6 +879,7 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   `--extension`; `--output-dir /tmp/playwright-mcp` is one directory for every concurrent step
   (a per-step dir needs an `env` on the task, or per-step `mcp:` — I); the live test takes the
   model's own list of its servers as the evidence. → I, and the next M run.
+
 - **checks killed by the harness, not by the code (2026-09-13, B2):** three of B2's `respond` checks
   ended `stopped · harness` with 16 GB available and `/proc/pressure/memory` at 0.00 — Claude Code
   2.1.270's "low on memory" rule stopped the `wf up` background task and the check's `claude --bg`
@@ -861,26 +890,31 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   environmental refusals in a day (M1's flake and WF_STDERR leak before). `wf retry --recheck` goes
   first in F, and a check that ends `stopped` should read as *not run*, distinct from refused. The
   daemon now runs detached (`setsid nohup npx wf up`) so the harness has nothing of it to kill. → F.
+
 - **the api re-derives what the package keeps private (B2):** `phaseOfView`, `closeoutAsked`,
   `readVerdict` and `checkReports` are not exported, so `apps/api/src/app.ts` carries copies of the
   first three (`phaseOf`, `askedOf`, `verdictOf`) and reads a refused check's exit off the engine's
   attempt rather than the log `wf ls` reads — two sources that agree today and a test holds the words
   to `list`'s. Export a log-free verdict and the two predicates; the copies go. → I, with the
   mode-list copies.
+
 - **the board and the api after R (2026-09-13):** `listing` now says `rounds exhausted` for a loop at its cap,
   and `apps/web/src/lib/status.ts` maps a word it does not know to `working`, so such a run reads as working
   on the board; `apps/api`'s `judge` passes `assess` no round asks and `moving` does not count a round due.
   Small apps run: map the word (amber, waiting on you), pass `readAsks(run.id).rounds`, count `round`. → apps.
+
 - **the reviewer cannot run the suite (B1's review, 2026-09-13):** on the operator folders the review step runs
   read-only by prose, and the permission classifier refused `node --test`, so it reviewed by reading. The check
   had run the suite, so nothing was lost; but a reviewer that can run tests finds more. → I: `tools:` on the
   review step naming Bash for `npm test`, and read-only for the rest.
+
 - **the canvas gate reads the step, the banner reads the api (B3's round-2 review, 2026-09-13):** `isGate`
   in `apps/web/src/lib/status.ts` is decided from the step's state alone, while the api's `waitingOnYou`
   now leaves out a step with a `wf round`/`wf retry` ask pending — so for up to one tick the canvas says
   "waiting on you" and the page's banner does not. Pass `run.waitingOnYou.includes(step.name)` on
   `StepNodeData` and require it in the gate; a component test with a pending ask. Judged not worth a
   round by the reviewer; a small apps run, with the api's swap to I's exports. → apps.
+
 - **the reviewer can run the suite, and nothing else (2026-09-13, after I):** the operator folders' review
   step is `tools: Read, Grep, Glob, Bash` with `permissionMode: dontAsk`, and `.claude/settings.json` allows the
   exact read-only commands (`npm test`, `npm run typecheck|build|e2e`, `npx turbo run test:*`, `node --test:*`,
@@ -888,17 +922,20 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   no Edit or Write on the list — so the reviewer is read-only by machinery, not by prose (plan §4 I's aim). The
   shipped `review.md` stays on codex, whose fence is the sandbox. E6 froze the old folder, so the first
   run to test the fence is the next one filed.
+
 - **the fence judges a compound command by its segments (G's review, 2026-09-13):** A2's reviewer ran
   `npm test` fine under `dontAsk`; G's ran `cd packages/agent-workflows && node --test …` and was denied,
   because `cd` matched no allow rule — every segment must. `git log … && git status && git diff …` passed
   for that reason. `Bash(cd:*)` is now allowed (it does nothing on its own), and the operator folders'
   review body says how to run the suite. Verified, not guessed: the denial is in the session transcript.
+
 - **the fenced reviewer cannot read the run's artifacts (B4's review, 2026-09-13):** under `dontAsk`, a
   `Read` outside the worktree — `~/.agent-workflows/runs/<id>/artifacts/…`, where the implement step's
   screenshots are — is denied, so no reviewer has looked at a screenshot since the fence. Allowed on this
   machine in `.claude/settings.local.json` (`Read(//home/…/.agent-workflows/**)`, a path that is nobody
   else's); the portable fix is an artifacts directory the step is told, carried on the task (§4b, the
   `look` note). → I's follow-up, small.
+
 - **rounds are invisible in the inspector, defaults read as `—`, artifacts are bare paths (operator,
   2026-09-13):** a step in round 2 shows `attempts 1` (the engine's count for the current try's task)
   beside `round 2 of 3` (the run's tries), and the earlier round's task, closeout, check and replies are
@@ -906,16 +943,19 @@ Recorded at merge time and since addressed by a run or by hand (kept for the rea
   `tools` are not rows; the Output tab's artifacts cannot be opened. B7: `tries` on the api's step, effective
   values marked `default`, a Rounds section and per-try Output, and an artifacts route serving a listed
   file by name (inside the run-owned directory, never a path) with images inline. → apps, filed after B6/S2.
+
 - **the reviewer's fence has two holes the brief covers (W3's round-2 review):** `.claude/settings.json`
   allows `npm run build` and `npm run e2e` for implement's sake, so a `dontAsk` reviewer with Bash may run
   them and write `routeTree.gen.ts` and `.e2e/` into the workspace; only its brief keeps it from them. A
   per-step deny — `disallow:` on a step, passed as `--disallowedTools "Bash(npm run build)" …` — closes it
   by machinery. → agent-workflows, small (the engine passes what the step names, as `tools:`).
+
 - **`wf decide` prints a nested `where` as JSON (U2's review):** `itemLines` in run.ts formats a finding as
   `file:line` only when `file` is top-level; U2's ui review declares `where: { file, line } | { page, theme }`,
   which prints as `- where: {"file":…}`. Teach `itemLines` a `where` object: `file:line` or `page · theme`.
   Also learned: `tools:` names Claude Code's built-in tools and `Skill` is one, so a step that should
   invoke a skill lists `Skill` — the review fence becomes `Read, Grep, Glob, Bash, Skill`. → agent-workflows, small.
+
 - **what a worker gets, measured (2026-09-14, `claude -p` with the engine's flags):** an `implement` step with
   no `tools:` has the operator's built-in set — `WebFetch`, `WebSearch`, `Agent`, `Monitor`, `Workflow`,
   `SendMessage`, `Cron*`, `RemoteTrigger`, `Task*`, `NotebookEdit`, `ScheduleWakeup` — plus `.mcp.json`'s 23
@@ -939,10 +979,9 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done. In flight 2026-09-14: B9 (apps, items 11–15 in one) as
 `five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
-`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 in its last round. Left after B9: items 20 (settings), 27 (engine, small),
-28 (agent-workflows, tiny). Cost and budget (item 29) filed 2026-09-15: E8 `cost-measured-and-a-budget-s-eou6`
-(engine, `./workflows/dev`) and W7 `cost-measured-and-a-budget-s-5rg0` (agent-workflows, `--after` E8 — the first real
-use of the edge); B10 (the board's cost) after B9 lands.
+`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 done, `26ebf0e`. In flight: E8 `cost-measured-and-a-budget-s-eou6`
+(engine, `./workflows/dev`) and W7 `cost-measured-and-a-budget-s-5rg0` (agent-workflows, `--after` E8 — the first real use of
+the edge). Then B10 (the board's cost). Left after them: items 20 (settings), 27, 28, 30 (small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -1002,11 +1041,12 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
     drop a settings block that parses as a card. agent-workflows, small. *Done, W5, `d69a5fd`.*
 
 **apps, small**
-11. The timeline — per try and per check, on the run page and in `wf decide`; `effort`/`tools` on the Workflows page's node. *B9.*
-12. The card's touched line double-counts a fan-out. *B9.*
-13. The session stream after a reconnect (clear the retry error on `open`). *B9.*
-14. The Capabilities page per step: what a step gets, measured. *B9.*
-15. api tests off the live registry. *B9.*
+11. The timeline — per try and per check, on the run page and in `wf decide`; `effort`/`tools` on the Workflows page's node. *Done, B9, `26ebf0e`.*
+12. The card's touched line double-counts a fan-out. *Done, B9, `26ebf0e`.*
+13. The session stream after a reconnect (clear the retry error on `open`). *Done, B9, `26ebf0e`.*
+14. The Capabilities page per step: what a step gets, measured. *Done, B9, `26ebf0e`.* Left by its review: the dontAsk
+    sentence omits Claude Code's built-in read-only commands — item 30.
+15. api tests off the live registry. *Done, B9, `26ebf0e`: `apps/api/test/harness.ts`, and root `npm test` parallel again.*
 
 **agent-engine, small**
 16. `resume.test.ts`'s usage assertion (the retry writes a different count). *Done, E7, `9709867`.*
@@ -1034,6 +1074,10 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
     capped session ends, measured live), W7 (agent-workflows: `budget:` on a step, carried on every filing; cost per
     step and per run in `wf ls`/`wf decide`; `budget exhausted` in the vocabulary, `wf retry --budget`), then B10
     (apps: cost on the card, the run page and the timeline).
+
+30. The Capabilities page's dontAsk sentence says only the settings' allows run without a prompt; Claude Code also runs
+    a built-in read-only set (`cat`, `ls`, `grep`, `find`, `head`, `tail`, `wc`, `diff`, read-only `git`) in every mode
+    (B9's last review measured it). Say "of the commands that ask", or carry that set as dated data. apps, tiny.
 
 **Documentation**
 19. The ledger reordered: open first, settled below. *Done, `55acbde`.*

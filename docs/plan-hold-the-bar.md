@@ -939,8 +939,8 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done. In flight 2026-09-14: B9 (apps, items 11–15 in one) as
 `five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
-`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 (its agent-workflows
-follow-up) filed; B9 in round 2. Left after them: items 20 (settings) and 27 (engine, small).
+`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 in its last round. Left after B9: items 20 (settings), 27 (engine, small),
+28 (agent-workflows, tiny), and the cost/budget work the operator asked about on 2026-09-15 (not yet filed).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -1013,11 +1013,16 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
     check, codex) still observes every harness; observe the task's own, as `transcript` does. engine, small — item 27.
 18. Bug 1 of the evaluation — quiet without a closeout settles `succeeded` — half-verified in open-issues since day one.
     *Done, E7, `9709867`: the attempt ends `unsigned`, a nudge, then `failed` with the reason.* Follow-up in agent-workflows:
-    read that failure as `unsigned` again (outcome `blocked`, waiting on you, the retry brief's wording) — W6, filed
-    2026-09-15 as `one-small-item-in-agent-work-tpxb` from `./workflows/dev`.
+    read that failure as `unsigned` again (outcome `blocked`, waiting on you, the retry brief's wording) — done, W6,
+    `aa95f4a`. Its review left a test gap: no two-attempt case pins that `closeoutAsked` reads the *last* attempt's
+    reason (item 28).
 
 27. A `view` of a task whose harness has no `find` observes every harness (E7's last review): observe the task's own
     harness instead, as `transcript` does, and fix the README's saving claim. engine, small.
+
+28. `closeoutAsked` reads the last attempt's `reason`, and no test makes a two-attempt task (attempt 1 unsigned,
+    attempt 2 lost) read `failed` rather than `unsigned` (W6's review). A store test with `maxAttempts: 2`. agent-
+    workflows, tiny.
 
 **Documentation**
 19. The ledger reordered: open first, settled below. *Done, `55acbde`.*

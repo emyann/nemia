@@ -8,39 +8,10 @@ its number behind rather than renumbering the rest, so "bug 9" means the same th
 State as of 2026-09-14: agent-engine after the hold-the-bar engine work (repository
 `docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), a
 session's conversation read as events (§4 S1), and `say`, a person's words into a running session on the
-record (§6 item 3, the engine half), and `find`, one session by its name without `claude agents` (§6 item 17);
-agent-workflows `0e7b02a`.
+record (§6 item 3, the engine half), `find`, one session by its name without `claude agents` (§6 item 17), and
+bug 1, a quiet session with no closeout recorded a success (§6 item 18); agent-workflows `0e7b02a`.
 
 ## Bugs
-
-### 1. A step that asked for a closeout still settles `succeeded` when it goes quiet without one
-
-**Where.** The Claude runner turns *working, not busy, transcript quiet for 90 seconds* into
-`state: done` whether or not the task asked for a closeout (`agent-engine/src/runner.ts`, the
-quiescence rule in `claudeOps`). The engine records that as a normal end (`closedOut` in
-`agent-engine/src/engine.ts` never sees a statement), and the workflow stops a DAG only for a
-closeout that says `blocked` (`agent-workflows/src/run.ts:84`), so a missing one reads as success.
-
-**Effect.** A step that crashes, hits a rate limit, or ends its turn without calling
-`StructuredOutput` is reported `succeeded`, the next step is filed, and `wf decide` says every step
-succeeded — with no summary for that step. A false completion, which the engine README calls the one
-failure worse than a stall.
-
-**Proposed fix.** The runner stops deciding: it reports how long the session has been quiet, as a
-fact on the sighting. The engine decides, because only the journal knows whether this task asked for
-a closeout:
-
-- no `closeoutSchema` → quiet means done, as today (it is all such a task has);
-- a schema and no statement → the attempt ends as *stalled*, not a success, so nothing downstream
-  runs; the task's resume policy then applies — resume the session with a nudge ("you stopped
-  without giving your closeout; finish, or report blocked") — and a person gets it when attempts
-  run out.
-
-**Status.** Deferred (2026-09-12, operator). The fix is a change to `decide` — the only one the
-evaluation proposed — and the engine work that followed was held to leaving `decide` unchanged.
-The run-side half closes without it: the workflow layer's `unsigned` status (plan package C) does
-not let a step that asked for a closeout and gave none satisfy `after`. The engine half stays open:
-`ae` on its own still records such a task `succeeded`.
 
 ### 2. `advance` hands off only steps that succeeded
 
@@ -181,12 +152,15 @@ a registration's word over the registry's. On this machine every live registrati
 without `/proc` (macOS) a pid another process has taken since is not caught, since `procStart` is checked only where the
 system says when a process started.
 
-### 14. A session reported `done` by quiet is refused, though it could still hear
+### 14. Words said to a quiet session race the pass that ends it
 
-The Claude runner reports a `working` session quiet for 90 seconds as `done` (the quiescence floor), and `say`
-refuses a session its harness does not list running, so words cannot reach one that has gone quiet — the "nudge
-it past a stall" case — although `claude agents` still has it running and its inbox would start a turn. The next
-pass writes its end anyway. `wf retry --message` continues it.
+A quiet session is no longer reported `done` (bug 1, fixed): the runner says how long it has been quiet and leaves it
+`working`, so `say` reaches it, and an idle session's inbox starts a turn — the "nudge it past a stall" case this issue
+was about. What is left is a race. A pass that observes the session between the words being posted and its first write,
+or its going busy, still reads it quiet and ends the attempt — `done`, or `unsigned` for a task that asked for a
+statement — and releases the session with the words unread. The window is that one moment against a pass every few
+seconds; it was not measured. `find` changes nothing here: `say` needs the session's state and its process, and still
+observes.
 
 ### 15. Words delivered and not journalled, if the process dies between the two
 
@@ -280,6 +254,10 @@ attempt — into the continuation's brief, as `wf retry --message` carries an an
   fake `claude` that keeps a registry, at shipped defaults. The live run released a session that had
   given its closeout; none that ended by quiet, and none settled without an end.
 
+- **An unsigned end, and its nudge** (§6 item 18). A fake `claude` that keeps a registry, at shipped defaults
+  (`test/unsigned.test.ts`), and `decide` alone; every new guard was taken out once and a test failed. The live test
+  that would show how Claude Code itself ends such a session was written and not run (last section).
+
 - **Codex usage** (engine `bb3de3c`). Measured on the `exec --json` streams of seventeen codex-cli
   0.154.0 runs the worker had captured (`~/.agent-workflows/engine/runs/codex`): the sixteen whose
   turn completed each ended in one `turn.completed` carrying `input_tokens`, `cached_input_tokens`,
@@ -327,7 +305,8 @@ attempt — into the continuation's brief, as `wf retry --message` carries an an
 
 ## Open questions
 
-1. **Quiescence: stalled or done** for a task that asked for a closeout — bug 1, deferred.
+1. **Quiescence: stalled or done** for a task that asked for a closeout — answered: neither, *unsigned* (bug 1, fixed; the
+   last section).
 2. **Why a Claude session stays `working` instead of reaching `done`.** Twenty-plus sessions measured:
    not resume, not duration, not the two together. It is the reason the quiescence floor exists.
 3. **`wf ls` choices merged as implemented** (`7f07b71`), open to revisit: an extra "waiting on you"
@@ -376,6 +355,7 @@ attempt — into the continuation's brief, as `wf retry --message` carries an an
 | every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `7200295` |
 | a released session that had ended by quiet was removed without a `claude stop` — and a worktree task's was never touched, left `working` for good — because `release` read the runner's translated `done` | `release` stops on the state `claude agents` itself listed (found in review) | engine `c2ebd62` |
 | a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `9c4221e` |
+| a task that asked for a closeout settled `succeeded` when its session went quiet without one (bug 1): at shipped defaults, `ended: done`, `reason: harness`, no closeout | the Claude runner reports how long a session has been quiet (`quietMs`), from its last write or its own start; `decide` ends a quiet attempt `done` when no statement was asked for, and `failed`, `unsigned`, when one was and none came — continued with a nudge by the resume policy, and settled `failed` saying so when attempts run out | engine, §6 item 18 (last section) |
 | a nudged retry that `--resume`d its session was recorded with no closeout and its first try's usage, to the byte; and a statement given after a `view` had seen the session listed final was never read, until the daemon restarted | the Claude runner keeps a read of a finished session for one attempt — the row's name, its session, the registry's start — and only while the transcript has not been written since | engine `00e301b` |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
@@ -415,3 +395,33 @@ resumes, 21 ran in a different working directory from the session they continued
 that kept its id (`9ea123ff…`, implement → respond) went on writing the original project's transcript,
 and no id has two transcripts among the 432 project directories. So a resume does not move the file
 the cache names.
+
+## Quiet without a closeout (bug 1, fixed 2026-09-14, plan §6 item 18)
+
+**Measured first.** At shipped defaults — `createEngine()`, a fake `claude` listing the session `working` and idle, and a
+transcript whose last line was the session's own words, quiet for ten minutes — a task with a `closeoutSchema` whose
+session gave no `StructuredOutput` was recorded `ended: done`, `reason: harness`, and settled `succeeded` with no
+closeout. A transcript whose only statement was its parent's, made before the attempt began, did the same: the engine
+dropped the inherited statement, and the runner's `done` settled the task anyway.
+
+**On the record.** Of the 236 tasks in `~/.agent-workflows/engine`, 144 were Claude Code tasks with a schema, whose
+attempts ended `done` 142 times; 2 of those had no closeout, and both were the read fixed in `00e301b` — their
+transcripts held statements. No session on this machine is known to have gone quiet with nothing said, so the fix is
+sized to the quiet rule and no further.
+
+**What changed.** The Claude runner reports `quietMs` and never turns quiet into `done`. `decide` ends a quiet attempt
+`done` when no statement was asked for, and `failed` with reason `unsigned` when one was and none came. An unsigned
+attempt is continued under `interrupted` and `always`: its session is stopped if it still runs, then `--resume`d and
+told a nudge instead of the brief, journalled on `starting`. Out of attempts, the task settles `failed` with a note that
+says so. Quiet is counted from the later of the last write and the session's own start, so a continuation over a cold
+transcript does not end as it begins. `decide` grew by a dozen lines and reads no tools, usage or exit codes (the source
+test holds). agent-workflows files one attempt unless a step says otherwise, so a run now sees such a step `failed`
+rather than `unsigned`; both are final, and both are offered a nudge and a fresh try (`agent-workflows/src/run.ts`).
+
+**Not measured.** How Claude Code itself ends a `--bg` session whose turn ends without the call. 2.1.271's bundle has a
+count of structured-output retries (`MAX_STRUCTURED_OUTPUT_RETRIES`) and an error for running out of them. If the harness
+nudged such a session and then listed it `done` with nothing said, the engine would still record `succeeded`: a second
+door to this bug, through `state: done` rather than quiet. `test/live.test.ts` fails on exactly that, and was written
+and not run (`AE_LIVE` was not set). And a transcript with no user line gives no `lastModified` through the SDK's
+`getSessionInfo`, so its session is never measured quiet and ends only at its deadline: found writing the test, whose
+first fixture had no prompt line. Every `--bg` transcript seen starts with its prompt.

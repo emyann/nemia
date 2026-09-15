@@ -141,8 +141,8 @@ test('a task that asked for a worktree has its session stopped and never removed
   });
 });
 
-test('a session ended by quiet is stopped before it goes — the runner reports it done, and claude agents still has it working', async () => {
-  // Found in review: `release` read the sighting's state, which quiescence had rewritten to `done`. A
+test('a session ended by quiet is stopped before it goes — its end is on the record, and claude agents still has it working', async () => {
+  // Found in review: `release` read the sighting's state, which quiescence then rewrote to `done`. A
   // worktree task's session was then never touched, left working, and any other was removed unstopped.
   for (const worktree of [false, true]) {
     const claude = fakeClaude();
@@ -152,6 +152,8 @@ test('a session ended by quiet is stopped before it goes — the runner reports 
       await engine.tick();
       const [row] = claude.rows();
       wrote(row!, 10 * 60_000);
+      // Started before that, too: quiet is counted from the later of its last write and its own start.
+      claude.setRows(claude.rows().map((r) => ({ ...r, startedAt: Date.now() - 20 * 60_000 })));
 
       for (let i = 0; i < 3; i++) await engine.tick();
       const at = `worktree: ${worktree}`;

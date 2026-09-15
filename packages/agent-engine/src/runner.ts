@@ -161,7 +161,8 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
 }
 
 /**
- * How long `working` + not busy must hold before this harness calls a session finished.
+ * How long `working` + not busy + nothing written must hold before this harness reports a session quiet —
+ * stopped, rather than paused (`Sighting.quietMs`). What quiet means for the attempt is `decide`'s.
  *
  * 90 seconds. Long enough that a pause between self-driven steps resumes first — the docs are
  * explicit that `working` also covers "between steps of work it drives on its own" — and short
@@ -740,15 +741,18 @@ export type ClaudeOptions = {
  * took its final write, in every probe. Claude Code's own web UI tracks `status` for its liveness
  * dot rather than `state`, which is the same conclusion arrived at independently.
  *
- * So this harness's definition of finished is:
+ * So this harness reports a session that has stopped in one of two ways:
  *
- *     done  ⟸  state = done
- *           ⟸  state = working AND not busy AND transcript quiet, for QUIESCENT_AFTER_MS
+ *     done   ⟸  state = done
+ *     quiet  ⟸  state = working AND not busy AND nothing written for QUIESCENT_AFTER_MS, counted from its
+ *               last write or its own start, whichever is later: `quietMs`, with `working` left as it is
  *
- * It lives HERE, in the runner, and not in `decide`. `working` and `idle` are this harness's
- * vocabulary; the engine's is `working | blocked | done | failed | stopped`, and translating one
- * into the other is the whole job of a runner. A harness that ends by exiting — `codex exec` —
- * answers the same question by exit code and needs none of this.
+ * Telling a quiet session from one between steps lives HERE, in the runner, and not in `decide`: `working`
+ * and `idle` are this harness's vocabulary; the engine's is `working | blocked | done | failed | stopped`,
+ * and translating one into the other is the whole job of a runner. What quiet MEANS does not live here. It
+ * was `done`, and a task that had asked for a closing statement and was told none settled `succeeded` (bug 1,
+ * `docs/open-issues.md`); only the journal knows whether one was asked for, so `decide` says. A harness that
+ * ends by exiting — `codex exec` — answers the same question by exit code and needs none of this.
  */
 export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
   const quiescentAfterMs = options.quiescentAfterMs ?? QUIESCENT_AFTER_MS;
@@ -813,9 +817,9 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     since === undefined ? undefined : keptRead(keptUsage, attempt, s, writtenAt, () => usageFrom(s.sessionId, since));
 
   /**
-   * Each of our sessions' state as `claude agents` itself last listed it, before this runner's own
-   * definition of finished is applied: a session quiet for the window is reported `done` while Claude
-   * Code still has it running, and `release` must stop that one. Rebuilt by every `observe`, which a
+   * Each of our sessions' state as `claude agents` itself last listed it: what `release` stops on, whatever
+   * the sighting it is handed says. A session whose end is on the record — quiet, or idle after its closeout —
+   * is still running on Claude Code, and `release` must stop that one. Rebuilt by every `observe`, which a
    * pass always makes before it releases anything.
    */
   const listed = new Map<string, Observed>();
@@ -936,12 +940,18 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
                   const used = await usageOf(attempt, sighting, startedAt, writtenAt);
                   const reported: Sighting = { ...sighting, ...(said ? { closeout: said } : {}), ...(used ? { usage: used } : {}) };
                   if (reported.state !== 'working') return [name, reported] as const;
-                  // The floor underneath, statement or not. Kept even when there IS one, because an
-                  // inherited statement is discarded upstream and must not leave a session with no
-                  // way to end. No transcript, no verdict: the deadline is for sessions nobody reads.
-                  const quietSince = await writtenAt();
-                  return quietSince !== undefined && now() - quietSince >= quiescentAfterMs
-                    ? [name, { ...reported, state: 'done' as const }] as const
+                  // The floor underneath, statement or not: how long it has been quiet, once that is long
+                  // enough to be stopped rather than paused — reported, not concluded (`decide` says what it
+                  // means). Kept even when there IS a statement, because an inherited one is discarded
+                  // upstream. No transcript, no measure: the deadline is for sessions nobody reads.
+                  //
+                  // From its last write or its own start, whichever is later: a session resumed over a
+                  // transcript cold for an hour has been quiet only since it began, and measured by the
+                  // transcript alone it would end the moment the registry listed it idle.
+                  const lastWrite = await writtenAt();
+                  const quietFor = lastWrite === undefined ? undefined : now() - Math.max(lastWrite, startedAt ?? lastWrite);
+                  return quietFor !== undefined && quietFor >= quiescentAfterMs
+                    ? [name, { ...reported, quietMs: quietFor }] as const
                     : [name, reported] as const;
                 }),
           { concurrency: 'unbounded' },
@@ -977,9 +987,9 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
      * worktree", and the task's work is in that worktree.
      */
     release: (session, task) => Effect.gen(function* () {
-      // The registry's word, not the sighting's: quiescence reports a quiet `working/idle` session
-      // `done`, and it is still running (found in review). A session this runner has not listed — no
-      // `observe` made here — has only its sighting to go by.
+      // The registry's word, not the sighting's: a session whose end is on the record — quiet, or idle
+      // after its closeout — is still running (found in review, when quiet was reported `done`). A session
+      // this runner has not listed — no `observe` made here — has only its sighting to go by.
       const running = listed.get(session.sessionId) ?? session.state;
       if (running === 'working' || running === 'blocked') {
         // Failing only if it exited since it was observed — which leaves `rm` exactly as able to go on.

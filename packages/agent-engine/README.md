@@ -47,7 +47,7 @@ carried on the task and read by a runner, never a callback into `decide`.
 
 | | continues when |
 |---|---|
-| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating |
+| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating — or **unsigned**: it went quiet without the closing statement it was asked for |
 | `always` | any failure, including one the harness reported |
 | `never` | nothing; every attempt starts clean |
 
@@ -85,8 +85,8 @@ Claude Code keeps every `--bg` session in `claude agents` until something remove
 has given its closeout stays there `working/idle` for good — every run used to leave its sessions
 behind, to be cleared by hand. So once an attempt's end is on the record, the engine **releases** its
 session: `claude stop` if it still runs, then `claude rm`. Whether it still runs is the registry's
-word, not the runner's: a session quiet for ninety seconds is reported `done`, and `claude agents`
-still has it working. It is I/O applied to the record, not a
+word: a session whose end is on the record because it went quiet, or gave its closeout, is still
+working as far as `claude agents` is concerned. It is I/O applied to the record, not a
 decision — `decide` is not asked — and it is level-triggered: asked on every pass that still sees such
 a session, so a crash between writing the end and releasing is repaired by the next pass, and a
 release the harness refuses is asked again.
@@ -367,7 +367,7 @@ operator's args and env.
 
 `ae start` has no `mcp` key: a brief's values are one line each, so the map is the API's for now.
 
-## What "done" means, and why the harness decides it
+## What "done" means, and who decides it
 
 **`state: done` is not a reliable completion signal for the work this engine is for.** Measured
 across five sessions:
@@ -449,12 +449,15 @@ Two fields, two questions. Reading them as `state ?? status` discarded the usefu
 an interactive session's `status: idle` be recorded as a *failure*, since `idle` is not a state at
 all. `busy` is likewise a status, and no longer sits in `Observed` pretending otherwise.
 
-So `claudeOps` answers the question itself:
+So `claudeOps` answers the half of the question that is its harness's vocabulary — whether a session has stopped:
 
 ```
-done  ⟸  state = done
-      ⟸  state = working AND not busy AND transcript quiet, for 90 seconds
+done   ⟸  state = done
+quiet  ⟸  state = working AND not busy AND nothing written for 90 seconds,
+          counted from its last write or its own start, whichever is later
 ```
+
+and reports quiet as a fact, `quietMs`, with the state left `working`. What quiet means is `decide`'s (below).
 
 **The clock is the transcript's, not the observer's.** A session that speaks pushes its own
 deadline out, which is what keeps a pause between self-driven steps from being mistaken for an
@@ -478,8 +481,41 @@ middle of a long tool call — which writes nothing for minutes at a time (35 se
 session we sampled). It is one gate rather than two, held deliberately, and pinned by a test. A
 session whose transcript cannot be read gets no verdict at all; the deadline is for those.
 
-The quiet rule still ends a task that asked for a closeout and never gave one as `succeeded` —
-open issue 1 in `docs/open-issues.md`, deferred, with the reason there.
+### Quiet, when a closing statement was asked for and none came
+
+Quiet used to be `done`, for every task. A task that had asked for a closeout, and whose session ended its turn
+without one — a crash, a rate limit, a model that forgot — settled `succeeded` with nothing said, and whatever waited
+on it ran: a false completion, the one failure worse than a stall. Measured at shipped defaults before the fix, with a
+fake `claude` listing the session working and idle over a transcript quiet for ten minutes: `ended: done`, `reason:
+harness`, `settled: succeeded`, no closeout. Only the journal knows whether a statement was asked for, so the runner
+reports how long a session has been quiet, and `decide` says what that means:
+
+| the task | quiet ends the attempt | and then |
+|---|---|---|
+| asked for no `closeoutSchema` | `done`, reason `harness` | `succeeded`, as before: quiet is all such a task has |
+| asked for one, and this attempt gave one | `done`, with the statement | `succeeded` |
+| asked for one, and none came — or only one made before the attempt began | `failed`, reason **`unsigned`** | the resume policy: continued with a nudge while attempts remain, `failed` when they run out |
+
+`unsigned` is continued under `interrupted` and `always`, as `lost` is: the work in the transcript is real, and nobody
+has judged it, the session included. Its session is stopped first if it still runs — quiet is not gone — and the next
+attempt `--resume`s it, told why it is back instead of the brief it already has: *"You stopped without giving your
+closing statement, and this task asks for one. If the work is done, give it now. If it is not, finish the work, then
+give it. If you cannot finish, give it anyway, saying what stops you."* The nudge is journalled on the attempt's
+`starting` entry, and read as `state.attempts[n].nudge`. Out of attempts, the task settles `failed` with the note
+`N attempt(s), none succeeded: the last went quiet without the closing statement it was asked for`.
+
+Quiet is counted from the later of the transcript's last write and the session's own start in `claude agents`: a
+continuation `--resume`s a transcript that may have been cold for an hour, and measured by the transcript alone it
+would end the moment the registry listed it idle.
+
+**What is not measured.** `test/unsigned.test.ts` holds all of this with a fake `claude`; no live session has gone
+quiet unsigned under it. On the record on the machine this was written on, 144 Claude Code tasks asked for a closeout,
+and 2 of their attempts ended `done` without one — both the read fixed in `00e301b`, not a session that said nothing —
+so the case has not been seen live either way. Claude Code 2.1.271's bundle has a retry count for structured output
+(`MAX_STRUCTURED_OUTPUT_RETRIES`) and an error for running out of it. Whether a `--bg` session is nudged by the harness
+when its turn ends without the call, and whether it then ends itself `done` with nothing said — a way to a success
+without a statement that quiet does not cover — is what `test/live.test.ts` measures (`AE_LIVE=1`), and it has not been
+run.
 
 ### The workload's own word
 
@@ -532,11 +568,12 @@ It layers UNDER the harness's own answer rather than replacing it. [Hermes
 Kanban](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban) solves the same
 problem with a terminal tool call, `kanban_complete(...)`, which it can require because every worker
 is its own. Here a structured final answer is the fast path and observation is the floor: a workload
-that never gives one ends exactly as it did before.
+that never gives one ends by quiet — unsigned, where one was asked for (above).
 
 **It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
 engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
-job of a runner. `decide` did not change. Codex, which ends by exiting, needs none of this and gets
+job of a runner. What a quiet session means is `decide`'s, since only the journal knows whether a statement was
+asked for. Codex, which ends by exiting, needs none of this and gets
 none of it. And because it is a translation rather than a judgement, it tests with an injected clock
 and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 
@@ -890,7 +927,8 @@ selector, and it is why no attempt can ever run twice.
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
 | `test/engine.test.ts` | the crash cases, the ceiling, the fields carried, against a fake harness |
-| `test/completion.test.ts` | Claude Code's "done", its argv and its usage, with a fake `claude` on `PATH` |
+| `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
+| `test/unsigned.test.ts` | a session gone quiet without the closing statement its task asked for: unsigned, continued with a nudge, then failed saying why; quiet with none asked for still succeeds — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
@@ -903,7 +941,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, and `say` into a working session, against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, and a session that ends its turn without its closing statement, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 

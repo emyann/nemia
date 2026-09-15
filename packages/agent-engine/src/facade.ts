@@ -488,7 +488,9 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // A session waiting on a person is running, and its inbox takes words as a working one's does. It reads them
       // only if it moves again: one stalled on a login refresh moved on when a message came (2026-09-13); one waiting
       // on a permission prompt nobody answers keeps them queued, and loses them when stopped or continued (open issue
-      // 16). `claude agents` does not say which wait a session is in, so neither is refused.
+      // 16). `claude agents` does not say which wait a session is in, so neither is refused. A quiet session is
+      // `working` too: its runner reports how long it has been quiet, not an end, and an idle session's inbox
+      // starts a turn (open issue 14).
       if (sighting.state !== 'working' && sighting.state !== 'blocked') {
         throw refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: the next pass writes its end. ${resume}`);
       }

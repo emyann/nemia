@@ -80,6 +80,12 @@ export type Sighting = {
    * so `decide` reads this, and no runner turns it into `done`.
    */
   quietMs?: number;
+  /**
+   * The harness ended the session because it spent the budget its task gave it — as the harness printed it (`claude -p`'s
+   * result, `subtype: error_max_budget_usd`), never a cost compared with a budget, which nothing here does. `decide`
+   * records it as the end's reason, and continues no such session.
+   */
+  budgetSpent?: true;
 };
 
 /**
@@ -136,11 +142,13 @@ const NUDGE = 'You stopped without giving your closing statement, and this task 
  *   `unsigned`     the session went quiet without the closing statement its task asked for. It stopped; it may
  *                  have finished, and it did not say so, which is all a statement is for. Recorded `failed`.
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
+ *   `budget`       the harness ended the session at the spend cap its task gave it. It was cut off, not concluded, and
+ *                  is never continued: a nudge would spend past the cap. Recorded `failed`.
  *
  * Everything about resume policy hangs on this distinction, which is why it is recorded rather
  * than inferred later.
  */
-export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable';
+export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'budget';
 
 /** What a new attempt does with the one before it. A workload property, not a callback. */
 export type ResumePolicy =
@@ -148,7 +156,7 @@ export type ResumePolicy =
    *  included. A harness that reached a conclusion we did not like is usually not improved by being
    *  dropped back into the context that produced it. */
   | 'interrupted'
-  /** Always continue. Right for long, expensive work where any progress beats a clean start. */
+  /** Always continue — but a session that spent its budget. Right for long, expensive work where any progress beats a clean start. */
   | 'always'
   /** Never continue. Right when an attempt's context is the thing suspected of being wrong. */
   | 'never';
@@ -193,6 +201,12 @@ export type Event =
        * read here: a runner hands them to its harness, and `decide` never learns what a server is.
        */
       mcp?: Record<string, McpServer>;
+      /**
+       * The most one attempt's session may spend, in dollars — per attempt, as the harness keeps it: `claude -p
+       * --max-budget-usd` counts one process's spend. Carried, never read here: a runner hands it to its harness, and
+       * `decide` learns only that a harness ended a session on it (`Sighting.budgetSpent`).
+       */
+      budgetUsd?: number;
     }
   /**
    * INTENT: we are about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is told instead of
@@ -284,6 +298,8 @@ export type State = {
   disallowedTools?: string[];
   effort?: string;
   mcp?: Record<string, McpServer>;
+  /** The spend cap, per attempt. See the `filed` event. `decide` never reads it. */
+  budgetUsd?: number;
   attempts: Attempt[];
   /** What a person said to the task's sessions while they ran, in the order it was said. Carried, never read. */
   said: Said[];
@@ -305,7 +321,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
         s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
-        s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.effort = e.effort; s.mcp = e.mcp;
+        s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.effort = e.effort; s.mcp = e.mcp; s.budgetUsd = e.budgetUsd;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}), usage: null, exitCode: null });
@@ -433,7 +449,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     }
     const unsigned = quiet && state.closeoutSchema !== undefined && sighting.closeout === undefined;
     return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: unsigned ? 'failed' : quiet ? 'done' : sighting.state,
-      reason: unsigned ? 'unsigned' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
+      reason: unsigned ? 'unsigned' : sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
   }
 
   if (!last.spawnedAt) return { do: 'spawn', attempt: last.n, name: nameFor(state.taskId, last.n) };
@@ -460,7 +476,9 @@ function resumeTarget(state: State, last: Attempt | undefined): string | undefin
   // That is a fact about the work, not a retry policy, so `resume: 'never'` does not override it:
   // "do not resume a failure" and "this task IS a continuation" are different statements.
   if (!last) return state.resumeFrom;
-  if (!last.nativeId || state.resume === 'never') return undefined;
+  // Not a session that spent its budget, whatever the policy: a nudge would spend past the cap. A task filed again with
+  // `resumeFrom` its session, and a budget of its own, continues it.
+  if (!last.nativeId || state.resume === 'never' || last.reason === 'budget') return undefined;
   if (state.resume === 'always') return last.nativeId;
   return last.reason === 'lost' || last.reason === 'unsigned' ? last.nativeId : undefined;
 }

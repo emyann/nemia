@@ -43,7 +43,11 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Effect, Layer } from 'effect';
 import { createEngine, type Engine, type Said, type TaskView } from '../src/facade.ts';
+import { file, tick, view } from '../src/engine.ts';
+import { Journal } from '../src/journal.ts';
+import { Runner } from '../src/runner.ts';
 
 const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
@@ -338,6 +342,75 @@ test('a settled --bg session is stopped and removed from claude agents — and a
     for (const s of sessions) {
       for (const verb of ['stop', 'rm']) {
         try { execFileSync('claude', [verb, s.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 }); } catch { /* released already */ }
+      }
+    }
+  }
+});
+
+const NOTES = Array.from({ length: 200 }, (_, i) => `line ${i + 1}`).join('\n');
+/** A session that spends: forty reads of a file, one call at a time. */
+const LOOP_BRIEF = [
+  'Read the file NOTES.txt with your Read tool. Then read it again.',
+  'Keep reading it, one Read call at a time, at least 40 times, and say nothing in between. Then reply done.',
+].join(' ');
+const notesIn = (label: string) => {
+  const dir = tmp(label);
+  fs.writeFileSync(path.join(dir, 'NOTES.txt'), NOTES);
+  return dir;
+};
+
+test('claude -p given a $0.01 budget stops at it: each attempt ends failed, reason budget, with what it cost — and the second does not continue the first', {
+  skip,
+  timeout: 12 * 60_000,
+}, async (t) => {
+  const engine = createEngine({ root: tmp('budget-board') });
+  const ids = {
+    capped: await engine.file({
+      brief: LOOP_BRIEF, cwd: notesIn('budget-p'), harness: 'claude-detached', model: 'haiku', tools: ['Read'],
+      budgetUsd: 0.01, maxAttempts: 2, resume: 'always', deadlineSeconds: 480,
+    }),
+  };
+  await settleThenCheck(engine, ids, (views) => {
+    const { state } = views.capped!;
+    t.diagnostic(JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom }))));
+    assert.equal(state.settled, 'failed', `settled: ${views.capped?.phase}`);
+    assert.equal(state.attempts.length, 2);
+    for (const a of state.attempts) {
+      assert.equal(a.reason, 'budget', `attempt ${a.n} ended at its cap, as the harness printed it`);
+      assert.ok((a.usage?.costUsd ?? 0) >= 0.01, `attempt ${a.n} cost at least its cap: ${a.usage?.costUsd}`);
+    }
+    assert.equal(state.attempts[1]?.resumeFrom, undefined, 'the second started clean, though the policy is always');
+  });
+});
+
+test('a claude --bg session given --max-budget-usd 0.01 spends past it and ends on its own — why file() refuses a budget on claude — and what it spent is measured once it is let go', {
+  skip,
+  timeout: 12 * 60_000,
+}, async (t) => {
+  // Through the Effect door, which refuses nothing: `createEngine().file()` refuses this task.
+  const root = tmp('bg-budget-board');
+  const layer = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), Runner.claude({ root }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file({ brief: LOOP_BRIEF, cwd: notesIn('bg-budget'), model: 'haiku', tools: ['Read'], budgetUsd: 0.01, deadlineSeconds: 480 }));
+  let v = await run(view(id, new Map()));
+  try {
+    const until = Date.now() + 10 * 60_000;
+    while (!v.state.settled && Date.now() < until) {
+      await run(tick());
+      v = await run(view(id, new Map()));
+      if (!v.state.settled) await new Promise((r) => setTimeout(r, 5_000));
+    }
+    const [a] = v.state.attempts;
+    t.diagnostic(`settled ${v.state.settled}, attempt 1 ended ${a?.ended} (${a?.reason}), usage ${JSON.stringify(a?.usage)}`);
+    assert.equal(v.state.settled, 'succeeded', 'Claude Code ended it on its own terms, not at a cap');
+    // `claude -p` at this cap stopped after two responses; this one made its forty-odd calls.
+    assert.ok((a?.usage?.toolCalls ?? 0) >= 10, `it kept going past the cap: ${a?.usage?.toolCalls} tool calls. If it stopped early, Claude Code may keep --max-budget-usd under --bg now: measure it, and lift the refusal in claudeBgRefuses`);
+    assert.ok((a?.usage?.costUsd ?? 0) > 0.05, `and what it spent, far past the cap, was read once its release stopped it: ${a?.usage?.costUsd}`);
+  } finally {
+    const session = v.sessionId ?? v.state.attempts.at(-1)?.nativeId;
+    if (session) {
+      for (const verb of ['stop', 'rm']) {
+        try { execFileSync('claude', [verb, session.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 }); } catch { /* released already */ }
       }
     }
   }

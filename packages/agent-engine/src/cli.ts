@@ -21,7 +21,7 @@ import { createEngine, type Attempt, type Engine, type Event, type ResumePolicy,
  */
 export const BRIEF_KEYS = [
   'cwd', 'harness', 'model', 'permissionMode', 'maxAttempts', 'deadlineSeconds',
-  'resume', 'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort',
+  'resume', 'resumeFrom', 'worktree', 'closeoutSchema', 'tools', 'effort', 'budgetUsd',
 ] as const satisfies readonly (keyof TaskSpec)[];
 export type BriefKey = (typeof BRIEF_KEYS)[number];
 
@@ -77,6 +77,11 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   if (deadlineSeconds !== undefined && !(Number.isFinite(Number(deadlineSeconds)) && Number(deadlineSeconds) > 0)) {
     throw refuse(`\`deadlineSeconds: ${deadlineSeconds}\` is not a number of seconds. Write seconds above 0, like \`deadlineSeconds: 900\` for fifteen minutes.`);
   }
+  const budgetUsd = meta.get('budgetUsd');
+  // Digits and a point: `$5` and `5 USD` are what a person writes, and `Number` would make the one NaN and refuse neither.
+  if (budgetUsd !== undefined && !(/^\d*\.?\d+$/.test(budgetUsd) && Number.isFinite(Number(budgetUsd)) && Number(budgetUsd) > 0)) {
+    throw refuse(`\`budgetUsd: ${budgetUsd}\` is not an amount of dollars. Write dollars above 0, digits only, like \`budgetUsd: 5\` or \`budgetUsd: 0.25\`.`);
+  }
   const resume = meta.get('resume');
   if (resume !== undefined && !Object.hasOwn(RESUME_POLICIES, resume)) {
     throw refuse(`\`resume: ${resume}\` is not a retry policy. It is one of: ${Object.keys(RESUME_POLICIES).join(', ')}. To continue a particular session, that is \`resumeFrom: <session id>\`.`);
@@ -126,6 +131,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
     worktree: worktree === undefined || worktree === 'false' ? undefined : worktree === 'true' ? true : worktree,
     tools: toolList,
     effort: meta.get('effort'),
+    budgetUsd: budgetUsd !== undefined ? Number(budgetUsd) : undefined,
   };
 }
 
@@ -224,6 +230,8 @@ const HELP = `ae — an engine for agent sessions
                      unless the list has Bash, Write or Edit)
     effort           claude: low | medium | high | xhigh | max
                      codex:  none | minimal | low | medium | high | xhigh | max
+    budgetUsd        dollars one attempt may spend — claude-detached only: claude -p
+                     ends the session at it; a --bg session keeps no cap
   a key not listed here, or a value the harness cannot take, is refused (exit 2)
 
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster

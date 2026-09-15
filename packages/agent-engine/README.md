@@ -228,6 +228,7 @@ after a space starts a comment. The keys are a closed list:
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
 | `tools` | `Read, Grep, Glob` — the only tools the session has; see below |
 | `effort` | how hard the harness thinks, in its own words — see below |
+| `budgetUsd` | the most one attempt may spend, in dollars, digits only — `claude-detached` only; see below |
 
 **Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with

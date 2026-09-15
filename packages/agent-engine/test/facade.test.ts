@@ -391,6 +391,22 @@ test('file() refuses an mcp map whose entries are not .mcp.json servers, and jou
   assert.deepEqual((filed as { mcp?: unknown }).mcp, mcp, 'on the record, for the runner');
 });
 
+test('file() refuses a budgetUsd that is not dollars above 0, and one on a harness that would keep no cap — and journals one claude-detached keeps', async () => {
+  const { journal, engine } = shipped();
+  for (const budgetUsd of [0, -1, Number.NaN, Infinity, '5' as unknown as number]) {
+    await refused(engine, { brief: 'b', cwd: '/r', harness: 'claude-detached', budgetUsd }, /is not an amount of dollars\. Give dollars above 0/);
+  }
+  // Measured: a `claude --bg` session given a $0.01 cap spent $0.19. The default harness is that one.
+  await refused(engine, { brief: 'b', cwd: '/r', budgetUsd: 5 }, /`budgetUsd: 5` is a spend cap, and a `claude --bg` session does not keep one.*File the task on `claude-detached`/);
+  await refused(engine, { brief: 'b', cwd: '/r', harness: 'codex', budgetUsd: 5 }, /`budgetUsd: 5` is a spend cap in dollars, and `codex exec` has none/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  const id = await engine.file({ brief: 'b', cwd: '/r', harness: 'claude-detached', budgetUsd: 0.25 });
+  const [filed] = await journal.read(id);
+  assert.equal((filed as { budgetUsd?: number }).budgetUsd, 0.25, 'on the record, for the runner');
+  assert.equal((await engine.view(id)).state.budgetUsd, 0.25);
+});
+
 test('a PromiseRunner whose spawn rejects is not taken to have started nothing — unless it says so', async () => {
   const sessions = new Map<string, Sighting>();
   const launcher: PromiseRunner = {

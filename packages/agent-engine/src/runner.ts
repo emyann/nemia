@@ -58,6 +58,8 @@ export type SpawnRequest = {
   effort?: string;
   /** MCP servers the session may have, by name, beside its checkout's `.mcp.json`. Absent: only those. */
   mcp?: Record<string, McpServer>;
+  /** The most the session may spend, in dollars. Absent: no cap. */
+  budgetUsd?: number;
 };
 
 /**
@@ -541,6 +543,15 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
 };
 
 /**
+ * What a Claude Code background session cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a spend
+ * cap. `claude --bg` takes `--max-budget-usd` and keeps nothing of it — its help says the flag "only works with --print",
+ * and a `--bg` session given a $0.01 cap read a file 42 times, spent $0.19 and ended `done` (measured on 2.1.272, and by
+ * `test/live.test.ts`). A cap that caps nothing is refused rather than carried; `claude -p` keeps one.
+ */
+export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => claudeRefuses(task) ?? (task.budgetUsd === undefined ? undefined
+  : `\`budgetUsd: ${task.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session given a $0.01 cap spent $0.19 (2.1.272, measured). File the task on \`claude-detached\`, which runs \`claude -p\` and ends the session at its cap, or leave \`budgetUsd\` off.`);
+
+/**
  * The longest line Claude Code's inbox reads, in characters. A longer one drops the connection and
  * delivers nothing, and says so to nobody (`Ftt` in 2.1.270's inbox), so `say` refuses it first.
  */
@@ -965,6 +976,9 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // it, which works under `--bg` as well as `-p` — verified on 2.1.270, though documented only
       // for `-p`. Takes a required value, so unlike `--worktree` it cannot swallow the prompt.
       ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
+      // The spend cap, as asked. Claude Code keeps it only with `--print`, so `file()` refuses a budget on this harness
+      // (`claudeBgRefuses`); a task that reaches the runner with one anyway is not given less than it asked for.
+      ...(r.budgetUsd !== undefined ? ['--max-budget-usd', String(r.budgetUsd)] : []),
       r.brief,
     ], { cwd: r.cwd, verb: 'spawn' }))).pipe(Effect.asVoid),
 

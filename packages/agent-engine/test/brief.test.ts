@@ -44,6 +44,7 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
     closeoutSchema: [schema, { type: 'object' }],
     tools: ['Read, Grep,Glob', ['Read', 'Grep', 'Glob']],
     effort: ['high', 'high'],
+    budgetUsd: ['0.25', 0.25],
   };
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];
@@ -60,6 +61,14 @@ test('`deadlineSeconds: 5m` is refused — it became NaN, and stopped the task o
   for (const bad of ['5m', '0', '-30', 'Infinity', 'soon', '1e400']) {
     refuses(brief(`deadlineSeconds: ${bad}`), /is not a number of seconds.*deadlineSeconds: 900/);
   }
+});
+
+test('a budgetUsd that is not dollars above 0, in digits, is refused', () => {
+  // `$5` would be NaN to `Number`, and `1e2` a hundred dollars nobody meant; the last converts to Infinity.
+  for (const bad of ['$5', '5 USD', '0', '0.0', '-1', '1e2', 'Infinity', 'lots', '9'.repeat(400)]) {
+    refuses(brief(`budgetUsd: ${bad}`), /is not an amount of dollars.*budgetUsd: 5/);
+  }
+  assert.equal(parse(brief('budgetUsd: .5')).budgetUsd, 0.5);
 });
 
 test('a maxAttempts that is not a whole number from 1 is refused', () => {

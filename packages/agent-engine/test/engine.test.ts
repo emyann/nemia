@@ -489,7 +489,7 @@ import fs from 'node:fs';
 test('tools, disallowedTools, effort and mcp are declared by the task and reach every attempt untouched', async () => {
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
-  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp }));
+  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, budgetUsd: 0.5 }));
   await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'failed' });
   await b.run(tick());
@@ -499,6 +499,7 @@ test('tools, disallowedTools, effort and mcp are declared by the task and reach 
     assert.deepEqual(r.disallowedTools, ['Bash(npm run build)'], 'and denied the same');
     assert.equal(r.effort, 'low');
     assert.deepEqual(r.mcp, mcp, 'and given the same servers');
+    assert.equal(r.budgetUsd, 0.5, 'and the same cap');
   }
 
   const plain = board();
@@ -508,13 +509,30 @@ test('tools, disallowedTools, effort and mcp are declared by the task and reach 
   assert.equal(plain.spawned[0]!.disallowedTools, undefined, 'no deny list');
   assert.equal(plain.spawned[0]!.effort, undefined);
   assert.equal(plain.spawned[0]!.mcp, undefined, 'no map, no servers of its own');
+  assert.equal(plain.spawned[0]!.budgetUsd, undefined, 'no budget, no cap');
 });
 
-test('decide never reads tools, effort, MCP servers, usage, an exit code, an end time or what a person said — carried on the record, never judged', () => {
+test('decide never reads tools, effort, MCP servers, a budget, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said/);
+  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.costUsd/);
+});
+
+test('a session its harness ended at its budget ends failed, reason budget, with what it cost — and its retry starts clean under the same cap, even under resume: always', async () => {
+  const b = board();
+  const id = await b.run(file({ ...spec, maxAttempts: 2, resume: 'always', budgetUsd: 0.01 }));
+  await b.run(tick());
+  const first = [...b.sessions.keys()][0]!;
+  b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed', exitCode: 1, budgetSpent: true, usage: { costUsd: 0.018, apiMs: 718 } });
+  await b.run(tick());
+
+  const [a] = (await b.run(view(id, new Map()))).state.attempts;
+  assert.deepEqual([a!.ended, a!.reason, a!.exitCode], ['failed', 'budget', 1]);
+  assert.deepEqual(a!.usage, { costUsd: 0.018, apiMs: 718 }, 'and what it spent getting there');
+  assert.equal(b.spawned.length, 2, 'attempts remained, so a second was started');
+  assert.equal(b.spawned[1]!.resumeFrom, undefined, 'clean: continuing that session would spend past its cap');
+  assert.equal(b.spawned[1]!.budgetUsd, 0.01, 'under the same cap');
 });
 
 // ─── usage: carried from the sighting, null when nobody measured ────────────

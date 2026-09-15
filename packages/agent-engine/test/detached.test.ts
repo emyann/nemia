@@ -507,6 +507,26 @@ test("claude -p's answer is its result object's structured_output, and nothing e
   assert.deepEqual(claudeResultOutput(''), {});
 });
 
+test('a budget reaches claude-detached as --max-budget-usd, and REFUSED on codex, which has no spend cap — in its own words', async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const d = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', budgetUsd: 0.25, resumeFrom: 'abc' }).args;
+  assert.equal(d[d.indexOf('--max-budget-usd') + 1], '0.25');
+  assert.equal(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args.includes('--max-budget-usd'), false, 'no budget, no flag');
+  assert.equal(claudeDetached.refuses!({ brief: 'b', cwd: '/r', budgetUsd: 0.25 }), undefined, 'claude -p keeps one');
+
+  assert.match(codex.refuses!({ brief: 'b', cwd: '/r', budgetUsd: 0.25 }) ?? '', /`budgetUsd: 0\.25` is a spend cap in dollars, and `codex exec` has none.*`claude-detached`/);
+  assert.equal(codex.refuses!({ brief: 'b', cwd: '/r' }), undefined, 'no budget, nothing refused');
+  assert.equal(codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', budgetUsd: 0.25 }).args.some((a) => a.includes('budget')), false, 'a direct caller is given no flag codex does not have');
+});
+
+test('claude -p that stopped at its budget says so in its result, and one that failed another way does not', () => {
+  // Measured on 2.1.272 with `--max-budget-usd 0.01` and haiku: exit 1, and this result (keys trimmed).
+  const spent = resultLine({ subtype: 'error_max_budget_usd', is_error: true, terminal_reason: 'budget_exhausted', errors: ['Reached maximum budget ($0.01)'], total_cost_usd: 0.01804, duration_api_ms: 718 });
+  assert.deepEqual(claudeResultOutput(spent), { usage: { costUsd: 0.01804, apiMs: 718 }, budgetSpent: true });
+  assert.equal(claudeResultOutput(resultLine({ subtype: 'error_max_turns', is_error: true })).budgetSpent, undefined, 'another error is not a spent budget');
+  assert.equal(claudeResultOutput(resultLine({ terminal_reason: 'budget_exhausted' })).budgetSpent, undefined, 'the subtype says it, as the SDK documents it');
+});
+
 test("what claude -p cost is its result's total_cost_usd, and its API time duration_api_ms — measured or absent, never 0", () => {
   // Measured on 2.1.272: a result carries both, beside a `usage` whose token counts read 0 where `modelUsage` counted thousands.
   assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: 0.01804, duration_api_ms: 718, usage: { input_tokens: 0, output_tokens: 0 } })), { usage: { costUsd: 0.01804, apiMs: 718 } });

@@ -19,6 +19,35 @@ const seen = (...pairs: Array<[string, Observed]>): Map<string, Sighting> =>
 const filed = (maxAttempts = 1): Event =>
   ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', maxAttempts });
 
+test('a session its harness ended at its spend cap ends failed, reason budget — and is not continued, whatever the policy', () => {
+  for (const resume of ['interrupted', 'always'] as const) {
+    const events: Event[] = [
+      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 2, resume, budgetUsd: 0.01 },
+      { kind: 'starting', at: at(1), attempt: 1 },
+      { kind: 'spawned', at: at(2), attempt: 1 },
+    ];
+    const spent = new Map([[N1, { sessionId: 's0', state: 'failed' as const, nativeId: 'native-1', budgetSpent: true as const }]]);
+    assert.deepEqual(decide(fold(TASK, events), spent, now(5)),
+      { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'budget', nativeId: 'native-1', closeout: undefined }, resume);
+    const ended = fold(TASK, [...events, { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'budget', nativeId: 'native-1' }]);
+    assert.deepEqual(decide(ended, new Map(), now(7)), { do: 'start', attempt: 2, resumeFrom: undefined }, `${resume}: a clean start — a nudge would spend past the cap`);
+  }
+  // The control: the same failure with no word from the harness about a budget is its verdict, and `always` continues it.
+  const always = fold(TASK, [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 2, resume: 'always', budgetUsd: 0.01 },
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+  ]);
+  assert.equal((decide(always, new Map([[N1, { sessionId: 's0', state: 'failed' as const, nativeId: 'native-1' }]]), now(5)) as { reason?: string }).reason, 'harness');
+  const failed = fold(TASK, [
+    { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 2, resume: 'always', budgetUsd: 0.01 },
+    { kind: 'starting', at: at(1), attempt: 1 },
+    { kind: 'spawned', at: at(2), attempt: 1 },
+    { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'harness', nativeId: 'native-1' },
+  ]);
+  assert.deepEqual(decide(failed, new Map(), now(7)), { do: 'start', attempt: 2, resumeFrom: 'native-1' });
+});
+
 test('a filed task starts its first attempt', () => {
   const s = fold(TASK, [filed()]);
   assert.deepEqual(decide(s, seen(), now()), { do: 'start', attempt: 1, resumeFrom: undefined });

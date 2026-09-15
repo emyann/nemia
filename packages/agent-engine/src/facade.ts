@@ -16,7 +16,7 @@ import os from 'node:os';
 import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  claudeOps, claudeRefuses, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
+  claudeBgRefuses, claudeOps, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
   type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
@@ -145,6 +145,14 @@ export type TaskSpec = {
    * on the task; `decide` never reads it.
    */
   mcp?: Record<string, McpServer>;
+  /**
+   * The most one attempt's session may spend, in dollars — `0.25`, `5`. Given to Claude Code as `--max-budget-usd`:
+   * `claude -p` ends the session once a response takes it past the cap, and the attempt ends `failed`, reason `budget`,
+   * with what it cost — never continued, whatever `resume` says, since a nudge would spend past it. Per attempt, as the
+   * harness counts it. Refused unless a positive number, and on a harness that keeps no cap: `claude`, whose `--bg`
+   * sessions spend past one (measured), and `codex`. Carried on the task; `decide` never reads it.
+   */
+  budgetUsd?: number;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };
@@ -161,7 +169,8 @@ export type Engine = {
    * resumeFrom or effort; a `cwd` that is not absolute; a `tools` that is not a list of names; a
    * `disallowedTools` that is not a list of permission rules; an
    * `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
-   * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists).
+   * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists); a
+   * `budgetUsd` that is not dollars above 0, or one its harness would not keep (`claude`, `codex`).
    * A harness brought as a `PromiseRunner` is asked nothing.
    */
   file(spec: TaskSpec): Promise<string>;
@@ -344,8 +353,11 @@ const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
   }
   const mcp = spec.mcp === undefined ? undefined : mcpRefuses(spec.mcp);
   if (mcp) return mcp;
+  if (spec.budgetUsd !== undefined && !(typeof spec.budgetUsd === 'number' && Number.isFinite(spec.budgetUsd) && spec.budgetUsd > 0)) {
+    return `\`budgetUsd: ${typeof spec.budgetUsd === 'number' ? spec.budgetUsd : JSON.stringify(spec.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
+  }
   const h = harnesses[spec.harness]!;
-  return (h === 'claude-bg' ? claudeRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
+  return (h === 'claude-bg' ? claudeBgRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);
 };
 
 // ─── the engine ─────────────────────────────────────────────────────────────

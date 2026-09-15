@@ -47,10 +47,16 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
   git(repo, 'checkout', '-q', 'main');
 };
 
-/** A board a test settles by hand. A settled attempt carries the usage it is given, as the engine records it. */
+/**
+ * A board a test settles by hand. A settled attempt carries the usage it is given, as the engine records it. The n-th task filed is filed
+ * 10n minutes after midnight on 2026-09-13, its attempt started 5 s and spawned 12 s after that, and ended 5 minutes after filing once it
+ * settled; the feed has each filing.
+ */
 const board = () => {
   type Filed = { id: string; closeoutSchema?: object };
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object }>();
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; filedAt: number }>();
+  const T0 = Date.parse('2026-09-13T00:00:00Z');
+  const iso = (ms: number) => new Date(ms).toISOString();
   const logs = new Map<string, string>();
   /** How many times each task was viewed: every view is a harness observe. */
   const viewed = new Map<string, number>();
@@ -64,13 +70,15 @@ const board = () => {
         state: {
           brief: t ? 'filed' : '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false,
           attempts: !t || t.phase === 'pending' ? [] : [{
-            n: 1, endedAt: settled ? '2026-09-13T00:00:00Z' : null, reason: settled ? 'harness' : null,
+            n: 1, startedAt: iso(t.filedAt + 5_000), spawnedAt: iso(t.filedAt + 12_000),
+            endedAt: settled ? iso(t.filedAt + 300_000) : null, reason: settled ? 'harness' : null,
             nativeId: `native-${id}`, closeout: t.closeout, usage: t.usage ?? null, exitCode: null,
           }],
         },
       };
     },
-    file: async (spec: Filed) => { tasks.set(spec.id, { spec, phase: 'pending' }); return spec.id; },
+    file: async (spec: Filed) => { tasks.set(spec.id, { spec, phase: 'pending', filedAt: T0 + tasks.size * 600_000 }); return spec.id; },
+    feed: async () => ({ entries: [...tasks].map(([taskId, t]) => ({ taskId, event: { kind: 'filed', at: iso(t.filedAt) } })), cursor: tasks.size }),
     stop: async () => {},
     logs: async (id: string) => logs.get(id) ?? '(no output yet)',
   } as unknown as Engine;
@@ -163,6 +171,17 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   const review = indexOf(lines, '  review');
   assert.deepEqual(lines.slice(review + 1, review + 3), ['    used  not measured', '    cost  not measured']);
   assert.ok(!lines.some((l) => /^\s+cost .*\d/.test(l)), 'cost never prints a number no runner measured');
+
+  // Where the time went, after what each step used: its session and its check, each filed, spawned and ended, queued and ran — off the
+  // engine's attempts, and the filing times on its feed.
+  assert.deepEqual(lines.slice(check + 3, check + 5), [
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
+    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
+  ]);
+  assert.deepEqual(lines.slice(review + 3, review + 4), ['    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured']);
+  // And the run's, after every step and before the branches: one round, so the run's line alone.
+  const total = indexOf(lines, '  timeline  run  queued 36s  ran 14m24s  wall 25m00s');
+  assert.ok(review < total && total < indexOf(lines, new RegExp(`^  ${branch}`)), 'after the steps, before the branches');
 
   // The commands stay as they are, and none is run.
   assert.deepEqual(lines.slice(-2), [`  ship it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`]);

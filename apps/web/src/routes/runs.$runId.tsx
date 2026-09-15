@@ -8,6 +8,7 @@ import { Check, code, Facts, specRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
+import { Timeline } from '../components/Timeline';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runQuery, type RunDetail } from '../lib/api';
 import { answersOf } from '../lib/asks';
@@ -85,6 +86,8 @@ function Run({ run }: { run: RunDetail }) {
           ]}
         />
       </section>
+
+      <Timeline run={run} />
 
       {run.steps.map((step) => (
         <StepSection key={step.name} step={step} runCancelled={runCancelled} />

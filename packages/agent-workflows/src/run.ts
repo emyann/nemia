@@ -14,6 +14,7 @@
 import path from 'node:path';
 import { checkContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
 import { depsLines, type Provisioned } from './deps.ts';
+import { sumUsage, usedLines, type Consumed } from './radius.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, type Workflow } from './workflow.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
@@ -2197,4 +2198,222 @@ export function workspacePlan(steps: readonly Workflow[], step: Workflow): Works
   return siblings.length === 1
     ? { kind: 'inherit', from: parent }
     : { kind: 'fork', from: parent };
+}
+
+// ─── where the time went ────────────────────────────────────────────────────
+
+/**
+ * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the
+ * engine. runner.ts hands `timeline` the engine's views, which have this shape.
+ */
+export type AttemptClock = { startedAt: string; spawnedAt: string | null; endedAt: string | null; reason: string | null; usage: Consumed | null };
+
+/** A task as the timeline reads it off the engine's view: its brief, its attempts, whether it settled, and what the attempt in flight has consumed so far. */
+export type TaskClock = { state: { brief: string; attempts: readonly AttemptClock[]; settled: string | null }; usage?: Consumed };
+
+/**
+ * What one task's session consumed, summed over its attempts (`sumUsage`): a settled attempt's usage off the engine's record, the one in
+ * flight off the view, and an attempt that never started left out. Undefined where nobody measured it.
+ */
+export const taskUsage = (view: TaskClock | undefined): Consumed | undefined =>
+  view ? sumUsage(view.state.attempts.filter((a) => a.reason !== 'unstartable').map((a) => (a.endedAt ? a.usage : view.usage))) : undefined;
+
+/**
+ * One task on the clock: a try's session, or its check.
+ *
+ * `filedAt` is when the task was filed, off the engine's feed — its view carries no such time — and null where the feed has no filing of it.
+ * `spawnedAt` is its first attempt's spawn, `endedAt` its last attempt's end once the task settled. A task waits for a slot between
+ * being filed and its first attempt, so `queuedMs` — filed → spawned — is the slot wait and the spawn; `ranMs` is spawned → ended,
+ * gaps between attempts included. Each is null where it cannot be measured, never 0.
+ *
+ * `at` is where the task stands: `unknown` to the engine; `queued`, filed and no attempt yet; `starting`, a slot taken and not spawned;
+ * `running`, spawned and not settled; `ended`, settled after it spawned; `unspawned`, settled before it ever spawned — stopped in the queue,
+ * or never startable. `queued` and `ran` are the two times in words: a duration, or why there is none.
+ */
+export type TaskSpan = {
+  taskId: string;
+  at: 'unknown' | 'queued' | 'starting' | 'running' | 'ended' | 'unspawned';
+  filedAt: string | null;
+  spawnedAt: string | null;
+  endedAt: string | null;
+  attempts: number;
+  queuedMs: number | null;
+  ranMs: number | null;
+  queued: string;
+  ran: string;
+};
+
+/**
+ * One try of a step on the clock. `round` is the round of its loop it was filed in (`roundIn`). `session` is its session's task; null on
+ * a try a recheck reached, which ran no session of its own — `sessionOf` names the try whose session it is. `check` is its check's task,
+ * null for a try whose check was never filed. `used` is what its session consumed (`taskUsage`), absent on a recheck's try.
+ */
+export type TimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used?: Consumed };
+
+/**
+ * The time of several tasks together: a round's, or the run's (`round` null). `tasks` counts the sessions and checks in it — a recheck's try
+ * adds its check, and not its session again — and `inFlight` those that have not ended. `queuedMs` sums the queue times that are known, and
+ * `ranMs` the run times of the tasks that ended: sums, so a fan-out's run time is more than its wall. `wallMs` is first filed → last ended,
+ * null while a task is in flight or a filing is not known. `queued`, `ran` and `wall` are the three in words, each saying what it leaves out.
+ */
+export type TimelineTotal = {
+  round: number | null;
+  tasks: number;
+  inFlight: number;
+  queuedMs: number;
+  ranMs: number;
+  wallMs: number | null;
+  queued: string;
+  ran: string;
+  wall: string;
+};
+
+/** Where a run's time went: every step's tries, in the record's order; a total per round of its loop, and the run's. */
+export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineTotal[]; run: TimelineTotal };
+
+/**
+ * Where a run's time went, per try and per check of every step, off the engine's views of their tasks and the run's `tries`. Pure.
+ *
+ * `views` must hold every task of every try — the tries behind the current one too, and each try's check; a task it does not hold reads as
+ * one the engine has no record of. `filed` is each task's filing time, off the engine's feed (`readFilings` in runner.ts); without it every
+ * queue time is `not known`. A step not filed has no try on the clock.
+ */
+export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, filed: ReadonlyMap<string, string> = new Map()): Timeline {
+  const steps: Record<string, TimelineTry[]> = {};
+  const counted: Array<{ round: number; span: TaskSpan }> = [];
+  for (const [name, record] of Object.entries(run.steps)) {
+    const earlier = record.tries ?? [];
+    const tries = [
+      ...earlier.map((t, i) => ({ taskId: t.taskId, check: t.check?.taskId, round: roundIn({ taskId: null, tries: earlier.slice(0, i) }) })),
+      ...(record.taskId ? [{ taskId: record.taskId, check: record.check?.taskId, round: roundIn(record) }] : []),
+    ];
+    steps[name] = tries.map((t, i): TimelineTry => {
+      // A recheck replaced only the check: the try after it has the same task, whose session is counted once, on the try that ran it.
+      const first = tries.findIndex((u) => u.taskId === t.taskId);
+      const session = first === i ? spanOf(t.taskId, views.get(t.taskId), filed.get(t.taskId)) : null;
+      const check = t.check ? spanOf(t.check, views.get(t.check), filed.get(t.check)) : null;
+      for (const span of [session, check]) if (span) counted.push({ round: t.round, span });
+      const used = session ? taskUsage(views.get(t.taskId)) : undefined;
+      return { try: i + 1, round: t.round, session, sessionOf: first === i ? null : first + 1, check, ...(used ? { used } : {}) };
+    });
+  }
+  const rounds = [...new Set(counted.map((c) => c.round))].sort((a, b) => a - b);
+  return {
+    steps,
+    rounds: rounds.map((round) => totalOf(round, counted.filter((c) => c.round === round).map((c) => c.span))),
+    run: totalOf(null, counted.map((c) => c.span)),
+  };
+}
+
+const between = (from: string | null, to: string | null): number | null => (from && to ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
+
+/** One task on the clock (`TaskSpan`), off the engine's view of it and its filing time. */
+function spanOf(taskId: string, view: TaskClock | undefined, filedAt: string | undefined): TaskSpan {
+  const attempts = view?.state.attempts ?? [];
+  const settled = view?.state.settled ?? null;
+  const spawnedAt = attempts.find((a) => a.spawnedAt)?.spawnedAt ?? null;
+  const at: TaskSpan['at'] = !view || (!attempts.length && !view.state.brief) ? 'unknown'
+    : settled ? (spawnedAt ? 'ended' : 'unspawned')
+    : !attempts.length ? 'queued'
+    : spawnedAt ? 'running' : 'starting';
+  const endedAt = at === 'ended' ? attempts.at(-1)?.endedAt ?? null : null;
+  const queuedMs = between(filedAt ?? null, spawnedAt);
+  const ranMs = between(spawnedAt, endedAt);
+  const queued = at === 'unknown' ? 'not on the record'
+    : at === 'queued' ? 'waiting for a slot'
+    : at === 'starting' ? 'not spawned yet'
+    : at === 'unspawned' ? 'never spawned'
+    : queuedMs === null ? 'not known' : durationWord(queuedMs);
+  const ran = at === 'unknown' ? 'not on the record'
+    : at === 'running' ? 'still running, no end yet'
+    : !spawnedAt ? '—'
+    : ranMs === null ? 'not known' : durationWord(ranMs);
+  return { taskId, at, filedAt: filedAt ?? null, spawnedAt, endedAt, attempts: attempts.length, queuedMs, ranMs, queued, ran };
+}
+
+/** Several tasks' time together (`TimelineTotal`). */
+function totalOf(round: number | null, spans: readonly TaskSpan[]): TimelineTotal {
+  const inFlight = spans.filter((s) => s.at === 'queued' || s.at === 'starting' || s.at === 'running');
+  const queuedMs = spans.reduce((n, s) => n + (s.queuedMs ?? 0), 0);
+  const ranMs = spans.reduce((n, s) => n + (s.ranMs ?? 0), 0);
+  const waiting = spans.filter((s) => s.at === 'queued' || s.at === 'starting').length;
+  const queueUnknown = spans.filter((s) => s.queued === 'not known' || s.at === 'unknown').length;
+  const running = spans.filter((s) => s.at === 'running').length;
+  const ranUnknown = spans.filter((s) => s.ran === 'not known' || s.at === 'unknown').length;
+  const firsts = spans.map((s) => s.filedAt);
+  const lasts = spans.map((s) => s.endedAt).filter((at): at is string => at !== null);
+  const wallMs = inFlight.length || !spans.length || firsts.some((at) => at === null) || spans.some((s) => s.at === 'unknown' || (s.at === 'ended' && !s.endedAt)) || !lasts.length
+    ? null
+    : between([...firsts as string[]].sort()[0]!, lasts.sort().at(-1)!);
+  // A sum over the times that are known, then what it leaves out — and never a sum of none, which would read as nothing spent.
+  const said = (known: number, ms: number, pending: [number, string], unknown: number): string =>
+    [known ? durationWord(ms) : '', pending[0] ? `${pending[0]} ${pending[1]}` : '', unknown ? (known || pending[0] ? `${unknown} not known` : 'not known') : '']
+      .filter(Boolean).join(', ') || '—';
+  return {
+    round,
+    tasks: spans.length,
+    inFlight: inFlight.length,
+    queuedMs,
+    ranMs,
+    wallMs,
+    queued: said(spans.filter((s) => s.queuedMs !== null).length, queuedMs, [waiting, 'waiting'], queueUnknown),
+    ran: said(spans.filter((s) => s.ranMs !== null).length, ranMs, [running, 'still running'], ranUnknown),
+    wall: wallMs !== null ? durationWord(wallMs) : inFlight.length ? 'still going' : 'not known',
+  };
+}
+
+/** A duration for a person, as the operator measures one: `58s`, `19m42s`, `1h05m`, `2d03h`. */
+export function durationWord(ms: number): string {
+  const s = Math.floor(Math.max(0, ms) / 1000);
+  const two = (n: number) => String(n).padStart(2, '0');
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m${two(s % 60)}s`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h${two(m % 60)}m`;
+  return `${Math.floor(h / 24)}d${two(h % 24)}h`;
+}
+
+/**
+ * A step's timeline as `wf decide` prints it, under its `used`: a row per try's session and per try's check, in the order they ran. Each
+ * says when it was filed, spawned and ended — UTC, with the day where it is not the first row's — then its queue and run time, and beside a
+ * session what it used. Empty for a step not filed.
+ */
+export function timelineLines(tries: readonly TimelineTry[]): string[] {
+  const instants = tries.flatMap((t) => [t.session, t.check]).flatMap((s) => (s ? [s.filedAt, s.spawnedAt, s.endedAt] : [])).filter((at): at is string => at !== null);
+  const day = instants.sort()[0]?.slice(0, 10);
+  const clock = (at: string | null) => (at === null ? 'not known' : `${at.slice(0, 10) === day ? '' : `${at.slice(5, 10)} `}${at.slice(11, 19)}Z`);
+  const words = (s: TaskSpan): string => {
+    if (s.at === 'unknown') return `the engine has no record of ${s.taskId}`;
+    const filedAt = `filed ${clock(s.filedAt)}`;
+    if (s.at === 'queued') return `${filedAt}  waiting for a slot`;
+    if (s.at === 'starting') return `${filedAt}  a slot taken, not spawned yet`;
+    if (s.at === 'unspawned') return `${filedAt}  settled before it spawned`;
+    const times = `${filedAt}  spawned ${clock(s.spawnedAt)}`;
+    const attempts = s.attempts > 1 ? `  ${s.attempts} attempts` : '';
+    if (s.at === 'running') return `${times}  no end yet, still running  queued ${s.queued}${attempts}`;
+    return `${times}  ended ${clock(s.endedAt)}  queued ${s.queued}  ran ${s.ran}${attempts}`;
+  };
+  const rows = tries.flatMap((t): Array<[string, string]> => {
+    const label = `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
+    const used = usedLines(t.used)[0]!.replace(/^used\s+/, '');
+    return [
+      [label, t.session ? `${words(t.session)}  used ${used}` : `its session is try ${t.sessionOf}'s, checked again`],
+      ...(t.check ? [[`try ${t.try} check`, words(t.check)] satisfies [string, string]] : []),
+    ];
+  });
+  return rowsUnder('timeline', rows);
+}
+
+/** A run's totals as `wf decide` prints them, after its steps: each round's, when its loop went round, then the run's. */
+export function timelineTotalLines(t: Timeline): string[] {
+  if (!t.run.tasks) return [];
+  const said = (total: TimelineTotal) => `queued ${total.queued}  ran ${total.ran}  wall ${total.wall}`;
+  return rowsUnder('timeline', [...(t.rounds.length > 1 ? t.rounds.map((r): [string, string] => [`round ${r.round}`, said(r)]) : []), ['run', said(t.run)]]);
+}
+
+/** Rows under a label, the label on the first and the rest aligned under it, each row's name padded to the longest. */
+function rowsUnder(label: string, rows: ReadonlyArray<readonly [string, string]>): string[] {
+  const width = Math.max(0, ...rows.map(([name]) => name.length));
+  return rows.map(([name, text], i) => `${i ? ' '.repeat(label.length) : label}  ${name.padEnd(width)}  ${text}`);
 }

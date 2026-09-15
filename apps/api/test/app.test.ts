@@ -141,6 +141,22 @@ const r2 = {
   },
 };
 
+/**
+ * The timeline of a step whose one task settled as `settledTask` journals it — filed, spawned and ended all at `at` — in a store that keeps
+ * no feed, so its filing, and the queue, is not known: never 0. What its session used is nobody's count.
+ */
+const settledTimeline = (taskId: string) => [{
+  try: 1, round: 1, sessionOf: null, check: null,
+  session: { taskId, at: 'ended', filedAt: null, spawnedAt: at, endedAt: at, attempts: 1, queuedMs: null, ranMs: 0, queued: 'not known', ran: '0s' },
+  used: { usage: null, used: 'not measured', cost: 'not measured' },
+}];
+
+/** The run's time over that one task: a round, and the run, both with a queue and a wall nobody can know. */
+const oneTaskTotals = () => {
+  const total = { tasks: 1, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: 'not known', ran: '0s', wall: 'not known' };
+  return { rounds: [{ round: 1, ...total }], run: { round: null, ...total } };
+};
+
 test('a run in full: the brief, each step\'s spec and prose, what it was told, and how it went', async () => {
   settledTask('t-2', blocked);
   writeRun(r2);
@@ -156,6 +172,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     status: 'failed', moving: false, waitingOnYou: ['implement'], warning: null,
     graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
     steps: undefined,
+    timeline: oneTaskTotals(),
   });
 
   const implementTry = {
@@ -178,6 +195,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     // Its journal carries no usage: nobody measured it, which is not 0.
     used: { usage: null, used: 'not measured', cost: 'not measured' },
     tries: firstTry(implementTry),
+    timeline: settledTimeline('t-2'),
   });
 
   const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, attempts: { count: 0, latest: null } };
@@ -192,9 +210,10 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     note: null,
     needs: null, blockedByHarness: false, lastLine: null, said: [], asked: null,
     ...reviewTry,
-    // Not filed: it consumed nothing.
+    // Not filed: it consumed nothing, and has no try on the clock.
     used: null,
     tries: firstTry(reviewTry),
+    timeline: [],
   });
   // Not filed, so what it would be given now: implement has run in this workspace, so look there.
   assert.ok(review.told.startsWith('Review what implement did.\n\n## What was asked for\n\nAdd a cache\n\nKeep it small.'), review.told);
@@ -262,11 +281,12 @@ test('a run whose workflow folder is gone still answers, from its record', async
       ...implementTry,
       used: { usage: null, used: 'not measured', cost: 'not measured' },
       tries: firstTry(implementTry),
+      timeline: settledTimeline('t-2'),
     },
     {
       name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, note: null,
       needs: null, blockedByHarness: false, lastLine: null, said: [], asked: null,
-      ...reviewTry, used: null, tries: firstTry(reviewTry),
+      ...reviewTry, used: null, tries: firstTry(reviewTry), timeline: [],
     },
   ]);
 
@@ -316,6 +336,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
     ...originalTry,
     used: { usage: null, used: 'not measured', cost: 'not measured' },
     tries: firstTry(originalTry),
+    timeline: settledTimeline('t-6'),
   });
   assert.deepEqual([review.body, review.spec.after, review.status], ['Review it.', ['replacement'], 'waiting']);
   assert.deepEqual([replacement.body, replacement.taskId, replacement.status, replacement.closeout], ['Do the original thing.', null, 'waiting', null]);
@@ -1232,4 +1253,76 @@ test("a step's file is served by name, with its type and no caching — and a na
   // No such run, and no such step.
   assert.match((await (await app.request('/api/runs/no-such-run/steps/shoot/artifacts/shot.png')).json()).error, /No run 'no-such-run'/);
   assert.equal((await app.request('/api/runs/r-52/steps/deploy/artifacts/shot.png')).status, 404);
+});
+
+// ─── where the time went ────────────────────────────────────────────────────
+
+test("the detail carries where each step's time went — per try and per check, filed off the engine's feed — and the run's, in the package's words", async (t) => {
+  const { readFilings, timeline } = await import('agent-workflows');
+  const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 9, m, s)).toISOString();
+  /** A task as the engine journals one: filed, a slot taken and spawned, and — given an end — ended and settled. */
+  const ran = (taskId: string, harness: string, filedAt: string, spawnedAt: string, ended?: { at: string; outcome: 'succeeded' | 'failed'; more?: object }) => journal(taskId, [
+    { kind: 'filed', at: filedAt, brief: filedBrief(taskId), cwd: '/code/app', maxAttempts: 1, harness },
+    { kind: 'starting', at: spawnedAt, attempt: 1 },
+    { kind: 'spawned', at: spawnedAt, attempt: 1 },
+    ...(ended
+      ? [
+          { kind: 'ended', at: ended.at, attempt: 1, sessionId: `ae/${taskId}/1`, observed: ended.outcome === 'succeeded' ? 'done' : 'failed', reason: 'harness', ...ended.more },
+          { kind: 'settled', at: ended.at, outcome: ended.outcome },
+        ]
+      : []),
+  ]);
+  const feed = path.join(root, 'engine', 'feed.jsonl');
+  const fileOnFeed = (taskId: string, at: string) => fs.appendFileSync(feed, `${JSON.stringify({ taskId, event: { kind: 'filed', at } })}\n`);
+
+  // implement's check refused try 1, and try 2's check is still running. The feed has each filing; a task's view has none.
+  ran('r-60-implement', 'codex', T(0), T(0, 12), { at: T(19, 54), outcome: 'succeeded', more: { closeout: done, usage: { turns: 54, toolCalls: 146 } } });
+  ran('r-60-implement-check', 'check', T(19, 56), T(19, 57), { at: T(20, 55), outcome: 'failed', more: { exitCode: 1 } });
+  ran('r-60-implement-try2', 'codex', T(21), T(21, 3), { at: T(26, 38), outcome: 'succeeded', more: { closeout: done } });
+  ran('r-60-implement-try2-check', 'check', T(26, 40), T(26, 41));
+  for (const [taskId, at] of [['r-60-implement', T(0)], ['r-60-implement-check', T(19, 56)], ['r-60-implement-try2', T(21)], ['r-60-implement-try2-check', T(26, 40)]] as const) fileOnFeed(taskId, at);
+  const record = {
+    ...r2, id: 'r-60', workflowDir: gone,
+    workflow: [{ name: 'implement', after: [], body: 'Implement it.', check: 'npm test', retries: 1 }, { name: 'review', after: ['implement'], body: 'Review it.' }],
+    steps: {
+      implement: {
+        taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' },
+        tries: [{ taskId: 'r-60-implement', check: { taskId: 'r-60-implement-check' }, then: 'retries' }],
+      },
+      review: { taskId: null },
+    },
+  };
+  writeRun(record);
+
+  const observations = countingObservations(t);
+  const run = await (await app.request('/api/runs/r-60')).json();
+  assert.equal(observations(), 1, 'the feed is a read of the store: the detail observes the harnesses once, as it did');
+  const [implement, review] = run.steps;
+  const words = (s: { at: string; filedAt: string | null; spawnedAt: string | null; endedAt: string | null; queued: string; ran: string } | null) =>
+    s && { at: s.at, filedAt: s.filedAt, spawnedAt: s.spawnedAt, endedAt: s.endedAt, queued: s.queued, ran: s.ran };
+  assert.deepEqual(implement.timeline.map((x: { try: number; round: number; sessionOf: number | null }) => [x.try, x.round, x.sessionOf]), [[1, 1, null], [2, 1, null]]);
+  assert.deepEqual(words(implement.timeline[0].session), { at: 'ended', filedAt: T(0), spawnedAt: T(0, 12), endedAt: T(19, 54), queued: '12s', ran: '19m42s' });
+  assert.deepEqual(words(implement.timeline[0].check), { at: 'ended', filedAt: T(19, 56), spawnedAt: T(19, 57), endedAt: T(20, 55), queued: '1s', ran: '58s' });
+  assert.deepEqual(words(implement.timeline[1].check), { at: 'running', filedAt: T(26, 40), spawnedAt: T(26, 41), endedAt: null, queued: '1s', ran: 'still running, no end yet' });
+  // What each session used, in `wf decide`'s words, as the step's `used` is.
+  assert.deepEqual(implement.timeline[0].used, { usage: { turns: 54, toolCalls: 146 }, used: '54 turns · 146 tool calls · tokens in not measured · tokens out not measured', cost: 'not measured' });
+  assert.deepEqual(review.timeline, [], 'a step not filed has no try on the clock');
+  assert.deepEqual([run.timeline.run.tasks, run.timeline.run.inFlight, run.timeline.run.queued, run.timeline.run.ran, run.timeline.run.wall], [4, 1, '17s', '26m15s, 1 still running', 'still going']);
+
+  // Held to the package: its `timeline` over the engine's own views and the feed's filings, word for word.
+  const e = engine();
+  const views = new Map((await e.list()).map((view) => [view.id, view]));
+  const { filed } = await readFilings(e);
+  const theirs = timeline(readRun('r-60'), views, filed);
+  assert.deepEqual(run.timeline, JSON.parse(JSON.stringify({ rounds: theirs.rounds, run: theirs.run })));
+  // Each try as the package has it, less `used`, which the api words as `wf decide` does (asserted above).
+  const lessUsed = (tries: ReadonlyArray<{ used?: unknown }>) => JSON.parse(JSON.stringify(tries.map(({ used: _, ...x }) => x)));
+  assert.deepEqual(lessUsed(implement.timeline), lessUsed(theirs.steps.implement!));
+
+  // A try filed since is read on from where the last read of the feed stopped: its filing is known on the next poll, and not `not known`.
+  ran('r-60-implement-try3', 'codex', T(40), T(40, 7));
+  fileOnFeed('r-60-implement-try3', T(40));
+  writeRun({ ...record, steps: { ...record.steps, implement: { taskId: 'r-60-implement-try3', tries: [...record.steps.implement.tries, { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, then: 'nudge' }] } } });
+  const again = await (await app.request('/api/runs/r-60')).json();
+  assert.deepEqual(words(again.steps[0].timeline[2].session), { at: 'running', filedAt: T(40), spawnedAt: T(40, 7), endedAt: null, queued: '7s', ran: 'still running, no end yet' });
 });

@@ -918,6 +918,10 @@ screen shows what the branch touched, read out of git:
     check  npm test  →  exit 0 ✓
     used  29 turns · 93 tool calls · 6.35M in · 112k out
     cost  not measured
+    timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 turns · …
+              try 1 check  filed 08:19:56Z  spawned 08:19:57Z  ended 08:20:55Z  queued 1s  ran 58s
+
+  timeline  run  queued 13s  ran 20m40s  wall 20m55s
 ```
 
 - **touched** is `git diff --numstat` against the run's base, grouped by workspace package (the base's
@@ -942,6 +946,14 @@ screen shows what the branch touched, read out of git:
 - **used** and **cost** are the engine's `usage` for the step's current try, summed over its attempts.
   A count nobody measured says `not measured`, never `0`. So does cost, which none of the runners `wf`
   files on reports.
+- **timeline** is where the step's time went (`timeline` in `src/run.ts`, pure): a row for each try's
+  session and each try's check, in UTC — filed, spawned, ended; *queued*, filed → spawned, which is the wait
+  for a slot behind other runs; *ran*, spawned → ended. The spawn and the end are the engine's attempts; the
+  filing is on the engine's feed, since a task's view carries no filing time, and a queue the feed cannot
+  time says `not known`, never `0s`. A try still running says `no end yet`, and a try a recheck reached says
+  whose session it checked again. After the steps, a total for each round of a loop that went round, then
+  the run's: queued and ran summed — so steps side by side add up to more than the wall — and the wall,
+  first filed → last ended, `still going` while anything is in flight.
 
 The three lists are globs, written once in `src/radius.ts` and printed by `wf decide --help`. A branch
 git cannot diff says it was not read, and the lesson line says it does not know. Neither reads it as a

@@ -98,7 +98,9 @@ function runWith(note: string | null): RunDetail {
         try: 1, round: 1, then: null, current: true, taskId: 't-1', note, status: 'rounds exhausted', check: null, closeout: null,
         attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
       }],
+      timeline: [],
     }],
+    timeline: { rounds: [], run: { round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } },
   };
 }
 
@@ -471,7 +473,7 @@ const unset: WorkflowStepSpec = {
 
 const unescaped = (text: string) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
 
-test("a workflow's step is drawn in the spec mode: what it runs on, its check, tools, mode and loop — and no status chip, no attempt", async () => {
+test("a workflow's step is drawn in the spec mode: what it runs on, its check, effort, tools, mode and loop — and no status chip, no attempt", async () => {
   const html = await specMarkup({
     ...unset, harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash'], permissionMode: 'dontAsk',
     check: 'npm test && npm run typecheck', output: 'review.schema.json', loop: 'implement', rounds: 3,
@@ -482,6 +484,7 @@ test("a workflow's step is drawn in the spec mode: what it runs on, its check, t
   const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2]!)]);
   assert.deepEqual(lines, [
     ['check', 'npm test && npm run typecheck'],
+    ['effort', "harness's own"],
     ['tools', '4'],
     ['mode', 'dontAsk'],
     ['loop', 'implement · 3 rounds'],
@@ -499,22 +502,30 @@ test("a workflow's step is drawn in the spec mode: what it runs on, its check, t
   assert.deepEqual(handles, [['target', 'left', null], ['source', 'right', null], ['source', 'bottom', LOOP_SOURCE], ['target', 'bottom', LOOP_TARGET]], html);
 });
 
-test('a step that sets nothing is drawn on the defaults, with no lines under its head', async () => {
+test("a step that sets nothing is drawn on the defaults: its harness's own effort and tools under its head, and nothing else", async () => {
   const html = await specMarkup(unset);
   assert.match(html, />default harness · default model</);
-  assert.doesNotMatch(html, /<dl/, html);
+  const lines = [...html.matchAll(/<dt[^>]*>([^<]+)<\/dt><dd[^>]*>([^<]*)<\/dd>/g)].map((m) => [m[1], unescaped(m[2]!)]);
+  assert.deepEqual(lines, [['effort', "harness's own"], ['tools', "harness's own"]], html);
   assert.doesNotMatch(html, /data-state=/, html);
 
   const { specLines } = await import('../src/components/StepNode.tsx');
-  assert.deepEqual(specLines({ ...unset, loop: 'implement', rounds: 1 }), [['loop', 'implement · 1 round']]);
+  assert.deepEqual(specLines({ ...unset, loop: 'implement', rounds: 1 }).at(-1), ['loop', 'implement · 1 round']);
 });
 
 test('a step with more than three tools counts them on its node, named in the title; three or fewer are written out', async () => {
   const { specLines } = await import('../src/components/StepNode.tsx');
   const four = ['Read', 'Grep', 'Glob', 'Bash'];
-  assert.deepEqual(specLines({ ...unset, tools: four }), [['tools', '4', 'Read, Grep, Glob, Bash']]);
-  assert.deepEqual(specLines({ ...unset, tools: four.slice(0, 3) }), [['tools', 'Read, Grep, Glob']]);
-  assert.deepEqual(specLines({ ...unset, tools: ['Read'] }), [['tools', 'Read']]);
+  const toolsOf = (tools: string[] | null) => specLines({ ...unset, tools }).filter(([label]) => label === 'tools');
+  assert.deepEqual(toolsOf(four), [['tools', '4', 'Read, Grep, Glob, Bash']]);
+  assert.deepEqual(toolsOf(four.slice(0, 3)), [['tools', 'Read, Grep, Glob']]);
+  assert.deepEqual(toolsOf(['Read']), [['tools', 'Read']]);
+  // Unset is the harness's own set, and an empty list is none: never a line with nothing on it.
+  assert.deepEqual(toolsOf(null), [['tools', "harness's own"]]);
+  assert.deepEqual(toolsOf([]), [['tools', 'none']]);
+  // The effort a step sets, and the harness's own where it sets none.
+  assert.deepEqual(specLines({ ...unset, effort: 'high' }).find(([label]) => label === 'effort'), ['effort', 'high']);
+  assert.deepEqual(specLines(unset).find(([label]) => label === 'effort'), ['effort', "harness's own"]);
 
   /** The tools line as drawn: what it shows, and its title. */
   const toolsLine = (html: string) => {
@@ -1028,4 +1039,55 @@ test('the edges between cards are drawn as every edge is: from a run into each c
   assert.match(done, /data-state="done"/);
   assert.doesNotMatch(done, /stroke-dasharray/);
   assert.equal(travelling(done + toCome).length, 0);
+});
+
+// ─── the timeline ────────────────────────────────────────────────────────────
+
+test("the run page's timeline: a row per try's session and per check, in the api's words — a recheck, a check still running, a task the engine lost — and the totals", async () => {
+  const { Timeline } = await import('../src/components/Timeline.tsx');
+  type TaskSpan = import('../src/lib/api.ts').TaskSpan;
+  type TimelineTotal = import('../src/lib/api.ts').TimelineTotal;
+  const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
+  const span = (taskId: string, at: TaskSpan['at'], queued: string, ran: string, times: Partial<TaskSpan> = {}): TaskSpan =>
+    ({ taskId, at, filedAt: null, spawnedAt: null, endedAt: null, attempts: 1, queuedMs: null, ranMs: null, queued, ran, ...times });
+  const total = (round: number | null, queued: string, ran: string, wall: string): TimelineTotal =>
+    ({ round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall });
+  const base = runWith(null);
+  const used = { usage: { turns: 54 }, used: '54 turns · tool calls not measured · tokens in not measured · tokens out not measured', cost: 'not measured' };
+  const run: RunDetail = {
+    ...base,
+    steps: [
+      {
+        ...base.steps[0]!, name: 'implement',
+        timeline: [
+          { try: 1, round: 1, sessionOf: null, used, session: span('t-1', 'ended', '12s', '19m42s', { filedAt: T(0), spawnedAt: T(0, 12), endedAt: T(19, 54) }), check: span('c-1', 'ended', '1s', '58s', { filedAt: T(19, 56) }) },
+          // Rechecked: no session of its own, and its check still running.
+          { try: 2, round: 1, sessionOf: 1, used: null, session: null, check: span('c-2', 'running', '1s', 'still running, no end yet', { filedAt: T(30), spawnedAt: T(30, 1) }) },
+        ],
+      },
+      { ...base.steps[0]!, name: 'review', timeline: [{ try: 1, round: 1, sessionOf: null, used: null, session: span('t-lost', 'unknown', 'not on the record', 'not on the record'), check: null }] },
+      { ...base.steps[0]!, name: 'respond', timeline: [] },
+    ],
+    timeline: { rounds: [total(1, '14s', '20m40s', 'still going')], run: total(null, '14s', '20m40s, 1 still running', 'still going') },
+  };
+  const html = renderToStaticMarkup(createElement(Timeline, { run }));
+  const rows = [...html.matchAll(/<tr data-step="([^"]+)"(?: data-try="\d+")? data-task="(\w+)" data-at="(\w+)"/g)].map((m) => [m[1], m[2], m[3]]);
+  assert.deepEqual(rows, [['implement', 'session', 'ended'], ['implement', 'check', 'ended'], ['implement', 'session', 'rechecked'], ['implement', 'check', 'running'], ['review', 'session', 'unknown']], html);
+  const cell = (name: string) => [...html.matchAll(new RegExp(`data-cell="${name}"[^>]*>([^<]*)<`, 'g'))].map((m) => unescaped(m[1]!));
+  assert.deepEqual(cell('queued'), ['12s', '1s', '1s', '14s']);
+  assert.deepEqual(cell('ran'), ['19m42s', '58s', 'still running, no end yet', '20m40s, 1 still running']);
+  assert.ok(html.includes(`<time dateTime="${T(0, 12)}"`) || html.includes(`datetime="${T(0, 12)}"`), 'each instant as the engine wrote it, on its <time>');
+  assert.match(unescaped(html), /try 2<\/td><td colSpan="6"[^>]*>its session is try 1's, checked again/i);
+  assert.match(html, /the engine has no record of t-lost/);
+  assert.ok(html.includes('>54 turns · tool calls not measured'), 'what the session used, beside it');
+  assert.doesNotMatch(html, /data-step="respond"/, 'a step not filed has no row');
+  // One round: the run's total alone, its wall in the api's words.
+  assert.deepEqual([...html.matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]), ['run']);
+  assert.match(html, /data-cell="wall"[^>]*>wall still going</);
+
+  // A loop that went round: each round's total, then the run's.
+  const looped = { ...run, timeline: { rounds: [total(1, '30s', '13m30s', '15m00s'), total(2, '1m10s', '6m50s', '9m00s')], run: total(null, '1m40s', '20m20s', '25m00s') } };
+  assert.deepEqual([...renderToStaticMarkup(createElement(Timeline, { run: looped })).matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]), ['round-1', 'round-2', 'run']);
+  // Nothing filed: no timeline at all.
+  assert.equal(renderToStaticMarkup(createElement(Timeline, { run: { ...run, steps: run.steps.map((step) => ({ ...step, timeline: [] })) } })), '');
 });

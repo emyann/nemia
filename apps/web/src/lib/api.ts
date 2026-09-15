@@ -206,7 +206,48 @@ export type RunDetail = {
     used: StepUsed | null;
     /** Every try, earliest first, the current one last: `attempts` counts the current try's task alone. */
     tries: StepTry[];
+    /** Where the step's time went, try by try and check by check; empty for a step not filed. */
+    timeline: StepTimelineTry[];
   }>;
+  /** The run's time together: each round of its loop, and the whole run. */
+  timeline: { rounds: TimelineTotal[]; run: TimelineTotal };
+};
+
+/**
+ * Mirrors `TaskSpan` in agent-workflows' run.ts: one task of a try on the clock — its session, or its check. `filedAt` is off the engine's
+ * feed, and null where the feed has none; `spawnedAt` its first attempt's spawn; `endedAt` its last attempt's end once it settled. `at` is
+ * where it stands, and `queued` (filed → spawned, the wait for a slot) and `ran` (spawned → ended) the package's words for its two times.
+ */
+export type TaskSpan = {
+  taskId: string;
+  at: 'unknown' | 'queued' | 'starting' | 'running' | 'ended' | 'unspawned';
+  filedAt: string | null;
+  spawnedAt: string | null;
+  endedAt: string | null;
+  attempts: number;
+  queuedMs: number | null;
+  ranMs: number | null;
+  queued: string;
+  ran: string;
+};
+
+/**
+ * Mirrors `StepTimelineTry` in apps/api/src/app.ts: one try of a step on the clock. `session` is null on a try a recheck reached, whose session
+ * is try `sessionOf`'s; `check` null for a try whose check was never filed; `used` what its session consumed, in `wf decide`'s words.
+ */
+export type StepTimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used: StepUsed | null };
+
+/** Mirrors `TimelineTotal` in agent-workflows' run.ts: a round's time, or the run's (`round` null) — sums over its tasks, and its wall, in words. */
+export type TimelineTotal = {
+  round: number | null;
+  tasks: number;
+  inFlight: number;
+  queuedMs: number;
+  ranMs: number;
+  wallMs: number | null;
+  queued: string;
+  ran: string;
+  wall: string;
 };
 
 /** Mirrors `Usage` in apps/api/src/app.ts: a count nobody measured is absent, never 0. */
@@ -509,6 +550,13 @@ export function withGraph(id: string, detail: RunDetail): RunDetail {
   const unsaid = detail.steps.find((step) => !Array.isArray((step as { said?: unknown }).said));
   if (unsaid) {
     throw new Error(`The api answered run '${id}' without what was said to its step '${unsaid.name}', so it is older than this board, whose session page shows what a person said to a step. ${restart}`);
+  }
+  // And a run's page draws where its time went, off each step's timeline and the run's totals.
+  const untimed = detail.steps.find((step) => !Array.isArray((step as { timeline?: unknown }).timeline));
+  const totals = (detail as { timeline?: Partial<RunDetail['timeline']> | null }).timeline;
+  if (untimed || !totals || !Array.isArray(totals.rounds) || !totals.run) {
+    const what = untimed ? `the timeline of its step '${untimed.name}'` : 'the timeline of the run';
+    throw new Error(`The api answered run '${id}' without ${what}, so it is older than this board, whose run page shows where a run's time went. ${restart}`);
   }
   return detail;
 }

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, retry, saidCount, say, sensitiveDiff, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Wait } from 'agent-workflows';
+import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, saidCount, say, sensitiveDiff, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
 import { answerOf, assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
@@ -269,8 +269,18 @@ export type RunDetail = {
      * round of a loop, and each try within one, is a task of its own.
      */
     tries: StepTry[];
+    /** Where the step's time went, try by try and check by check (`StepTimelineTry`); empty for a step not filed. */
+    timeline: StepTimelineTry[];
   }>;
+  /** The run's time together, in the package's words (`timeline`): each round of its loop, and the whole run. */
+  timeline: { rounds: TimelineTotal[]; run: TimelineTotal };
 };
+
+/**
+ * One try of a step on the clock, as the package's `timeline` has it (`TimelineTry`): its session's task and its check's, each filed, spawned
+ * and ended, with how long it queued for a slot and ran (the package's `TaskSpan`) — and what its session used, in `wf decide`'s words, where it ran one.
+ */
+export type StepTimelineTry = Omit<TimelineTry, 'used'> & { used: StepUsed | null };
 
 /** What a session consumed as the engine's `Usage` carries it: a count nobody measured is absent, never 0. */
 export type Usage = NonNullable<ReturnType<typeof consumption>[string]>;
@@ -626,6 +636,23 @@ function needsOf(run: Run, name: string, views: Views): StepNeeds {
   };
 }
 
+/**
+ * When each task was filed, off the engine's feed (`readFilings`), and where the last read of it stopped: a task's view carries no filing
+ * time, and the wait for a slot is filing → first attempt. Read on from the cursor on each detail — a filing is written once and never
+ * changes — so a page polled every five seconds reads what was appended since. A read's cache: a fresh process reads the feed from the start.
+ */
+const filings = { filed: new Map<string, string>(), cursor: 0 };
+
+/** Every task's filing time the feed has, read on from where the last read stopped. A feed that cannot be read this time leaves what was read before. */
+async function filedTimes(): Promise<ReadonlyMap<string, string>> {
+  try {
+    filings.cursor = (await readFilings(e, filings.cursor, filings.filed)).cursor;
+  } catch {
+    // The queue times of tasks filed since say `not known` until a read works.
+  }
+  return filings.filed;
+}
+
 /** Where the last read of a blocked session's conversation stopped, and what it had said last by then: by task and attempt. */
 const lastSaid = new Map<string, { cursor: string; line: string | null }>();
 
@@ -697,6 +724,8 @@ async function detail(run: Run): Promise<RunDetail> {
   const source = shownWorkflow(run, workflows);
   // Off the views already read: no observation of its own.
   const used = consumption(views, run);
+  // Off the same views — every task in the store, so every try's — and the feed's filing times: no observation either.
+  const clock = timeline(run, views, await filedTimes());
   return {
     id: run.id,
     brief: run.brief,
@@ -743,8 +772,10 @@ async function detail(run: Run): Promise<RunDetail> {
         ...current,
         used: taskId ? usedOf(used[name]) : null,
         tries: triesOf(run, name, steps, views, current, judged.answers),
+        timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used) : null })),
       };
     })),
+    timeline: { rounds: clock.rounds, run: clock.run },
   };
 }
 

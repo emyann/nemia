@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   AGENT_FACING, CHECK_AFFECTING, LESSON, ROOT_GROUP, branchesToRead, count, deepWorkspaces, groupOf, inFullLines, isLesson, lessonGlobs, lessonLine, matches,
-  parseGlobs, parseNumstat, radius, radiusLines, sensitiveHeading, sensitivePaths, sumUsage, touchedLines, usedLines,
+  parseGlobs, parseNumstat, radius, radiusLines, sensitiveHeading, sensitivePaths, sumUsage, touchedLines, usedLines, budgetWord, dollars,
 } from '../src/radius.ts';
 
 const WORKSPACES = ['packages/*', 'apps/*'];
@@ -228,4 +228,18 @@ test('the screen reads the result branches, or — before a terminal step has on
   assert.deepEqual(branchesToRead(['wf/r/review'], ['wf/r/implement', 'wf/r/review']), ['wf/r/review']);
   assert.deepEqual(branchesToRead([], ['wf/r/implement', undefined, 'wf/r/implement']), ['wf/r/implement']);
   assert.deepEqual(branchesToRead([], [undefined]), []);
+});
+
+test('what a session used, with the api and tool time its harness counted — beside the counts once either is measured — and its cost to the cent, three figures under one', () => {
+  assert.deepEqual(usedLines({ turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 }),
+    ['used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s', 'cost  $3.01']);
+  // `claude-detached` counts api time and cost, and nothing else.
+  assert.deepEqual(usedLines({ costUsd: 4.2, apiMs: 61_000 }),
+    ['used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured · api 1m01s · tools not measured', 'cost  $4.20']);
+  assert.equal(usedLines({ turns: 3, toolMs: 400 })[0], 'used  3 turns · tool calls not measured · tokens in not measured · tokens out not measured · api not measured · tools <1s', 'a measured moment is not 0s');
+  assert.equal(usedLines({ turns: 3 })[0], 'used  3 turns · tool calls not measured · tokens in not measured · tokens out not measured', 'nothing timed it: said as before');
+  assert.deepEqual([dollars(3.012), dollars(4.2), dollars(0.004), dollars(0.00412), dollars(0)], ['$3.01', '$4.20', '$0.004', '$0.00412', '$0.00']);
+  assert.deepEqual([budgetWord(3), budgetWord(2.5), budgetWord(0.25)], ['$3', '$2.50', '$0.25']);
+  // Summed as every count is: only where every attempt measured it.
+  assert.deepEqual(sumUsage([{ apiMs: 1_000, toolMs: 5, costUsd: 1 }, { apiMs: 2_000, costUsd: 0.5 }]), { apiMs: 3_000, costUsd: 1.5 });
 });

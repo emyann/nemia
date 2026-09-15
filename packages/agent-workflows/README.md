@@ -92,7 +92,7 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `effort`,
-`permissionMode`, `tools`, `disallow`, `deadlineSeconds`, `maxAttempts`, `check`, `retries`, `output`, `loop`,
+`permissionMode`, `tools`, `disallow`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
 
@@ -182,6 +182,56 @@ are copies of agent-engine's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX
 word only when the step is filed, after the run exists. `test/vocabulary.test.ts` imports the engine's
 lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
 codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
+
+### What a step may spend: `budget:`
+
+```md
+---
+check: npm test && npm run typecheck
+retries: 1
+budget: 5        # dollars: the most this step's tries may cost together
+---
+Implement what was asked, in this repository.
+```
+
+`budget:` is dollars, `budget: 5` or `budget: 2.50`: the most the step's tries may cost together, every try and every round of it.
+Refused at load, naming the fix: `0`, a negative, a word, an amount written with its unit (`$5`, with `budget: 5` to write instead) and
+an empty value; and any `budget:` on codex, in the engine's words — `codex exec` has no spend cap, and reports no cost to cap. It is
+frozen on the run with every other key.
+
+The cost is the engine's: what the harness priced each attempt at, read once the attempt has ended (agent-engine's README, *What an
+attempt consumed*). What the key does turns on what the harness can keep:
+
+| harness | while a try runs | once a try has ended |
+|---|---|---|
+| `claude` | nothing. A `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-engine's open issues 17 and 18), so **a `claude` step is never stopped mid-flight by its budget, and can overrun it by one try** | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
+| `claude-detached` | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `budgetUsd` on every filing, so `claude -p` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the engine settles the task `failed`, naming the budget, and the step reads `budget exhausted`. An attempt the engine starts again within one filing (`maxAttempts:`) is handed the same amount | as on `claude` |
+| `codex` | refused at load | — |
+
+A step reads **`over budget`** — `over budget $4.20 of $3` in `wf ls` — when its ended tries have together cost the cap in force or
+more, so nothing is left and any session would spend past it, and another session of it is the way on: its last try ended without letting
+what waits on it run (its check refused; it ended unsigned, failed or stopped; or it signed off blocked and its session settled), or its
+loop asks for a round that would file it again.
+
+- **`retries:` files no try of it, and no round of its loop goes, on the run's word.** Spending past the cap on its own word is what a
+  cap forbids. A looping step whose round would file a step over its budget reads `over budget` too, naming that step (`over budget —
+  implement $4.20 of $3`), so what waits on the loop is not filed.
+- **A person raises the cap:** `wf retry <run> <step> --budget <amount>` for a try, `wf round <run> [<step>] --budget <amount>` for a
+  round. Each is refused by name without `--budget`, or with one not above what the step has cost. `--budget` on a step that is not over
+  its budget is refused, and so is `--budget` on `--recheck`, which files no session: a recheck costs nothing and needs none. The raise
+  rides on the ask, and the tick keeps it on the try the ask replaced (`EarlierTry.budget`). It is in force from that try on, and a try
+  that passes the new cap is held again.
+- **A check that did not finish holds nothing.** Killed at its deadline or stopped, it said nothing of the work, and its way on is the
+  check again, which costs nothing: the step reads `failed ✗ check (unfinished)` as it would without a budget, and `wf decide` offers
+  `--recheck` first, saying that a new session of it needs `--budget`.
+- **A step that did the work keeps its word.** Verified or unverified, and not asked for again, a step over its budget still lets what
+  waits on it run: nothing more would be filed for it anyway.
+- **A try's brief says why its last try ended** — unsigned, failed, its check — and, beside that, that its tries had reached the budget
+  and a person raised it. Being over budget is why nothing was filed, not what the session has to fix.
+
+Only what the engine measured counts, so a step with a budget whose tries have no cost on them reads as it would without one. The rule is
+the same on both Claude harnesses — the tries together, against the cap — and on `claude-detached` the harness keeps it too, each session
+handed what is left.
 
 ## What one step knows of another
 
@@ -572,13 +622,26 @@ another repository and change that line.
 | `verified ✓` | its check exited 0 | is filed |
 | `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
 | `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, below |
+| `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `wf round --budget` |
+| `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (`claude-detached`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
 | `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** — unless it is tried again, below |
 | `failed`, `stopped` | the engine's verdict on the step's own task | **never runs** |
 
-`→ waiting on you` names every step that is blocked, unsigned, refused by its check or out of rounds,
-and has no try or round due. `wf decide` prints `FAILED CHECK:`, `CHECK DID NOT FINISH:`, `UNSIGNED:`,
-`UNVERIFIED:` and `ROUNDS EXHAUSTED` first, then each check's command and exit code and, for a check
-that refused, the last 20 lines of stdout and of stderr.
+`→ waiting on you` names every step that is blocked, unsigned, refused by its check, out of rounds, over
+budget or ended at its budget, and has no try or round due. `wf decide` prints `FAILED CHECK:`, `CHECK DID NOT
+FINISH:`, `UNSIGNED:`, `UNVERIFIED:`, `ROUNDS EXHAUSTED`, `OVER BUDGET` and `BUDGET EXHAUSTED` first, then each
+check's command and exit code and, for a check that refused, the last 20 lines of stdout and of stderr.
+
+A step over its budget is named for how it ended on its own work as well — `FAILED:` with its logs, `UNSIGNED:`,
+`FAILED CHECK:` — since a cap reached does not make a broken session any less broken. The `OVER BUDGET` line then says
+why each step is held: its own amounts, `implement ($4.25 of $3)`, or, for a looping step, the step its round would
+file again, `review (held: its round would file implement again, which has cost $4.25 of its $3 budget)`. Its offer
+says both: `implement: over budget (failed), $3.40 of $3. Raise its cap above $3.40 …`.
+
+Beside each step's word, `wf ls` puts what its tries have cost once the engine measured it — `verified ✓  $3.01`,
+and `≥$3.01` where an ended attempt has no cost on it — and on the run's line, the run's total. A word that already
+shows the step's own spend, `over budget $4.20 of $3`, has nothing beside it. A looping step held on another step's
+budget, `over budget — implement $4.25 of $3`, has its own cost beside it.
 
 **`unsigned` blocks every `claude-detached` step** until engine open issue 4 is fixed: that harness
 never hands the closeout schema on, so its steps never sign off. `claude` and `codex` steps do.
@@ -648,10 +711,15 @@ retries: 1
   session to read it. A hand-written ask file is held to the same word by the tick,
   and one from before messages reads as it did. The record keeps no message: what `wf ls` and `wf decide` say
   of an answered try is read off the ask file, waiting or in `done/`.
+- **A step past its budget needs `--budget <amount>`.** A step `over budget` or `budget exhausted` waits on you like a refused
+  check, and `retries:` never tries it. `wf decide` offers `wf retry <run> <step> --budget <amount>` for those two statuses,
+  with what the step has cost and the cap; a step whose check did not finish past its budget is offered `--recheck` first, which
+  needs none. A session of one is refused without `--budget`, or with one not above what the step has cost, and the try's brief
+  says why its last try ended and, beside it, that the cap was raised ([What a step may spend](#what-a-step-may-spend-budget)).
 - **The record keeps the current try where it always was.** `steps[name].taskId` and `steps[name].check` are
   the current try's, so everything that reads them reads the try that decides the step. The tries before it
   go under `steps[name].tries`, in order, each with what replaced it: `retries`, `nudge`, `fresh` (and its
-  model) or `recheck`. A person's tries do not spend the step's `retries`.
+  model) or `recheck` — and the cap a `--budget` raised, when one did. A person's tries do not spend the step's `retries`.
 - **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
   0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`,
   `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
@@ -742,6 +810,10 @@ rounds: 3
   that files a round and dies before writing the record is adopted by the next, as a try is. `wf ls`
   says `round 2 of 3` beside each step of the loop, and `round 2 of 3 due` while the next tick has it
   to file.
+- **A loop past a budget.** A round that would file a step of the loop over its `budget:` is not filed on the looping
+  step's word: both read `over budget`, and `wf round <run> --budget <amount>` raises the cap of each such step for the round —
+  refused without it, or with one not above what they have cost. A loop `rounds exhausted` with a step past its budget asks for
+  `--budget` with its once more too.
 - **A loop is a chain.** At load the run refuses a `loop:` that names no step this one waits on, a
   looping step without a boolean `again`, `rounds:` without `loop:`, a step in the loop that forks or
   merges a worktree of its own (cut once, off round 1's branch, it would judge work that is no longer
@@ -916,11 +988,12 @@ screen shows what the branch touched, read out of git:
 
   implement
     check  npm test  →  exit 0 ✓
-    used  29 turns · 93 tool calls · 6.35M in · 112k out
-    cost  not measured
-    timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 turns · …
+    used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s
+    cost  $3.01 · budget $5
+    timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 turns · …  cost $3.01
               try 1 check  filed 08:19:56Z  spawned 08:19:57Z  ended 08:20:55Z  queued 1s  ran 58s
 
+  cost  run $3.01
   timeline  run  queued 13s  ran 20m40s  wall 20m55s
 ```
 
@@ -944,11 +1017,15 @@ screen shows what the branch touched, read out of git:
   `docs/`: an app's `src/routes/docs/` is product code, and counting it would report a lesson nobody wrote. CLAUDE.md's *When you miss* is a rule, and
   this line holds a person to it.
 - **used** and **cost** are the engine's `usage` for the step's current try, summed over its attempts.
-  A count nobody measured says `not measured`, never `0`. So does cost, which none of the runners `wf`
-  files on reports.
+  A count nobody measured says `not measured`, never `0`, and so does a cost. Beside the counts, the time the
+  harness counted waiting on the model and running tools, once either was measured (`api 8m06s · tools 2s`).
+  The cost is the harness's own figure, to the cent (three figures under one); for a step whose tries ran more
+  than one session, also what they cost together (`$1.19 this try · $4.20 over 3 tries`); then the cap in force
+  (`· budget $5`). After the steps, the run's (`cost  run $12.40`): every step's tries together, saying how many
+  ended attempts had no cost on them.
 - **timeline** is where the step's time went (`timeline` in `src/run.ts`, pure): a row for each try's
   session and each try's check, in UTC — filed, spawned, ended; *queued*, filed → spawned, which is the wait
-  for a slot behind other runs; *ran*, spawned → ended. The spawn and the end are the engine's attempts; the
+  for a slot behind other runs; *ran*, spawned → ended; beside a session, what it used, and what it cost where that was measured. The spawn and the end are the engine's attempts; the
   filing is on the engine's feed, since a task's view carries no filing time, and a queue the feed cannot
   time says `not known`, never `0s`. A try still running says `no end yet`, and a try a recheck reached says
   whose session it checked again. After the steps, a total for each round of a loop that went round — the

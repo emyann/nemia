@@ -19,7 +19,7 @@
  * judgement belongs to a step with an agent in it, not to a keyword. The workflow is a team, not a
  * program: `after` orders, `resume` continues, `check` measures, `retries` counts, `output` declares
  * what a step's closeout says for the steps after it and `input` reads it, `loop` is the edge back and
- * `rounds` counts it, and the rest say who does the work and for how long.
+ * `rounds` counts it, and the rest say who does the work, for how long and for how much.
  *
  * `loop` is the one edge that points backwards, and it is still not a condition: whether the work goes
  * round again is the looping step's agent's word — `again`, in its closeout, the way `blocked` is — and
@@ -71,6 +71,15 @@ export type Workflow = {
   disallow?: string[];
   deadlineSeconds?: number;
   maxAttempts?: number;
+  /**
+   * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
+   * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
+   * try, no round of a loop it is in — until a person raises it (`wf retry --budget`, `wf round --budget`). A `claude` session is never
+   * stopped by it mid-flight: `--bg` keeps no cap, and writes its cost only as its process exits, so a step can overrun by one try. On
+   * `claude-detached` what is left of it is handed to the engine as `budgetUsd` too, and the harness ends a session once the tries together
+   * reach it. Refused on codex, which has none.
+   */
+  budget?: number;
   /**
    * A shell command the run executes in the step's workspace after the step hands off; exit 0 is
    * what makes the step verified. It measures, it does not route. The command is read from the
@@ -133,7 +142,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'deadlineSeconds', 'maxAttempts', 'check', 'retries', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -265,6 +274,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     disallow: disallowOf(name, meta.disallow, harness),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
     maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
+    budget: budgetOf(name, meta.budget, harness),
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),
     input: meta.input?.split(',').map((s) => s.trim()).filter(Boolean),
@@ -332,7 +342,9 @@ function readKeys(step: string, block: string): Partial<Record<StepKey, string>>
           ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
           : key === 'disallow'
             ? `${step}: \`disallow\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
-            : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
+            : key === 'budget'
+              ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
+              : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
     }
     meta[key] = value;
   }
@@ -450,6 +462,41 @@ function countOf(step: string, key: keyof typeof COUNTS, value: string | undefin
   const unit = key === 'deadlineSeconds' ? /^(\d+)\s*([smh])$/.exec(value) : null;
   const instead = unit ? `\`${key}: ${Math.max(least, Number(unit[1]) * { s: 1, m: 60, h: 3600 }[unit[2] as 's' | 'm' | 'h'])}\`` : `for example \`${key}: ${example}\``;
   return refuse(`${step}: \`${key}: ${value}\` is not a count. \`${key}\` is ${counts}: a whole number ${least ? 'above zero' : 'of zero or more'}, in digits${unit ? ' with no unit' : ''} — ${instead}.`);
+}
+
+const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
+
+/**
+ * Dollars as a person writes them — `5`, `2.50` — or undefined for anything else: digits, and a point with digits after it, above
+ * zero. What `budget:` takes, and `wf retry --budget` and `wf round --budget` too.
+ */
+export function dollarsOf(written: string): number | undefined {
+  const value = written.trim();
+  const n = /^\d+(?:\.\d+)?$/.test(value) ? Number(value) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * The reason `codex exec` keeps no budget, in the engine's words (agent-engine's `codex.refuses`), which `test/vocabulary.test.ts`
+ * holds this copy to: a cap there is one nothing reads.
+ */
+const CODEX_KEEPS_NO_CAP = 'is a spend cap in dollars, and `codex exec` has none: 0.154.0 has no such flag, and reports no cost to cap';
+
+/**
+ * `budget:` as dollars, refused unless an amount above zero (`dollarsOf`), and on codex. `$5` and `5 USD` are what the author meant, so
+ * the refusal writes the amount back without its unit, as `deadlineSeconds: 5m`'s does the arithmetic.
+ */
+function budgetOf(step: string, budget: string | undefined, harness: string | undefined): number | undefined {
+  if (budget === undefined) return undefined;
+  const named = `${step}: \`budget: ${budget}\``;
+  if (harness === 'codex') {
+    refuse(`${named} ${CODEX_KEEPS_NO_CAP}. Delete the line, or run the step on claude, where the run files nothing more for it once its tries have cost the budget, or on claude-detached, whose harness also ends a session at the cap.`);
+  }
+  const amount = dollarsOf(budget);
+  if (amount !== undefined) return amount;
+  const bare = budget.replace(/^\$\s*/, '').replace(/\s*(?:usd|dollars?)$/i, '');
+  const unit = dollarsOf(bare) !== undefined;
+  return refuse(`${named} is not an amount. \`budget\` is the most the step's tries may cost together, in dollars: a number above zero, in digits${unit ? ` with no unit — \`budget: ${bare}\`` : ` — for example ${BUDGET_EXAMPLE}`}.`);
 }
 
 function checkOf(step: string, check: string | undefined): string | undefined {

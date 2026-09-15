@@ -309,7 +309,7 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 test('every key a step has is read — none is accepted and then dropped', () => {
   const values: Record<StepKey, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
-    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', deadlineSeconds: '900', maxAttempts: '2', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
+    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -324,7 +324,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, disallow, deadlineSeconds, maxAttempts, check, retries, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, disallow, deadlineSeconds, maxAttempts, budget, check, retries, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -448,6 +448,26 @@ test('deadlineSeconds: 5m is refused, with the seconds to write instead', () => 
   for (const bad of ['0', '-5', '1.5', '9e2', 'NaN', 'Infinity', 'ninety', '0x10']) {
     assert.throws(() => fm('review', `deadlineSeconds: ${bad}`), /is not a count\. .*above zero/, bad);
   }
+});
+
+test('budget: is dollars — a whole amount or one with cents — frozen as a number; absent, the step has no cap', () => {
+  assert.equal(fm('implement', 'budget: 5').budget, 5);
+  assert.equal(fm('implement', 'budget: 2.50').budget, 2.5);
+  assert.equal(fm('implement', 'budget: 0.25').budget, 0.25);
+  assert.equal(fm('implement', 'harness: claude-detached\nbudget: 3').budget, 3);
+  assert.equal(fm('implement', 'check: npm test').budget, undefined);
+});
+
+test('REFUSED: a budget: that is not an amount above zero — 0, a negative, a word, an empty value — each naming the fix', () => {
+  const refusedAs = (value: string, pattern: RegExp) =>
+    assert.throws(() => fm('implement', `budget:${value ? ` ${value}` : ''}`), (e: Error) => e instanceof WorkflowError && e.exitCode === 2 && pattern.test(e.message), value);
+  for (const zero of ['0', '0.00']) refusedAs(zero, /^implement: `budget: 0(\.00)?` is not an amount\. `budget` is the most the step's tries may cost together, in dollars: a number above zero, in digits — for example `budget: 5`, or `budget: 2\.50`\.$/);
+  for (const bad of ['-1', '-2.50', 'five', 'lots', '1e3', '.5', '2.', 'Infinity', 'NaN', '5 5']) refusedAs(bad, /is not an amount\. .*a number above zero, in digits — for example `budget: 5`/);
+  // The unit is what the author meant, so the refusal writes the amount without it.
+  refusedAs('$5', /^implement: `budget: \$5` is not an amount\. .* in digits with no unit — `budget: 5`\.$/);
+  refusedAs('2.50 USD', /with no unit — `budget: 2\.50`\.$/);
+  refusedAs('', /^implement: `budget` has no value, which reads as no cap to one person and as nothing to spend to another\. Give the most the step's tries may cost together, in dollars — `budget: 5`, or `budget: 2\.50` — or delete the line, and the step has no budget\.$/);
+  refusedAs('   ', /`budget` has no value/);
 });
 
 test('maxAttempts and retries are whole counts; retries may be 0, which is what absent means', () => {

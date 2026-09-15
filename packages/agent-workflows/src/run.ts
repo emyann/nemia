@@ -14,7 +14,9 @@
 import path from 'node:path';
 import { checkContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
 import { depsLines, type Provisioned } from './deps.ts';
-import { sumUsage, usedLines, type Consumed } from './radius.ts';
+import { budgetWord, dollars, durationWord, sumUsage, usedLines, type Consumed } from './radius.ts';
+
+export { durationWord };
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, type Workflow } from './workflow.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
@@ -104,6 +106,11 @@ export type Run = {
  *   verified         its check exited 0
  *   unverified       signed off, and it declared no `check:` — nothing but its own word says it worked
  *   exhausted        verified or unverified, and it asked for another round of its `loop:` on the last one `rounds:` allows
+ *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
+ *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
+ *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
+ *                    for one, a step of its loop is
+ *   budget exhausted its harness ended its session at the step's `budget:` (`claude-detached`: the engine's reason `budget`)
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
  *
@@ -111,14 +118,15 @@ export type Run = {
  * ended; the run no longer reads it as the work being done.
  */
 export type StepStatus =
-  | 'waiting' | 'running' | 'blocked' | 'unsigned' | 'checking' | 'verified' | 'unverified' | 'exhausted' | 'failed (check)' | 'failed' | 'stopped';
+  | 'waiting' | 'running' | 'blocked' | 'unsigned' | 'checking' | 'verified' | 'unverified' | 'exhausted' | 'over budget' | 'budget exhausted'
+  | 'failed (check)' | 'failed' | 'stopped';
 
 /** What a follower may be filed on. */
 export const satisfiesAfter = (s: StepStatus): boolean => s === 'verified' || s === 'unverified';
 
 /** Final without satisfying `after`: nothing waiting on a step in one of these can ever run. */
 export const stopsFollowers = (s: StepStatus): boolean =>
-  s === 'blocked' || s === 'unsigned' || s === 'exhausted' || s === 'failed (check)' || s === 'failed' || s === 'stopped';
+  s === 'blocked' || s === 'unsigned' || s === 'exhausted' || s === 'over budget' || s === 'budget exhausted' || s === 'failed (check)' || s === 'failed' || s === 'stopped';
 
 export type Assessment = {
   /** Steps whose predecessors are all verified or unverified, and which have not been filed. File these. */
@@ -163,6 +171,8 @@ export function assess(
   roundAsks: readonly RoundAsk[] = [],
   /** Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to stop it first. */
   harnessBlocked: (taskId: string) => boolean = () => false,
+  /** What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, nothing is known spent, and no step is over. */
+  spendOf: SpendOf = () => undefined,
 ): Assessment {
   // A cancelled run outranks anything its tasks say. Nothing more is filed for it however
   // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
@@ -170,12 +180,12 @@ export function assess(
   // Nor its checks: a suite nobody will read the verdict of is a suite nobody asked for. Nor a try, nor a round.
   if (run.cancelledAt) return { ready: [], check: [], retry: [], round: [], blocked: [], status: 'cancelled' };
 
-  const status = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps)]));
+  const status = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   // A step about to be tried again is not final: what waits on it waits, and the run is still going.
-  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked);
+  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
   for (const r of retry) status.set(r.step, 'running');
   // Nor is a looping step whose loop goes round again: what waits on it waits for the next round's answer.
-  const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks);
+  const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
   for (const r of round) status.set(r.step, 'running');
   const ready: string[] = [];
   const check: string[] = [];
@@ -375,6 +385,15 @@ export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<R
  * done by its check or its word, and final without letting what waits on it run — a person decides. Below
  * the cap it reads as signed, and `assess` files the next round (`roundsDue`). From its second round a
  * loop's target owes `replies` beside what it declares (`owedFields`), which is why `steps` is asked for.
+ *
+ * **A budget is spent once the engine says so.** A task whose harness ended its last attempt at its cap is `budget exhausted`, whatever
+ * else its session left. A step whose ended tries have together cost the cap in force on it or more (`overBudget`), leaving nothing to
+ * spend, is `over budget` where another session of it would be the way on (`held`): its try ended without letting what waits on it run —
+ * which `retries:` would try again, or a person — or its loop asks for a round that would file it again. A check that did not finish is no
+ * such end: its way on is the check again, which costs nothing, so the step reads `failed (check)` as before, and only a check that
+ * refused (`refusedCheck`, off `verdictOf`) holds it. A step that did the work and is not asked for again keeps its word: nothing more is
+ * filed for it anyway, and what waits on it runs. Only what the engine measured counts, so a `claude` session still running, whose cost
+ * is written as its process exits, counts once it has ended — and a step can overrun by one try.
  */
 export function stepStatus(
   step: Workflow,
@@ -384,6 +403,68 @@ export function stepStatus(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   /** The run's steps: what says whether this one is a loop's target, and owes `replies`. */
   steps: readonly Workflow[] = [],
+  /** What each task's sessions cost (`taskSpend`). Left out, nothing is known spent: no step is over budget, nor ended at one. */
+  spendOf: SpendOf = () => undefined,
+  /**
+   * What each step's current check exited with (`refusedCheck`): only a check that refused holds a step over its budget. Left out, no check
+   * is taken to have refused, so a step whose check did not pass reads `failed (check)`, as `retriesDue` reads it: no try due.
+   */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+): StepStatus {
+  return standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status;
+}
+
+/** Where a step stands (`stepStatus`), and where it would stand but for being over its budget (`own`): a try's ways are its own status's. */
+function standing(
+  step: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+): { status: StepStatus; own: StepStatus } {
+  const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+  return { own, status: held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf) ? 'over budget' : own };
+}
+
+/** The statuses a try takes a step on from (`retryable`): a step over its budget in one waits for a person to raise the cap. */
+const TRIED_FROM: ReadonlySet<StepStatus> = new Set(['unsigned', 'failed (check)', 'failed', 'stopped', 'blocked']);
+const SETTLED: ReadonlySet<TaskPhase> = new Set(['succeeded', 'failed', 'stopped']);
+
+/**
+ * Whether a step reads `over budget`: over it (`overBudget`) with another session of it the way on — a try, from a status a try is taken from
+ * (a step signed off blocked, once its session has settled; a check that refused, and not one that did not finish, whose way on is the
+ * check again), or a round its loop asks for (`roundWanted`). A looping step that asked for a round is held by any step of its loop over
+ * budget, itself included: the round would file each of them again.
+ */
+function held(
+  step: Workflow, run: Run, own: StepStatus, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf, verdictOf: (step: string) => Verdict | undefined,
+): boolean {
+  const record = run.steps[step.name];
+  const taskId = record?.taskId;
+  if (!taskId) return false;
+  if (own === 'failed (check)' && !(record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name)))) return false;
+  if (TRIED_FROM.has(own)) return (own !== 'blocked' || SETTLED.has(phaseOf(taskId))) && Boolean(overBudget(step, run, spendOf));
+  if (!satisfiesAfter(own)) return false;
+  const looping = loopOf(steps, step.name);
+  if (!looping || !roundWanted(looping, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)) return false;
+  return looping.name === step.name ? loopOver(steps, looping, run, spendOf).length > 0 : Boolean(overBudget(step, run, spendOf));
+}
+
+/** Whether a looping step asked for a round its `rounds:` still allows — signed, and `again: true` — which the run files on its word. */
+function roundWanted(
+  looping: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf,
+): boolean {
+  return satisfiesAfter(ownStatus(looping, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)) && closeoutOf(looping.name)?.output?.again === true;
+}
+
+/**
+ * Where a step stands on its own work, its budget aside: `stepStatus`, but never `over budget` — `budget exhausted` is the harness's end of
+ * the session, and its own. What a try's brief says the last try ended as (`retrySection`): being over budget is why nothing was filed, not
+ * how the try ended.
+ */
+export function ownStatus(
+  step: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf,
 ): StepStatus {
   const st = run.steps[step.name];
   if (!st?.taskId) return 'waiting';
@@ -391,6 +472,8 @@ export function stepStatus(
   if (said?.outcome === 'blocked') return 'blocked';
 
   const phase = phaseOf(st.taskId);
+  // Cut off at its cap, not concluded: the engine settles it `failed`, naming the budget, and no attempt follows (agent-engine's README).
+  if (phase === 'failed' && spendOf(st.taskId)?.budgetEnded) return 'budget exhausted';
   const asked = askedCloseout(st.taskId);
   if (phase === 'failed' && !said && asked === 'unsigned') return 'unsigned';
   if (phase === 'failed' || phase === 'stopped') return phase;
@@ -406,6 +489,130 @@ export function stepStatus(
   return check === 'succeeded' ? signed('verified')
     : check === 'failed' || check === 'stopped' ? 'failed (check)'
     : 'checking';
+}
+
+// ─── what a step may spend ──────────────────────────────────────────────────
+
+/**
+ * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`), and
+ * how many ended with none (`unmeasured`) — killed before its harness wrote one, or on a model it could not price. An attempt still running is
+ * in neither: a `claude --bg` session writes its cost only as its process exits (agent-engine's open issue 18).
+ */
+export type Spend = { usd: number; measured: number; unmeasured: number };
+
+/** What one task's sessions cost (`Spend`), and whether its harness ended its last attempt at its budget — the engine's reason `budget`. */
+export type TaskSpend = Spend & { budgetEnded: boolean };
+
+/** What a task's sessions cost, off the engine's view of it (`taskSpend`); undefined for a task nobody read. */
+export type SpendOf = (taskId: string) => TaskSpend | undefined;
+
+const NOTHING_SPENT: Spend = { usd: 0, measured: 0, unmeasured: 0 };
+
+/**
+ * What one task cost, off the engine's view of it. Pure. An attempt counts once it is over — its end written, or its task settled with it
+ * open, as a deadline leaves one — and one that never started (`unstartable`) ran no session. Undefined for no view.
+ */
+export function taskSpend(view: TaskClock | undefined): TaskSpend | undefined {
+  if (!view) return undefined;
+  const over = view.state.attempts.filter((a) => a.reason !== 'unstartable' && (a.endedAt != null || view.state.settled != null));
+  const costs = over.map((a) => a.usage?.costUsd);
+  return {
+    usd: costs.reduce<number>((n, c) => n + (c ?? 0), 0),
+    measured: costs.filter((c) => c !== undefined).length,
+    unmeasured: costs.filter((c) => c === undefined).length,
+    budgetEnded: view.state.attempts.at(-1)?.reason === 'budget',
+  };
+}
+
+/** Several spends as one. */
+export const addSpend = (spends: ReadonlyArray<Spend | undefined>): Spend =>
+  spends.reduce<Spend>((sum, s) => (s ? { usd: sum.usd + s.usd, measured: sum.measured + s.measured, unmeasured: sum.unmeasured + s.unmeasured } : sum), NOTHING_SPENT);
+
+/** The tasks a step's sessions ran as, every try's, each once: the try after a recheck has its session's task again (`EarlierTry`). */
+export const sessionTasks = (record: StepRecord | undefined): string[] =>
+  [...new Set([...(record?.tries ?? []).map((t) => t.taskId), ...(record?.taskId ? [record.taskId] : [])])];
+
+/** What a step's tries have cost together: every try's session, once (`sessionTasks`). Pure. */
+export const stepSpend = (run: Run, name: string, spendOf: SpendOf): Spend => addSpend(sessionTasks(run.steps[name]).map(spendOf));
+
+/** What a run has cost: every step's tries. Its checks run on the run's own shell harness, which prices nothing. Pure. */
+export const runSpend = (run: Run, spendOf: SpendOf): Spend => addSpend(Object.keys(run.steps).map((name) => stepSpend(run, name, spendOf)));
+
+/** The cap in force on a step: the last a person raised it to (`EarlierTry.budget`: `wf retry --budget`, `wf round --budget`), else its `budget:`. */
+export const budgetOf = (step: Workflow, record: StepRecord | undefined): number | undefined =>
+  [...(record?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget ?? step.budget;
+
+/**
+ * A step whose tries have together cost the cap in force on it or more — nothing left to spend, since any session spends something: what they
+ * cost, and the cap. Undefined for any other. Pure. At the cap and not only past it, so a session filed for a step not held always has
+ * something left, which `budgetUsdFor` hands a harness that keeps a cap.
+ */
+export function overBudget(step: Workflow, run: Run, spendOf: SpendOf): { spent: Spend; cap: number } | undefined {
+  const cap = budgetOf(step, run.steps[step.name]);
+  if (cap === undefined) return undefined;
+  const spent = stepSpend(run, step.name, spendOf);
+  return spent.usd >= cap ? { spent, cap } : undefined;
+}
+
+/** The steps of a looping step's loop (`loopSpan`) that are over budget, in its order: what holds its next round. */
+export const loopOver = (steps: readonly Workflow[], looping: Workflow, run: Run, spendOf: SpendOf): Array<{ name: string; spent: Spend; cap: number }> =>
+  loopSpan(steps, looping).flatMap((name) => {
+    const step = steps.find((s) => s.name === name);
+    const over = step && overBudget(step, run, spendOf);
+    return over ? [{ name, ...over }] : [];
+  });
+
+/** What sessions cost, for a person: `$4.20` — and `≥$4.20` when a session that ended has no cost on it, so a part never reads as the whole. */
+export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${dollars(s.usd)}`;
+
+/**
+ * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, on `claude-detached` only, whose
+ * `claude -p` ends a session at it — so the harness holds the tries together to the cap, and not each session to a whole cap of its own. The
+ * engine refuses one on `claude`, whose `--bg` sessions keep none (agent-engine's open issue 17): there the run holds the cap between tries.
+ *
+ * To the millionth of a dollar, rounded up, so the harness is handed digits and never `0`, which the engine refuses: a step with nothing
+ * left is `over budget`, and filed nothing (`overBudget`). An attempt the engine starts again within one filing (`maxAttempts:`) is handed
+ * the same amount, since the engine counts no spend of its own.
+ */
+export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spend = NOTHING_SPENT): number | undefined {
+  if (step.harness !== 'claude-detached' || cap === undefined) return undefined;
+  return Math.max(Math.ceil((cap - spent.usd) * 1e6 - 1e-6) / 1e6, 1e-6);
+}
+
+/**
+ * What a person's try of a step over its budget, or ended at it, has to carry: a `--budget` above `above` — what its tries have cost, or the
+ * cap its session was ended at, whichever is more — beside what they cost and the cap in force.
+ */
+export type Raise = { above: number; spent: Spend; cap: number };
+
+function raiseOf(step: Workflow, run: Run, spendOf: SpendOf): Raise | undefined {
+  const cap = budgetOf(step, run.steps[step.name]);
+  if (cap === undefined) return undefined;
+  const spent = stepSpend(run, step.name, spendOf);
+  return { above: Math.max(spent.usd, cap), spent, cap };
+}
+
+/** What a raise has to pass, for a person: what the step's tries cost, `$4.20`, or the cap its session was ended at, as its author wrote it, `$3`. */
+const aboveWord = (r: Raise): string => (r.above > r.spent.usd ? budgetWord(r.above) : dollars(r.above));
+
+/** A step over its budget, or ended at it, in words: `is over budget: its tries have cost $4.20 of its $3 budget`. */
+const raiseWords = (status: StepStatus, r: Raise): string => (status === 'budget exhausted'
+  ? `ended at its budget: its harness stopped its session at ${budgetWord(r.cap)}, and its tries have cost ${spentWord(r.spent)}`
+  : `is over budget: its tries have cost ${spentWord(r.spent)} of its ${budgetWord(r.cap)} budget`);
+
+/**
+ * Why a `--budget` cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the run,
+ * as `messageRefusal` is: an amount that is not dollars above zero, and `--budget` on `--recheck`, which files no session to spend it.
+ */
+export function budgetRefusal(how: RetryHow, command = 'wf retry <runId> <step>'): string | null {
+  if (how.budget === undefined) return null;
+  if (!(typeof how.budget === 'number' && Number.isFinite(how.budget) && how.budget > 0)) {
+    return `--budget ${String(how.budget)} is not an amount. It is the most the step's tries may cost together, in dollars, above what they have cost: ${command} --budget <amount>, like 5 or 2.50.`;
+  }
+  if (how.mode === 'recheck') {
+    return `--budget raises a step's cap for the session a try files, and --recheck files none — it runs the check again, which costs nothing. Recheck without it (${command} --recheck), or give the cap to a session: ${command} --budget <amount>.`;
+  }
+  return null;
 }
 
 /**
@@ -489,7 +696,11 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
  * recheck replaces only the check, so the try after one has the same `taskId`. Or `round`: the step's loop
  * went round again (`roundFiled`), and the try after it is the next round's.
  */
-export type EarlierTry = { taskId: string; check?: { taskId: string }; then: 'retries' | RetryMode | 'round'; model?: string };
+export type EarlierTry = {
+  taskId: string; check?: { taskId: string }; then: 'retries' | RetryMode | 'round'; model?: string;
+  /** The cap a person raised the step's `budget:` to for the try after this one (`--budget`): in force from it on (`budgetOf`). */
+  budget?: number;
+};
 
 /** One step on the run's record: its current try's task and check, where it works, and the tries before (`Run.steps`). */
 export type StepRecord = { taskId: string | null; workspace?: string; branch?: string; check?: { taskId: string }; tries?: EarlierTry[] };
@@ -500,10 +711,13 @@ export type StepRecord = { taskId: string | null; workspace?: string; branch?: s
  * step. The try's brief carries it as `## Your answer` (`retrySection`). Absent on an ask without one, and on every ask file
  * written before there were messages.
  */
-export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: string; message?: string; at: string };
+export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: string; message?: string; budget?: number; at: string };
 
-/** How a person asks for a try with `wf retry`: one way, the model a `--model` names, and what they said with it. */
-export type RetryHow = { mode: RetryMode; model?: string; message?: string };
+/**
+ * How a person asks for a try with `wf retry`: one way, the model a `--model` names, what they said with it — and `budget`, the cap
+ * `--budget` raises a step over its budget, or ended at it, to.
+ */
+export type RetryHow = { mode: RetryMode; model?: string; message?: string; budget?: number };
 
 /**
  * A try to file on this pass: of which step, its number, how, on whose word — and, for a person's, what they said with it.
@@ -513,7 +727,7 @@ export type RetryHow = { mode: RetryMode; model?: string; message?: string };
  * step, and files it. `runsOn` beside it when the harness no longer says the session is blocked: asked for while it was, the session has
  * worked again since.
  */
-export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; by: 'retries' | 'ask'; stopFirst?: true; runsOn?: true };
+export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; budget?: number; by: 'retries' | 'ask'; stopFirst?: true; runsOn?: true };
 
 /**
  * Why a message cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the
@@ -577,6 +791,12 @@ export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): bo
  * asked for it, and the tick stops the session before it files the try (`stopFirst`), so no two agents share the
  * conversation. Not `recheck`: nothing of it was checked. Left out, `harnessBlocked` says no session is blocked,
  * and such a step is running, with nothing to try, as it was.
+ *
+ * A step `over budget` from a try is tried the ways its own status takes, and one `budget exhausted` as a session that failed — each with
+ * `raise`: a session filed for it has to carry a `--budget` above what it has spent, since spending past the cap on anyone's word but a
+ * person's raising it is what a cap forbids. A recheck costs nothing, and needs none. So `raise` is on a settled step over its budget, or
+ * ended at it, that may be tried: those two statuses, and a `failed (check)` whose check did not finish past its budget, which is offered
+ * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `wf round`'s.
  */
 export function retryable(
   step: Workflow,
@@ -587,17 +807,27 @@ export function retryable(
   steps: readonly Workflow[] = [],
   /** Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human` (`harnessBlocked` in runner.ts). */
   harnessBlocked: (taskId: string) => boolean = () => false,
-): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean } {
-  const status = stepStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps);
+  /** What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and none carries `raise`. */
+  spendOf: SpendOf = () => undefined,
+  /** What each step's current check exited with (`stepStatus`): a check that refused holds a step over its budget, one that did not finish does not. */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean; raise?: Raise } {
+  const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
-  const settled = taskId ? ['succeeded', 'failed', 'stopped'].includes(phaseOf(taskId)) : false;
+  const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
   const blockedByHarness = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
+  const tried = status === 'over budget' ? own : status;
   const modes: RetryMode[] =
-    status === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
-    : status === 'unsigned' || status === 'failed' || status === 'stopped' || (status === 'blocked' && settled) || blockedByHarness ? ['nudge', 'fresh']
+    tried === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
+    : tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || (tried === 'blocked' && settled) || tried === 'budget exhausted' || blockedByHarness ? ['nudge', 'fresh']
     : [];
-  return { status, modes, blockedByHarness };
+  const raise = settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
+  return { status, modes, blockedByHarness, ...(raise ? { raise } : {}) };
 }
+
+/** Whether a person's ask carries what a try of its step needs past its budget (`Raise`): a `--budget` above it, on an ask that files a session. */
+const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined): boolean =>
+  !raise || a.mode === 'recheck' || (a.budget !== undefined && a.budget > raise.above);
 
 /**
  * The tries due now. Pure, and blind to cancellation on purpose: `assess` answers for a cancelled run, and
@@ -615,6 +845,9 @@ export function retryable(
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
+ *
+ * A step over its budget, or ended at it, is never tried on the run's word — it is not `failed (check)`, so `retries:` files nothing — and a
+ * person's ask for a session of it is due only with a `--budget` above what it has spent (`Raise`), which the try carries and the record keeps.
  */
 export function retriesDue(
   steps: readonly Workflow[],
@@ -626,21 +859,24 @@ export function retriesDue(
   asks: readonly RetryAsk[] = [],
   /** Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to stop it first. */
   harnessBlocked: (taskId: string) => boolean = () => false,
+  /** What each task's sessions cost (`taskSpend`): what holds a step over its budget. */
+  spendOf: SpendOf = () => undefined,
 ): Retry[] {
   const due: Retry[] = [];
   for (const step of steps) {
     const record = run.steps[step.name];
-    const { status, modes, blockedByHarness } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked);
+    const { status, modes, blockedByHarness, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
     if (!record?.taskId) continue;
     const phase = phaseOf(record.taskId);
     const unsettled = phase === 'pending' || phase === 'running';
     const ways = unsettled ? STOPPED_FIRST : modes;
     if (!ways.length) continue;
     const next = tryOf(run, step.name) + 1;
-    const ask = asks.find((a) => a.step === step.name && a.try === next && ways.includes(a.mode));
+    const ask = asks.find((a) => a.step === step.name && a.try === next && ways.includes(a.mode) && carries(a, raise));
     if (ask) {
       due.push({
-        step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), ...(ask.message !== undefined ? { message: ask.message } : {}), by: 'ask',
+        step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), ...(ask.message !== undefined ? { message: ask.message } : {}),
+        ...(raise && ask.mode !== 'recheck' ? { budget: ask.budget } : {}), by: 'ask',
         ...(unsettled ? { stopFirst: true as const, ...(blockedByHarness ? {} : { runsOn: true as const }) } : {}),
       });
     } else if (status === 'failed (check)' && record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name))
@@ -665,6 +901,7 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
     ...(check ? { check } : {}),
     then: retry.by === 'retries' ? 'retries' : retry.mode,
     ...(retry.model ? { model: retry.model } : {}),
+    ...(retry.budget !== undefined ? { budget: retry.budget } : {}),
   };
   return { ...rest, taskId: retry.mode === 'recheck' ? record.taskId : taskId!, tries: [...tries, over] };
 }
@@ -682,6 +919,10 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
  *
  * A step whose session its harness blocked, with nothing signed, may be asked for only when `harnessBlocked` is given: the tick
  * stops that session before it files the try (`retryable`). Without it, such a step is still running, and refused as one.
+ *
+ * A budget: a `--budget` that is not an amount or rides on `--recheck` (`budgetRefusal`); a session of a step over its budget, or ended at it,
+ * asked for without a `--budget` above what it has spent (`Raise`), or with one not above it — by name; `--budget` on any other step, whose
+ * cap is not what stops it; and an ask already waiting that no tick will honour, for want of one.
  */
 export function retryRefusal(
   steps: readonly Workflow[],
@@ -695,8 +936,11 @@ export function retryRefusal(
   asks: readonly RetryAsk[] = [],
   /** Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is running, and refused. */
   harnessBlocked: (taskId: string) => boolean = () => false,
+  /** What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and `--budget` is refused on every one. */
+  spendOf: SpendOf = () => undefined,
 ): string | null {
-  const wrong = messageRefusal(how, `wf retry ${run.id} ${name}`);
+  const command = `wf retry ${run.id} ${name}`;
+  const wrong = messageRefusal(how, command) ?? budgetRefusal(how, command);
   if (wrong) return wrong;
   const step = steps.find((s) => s.name === name);
   if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
@@ -704,11 +948,14 @@ export function retryRefusal(
     return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.`;
   }
   const next = tryOf(run, name) + 1;
+  const { status, modes, blockedByHarness, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
   const pending = asks.find((a) => a.step === name && a.try === next);
+  if (pending && !carries(pending, raise)) {
+    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --budget <amount>.`;
+  }
   if (pending) {
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
   }
-  const { status, modes, blockedByHarness } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked);
   if (!modes.length) {
     const why: Partial<Record<StepStatus, string>> = {
       waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: wf ls ${run.id}.`,
@@ -718,6 +965,7 @@ export function retryRefusal(
       unverified: `${name} signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.`,
       blocked: `${name} signed off blocked and its session has not ended, so a new try would run beside it. Wait for it to settle: wf ls ${run.id}.`,
       exhausted: `${name} asked for another round on the last one \`rounds: ${capOf(step)}\` allows: its work is signed, and going round once more is a person's call, not another try. Make it: wf round ${run.id} ${name}.`,
+      'over budget': `${name} did its work, and its loop asks for a round that would file ${loopOf(steps, name)?.name === name ? 'a step of it' : 'it'} again, past its budget: going round is a person's call, not another try. Raise the cap with the round: wf round ${run.id} ${loopOf(steps, name)?.name ?? name} --budget <amount>.`,
     };
     return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
   }
@@ -725,7 +973,24 @@ export function retryRefusal(
     const is = blockedByHarness ? 'is running, its session blocked by its harness with nothing signed off' : `is ${status}`;
     return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`;
   }
-  if (retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf).some((r) => r.step === name)) {
+  if (raise && how.mode !== 'recheck' && how.budget === undefined) {
+    const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
+    // A check that did not finish is no verdict: run again as the work stands, it costs nothing, and may pass.
+    if (status === 'failed (check)') {
+      return `${name}'s check did not finish, and ${name} ${raiseWords(status, raise)}. Run its check again, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
+    }
+    return `${name} ${raiseWords(status, raise)}, and the run spends nothing more on it until a person raises the cap. Raise it with the try, above ${aboveWord(raise)}: ${withTry}.`;
+  }
+  if (raise && how.budget !== undefined && how.budget <= raise.above) {
+    const what = raise.above > raise.spent.usd ? `the ${budgetWord(raise.cap)} budget ${name}'s session was ended at` : `what ${name}'s tries have cost`;
+    return `--budget ${how.budget} is not above ${aboveWord(raise)}, ${what}: a try under it would read ${status === 'budget exhausted' ? status : 'over budget'} again as soon as it ended. Give more than ${aboveWord(raise)}: ${command} --budget <amount>.`;
+  }
+  if (!raise && how.budget !== undefined) {
+    const cap = budgetOf(step, run.steps[name]);
+    const spent = cap === undefined ? `, and has no \`budget:\` to raise` : `: its tries have cost ${spentWord(stepSpend(run, name, spendOf))} of its ${budgetWord(cap)} budget, which is not what stops it`;
+    return `--budget raises the cap of a step over its budget, or ended at it, and ${name} is ${status}${spent}. Try it without --budget: ${command}.`;
+  }
+  if (retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf).some((r) => r.step === name)) {
     const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);
     return `the run tries ${name} again itself: its check refused, and \`retries: ${step.retries}\` has ${left} left, so the next tick files try ${next}. Wait for it: wf ls ${run.id}.`;
   }
@@ -744,12 +1009,14 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   const looping = loopOf(steps, step.name);
   const round = roundIn(record);
   const inRound = looping && round > 1 ? roundWord(round, capOf(looping)) : '';
-  if (last.then === 'round') return inRound;
+  // The cap a person raised with it, beside the try it was raised for.
+  const raised = last.budget !== undefined ? `budget ${budgetWord(last.budget)}` : '';
+  if (last.then === 'round') return [inRound, raised].filter(Boolean).join(', ');
   const how = last.then === 'retries' ? `by retries: ${step.retries ?? 0}`
     : last.then === 'recheck' ? 'rechecked on your word'
     : last.then === 'fresh' ? `fresh${last.model ? ` on ${last.model}` : ''}, on your word`
     : 'nudged on your word';
-  return [inRound, `try ${record!.tries!.length + 1}, ${how}`, answered ? 'answered' : ''].filter(Boolean).join(', ');
+  return [inRound, `try ${record!.tries!.length + 1}, ${how}`, raised, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
 
 /**
@@ -757,7 +1024,7 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
  * while its harness says so, and `its session` once it works again (`runsOn`).
  */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => (r.by === 'ask'
-  ? `try ${r.try} asked (${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
+  ? `try ${r.try} asked (${modeWord(r)}${r.budget !== undefined ? `, --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
   : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`);
 
 /**
@@ -788,21 +1055,53 @@ export function retryLines(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
+  /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is offered its try with `--budget`. */
+  spendOf: SpendOf = () => undefined,
+  /** What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`, one that did not finish the recheck. */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): string[] {
   if (d.kind !== 'awaiting') return [];
   const lines: string[] = [];
   for (const step of steps) {
-    const { status, modes } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps);
+    const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
     if (!modes.length) continue;
     const command = `wf retry ${run.id} ${step.name}`;
     const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
+    // A check that did not finish first, past a budget or not: run again as the work stands, it costs nothing. A session needs the raise.
     if (d.unfinishedCheck.includes(step.name)) {
-      lines.push(`${step.name}: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  ${command} --recheck`);
+      const session = raise ? `  (a new session needs --budget above ${aboveWord(raise)}: its tries have cost ${spentWord(raise.spent)} of ${budgetWord(raise.cap)})` : '';
+      lines.push(`${step.name}: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  ${command} --recheck${session}`);
+    } else if (raise) {
+      const recheck = modes.includes('recheck') ? '; --recheck runs its check again, and needs no --budget' : '';
+      // Why it stopped, beside the cap it reached: a person paying for a session of it decides on a broken session differently.
+      const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+      const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
+      lines.push(`${step.name}: ${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}. Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`);
     } else {
       lines.push(`${step.name}: ${status}. Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
     }
   }
   return lines;
+}
+
+/**
+ * `wf decide`'s OVER BUDGET line, saying for each step why it is held. A step whose own tries cost its budget or more gives the amounts:
+ * `implement ($4.25 of $3)`. A looping step held because its round would file such a step again names that step, as `wf ls` does:
+ * `review (held: its round would file implement again, which has cost $4.25 of its $3 budget)`. Pure. Undefined with no step over budget.
+ * How each ended on its own work is on its own line — FAILED, UNSIGNED, FAILED CHECK (`decision`).
+ */
+export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf): string | undefined {
+  if (d.kind !== 'awaiting' || !d.overBudget.length) return undefined;
+  const why = d.overBudget.map((name) => {
+    const step = steps.find((s) => s.name === name);
+    const own = step ? overBudget(step, run, spendOf) : undefined;
+    if (own) return `${name} (${spentWord(own.spent)} of ${budgetWord(own.cap)})`;
+    const others = step ? loopOver(steps, step, run, spendOf) : [];
+    if (!others.length) return name;
+    return `${name} (held: its round would file ${others.map((o) => `${o.name} again, which has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ')})`;
+  });
+  const them = d.overBudget.length > 1 ? 'them' : 'it';
+  return `OVER BUDGET, waiting on you: ${why.join(', ')}  — the run files nothing more for ${them} on its own; nothing after ${them} ran`;
 }
 
 /**
@@ -817,12 +1116,17 @@ export function answerLines(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
+  /** What each task's sessions cost (`taskSpend`): a blocked step over its budget is answered with `--budget` too. */
+  spendOf: SpendOf = () => undefined,
 ): Record<string, string> {
   if (d.kind !== 'awaiting') return {};
   const lines: Record<string, string> = {};
   for (const step of steps) {
-    const { status, modes } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps);
+    const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);
     if (status === 'blocked' && modes.length) lines[step.name] = `to answer it:  wf retry ${run.id} ${step.name} --message "<answer>"`;
+    else if (raise && modes.length && closeoutOf(step.name)?.outcome === 'blocked') {
+      lines[step.name] = `to answer it, its cap raised above ${aboveWord(raise)}:  wf retry ${run.id} ${step.name} --budget <amount> --message "<answer>"`;
+    }
   }
   return lines;
 }
@@ -880,10 +1184,14 @@ export function saidLines(said: readonly SaidTo[]): string[] {
  * A loop going round again: the looping step, the step its `loop:` runs again, the round to file, and on whose word — the looping step's
  * `again: true` with rounds left, or a person's `wf round` once they are spent.
  */
-export type Round = { step: string; target: string; round: number; by: 'again' | 'ask' };
+export type Round = {
+  step: string; target: string; round: number; by: 'again' | 'ask';
+  /** On a person's round past a step of the loop's budget (`wf round --budget`): the cap, and the steps of the loop it is raised for — those over it. */
+  budget?: number; raise?: string[];
+};
 
-/** A person's `wf round`, as its ask file says it: the looping step, the round it asks for, and when. */
-export type RoundAsk = { step: string; round: number; at: string };
+/** A person's `wf round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when. */
+export type RoundAsk = { step: string; round: number; budget?: number; at: string };
 
 /** The rounds a looping step's loop runs on its own word: its `rounds:`, which the parser always sets. */
 export const capOf = (looping: Workflow): number => looping.rounds ?? DEFAULT_ROUNDS;
@@ -949,6 +1257,9 @@ export const REPLIES_SCHEMA = {
  * A looping step verified — or unverified, with no check — whose closeout says `again: true`: below its cap, since at the cap `stepStatus`
  * says `exhausted`, and the run files the next round on the step's word. A loop that is `exhausted`: only a person's ask for the next
  * round, which names it, so it is honoured once. `again: false`, blocked, unsigned, a check that did not pass: nothing is due.
+ *
+ * A loop with a step over its budget goes round on nobody's word but a person's raising the cap: its looping step reads `over budget`, so
+ * `again` files nothing, and a person's ask — at the cap, or below it — is due only with a `--budget` above what each of those steps has cost.
  */
 export function roundsDue(
   steps: readonly Workflow[],
@@ -957,15 +1268,26 @@ export function roundsDue(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   asks: readonly RoundAsk[] = [],
+  /** What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget. */
+  spendOf: SpendOf = () => undefined,
 ): Round[] {
   const due: Round[] = [];
   for (const step of steps) {
     if (!step.loop) continue;
-    const status = stepStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps);
+    const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
     const round = roundOf(run, step.name) + 1;
     const again = satisfiesAfter(status) && closeoutOf(step.name)?.output?.again === true;
-    const asked = status === 'exhausted' && asks.some((a) => a.step === step.name && a.round === round);
-    if (again || asked) due.push({ step: step.name, target: step.loop, round, by: again ? 'again' : 'ask' });
+    if (again) {
+      due.push({ step: step.name, target: step.loop, round, by: 'again' });
+      continue;
+    }
+    const over = loopOver(steps, step, run, spendOf);
+    const above = Math.max(0, ...over.map((o) => o.spent.usd));
+    const held = status === 'over budget' && satisfiesAfter(own) && closeoutOf(step.name)?.output?.again === true;
+    const ask = status === 'exhausted' || held
+      ? asks.find((a) => a.step === step.name && a.round === round && (!over.length || (a.budget !== undefined && a.budget > above)))
+      : undefined;
+    if (ask) due.push({ step: step.name, target: step.loop, round, by: 'ask', ...(over.length ? { budget: ask.budget, raise: over.map((o) => o.name) } : {}) });
   }
   return due;
 }
@@ -983,7 +1305,9 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
   const next = { ...run.steps };
   for (const name of looping ? loopSpan(steps, looping) : []) {
     const { check, tries = [], ...rest } = run.steps[name] ?? { taskId: null };
-    const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then: 'round' }] : [];
+    // A cap a person raised with the round is kept on each step it was raised for, in force from its next try (`budgetOf`).
+    const raised = r.budget !== undefined && r.raise?.includes(name) ? { budget: r.budget } : {};
+    const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then: 'round', ...raised }] : [];
     next[name] = { ...rest, taskId: name === r.target ? taskId : null, tries: [...tries, ...over] };
   }
   return next;
@@ -999,6 +1323,9 @@ export const spentRoundAsks = (run: Run, asks: readonly RoundAsk[]): RoundAsk[] 
  * round once more on a person's word. Refused: a cancelled run, which files nothing; a step that is not here or has no `loop:`, a workflow
  * with no loop, or several and none named; a round already asked for; a step of the loop that stopped in this round, which `wf retry` is
  * for; a round the run files itself; a loop that ended without asking again; and a round still running.
+ *
+ * A round of a loop whose step is over its budget is a person's to ask for, at the cap or below it, and only with `budget` — `--budget` above
+ * what each such step has cost — which is refused by name when it is not, and refused on a loop with no step over its budget.
  */
 export function roundAsk(
   steps: readonly Workflow[],
@@ -1008,8 +1335,15 @@ export function roundAsk(
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   asks: readonly RoundAsk[] = [],
-): { step: string; round: number } | { refusal: string } {
+  /** What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget. */
+  spendOf: SpendOf = () => undefined,
+  /** The cap `wf round --budget` raises the loop's steps over their budget to. */
+  budget?: number,
+): { step: string; round: number; budget?: number } | { refusal: string } {
   const no = (refusal: string) => ({ refusal });
+  if (budget !== undefined && !(Number.isFinite(budget) && budget > 0)) {
+    return no(`--budget ${String(budget)} is not an amount. It is the most a step of the loop may cost together, in dollars, above what it has cost: wf round ${run.id} [<step>] --budget <amount>, like 5 or 2.50.`);
+  }
   if (run.cancelledAt) {
     return no(`${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a round would never be honoured. Start a new run for the work with wf start.`);
   }
@@ -1026,17 +1360,38 @@ export function roundAsk(
   }
   const looping = named ?? loops[0]!;
   const now = roundOf(run, looping.name);
+  const over = loopOver(steps, looping, run, spendOf);
+  const above = Math.max(0, ...over.map((o) => o.spent.usd));
   const pending = asks.find((a) => a.step === looping.name && a.round === now + 1);
+  if (pending && over.length && !(pending.budget !== undefined && pending.budget > above)) {
+    return no(`round ${now + 1} of ${looping.name}'s loop is asked for (at ${pending.at}) without a --budget above ${dollars(above)}, and ${overWords(over)}, so no tick honours it. Delete that ask — round-${looping.name}-${now + 1}, in the run's .asks directory — and ask again: wf round ${run.id} ${looping.name} --budget <amount>.`);
+  }
   if (pending) return no(`round ${now + 1} of ${looping.name}'s loop is already asked for (at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`);
 
-  const statusOf = (n: string) => stepStatus(steps.find((s) => s.name === n)!, run, phaseOf, closeoutOf, askedCloseout, steps);
-  const stuck = loopSpan(steps, looping).find((n) => statusOf(n) !== 'exhausted' && stopsFollowers(statusOf(n)));
+  const at = (n: string) => standing(steps.find((s) => s.name === n)!, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+  // A step that stopped in the round is a try's to take on: its own status, whatever its budget. One over budget only because a round would
+  // file it again has not stopped.
+  const stuck = loopSpan(steps, looping).find((n) => at(n).own !== 'exhausted' && stopsFollowers(at(n).own));
   if (stuck) {
-    return no(`${stuck} is ${statusOf(stuck)} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stuck} again: wf retry ${run.id} ${stuck} — or see why: wf decide ${run.id}.`);
+    return no(`${stuck} is ${at(stuck).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stuck} again: wf retry ${run.id} ${stuck} — or see why: wf decide ${run.id}.`);
   }
-  const status = statusOf(looping.name);
-  if (status === 'exhausted') return { step: looping.name, round: now + 1 };
-  if (roundsDue([looping], run, phaseOf, closeoutOf, askedCloseout).length) {
+  const { status, own } = at(looping.name);
+  if (status === 'exhausted' || (status === 'over budget' && satisfiesAfter(own))) {
+    if (over.length && budget === undefined) {
+      return no(`${looping.name} asked for round ${now + 1}, and ${overWords(over)}: the run files nothing more for ${over.length > 1 ? 'them' : 'it'} until a person raises the cap. Raise it with the round, above ${dollars(above)}: wf round ${run.id} ${looping.name} --budget <amount>.`);
+    }
+    if (over.length && budget! <= above) {
+      return no(`--budget ${budget} is not above ${dollars(above)}, what ${over.map((o) => o.name).join(' and ')} ${over.length > 1 ? 'have' : 'has'} cost: the round would be held again as soon as it was asked for. Give more than ${dollars(above)}: wf round ${run.id} ${looping.name} --budget <amount>.`);
+    }
+    if (!over.length && budget !== undefined) {
+      return no(`--budget raises the cap of a step of the loop over its budget, and no step of ${looping.name}'s loop is. Once more without it: wf round ${run.id} ${looping.name}.`);
+    }
+    return { step: looping.name, round: now + 1, ...(over.length ? { budget } : {}) };
+  }
+  if (budget !== undefined) {
+    return no(`--budget raises the cap of a loop whose round waits on its budget, and ${looping.name}'s does not: ${roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, [], spendOf).some((r) => r.step === looping.name) ? 'the run goes round again itself' : satisfiesAfter(status) ? 'it signed off without asking for another round' : `round ${now} is still running`}. See it: wf ls ${run.id}.`);
+  }
+  if (roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, [], spendOf).some((r) => r.step === looping.name)) {
     return no(`the run goes round again itself: ${looping.name} asked for another round, and \`rounds: ${capOf(looping)}\` has ${capOf(looping) - now} left, so the next tick files round ${now + 1}. Wait for it: wf ls ${run.id}.`);
   }
   if (satisfiesAfter(status)) {
@@ -1049,21 +1404,38 @@ export function roundAsk(
 export function roundDueNote(steps: readonly Workflow[], r: Round): string {
   const looping = steps.find((s) => s.name === r.step);
   return r.by === 'ask'
-    ? `round ${r.round} asked (wf round) — the next tick files ${r.target}`
+    ? `round ${r.round} asked (wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}) — the next tick files ${r.target}`
     : `round ${r.round} of ${looping ? capOf(looping) : DEFAULT_ROUNDS} due — ${r.step} asked again, and the next tick files ${r.target}`;
 }
 
-/** A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more. */
-const exhaustedNote = (step: Workflow, run: Run): string =>
-  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — once more: wf round ${run.id} ${step.name}`;
+/** A loop out of rounds, beside its looping step's line: where it stands, and the command that takes it once more — with `--budget`, past a step's. */
+const exhaustedNote = (step: Workflow, run: Run, raise = false): string =>
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again — once more: wf round ${run.id} ${step.name}${raise ? ' --budget <amount>' : ''}`;
 
-/** What `wf decide` offers for each loop out of rounds: the `wf round` that takes it once more, and what that files. Pure. */
-export function roundLines(steps: readonly Workflow[], run: Run, d: Decision): string[] {
+/** A loop whose round waits on a step's budget, beside its looping step's line: where it stands, and the command that raises the cap for the round. */
+const heldNote = (step: Workflow, run: Run): string =>
+  `${roundWord(roundOf(run, step.name), capOf(step))}, and it asked again, past a budget — once more: wf round ${run.id} ${step.name} --budget <amount>`;
+
+/** The steps of a loop over their budget, in words: `implement has cost $4.20 of its $3 budget`. */
+const overWords = (over: ReadonlyArray<{ name: string; spent: Spend; cap: number }>): string =>
+  over.map((o) => `${o.name} has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ');
+
+/**
+ * What `wf decide` offers for each loop out of rounds, and each whose round waits on a step's budget: the `wf round` that takes it once more,
+ * with `--budget` where a step of it is over its budget, and what that files. Pure. `spendOf` as `stepStatus` takes it.
+ */
+export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf = () => undefined): string[] {
   if (d.kind !== 'awaiting') return [];
-  return d.exhausted.flatMap((name) => {
-    const looping = steps.find((s) => s.name === name);
-    if (!looping?.loop) return [];
-    return [`${name}: it asked for round ${roundOf(run, name) + 1}, and \`rounds: ${capOf(looping)}\` are spent. Its findings are below. Once more — ${looping.loop} continued, then a new ${name}:  wf round ${run.id} ${name}`];
+  return steps.filter((s) => s.loop && (d.exhausted.includes(s.name) || d.overBudget.includes(s.name))).flatMap((looping) => {
+    const name = looping.name;
+    const over = loopOver(steps, looping, run, spendOf);
+    const exhausted = d.exhausted.includes(name);
+    // Over budget and not held for it — its own try stopped — is `retryLines`' to offer.
+    if (!exhausted && !over.length) return [];
+    const raise = over.length ? `, and ${overWords(over)}` : '';
+    const once = over.length ? `, its cap raised above ${dollars(Math.max(...over.map((o) => o.spent.usd)))}` : '';
+    const why = exhausted ? `\`rounds: ${capOf(looping)}\` are spent${raise}` : overWords(over);
+    return [`${name}: it asked for round ${roundOf(run, name) + 1}, and ${why}. Its findings are below. Once more${once} — ${looping.loop} continued, then a new ${name}:  wf round ${run.id} ${name}${over.length ? ' --budget <amount>' : ''}`];
   });
 }
 
@@ -1125,6 +1497,8 @@ export function cancelPlan(
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
+  /** What each task's sessions cost (`taskSpend`): a step over its budget has no try due, and nothing is filed for it. */
+  spendOf: SpendOf = () => undefined,
 ): CancelPlan {
   // Whatever is in flight is stopped whatever the rest of the run looks like. A fan-out can have
   // one sibling still working while another has already failed the run as a whole, and that
@@ -1135,7 +1509,7 @@ export function cancelPlan(
 
   // Nothing in flight, so the question is only whether a tick would still file something — a step, a
   // check, a try or a round. `ready`, `check`, `retry` and `round` are the honest test for that; `status` alone is not.
-  const { ready, check, retry, round, status } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks);
+  const { ready, check, retry, round, status } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, () => false, spendOf);
   if (!ready.length && !check.length && !retry.length && !round.length && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
   return { kind: 'cancel', stop: [] };
 }
@@ -1540,7 +1914,7 @@ export type Decision =
   | { kind: 'shipped'; branches: string[] }
   | {
       kind: 'awaiting'; outcome: 'succeeded' | 'failed' | 'blocked'; branches: string[];
-      /** Steps whose task failed or was stopped. */
+      /** Steps whose task failed or was stopped — over their budget or not, as each list below names a step by how it ended on its own work. */
       failed: string[];
       /** Steps that signed off blocked. */
       stuck: string[];
@@ -1554,6 +1928,10 @@ export type Decision =
       unverified: string[];
       /** Looping steps that asked for another round on the last one their `rounds:` allows. */
       exhausted: string[];
+      /** Steps whose tries cost their `budget:` or more where another session of them is the way on, and looping steps whose round waits on one (`stepStatus`). */
+      overBudget: string[];
+      /** Steps whose harness ended their session at their `budget:`. */
+      budgetExhausted: string[];
       /** The steps worked on the base branch itself (`--no-worktree`): there is nothing to merge. */
       direct: boolean;
     };
@@ -1584,11 +1962,14 @@ export function decision(
   roundAsks: readonly RoundAsk[] = [],
   /** Whether a task's session is blocked by its harness (`retryable`): a person's try of such a step is waited on too. */
   harnessBlocked: (taskId: string) => boolean = () => false,
+  /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person. */
+  spendOf: SpendOf = () => undefined,
 ): Decision {
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
-  const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked);
-  const statusOf = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps)]));
+  const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf);
+  const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
+  const statusOf = new Map(steps.map((s) => [s.name, standingOf.get(s.name)!.status]));
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
     // whose check is still running is one of them: its agent has finished, its verdict has not.
@@ -1624,7 +2005,9 @@ export function decision(
   // Told apart on purpose. A step that STOPPED itself and said why is a question for you; one the
   // engine recorded as failed is a thing that broke; one its check refused broke something the run
   // can name. Lumping them loses the only bit that decides whether you read a summary or a log.
-  const named = (...want: StepStatus[]) => steps.filter((s) => want.includes(statusOf.get(s.name)!)).map((s) => s.name).sort();
+  // By how each step ended on its own work (`ownStatus`): a step past its budget whose session broke is still a step that broke, and one
+  // that gave no closeout still gave none. Being over budget is said beside that, in `overBudget`, never in its place.
+  const named = (...want: StepStatus[]) => steps.filter((s) => want.includes(standingOf.get(s.name)!.own)).map((s) => s.name).sort();
   const stuck = named('blocked');
   const failed = named('failed', 'stopped');
   // A check that refused and one that never finished are both `failed (check)`, and both stop what follows. They
@@ -1636,12 +2019,17 @@ export function decision(
   const unverified = named('unverified');
   // A loop out of rounds broke nothing: its step asked for more than the workflow allows, and a person decides.
   const exhausted = named('exhausted');
-  const outcome = failed.length || checkFailed.length ? 'failed' : stuck.length || unsigned.length || exhausted.length ? 'blocked' : 'succeeded';
+  // Nor did a cap reached: spending more on the step is a person's call.
+  const pastBudget = steps.filter((s) => statusOf.get(s.name) === 'over budget').map((s) => s.name).sort();
+  const budgetExhausted = named('budget exhausted');
+  const outcome = failed.length || checkFailed.length ? 'failed'
+    : stuck.length || unsigned.length || exhausted.length || pastBudget.length || budgetExhausted.length ? 'blocked'
+    : 'succeeded';
   // A branch that never moved is on the base branch from the moment it was cut: shipped only when there was nothing wrong to hide.
   if (onBase && outcome === 'succeeded') return { kind: 'shipped', branches };
   return {
     kind: 'awaiting', outcome,
-    branches, failed, stuck, failedCheck, unfinishedCheck, unsigned, unverified, exhausted, direct,
+    branches, failed, stuck, failedCheck, unfinishedCheck, unsigned, unverified, exhausted, overBudget: pastBudget, budgetExhausted, direct,
   };
 }
 
@@ -1653,11 +2041,16 @@ export type Listing = {
    * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on.
    */
-  steps: Array<{ name: string; status: string; branch: string | null; note?: string }>;
+  steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string }>;
   /** Steps a person has to act on — blocked, unsigned, or refused by their check, with no try due — on a run nobody has called off. */
   waitingOnYou: string[];
   /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
   waiting: Wait[];
+  /**
+   * What the run has cost so far, every step's ended tries together (`runSpend`): `$12.40`, and `≥$12.40` where an ended attempt has no cost
+   * on it. Absent until a cost was measured. Each step's own is `cost` on its line, beside its word — and in it, for a step at its budget.
+   */
+  cost?: string;
 };
 
 /**
@@ -1696,6 +2089,8 @@ export function listing(
   waits: readonly Wait[] = [],
   /** How many times a person said something to each step's current try while it ran (`wf say`), off the engine's `said` on its task. */
   saidTo: (step: string) => number = () => 0,
+  /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts. */
+  spendOf: SpendOf = () => undefined,
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run.
   const waiting = gated(run) ? [...waits] : [];
@@ -1711,22 +2106,30 @@ export function listing(
   };
   // A step the next tick tries again is waiting on the run, not on you — you asked, or its `retries:` did. So is a loop going round again.
   // The engine's word says when a harness blocked a session: a person's try of that step is due, and stops the session first.
-  const due = run.cancelledAt ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human');
-  const rounds = run.cancelledAt ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks);
+  const due = run.cancelledAt ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
+  const rounds = run.cancelledAt ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
 
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
+  /** Looping steps whose round waits on a step of their loop's budget. */
+  const heldLoops = new Set<string>();
+  /** Steps whose word says what they spent: `over budget $4.20 of $3`, `budget exhausted $3.02 of $3`. Their line carries no `cost` beside it. */
+  const priced = new Set<string>();
   const rows = steps.map((step) => {
     const row = lineOf(step);
+    const spent = stepSpend(run, step.name, spendOf);
+    // What its tries have cost so far, beside its word, once a cost was measured.
+    const cost = spent.measured && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
     const tried = retry ? dueNote(step, run, retry)
       : round ? roundDueNote(steps, round)
-      : exhausted.has(step.name) ? exhaustedNote(step, run)
+      : exhausted.has(step.name) ? exhaustedNote(step, run, loopOver(steps, step, run, spendOf).length > 0)
+      : heldLoops.has(step.name) ? heldNote(step, run)
       : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
     // A step its current try's session was told something, said beside the try it is on: a person's word the reviewer has to weigh.
     const note = [tried, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
-    return note ? { ...row, note } : row;
+    return { ...row, ...(note ? { note } : {}), ...cost };
   });
 
   function lineOf(step: Workflow): Listing['steps'][number] {
@@ -1736,9 +2139,17 @@ export function listing(
     // A root of a run waiting on runs names them, where the engine's `pending` would be once it is filed: what waits on a root still says `waiting`.
     if (!taskId) return { name, status: waiting.length && !step.after.length ? waitWord(waiting) : 'waiting', branch };
 
-    const status = stepStatus(step, run, settledOf, readable, askedCloseout, steps);
-    const onYou = status === 'blocked' || status === 'unsigned' || status === 'failed (check)' || status === 'exhausted';
+    const { status, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+    const onYou = status === 'blocked' || status === 'unsigned' || status === 'failed (check)' || status === 'exhausted' || status === 'over budget' || status === 'budget exhausted';
     if (onYou && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
+    // A cap reached says so, with what was spent and the cap in force: `over budget $4.20 of $3`.
+    if (status === 'over budget' || status === 'budget exhausted') {
+      if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
+      // Its cost is in its word when the word shows its own spend. A looping step held on another step's budget shows that step's, and
+      // its own goes beside it, as any step's does.
+      if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);
+      return { name, status: budgetStatus(step, status), branch };
+    }
     // A loop out of rounds says so in a word of its own: its check passed or it had none, and it still stops what follows.
     if (status === 'exhausted') {
       exhausted.add(name);
@@ -1757,9 +2168,51 @@ export function listing(
     return { name, status: `${word}${said}`, branch };
   }
 
+  /**
+   * A step at its budget, in one word and the amounts: `over budget $4.20 of $3`, `budget exhausted $3.02 of $3` — and a looping step whose
+   * round waits on another step's, that step's: `over budget — implement $4.20 of $3`.
+   */
+  function budgetStatus(step: Workflow, status: StepStatus): string {
+    const spent = stepSpend(run, step.name, spendOf);
+    const cap = budgetOf(step, run.steps[step.name]);
+    const of = cap === undefined ? '' : ` of ${budgetWord(cap)}`;
+    if (status === 'budget exhausted') return `budget exhausted${spent.measured ? ` ${spentWord(spent)}${of}` : cap === undefined ? '' : ` at ${budgetWord(cap)}`}`;
+    if (overBudget(step, run, spendOf)) return `over budget ${spentWord(spent)}${of}`;
+    return `over budget — ${loopOver(steps, step, run, spendOf).map((o) => `${o.name} ${spentWord(o.spent)} of ${budgetWord(o.cap)}`).join(', ')}`;
+  }
+
   // A run somebody called off is waiting on nobody — `wf decide` says there is nothing to decide —
   // though each step still signed off the way it did, and its line still says so.
-  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting };
+  const total = runSpend(run, spendOf);
+  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting, ...(total.measured ? { cost: spentWord(total) } : {}) };
+}
+
+/**
+ * A step's `cost` line on `wf decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) — and for a step whose
+ * tries ran more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where
+ * nobody measured, never $0.
+ */
+export function costLine(step: Workflow | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
+  const current = usedLines(used)[1]!.replace(/^cost\s+/, '');
+  const record = run.steps[name];
+  const sessions = sessionTasks(record).length;
+  const all = stepSpend(run, name, spendOf);
+  const spent = sessions > 1
+    ? `${current === 'not measured' ? 'this try not measured' : `${current} this try`} · ${all.measured ? spentWord(all) : 'not measured'} over ${tryOf(run, name)} tries`
+    : current;
+  const cap = step ? budgetOf(step, record) : undefined;
+  return `cost  ${spent}${cap !== undefined ? ` · budget ${budgetWord(cap)}` : ''}`;
+}
+
+/**
+ * The run's `cost` on `wf decide`, after its steps: every step's tries together (`runSpend`), with how many ended attempts have no cost on
+ * them — or `not measured`. Pure. None before any attempt has ended.
+ */
+export function runCostLines(run: Run, spendOf: SpendOf): string[] {
+  const spent = runSpend(run, spendOf);
+  if (!spent.measured && !spent.unmeasured) return [];
+  if (!spent.measured) return ['cost  run not measured'];
+  return [`cost  run ${dollars(spent.usd)}${spent.unmeasured ? ` measured · ${spent.unmeasured} attempt${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`];
 }
 
 /**
@@ -1900,12 +2353,14 @@ export type RetryBriefing = {
   model?: string;
   /** Whether this try continues the last one's session. A nudge whose last try left no session to continue starts a new one. */
   resumed: boolean;
-  /** Where the last try stood: why it is being tried again. */
+  /** Where the last try stood on its own work (`ownStatus`): why it is being tried again. Not `over budget`, which is why nothing was filed — `budget` says a person raised it. */
   status: StepStatus;
   /** What the last try's check said, when it did not pass. */
   refusal?: CheckRefusal;
   /** What the person who asked for this try said with it (`wf retry --message`), as they wrote it. */
   message?: string;
+  /** The cap the person who asked for this try raised the step's budget to (`wf retry --budget`). */
+  budget?: number;
   /**
    * What a person said to the last try's session while it ran (`wf say`): the engine's `said` on its task, in the order said. Given again to
    * a try that continues that session (`saidSection`), since a session may never have read it — and to no new session.
@@ -1932,10 +2387,16 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
     blocked: 'The last try signed off `blocked`. What it needed may have been settled since.',
     failed: "The last try's session ended `failed` before it signed off.",
     stopped: "The last try's session was stopped before it signed off.",
+    'budget exhausted': "The last try's session was ended by its harness at this step's budget, before it signed off.",
   };
+  // Beside why the last try ended, never in its place: a budget reached is why nothing more was filed, not what the session has to fix.
+  const pastBudget = r.budget !== undefined && r.status !== 'budget exhausted'
+    ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
+    : [];
   const who = r.by === 'retries'
     ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
-    : `A person asked for this try: \`wf retry ${modeWord(r)}${r.message !== undefined ? ' --message' : ''}\`${r.message !== undefined ? ', with what they said below' : ''}.`;
+    : `A person asked for this try: \`wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ' --message' : ''}\``
+      + `${r.budget !== undefined ? `, raising this step's budget to ${budgetWord(r.budget)}` : ''}${r.message !== undefined ? ', with what they said below' : ''}.`;
   const where = r.resumed
     ? "This is the last try's session, continued. Finish the work, then sign off again."
     : 'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n'
@@ -1943,7 +2404,7 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
   const answer = r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : [];
   // What was said to the session while it ran comes before the answer given now, in the order a person said them.
   const told = r.resumed ? saidSection(r.said) : [];
-  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, who, '', where, ...told, ...answer, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
+  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, ...pastBudget, who, '', where, ...told, ...answer, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
 }
 
 /**
@@ -2386,22 +2847,10 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
   };
 }
 
-/** A duration for a person, as the operator measures one: `58s`, `19m42s`, `1h05m`, `2d03h`. */
-export function durationWord(ms: number): string {
-  const s = Math.floor(Math.max(0, ms) / 1000);
-  const two = (n: number) => String(n).padStart(2, '0');
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m${two(s % 60)}s`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h${two(m % 60)}m`;
-  return `${Math.floor(h / 24)}d${two(h % 24)}h`;
-}
-
 /**
  * A step's timeline as `wf decide` prints it, under its `used`: a row per try's session and per try's check, in the order they ran. Each
  * says when it was filed, spawned and ended — UTC, with the day where it is not the first row's — then its queue and run time, and beside a
- * session what it used. Empty for a step not filed.
+ * session what it used and, where the engine measured it, what it cost. Empty for a step not filed.
  */
 export function timelineLines(tries: readonly TimelineTry[]): string[] {
   const instants = tries.flatMap((t) => [t.session, t.check]).flatMap((s) => (s ? [s.filedAt, s.spawnedAt, s.endedAt] : [])).filter((at): at is string => at !== null);
@@ -2421,8 +2870,10 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
   const rows = tries.flatMap((t): Array<[string, string]> => {
     const label = `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
     const used = usedLines(t.used)[0]!.replace(/^used\s+/, '');
+    // What the session cost, beside what it used, where the engine measured it.
+    const cost = t.used?.costUsd !== undefined ? `  cost ${dollars(t.used.costUsd)}` : '';
     return [
-      [label, t.session ? `${words(t.session)}  used ${used}` : `its session is try ${t.sessionOf}'s, checked again`],
+      [label, t.session ? `${words(t.session)}  used ${used}${cost}` : `its session is try ${t.sessionOf}'s, checked again`],
       ...(t.check ? [[`try ${t.try} check`, words(t.check)] satisfies [string, string]] : []),
     ];
   });

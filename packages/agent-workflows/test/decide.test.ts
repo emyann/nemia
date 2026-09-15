@@ -316,3 +316,69 @@ test("`wf decide` on a try a person answered: its line says so, and under it wha
   assert.ok(head < question && question < indexOf(lines, '    needs: And the README, too?'), 'the question and its answer, then what the try made of them');
   assert.ok(!fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8').includes('The flag is public'), 'composed on read: the record keeps no message');
 });
+
+test("a measured cost on both screens: `wf decide` prints each step's beside what it used, with the api and tool time, and the run's after the steps; `wf ls` puts each step's beside its word and the run's on its line — and a run nobody measured prints no dollar", async (t) => {
+  const repo = aRepo();
+  const run = start({ brief: 'add sub', repo, workflowDir: folder(), isolate: false });
+  const { e, settle, logs } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED, { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 });
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-check`, 'succeeded');
+  logs.set(`${run.id}-implement-check`, '# pass 1\n\n[wf check] exit 0\n');
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', SIGNED, { costUsd: 0.5 });
+
+  const lines = await screen(t, e, run.id);
+  const check = indexOf(lines, /^    check  npm test  →/);
+  assert.deepEqual(lines.slice(check + 1, check + 3), ['    used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s', '    cost  $3.01']);
+  assert.match(lines[check + 3]!, /^    timeline  try 1 .*  used 29 turns · 93 tool calls · 6\.35M in · 112k out · api 8m06s · tools 2s  cost \$3\.01$/);
+  const review = indexOf(lines, '  review');
+  assert.deepEqual(lines.slice(review + 1, review + 3), ['    used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured', '    cost  $0.50']);
+  const total = indexOf(lines, '  cost  run $3.51');
+  assert.ok(review < total && total < indexOf(lines, /^  timeline  run /), 'after the steps, beside the run\'s time');
+
+  const ls = async (id: string): Promise<string[]> => {
+    const out: string[] = [];
+    const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.map(String).join(' ')); });
+    try { await main(['ls', id], e); } finally { log.mock.restore(); }
+    return out;
+  };
+  const listed = await ls(run.id);
+  assert.equal(listed[0], `${run.id}  add sub  $3.51`);
+  assert.match(listed[1]!, /^   implement      verified ✓  \$3\.01 +\S/);
+  assert.match(listed[2]!, /^   review         unverified · done  \$0\.50 +\S/);
+
+  // The run the other screen tests read measured no cost: no dollar on either screen, and the run's cost says not measured.
+  const unmeasured = await awaiting();
+  assert.ok(!(await ls(unmeasured.run.id)).some((l) => l.includes('$')));
+  const bare = await screen(t, unmeasured.e, unmeasured.run.id);
+  assert.ok(bare.includes('  cost  run not measured') && !bare.some((l) => l.includes('$')), bare.join('\n'));
+});
+
+test("REFUSED to hide why a step stopped past its budget: `wf decide` on a step whose session failed after spending its budget says FAILED with its logs, and one that ended unsigned says UNSIGNED, each beside the OVER BUDGET line — and the offer names both", async (t) => {
+  const budgeted = () => {
+    const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 3\n---\nimplement it\n');
+    fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+    return dir;
+  };
+  const cases = [
+    ['failed', 'failed', (id: string) => `  FAILED: implement  (wf logs ${id} <step>)`],
+    ['unsigned', 'succeeded', () => '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran'],
+  ] as const;
+  for (const [own, phase, banner] of cases) {
+    const run = start({ brief: `add sub, ${own}`, repo: aRepo(), workflowDir: budgeted(), isolate: false });
+    const { e, settle } = board();
+    await advance(e, readRun(run.id));
+    // No closeout either way: the one session failed, the other ended without it.
+    settle(`${run.id}-implement`, phase, undefined, { costUsd: 3.4 });
+    const lines = await screen(t, e, run.id);
+    const said = indexOf(lines, banner(run.id));
+    const over = indexOf(lines, '  OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran');
+    assert.ok(said < over, `${own}: why it stopped, then why nothing more is filed`);
+    indexOf(lines, `    implement: over budget (${own}), $3.40 of $3. Raise its cap above $3.40 and continue its session:  wf retry ${run.id} implement --budget <amount>  (--fresh, or --model <m>, for a new session)`);
+    indexOf(lines, '    cost  $3.40 · budget $3');
+    assert.ok(!lines.some((l) => /its tries have cost its budget: or more/.test(l)), 'the shared reason is gone');
+  }
+});

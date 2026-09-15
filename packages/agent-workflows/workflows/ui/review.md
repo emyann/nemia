@@ -16,6 +16,10 @@ permissionMode: dontAsk
 # and `node --test apps/web/test/e2e/run.ts`, and no deny closes an allow that runs any task or any file (`node --test`
 # takes a glob). Narrowing those two allows is the settings' to do; until then the brief keeps review from them.
 disallow: Bash(npm run build), Bash(npm run e2e)
+# Dollars the step's tries may cost together, over every round (`budget:`). A review of this repository has cost $3.7 for one
+# try and $10.5 over three rounds (measured 2026-09-15, W7's own run); $20 is above any review seen. On `claude` the cap bounds
+# further spend — a session is not stopped mid-flight — so past it the run files no more of this step until a person raises it.
+budget: 20
 # The review travels as this step's closeout — `findings` and `again`, in the shape review.schema.json declares. A
 # finding names where it is: a file and a line, or a page and a theme.
 output: review.schema.json

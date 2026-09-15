@@ -2,11 +2,12 @@
  * A person's words to a step's running session over HTTP: POST /api/runs/:id/steps/:step/say, which calls the package's `say()` — `wf say`'s
  * own — and the `said` on the step's detail, read back off the engine's journal.
  *
- * At shipped defaults: the api's own engine over a store this file seeds; a fake `claude` first on PATH that lists the sessions this file says
+ * At shipped defaults: the api's own engine over a store this file seeds; the harness's fake `claude` (test/harness.ts) first on PATH, listing the sessions this file says
  * are running, each with a pid, so the registry of the sessions on this machine is never asked; and a real Unix socket standing in for a
  * session's inbox, registered where Claude Code registers one (`<CLAUDE_CONFIG_DIR>/sessions/<pid>.json`). So words the api takes are on that
  * socket, as given, and on the task's journal; words it refuses are on neither.
  */
+import { registry } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,15 +23,6 @@ const root = tmp('root');
 process.env.WF_ROOT = root;
 const config = tmp('claude');
 process.env.CLAUDE_CONFIG_DIR = config;
-
-const bin = tmp('bin');
-const registry = path.join(bin, 'registry.json');
-fs.writeFileSync(registry, '[]');
-fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
-const fs = require('node:fs');
-if (process.argv[2] === 'agents') process.stdout.write(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
-`, { mode: 0o755 });
-process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 
 const { app } = await import('../src/app.ts');
 const { engine, list, readRun, say } = await import('agent-workflows');

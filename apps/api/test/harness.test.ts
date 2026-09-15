@@ -1,0 +1,54 @@
+/**
+ * The api's tests observe the harness `test/harness.ts` installs, and never this machine's registry: every test file imports it first, and
+ * the `claude` the api's engine runs is the harness's.
+ */
+import { bin, calls, observations, registry, unharnessed } from './harness.ts';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-harness-root-'));
+const { app } = await import('../src/app.ts');
+const { engine } = await import('agent-workflows');
+
+test('every api test file imports the harness first, before anything that could observe this machine', () => {
+  const dir = import.meta.dirname;
+  const files = fs.readdirSync(dir).filter((file) => file.endsWith('.test.ts'));
+  assert.ok(files.includes('app.test.ts') && files.includes('harness.test.ts'), 'and this is looking at the api\'s tests');
+  assert.deepEqual(files.map((file) => [file, unharnessed(fs.readFileSync(path.join(dir, file), 'utf8'))]).filter(([, why]) => why !== null), []);
+});
+
+test('REFUSED: a test file whose first import is not the harness — a builtin, the api, none at all, or an import() above it — is named, with the fix', () => {
+  const refused = (text: string, why: RegExp) => {
+    const said = unharnessed(text);
+    assert.ok(said !== null && why.test(said) && said.includes("Make `import './harness.ts'` first"), `${JSON.stringify(text)} → ${said}`);
+  };
+  refused("import { test } from 'node:test';\nimport './harness.ts';\n", /^its first import is node:test\./);
+  refused("import { app } from '../src/app.ts';\nimport { observations } from './harness.ts';\n", /^its first import is \.\.\/src\/app\.ts\./);
+  refused("const { app } = await import('../src/app.ts');\nimport './harness.ts';\n", /^it imports a module with import\(\) before any static import\./);
+  refused('const one = 1;\n', /^it imports no harness\./);
+  assert.equal(unharnessed("import './harness.ts';\nimport { test } from 'node:test';\n"), null);
+  assert.equal(unharnessed("import {\n  observations,\n  registry,\n} from './harness.ts';\nconst { app } = await import('../src/app.ts');\n"), null);
+});
+
+test("the `claude` the api's engine runs is the harness's: it resolves there, answers with the harness's registry, and each observation is noted", async () => {
+  assert.equal(execFileSync('sh', ['-c', 'command -v claude'], { encoding: 'utf8' }).trim(), path.join(bin, 'claude'));
+  fs.writeFileSync(registry, JSON.stringify([{ name: 'ae/t-harness/1', sessionId: 'a-session', kind: 'background', state: 'working', status: 'busy', startedAt: 0 }]));
+  const listed = execFileSync('claude', ['agents', '--all', '--json'], { encoding: 'utf8' });
+  assert.deepEqual(JSON.parse(listed), JSON.parse(fs.readFileSync(registry, 'utf8')));
+  fs.writeFileSync(registry, '[]');
+
+  // A task filed on the engine's Claude harness, and read: through the package's engine, and through the api's own.
+  const e = engine();
+  await e.file({ id: 't-harness', brief: 'Read me.', cwd: os.tmpdir(), harness: 'claude' });
+  let before = observations();
+  await e.view('t-harness');
+  assert.ok(observations() > before, "the package's engine observed the harness's `claude`");
+  before = observations();
+  assert.equal((await app.request('/api/runs')).status, 200);
+  assert.ok(observations() > before, "and so did the api's");
+  assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
+});

@@ -2,6 +2,7 @@
  * GET /api/workflows and POST /api/runs (workflows.ts): a repository's workflows listed, and a run of one started, in a
  * scratch store and a scratch repository — and this repository's own workflows, as the board lists them.
  */
+import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';

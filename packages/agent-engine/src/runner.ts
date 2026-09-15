@@ -132,8 +132,12 @@ export type RunnerOps = {
    * Asked on every pass that still observes such a session, so it must be idempotent and needs no
    * memory: one that fails is asked again next pass. Given the session as observed, to tell a live one
    * from one that has exited, and the task's `worktree`, since a harness may remove the one it cut.
+   *
+   * Resolves with what the session consumed, read once this call has stopped it, for a harness that writes part of that
+   * only as a session's process exits — after its end was written (Claude Code's cost). The engine records it on the
+   * attempt. Nothing when it stopped nothing.
    */
-  readonly release?: (session: Sighting, task: { worktree?: string | boolean }) => Effect.Effect<void, RunnerError>;
+  readonly release?: (session: Sighting, task: { worktree?: string | boolean }) => Effect.Effect<Usage | void, RunnerError>;
   /**
    * The session's conversation as events, from `after` on, and the cursor to ask again with. Optional:
    * a harness that keeps no record of its conversation has `logs`, and that is all. Pull-only and
@@ -384,20 +388,102 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number): Transcri
   });
 };
 
+/** One `cost-state` line: the session's totals as its process exited, and when that count began. */
+type CostState = { costUsd?: number; apiMs?: number; toolMs?: number; startTime?: number; unpriced: boolean };
+
+const costStateOf = (line: string): CostState | undefined => {
+  let e: Record<string, unknown> | null;
+  try { e = JSON.parse(line); } catch { return undefined; }
+  if (e?.type !== 'cost-state') return undefined;
+  const n = (key: string) => (typeof e[key] === 'number' && Number.isFinite(e[key]) ? (e[key] as number) : undefined);
+  return { costUsd: n('totalCostUSD'), apiMs: n('totalAPIDuration'), toolMs: n('totalToolDuration'), startTime: n('startTime'), unpriced: e.hasUnknownModelCost === true };
+};
+
 /**
- * What a session consumed, read from its transcript: the responses made at or after `since`.
+ * How far before the session's start in the registry a `cost-state`'s `startTime` may be and still be the count this
+ * session began. Claude Code starts counting a moment before or after it registers the session — 10 to 440 ms either
+ * way, measured on 2.1.272 — and a count carried on from an earlier process of the session began minutes before.
+ */
+const COST_START_SLACK_MS = 5_000;
+
+/**
+ * An attempt's cost, from the `cost-state` lines around it: the last written after its first line, less the one the
+ * session had written before that, when its count was carried on from it.
+ *
+ * Measured on the `--bg` transcripts on this machine (2.1.246 to 2.1.272), and by stopping a session by hand: Claude
+ * Code writes the line twice as a session's process exits — `claude stop` returns once it has — never per turn, and
+ * with no time of its own, so a line belongs to the attempt whose lines it follows. And `--resume` carries the count
+ * on: one session continued twice wrote $28.32, $43.04 and $47.21, all three under its first process's `startTime`. So
+ * a continuation's own cost is its total less its session's total when it began — the difference is recorded, not the
+ * session's total, so an attempt's cost is its own, as its tokens are, and as a resumed `claude -p` reports its own.
+ *
+ * Absent, never 0: while no line has been written since the attempt began (its process has not exited); when the count
+ * was carried on from a total this transcript does not show; and, for `costUsd`, when the harness could not price a
+ * model the session used — a total too low reads as the whole cost, so none is given, and `unpricedModel` says why.
+ */
+const costOf = (before: CostState | undefined, after: CostState | undefined, since: number): Usage => {
+  if (after?.startTime === undefined) return {};
+  const carried = after.startTime < since - COST_START_SLACK_MS;
+  const base = carried && before?.startTime === after.startTime ? before : undefined;
+  if (carried && !base) return {};
+  const own = (key: 'costUsd' | 'apiMs' | 'toolMs') => {
+    const total = after[key];
+    const was = base ? base[key] : 0;
+    if (total === undefined || was === undefined || total < was) return undefined;
+    return base ? Number((total - was).toFixed(6)) : total;
+  };
+  const unpriced = after.unpriced || base?.unpriced === true;
+  const [costUsd, apiMs, toolMs] = [own('costUsd'), own('apiMs'), own('toolMs')];
+  return {
+    ...(costUsd !== undefined && !unpriced ? { costUsd } : {}),
+    ...(apiMs !== undefined ? { apiMs } : {}),
+    ...(toolMs !== undefined ? { toolMs } : {}),
+    ...(unpriced ? { unpricedModel: true as const } : {}),
+  };
+};
+
+/**
+ * What a session consumed, read from its transcript: the responses made at or after `since`, and what Claude Code said
+ * the attempt cost (`costOf`).
  *
  * `since` is the session's own start, from the harness's registry. A resumed transcript holds its
  * parent's whole conversation under the child's id, with the parent's timestamps, so counted whole
  * a continuation would report its parent's work as its own. A response is written as one line per
  * content block, each repeating its `message.id` and `usage` (measured: 160 lines, 85 responses),
  * so responses are counted once, by id. Tokens are given only when every counted response carried
- * them. A transcript holds no cost, so `costUsd` is absent — never 0.
+ * them.
+ *
+ * The attempt's lines begin at the first line whose own time is at or after `since`, and end where the session was
+ * continued under another name (an `agent-name` line naming another): a session its registry still lists after it
+ * ended can have been resumed by a later task since, and what that task spent is not this attempt's.
  */
 export const transcriptUsage = (jsonl: string, since: number): Usage => {
   const responses = new Map<string, { input: number; output: number } | null>();
   const toolCalls = new Set<string>();
+  let before: CostState | undefined;
+  let after: CostState | undefined;
+  let begun = false;
+  let name: string | undefined;
   for (const line of jsonl.split('\n')) {
+    if (line.includes('"cost-state"')) {
+      const state = costStateOf(line);
+      if (state) {
+        if (begun) after = state; else before = state;
+        continue;
+      }
+    }
+    if (line.includes('"agent-name"')) {
+      let entry: { type?: unknown; agentName?: unknown } | null = null;
+      try { entry = JSON.parse(line); } catch { /* not a line */ }
+      if (entry?.type === 'agent-name' && typeof entry.agentName === 'string') {
+        if (begun && name !== undefined && entry.agentName !== name) break;
+        name = entry.agentName;
+        continue;
+      }
+    }
+    if (!begun && line.includes('"timestamp"')) {
+      try { begun = Date.parse((JSON.parse(line) as { timestamp?: unknown } | null)?.timestamp as string) >= since; } catch { /* not a line */ }
+    }
     if (!line.includes('"assistant"')) continue;
     let entry: { type?: string; timestamp?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } };
     try { entry = JSON.parse(line); } catch { continue; }
@@ -422,6 +508,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     ...(measured.length === counted.length
       ? { inputTokens: measured.reduce((t, c) => t + c.input, 0), outputTokens: measured.reduce((t, c) => t + c.output, 0) }
       : {}),
+    ...costOf(before, after, since),
   };
 };
 
@@ -829,6 +916,8 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * session from; a session listed with no process — one that has exited — has none.
    */
   const pids = new Map<string, number>();
+  /** When `claude agents` last listed each of our sessions as started, by session id: what `release` reads usage from. */
+  const starts = new Map<string, number>();
 
   return ({
     spawn: (r) => Effect.try({
@@ -885,6 +974,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         const m = new Map<string, { sighting: Sighting; startedAt?: number }>();
         listed.clear();
         pids.clear();
+        starts.clear();
         for (const row of rows) {
           // `state` and `status` answer different questions and are NOT a fallback chain. `state`
           // is the session's lifecycle; `status` is whether its process is busy this instant. A
@@ -896,6 +986,7 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
           if (row.name?.startsWith('ae/') && row.sessionId && state) {
             listed.set(row.sessionId, state);
             if (Number.isInteger(row.pid) && (row.pid as number) > 0) pids.set(row.sessionId, row.pid as number);
+            if (typeof row.startedAt === 'number') starts.set(row.sessionId, row.startedAt);
             m.set(row.name, {
               sighting: { sessionId: row.sessionId, state, busy: row.status === 'busy', nativeId: row.sessionId },
               // When THIS session started, as the harness recorded it: what usage is counted from.
@@ -985,20 +1076,31 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
      *
      * Only stopped when the task asked for a worktree: `claude rm` deletes "a background session and its
      * worktree", and the task's work is in that worktree.
+     *
+     * And what the session consumed, read again once it is stopped: Claude Code writes a session's cost into its
+     * transcript only as the process exits, and `claude stop` returns once it has (measured on 2.1.272: 0.6 s, both
+     * `cost-state` lines there as it returned). The end on the record was read before that, with no cost in it.
      */
     release: (session, task) => Effect.gen(function* () {
       // The registry's word, not the sighting's: a session whose end is on the record — quiet, or idle
       // after its closeout — is still running (found in review, when quiet was reported `done`). A session
-      // this runner has not listed — no `observe` made here — has only its sighting to go by.
+      // this runner has not listed — no `observe` made here — has only its sighting to go by. A process listed
+      // for it runs whatever its state says: a session `done` keeps its process until it is stopped (2.1.272).
       const running = listed.get(session.sessionId) ?? session.state;
-      if (running === 'working' || running === 'blocked') {
+      const alive = running === 'working' || running === 'blocked' || pids.has(session.sessionId);
+      if (alive) {
         // Failing only if it exited since it was observed — which leaves `rm` exactly as able to go on.
         yield* sh('claude', ['stop', short(session.sessionId)], { verb: 'release' }).pipe(
           Effect.catchTag('RunnerError', () => Effect.succeed('')),
         );
       }
-      if (task.worktree) return;
-      yield* sh('claude', ['rm', short(session.sessionId)], { verb: 'release' });
+      // Read before `rm`: one that fails leaves the session listed, and the next pass's sighting carries the same read.
+      const since = starts.get(session.sessionId);
+      const measured = alive && since !== undefined
+        ? yield* Effect.promise(() => usageFrom(session.sessionId, since).catch(() => undefined))
+        : undefined;
+      if (!task.worktree) yield* sh('claude', ['rm', short(session.sessionId)], { verb: 'release' });
+      return measured;
     }),
 
     // The one verb where the Agent SDK is simply better than the CLI: `getSessionMessages` reads

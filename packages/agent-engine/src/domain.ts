@@ -100,8 +100,21 @@ export type Usage = {
   /** Every input token the model read, cached ones included. */
   inputTokens?: number;
   outputTokens?: number;
-  /** Only a runner that is told the cost has one. A transcript does not say. */
+  /**
+   * What the session cost, in dollars, as its harness priced it — never computed here from tokens. Claude Code writes a
+   * session's total into its transcript as its process exits (`cost-state`), and `claude -p` prints it as it exits
+   * (`total_cost_usd`). This attempt's own: a resumed session's total, which carries the one before it, less that one.
+   */
   costUsd?: number;
+  /** Milliseconds spent waiting on the model's API, as the harness counted them. This attempt's own, as `costUsd` is. */
+  apiMs?: number;
+  /** Milliseconds spent running tools, as the harness counted them. This attempt's own, as `costUsd` is. */
+  toolMs?: number;
+  /**
+   * The harness used a model it has no price for, so its total is not the whole cost: `costUsd` is absent rather than
+   * too low, and this says why (Claude Code's `hasUnknownModelCost`).
+   */
+  unpricedModel?: true;
 };
 
 /** The join key. Deterministic, so it survives anything that kills this process. */
@@ -197,6 +210,12 @@ export type Event =
    * come from the same sighting, when its runner measured them; `decide` reads neither.
    */
   | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number; error?: string }
+  /**
+   * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
+   * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
+   * A fact for the record, written once; `decide` never reads it.
+   */
+  | { kind: 'measured'; at: string; attempt: number; usage: Usage }
   /** The operator asked for it to stop. */
   | { kind: 'stop-requested'; at: string }
   /**
@@ -299,6 +318,11 @@ export function fold(taskId: string, events: readonly Event[]): State {
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
         if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; a.error = e.error ?? a.error; }
+        break;
+      }
+      case 'measured': {
+        const a = s.attempts.find((x) => x.n === e.attempt);
+        if (a) a.usage = { ...a.usage, ...e.usage };
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;

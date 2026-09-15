@@ -13,7 +13,7 @@
 import { Effect, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State } from './domain.ts';
+import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
   claudeOps, claudeRefuses, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
@@ -56,9 +56,11 @@ export type PromiseRunner = {
   /**
    * Optional. Let go of a session whose attempt's end the engine has written down — stop it if it
    * runs, drop it from your registry. Called on every pass that still observes it, so make it
-   * idempotent; a rejection is asked again on the next.
+   * idempotent; a rejection is asked again on the next. Resolve with what the session consumed, read
+   * once you stopped it, when your harness writes part of that only as a session exits: the engine
+   * records it on the attempt (a `measured` entry). Resolve with nothing when you stopped nothing.
    */
-  release?(session: Sighting, task: { worktree?: string | boolean }): Promise<void>;
+  release?(session: Sighting, task: { worktree?: string | boolean }): Promise<Usage | void>;
   /**
    * Optional. The session's conversation as events from `after` — a cursor this method returned, in
    * whatever shape you chose, or none for the start — and the cursor to ask again with. The engine passes
@@ -270,7 +272,9 @@ const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Reco
           logs: (id: string) => wrap(() => h.logs(id), (m) => new RunnerError({ verb: 'logs', message: m })),
           ...(h.release ? {
             release: (session: Sighting, task: { worktree?: string | boolean }) =>
-              wrap(() => h.release!(session, task), (m) => new RunnerError({ verb: 'release', message: m })),
+              wrap(() => h.release!(session, task), (m) => new RunnerError({ verb: 'release', message: m })).pipe(
+                Effect.map((used) => used || undefined),
+              ),
           } : {}),
           ...(h.transcript ? {
             transcript: (id: string, after?: TranscriptCursor) =>

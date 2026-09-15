@@ -531,6 +531,29 @@ test('what a session consumed and how it exited go on the attempt, from the sigh
   assert.equal(a!.exitCode, 0);
 });
 
+test('what a release reads once it has stopped a session is written on the attempt once, as measured — a session left listed is asked on every pass', async () => {
+  const sessions = new Map<string, Sighting>();
+  const ops = testOps({ sessions });
+  let asked = 0;
+  const layer = Layer.mergeAll(Journal.test(), Runner.layer({
+    ...ops,
+    // Stopped by the first call, as Claude Code writes a session's cost only then; listed still, as a worktree task's is.
+    release: () => Effect.sync(() => (++asked === 1 ? { turns: 2, costUsd: 0.5, apiMs: 900 } : undefined)),
+  }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file(spec));
+  await run(tick());
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'done', usage: { turns: 2 } });
+  for (let i = 0; i < 3; i++) await run(tick());
+
+  assert.equal(asked, 3, 'released on every pass that still sees it');
+  const events = await run(Effect.flatMap(Journal, (j) => j.read(id)));
+  const ended = events.find((e) => e.kind === 'ended');
+  assert.deepEqual(ended?.kind === 'ended' && ended.usage, { turns: 2 }, 'its end, as the sighting that ended it said');
+  assert.deepEqual(events.filter((e) => e.kind === 'measured').map((e) => e.kind === 'measured' && e.usage), [{ turns: 2, costUsd: 0.5, apiMs: 900 }], 'written once');
+  assert.deepEqual(fold(id, events).attempts[0]!.usage, { turns: 2, costUsd: 0.5, apiMs: 900 });
+});
+
 test('an attempt nobody measured records null — not zeros that would read as free', async () => {
   const b = board();
   const id = await b.run(file(spec));

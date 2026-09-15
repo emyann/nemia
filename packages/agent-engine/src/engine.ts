@@ -226,17 +226,27 @@ export const settleTask = Effect.fn('settleTask')(function* (
  * Level-triggered like the rest: asked on every pass that still observes such a session, so a crash
  * between writing an end and releasing is repaired by the next pass. A release the harness refuses is
  * not the pass's failure; it is asked again.
+ *
+ * What the attempt consumed is written down here as well, when it says more than the record does (`measured`):
+ * Claude Code writes a session's cost only as its process exits, which is after its end was written, so the read a
+ * release takes once it has stopped the session is the first to have it — or, for a session left listed, the
+ * sighting's. Written once: a session left listed is seen on every pass, and the second read says nothing new.
  */
 const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, observed: ReadonlyMap<string, Sighting>) {
   const runner = yield* Runner;
+  const journal = yield* Journal;
   if (!runner.release) return;
   for (const attempt of state.attempts) {
     const finished = attempt.ended !== null || (state.settled !== null && attempt.nativeId !== null);
     const session = finished ? observed.get(nameFor(state.taskId, attempt.n)) : undefined;
     if (!session) continue;
-    yield* runner.release(session, { worktree: state.worktree }).pipe(
+    const released = yield* runner.release(session, { worktree: state.worktree }).pipe(
       Effect.catchTag('RunnerError', () => Effect.succeed(undefined)),
     );
+    const measured = typeof released === 'object' ? released : session.usage;
+    if (measured && Object.keys(measured).some((key) => !Object.hasOwn(attempt.usage ?? {}, key))) {
+      yield* journal.append(state.taskId, { kind: 'measured', at: new Date().toISOString(), attempt: attempt.n, usage: measured });
+    }
   }
 });
 

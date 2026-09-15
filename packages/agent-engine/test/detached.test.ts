@@ -507,6 +507,19 @@ test("claude -p's answer is its result object's structured_output, and nothing e
   assert.deepEqual(claudeResultOutput(''), {});
 });
 
+test("what claude -p cost is its result's total_cost_usd, and its API time duration_api_ms — measured or absent, never 0", () => {
+  // Measured on 2.1.272: a result carries both, beside a `usage` whose token counts read 0 where `modelUsage` counted thousands.
+  assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: 0.01804, duration_api_ms: 718, usage: { input_tokens: 0, output_tokens: 0 } })), { usage: { costUsd: 0.01804, apiMs: 718 } });
+  assert.deepEqual(
+    claudeResultOutput(resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.2 })),
+    { closeout: { payload: { outcome: 'done' } }, usage: { costUsd: 0.2 } },
+    'beside the answer, and a count it does not give is not given',
+  );
+  assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: 'a lot', duration_api_ms: null })), {}, 'what is not a number is not a measurement');
+  assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: -1 })), {});
+  assert.deepEqual(claudeResultOutput(JSON.stringify({ type: 'assistant', total_cost_usd: 1 })), {}, 'only a result says it');
+});
+
 test("a spec that reads its harness's output reports the answer found there, stamped with when it was written — nothing in the workspace", async () => {
   const dir = root();
   const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'ae-ws-'));
@@ -577,7 +590,7 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
     `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
     `printf '%s\\n' "$@" > '${bin}/argv'`,
     'echo "a warning" >&2',
-    `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' } })}'`,
+    `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.0123, duration_api_ms: 850 })}'`,
   ].join('\n'), { mode: 0o755 });
   const prev = process.env.PATH;
   process.env.PATH = `${bin}:${prev}`;
@@ -595,6 +608,7 @@ test('claude-detached at shipped defaults: a task that asked for a closeout gets
     assert.equal(state.settled, 'succeeded');
     assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
     assert.equal(state.attempts[0]?.nativeId, SESSION, 'and the session id, from the same JSON');
+    assert.deepEqual(state.attempts[0]?.usage, { costUsd: 0.0123, apiMs: 850 }, 'and what it cost, from the same JSON');
     const argv = fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
     assert.deepEqual(JSON.parse(argv[argv.indexOf('--json-schema') + 1]!), schema);
     assert.equal(argv[argv.indexOf('--output-format') + 1], 'json');

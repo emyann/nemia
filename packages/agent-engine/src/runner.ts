@@ -5,7 +5,8 @@
  * fifth, `release`, is optional — letting go of a session whose end is on the record, for a harness
  * whose registry would otherwise keep it for ever. So is a sixth, `transcript`: the same session's
  * conversation as events, for a person to follow, and nothing the engine acts on. And a seventh, `say`:
- * a person's words handed to a session while it runs, which the engine journals and never acts on. Swap the layer and the same engine drives a
+ * a person's words handed to a session while it runs, which the engine journals and never acts on. And an eighth,
+ * `find`: one session by its name, without observing every other, for a read that needs only which session it is. Swap the layer and the same engine drives a
  * different harness; `Runner.test()` drives nothing at all, which is how the engine's tests cost zero
  * dollars.
  *
@@ -107,12 +108,20 @@ export type Transcript = { events: TranscriptEvent[]; cursor: TranscriptCursor }
  * the line this type exists to hold. `release` does not cross it: optional, told only what the record
  * already says, and answering nothing the engine acts on. Nor does `transcript`: optional, and read
  * for a person, never by `decide`. Nor does `say`: optional, a person's words carried in, and nothing
- * the engine decides on.
+ * the engine decides on. Nor does `find`: optional, a cheaper way to one session's id than `observe`, and never
+ * its state.
  */
 export type RunnerOps = {
   readonly spawn: (r: SpawnRequest) => Effect.Effect<void, RunnerError>;
   /** Every session this runner knows about, BY NAME. One call per pass, never per task. */
   readonly observe: Effect.Effect<Map<string, Sighting>, RunnerError>;
+  /**
+   * The one session running under `name`, found without observing every other: which session it is, and nothing of
+   * its state. Optional — for a harness that can answer by name for less than `observe` costs (Claude Code: the
+   * session's registration file, where `observe` runs `claude agents`). Resolves `undefined` when none runs under the
+   * name. A read that needs a session's state asks `observe`, and where the two differ, `observe`'s word is taken.
+   */
+  readonly find?: (name: string) => Effect.Effect<{ sessionId: string } | undefined, RunnerError>;
   readonly stop: (sessionId: string) => Effect.Effect<void, RunnerError>;
   readonly logs: (sessionId: string) => Effect.Effect<string, RunnerError>;
   /**
@@ -525,6 +534,64 @@ export const inboxSocketRefuses = (socket: string, stat: { isSocket(): boolean; 
   return undefined;
 };
 
+/** Whether a process runs under `pid` that this one may signal. One another user's process holds (EPERM) counts as none. */
+const signalable = (pid: number): boolean => {
+  try { process.kill(pid, 0); return true; } catch { return false; }
+};
+
+/**
+ * When a process started, as `/proc/<pid>/stat` counts it (its 22nd field): what Claude Code writes in a session's
+ * registration as `procStart` (measured on the live `--bg` sessions of 2.1.271). `undefined` where there is no `/proc`.
+ */
+export const processStart = (pid: number): string | undefined => {
+  let stat: string;
+  try { stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8'); } catch { return undefined; }
+  // The second field is the command's name in parentheses, which may hold spaces and parentheses: count from the last.
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+};
+
+/**
+ * The running background session Claude Code has registered under `name` — from `<sessionsDir>/<pid>.json`, which the
+ * session writes for itself (`pid`, `sessionId`, `name`, `kind`) and `say` reads an inbox from — or `undefined`. A few
+ * milliseconds, where `claude agents --json` takes a third of a second (2.1.271).
+ *
+ * Which session it is, and nothing of its state: the file does not say whether a session is working, idle or blocked,
+ * and that stays the registry's. And a running session only, because a registration outlives its process (18 of the
+ * 21 on the machine this was written on had none). So a file is taken only when:
+ *
+ * - it is a file this user owns, named for the `pid` it holds, of a `bg` session: an interactive one is never ours;
+ * - a process this user may signal runs under that pid;
+ * - where the system says when a process started (`/proc`), it started when the registration says (`procStart`): a pid
+ *   another process has taken since is not the session. Without `/proc` (macOS) that check is not made.
+ *
+ * `uid` is who "this user" is, and `startOf` when a process started: both passed only by a test.
+ */
+export const claudeRegistered = async (
+  sessionsDir: string,
+  name: string,
+  { uid = process.getuid?.(), startOf = processStart }: { uid?: number; startOf?: (pid: number) => string | undefined } = {},
+): Promise<{ sessionId: string; pid: number } | undefined> => {
+  let files: string[];
+  try { files = await fs.promises.readdir(sessionsDir); } catch { return undefined; }
+  for (const f of files) {
+    const pid = Number(/^([1-9]\d*)\.json$/.exec(f)?.[1]);
+    if (!pid) continue;
+    let r: { pid?: unknown; sessionId?: unknown; name?: unknown; kind?: unknown; procStart?: unknown } | null;
+    try {
+      const file = path.join(sessionsDir, f);
+      const stat = await fs.promises.lstat(file);
+      if (!stat.isFile() || (uid !== undefined && stat.uid !== uid)) continue;
+      r = JSON.parse(await fs.promises.readFile(file, 'utf8'));
+    } catch { continue; } // gone since the directory was read, or read mid-write: not found this time
+    if (r?.name !== name || r.kind !== 'bg' || r.pid !== pid || typeof r.sessionId !== 'string' || !r.sessionId) continue;
+    if (!signalable(pid)) continue;
+    const started = startOf(pid);
+    if (started !== undefined && String(r.procStart) !== started) continue;
+    return { sessionId: r.sessionId, pid };
+  }
+  return undefined;
+};
+
 /** How long a post to a session's inbox may take. The inbox answers nothing, so this bounds a connection that hangs. */
 const SAY_TIMEOUT_MS = 5_000;
 
@@ -653,7 +720,7 @@ export type ClaudeOptions = {
   /** Where the runner writes what it hands the CLI by path — a task's MCP config. Default `~/.agent-engine`. */
   root?: string;
   /**
-   * Where Claude Code registers each running session, by pid: `say` finds a session's inbox there. Default
+   * Where Claude Code registers each running session, by pid: `find` finds a session there by its name, and `say` its inbox. Default
    * `sessions` under `$CLAUDE_CONFIG_DIR`, or under `~/.claude`, read when the runner is made.
    */
   sessionsDir?: string;
@@ -881,6 +948,20 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         ).pipe(Effect.map((entries) => new Map(entries)));
       }),
     ),
+
+    /**
+     * The session running under `name`, from its registration (`claudeRegistered`) rather than `claude agents`: about
+     * 2 ms here, where the CLI took about 330 ms (2.1.271, 231 rows). Which session it is, never its state. Every live
+     * registration on the machine this was measured on named the same session, under the same name, as `claude agents`
+     * listed for its pid.
+     */
+    find: (name) => Effect.tryPromise({
+      try: async () => {
+        const found = await claudeRegistered(sessionsDir, name);
+        return found && { sessionId: found.sessionId };
+      },
+      catch: (cause) => new RunnerError({ verb: 'find', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
+    }),
 
     // `claude stop` takes the short id, which is the uuid's first block.
     stop: (sessionId) => sh('claude', ['stop', short(sessionId)], { verb: 'stop' }).pipe(Effect.asVoid),

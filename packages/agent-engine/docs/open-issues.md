@@ -8,7 +8,8 @@ its number behind rather than renumbering the rest, so "bug 9" means the same th
 State as of 2026-09-14: agent-engine after the hold-the-bar engine work (repository
 `docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), a
 session's conversation read as events (§4 S1), and `say`, a person's words into a running session on the
-record (§6 item 3, the engine half); agent-workflows `0e7b02a`.
+record (§6 item 3, the engine half), and `find`, one session by its name without `claude agents` (§6 item 17);
+agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -172,6 +173,14 @@ engine does not read, so every `say` there rejects (not a socket). The other way
 terminal over the background daemon's control socket and typing, was not taken: it is a terminal path, and it
 would type into whatever prompt the session has open.
 
+`find` rests on the same files (§6 item 17): a registration's `name`, `kind`, `pid` and `procStart`, as 2.1.270 and
+2.1.271 write them. A release that renames or moves them makes `find` find nothing, and every read that used it observes
+instead — slower, not wrong. One that kept the files but let a registration name a session other than the one `claude
+agents` lists for it would make `transcript` of an attempt in flight read the wrong conversation: the one read that takes
+a registration's word over the registry's. On this machine every live registration agreed with the registry on both. And
+without `/proc` (macOS) a pid another process has taken since is not caught, since `procStart` is checked only where the
+system says when a process started.
+
 ### 14. A session reported `done` by quiet is refused, though it could still hear
 
 The Claude runner reports a `working` session quiet for 90 seconds as `done` (the quiescence floor), and `say`
@@ -257,11 +266,15 @@ attempt — into the continuation's brief, as `wf retry --message` carries an an
   does; any rollout item of a type other than the five read; a Codex thread whose reasoning has a
   summary; and how long a command's item waits to be written, since none of the commands in those
   rollouts ran long.
-- **What a poll of a running Claude session costs.** An ended attempt is read by the id on the record,
-  with no registry asked. One in flight is not: each `transcript` call runs `claude agents` (~300 ms), and
-  the Claude runner's second pass reads the closeout and usage of every idle `ae/` session it lists, as
-  every `view` does. Measured by nobody under a board polling once a second (plan §4 S2). If it bites, a
-  runner verb that finds one session by name, not a cache in the engine, is the fix.
+- **What a poll of a running Claude session costs** (§6 item 17). Measured on this machine's board (2.1.271, 231 rows
+  in `claude agents`, 236 tasks): `claude agents --json` took 0.32–0.36 s a call, and so did every `view` — of a settled
+  task too — and every `transcript` of an attempt in flight. Now a view of a task with no attempt in flight reads its
+  record (0.2 ms), and a `transcript` of one in flight finds its session by name from the session's registration (`find`:
+  about 2 ms to find one, 6 ms to find none among 21 files; the whole read, 14 ms, mostly the transcript). A view of an
+  attempt in flight, `list`, `say` and a pass still observe, and a view still makes the runner's second pass over every
+  idle `ae/` session it lists. So a board's open stream on a running step makes one `claude agents` call a second, not
+  two. Verified with a fake `claude` that counts its calls and registration files the test writes
+  (`test/find.test.ts`, every guard made to refuse by taking it out); no board has been measured polling it.
 
 - **Releasing a quiet session, or one a person or a deadline stopped** (engine `c2ebd62`, `9c4221e`). A
   fake `claude` that keeps a registry, at shipped defaults. The live run released a session that had

@@ -72,7 +72,7 @@ JOIN KEY  a name we choose        →  claude --name ae/<task>/<attempt>
 ```
 
 That's the whole engine. `decide()` is pure, total, and returns exactly one step; everything
-effectful is the four verbs of `Runner`, and three optional ones: one that lets a finished session go, one that reads its conversation, and one that hands a running session a person's words. Kubernetes' control plane for the loop, durable
+effectful is the four verbs of `Runner`, and four optional ones: one that finds a session by its name for less than observing them all, one that lets a finished session go, one that reads its conversation, and one that hands a running session a person's words. Kubernetes' control plane for the loop, durable
 execution's journal for the memory, and the local harness as the kubelet.
 
 **The engine never holds a session.** `claude --bg` hands it to the harness, which already owns
@@ -145,7 +145,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 |---|---|
 | `'claude-bg'` | Claude Code's background sessions; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, and three optional ones, `release`, `transcript` and `say`, for anything else at all |
+| a `PromiseRunner` | four async methods, and four optional ones, `find`, `release`, `transcript` and `say`, for anything else at all |
 
 **`src/cli.ts` imports `createEngine`, and types, and nothing else from the engine.** That is
 deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
@@ -648,7 +648,8 @@ could not say whether a result was an error. What the records do not give, and s
 **Which session is read.** An attempt that has ended — or whose task settled with it open — is read by the
 session id the journal recorded, and no registry is asked: a board that re-reads a finished step costs no
 `claude agents`, and a registry that cannot be read does not stop it. An attempt in flight is found by
-observing its task's harness, alone. A registry that cannot be read this time counts as nothing observed,
+name when its task's harness can `find` it — for Claude Code, from the session's registration, with no `claude
+agents` call — and by observing that harness alone when it cannot, or finds none (below). A registry that cannot be read this time counts as nothing observed,
 as a pass counts it. So does a session not started yet: no events, and the cursor asked with (or one from
 the start). Neither is a refusal: ask again.
 
@@ -726,6 +727,56 @@ the fix is to continue a session that has ended, the sentence says so: a new tas
 what `wf retry --message` does. A registry that cannot be read, or words the harness did not take, reject
 without an exit code: nothing was said, so ask again.
 
+## What a read asks of the harness: `observe` and `find`
+
+`observe` lists every session a harness has, and for Claude Code that is `claude agents --all --json`: about a third
+of a second a call on the machine this was measured on (2.1.271, 231 rows). A pass needs it, since it decides for every
+task at once. A person's read needs less, and used to pay the same: every `view` observed, so a board's open stream on a
+running step made two such calls a second (its `view` and its `transcript`), and the api's list of runs one for every
+step on every poll (plan §4 S2).
+
+So a harness may also answer `find(name)`: the one session running under a name the engine chose, found without
+observing every other — which session it is, and nothing of its state. Claude Code's runner reads it off the session's
+registration, `~/.claude/sessions/<pid>.json`, which a running session writes for itself with its `pid`, `sessionId`,
+`name` and `kind`: the file `say` finds an inbox through. Each read asks only what it needs:
+
+| read | needs | Claude Code asks |
+|---|---|---|
+| `tick` | every session's state | `observe`, once a pass |
+| `list()` | every task's phase | `observe`, once |
+| `view(id)`, attempt in flight | its session's state — working, idle, blocked | `observe` |
+| `view(id)`, any other task | its phase, and its session's id once an attempt has ended: both on the record | nothing; `find` for a session whose id the record lacks |
+| `logs(id)` | the session's id | as `view(id)` |
+| `transcript(id)`, attempt in flight | which session it is | `find`; `observe` when no registration names it |
+| `transcript(id)`, attempt ended | the id on the record | nothing |
+| `say(id)` | its state, and its process | `observe`, then the registration by the pid listed |
+
+A view of a task with no attempt in flight carries no `usage`: an ended attempt's is on `state.attempts`. Measured on
+a loop of twenty reads each against that machine's board (236 tasks), before and after:
+
+| read | before | after |
+|---|---|---|
+| `view` of a settled task | 320 ms | 0.2 ms |
+| `transcript` of a running task, read whole | 334 ms | 14 ms, most of it the transcript |
+| `view` of a running task | 323 ms | about the same: it observes |
+| `list()` | 339 ms | about the same: it observes |
+
+So the open stream on a running step makes one `claude agents` call a second, not two, and a list of runs asks the
+registry only for the steps still running. `find` itself took about 2 ms to find a session and 6 ms to find none among
+the 21 registrations there.
+
+**A registration outlives its process** — 18 of those 21 had none — so one is taken only when it is a file this user
+owns, named for the pid it holds, of a `bg` session (an interactive one is never the engine's); a process this user may
+signal runs under that pid; and, where there is `/proc`, that process started when the registration says
+(`procStart`), so a pid another process has taken since is not the session. Without `/proc` (macOS) that last check is
+not made. A registration refused, or not there, refuses nothing: the read observes, as it did before.
+
+**Where a registration and the registry disagree, every read that observes takes the registry's word** — a view's phase
+and session, `say`, and the pass, which never uses `find`. `transcript` of an attempt in flight is the one read that
+takes a registration's, and only for which session to read: every live registration on that machine named the session
+`claude agents` listed for its pid, under the same name. A `PromiseRunner` without `find` is observed as it always was
+(`test/find.test.ts`).
+
 ## Letting a sandboxed Codex step commit
 
 Codex's `workspace-write` sandbox keeps `.git` read-only on purpose — including the real git
@@ -781,6 +832,7 @@ reason `Runner` is a seam and not an import.
 | narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session; `disallowedTools` → `--disallowedTools` | not wired: it passes only `model` and `permissionMode` |
 | MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json` and the task's `mcp`, never the operator's | not wired |
 | the conversation as events | `transcript`, from the session's transcript | not wired: no `transcript` |
+| one session by its name | `find`, from the session's registration | not wired: every read observes |
 | telling a running session something | `say`, a line on the session's inbox socket | not wired: no `say` |
 | good for | the fleet, long work, unattended | one task in the foreground, with a human watching |
 
@@ -830,7 +882,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
 | `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `src/journal.ts` | append-only JSONL per task, plus the board-wide feed |
-| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `release`, `transcript` and `say` — Claude Code's runner, words and usage, its inbox, and the one transcript reader |
+| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — Claude Code's runner, words and usage, its registrations and inbox, and the one transcript reader |
 | `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits; the Codex and `claude -p` specs, and Codex's rollout read as a transcript |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
@@ -849,6 +901,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
+| `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree |
 | `test/readme.test.ts` | this file, held to the code |
 | `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, and `say` into a working session, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |

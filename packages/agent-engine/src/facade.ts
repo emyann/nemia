@@ -13,7 +13,7 @@
 import { Effect, Layer } from 'effect';
 import path from 'node:path';
 import os from 'node:os';
-import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting } from './domain.ts';
+import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
   claudeOps, claudeRefuses, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
@@ -45,6 +45,12 @@ export type PromiseRunner = {
    */
   spawn(r: SpawnRequest): Promise<void>;
   observe(): Promise<Map<string, Sighting>>;
+  /**
+   * Optional. The session running under `name` — a name the engine chose — found without observing every other, or
+   * `undefined` when none runs. Only which session it is: a read that needs its state asks `observe`, and takes
+   * `observe`'s word. Without it, `view`, `transcript` and `logs` observe this harness as they always have.
+   */
+  find?(name: string): Promise<{ sessionId: string } | undefined>;
   stop(sessionId: string): Promise<void>;
   logs(sessionId: string): Promise<string>;
   /**
@@ -159,6 +165,13 @@ export type Engine = {
   file(spec: TaskSpec): Promise<string>;
   /** One pass: start what may start, notice what ended, settle what is over. */
   tick(): Promise<TickReport>;
+  /**
+   * One task. An attempt in flight is observed, as a pass observes: its phase is its session's state, and only a
+   * registry has that. Any other task is read off its record — its phase is there, and so is its session's id once an
+   * attempt has ended — and the registry is not asked. A session whose id the record lacks is found by name when its
+   * harness can `find` one, and observed when it cannot or finds none; a harness without `find` is observed as ever.
+   * `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
+   */
   view(taskId: string): Promise<TaskView>;
   list(): Promise<TaskView[]>;
   /** Ask a task to stop. Takes effect on the next tick, and confirms on the one after. */
@@ -171,8 +184,9 @@ export type Engine = {
    * from the start.
    *
    * An attempt that has ended is read by the session id the journal recorded, and no registry is asked.
-   * One in flight is found by observing its harness, and a registry that cannot be read this time is
-   * nothing observed, as a pass reads it: no events, and the cursor given back.
+   * One in flight is found by name when its harness can `find` it, and by observing its harness when it
+   * cannot or finds none; a registry that cannot be read this time is nothing observed, as a pass reads
+   * it: no events, and the cursor given back.
    *
    * Refused — rejected with an `Error` whose `exitCode` is 2 — for a task this engine has no record of;
    * a harness that keeps no conversation this engine can read (a `HarnessSpec` or `PromiseRunner`
@@ -249,6 +263,9 @@ const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Reco
             }),
           }),
           observe: wrap(() => h.observe(), (m) => new RunnerError({ verb: 'observe', message: m })),
+          ...(h.find ? {
+            find: (name: string) => wrap(() => h.find!(name), (m) => new RunnerError({ verb: 'find', message: m })),
+          } : {}),
           stop: (id: string) => wrap(() => h.stop(id), (m) => new RunnerError({ verb: 'stop', message: m })),
           logs: (id: string) => wrap(() => h.logs(id), (m) => new RunnerError({ verb: 'logs', message: m })),
           ...(h.release ? {
@@ -351,6 +368,31 @@ export function createEngine(options: EngineOptions = {}): Engine {
   const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Promise<A> =>
     Effect.runPromise(e.pipe(Effect.provide(layer)));
 
+  /** The harness a task runs on: the one it was filed with, or the fallback for one this engine no longer has. */
+  const harnessOf = (state: State) => {
+    const asked = state.harness ?? fallback;
+    return Object.hasOwn(runners, asked) ? asked : fallback;
+  };
+
+  /**
+   * One task's view, asking a registry only what the record cannot answer (`Engine.view`).
+   *
+   * Observed for an attempt in flight, whose phase is its session's state; and for a harness that cannot `find`, since
+   * a detached runner's handle for a session is not the id on the record. Otherwise the record holds the phase and,
+   * once an attempt has ended, its session's id, which a registry could only confirm. A session whose id the record
+   * lacks — a task settled with its attempt open, before `settled` carried one — is found by name, or observed.
+   */
+  const viewOf = (taskId: string) => Effect.gen(function* () {
+    const observed = Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => view(taskId, o)));
+    const state = fold(taskId, yield* Effect.flatMap(Journal, (j) => j.read(taskId)));
+    const last = state.attempts.at(-1);
+    const { find } = runners[harnessOf(state)]!;
+    if (!find || (!state.settled && last?.ended === null)) return yield* observed;
+    if (!last || last.nativeId) return yield* view(taskId, new Map());
+    const found = yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined)));
+    return found ? { ...(yield* view(taskId, new Map())), sessionId: found.sessionId } : yield* observed;
+  });
+
   const engine: Engine = {
     // The harness is RESOLVED here, never left implicit. A task filed without one would otherwise
     // be counted in a pool called 'default' while an identical task that named its harness went
@@ -362,7 +404,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       return go(file(task));
     },
     tick: () => go(tick(max)),
-    view: (taskId) => go(Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => view(taskId, o)))),
+    view: (taskId) => go(viewOf(taskId)),
     list: () => go(Effect.gen(function* () {
       const observed = yield* (yield* Runner).observe;
       const ids = yield* (yield* Journal).list;
@@ -370,11 +412,11 @@ export function createEngine(options: EngineOptions = {}): Engine {
     })),
     stop: (taskId) => go(requestStop(taskId)),
     logs: (taskId) => go(Effect.gen(function* () {
-      const v = yield* view(taskId, yield* (yield* Runner).observe);
+      const v = yield* viewOf(taskId);
       if (!v.sessionId) return '(no session yet)';
       // Asked of the task's own harness, not of whichever reported the session this pass: a session its
       // harness has released is in no observation, and its transcript is still there to read.
-      return yield* (runners[v.state.harness ?? fallback] ?? runners[fallback]!).logs(v.sessionId);
+      return yield* runners[harnessOf(v.state)]!.logs(v.sessionId);
     })),
     transcript: async (taskId, after) => {
       const refuse = (why: string) => Object.assign(new Error(`transcript: ${why}`), { exitCode: 2 });
@@ -383,8 +425,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       const state = fold(taskId, events);
       // The task's own harness, as for `logs`, and observed by that harness alone: a board asks this every
       // second while a session runs, and no other harness's registry can name the session.
-      const asked = state.harness ?? fallback;
-      const harness = Object.hasOwn(runners, asked) ? asked : fallback;
+      const harness = harnessOf(state);
       const runner = runners[harness]!;
       const read = runner.transcript;
       if (!read) throw refuse(`the \`${harness}\` harness keeps no conversation this engine can read. \`logs\` gives what its session printed.`);
@@ -397,9 +438,15 @@ export function createEngine(options: EngineOptions = {}): Engine {
       // The start, as a read of no session gives it, is handed to no runner: it is asked from the start.
       const start = noTranscript().cursor;
       // An attempt that has ended — or whose task settled with it open — has its session's id on the record,
-      // and no registry is asked for it: what `logs` falls back to. Only an attempt in flight needs one, and a
-      // registry that cannot be read this time is nothing observed, as `composite` reads it for a pass.
-      const sessionId = state.attempts.at(-1)?.nativeId ?? (await go(runner.observe.pipe(
+      // and no registry is asked for it: what `logs` falls back to. Only an attempt in flight needs one, and only
+      // its id: found by name when the harness can `find` it, and observed when it cannot or finds none — a session
+      // not registered yet, or one that exited before its end was written. A registry that cannot be read this time
+      // is nothing observed, as `composite` reads it for a pass, and a `find` that fails is nothing found.
+      const last = state.attempts.at(-1);
+      const found = !last?.nativeId && last?.ended === null && runner.find
+        ? await go(runner.find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined))))
+        : undefined;
+      const sessionId = last?.nativeId ?? found?.sessionId ?? (await go(runner.observe.pipe(
         Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
         Effect.flatMap((observed) => view(taskId, observed)),
       ))).sessionId;
@@ -416,8 +463,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       if (!events.length) throw refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
       const state = fold(taskId, events);
       // The task's own harness, as for `transcript`: only its registry can name the session, and only it has a way in.
-      const asked = state.harness ?? fallback;
-      const harness = Object.hasOwn(runners, asked) ? asked : fallback;
+      const harness = harnessOf(state);
       const runner = runners[harness]!;
       const h = harnesses[harness]!;
       const deliver = runner.say;

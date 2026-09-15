@@ -84,3 +84,15 @@ test("every word the parser takes, the engine's own refusal takes too — asked 
   assert.deepEqual(PERMISSION_MODES.claude, PERMISSION_MODES['claude-detached']);
   assert.deepEqual(EFFORTS.claude, EFFORTS['claude-detached']);
 });
+
+test("REFUSED at load in the engine's words: a `budget:` on a codex step, which `codex exec` has no spend cap to keep", async () => {
+  const { parseWorkflow } = await import('../src/workflow.ts');
+  const engine = codex.refuses!({ brief: 'b', cwd: '/w', budgetUsd: 5 });
+  assert.ok(engine, 'the engine refuses a budget on codex');
+  const reason = /^`budgetUsd: 5` (.*?)\. Leave/.exec(engine)?.[1];
+  assert.ok(reason, engine);
+  assert.throws(() => parseWorkflow('review', '---\nharness: codex\nbudget: 5\n---\nreview it\n'), (e: Error) => e.message.startsWith(`review: \`budget: 5\` ${reason}.`));
+  // The harnesses a budget is taken on: `claude`, whose cap the run holds between tries, and `claude-detached`, whose harness keeps it too.
+  assert.equal(claudeDetached.refuses!({ brief: 'b', cwd: '/w', budgetUsd: 5 }), undefined);
+  for (const harness of ['claude', 'claude-detached']) assert.equal(parseWorkflow('x', `---\nharness: ${harness}\nbudget: 5\n---\ndo it\n`).budget, 5, harness);
+});

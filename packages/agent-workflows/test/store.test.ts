@@ -2645,3 +2645,12 @@ test("REFUSED before, now read as it was: a run from before collection — its s
   assert.deepEqual((await advance(b.e, readRun(run.id))).notes, []);
   assert.deepEqual(artifactFiles(run, 'implement'), []);
 });
+
+// ─── what a step may spend ──────────────────────────────────────────────────
+
+test("a step's `budget:` is frozen on the run with the rest of its keys: the folder edited afterwards never raises it, nor takes it off", () => {
+  const dir = folder('budget: 2.50');
+  const run = started(dir);
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 500\n---\nimplement it\n');
+  assert.deepEqual(stepsOf(readRun(run.id)).map((s) => [s.name, s.budget]), [['implement', 2.5], ['review', undefined]]);
+});

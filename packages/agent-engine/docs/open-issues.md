@@ -9,7 +9,8 @@ State as of 2026-09-14: agent-engine after the hold-the-bar engine work (reposit
 `docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), a
 session's conversation read as events (§4 S1), and `say`, a person's words into a running session on the
 record (§6 item 3, the engine half), `find`, one session by its name without `claude agents` (§6 item 17), and
-bug 1, a quiet session with no closeout recorded a success (§6 item 18); agent-workflows `0e7b02a`.
+bug 1, a quiet session with no closeout recorded a success (§6 item 18), and what a session cost, read from its harness,
+with a spend cap on the task (engine `9d075f7`, `26020c1`); agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -37,12 +38,14 @@ running, then removed. One kind is left there, stopped: a task that asked for a 
 need that work somewhere else first. A session whose task a person or a deadline settled before the
 `settled` entry carried its id stays listed too, since `ae logs` could not read it once removed.
 
-### 4. `claude-detached` measures no usage
+### 4. `claude-detached` measures its cost, and no turns, tokens or tool calls
 
-`agent-engine/src/runner-detached.ts`. Its closeout is read now (engine `3e44ab6`), from the one
-`result` object `claude -p --output-format json` prints; what the attempt consumed is not, and it
-records `usage: null`. The same object carries `num_turns`, `usage` and `total_cost_usd` (seen in one
-live call on 2.1.270), but no count of tool calls. Low priority: this harness exists for comparison.
+`agent-engine/src/runner-detached.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
+`total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
+prints. Its turns, tokens and tool calls are not. The object carries `num_turns` and a `usage`, but on 2.1.272 that `usage`
+counted 0 input and 0 output tokens in a run whose `modelUsage` counted thousands, so neither is read until what each counts
+is measured; it has no count of tool calls, and no tool time. Low priority: this harness exists for comparison — and, since
+only `claude -p` keeps a spend cap (issue 17), for a task that must not spend past one.
 
 ### 5. An unstartable first attempt of a continuation retries cold
 
@@ -191,6 +194,41 @@ queued while it waited, and a login-refresh stall nudged by `say` rather than by
 
 **Possible fix.** Whatever continues a blocked attempt carries what was said to it — `state.said` for that
 attempt — into the continuation's brief, as `wf retry --message` carries an answer. That is the upper layer's.
+
+### 17. A `claude --bg` session keeps no spend cap
+
+**Measured** (2026-09-15, Claude Code 2.1.272, `--model haiku`, by hand). `claude --bg --max-budget-usd 0.01`, told to read a
+file forty times, took the flag without a word, read it 42 times, spent $0.19 and was listed `done`; nothing in `claude
+agents` or its transcript names a budget. The flag's help says it "only works with --print". The same brief under `claude
+-p` stopped after two responses, at $0.018.
+
+**Effect.** `file()` refuses `budgetUsd` on `claude` (engine `26020c1`), so nothing bounds what a `--bg` session spends — and
+`claude` is the harness agent-workflows runs its steps on. A task can have a cap only on `claude-detached`, which gives up
+what `-p` lacks: `say`, and following the conversation while it runs (issue 11).
+
+**Why the engine does not keep it instead.** A `--bg` session's cost is written only as its process exits (issue 18), so no
+read of a running session says what it has spent. Pricing its transcript's tokens here would be a price list of the
+engine's, not the harness's figure, and wrong the day a price changes. An engine-kept cap needs Claude Code to say what a
+running session has spent — in `claude agents`, its registration file, or a `cost-state` per turn — and 2.1.272 says it in
+none of them.
+
+### 18. A `--bg` attempt's cost is read only once its session is let go
+
+Claude Code writes a `cost-state` pair as a session's process exits, and never per turn: every `--bg` transcript on this
+machine from 2.1.246 to 2.1.272 holds one pair per process, and a session stopped by hand had none until `claude stop`
+returned. So the Claude runner reads an attempt's cost after its end is written: its release stops the session and reads the
+transcript, and the pass journals a `measured` entry (engine `9d075f7`). What that leaves:
+
+- **A crash between the read and the entry** loses the cost when the same release removed the session: no later pass
+  observes it. A worktree task's session, stopped and left listed, is read again by the next pass, and measured from that.
+- **A session its release did not stop** — one that had already exited, or that a person or a deadline stopped before its
+  task settled — is measured from the sighting the pass made. One removed before this change never is.
+- **No cost at all** for a session killed so hard it wrote no `cost-state`, and for a continuation whose count was carried on
+  from a total its transcript does not show — a parent killed that way: absent, not a guess.
+- **An attempt in flight has no cost** in `view` or `ae ls`: nothing has been written yet.
+- **The resumed reading rests on one shape**: a continuation writes into the same transcript, after its parent's pair, under
+  its parent's `startTime` (one session continued twice, 2026-09-15). Its cost is its total less its parent's. No resumed
+  session has been measured end to end under the engine.
 
 ## Verified live, once
 
@@ -361,6 +399,8 @@ attempt — into the continuation's brief, as `wf retry --message` carries an an
 | a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `9c4221e` |
 | a task that asked for a closeout settled `succeeded` when its session went quiet without one (bug 1): at shipped defaults, `ended: done`, `reason: harness`, no closeout | the Claude runner reports how long a session has been quiet (`quietMs`), from its last write or its own start; `decide` ends a quiet attempt `done` when no statement was asked for, and `failed`, `unsigned`, when one was and none came — continued with a nudge by the resume policy, and settled `failed` saying so when attempts run out | engine, §6 item 18 (last section) |
 | a nudged retry that `--resume`d its session was recorded with no closeout and its first try's usage, to the byte; and a statement given after a `view` had seen the session listed final was never read, until the daemon restarted | the Claude runner keeps a read of a finished session for one attempt — the row's name, its session, the registry's start — and only while the transcript has not been written since | engine `00e301b` |
+| no attempt recorded what it cost — `Usage.costUsd` was declared and never filled, and every `wf decide` said "cost not measured" | the Claude runner reads Claude Code's `cost-state`, written as a session's process exits, once its release has stopped the session, and the pass journals it as `measured`; a resumed attempt records its own share, not its session's total; `claude -p`'s `total_cost_usd` goes on its end (issues 4, 18) | engine `9d075f7` |
+| nothing could bound what a session spends | `budgetUsd` on the task, `--max-budget-usd` from both Claude runners, and a session `claude -p` ended at its cap recorded `failed`, reason `budget`, and never continued; refused on `claude`, whose `--bg` sessions keep no cap (issue 17), and on `codex` | engine `26020c1` |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

@@ -146,11 +146,17 @@ export const usageLine = (u: Usage | null): string => {
   if (!u) return 'usage not measured';
   const tokens = u.inputTokens !== undefined && u.outputTokens !== undefined
     ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out` : ' · tokens not measured';
-  const cost = u.costUsd !== undefined ? ` · $${u.costUsd.toFixed(3)}` : ' · cost not measured';
   const turns = u.turns !== undefined ? `${u.turns} turns` : 'turns not measured';
   const calls = u.toolCalls !== undefined ? `${u.toolCalls} tool calls` : 'tool calls not measured';
-  return `${turns} · ${calls}${tokens}${cost}`;
+  return `${turns} · ${calls}${tokens} · ${costLine(u)}`;
 };
+
+/** Dollars for a person, to the cent: $3.01. Under a cent is `<$0.01` — `$0.00` would read as free. */
+export const usd = (n: number): string => (n > 0 && n < 0.01 ? '<$0.01' : `$${n.toFixed(2)}`);
+
+/** What an attempt cost, for a person: dollars, or that nobody measured it — and why, when the harness said. */
+const costLine = (u: Usage | null | undefined): string =>
+  u?.costUsd !== undefined ? usd(u.costUsd) : u?.unpricedModel ? 'cost not measured (a model without a price)' : 'cost not measured';
 
 /** A length of time for a person: 42s, 4m 59s, 1h 02m. */
 const duration = (ms: number): string => {
@@ -174,16 +180,19 @@ export const attemptLine = (a: Attempt): string => {
   const when = ranLine(a);
   if (a.ended === null) return `attempt ${a.n}  running ${when}`;
   if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
-  const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : ''}`;
+  const how = `${a.ended}${a.reason === 'lost' || a.reason === 'budget' ? ` (${a.reason})` : ''}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
   return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${failedCall}`;
 };
 
-const line = (v: TaskView) => {
+/**
+ * One task, for `ae ls`: its latest attempt's cost beside its turns — `$3.01 · 12t`, or `cost not measured` — once it has
+ * an attempt. An attempt still running has none yet: Claude Code writes a session's cost as its process exits.
+ */
+export const taskLine = (v: TaskView) => {
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
-  const measured = u ? [u.costUsd !== undefined ? `$${u.costUsd.toFixed(3)}` : '', u.turns !== undefined ? `${u.turns}t` : ''].filter(Boolean) : [];
-  const meter = measured.length ? `  ${measured.join('/')}` : '';
+  const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
   return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${v.state.attempts.length}/${v.state.maxAttempts}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 
@@ -193,11 +202,12 @@ const line = (v: TaskView) => {
  */
 const KINDS: Record<string, string> = {
   filed: 'filed', starting: 'starting', spawned: 'started',
-  ended: 'ended', settled: 'SETTLED', 'stop-requested': 'stop asked', said: 'said',
+  ended: 'ended', measured: 'measured', settled: 'SETTLED', 'stop-requested': 'stop asked', said: 'said',
 };
 
 const entryLine = (taskId: string, event: Event) => {
   const extra = event.kind === 'settled' ? `  ${event.outcome}`
+    : event.kind === 'measured' ? `  attempt ${event.attempt}: ${costLine(event.usage)}`
     : event.kind === 'ended' ? `  ${event.observed}${event.reason === 'harness' ? '' : ` (${event.reason})`}${event.error ? `: ${event.error.split('\n')[0]!.slice(0, 160)}` : ''}`
     : event.kind === 'spawned' && event.error ? `  but the call failed: ${event.error.split('\n')[0]!.slice(0, 160)}`
     : event.kind === 'said' ? `  to attempt ${event.attempt}: ${event.text.trim().split('\n')[0]!.slice(0, 160)}`
@@ -258,7 +268,7 @@ export async function main(argv: string[]): Promise<void> {
     case 'ls': {
       const views = await engine.list();
       if (!views.length) return console.log('no tasks');
-      for (const v of views) console.log(line(v));
+      for (const v of views) console.log(taskLine(v));
       return;
     }
 
@@ -269,6 +279,7 @@ export async function main(argv: string[]): Promise<void> {
       const { entries } = await engine.feed(0);
       for (const e of entries.filter((x) => x.taskId === arg)) console.log(entryLine(e.taskId, e.event));
       console.log(`\ncwd: ${v.state.cwd}\nbrief: ${v.state.brief.slice(0, 200)}`);
+      if (v.state.budgetUsd !== undefined) console.log(`budget: $${v.state.budgetUsd} an attempt`);
       for (const a of v.state.attempts) console.log(attemptLine(a));
       return;
     }

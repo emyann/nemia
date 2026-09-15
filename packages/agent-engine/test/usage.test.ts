@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/runner.ts';
 import { codexOutput } from '../src/runner-detached.ts';
-import { attemptLine, usageLine } from '../src/cli.ts';
+import { attemptLine, taskLine, usageLine, usd } from '../src/cli.ts';
 import { fold, type Event } from '../src/domain.ts';
 
 const line = (o: object) => JSON.stringify(o);
@@ -191,13 +191,34 @@ test('a measured attempt prints what was measured, and names what was not', () =
     usageLine({ turns: 12, toolCalls: 31, inputTokens: 1_234_567, outputTokens: 20_400 }),
     '12 turns · 31 tool calls · 1.2M in · 20.4k out · cost not measured',
   );
-  assert.equal(usageLine({ turns: 4, toolCalls: 2, costUsd: 0.1054 }), '4 turns · 2 tool calls · tokens not measured · $0.105');
+  assert.equal(usageLine({ turns: 4, toolCalls: 2, costUsd: 0.1054 }), '4 turns · 2 tool calls · tokens not measured · $0.11');
   const [a] = fold('t', [
     { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
     { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
     { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'harness', exitCode: 3, usage: { turns: 1, toolCalls: 0 } },
   ]).attempts;
   assert.equal(attemptLine(a!), 'attempt 1  failed  09:00:01 → 09:05:00 (4m 59s)  exit 3  1 turns · 0 tool calls · tokens not measured · cost not measured');
+});
+
+test('ae show and ae ls print what an attempt cost to the cent — never $0.00 for a cost under one — or that nobody measured it, and why', () => {
+  assert.equal(usd(3.0054), '$3.01');
+  assert.equal(usd(0.0042), '<$0.01', 'a resumed claude -p that spent less than a cent did not spend nothing');
+  assert.equal(usd(0), '$0.00');
+  assert.equal(usageLine({ turns: 1, toolCalls: 0, apiMs: 900, unpricedModel: true }), '1 turns · 0 tool calls · tokens not measured · cost not measured (a model without a price)');
+
+  const base: Event[] = [
+    { kind: 'filed', at: '2026-09-15T09:00:00Z', brief: 'read the notes\nforty times', cwd: '/r', maxAttempts: 1, harness: 'claude-detached', budgetUsd: 0.01 },
+    { kind: 'starting', at: '2026-09-15T09:00:01Z', attempt: 1 },
+  ];
+  const spent = fold('t-1', [...base, { kind: 'ended', at: '2026-09-15T09:00:04Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'budget', exitCode: 1, usage: { costUsd: 0.01804, apiMs: 718 } }]);
+  assert.equal(attemptLine(spent.attempts[0]!), 'attempt 1  failed (budget)  09:00:01 → 09:00:04 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02');
+
+  const shown = (state: ReturnType<typeof fold>, usage?: object) => taskLine({ id: 't-1', state, phase: state.settled ?? 'running (working)', sessionId: null, ...(usage ? { usage } : {}) });
+  assert.match(shown(spent), /  1\/1  \$0\.02  read the notes$/);
+  const measured = fold('t-1', [...base, { kind: 'ended', at: '2026-09-15T09:05:00Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: { turns: 12 } }, { kind: 'measured', at: '2026-09-15T09:05:01Z', attempt: 1, usage: { turns: 12, costUsd: 3.0054 } }]);
+  assert.match(shown(measured), /  1\/1  \$3\.01 · 12t  read the notes$/, 'measured once its session was let go');
+  assert.match(shown(fold('t-1', base), { turns: 3 }), /  1\/1  cost not measured · 3t  read the notes$/, 'running: no cost written yet');
+  assert.match(shown(fold('t-1', base.slice(0, 1))), /  0\/1  read the notes$/, 'no attempt, nothing to cost');
 });
 
 test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {

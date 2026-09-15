@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import type { StepCheck, StepFiled, StepLog, StepSpec } from '../lib/api';
+import type { RunDetail, StepCheck, StepFiled, StepLog, StepSpec } from '../lib/api';
+import { costText, pastBudget } from '../lib/cost';
 
 /** Label and value, one per row. A value that is not set reads as a dash. */
 export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]> }) {
@@ -87,6 +88,21 @@ function Marked({ value, mark, word = false, title }: { value: string; mark: str
 }
 
 export const code = (value: string | null) => (value === null ? null : <span className="font-mono text-xs">{value}</span>);
+
+type Priced = Pick<RunDetail['steps'][number], 'spent' | 'budget' | 'taskId' | 'tries'>;
+
+/**
+ * A `spent` row for `Facts`, where one says more than the current try's `cost` does: for a step with a cap, what its tries have cost of it
+ * (`$4.25 of $3`), red once they have cost it or more; for one tried more than once, what every try cost together. None otherwise. A filed
+ * step nobody priced reads `not measured`, never $0.
+ */
+export function spentRows(step: Priced): Array<[string, ReactNode]> {
+  if (!step.budget && step.tries.length < 2) return [];
+  const text = costText(step);
+  if (!text) return [['spent', step.taskId ? 'not measured' : null]];
+  const over = pastBudget(step);
+  return [['spent', <span data-spent={over ? 'over' : 'within'} className={`font-mono text-xs ${over ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}>{text}</span>]];
+}
 
 /**
  * The command a step is judged by, and once its check refused, what it exited with and the last lines of

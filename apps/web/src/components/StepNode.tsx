@@ -2,6 +2,7 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { RunDetail, WorkflowStepSpec } from '../lib/api';
 import { needOf, needText } from '../lib/asks';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
+import { costText, pastBudget } from '../lib/cost';
 import { isGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
@@ -36,6 +37,9 @@ export function StepNode({
   // What a person has to know to act on it: the question of a step that asks, or that the harness blocked its session.
   const need = needOf(step, waitingOnYou, runCancelled);
   const { spec } = step;
+  // What its tries have cost, of its cap where it has one: red once they have cost it or more.
+  const cost = costText(step);
+  const over = pastBudget(step);
 
   return (
     <div
@@ -80,6 +84,17 @@ export function StepNode({
           {attemptLine(step.attempts, live, now) ?? 'no attempt yet'}
         </span>
       </div>
+
+      {cost && (
+        <p
+          data-cost={over ? 'over' : 'within'}
+          title={step.budget ? `What its tries have cost of its ${step.budget.said} budget${over ? ': the cap or more, so the run spends nothing more on it until a person raises it' : ''}` : 'What its tries have cost'}
+          className={`truncate border-t border-neutral-200 px-3 py-1 font-mono text-[11px] dark:border-neutral-800 ${over ? 'font-semibold text-red-700 dark:text-red-400' : 'text-neutral-500 dark:text-neutral-400'}`}
+        >
+          <span className="font-sans font-normal">cost </span>
+          {cost}
+        </p>
+      )}
 
       {/*
         The gate, and what it waits for when the step said: one line, as the node's others, and whole on hover — a second would

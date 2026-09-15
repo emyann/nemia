@@ -14,6 +14,12 @@ test('each word wf ls prints reads as the state a person acts on', () => {
     ['checking', 'checking'],
     ['verified ✓', 'verified'],
     ['rounds exhausted', 'exhausted'],
+    ['over budget $4.20 of $3', 'over-budget'],
+    ['over budget ≥$4.20 of $3', 'over-budget'],
+    ['over budget — implement $4.25 of $3', 'over-budget'],
+    ['budget exhausted $3.02 of $3', 'budget-exhausted'],
+    ['budget exhausted at $3', 'budget-exhausted'],
+    ['budget exhausted', 'budget-exhausted'],
     ['unverified · done', 'unverified'],
     ['unverified · closeout unreadable', 'unverified'],
     ['unverified', 'unverified'],
@@ -77,14 +83,26 @@ test('a loop out of rounds waits on a person, in amber like a step that signed o
 test('a word the board does not know reads as working, on purpose: never as done, and never as waiting on you', () => {
   // What `rounds exhausted` read as before the board knew it. A word `wf ls` gains after this was written is shown
   // as still going until the board is taught it, rather than as a verdict the run never gave.
-  for (const status of ['a word wf ls has gained since', 'rounds exhausted, and more', 'exhausted']) {
+  for (const status of ['a word wf ls has gained since', 'rounds exhausted, and more', 'exhausted', 'over budgetary', 'budget', 'budget exhaustedness', 'over budget']) {
     assert.equal(stepState(status, false), 'working', status);
     assert.equal(satisfiesAfter(stepState(status, false)), false, status);
   }
 });
 
-test('a human gate is a step a person decides: signed off blocked, or a loop out of rounds — and on a cancelled run, neither', () => {
-  for (const status of ['succeeded · BLOCKED', 'rounds exhausted']) {
+test('a step past its budget waits on a person in amber, as a loop out of rounds does, and says on hover what raises its cap', () => {
+  for (const state of ['over-budget', 'budget-exhausted'] as const) {
+    assert.equal(stateClass[state], stateClass.exhausted, state);
+    assert.equal(satisfiesAfter(state), false, `${state} is not work done`);
+    assert.match(stateMeaning[state], /until a person raises the cap — wf retry --budget/);
+  }
+  assert.match(stateMeaning['over-budget'], /^over budget: its tries have cost its budget: or more/);
+  assert.match(stateMeaning['budget-exhausted'], /^budget exhausted: its harness ended its session at its budget:/);
+  // Final, so a run somebody called off does not make it read as a step that never started.
+  assert.equal(stepState('over budget $4.20 of $3', true), 'over-budget');
+});
+
+test('a human gate is a step a person decides: signed off blocked, a loop out of rounds, or a step past its budget — and on a cancelled run, none', () => {
+  for (const status of ['succeeded · BLOCKED', 'rounds exhausted', 'over budget $4.20 of $3', 'over budget — implement $4.25 of $3', 'budget exhausted $3.02 of $3']) {
     assert.equal(isGate(stepState(status, false), false), true, status);
     // Nobody waits for the answer on a run somebody called off.
     assert.equal(isGate(stepState(status, true), true), false, `${status}, on a cancelled run`);

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answersOf, askedSaid, needLine, needOf, needsOf, needText, offersOf, type Need } from '../src/lib/asks.ts';
+import { answersOf, askedSaid, needLine, needOf, needsOf, needText, offersOf, raiseTo, type Need } from '../src/lib/asks.ts';
 import type { RunDetail } from '../src/lib/api.ts';
 
 const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
@@ -114,4 +114,36 @@ test('REFUSED: no Continue for a session still at work, which the harness did no
 test('a try the api has just taken, as the board says it until the run is read again: what the tick does next — stopping a blocked session first, where the package says so', () => {
   assert.equal(askedSaid({ try: 2, stopFirst: false }), 'try 2 asked — the next tick files it');
   assert.equal(askedSaid({ try: 3, stopFirst: true }), 'try 3 asked — stopping its blocked session, then the tick files it');
+});
+
+test("a step past its budget is offered the raise the api says the package takes — with its try, or its loop's round — started above what it has cost", () => {
+  const byTry = { by: 'retry' as const, above: 4.25, said: '$4.25' };
+  const byRound = { by: 'round' as const, above: 2.1, said: '$2.10' };
+  const steps = [
+    step('tokens', 'over budget $4.25 of $3', { raise: byTry }),
+    step('review', 'over budget — implement $2.10 of $2', { raise: byRound }),
+    step('lint', 'budget exhausted $3.02 of $3', { raise: { by: 'retry', above: 3.02, said: '$3.02' } }),
+  ];
+  assert.deepEqual(offersOf(run(steps, ['tokens', 'review', 'lint'])), [
+    { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', ...byTry },
+    { step: 'review', kind: 'raise', status: 'over budget — implement $2.10 of $2', ...byRound },
+    { step: 'lint', kind: 'raise', status: 'budget exhausted $3.02 of $3', by: 'retry', above: 3.02, said: '$3.02' },
+  ]);
+  assert.deepEqual(answersOf(run(steps, ['tokens'])).map((o) => o.kind), ['raise'], 'a raise is an answer the Decide section offers');
+  // The first whole dollar above what the package says the cap has to pass: never the amount itself, which it refuses.
+  assert.deepEqual([raiseTo(4.25), raiseTo(3), raiseTo(2.1), raiseTo(0.004)], [5, 4, 3, 1]);
+});
+
+test('REFUSED: no raise for a step past its budget the package takes none of, nor one not waiting on you, nor one whose raise is asked, nor on a run called off — and a raise the api carries on another word is not offered as one', () => {
+  const byTry = { by: 'retry' as const, above: 4.25, said: '$4.25' };
+  // The loop's target: it goes again with its looping step's round, whose row that is.
+  assert.deepEqual(offersOf(run([step('implement', 'over budget $2.10 of $2', { raise: null })], ['implement'])), []);
+  assert.deepEqual(offersOf(run([step('tokens', 'over budget $4.25 of $3', { raise: byTry })], [])), []);
+  const note = 'try 3 asked (--nudge, --budget 5) — the next tick files it';
+  const asked = step('tokens', 'over budget $4.25 of $3', { raise: byTry, note, asked: { try: 3, mode: 'nudge', model: null, message: null, stopFirst: false } });
+  assert.deepEqual(offersOf(run([asked], [])), [{ step: 'tokens', kind: 'asked', try: 3, note }]);
+  assert.deepEqual(offersOf(run([step('tokens', 'over budget $4.25 of $3', { raise: byTry })], ['tokens'], '2026-09-15T07:00:00.000Z')), []);
+  // A check that did not finish past its budget: the package offers its free recheck first, and the board a try again, not a raise.
+  const lint = step('lint', 'failed ✗ check (unfinished)', { raise: byTry, check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null } });
+  assert.deepEqual(offersOf(run([lint], ['lint'])), [{ step: 'lint', kind: 'try-again', recheck: true, unfinished: true }]);
 });

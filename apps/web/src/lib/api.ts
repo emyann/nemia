@@ -22,6 +22,8 @@ export type RunSummary = {
    * run waiting on runs that may still ship among them, and not those of one waiting on a run that never ships without a person.
    */
   moving: boolean;
+  /** What the run has cost so far, every step's tries together, as `wf ls` adds it up (`Spent`); null until a cost was measured. */
+  cost: Spent | null;
   /**
    * `note` is what `wf ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints nothing.
    * `needs` and `blockedByHarness` are what a person has to know to act on it (`StepNeeds`).
@@ -30,6 +32,24 @@ export type RunSummary = {
   /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds. Empty on a cancelled run. */
   waitingOnYou: string[];
 };
+
+/**
+ * Mirrors `Spent` in apps/api/src/app.ts: what sessions cost, as the package adds it up — the dollars of the attempts that ended with a cost on
+ * them, how many did and how many ended with none — and `said`, its word for it: `$4.20`, or `≥$4.20` where an ended attempt has no cost on it.
+ */
+export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
+
+/**
+ * Mirrors `StepBudget` in apps/api/src/app.ts: a step's cap in force — the `budget:` the run froze, or what a person raised it to — as its
+ * author writes one (`said`, `$3`), what its tries have cost of it (`of`, `$4.25 of $3`, null until measured), and whether that is the cap or more.
+ */
+export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
+
+/**
+ * Mirrors `StepRaise` in apps/api/src/app.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its loop's round
+ * (`round`) — and what the budget has to be more than, as the package refuses less.
+ */
+export type StepRaise = { by: 'retry' | 'round'; above: number; said: string };
 
 /**
  * Mirrors `RunWaiting` in apps/api/src/app.ts: what a run started `--after` still waits on, in the package's words. `runs` are each run
@@ -173,6 +193,8 @@ export type RunDetail = {
   waiting: RunWaiting | null;
   status: RunStatus;
   moving: boolean;
+  /** As on `RunSummary`. */
+  cost: Spent | null;
   waitingOnYou: string[];
   warning: string | null;
   /** The steps as a graph, from the workflow the run froze: what the canvases draw, so none derives it from `after`. */
@@ -204,12 +226,18 @@ export type RunDetail = {
     attempts: StepAttempts;
     /** What its current try consumed, in `wf decide`'s words; null for a step not filed. */
     used: StepUsed | null;
+    /** What all its tries have cost together, as `wf ls` puts it beside its word; null until a cost was measured. */
+    spent: Spent | null;
+    /** Its cap in force, and what its tries have cost of it; null for a step with no `budget:`. */
+    budget: StepBudget | null;
+    /** The raise of its cap the package takes, and how; null where none does, and on a run called off. */
+    raise: StepRaise | null;
     /** Every try, earliest first, the current one last: `attempts` counts the current try's task alone. */
     tries: StepTry[];
     /** Where the step's time went, try by try and check by check; empty for a step not filed. */
     timeline: StepTimelineTry[];
   }>;
-  /** The run's time together: each round of its loop, and the whole run. */
+  /** The run's time together: each round of its loop, and the whole run — with what the sessions in each cost. */
   timeline: { rounds: TimelineTotal[]; run: TimelineTotal };
 };
 
@@ -238,8 +266,9 @@ export type TaskSpan = {
 export type StepTimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used: StepUsed | null };
 
 /**
- * Mirrors `TimelineTotal` in agent-workflows' run.ts: a round of a loop — `loop` its looping step, counting the steps that round files again — or
- * the run's, every step's (`loop` and `round` null); sums over its tasks, and its wall, in words.
+ * Mirrors `StepTimelineTotal` in apps/api/src/app.ts — `TimelineTotal` in agent-workflows' run.ts, with its cost: a round of a loop — `loop` its
+ * looping step, counting the steps that round files again — or the run's, every step's (`loop` and `round` null); sums over its tasks, and its
+ * wall, in words; and what the sessions in it cost, null where none was measured.
  */
 export type TimelineTotal = {
   loop: string | null;
@@ -252,13 +281,17 @@ export type TimelineTotal = {
   queued: string;
   ran: string;
   wall: string;
+  cost: Spent | null;
 };
 
 /** Mirrors `Usage` in apps/api/src/app.ts: a count nobody measured is absent, never 0. */
-export type Usage = { turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number };
+export type Usage = { turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number; apiMs?: number; toolMs?: number };
 
-/** Mirrors `StepUsed` in apps/api/src/app.ts: the usage, and `wf decide`'s words for it — `used` and `cost`, `not measured` where nobody counted. */
-export type StepUsed = { usage: Usage | null; used: string; cost: string };
+/**
+ * Mirrors `StepUsed` in apps/api/src/app.ts: the usage, and `wf decide`'s words for it — `used` and `cost`, `not measured` where nobody
+ * counted — and the engine's cost, api time and tool time off it, each null where nobody measured it.
+ */
+export type StepUsed = { usage: Usage | null; used: string; cost: string; costUsd: number | null; apiMs: number | null; toolMs: number | null };
 
 /** Mirrors `Change` in agent-workflows' radius.ts: a file a branch changed. A binary file has null counts, never 0. */
 export type Change = { path: string; from?: string; added: number | null; removed: number | null };
@@ -291,6 +324,10 @@ export type Decidable = {
   sensitive: SensitiveDiff[];
   used: Record<string, StepUsed>;
   total: StepUsed;
+  /** What the run has cost, as `wf decide` prints it after its steps, without its label; null before any attempt has ended. */
+  cost: string | null;
+  /** `wf decide`'s OVER BUDGET line: why each step held on its budget is held; null when none is. */
+  overBudget: string | null;
   commands: DecideCommand[];
 };
 
@@ -538,12 +575,13 @@ export async function startRun(start: { workflow: string; from: WorkflowListing[
 /**
  * Ask for another try of a step, as `wf retry` does: the api calls the package's `retry()`, which writes the ask and nothing else, and the
  * next tick files the try. Resolves with the try asked for, its ask file, and the package's `stopFirst` — the tick stops the step's blocked
- * session before it files the try; rejects with the api's refusal in full — the package's words for a message that cannot ride on the ask
- * or a step that may not be tried again that way, or the api's own about the request.
+ * session before it files the try; rejects with the api's refusal in full — the package's words for a message or a budget that cannot ride
+ * on the ask, a step that may not be tried again that way, or a budget not above what its tries have cost — or the api's own about the request.
+ * `budget` is `--budget`: the cap a step over its budget, or ended at it, is raised to.
  *
  * Sent as `application/json`, which the api requires of it, as of a start.
  */
-export async function askTry(runId: string, step: string, how: { mode: RetryMode; model?: string; message?: string }): Promise<{ try: number; file: string; stopFirst: boolean }> {
+export async function askTry(runId: string, step: string, how: { mode: RetryMode; model?: string; message?: string; budget?: number }): Promise<{ try: number; file: string; stopFirst: boolean }> {
   const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/retry`;
   const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
   const body = (await res.json().catch(() => undefined)) as { try?: unknown; file?: unknown; stopFirst?: unknown; error?: unknown } | undefined;
@@ -553,6 +591,29 @@ export async function askTry(runId: string, step: string, how: { mode: RetryMode
     throw new Error(
       `POST ${route} answered ${res.status} ${res.statusText} without the try it asked for, so the api and this board disagree about what an ask answers. ` +
         `The ask may be written: look at the step's note (\`wf ls ${runId}\`) before asking again, and restart the api (\`npm run dev\`).`,
+    );
+  }
+  throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
+}
+
+/**
+ * Ask for another round of a run's loop, as `wf round` does — past a cap, with `budget`, `--budget`: the api calls the package's `round()`,
+ * which writes the ask and nothing else, and the next tick files the round. Resolves with the looping step, the round asked for, and its ask
+ * file; rejects with the api's refusal in full — the package's words for a round the loop may not go, or a budget not above what its steps
+ * have cost — or the api's own about the request.
+ *
+ * Sent as `application/json`, which the api requires of it, as of a try.
+ */
+export async function askRound(runId: string, how: { step?: string; budget?: number }): Promise<{ step: string; round: number; file: string }> {
+  const route = `/api/runs/${encodeURIComponent(runId)}/round`;
+  const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
+  const body = (await res.json().catch(() => undefined)) as { step?: unknown; round?: unknown; file?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.step === 'string' && typeof body.round === 'number') return { step: body.step, round: body.round, file: String(body.file) };
+  if (res.ok) {
+    // Written, it may well be: look before asking again.
+    throw new Error(
+      `POST ${route} answered ${res.status} ${res.statusText} without the round it asked for, so the api and this board disagree about what an ask answers. ` +
+        `The ask may be written: look at the looping step's note (\`wf ls ${runId}\`) before asking again, and restart the api (\`npm run dev\`).`,
     );
   }
   throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);

@@ -1077,7 +1077,7 @@ test("the run page's timeline: a row per try's session and per check, in the api
   assert.deepEqual(cell('queued'), ['12s', '1s', '1s', '14s']);
   assert.deepEqual(cell('ran'), ['19m42s', '58s', 'still running, no end yet', '20m40s, 1 still running']);
   assert.ok(html.includes(`<time dateTime="${T(0, 12)}"`) || html.includes(`datetime="${T(0, 12)}"`), 'each instant as the engine wrote it, on its <time>');
-  assert.match(unescaped(html), /try 2<\/td><td colSpan="6"[^>]*>its session is try 1's, checked again/i);
+  assert.match(unescaped(html), /try 2<\/td><td colSpan="7"[^>]*>its session is try 1's, checked again/i);
   assert.match(html, /the engine has no record of t-lost/);
   assert.ok(html.includes('>54 turns · tool calls not measured'), 'what the session used, beside it');
   assert.doesNotMatch(html, /data-step="respond"/, 'a step not filed has no row');
@@ -1103,4 +1103,134 @@ test("the run page's timeline: a row per try's session and per check, in the api
   assert.deepEqual(labels, ['review round 1', 'review round 2', 'proofread round 1', 'proofread round 2']);
   // Nothing filed: no timeline at all.
   assert.equal(renderToStaticMarkup(createElement(Timeline, { run: { ...run, steps: run.steps.map((step) => ({ ...step, timeline: [] })) } })), '');
+});
+
+// ─── what a step and a run cost ─────────────────────────────────────────────
+
+const { Timeline } = await import('../src/components/Timeline.tsx');
+
+/** A step's cost as the api gives it: what its tries cost, of a cap where it has one, and whether that is the cap or more. */
+const priced = (spent: number | null, cap: number | null, over = false) => ({
+  spent: spent === null ? null : { usd: spent, measured: 2, unmeasured: 0, said: `$${spent.toFixed(2)}` },
+  budget: cap === null ? null : { usd: cap, said: `$${cap}`, of: spent === null ? null : `$${spent.toFixed(2)} of $${cap}`, over },
+  raise: null,
+});
+
+/** `run`, its one step priced as `cost` says, with the word and who waits on it. */
+const pricedRun = (status: string, cost: ReturnType<typeof priced>, waitingOnYou: string[] = [], cancelledAt: string | null = null): RunDetail => {
+  const run = runOf(status, { waitingOnYou, cancelledAt });
+  return { ...run, steps: [{ ...run.steps[0]!, ...cost }] };
+};
+
+test("a step's node says what its tries cost, of its cap where it has one — red once they cost it or more — and a step past its budget is a human gate", () => {
+  const over = nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), ['review']));
+  const costOf = (html: string) => /<p data-cost="(\w+)"[^>]*class="([^"]*)"><span[^>]*>cost <\/span>([^<]*)<\/p>/.exec(html);
+  const [, state, className, said] = costOf(over) ?? [];
+  assert.deepEqual([state, said], ['over', '$4.25 of $3'], over);
+  assert.match(className!, /\btext-red-700\b/);
+  assert.equal(gateDrawn(over), true, 'over budget waits on you: a human gate');
+  assert.equal(gateDrawn(nodeMarkup(pricedRun('budget exhausted $3.02 of $3', priced(3.02, 3, true), ['review']))), true, 'and so does a session ended at its cap');
+
+  const within = costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, 3))));
+  assert.deepEqual([within?.[1], within?.[3], /\btext-red-700\b/.test(within?.[2] ?? '')], ['within', '$1.20 of $3', false]);
+  assert.equal(costOf(nodeMarkup(pricedRun('verified ✓', priced(1.2, null))))?.[3], '$1.20', 'no cap: what its tries cost');
+  assert.equal(costOf(nodeMarkup(pricedRun('running (working)', priced(null, 3))))?.[3], 'budget $3', 'a cap, and nothing measured yet: the cap alone, never $0');
+  assert.doesNotMatch(nodeMarkup(pricedRun('verified ✓', priced(null, null))), /data-cost/, 'nothing measured and no cap: no cost row');
+});
+
+test('REFUSED: a step past its budget is no gate where the api does not say it waits on you, nor on a run called off', () => {
+  assert.equal(gateDrawn(nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), []))), false);
+  assert.equal(gateDrawn(nodeMarkup(pricedRun('over budget $4.25 of $3', priced(4.25, 3, true), ['review'], '2026-09-15T07:00:00.000Z'))), false);
+});
+
+test("the inspector's Details say what every try cost of its cap — `spent`, red once past it — and add nothing for a step on its one try with no cap", () => {
+  const run = runWith(null);
+  const markup = (step: RunDetail['steps'][number]) => renderToStaticMarkup(createElement(StepInspector, { run, step, onClose: () => {} }));
+  const rows = (step: RunDetail['steps'][number]) =>
+    Object.fromEntries([...markup(step).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], m[2]!.replace(/<[^>]+>/g, '')]));
+  const step = run.steps[0]!;
+  const over = { ...step, ...priced(4.25, 3, true) };
+  assert.equal(rows(over).spent, '$4.25 of $3');
+  assert.match(markup(over), /<span data-spent="over" class="[^"]*\btext-red-700\b[^"]*">\$4\.25 of \$3<\/span>/);
+  assert.match(markup({ ...step, ...priced(1.2, 3) }), /<span data-spent="within" class="font-mono text-xs ">\$1\.20 of \$3<\/span>/);
+  assert.equal(rows({ ...step, ...priced(null, 3) }).spent, 'budget $3');
+  // One try and no cap: its `cost` is all of it, and there is no `spent` row.
+  assert.equal(Object.hasOwn(rows({ ...step, ...priced(1.2, null) }), 'spent'), false);
+  // Tried twice with no cap: every try's cost together — or, for a filed step nobody priced, `not measured`, never $0.
+  const twice = { ...step, tries: [{ ...step.tries[0]!, current: false }, { ...step.tries[0]!, try: 2 }] };
+  assert.equal(rows({ ...twice, ...priced(2.95, null) }).spent, '$2.95');
+  assert.equal(rows({ ...twice, ...priced(null, null) }).spent, 'not measured');
+});
+
+test("the timeline has a cost column: what each session cost, `not measured` where nobody priced it, nothing for a check — and each total its sessions', never $0", () => {
+  const span = (taskId: string) => ({ taskId, at: 'ended' as const, filedAt: at, spawnedAt: at, endedAt: at, attempts: 1, queuedMs: 0, ranMs: 0, queued: '0s', ran: '0s' });
+  const used = (cost: number | null) => ({ usage: null, used: 'not measured', cost: cost === null ? 'not measured' : `$${cost.toFixed(2)}`, costUsd: cost, apiMs: null, toolMs: null });
+  const base = runWith(null);
+  const total = { ...base.timeline.run, loop: 'review', tasks: 2 };
+  const run: RunDetail = {
+    ...base,
+    steps: [{
+      ...base.steps[0]!,
+      timeline: [
+        { try: 1, round: 1, session: span('t-1'), sessionOf: null, check: span('t-1-check'), used: used(1.75) },
+        { try: 2, round: 2, session: span('t-2'), sessionOf: null, check: null, used: used(null) },
+      ],
+    }],
+    timeline: {
+      rounds: [{ ...total, round: 1, cost: { usd: 1.75, measured: 1, unmeasured: 0, said: '$1.75' } }, { ...total, round: 2, cost: null }],
+      run: { ...base.timeline.run, cost: { usd: 1.75, measured: 1, unmeasured: 1, said: '≥$1.75' } },
+    },
+  };
+  const html = renderToStaticMarkup(createElement(Timeline, { run }));
+  assert.match(html, /<th scope="col"[^>]*>cost<\/th><\/tr><\/thead>/);
+  const rows = [...html.matchAll(/<tr ([^>]*)>([\s\S]*?)<\/tr>/g)].map((m) => [
+    /data-task="(\w+)"/.exec(m[1]!)?.[1] ?? /data-total="([^"]+)"/.exec(m[1]!)?.[1],
+    /<td data-cell="cost"[^>]*>([^<]*)<\/td>/.exec(m[2]!)?.[1],
+  ]);
+  assert.deepEqual(rows, [['session', '$1.75'], ['check', ''], ['session', 'not measured'], ['round-1', '$1.75'], ['round-2', 'not measured'], ['run', '≥$1.75']]);
+  // What a `≥` leaves out, on hover.
+  assert.match(html, /<td data-cell="cost" title="What the run&#x27;s tries cost, as its harness priced each session: 1 attempt measured; 1 ended attempt had no cost on it, so it cost at least this"/);
+});
+
+test("the Decide section says why a step past its budget is held — `wf decide`'s OVER BUDGET line — and what every try of the run cost", () => {
+  const line = 'OVER BUDGET, waiting on you: tokens ($4.25 of $3)  — the run files nothing more for it on its own; nothing after it ran';
+  const decision = {
+    touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
+    total: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
+    cost: 'run $6.35 measured · 2 attempts not measured', overBudget: line, commands: [],
+  };
+  const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
+  assert.match(html, /<p data-over-budget="true" class="[^"]*">OVER BUDGET, waiting on you: tokens \(\$4\.25 of \$3\) {2}— the run files nothing more for it on its own; nothing after it ran<\/p>/);
+  assert.match(html, /<dt[^>]*>every try<\/dt><dd[^>]*>run \$6\.35 measured · 2 attempts not measured<\/dd>/);
+  const none = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision: { ...decision, overBudget: null, cost: null } }));
+  assert.doesNotMatch(none, /data-over-budget/, 'no step held on a budget: no line');
+  assert.match(none, /<dt[^>]*>every try<\/dt><dd[^>]*>—<\/dd>/, 'nothing ended yet: a dash, not $0');
+});
+
+test("a step past its budget is offered a raise: its word with the amounts, a box started above what it cost with no floor of the board's, and Raise the budget and try again — or go round again, for its loop", () => {
+  const html = offersMarkup([
+    { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', by: 'retry', above: 4.25, said: '$4.25' },
+    { step: 'review', kind: 'raise', status: 'over budget — implement $2.10 of $2', by: 'round', above: 2.1, said: '$2.10' },
+  ]);
+  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, { kind: m[1]!, html: m[3]! }]));
+  assert.deepEqual([...rows].map(([name, { kind }]) => [name, kind]), [['tokens', 'raise'], ['review', 'raise']]);
+  const buttons = (name: string) => [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
+  const radios = (name: string) => [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  // The number box, and the amount it starts at, whatever order a server render writes its attributes in.
+  const box = (name: string) => { const input = /<input [^>]*type="number"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? ""; return /\bvalue="([^"]*)"/.exec(input)?.[1]; };
+
+  const tokens = textsOf(rows.get('tokens')!.html);
+  assert.ok(tokens.includes('over budget $4.25 of $3') && tokens.includes('wf retry r-1 tokens --budget <amount>') && tokens.includes('$4.25'), tokens.join(' | '));
+  assert.equal(box('tokens'), '5');
+  assert.deepEqual(buttons('tokens'), [['submit', false, 'Raise the budget and try again']]);
+  assert.deepEqual(radios('tokens'), [['nudge', true], ['fresh', false]]);
+  assert.match(rows.get('tokens')!.html, /<span class="sr-only">The cap to raise tokens to, in dollars<\/span>/);
+
+  const review = textsOf(rows.get('review')!.html);
+  assert.ok(review.includes('wf round r-1 review --budget <amount>'), review.join(' | '));
+  assert.equal(box('review'), '3');
+  assert.deepEqual(buttons('review'), [['submit', false, 'Raise the budget and go round again']]);
+  assert.deepEqual(radios('review'), [], 'a round has no mode');
+  // The package refuses a cap not above what was spent, in its words: the board sets no floor of its own that would keep that from it.
+  assert.doesNotMatch(html, /\bmin="|\brequired=""/);
 });

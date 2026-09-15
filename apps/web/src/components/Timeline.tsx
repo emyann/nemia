@@ -1,11 +1,12 @@
 import type { ReactNode } from 'react';
 import type { RunDetail, StepTimelineTry, TaskSpan, TimelineTotal } from '../lib/api';
+import { spentTitle } from '../lib/cost';
 
 /**
  * Where a run's time went, as `wf decide` prints it: a row for each try's session and each try's check of every step, in the order the run
- * keeps its steps — when it was filed, spawned and ended, how long it queued for a slot and ran, and what its session used — then each
- * round's total when its loop went round, and the run's. The words are the api's, which are the package's; the times are the engine's
- * instants, shown in this browser's clock. Nothing is drawn for a run with nothing filed.
+ * keeps its steps — when it was filed, spawned and ended, how long it queued for a slot and ran, what its session used and what it cost — then
+ * each round's total when its loop went round, and the run's, each with what its sessions cost. The words are the api's, which are the
+ * package's; the times are the engine's instants, shown in this browser's clock. Nothing is drawn for a run with nothing filed.
  */
 export function Timeline({ run }: { run: RunDetail }) {
   const steps = run.steps.filter((step) => step.timeline.length > 0);
@@ -20,13 +21,14 @@ export function Timeline({ run }: { run: RunDetail }) {
       <h2 className="text-sm font-medium">Timeline</h2>
       <p className="text-xs text-neutral-500">
         Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more than
-        its wall, first filed → last ended. A round's counts only the steps its loop files again.
+        its wall, first filed → last ended. A round's counts only the steps its loop files again. Cost is what the harness priced each session at,
+        once it ended; a check costs nothing.
       </p>
       <div className="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-800">
         <table className="w-full text-left text-xs tabular-nums">
           <thead className="bg-neutral-50 text-neutral-500 dark:bg-neutral-900 dark:text-neutral-400">
             <tr>
-              {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'used'].map((heading) => (
+              {['step', 'try', 'filed', 'spawned', 'ended', 'queued', 'ran', 'used', 'cost'].map((heading) => (
                 <th key={heading} scope="col" className="px-2 py-1.5 font-medium whitespace-nowrap">{heading}</th>
               ))}
             </tr>
@@ -34,7 +36,7 @@ export function Timeline({ run }: { run: RunDetail }) {
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-900">
             {steps.flatMap((step) => step.timeline.flatMap((t) => [
               <TryRow key={`${step.name}/${t.try}`} step={step.name} t={t} />,
-              ...(t.check ? [<SpanRow key={`${step.name}/${t.try}/check`} step={step.name} label={`try ${t.try} check`} task="check" span={t.check} used={null} />] : []),
+              ...(t.check ? [<SpanRow key={`${step.name}/${t.try}/check`} step={step.name} label={`try ${t.try} check`} task="check" span={t.check} used={null} cost={null} />] : []),
             ]))}
           </tbody>
           <tfoot className="border-t border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
@@ -52,24 +54,25 @@ const CELL = 'px-2 py-1 whitespace-nowrap';
 const tryLabel = (t: StepTimelineTry) => `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
 
 function TryRow({ step, t }: { step: string; t: StepTimelineTry }) {
-  if (t.session) return <SpanRow step={step} label={tryLabel(t)} task="session" span={t.session} used={t.used?.used ?? null} />;
+  if (t.session) return <SpanRow step={step} label={tryLabel(t)} task="session" span={t.session} used={t.used?.used ?? null} cost={t.used?.cost ?? null} />;
   return (
     <tr data-step={step} data-try={t.try} data-task="session" data-at="rechecked">
       <td className={`${CELL} font-medium`}>{step}</td>
       <td className={`${CELL} font-mono`}>{tryLabel(t)}</td>
-      <td colSpan={6} className={`${CELL} text-neutral-500`}>its session is try {t.sessionOf}'s, checked again</td>
+      <td colSpan={7} className={`${CELL} text-neutral-500`}>its session is try {t.sessionOf}'s, checked again</td>
     </tr>
   );
 }
 
-function SpanRow({ step, label, task, span, used }: { step: string; label: string; task: 'session' | 'check'; span: TaskSpan; used: string | null }) {
+/** A task's row: its instants and times, and for a session what it used and what it cost, in `wf decide`'s words — `not measured`, never $0. */
+function SpanRow({ step, label, task, span, used, cost }: { step: string; label: string; task: 'session' | 'check'; span: TaskSpan; used: string | null; cost: string | null }) {
   const lost = span.at === 'unknown';
   return (
     <tr data-step={step} data-task={task} data-at={span.at} className={task === 'check' ? 'text-neutral-600 dark:text-neutral-400' : undefined}>
       <td className={`${CELL} font-medium`}>{task === 'session' ? step : ''}</td>
       <td className={`${CELL} font-mono`}>{label}</td>
       {lost ? (
-        <td colSpan={6} data-cell="lost" className={`${CELL} text-neutral-500`}>the engine has no record of {span.taskId}</td>
+        <td colSpan={7} data-cell="lost" className={`${CELL} text-neutral-500`}>the engine has no record of {span.taskId}</td>
       ) : (
         <>
           <td className={CELL}>{instant(span.filedAt, 'not known')}</td>
@@ -78,14 +81,16 @@ function SpanRow({ step, label, task, span, used }: { step: string; label: strin
           <td data-cell="queued" className={`${CELL} font-mono`}>{span.queued}</td>
           <td data-cell="ran" className={`${CELL} font-mono ${span.at === 'running' ? 'text-sky-700 dark:text-sky-400' : ''}`}>{span.ran}</td>
           <td data-cell="used" className={`${CELL} font-mono text-neutral-500`}>{used ?? ''}</td>
+          <td data-cell="cost" className={`${CELL} font-mono ${cost === 'not measured' ? 'text-neutral-500' : ''}`}>{cost ?? ''}</td>
         </>
       )}
     </tr>
   );
 }
 
-/** A total's row: the run's, or a round's — named by its loop's looping step when `named`, as when two loops went round. */
+/** A total's row: the run's, or a round's — named by its loop's looping step when `named`, as when two loops went round — and what its sessions cost. */
 function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
+  const what = total.round === null ? "the run's tries" : `round ${total.round}'s sessions`;
   return (
     <tr data-total={total.round === null ? 'run' : `round-${total.round}`} data-loop={total.loop ?? undefined} className="font-medium">
       <td colSpan={2} className={CELL}>{total.round === null ? 'run' : `${named ? `${total.loop} ` : ''}round ${total.round}`}</td>
@@ -93,6 +98,11 @@ function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
       <td data-cell="queued" className={`${CELL} font-mono`}>{total.queued}</td>
       <td data-cell="ran" className={`${CELL} font-mono`}>{total.ran}</td>
       <td className={CELL} />
+      {total.cost ? (
+        <td data-cell="cost" title={spentTitle(total.cost, what)} className={`${CELL} font-mono`}>{total.cost.said}</td>
+      ) : (
+        <td data-cell="cost" className={`${CELL} font-mono text-neutral-500`}>not measured</td>
+      )}
     </tr>
   );
 }

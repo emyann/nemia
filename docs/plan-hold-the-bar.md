@@ -1014,7 +1014,7 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 18. Bug 1 of the evaluation — quiet without a closeout settles `succeeded` — half-verified in open-issues since day one.
     *Done, E7, `9709867`: the attempt ends `unsigned`, a nudge, then `failed` with the reason.* Follow-up in agent-workflows:
     read that failure as `unsigned` again (outcome `blocked`, waiting on you, the retry brief's wording) — W6, filed
-    2026-09-15 as `one-small-item-in-agent-work`-… from `./workflows/dev`.
+    2026-09-15 as `one-small-item-in-agent-work-tpxb` from `./workflows/dev`.
 
 27. A `view` of a task whose harness has no `find` observes every harness (E7's last review): observe the task's own
     harness instead, as `transcript` does, and fix the README's saving claim. engine, small.

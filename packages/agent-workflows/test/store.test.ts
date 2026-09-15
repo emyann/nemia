@@ -218,7 +218,7 @@ const gitOut = (cwd: string, ...args: string[]) => execFileSync('git', args, { c
  */
 const board = () => {
   type Filed = { id: string; brief: string; harness?: string; cwd: string; closeoutSchema?: object } & Record<string, unknown>;
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string }>();
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string; usage?: object }>();
   const filings: string[] = [];
   const stopped: string[] = [];
   const logs = new Map<string, string>();
@@ -235,8 +235,12 @@ const board = () => {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
           brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: said.get(id) ?? [],
-          // An attempt given a reason ended `failed` with it, as the engine records a session that went quiet unsigned, or broke.
-          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, ...(t.reason ? { ended: 'failed', reason: t.reason } : {}) }],
+          // An attempt given a reason ended `failed` with it, as the engine records a session that went quiet unsigned, or broke. What it
+          // consumed is on it once it has settled, and not before: a `--bg` session writes its cost as its process exits.
+          attempts: !t || t.phase === 'pending' ? [] : [{
+            n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: settled && t.usage ? t.usage : null,
+            ...(t.reason ? { ended: 'failed', reason: t.reason } : {}),
+          }],
         },
       };
     },
@@ -258,7 +262,7 @@ const board = () => {
       return entry;
     },
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string, usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
   return { e, tasks, filings, stopped, settle, logs, said, deaf };
 };
 
@@ -2653,4 +2657,117 @@ test("a step's `budget:` is frozen on the run with the rest of its keys: the fol
   const run = started(dir);
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 500\n---\nimplement it\n');
   assert.deepEqual(stepsOf(readRun(run.id)).map((s) => [s.name, s.budget]), [['implement', 2.5], ['review', undefined]]);
+});
+
+test("REFUSED past its budget at shipped defaults: a claude step whose ended tries cost more than its `budget:` is not tried again by `retries:` — `wf ls` says over budget with the amounts — `wf retry` is refused without `--budget` or with one not above what it spent, and one above it files the try, the cap on the record", async () => {
+  const { run, e, tasks, filings, settle } = await throughCheck('check: npm test\nretries: 2\nbudget: 3', 'failed', 1);
+  const implement = `${run.id}-implement`;
+  // The engine's view of the settled try, with what it cost on it.
+  settle(implement, 'succeeded', SIGNED, undefined, undefined, { costUsd: 4.25 });
+  for (let i = 0; i < 2; i++) {
+    const pass = await advance(e, readRun(run.id));
+    assert.deepEqual([pass.tried, pass.filed, pass.checked, pass.blocked, pass.status], [[], [], [], ['review'], 'failed'], `pass ${i + 1}`);
+  }
+  assert.deepEqual(filings, [implement, `${implement}-check`], '`retries: 2` files nothing past the cap');
+  assert.equal(tasks.get(implement)!.spec.budgetUsd, undefined, 'a claude step is filed with no budgetUsd: a --bg session keeps none');
+  const l = await list(e, readRun(run.id));
+  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['over budget $4.25 of $3', ['implement']]);
+  await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge' }), refusedWith(/^implement is over budget: its tries have cost \$4\.25 of its \$3 budget, .*: wf retry \S+ implement --budget <amount>\.$/));
+  await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge', budget: 4 }), refusedWith(/^--budget 4 is not above \$4\.25, what implement's tries have cost/));
+  assert.deepEqual(asksOf(run.id), [], 'no ask written');
+  const { offers, decision: d } = await decide(e, run.id);
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.overBudget], ['blocked', ['implement']]);
+  assert.match(offers[0]!, new RegExp(`^implement: over budget, \\$4\\.25 of \\$3\\. Raise its cap above \\$4\\.25 and continue its session:  wf retry ${run.id} implement --budget <amount>`));
+
+  const { ask } = await retry(e, run.id, 'implement', { mode: 'nudge', budget: 10 });
+  assert.equal(ask.budget, 10);
+  assert.match((await list(e, readRun(run.id))).steps[0]!.note ?? '', /^try 2 asked \(--nudge, --budget 10\) — the next tick files it/);
+  const pass = await advance(e, readRun(run.id));
+  const try2 = `${implement}-try2`;
+  assert.deepEqual(pass.tried, ['implement']);
+  assert.ok(pass.notes.includes('implement: try 2 — wf retry --nudge --budget 10'), pass.notes.join('\n'));
+  assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: implement, check: { taskId: `${implement}-check` }, then: 'nudge', budget: 10 }]);
+  const spec = tasks.get(try2)!.spec;
+  assert.deepEqual([spec.resumeFrom, spec.budgetUsd], [`native-${implement}`, undefined]);
+  assert.match(spec.brief, /A person asked for this try: `wf retry --nudge --budget 10`, raising this step's budget to \$10\./);
+  assert.match(spec.brief, /this step's tries had together cost more than its budget/);
+
+  // Try 2 costs $6 more — $10.25 of $10 — and its check refuses: over again, and `retries:` files nothing on its own.
+  settle(try2, 'succeeded', SIGNED, undefined, undefined, { costUsd: 6 });
+  assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
+  settle(`${try2}-check`, 'failed', undefined, 1);
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, []);
+  const again = await list(e, readRun(run.id));
+  assert.deepEqual([again.steps[0]!.status, again.steps[0]!.note], ['over budget $10.25 of $10', 'try 2, nudged on your word, budget $10']);
+});
+
+test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a session its harness ended at the cap reads budget exhausted — not tried by `retries:`, offered `--budget`, refused one not above what it spent — and a try with a larger one carries it", async () => {
+  const run = started(folder('harness: claude-detached\ncheck: npm test\nretries: 2\nbudget: 3'));
+  const { e, tasks, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  const implement = `${run.id}-implement`;
+  assert.deepEqual([tasks.get(implement)!.spec.harness, tasks.get(implement)!.spec.budgetUsd], ['claude-detached', 3]);
+  // The engine settles it `failed`, naming the budget, with what the session cost.
+  settle(implement, 'failed', undefined, 1, 'budget', { costUsd: 3.02 });
+  for (let i = 0; i < 2; i++) {
+    const pass = await advance(e, readRun(run.id));
+    assert.deepEqual([pass.tried, pass.filed, pass.checked, pass.blocked, pass.status], [[], [], [], ['review'], 'failed'], `pass ${i + 1}`);
+  }
+  assert.deepEqual(filings, [implement]);
+  const l = await list(e, readRun(run.id));
+  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['budget exhausted $3.02 of $3', ['implement']]);
+  const { offers, decision: d } = await decide(e, run.id);
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['blocked', ['implement'], []]);
+  assert.deepEqual(offers, [`implement: budget exhausted, $3.02 of $3. Raise its cap above $3.02 and continue its session:  wf retry ${run.id} implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 0 spent)`]);
+  await assert.rejects(retry(e, run.id, 'implement', { mode: 'fresh' }), refusedWith(/^implement ended at its budget: its harness stopped its session at \$3/));
+  await assert.rejects(retry(e, run.id, 'implement', { mode: 'fresh', budget: 2 }), refusedWith(/^--budget 2 is not above \$3\.02, what implement's tries have cost/));
+  await retry(e, run.id, 'implement', { mode: 'fresh', budget: 8 });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  const spec = tasks.get(`${implement}-try2`)!.spec;
+  assert.deepEqual([spec.harness, spec.budgetUsd, spec.resumeFrom], ['claude-detached', 8, undefined]);
+  assert.match(spec.brief, /The last try's session was ended by its harness at this step's budget, before it signed off\./);
+});
+
+test("REFUSED past a budget in a loop at shipped defaults: review's `again: true` files no round while implement is over its budget — `wf round` is refused without `--budget`, and with one files the round, the cap on implement's record", async () => {
+  const { main } = await import('../src/cli.ts');
+  const run = started(looped('', 'budget: 3\n'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED, undefined, undefined, { costUsd: 4.25 });
+  const filed = [...b.filings];
+  for (let i = 0; i < 2; i++) {
+    const pass = await advance(b.e, readRun(run.id));
+    assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.status], [[], [], [], 'failed'], `pass ${i + 1}`);
+  }
+  assert.deepEqual(b.filings, filed, 'no round');
+  const l = await list(b.e, readRun(run.id));
+  assert.deepEqual([l.steps.map((s) => s.status), l.waitingOnYou], [['over budget $4.25 of $3', 'over budget — implement $4.25 of $3'], ['implement', 'review']]);
+  await assert.rejects(round(b.e, run.id), refusedWith(/^review asked for round 2, and implement has cost \$4\.25 of its \$3 budget/));
+  await assert.rejects(main(['round', run.id, '--budget', 'lots'], b.e), refusedWith(/^--budget takes the most a step of the loop may cost together, in dollars, above what it has cost — an amount above zero, in digits, like 5 or 2\.50, and lots is not one/));
+  assert.deepEqual(roundAsksOf(run.id), []);
+
+  const { ask } = await round(b.e, run.id, undefined, 10);
+  assert.deepEqual([ask.round, ask.budget], [2, 10]);
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual(pass.looped, ['review']);
+  assert.ok(pass.notes.includes('review: round 2 — wf round --budget 10; implement goes again'), pass.notes.join('\n'));
+  assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: `${run.id}-implement`, check: { taskId: `${run.id}-implement-check` }, then: 'round', budget: 10 }]);
+  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.budgetUsd, undefined, "on claude the cap is the run's to hold");
+  assert.equal((await list(b.e, readRun(run.id))).steps[0]!.note, 'round 2 of 3, budget $10');
+});
+
+test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amount, a word, 0, a unit, twice, or with --recheck — and `--budget=<amount>` is read', async () => {
+  const { main } = await import('../src/cli.ts');
+  const { e } = board();
+  const cases: Array<[string[], RegExp]> = [
+    [['--budget'], /^--budget takes the most the step's tries may cost together, in dollars, above what they have cost — an amount above zero, in digits, like 5 or 2\.50: wf retry <runId> <step> --budget <amount>$/],
+    [['--budget', 'five'], /, and five is not one: /],
+    [['--budget', '0'], /, and 0 is not one: /],
+    [['--budget', '$5'], /, and \$5 is not one: /],
+    [['--budget', '5', '--budget', '6'], /^wf retry takes --budget once/],
+    [['--recheck', '--budget', '5'], /^--budget raises a step's cap for the session a try files, and --recheck files none/],
+  ];
+  for (const [argv, pattern] of cases) await assert.rejects(main(['retry', 'no-such-run', 'implement', ...argv], e), refusedWith(pattern), argv.join(' '));
+  await assert.rejects(main(['retry', 'no-such-run', 'implement', '--budget=5'], e), /^Error: no such run: no-such-run/, 'read, and the run is looked for');
 });

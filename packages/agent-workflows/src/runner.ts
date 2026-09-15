@@ -15,16 +15,16 @@ import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdo
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
 
 export { verdictWord } from './check.ts';
-export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
+export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, dueNote, durationWord, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { CloseoutAsked, ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, TaskSpan, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
+export { artifactLines, budgetRefusal, dueNote, durationWord, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export type { CloseoutAsked, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -132,9 +132,13 @@ function roundAskIn(file: string, step: string, round: number): RoundAsk | strin
   let held: unknown;
   try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
   if (!held || typeof held !== 'object' || Array.isArray(held)) return 'it is not an ask wf round wrote';
-  const { at } = held as Record<string, unknown>;
-  return { step, round, at: typeof at === 'string' ? at : '' };
+  const { at, budget } = held as Record<string, unknown>;
+  if (budget !== undefined && !isDollars(budget)) return 'its budget is not an amount of dollars above zero';
+  return { step, round, ...(isDollars(budget) ? { budget } : {}), at: typeof at === 'string' ? at : '' };
 }
+
+/** An amount an ask file may carry as its budget: dollars above zero, as `wf retry --budget` and `wf round --budget` write one. */
+const isDollars = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
 
 /**
  * One ask file, read: the step and the try from its name, how, when and what was said from what it holds — or why it cannot be read.
@@ -144,13 +148,18 @@ function roundAskIn(file: string, step: string, round: number): RoundAsk | strin
 function askIn(file: string, step: string, n: number): RetryAsk | string {
   let held: unknown;
   try { held = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (err) { return `unreadable (${(err as Error).message})`; }
-  const { mode, model, message, at } = (held && typeof held === 'object' ? held : {}) as Record<string, unknown>;
+  const { mode, model, message, budget, at } = (held && typeof held === 'object' ? held : {}) as Record<string, unknown>;
   if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') return `it asks for no mode wf retry knows (${JSON.stringify(mode)})`;
   if (model !== undefined && (typeof model !== 'string' || !model)) return 'its model is not a name';
   if (message !== undefined && typeof message !== 'string') return 'its message is not text';
   if (typeof message === 'string' && !message.trim()) return 'its message is empty';
   if (message !== undefined && mode === 'recheck') return 'it carries a message and asks for a recheck, which files no session to read it';
-  return { step, try: n, mode, ...(model ? { model: model as string } : {}), ...(typeof message === 'string' ? { message } : {}), at: typeof at === 'string' ? at : '' };
+  if (budget !== undefined && !isDollars(budget)) return 'its budget is not an amount of dollars above zero';
+  if (budget !== undefined && mode === 'recheck') return 'it carries a budget and asks for a recheck, which files no session to spend it';
+  return {
+    step, try: n, mode, ...(model ? { model: model as string } : {}), ...(typeof message === 'string' ? { message } : {}),
+    ...(isDollars(budget) ? { budget } : {}), at: typeof at === 'string' ? at : '',
+  };
 }
 
 /**
@@ -272,9 +281,12 @@ async function taskPhases(e: Engine, run: Run): Promise<{
   phaseOf: (taskId: string) => TaskPhase;
 }> {
   const views = new Map<string, TaskView>();
-  for (const { taskId, check } of Object.values(run.steps)) {
+  for (const { taskId, check, tries } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
     if (check) views.set(check.taskId, await e.view(check.taskId));
+    // Each earlier try's session, once: what the step's tries have cost together, which its `budget:` is held to (`stepSpend`). A settled
+    // task is read off its journal, and asks no harness.
+    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
   }
   return {
     views,
@@ -300,10 +312,11 @@ async function adoptChecks(
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
   asked: (taskId: string) => CloseoutAsked,
+  spendOf: SpendOf,
 ): Promise<string[]> {
   const adopted: string[] = [];
   for (const step of steps) {
-    if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps) !== 'checking') continue;
+    if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps, spendOf) !== 'checking') continue;
     const taskId = checkTaskId(run, step.name);
     const view = await e.view(taskId);
     if (!view.state.brief) continue;   // not filed: due, and this pass's to file
@@ -332,9 +345,10 @@ async function adoptTries(
   asked: (taskId: string) => CloseoutAsked,
   verdictOf: (step: string) => Verdict | undefined,
   asks: readonly RetryAsk[],
+  spendOf: SpendOf,
 ): Promise<string[]> {
   const adopted: string[] = [];
-  for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks)) {
+  for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf)) {
     const taskId = r.mode === 'recheck' ? checkTaskId(run, r.step, r.try) : stepTaskId(run, r.step, r.try);
     const view = await e.view(taskId);
     if (!view.state.brief) continue;   // not filed: due, and this pass's to file
@@ -363,9 +377,10 @@ async function adoptRounds(
   closeoutOf: (step: string) => Closeout | undefined,
   asked: (taskId: string) => CloseoutAsked,
   asks: readonly RoundAsk[],
+  spendOf: SpendOf,
 ): Promise<string[]> {
   const adopted: string[] = [];
-  for (const r of roundsDue(steps, run, phaseOf, closeoutOf, asked, asks)) {
+  for (const r of roundsDue(steps, run, phaseOf, closeoutOf, asked, asks, spendOf)) {
     const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
     const view = await e.view(taskId);
     if (!view.state.brief) continue;   // not filed: due, and this pass's to file
@@ -394,6 +409,12 @@ export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: 
  * Exported, log-free, for a consumer that asks `retry` for such a step as `wf retry` does.
  */
 export const harnessBlocked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean => views.get(taskId)?.phase === 'needs-human';
+
+/**
+ * What each task's sessions cost, off views already read (`taskSpend`): what holds a step to its `budget:`, and what `wf ls` and `wf decide`
+ * print beside it. Exported, log-free, for a consumer that words a step as `wf ls` does. A task with no view read has no spend known.
+ */
+export const spendReader = (views: ReadonlyMap<string, TaskView>): SpendOf => (taskId) => taskSpend(views.get(taskId));
 
 /**
  * What each step's current check exited with, off the engine's record: the code its process gave, or
@@ -894,11 +915,13 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
   const sessionBlocked = harnessBlocked(views);
+  // What each try has cost, as the engine has measured it: a step over its budget is filed nothing more on the run's word.
+  const spendOf = spendReader(views);
   // A person's word, read on every pass: an ask made while this pass was elsewhere is read by the next.
   const { asks, rounds: roundAsks, notes: askNotes } = readAsks(run.id);
-  const adoptedRounds = await adoptRounds(e, run, steps, views, phaseOf, signedOff, asked, roundAsks);
-  const adoptedTries = await adoptTries(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks);
-  const adopted = await adoptChecks(e, run, steps, views, phaseOf, signedOff, asked);
+  const adoptedRounds = await adoptRounds(e, run, steps, views, phaseOf, signedOff, asked, roundAsks, spendOf);
+  const adoptedTries = await adoptTries(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks, spendOf);
+  const adopted = await adoptChecks(e, run, steps, views, phaseOf, signedOff, asked, spendOf);
 
   // A cancelled run is enforced by every pass, not only by the verb that cancelled it.
   //
@@ -936,7 +959,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     return collectArtifacts(run, name, signedOff(name));
   });
 
-  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked);
+  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf);
   const { check, retry, round, blocked, status } = assessed;
   // A run that waits on runs (`--after`) files its roots once every one of them has shipped, as its `wf decide` says, read on this pass.
   // Only a run with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`gated`).
@@ -967,7 +990,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       continue;
     }
     tried.push(r.step);
-    notes.push(`${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : `wf retry ${modeWord(r)}${r.message !== undefined ? ', with your answer' : ''}`}`);
+    notes.push(`${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`}`);
     // A recheck files no session. Its check is filed below with the others, under the new try's id.
     if (r.mode === 'recheck') {
       run.steps[r.step] = nextTry(record, r);
@@ -996,10 +1019,11 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       await e.file({
         id: taskId,
         brief: composeBrief(step, run, steps, reads, files, undefined, {
-          try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), ...(r.message !== undefined ? { message: r.message } : {}), resumed: Boolean(resumeFrom),
+          try: r.try, by: r.by, mode: r.mode, ...(r.model ? { model: r.model } : {}), ...(r.message !== undefined ? { message: r.message } : {}),
+          ...(r.budget !== undefined ? { budget: r.budget } : {}), resumed: Boolean(resumeFrom),
           // What was said to the session a nudge continues: it may never have read it (agent-engine open issue 16).
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-          status: stepStatus(step, run, phaseOf, signedOff, asked, steps), ...(refusal ? { refusal } : {}),
+          status: stepStatus(step, run, phaseOf, signedOff, asked, steps, spendOf), ...(refusal ? { refusal } : {}),
         }, undefined, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
@@ -1011,6 +1035,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         disallowedTools: step.disallow,
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
+        // The cap a person raised with the try, or the one in force: handed to a harness that keeps one (`budgetUsdFor`).
+        budgetUsd: budgetUsdFor(step, r.budget ?? budgetOf(step, record)),
         resumeFrom,
         // A loop's target tried again within a round still owes its answers to the findings it was handed.
         closeoutSchema: closeoutSchemaOf(step, owesReplies(steps, run, r.step)),
@@ -1030,7 +1056,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     const record = run.steps[r.target]!;
     const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
     looped.push(r.step);
-    notes.push(`${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : 'wf round'}; ${r.target} goes again`);
+    notes.push(`${r.step}: round ${r.round} — ${r.by === 'again' ? `again, rounds: ${capOf(looping)}` : `wf round${r.budget !== undefined ? ` --budget ${r.budget}` : ''}`}; ${r.target} goes again`);
     // A round an earlier pass filed and never wrote down was adopted above. Looked up once more all the same, as a try is.
     if (!(await e.view(taskId)).state.brief) {
       const files = artifactsDir(run, r.target);
@@ -1052,6 +1078,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         disallowedTools: target.disallow,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
+        budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record)),
         resumeFrom,
         closeoutSchema: closeoutSchemaOf(target, true),
       });
@@ -1142,6 +1169,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       disallowedTools: step.disallow,
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
+      // What one session may spend, where its harness keeps a cap: `claude-detached`. On `claude` the run holds the cap between tries.
+      budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name])),
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
       // The shape of the step's closing statement, with the fields its `output:` declares — from the
       // workflow this run froze, never the folder. The engine hands it to the harness and records the
@@ -1195,11 +1224,12 @@ export async function cancel(e: Engine, id: string): Promise<Cancelled> {
   // the verb stops it at once; on the record only in memory, because this verb never writes the run.
   const { asks, rounds } = readAsks(id);
   const verdictOf = exitVerdicts(views, run);
-  await adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), rounds);
-  await adoptTries(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks);
-  await adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views));
+  const spendOf = spendReader(views);
+  await adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), rounds, spendOf);
+  await adoptTries(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, spendOf);
+  await adoptChecks(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendOf);
 
-  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, rounds);
+  const plan = cancelPlan(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), verdictOf, asks, rounds, spendOf);
   if (plan.kind === 'finished') return { run, plan };
 
   for (const { taskId } of plan.stop) await e.stop(taskId);
@@ -1237,7 +1267,7 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
     const v = views.get(taskId);
     return v?.state.brief ? v.phase : 'unknown';
   };
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run));
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views));
 }
 
 /**
@@ -1272,15 +1302,16 @@ export async function retry(e: Engine, id: string, stepName: string, how: RetryH
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
+  const spendOf = spendReader(views);
   const refusal = (asks: readonly RetryAsk[]) =>
-    retryRefusal(steps, run, stepName, how, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, blocked);
+    retryRefusal(steps, run, stepName, how, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, blocked, spendOf);
   const refuse = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
 
   const refused = refusal(readAsks(id).asks);
   if (refused) refuse(refused);
   const ask: RetryAsk = {
     step: stepName, try: tryOf(run, stepName) + 1, mode: how.mode, ...(how.model ? { model: how.model } : {}),
-    ...(how.message !== undefined ? { message: how.message } : {}), at: new Date().toISOString(),
+    ...(how.message !== undefined ? { message: how.message } : {}), ...(how.budget !== undefined ? { budget: how.budget } : {}), at: new Date().toISOString(),
   };
   const file = askFile(id, stepName, ask.try);
   // Someone asked in the moment since the look above: said as the look would have said it. Or a file is at the ask's name that no pass reads as one.
@@ -1289,7 +1320,7 @@ export async function retry(e: Engine, id: string, stepName: string, how: RetryH
       ?? `try ${ask.try} of ${stepName} is already asked for. Wait for it: wf ls ${id}.`);
   }
   const step = steps.find((s) => s.name === stepName)!;
-  return { run, ask, file, stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked).blockedByHarness };
+  return { run, ask, file, stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked, spendOf).blockedByHarness };
 }
 
 /** What `wf say` did: the step's task the words were said to, the try that task is, and the engine's `said` entry, as it journalled it. */
@@ -1338,17 +1369,18 @@ export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
  * Refused before anything is written, with what to do instead (`roundAsk`): a round still running, one the run files itself, a loop that
  * ended without asking again, a step of the loop that stopped, a cancelled run, a round already asked for. Like `wf retry`'s, the ask is the
  * person's own file, and the verb never writes the run's json, which the tick owns. `stepName` may be left out when the run has one loop.
+ * `budget` raises the cap of each step of the loop over its budget, for a round held on it: the ask carries it, and the tick keeps it.
  */
-export async function round(e: Engine, id: string, stepName?: string): Promise<RoundAsked> {
+export async function round(e: Engine, id: string, stepName?: string, budget?: number): Promise<RoundAsked> {
   const run = readRun(id);
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
-  const answer = (asks: readonly RoundAsk[]) => roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks);
+  const answer = (asks: readonly RoundAsk[]) => roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
   const refuse = (message: string): never => { throw Object.assign(new Error(message), { exitCode: 2 }); };
 
   const first = answer(readAsks(id).rounds);
   if ('refusal' in first) return refuse(first.refusal);
-  const ask: RoundAsk = { step: first.step, round: first.round, at: new Date().toISOString() };
+  const ask: RoundAsk = { step: first.step, round: first.round, ...(first.budget !== undefined ? { budget: first.budget } : {}), at: new Date().toISOString() };
   const file = roundAskFile(id, ask.step, ask.round);
   // Someone asked in the moment since the look above: said as the look would have said it.
   if (!writeAsk(file, ask)) {
@@ -1662,7 +1694,7 @@ export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
   if (!branches.length || !branches.every((b) => isShipped(record, b))) return { ...known, shipped: false };
   const { views, phaseOf } = await taskPhases(e, record);
   const { asks, rounds } = readAsks(id);
-  const said = decision(steps, record, phaseOf, (b) => isShipped(record, b), closeoutReader(views, record), closeoutAsked(views), exitVerdicts(views, record), asks, rounds);
+  const said = decision(steps, record, phaseOf, (b) => isShipped(record, b), closeoutReader(views, record), closeoutAsked(views), exitVerdicts(views, record), asks, rounds, () => false, spendReader(views));
   return { ...known, shipped: said.kind === 'shipped' };
 }
 
@@ -1870,7 +1902,8 @@ export async function decide(e: Engine, id: string): Promise<{
   // The verdict the screen prints, off the log: a refusal and a check that did not finish, told apart by it.
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);
-  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds, blocked);
+  const spendOf = spendReader(views);
+  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds, blocked, spendOf);
   // What a person said to a step's current try, off their ask file, and what the try before it needed, off the engine's record of that
   // try: the run's record keeps neither.
   const given = readAnswers(id);
@@ -1907,12 +1940,12 @@ export async function decide(e: Engine, id: string): Promise<{
   const filed = await readFilings(e).then(({ filed }) => filed, () => new Map<string, string>());
   return {
     run, decision: d, closeouts, checks,
-    retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked),
-    rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds),
-    offers: [...roundLines(steps, run, d), ...retryLines(steps, run, d, phaseOf, reader, asked)],
+    retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
+    rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
+    offers: [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf)],
     used: consumption(views, run),
     answers,
-    answering: answerLines(steps, run, d, phaseOf, reader, asked),
+    answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
     waiting: waitsOf(run, await parentsOf(e, run)),
     said,
     timeline: timeline(run, everyTry, filed, steps),

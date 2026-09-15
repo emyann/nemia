@@ -3,8 +3,8 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
-import { workflowFolder } from './workflow.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
@@ -25,7 +25,7 @@ const HELP = `wf — run a workflow of agent steps
   wf cancel <runId>            stop what it has in flight; file nothing more
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
-  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"]
+  wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]
                                try a step waiting on you again, once, on the next tick:
                                --nudge (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
@@ -34,9 +34,13 @@ const HELP = `wf — run a workflow of agent steps
                                for a step that signed off blocked, the answer to its needs — or
                                what you have to say to any step you try again; not with --recheck.
                                The next argument is the answer, whatever it starts with; an answer
-                               that is only one of these flags' names goes as --message=<answer>
-  wf round <runId> [<step>]    once more: a loop out of rounds goes round again, once, on the
-                               next tick — the step it loops to continued, then a new reviewer
+                               that is only one of these flags' names goes as --message=<answer>;
+                               --budget <amount>: for a step over budget or budget exhausted, its
+                               cap raised to that many dollars, above what its tries have cost
+  wf round <runId> [<step>] [--budget <amount>]
+                               once more: a loop out of rounds goes round again, once, on the
+                               next tick — the step it loops to continued, then a new reviewer;
+                               --budget raises the cap of a step of the loop over its budget
   wf say <runId> <step> "<words>"
                                tell a step's running session something, through its harness: the
                                engine journals the words on the step's task, wf ls notes the step
@@ -59,12 +63,15 @@ A workflow is a folder of markdown files. One file is one step:
 No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, \`retries\` counts the
 tries the run may re-file a step its check refused, \`output\` declares what a closeout says for a later
 step and \`input\` reads it, \`loop\` is the edge back and \`rounds\` counts it — whether to go round is the
-step's own \`again\` — and the rest (model, effort, permissionMode, tools, deadlineSeconds, maxAttempts) say
-who does the work, with what, and for how long. Everything else the agent is told is prose.
+step's own \`again\` — and the rest (model, effort, permissionMode, tools, disallow, deadlineSeconds,
+maxAttempts, budget) say who does the work, with what, for how long and for how much. Everything else the
+agent is told is prose.
 
   wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
   · unverified (no check: declared) · unsigned (ended without its closeout, or without a field its
-  output: declares) · BLOCKED · rounds exhausted (asked for another round on the last).
+  output: declares) · BLOCKED · rounds exhausted (asked for another round on the last)
+  · over budget $4.20 of $3 (its tries have cost more than its budget:, and nothing more is filed for
+  it on the run's word) · budget exhausted (its harness ended its session at its budget:).
 
   WF_ROOT            where runs and the engine's board live
   WF_MAX_CONCURRENT  sessions per harness at once (default 2)
@@ -229,7 +236,7 @@ function planHow(argv: string[]): { repo?: string } {
 }
 
 /** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
-const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--model', '--message'];
+const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--model', '--message', '--budget'];
 
 /**
  * `wf retry`'s one choice of how, read off its flags: at most one way, `--model` with a name, and `--message` at most once, with what
@@ -238,6 +245,7 @@ const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--mo
 function retryHow(argv: string[]): RetryHow {
   const given: Array<{ mode: RetryMode; model?: string }> = [];
   let message: string | undefined;
+  let budget: number | undefined;
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i]!;
     if (arg === '--nudge' || arg === '--fresh' || arg === '--recheck') given.push({ mode: arg.slice(2) as RetryMode });
@@ -255,13 +263,39 @@ function retryHow(argv: string[]): RetryHow {
         usage(`--message takes what to tell the step, and ${text} is one of wf retry's own flags, so the answer was left out: wf retry <runId> <step> --message "<answer>". If ${text} is the whole answer, give it as --message=${text}.`);
       }
       message = text;
-    } else usage(`wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>".`);
+    } else if (arg === '--budget' || arg.startsWith('--budget=')) {
+      if (budget !== undefined) usage('wf retry takes --budget once: the cap to raise the step to, in dollars — wf retry <runId> <step> --budget <amount>.');
+      budget = amountOf(arg === '--budget' ? argv[++i] : arg.slice('--budget='.length), "the most the step's tries may cost together, in dollars, above what they have cost", 'wf retry <runId> <step> --budget <amount>');
+    } else usage(`wf retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>" and --budget <amount>.`);
   }
   if (given.length > 1) usage('wf retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.');
-  const how: RetryHow = { ...(given[0] ?? { mode: 'nudge' }), ...(message !== undefined ? { message } : {}) };
-  const wrong = messageRefusal(how);
+  const how: RetryHow = { ...(given[0] ?? { mode: 'nudge' }), ...(message !== undefined ? { message } : {}), ...(budget !== undefined ? { budget } : {}) };
+  const wrong = messageRefusal(how) ?? budgetRefusal(how);
   if (wrong) usage(wrong);
   return how;
+}
+
+/** A `--budget`'s value as dollars (`dollarsOf`), or refused, saying what it takes: an amount above zero, in digits. */
+function amountOf(text: string | undefined, takes: string, form: string): number {
+  const amount = text === undefined ? undefined : dollarsOf(text);
+  if (amount === undefined) usage(`--budget takes ${takes} — an amount above zero, in digits, like 5 or 2.50${text === undefined ? '' : `, and ${text} is not one`}: ${form}`);
+  return amount!;
+}
+
+/** `wf round`'s arguments after the run: the step that closes the loop, when there is more than one, and `--budget <amount>`, at most once each. */
+function roundHow(argv: string[]): { stepName?: string; budget?: number } {
+  let stepName: string | undefined;
+  let budget: number | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg === '--budget' || arg.startsWith('--budget=')) {
+      if (budget !== undefined) usage('wf round takes --budget once: the cap to raise the steps of the loop over their budget to, in dollars — wf round <runId> [<step>] --budget <amount>.');
+      budget = amountOf(arg === '--budget' ? argv[++i] : arg.slice('--budget='.length), 'the most a step of the loop may cost together, in dollars, above what it has cost', 'wf round <runId> [<step>] --budget <amount>');
+    } else if (arg.startsWith('--') || stepName !== undefined) {
+      usage('wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.');
+    } else stepName = arg;
+  }
+  return { ...(stepName !== undefined ? { stepName } : {}), ...(budget !== undefined ? { budget } : {}) };
 }
 
 /** `e` is the engine the verbs talk to: the board under `WF_ROOT`, unless a test hands it one of its own. */
@@ -427,6 +461,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (decision.stuck.length) console.log(`  BLOCKED, waiting on you: ${decision.stuck.join(', ')}`);
       // A reviewer still asking after the rounds its workflow allows is the sign of a design question or a decision, and it is yours.
       if (decision.exhausted.length) console.log(`  ROUNDS EXHAUSTED, waiting on you: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`);
+      // A cap reached is a person's to raise: the run spends nothing more on the step on its own word.
+      if (decision.overBudget.length) console.log(`  OVER BUDGET, waiting on you: ${decision.overBudget.join(', ')}  — its tries have cost more than its budget:, and the run files nothing more for it on its own; nothing after it ran`);
+      if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED, waiting on you: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
       // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.
       if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
@@ -541,7 +578,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
       // A step whose session its harness blocked is taken too: the tick stops that session, then files the try.
       const { ask, file, stopFirst } = await retry(e, runId, stepName, retryHow(rest.slice(2)), { stopBlocked: true });
-      const how = ask.model ? `--model ${ask.model}` : `--${ask.mode}`;
+      const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
       const then = stopFirst ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped' : 'the next tick files it, once';
       console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`);
       console.log(`   ${file}`);
@@ -550,13 +587,11 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
 
     // A person's "once more" for a loop whose rounds are spent. Like `wf retry`, it writes the ask and nothing else: the tick honours it once.
     case 'round': {
-      const [runId, stepName, ...extra] = rest;
+      const [runId, ...more] = rest;
       if (!runId || runId.startsWith('--')) return console.log(HELP);
-      if (extra.length || stepName?.startsWith('--')) {
-        usage('wf round takes the run and, when the run has more than one loop, the step that closes the one to go round: wf round <runId> [<step>].');
-      }
-      const { ask, file } = await round(e, runId, stepName);
-      console.log(`${runId}  asked: round ${ask.round} of ${ask.step}'s loop — the next tick files it, once`);
+      const { stepName, budget } = roundHow(more);
+      const { ask, file } = await round(e, runId, stepName, budget);
+      console.log(`${runId}  asked: round ${ask.round} of ${ask.step}'s loop${ask.budget !== undefined ? `, its cap raised to ${budgetWord(ask.budget)}` : ''} — the next tick files it, once`);
       console.log(`   ${file}`);
       return;
     }

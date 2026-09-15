@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { readTranscript, transcriptPath, type TranscriptEvent } from './api';
+import { readTranscript, transcriptPath } from './api';
+import { animationFrames, follow, type Following } from './following.ts';
 import { mergeEvents } from './transcript';
 
-/** A step's conversation as a page holds it: the events so far, whether more may come, and why it could not be read, if it could not. */
-export type Following = { events: TranscriptEvent[]; live: boolean; loading: boolean; error: string | null };
+export type { Following } from './following.ts';
 
 /**
  * A step's conversation: read once, and followed while its task is live.
@@ -23,15 +23,7 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
     setState({ events: [], live: false, loading: taskId !== null, error: null });
     if (!taskId) return;
     const reading = new AbortController();
-    let source: EventSource | undefined;
-    let arrived: TranscriptEvent[] = [];
-    let frame = 0;
-    const flush = () => {
-      frame = 0;
-      const merged = arrived;
-      arrived = [];
-      setState((s) => ({ ...s, events: mergeEvents(s.events, merged) }));
-    };
+    let stop: (() => void) | undefined;
 
     readTranscript(runId, step, reading.signal).then(
       (first) => {
@@ -39,32 +31,7 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
         setState({ events: mergeEvents([], first.events), live: first.live, loading: false, error: null });
         if (!first.live || first.cursor === null) return;
         const stream = new EventSource(`${transcriptPath(runId, step)}/stream?after=${encodeURIComponent(first.cursor)}`);
-        source = stream;
-        const end = (error: string | null) => {
-          stream.close();
-          if (frame) {
-            cancelAnimationFrame(frame);
-            flush();
-          }
-          setState((s) => ({ ...s, live: false, error }));
-        };
-        stream.addEventListener('transcript', (message) => {
-          arrived.push(JSON.parse(message.data) as TranscriptEvent);
-          frame ||= requestAnimationFrame(flush);
-        });
-        stream.addEventListener('settled', () => end(null));
-        // A read that failed, and is being tried again every second: said, and still followed. One that will not be: the end.
-        stream.addEventListener('unreadable', (message) => {
-          const { error, retrying } = JSON.parse(message.data) as { error?: unknown; retrying?: unknown };
-          const said = typeof error === 'string' ? error : 'The conversation could not be read.';
-          if (retrying === true) setState((s) => ({ ...s, error: `${said} Reading it again every second.` }));
-          else end(said);
-        });
-        stream.addEventListener('readable', () => setState((s) => ({ ...s, error: null })));
-        stream.addEventListener('error', () => {
-          // A dropped connection is retried by the EventSource itself; it closes only when the api answered with a refusal.
-          if (stream.readyState === EventSource.CLOSED) end('The api refused to follow this conversation any further. Reload the page to read it again.');
-        });
+        stop = follow(stream, setState, animationFrames);
       },
       (err: unknown) => {
         if (!reading.signal.aborted) setState({ events: [], live: false, loading: false, error: err instanceof Error ? err.message : String(err) });
@@ -73,8 +40,7 @@ export function useStepTranscript(runId: string, step: string, taskId: string | 
 
     return () => {
       reading.abort();
-      source?.close();
-      if (frame) cancelAnimationFrame(frame);
+      stop?.();
     };
   }, [runId, step, taskId]);
 

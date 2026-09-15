@@ -2,7 +2,7 @@
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
  *  1. Builds the web app.
- *  2. Seeds a store in a temporary WF_ROOT with four fake runs, the first with a real repository and branch to decide
+ *  2. Seeds a store in a temporary WF_ROOT with five fake runs, the first with a real repository and branch to decide
  *     on, and beside it a checkout for the api to serve (`HKB_REPO`) on the Capabilities page, and workflows in both for
  *     the Workflows page (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { arrivalLine, CHECKOUT, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { arrivalLine, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -169,8 +169,8 @@ const PAGES: PageSpec[] = [
       // Its followers read `waiting`, and will for ever; they do not keep it on the floor.
       await expectCount(card, 0, `a run whose check refused is finished, not in flight: no card on the floor by default (${FAKE.id})`);
       // So is the loop out of rounds: it waits on a person, and nothing of it moves.
-      // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. Waiting on you: FAKE, LOOPING, and the run waiting on one called off.
-      await expectVisible(page.getByText('4 in flight · 6 finished · 3 waiting on you'), 'the Factory counts the runs in flight, the finished, and those waiting on you');
+      // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. Waiting on you: FAKE, LOOPING, COSTLY, and the run waiting on one called off.
+      await expectVisible(page.getByText('4 in flight · 7 finished · 4 waiting on you'), 'the Factory counts the runs in flight, the finished, and those waiting on you');
       await showFinished(page);
       // The run called off, and the one that waits on it: for ever, so on you, and its card names the run it waits on and why.
       await expectVisible(
@@ -187,6 +187,12 @@ const PAGES: PageSpec[] = [
       );
       await expectVisible(card, `the fake run's card, once finished runs are shown (${FAKE.id})`);
       await expectVisible(card.getByText(/^started .+ ago$/), 'the card reads finished: when it started, not a clock still counting');
+      // What a run cost, beside its age, once its harness priced a session of it — and nothing for a run nobody priced, which is not $0.
+      await expectVisible(
+        cardOf(page, COSTLY.id).locator('[data-cost]', { hasText: `· ${COSTLY.cost}` }),
+        `the card of a run whose sessions were priced says what it cost beside its age (${COSTLY.cost})`,
+      );
+      await expectCount(card.locator('[data-cost]'), 0, "the fake run's card says no cost: none of its sessions was priced");
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
       await expectVisible(
         card.locator(`[data-need="asks"][data-step="${FAKE.blocked}"]`, { hasText: `${FAKE.blocked} asks: ${SESSION.closeout.needs}` }),
@@ -335,6 +341,15 @@ const PAGES: PageSpec[] = [
         `the row of ${DIAMOND.orphan.id}, waiting on a run called off, says it waits on you, and what is yours to resolve`,
       );
       await expectCount(page.locator(`li a[href="/runs/${DIAMOND.bottom.id}"] [data-waiting-on-you]`), 0, `${DIAMOND.bottom.id}, waiting on a run that may still ship, does not wait on you`);
+      // What a run cost, beside when it started, once a session of it was priced; a step over its budget, an amber chip with the amounts.
+      const costly = page.locator('li', { has: page.locator(`a[href="/runs/${COSTLY.id}"]`) });
+      await expectVisible(costly.locator('[data-cost]', { hasText: COSTLY.cost }), `the row of a run whose sessions were priced says what it cost (${COSTLY.cost})`);
+      await expectVisible(
+        costly.locator('[data-state="over-budget"]', { hasText: COSTLY.over.status }),
+        `the row shows ${COSTLY.over.step} over its budget as an amber chip, with the amounts (${COSTLY.over.status})`,
+      );
+      await expectVisible(costly.getByText(`waiting on you: ${COSTLY.steps.join(', ')}`), 'and says every step past its budget waits on you');
+      await expectCount(page.locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) }).locator('[data-cost]'), 0, "the fake run's row says no cost: none of its sessions was priced");
       const loop = page.locator(`li a[href="/runs/${LOOPING.id}"]`);
       await expectVisible(loop.getByText(`waiting on you: ${LOOPING.exhausted}`), `the runs list says ${LOOPING.exhausted}, out of rounds, is waiting on you`);
       await expectVisible(
@@ -963,6 +978,121 @@ const PAGES: PageSpec[] = [
       await expectVisible(target.locator('li[data-answer]', { hasText: LOOPING.replied }), `round 2's reply, as finding → answer (why)`);
       await expectCount(target.locator('section[aria-label="Other tries"] details:not([open])'), 2, 'the other two rounds are folded beneath it');
       await settled(page);
+    },
+  },
+  {
+    // What a run cost, and steps held on their budget: the run's cost in its header, a cost column on the timeline, a step's cost of its cap on
+    // its node and in the inspector, red past it — and the raises the Decide section offers, one refused in a page of its own, where it is not
+    // above what was spent, in the package's words and with nothing written. Nothing is taken: every page after this one reads the store as seeded.
+    name: 'cost',
+    route: `/runs/${COSTLY.id}`,
+    expect: async (page) => {
+      await sidebar(page);
+      const { over, held } = COSTLY;
+      await expectCount(page.getByText(/no longer reads as a workflow|has changed since this run started/), 0, 'no warning about the workflow folder: it reads as the budgets the run froze');
+      await expectVisible(page.locator('article header [data-run-cost]', { hasText: `cost ${COSTLY.cost}` }), `the run's header says what it cost (${COSTLY.cost})`);
+      await expectVisible(page.getByText(`Waiting on you: ${COSTLY.steps.join(', ')}`), "the banner says every step past its budget waits on you, in the package's words");
+
+      // On the graph: each step's word with its amounts, amber and a human gate, and what its tries cost of its cap — red past it.
+      const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
+      const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);
+      await expectCount(graph.locator('.react-flow__node'), COSTLY.steps.length, `the run's graph has a node per step (${COSTLY.steps.join(', ')})`);
+      for (const [name, status] of [[over.step, over.status], [held.step, held.status], [held.target, held.targetStatus]] as const) {
+        await expectVisible(node(name).locator('[data-state="over-budget"]', { hasText: status }), `${name}'s chip on the graph says ${status}, amber`);
+        await expectVisible(node(name).getByText('human gate'), `${name}, past a budget, is drawn as a human gate`);
+      }
+      await expectVisible(node(over.step).locator('[data-cost="over"]', { hasText: over.of }), `${over.step}'s node says what its tries cost of its cap (${over.of}), red past it`);
+      await expectVisible(node(held.target).locator('[data-cost="over"]', { hasText: '$2.10 of $2' }), `${held.target}'s node says what its rounds cost of its cap`);
+      await expectCount(node(held.step).locator('[data-cost]'), 0, `${held.step}, with no cap and no session priced, has no cost row: not $0`);
+
+      // The timeline's cost column: each session's, `not measured` for the Codex sessions nobody priced, nothing for a check, and the totals.
+      const timeline = page.locator('section[aria-label="Timeline"]');
+      const cellsSay = async (cells: Locator, want: readonly string[], assertion: string) => {
+        await expectCount(cells, want.length, assertion);
+        const said = await cells.allTextContents();
+        if (JSON.stringify(said) !== JSON.stringify(want)) throw new Refused(`${assertion} — it says ${JSON.stringify(said)}`);
+      };
+      for (const [name, costs] of Object.entries(COSTLY.sessions)) {
+        await cellsSay(timeline.locator(`tr[data-step="${name}"][data-task="session"] [data-cell="cost"]`), costs, `the timeline says what each of ${name}'s sessions cost (${costs.join(', ')})`);
+      }
+      await cellsSay(timeline.locator(`tr[data-step="${over.step}"][data-task="check"] [data-cell="cost"]`), ['', ''], `${over.step}'s checks cost nothing, and say nothing`);
+      await cellsSay(timeline.locator('tfoot tr[data-total^="round-"] [data-cell="cost"]'), COSTLY.rounds, `each round of ${held.step}'s loop says what its sessions cost (${COSTLY.rounds.join(', ')})`);
+      await cellsSay(timeline.locator('tfoot tr[data-total="run"] [data-cell="cost"]'), [COSTLY.cost], `the run's total says what it cost (${COSTLY.cost})`);
+
+      // What `wf decide` says of steps held on their budget, and the raises: tokens' with its try, review's with its round, and none of implement's own.
+      const decide = page.locator('section[aria-label="Decide"]');
+      await expectVisible(
+        decide.locator('[data-over-budget]', { hasText: 'OVER BUDGET, waiting on you: implement ($2.10 of $2), review (held: its round would file implement again' }),
+        "the Decide section says why each step past its budget is held, in wf decide's words",
+      );
+      await expectVisible(decide.locator('section[aria-label="Used"] dd', { hasText: 'run $6.35 measured · 2 attempts not measured' }), "and what every try of the run cost, in wf decide's words");
+      const answers = decide.locator('section[aria-label="Answer"]');
+      const raiseRow = (p: Page | Locator, name: string) => p.locator(`section[aria-label="Answer"] [data-offer="raise"][data-step="${name}"]`);
+      const amountOf = (row: Locator, name: string) => row.getByRole('spinbutton', { name: new RegExp(`^The cap to raise ${name} to, in dollars`) });
+      for (const [name, startsAt, button] of [[over.step, over.startsAt, 'Raise the budget and try again'], [held.step, held.startsAt, 'Raise the budget and go round again']] as const) {
+        const row = raiseRow(decide, name);
+        await expectVisible(amountOf(row, name), `a box for the cap to raise ${name} to`);
+        const value = await amountOf(row, name).inputValue();
+        if (value !== startsAt) throw new Refused(`the box for ${name}'s cap starts at the first whole dollar above what was spent, ${startsAt} — it starts at ${value}`);
+        await expectVisible(row.getByRole('button', { name: button }), `${name}'s row offers ${button}`);
+      }
+      await expectVisible(raiseRow(decide, over.step).getByRole('radio', { name: /^a new session/ }), `a new session as an option to continuing ${over.step}'s`);
+      await expectCount(raiseRow(decide, held.step).getByRole('radio'), 0, 'a round has no mode to choose');
+      await expectCount(answers.locator(`[data-step="${held.target}"]`), 0, `${held.target} has no row of its own: it goes again with ${held.step}'s round`);
+      await expectVisible(decide.locator('[data-command="once more"] code', { hasText: `wf retry ${COSTLY.id} ${over.step} --budget <amount>` }), 'once more: the try with its cap raised, as a line');
+      await expectVisible(decide.locator('[data-command="once more"] code', { hasText: `wf round ${COSTLY.id} ${held.step} --budget <amount>` }), 'once more: the round with its cap raised, as a line');
+
+      // A raise not above what tokens' tries cost, in a page of its own whose one refusal is the point: the package's sentence beside the box,
+      // word for word, the amount still in it, and nothing written.
+      const asks = path.join(store!, 'runs', `${COSTLY.id}.asks`);
+      const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
+        r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${COSTLY.id}/steps/${over.step}/retry`;
+      const refused = await page.context().newPage();
+      try {
+        const { problems } = watch(refused);
+        await refused.goto(page.url(), { waitUntil: 'networkidle' });
+        const row = raiseRow(refused, over.step);
+        const box = amountOf(row, over.step);
+        await expectVisible(box, `the box for ${over.step}'s cap, on a page of its own`);
+        await box.fill(String(COSTLY.refused));
+        const [answered] = await Promise.all([
+          refused.waitForResponse(retried, { timeout: WAIT_MS }),
+          row.getByRole('button', { name: 'Raise the budget and try again' }).click(),
+        ]);
+        const sent = answered.request().postDataJSON() as { mode?: unknown; budget?: unknown } | null;
+        if (sent?.mode !== 'nudge' || sent.budget !== COSTLY.refused) {
+          throw new Refused(`the raise is sent as wf retry --budget ${COSTLY.refused} sends it, a nudge with the amount as a number — the board sent ${JSON.stringify(sent)}`);
+        }
+        const { error } = (await answered.json()) as { error?: string };
+        const sentence = `--budget ${COSTLY.refused} is not above $4.25, what ${over.step}'s tries have cost: a try under it would read over budget again as soon as it ended.`;
+        if (answered.status() !== 409 || !error?.startsWith(sentence)) {
+          throw new Refused(`the package refuses a raise not above what ${over.step}'s tries cost — the api answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        await expectVisible(row.locator('[data-refused]'), 'the refusal is shown beside the box, not swallowed');
+        const shown = await row.locator('[data-refused] p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal beside the box is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        if ((await box.inputValue()) !== String(COSTLY.refused)) throw new Refused('the amount stays in the box after a refusal, to raise again');
+        if (fs.existsSync(asks)) throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
+        await settled(refused);
+        await refused.screenshot({ path: path.join(OUT, `cost-refused-${await themeOf(refused)}.png`), fullPage: true });
+        await refused.waitForLoadState('networkidle');
+        // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
+        const expected = `request answered 409: POST ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await refused.close();
+        fs.rmSync(asks, { recursive: true, force: true });
+      }
+
+      // tokens' Details: what its tries cost of its cap, red past it. Left open for the photograph.
+      await node(over.step).click();
+      const inspector = page.locator(`aside[aria-label="Step ${over.step}"]`);
+      await expectVisible(inspector.locator('[data-spent="over"]', { hasText: over.of }), `the inspector's Details say what ${over.step}'s tries cost of its cap (${over.of}), red past it`);
+      await expectVisible(inspector.locator('[data-state="over-budget"]', { hasText: over.status }), `and its word, ${over.status}`);
+      await settled(page);
+      await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas beside the open inspector');
     },
   },
   {

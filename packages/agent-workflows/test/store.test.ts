@@ -2677,8 +2677,8 @@ test("REFUSED past its budget at shipped defaults: a claude step whose ended tri
   await assert.rejects(retry(e, run.id, 'implement', { mode: 'nudge', budget: 4 }), refusedWith(/^--budget 4 is not above \$4\.25, what implement's tries have cost/));
   assert.deepEqual(asksOf(run.id), [], 'no ask written');
   const { offers, decision: d } = await decide(e, run.id);
-  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.overBudget], ['blocked', ['implement']]);
-  assert.match(offers[0]!, new RegExp(`^implement: over budget, \\$4\\.25 of \\$3\\. Raise its cap above \\$4\\.25 and continue its session:  wf retry ${run.id} implement --budget <amount>`));
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.overBudget, d.failedCheck], ['failed', ['implement'], ['implement']]);
+  assert.match(offers[0]!, new RegExp(`^implement: over budget \\(check refused\\), \\$4\\.25 of \\$3\\. Raise its cap above \\$4\\.25 and continue its session:  wf retry ${run.id} implement --budget <amount>`));
 
   const { ask } = await retry(e, run.id, 'implement', { mode: 'nudge', budget: 10 });
   assert.equal(ask.budget, 10);

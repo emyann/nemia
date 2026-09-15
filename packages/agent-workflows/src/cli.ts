@@ -434,7 +434,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, used, costs, runCost, answers, answering, waiting, said, timeline } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, waiting, said, timeline } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${given ? `\n  ${given}` : ''}`;
@@ -466,7 +466,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // A reviewer still asking after the rounds its workflow allows is the sign of a design question or a decision, and it is yours.
       if (decision.exhausted.length) console.log(`  ROUNDS EXHAUSTED, waiting on you: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`);
       // A cap reached is a person's to raise: the run spends nothing more on the step on its own word.
-      if (decision.overBudget.length) console.log(`  OVER BUDGET, waiting on you: ${decision.overBudget.join(', ')}  — its tries have cost its budget: or more, and the run files nothing more for it on its own; nothing after it ran`);
+      // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
+      if (overBudgetLine) console.log(`  ${overBudgetLine}`);
       if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED, waiting on you: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
       // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.

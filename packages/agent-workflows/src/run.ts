@@ -1073,12 +1073,35 @@ export function retryLines(
       lines.push(`${step.name}: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  ${command} --recheck${session}`);
     } else if (raise) {
       const recheck = modes.includes('recheck') ? '; --recheck runs its check again, and needs no --budget' : '';
-      lines.push(`${step.name}: ${status}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}. Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`);
+      // Why it stopped, beside the cap it reached: a person paying for a session of it decides on a broken session differently.
+      const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+      const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
+      lines.push(`${step.name}: ${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}. Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`);
     } else {
       lines.push(`${step.name}: ${status}. Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
     }
   }
   return lines;
+}
+
+/**
+ * `wf decide`'s OVER BUDGET line, saying for each step why it is held. A step whose own tries cost its budget or more gives the amounts:
+ * `implement ($4.25 of $3)`. A looping step held because its round would file such a step again names that step, as `wf ls` does:
+ * `review (held: its round would file implement again, which has cost $4.25 of its $3 budget)`. Pure. Undefined with no step over budget.
+ * How each ended on its own work is on its own line — FAILED, UNSIGNED, FAILED CHECK (`decision`).
+ */
+export function overBudgetLine(steps: readonly Workflow[], run: Run, d: Decision, spendOf: SpendOf): string | undefined {
+  if (d.kind !== 'awaiting' || !d.overBudget.length) return undefined;
+  const why = d.overBudget.map((name) => {
+    const step = steps.find((s) => s.name === name);
+    const own = step ? overBudget(step, run, spendOf) : undefined;
+    if (own) return `${name} (${spentWord(own.spent)} of ${budgetWord(own.cap)})`;
+    const others = step ? loopOver(steps, step, run, spendOf) : [];
+    if (!others.length) return name;
+    return `${name} (held: its round would file ${others.map((o) => `${o.name} again, which has cost ${spentWord(o.spent)} of its ${budgetWord(o.cap)} budget`).join(', and ')})`;
+  });
+  const them = d.overBudget.length > 1 ? 'them' : 'it';
+  return `OVER BUDGET, waiting on you: ${why.join(', ')}  — the run files nothing more for ${them} on its own; nothing after ${them} ran`;
 }
 
 /**
@@ -1891,7 +1914,7 @@ export type Decision =
   | { kind: 'shipped'; branches: string[] }
   | {
       kind: 'awaiting'; outcome: 'succeeded' | 'failed' | 'blocked'; branches: string[];
-      /** Steps whose task failed or was stopped. */
+      /** Steps whose task failed or was stopped — over their budget or not, as each list below names a step by how it ended on its own work. */
       failed: string[];
       /** Steps that signed off blocked. */
       stuck: string[];
@@ -1945,7 +1968,8 @@ export function decision(
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
   const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf);
-  const statusOf = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
+  const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
+  const statusOf = new Map(steps.map((s) => [s.name, standingOf.get(s.name)!.status]));
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
     // whose check is still running is one of them: its agent has finished, its verdict has not.
@@ -1981,7 +2005,9 @@ export function decision(
   // Told apart on purpose. A step that STOPPED itself and said why is a question for you; one the
   // engine recorded as failed is a thing that broke; one its check refused broke something the run
   // can name. Lumping them loses the only bit that decides whether you read a summary or a log.
-  const named = (...want: StepStatus[]) => steps.filter((s) => want.includes(statusOf.get(s.name)!)).map((s) => s.name).sort();
+  // By how each step ended on its own work (`ownStatus`): a step past its budget whose session broke is still a step that broke, and one
+  // that gave no closeout still gave none. Being over budget is said beside that, in `overBudget`, never in its place.
+  const named = (...want: StepStatus[]) => steps.filter((s) => want.includes(standingOf.get(s.name)!.own)).map((s) => s.name).sort();
   const stuck = named('blocked');
   const failed = named('failed', 'stopped');
   // A check that refused and one that never finished are both `failed (check)`, and both stop what follows. They
@@ -1994,7 +2020,7 @@ export function decision(
   // A loop out of rounds broke nothing: its step asked for more than the workflow allows, and a person decides.
   const exhausted = named('exhausted');
   // Nor did a cap reached: spending more on the step is a person's call.
-  const pastBudget = named('over budget');
+  const pastBudget = steps.filter((s) => statusOf.get(s.name) === 'over budget').map((s) => s.name).sort();
   const budgetExhausted = named('budget exhausted');
   const outcome = failed.length || checkFailed.length ? 'failed'
     : stuck.length || unsigned.length || exhausted.length || pastBudget.length || budgetExhausted.length ? 'blocked'
@@ -2087,7 +2113,7 @@ export function listing(
   const exhausted = new Set<string>();
   /** Looping steps whose round waits on a step of their loop's budget. */
   const heldLoops = new Set<string>();
-  /** Steps whose word says what they spent: `over budget $4.20 of $3`. Their line carries no `cost` beside it. */
+  /** Steps whose word says what they spent: `over budget $4.20 of $3`, `budget exhausted $3.02 of $3`. Their line carries no `cost` beside it. */
   const priced = new Set<string>();
   const rows = steps.map((step) => {
     const row = lineOf(step);
@@ -2119,7 +2145,9 @@ export function listing(
     // A cap reached says so, with what was spent and the cap in force: `over budget $4.20 of $3`.
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
-      priced.add(name);
+      // Its cost is in its word when the word shows its own spend. A looping step held on another step's budget shows that step's, and
+      // its own goes beside it, as any step's does.
+      if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);
       return { name, status: budgetStatus(step, status), branch };
     }
     // A loop out of rounds says so in a word of its own: its check passed or it had none, and it still stops what follows.

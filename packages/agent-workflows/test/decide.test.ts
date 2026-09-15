@@ -355,3 +355,30 @@ test("a measured cost on both screens: `wf decide` prints each step's beside wha
   const bare = await screen(t, unmeasured.e, unmeasured.run.id);
   assert.ok(bare.includes('  cost  run not measured') && !bare.some((l) => l.includes('$')), bare.join('\n'));
 });
+
+test("REFUSED to hide why a step stopped past its budget: `wf decide` on a step whose session failed after spending its budget says FAILED with its logs, and one that ended unsigned says UNSIGNED, each beside the OVER BUDGET line — and the offer names both", async (t) => {
+  const budgeted = () => {
+    const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+    fs.writeFileSync(path.join(dir, 'implement.md'), '---\nbudget: 3\n---\nimplement it\n');
+    fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
+    return dir;
+  };
+  const cases = [
+    ['failed', 'failed', (id: string) => `  FAILED: implement  (wf logs ${id} <step>)`],
+    ['unsigned', 'succeeded', () => '  UNSIGNED: implement  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran'],
+  ] as const;
+  for (const [own, phase, banner] of cases) {
+    const run = start({ brief: `add sub, ${own}`, repo: aRepo(), workflowDir: budgeted(), isolate: false });
+    const { e, settle } = board();
+    await advance(e, readRun(run.id));
+    // No closeout either way: the one session failed, the other ended without it.
+    settle(`${run.id}-implement`, phase, undefined, { costUsd: 3.4 });
+    const lines = await screen(t, e, run.id);
+    const said = indexOf(lines, banner(run.id));
+    const over = indexOf(lines, '  OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran');
+    assert.ok(said < over, `${own}: why it stopped, then why nothing more is filed`);
+    indexOf(lines, `    implement: over budget (${own}), $3.40 of $3. Raise its cap above $3.40 and continue its session:  wf retry ${run.id} implement --budget <amount>  (--fresh, or --model <m>, for a new session)`);
+    indexOf(lines, '    cost  $3.40 · budget $3');
+    assert.ok(!lines.some((l) => /its tries have cost its budget: or more/.test(l)), 'the shared reason is gone');
+  }
+});

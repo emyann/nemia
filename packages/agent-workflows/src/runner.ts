@@ -24,7 +24,7 @@ export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -1878,6 +1878,8 @@ export async function decide(e: Engine, id: string): Promise<{
   rounding: Round[];
   /** For each loop out of rounds, the `wf round` that goes once more (`roundLines`); for each step a person may try again, the `wf retry` (`retryLines`). */
   offers: string[];
+  /** The OVER BUDGET line, saying why each step over its budget is held (`overBudgetLine`); undefined with none. */
+  overBudgetLine?: string;
   /** What each filed step's current try consumed (`consumption`), off the views read for the rest. */
   used: Record<string, Usage | undefined>;
   /** For each step with a try, its `cost` line (`costLine`): its current try's, its tries' together where there were more, and the cap in force. */
@@ -1953,6 +1955,7 @@ export async function decide(e: Engine, id: string): Promise<{
     retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
     rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
     offers: [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)],
+    overBudgetLine: overBudgetLine(steps, run, d, spendOf),
     used,
     costs,
     runCost: runCostLines(run, spendOf),

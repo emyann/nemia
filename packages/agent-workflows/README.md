@@ -632,8 +632,16 @@ budget or ended at its budget, and has no try or round due. `wf decide` prints `
 FINISH:`, `UNSIGNED:`, `UNVERIFIED:`, `ROUNDS EXHAUSTED`, `OVER BUDGET` and `BUDGET EXHAUSTED` first, then each
 check's command and exit code and, for a check that refused, the last 20 lines of stdout and of stderr.
 
+A step over its budget is named for how it ended on its own work as well — `FAILED:` with its logs, `UNSIGNED:`,
+`FAILED CHECK:` — since a cap reached does not make a broken session any less broken. The `OVER BUDGET` line then says
+why each step is held: its own amounts, `implement ($4.25 of $3)`, or, for a looping step, the step its round would
+file again, `review (held: its round would file implement again, which has cost $4.25 of its $3 budget)`. Its offer
+says both: `implement: over budget (failed), $3.40 of $3. Raise its cap above $3.40 …`.
+
 Beside each step's word, `wf ls` puts what its tries have cost once the engine measured it — `verified ✓  $3.01`,
-and `≥$3.01` where an ended attempt has no cost on it — and on the run's line, the run's total.
+and `≥$3.01` where an ended attempt has no cost on it — and on the run's line, the run's total. A word that already
+shows the step's own spend, `over budget $4.20 of $3`, has nothing beside it. A looping step held on another step's
+budget, `over budget — implement $4.25 of $3`, has its own cost beside it.
 
 **`unsigned` blocks every `claude-detached` step** until engine open issue 4 is fixed: that harness
 never hands the closeout schema on, so its steps never sign off. `claude` and `codex` steps do.

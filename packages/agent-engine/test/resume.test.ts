@@ -122,16 +122,18 @@ test("a session resumed under the same id is read for its new attempt: its own c
     claude.set(resumed!.name, { state: 'done' });
     assert.deepEqual((await engine.view(retry)).usage, { turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 }, "nothing since its own start — not the first try's count");
 
-    // It carries on, gives a closeout of its own, and is listed done.
+    // It carries on, gives a closeout of its own, and is listed done — in three responses, where the first try took two,
+    // so a record of the first try's count cannot pass for the retry's.
     await sleep(10);
-    append(row!.sessionId, prompt('give your closeout'), response('msg_3', call('tu_3', 'Bash')), response('msg_4', call('tu_4', 'StructuredOutput', { outcome: 'done', by: 'retry' })));
+    append(row!.sessionId, prompt('give your closeout'), response('msg_3', { type: 'text', text: 'Giving it.' }), response('msg_4', call('tu_3', 'Bash')), response('msg_5', call('tu_4', 'StructuredOutput', { outcome: 'done', by: 'retry' })));
     await engine.tick();
 
     const v = await engine.view(retry);
     assert.equal(v.state.settled, 'succeeded');
     const [is] = v.state.attempts;
     assert.deepEqual(is?.closeout, { outcome: 'done', by: 'retry' }, "its own statement, not the first try's");
-    assert.deepEqual(is?.usage, { turns: 2, toolCalls: 2, inputTokens: 200, outputTokens: 10 }, 'only the responses since its own start');
+    assert.notDeepEqual(is?.usage, was?.usage, "not the first try's count");
+    assert.deepEqual(is?.usage, { turns: 3, toolCalls: 2, inputTokens: 300, outputTokens: 15 }, 'only the responses since its own start');
   });
 });
 

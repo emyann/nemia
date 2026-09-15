@@ -24,11 +24,28 @@ const unread = (branch: string): Touched => ({ branch, radius: { error: `git cou
 test("the Factory card's line: every group once, each change's lines once — a rename across packages is not counted twice", () => {
   assert.equal(touchedSummary([read]), 'touched 3 packages · +12 −3');
   assert.equal(touchedSummary([{ branch: 'wf/r/one', radius: { ...radius, groups: [group('apps/web', 1, 4, 1)], changes: [{ path: 'apps/web/a.ts', added: 4, removed: 1 }] } }]), 'touched 1 package · +4 −1');
-  // Two branches touching the same package count it once, and a branch that could not be read is said, not dropped.
-  assert.equal(touchedSummary([read, read, unread('wf/r/gone')]), 'touched 3 packages · +24 −6 · 1 not read');
+  // Two branches with the same changes count each package and each file once, and a branch that could not be read is said, not dropped.
+  assert.equal(touchedSummary([read, read, unread('wf/r/gone')]), 'touched 3 packages · +12 −3 · 1 not read');
   assert.equal(touchedSummary([unread('wf/r/gone')]), 'touched not known — its branch could not be read');
   assert.equal(touchedSummary([unread('a'), unread('b')]), 'touched not known — 2 branches could not be read');
   assert.equal(touchedSummary([]), 'touched nothing — no branch to read');
+});
+
+test("REFUSED: a fan-out's result branches each carry the parent's changes, and the card counts them once — not once per branch", () => {
+  // plan changed packages/a/src/x.ts; api and web each started from its branch in a worktree of their own. api added a file beside it, and
+  // web changed x.ts further and a file of its own. Each result branch is diffed against the run's base, so each carries plan's +100.
+  const branch = (name: string, changes: Radius['changes'], groups: Radius['groups']): Touched =>
+    ({ branch: `wf/r/${name}`, radius: { changes, groups, agentFacing: [], checkAffecting: [], lessons: [] } });
+  const api = branch('api', [{ path: 'packages/a/src/x.ts', added: 100, removed: 0 }, { path: 'packages/a/src/y.ts', added: 5, removed: 0 }], [group('packages/a', 2, 105, 0)]);
+  const web = branch('web', [{ path: 'packages/a/src/x.ts', added: 120, removed: 4 }, { path: 'apps/web/z.ts', added: 7, removed: 1 }], [group('packages/a', 1, 120, 4), group('apps/web', 1, 7, 1)]);
+  // x.ts once, as the branch that changed it most has it — plan's lines and web's on top: +120 −4; then y.ts +5 and z.ts +7 −1.
+  assert.equal(touchedSummary([api, web]), 'touched 2 packages · +132 −5');
+  assert.notEqual(touchedSummary([api, web]), 'touched 2 packages · +232 −5', "plan's +100 counted once per result branch");
+  // In either order: the larger change is the file's, whichever branch is read first.
+  assert.equal(touchedSummary([web, api]), 'touched 2 packages · +132 −5');
+  // A binary file on both adds no lines, and does not stand in for a counted change of the same path.
+  const bin = branch('bin', [{ path: 'packages/a/src/x.ts', added: null, removed: null }], [group('packages/a', 1, 0, 0, 1)]);
+  assert.equal(touchedSummary([bin, api]), 'touched 1 package · +105 −0');
 });
 
 test('a bar is its group\'s share of the most lines a group on the branch changed: the largest fills the track, a binary-only group has none', () => {

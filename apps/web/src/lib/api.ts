@@ -206,7 +206,52 @@ export type RunDetail = {
     used: StepUsed | null;
     /** Every try, earliest first, the current one last: `attempts` counts the current try's task alone. */
     tries: StepTry[];
+    /** Where the step's time went, try by try and check by check; empty for a step not filed. */
+    timeline: StepTimelineTry[];
   }>;
+  /** The run's time together: each round of its loop, and the whole run. */
+  timeline: { rounds: TimelineTotal[]; run: TimelineTotal };
+};
+
+/**
+ * Mirrors `TaskSpan` in agent-workflows' run.ts: one task of a try on the clock — its session, or its check. `filedAt` is off the engine's
+ * feed, and null where the feed has none; `spawnedAt` its first attempt's spawn; `endedAt` its last attempt's end once it settled. `at` is
+ * where it stands, and `queued` (filed → spawned, the wait for a slot) and `ran` (spawned → ended) the package's words for its two times.
+ */
+export type TaskSpan = {
+  taskId: string;
+  at: 'unknown' | 'queued' | 'starting' | 'running' | 'ended' | 'unspawned';
+  filedAt: string | null;
+  spawnedAt: string | null;
+  endedAt: string | null;
+  attempts: number;
+  queuedMs: number | null;
+  ranMs: number | null;
+  queued: string;
+  ran: string;
+};
+
+/**
+ * Mirrors `StepTimelineTry` in apps/api/src/app.ts: one try of a step on the clock. `session` is null on a try a recheck reached, whose session
+ * is try `sessionOf`'s; `check` null for a try whose check was never filed; `used` what its session consumed, in `wf decide`'s words.
+ */
+export type StepTimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used: StepUsed | null };
+
+/**
+ * Mirrors `TimelineTotal` in agent-workflows' run.ts: a round of a loop — `loop` its looping step, counting the steps that round files again — or
+ * the run's, every step's (`loop` and `round` null); sums over its tasks, and its wall, in words.
+ */
+export type TimelineTotal = {
+  loop: string | null;
+  round: number | null;
+  tasks: number;
+  inFlight: number;
+  queuedMs: number;
+  ranMs: number;
+  wallMs: number | null;
+  queued: string;
+  ran: string;
+  wall: string;
 };
 
 /** Mirrors `Usage` in apps/api/src/app.ts: a count nobody measured is absent, never 0. */
@@ -343,14 +388,69 @@ export type McpServer = {
   checkedAt: string | null;
 };
 
-/** Mirrors `Capabilities` in apps/api/src/capabilities.ts: what the repository the api runs in offers a step. */
+/** A permission rule, and where it was read: the settings' file, or a step's `disallow:`. */
+export type Rule = { rule: string; source: string };
+
+/**
+ * Mirrors `MEASURED_TOOLS` in apps/api/src/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on `measuredAt` with
+ * `version` — data, never claimed current.
+ */
+export type MeasuredTools = {
+  harness: string;
+  version: string;
+  measuredAt: string;
+  source: string;
+  /** What the measurement named. */
+  tools: string[];
+  /** What such a step is taken to have that no measurement named, each with why: inferred, never measured. */
+  inferred: Array<{ name: string; why: string }>;
+  lacks: string[];
+};
+
+/**
+ * Mirrors `StepReach` in apps/api/src/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on Claude Code, the
+ * built-in tools it has (`declared` or `measured`, less what a deny rule takes), the skills it can load, each enabled server's tools; the deny
+ * rules that hold for it, and what the settings allow it, `bash` their commands and `dontAsk` whether the rest is denied without a prompt.
+ */
+export type StepReach = {
+  workflow: string;
+  from: 'repo' | 'yours';
+  step: string;
+  harness: string;
+  claudeCode: boolean;
+  fence: { tools: string[] | null; disallow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
+  tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: Array<{ name: string; rule: string; source: string; of: string | null }> } | null;
+  skills: { names: string[]; why: string | null } | null;
+  mcp: Array<{ server: string; tools: Array<{ name: string; denied: Rule | null; allowed: boolean }> | null; why: string | null }> | null;
+  denied: Rule[];
+  /**
+   * Mirrors `AllowedFor`: the allow rules that stand, those a deny takes back and of a tool the step does not have; the Bash rules that stand,
+   * each with the narrower denies that still refuse some of it; and why there is no Bash command, for a step with no Bash.
+   */
+  allowed: {
+    rules: string[];
+    takenBack: Array<{ rule: string; by: Rule }>;
+    unused: string[];
+    bash: Array<{ rule: string; command: string; except: string[] }>;
+    /** Every standing rule a narrower deny still refuses part of — a Bash command, one tool of a server — with those denies. */
+    exceptions: Array<{ rule: string; except: string[] }>;
+    dontAsk: boolean;
+    why: string | null;
+  };
+};
+
+/** Mirrors `CapabilitiesWithSteps` in apps/api/src/reach.ts: what the repository the api runs in offers a step, and what each step gets. */
 export type Capabilities = {
   repo: string;
   skills: Described[];
   agents: Described[];
   mcp: McpServer[];
-  denied: Array<{ rule: string; source: string }>;
+  denied: Rule[];
+  /** `permissions.allow` in the settings, in its order. */
+  allowed: Rule[];
   warnings: string[];
+  measured: MeasuredTools;
+  steps: StepReach[];
 };
 
 /**
@@ -372,6 +472,8 @@ export type WorkflowStepSpec = {
   input: string[];
   permissionMode: string | null;
   tools: string[] | null;
+  /** What the session may not have (`disallow:`): empty where the step denies nothing. */
+  disallow: string[];
   deadlineSeconds: number | null;
   maxAttempts: number | null;
   check: string | null;
@@ -509,6 +611,13 @@ export function withGraph(id: string, detail: RunDetail): RunDetail {
   const unsaid = detail.steps.find((step) => !Array.isArray((step as { said?: unknown }).said));
   if (unsaid) {
     throw new Error(`The api answered run '${id}' without what was said to its step '${unsaid.name}', so it is older than this board, whose session page shows what a person said to a step. ${restart}`);
+  }
+  // And a run's page draws where its time went, off each step's timeline and the run's totals.
+  const untimed = detail.steps.find((step) => !Array.isArray((step as { timeline?: unknown }).timeline));
+  const totals = (detail as { timeline?: Partial<RunDetail['timeline']> | null }).timeline;
+  if (untimed || !totals || !Array.isArray(totals.rounds) || !totals.run) {
+    const what = untimed ? `the timeline of its step '${untimed.name}'` : 'the timeline of the run';
+    throw new Error(`The api answered run '${id}' without ${what}, so it is older than this board, whose run page shows where a run's time went. ${restart}`);
   }
   return detail;
 }

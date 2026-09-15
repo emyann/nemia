@@ -2,10 +2,11 @@
  * A step's conversation over HTTP: GET …/transcript, and …/transcript/stream as server-sent events.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, reading a transcript file where Claude Code keeps
- * one (CLAUDE_CONFIG_DIR). What the routes give is held to what the engine gives for the same task. A fake `claude` is first
- * on PATH, so the registry of the sessions on this machine is never asked: it lists what a test says is running, and notes
+ * one (CLAUDE_CONFIG_DIR). What the routes give is held to what the engine gives for the same task. The harness's fake `claude`
+ * (test/harness.ts) is first on PATH, so the registry of the sessions on this machine is never asked: it lists what a test says is running, and notes
  * every call, so a test can count what the stream costs.
  */
+import { observations, registry } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -22,24 +23,8 @@ process.env.WF_ROOT = root;
 const config = tmp('claude');
 process.env.CLAUDE_CONFIG_DIR = config;
 
-const bin = tmp('bin');
-const registry = path.join(bin, 'registry.json');
-const calls = path.join(bin, 'calls');
-fs.writeFileSync(registry, '[]');
-fs.writeFileSync(calls, '');
-fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-fs.appendFileSync(${JSON.stringify(calls)}, args.join(' ') + '\\n');
-if (args[0] === 'agents') process.stdout.write(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
-`, { mode: 0o755 });
-process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
-
 const { app } = await import('../src/app.ts');
 const { engine } = await import('agent-workflows');
-
-/** How many times `claude agents` has been run. */
-const observations = () => fs.readFileSync(calls, 'utf8').split('\n').filter((line) => line.startsWith('agents')).length;
 
 const T0 = Date.parse('2026-09-13T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();

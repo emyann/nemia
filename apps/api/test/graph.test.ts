@@ -1,3 +1,4 @@
+import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULT_ROUNDS, parseWorkflow, validate, type Workflow } from 'agent-workflows/workflow';

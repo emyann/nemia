@@ -3,6 +3,7 @@
  * roots wait on, in the package's words — on the list, the detail and the decision, each held to what `wf ls` and `wf decide` say. Off a
  * real repository, where a parent ships by its branch being merged, and in a scratch store.
  */
+import { observations } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -10,15 +11,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-// agent-workflows locates its store when the module loads, so point it at a scratch directory first. Ahead of the real one on PATH, a
-// `claude` that notes each call and sees no sessions of ours: how many times a request observed the harnesses.
+// agent-workflows locates its store when the module loads, so point it at a scratch directory first. The harness counts the observations.
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-after-'));
 process.env.WF_ROOT = root;
-const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-after-bin-'));
-const calls = path.join(bin, 'calls');
-fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
-process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
-const observations = () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '').split('\n').filter((line) => line.startsWith('agents')).length;
 
 const { app } = await import('../src/app.ts');
 const { decide, engine, list, readRun, waitAdvice, waitWord } = await import('agent-workflows');

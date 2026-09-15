@@ -4,9 +4,10 @@
  * `retry()`, given the harness's word as `wf retry` gives it, and refused in the package's words.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, reading transcripts where Claude Code keeps them
- * (CLAUDE_CONFIG_DIR). A fake `claude` is first on PATH, listing the sessions this file says are running and noting every call, so the
+ * (CLAUDE_CONFIG_DIR). The harness's fake `claude` (test/harness.ts) is first on PATH, listing the sessions this file says are running and noting every call, so the
  * registry of the sessions on this machine is never asked, and a test can count what a request costs.
  */
+import { observations, registry, stops } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -21,23 +22,6 @@ const root = tmp('root');
 process.env.WF_ROOT = root;
 const config = tmp('claude');
 process.env.CLAUDE_CONFIG_DIR = config;
-
-const bin = tmp('bin');
-const registry = path.join(bin, 'registry.json');
-const calls = path.join(bin, 'calls');
-fs.writeFileSync(registry, '[]');
-fs.writeFileSync(calls, '');
-fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
-const fs = require('node:fs');
-fs.appendFileSync(${JSON.stringify(calls)}, process.argv.slice(2).join(' ') + '\\n');
-if (process.argv[2] === 'agents') process.stdout.write(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
-`, { mode: 0o755 });
-
-/** How many times `claude agents` has been run: an observation of the harness each. */
-const observations = () => fs.readFileSync(calls, 'utf8').split('\n').filter((line) => line.startsWith('agents')).length;
-/** How many times `claude stop` has been run: a session stopped, which is the tick's to do, and never the api's. */
-const stops = () => fs.readFileSync(calls, 'utf8').split('\n').filter((line) => line.startsWith('stop')).length;
-process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 
 const { app } = await import('../src/app.ts');
 const { askFile, engine, list, readRun, retry } = await import('agent-workflows');

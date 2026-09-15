@@ -135,15 +135,23 @@ export type SpecFlowNode = Node<SpecNodeData, 'spec'>;
 /** The most tools a node writes out. Past it the node counts them, and the names are the line's title: a list of four runs long. */
 const TOOLS_WRITTEN_OUT = 3;
 
+/** What a step that sets no effort, or no tools, runs with: its harness's, as the run page's spec rows say it. */
+export const HARNESS_OWN = "harness's own";
+
 /**
- * What a step is set to do beyond what it runs on, as its node lists it: its check, its tools, its permission mode and its
- * loop, each only when the step sets it. The rest of its keys are on the step's file. A line's `title`, when it has one, is
- * what its value stands for — the tools' names, where the value counts them — and is the value itself otherwise.
+ * What a step is set to do beyond what it runs on, as its node lists it: its check, its effort, its tools, its permission mode and
+ * its loop. The check, the mode and the loop only when the step sets them; the effort and the tools always, `harness's own` where
+ * it sets none — what a session runs with is the thing a person reads a workflow for, and a step that says nothing gets the most.
+ * The rest of its keys are on the step's file. A line's `title`, when it has one, is what its value stands for — the tools' names,
+ * where the value counts them — and is the value itself otherwise.
  */
 export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: string, title?: string]> {
   const lines: Array<[string, string, string?]> = [];
   if (spec.check) lines.push(['check', spec.check]);
-  if (spec.tools) {
+  lines.push(['effort', spec.effort ?? HARNESS_OWN]);
+  if (!spec.tools) lines.push(['tools', HARNESS_OWN]);
+  else if (!spec.tools.length) lines.push(['tools', 'none']);
+  else {
     const names = spec.tools.join(', ');
     lines.push(spec.tools.length > TOOLS_WRITTEN_OUT ? ['tools', String(spec.tools.length), names] : ['tools', names]);
   }

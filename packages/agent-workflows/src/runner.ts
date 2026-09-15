@@ -17,14 +17,14 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, dueNote, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { CloseoutAsked, ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Wait } from './run.ts';
+export { artifactLines, dueNote, durationWord, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export type { CloseoutAsked, ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, TaskSpan, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -1811,9 +1811,20 @@ export function consumption(views: ReadonlyMap<string, TaskView>, run: Run): Rec
   for (const [name, { taskId }] of Object.entries(run.steps)) {
     const v = taskId ? views.get(taskId) : undefined;
     if (!v) continue;
-    used[name] = sumUsage(v.state.attempts.filter((a) => a.reason !== 'unstartable').map((a) => (a.endedAt ? a.usage : v.usage)));
+    used[name] = taskUsage(v);
   }
   return used;
+}
+
+/**
+ * When each task was filed, off the engine's feed from `after`, added to `into`: the one record of a filing time, since a task's view
+ * carries none — and the time between filing and a first attempt is the wait for a slot (`timeline`). A filing is written once and never
+ * changes, so a reader that keeps `into` and the cursor reads on from where it stopped. A feed that cannot be read rejects, as the engine's does.
+ */
+export async function readFilings(e: Engine, after = 0, into = new Map<string, string>()): Promise<{ filed: Map<string, string>; cursor: number }> {
+  const { entries, cursor } = await e.feed(after);
+  for (const { taskId, event } of entries) if (event.kind === 'filed') into.set(taskId, event.at);
+  return { filed: into, cursor };
 }
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
@@ -1842,6 +1853,11 @@ export async function decide(e: Engine, id: string): Promise<{
   waiting: Wait[];
   /** For each step, what a person said to its sessions while they ran (`wf say`), try by try, off the engine's view of each try's task (`saidLines`). */
   said: Record<string, SaidTo[]>;
+  /**
+   * Where the run's time went, per try and per check (`timeline`): off the engine's view of every try's task and check, and the filing times
+   * on its feed. A feed that cannot be read leaves every queue time `not known`, and the screen printed all the same.
+   */
+  timeline: Timeline;
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
@@ -1867,8 +1883,15 @@ export async function decide(e: Engine, id: string): Promise<{
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
     answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
   }
+  // Every try's task and check, the tries behind the current one too, each viewed once: what a person said to each try, and the timeline.
+  const everyTry = new Map(views);
+  for (const record of Object.values(run.steps)) {
+    for (const t of record.tries ?? []) {
+      for (const taskId of [t.taskId, t.check?.taskId]) if (taskId && !everyTry.has(taskId)) everyTry.set(taskId, await e.view(taskId));
+    }
+  }
   // What a person said to each try's sessions while they ran, off the engine's journal of the try's task: every try, since words said to a try
-  // that was replaced still bear on the work the step hands on. An earlier try's task is read once more, as the answers above read one.
+  // that was replaced still bear on the work the step hands on.
   const said: Record<string, SaidTo[]> = {};
   for (const [name, record] of Object.entries(run.steps)) {
     const tasks = [...(record.tries ?? []).map((t) => t.taskId), ...(record.taskId ? [record.taskId] : [])];
@@ -1876,11 +1899,12 @@ export async function decide(e: Engine, id: string): Promise<{
     for (const [i, taskId] of tasks.entries()) {
       // A recheck replaced only a check: the try after it has the same task, whose words are the try's that ran its session, said once.
       if (tasks.indexOf(taskId) !== i) continue;
-      const view = views.get(taskId) ?? await e.view(taskId);
-      for (const s of saidIn(view)) told.push({ ...s, try: i + 1 });
+      for (const s of saidIn(everyTry.get(taskId)!)) told.push({ ...s, try: i + 1 });
     }
     if (told.length) said[name] = told;
   }
+  // A screen that cannot read the feed this time is still the screen: the queue times say they are not known.
+  const filed = await readFilings(e).then(({ filed }) => filed, () => new Map<string, string>());
   return {
     run, decision: d, closeouts, checks,
     retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked),
@@ -1891,6 +1915,7 @@ export async function decide(e: Engine, id: string): Promise<{
     answering: answerLines(steps, run, d, phaseOf, reader, asked),
     waiting: waitsOf(run, await parentsOf(e, run)),
     said,
+    timeline: timeline(run, everyTry, filed, steps),
   };
 }
 

@@ -63,6 +63,15 @@ export const FAKE = {
   artifacts: { image: 'palette.png', text: 'tokens.txt', path: 'TOKENS.md' },
   /** One per `after` between its steps: implement → review, review → respond, implement → respond, tokens → theme. */
   edges: 4,
+  /**
+   * Where its time went, off the engine's attempts and the filings on its feed (`seedFeed`): each step that signed off was spawned a minute
+   * after it was filed — `[queued, ran]` — and theme's check at once. review's task has no journal, so the run's totals leave it out and say so.
+   */
+  timeline: {
+    sessions: { implement: ['1m00s', '29m00s'], tokens: ['1m00s', '9m00s'], theme: ['1m00s', '19m00s'] },
+    check: ['0s', '3m00s'],
+    run: { queued: '3m00s, 1 not known', ran: '1h00m, 1 not known', wall: 'not known' },
+  },
 } as const;
 
 /**
@@ -384,6 +393,8 @@ export const CHECKOUT = {
   server: { name: 'fixture', tools: ['echo', 'wipe'], said: 'Say it back.', secondLine: 'A second line', denied: 'mcp__fixture__wipe' },
   missing: { name: 'missing', command: 'hkb-e2e-no-such-mcp-server' },
   denied: ['Bash(git push:*)', 'mcp__fixture__wipe'],
+  /** What its settings allow: two Bash commands, which WORKFLOWS' review, in dontAsk, may run. */
+  allowed: ['Bash(npm test)', 'Bash(git diff:*)'],
 } as const;
 
 /** Write CHECKOUT into `repo`. `mcpServer` is the file of the stdio MCP server it declares, which node runs. */
@@ -400,7 +411,7 @@ export function seedCheckout(repo: string, mcpServer: string): void {
   }, null, 2));
   write(path.join(repo, '.claude', 'settings.json'), JSON.stringify({
     enabledMcpjsonServers: [server.name, missing.name],
-    permissions: { deny: denied },
+    permissions: { deny: denied, allow: CHECKOUT.allowed },
   }, null, 2));
 }
 
@@ -417,6 +428,10 @@ export const WORKFLOWS = {
     runsOn: 'claude · opus',
     check: 'npm test && npm run typecheck',
     tools: 'Read, Grep, Glob, Bash',
+    /** The effort review sets; implement sets none, and runs at its harness's own. */
+    effort: 'high',
+    /** What implement disallows, which the Capabilities page takes from the set it has. */
+    disallow: 'SendMessage',
     loop: 'implement · 3 rounds',
   },
   broken: { name: 'broken', error: 'review: `afer` is not a key a step has.' },
@@ -428,8 +443,8 @@ export function seedWorkflows(repo: string, root: string): void {
   const { good, broken, yours } = WORKFLOWS;
   const dev = path.join(repo, 'workflows', good.name);
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
-  write(path.join(dev, 'implement.md'), `---\nharness: claude\nmodel: opus\ncheck: ${good.check}\n---\nImplement what was asked.\n`);
-  write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview the change.\n`);
+  write(path.join(dev, 'implement.md'), `---\nharness: claude\nmodel: opus\ncheck: ${good.check}\ndisallow: ${good.disallow}\n---\nImplement what was asked.\n`);
+  write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview the change.\n`);
   write(path.join(dev, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }, null, 2));
   const bad = path.join(repo, 'workflows', broken.name);
   write(path.join(bad, 'README.md'), `# ${broken.name}\n\nA reviewer whose after is misspelt.\n`);
@@ -532,6 +547,21 @@ function draftConversation(ago: (minutes: number) => string): object[] {
 }
 
 const lines = (events: object[]): string => events.map((event) => `${JSON.stringify(event)}\n`).join('');
+
+/**
+ * The engine's feed, as its journal keeps one beside the tasks: every event of every task's journal in the store, in the order they
+ * happened. The seed writes each journal by hand, and the api reads when a task was filed off the feed alone (`readFilings`), so this is
+ * written last, over them all.
+ */
+export function seedFeed(root: string): void {
+  const tasks = path.join(root, 'engine', 'tasks');
+  const entries = fs.readdirSync(tasks).filter((file) => file.endsWith('.jsonl')).flatMap((file) =>
+    fs.readFileSync(path.join(tasks, file), 'utf8').split('\n').filter(Boolean)
+      .map((line) => ({ taskId: file.slice(0, -'.jsonl'.length), event: JSON.parse(line) as { at: string } })));
+  // Stable, so a journal's events that share an instant keep their order.
+  entries.sort((a, b) => a.event.at.localeCompare(b.event.at));
+  write(path.join(root, 'engine', 'feed.jsonl'), lines(entries));
+}
 
 /** Write the fake run into `root`, which becomes the api's WF_ROOT. Times are minutes before `now`. */
 export function seed(root: string, now = Date.now()): void {

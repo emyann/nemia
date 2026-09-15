@@ -3,6 +3,7 @@
  * lesson line, the check-affecting diffs cut per file, what each step consumed, and the commands — and nothing of it, and
  * no `git` at all, for a run still running.
  */
+import './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -14,12 +15,11 @@ import path from 'node:path';
 const root = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-decision-'));
 process.env.WF_ROOT = root;
 
-// Ahead of the real ones on PATH: a `claude` that sees no sessions of ours, so the engine's observation is the store's,
-// and a `git` that notes each call and runs the real one, so a test can count what the route asked of git.
+// Ahead of the real one on PATH, beside the harness's `claude`: a `git` that notes each call and runs the real one, so a test can count
+// what the route asked of git.
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
 const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-decision-bin-'));
 const gitCalls = path.join(bin, 'git-calls');
-fs.writeFileSync(path.join(bin, 'claude'), "#!/bin/sh\necho '[]'\n", { mode: 0o755 });
 fs.writeFileSync(path.join(bin, 'git'), `#!/bin/sh\necho "$*" >> '${gitCalls}'\nexec '${realGit}' "$@"\n`, { mode: 0o755 });
 process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);

@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { arrivalLine, CHECKOUT, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { arrivalLine, CHECKOUT, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -425,6 +425,29 @@ const PAGES: PageSpec[] = [
       );
       const blocked = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });
       await expectVisible(blocked.locator('[data-mark="default"]', { hasText: 'auto · default' }), `${FAKE.blocked}'s spec says the mode its Claude Code session runs in (auto · default)`);
+
+      // Where the run's time went: a row per try's session and per check, each queued filed → spawned and ran spawned → ended, off the
+      // engine's attempts and the filings on its feed.
+      const timeline = page.locator('section[aria-label="Timeline"]');
+      const exactly = (text: string) => new RegExp(`^${text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`);
+      for (const [step, [queued, ran]] of Object.entries(FAKE.timeline.sessions)) {
+        const row = timeline.locator(`tr[data-step="${step}"][data-task="session"][data-at="ended"]`);
+        await expectVisible(row.locator('[data-cell="queued"]', { hasText: exactly(queued) }), `the timeline says ${step} queued ${queued} for a slot`);
+        await expectVisible(row.locator('[data-cell="ran"]', { hasText: exactly(ran) }), `the timeline says ${step} ran ${ran}`);
+      }
+      const [checkQueued, checkRan] = FAKE.timeline.check;
+      const checkRow = timeline.locator(`tr[data-step="${FAKE.refused}"][data-task="check"][data-at="ended"]`);
+      await expectVisible(checkRow.locator('[data-cell="queued"]', { hasText: exactly(checkQueued) }), `${FAKE.refused}'s check queued ${checkQueued}`);
+      await expectVisible(checkRow.locator('[data-cell="ran"]', { hasText: exactly(checkRan) }), `${FAKE.refused}'s check ran ${checkRan}`);
+      await expectVisible(timeline.locator(`tr[data-step="${FAKE.unverified}"] [data-cell="used"]`, { hasText: FAKE.used }), `what ${FAKE.unverified}'s session used, beside its times`);
+      await expectVisible(timeline.locator('tr[data-step="review"][data-at="unknown"]', { hasText: `the engine has no record of ${FAKE.id}-review` }), 'review, whose task the engine lost, is said, not timed');
+      await expectCount(timeline.locator('tr[data-step="respond"]'), 0, 'respond, not filed, has no row');
+      const total = timeline.locator('tr[data-total="run"]');
+      for (const cell of ['queued', 'ran'] as const) {
+        await expectVisible(total.locator(`[data-cell="${cell}"]`, { hasText: exactly(FAKE.timeline.run[cell]) }), `the run's total ${cell} is ${FAKE.timeline.run[cell]}`);
+      }
+      await expectVisible(total.locator('[data-cell="wall"]', { hasText: `wall ${FAKE.timeline.run.wall}` }), `the run's wall is ${FAKE.timeline.run.wall}: a task it cannot time`);
+      await expectCount(timeline.locator('tr[data-total^="round-"]'), 0, "one round: the run's total alone");
       await graph.locator(`.react-flow__node[data-id="${FAKE.unverified}"]`).click();
       const inspected = page.locator(`aside[aria-label="Step ${FAKE.unverified}"]`);
       await expectVisible(inspected.locator('dd', { hasText: FAKE.used }), `the inspector's Details say what ${FAKE.unverified} used`);
@@ -909,6 +932,13 @@ const PAGES: PageSpec[] = [
         const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name, exact: true }) });
         await expectVisible(section.locator('[data-note]', { hasText: LOOPING.notes[name] }), `the run's page shows ${name}'s note under its chip (${LOOPING.notes[name]})`);
       }
+      // The timeline, from the tries on the record: a row for each step's try in each of the three rounds, and a total a round, then the run's.
+      const timeline = page.locator('section[aria-label="Timeline"]');
+      for (const name of LOOPING.steps) {
+        await expectCount(timeline.locator(`tr[data-step="${name}"][data-task="session"]`), 3, `${name} has a row on the timeline for each of its three rounds`);
+      }
+      await expectVisible(timeline.locator('tr[data-step="implement"] td', { hasText: /^try 3 · round 3$/ }), "implement's third try is round 3's");
+      await expectCount(timeline.locator('tfoot tr[data-total]'), 4, "a total for each of the loop's three rounds, and the run's");
       await node(LOOPING.exhausted).click();
       const inspector = page.locator(`aside[aria-label="Step ${LOOPING.exhausted}"]`);
       await expectVisible(inspector.locator('[data-state="exhausted"]'), `the step inspector opens on a click on ${LOOPING.exhausted}`);
@@ -1003,6 +1033,9 @@ const PAGES: PageSpec[] = [
       const tools = good.tools.split(', ').length;
       await expectVisible(node('review').locator(`dd[title="${good.tools}"]`, { hasText: new RegExp(`^${tools}$`) }), `review's node counts its ${tools} tools and names them on hover (${good.tools})`);
       await expectVisible(node('review').getByText(good.loop, { exact: true }), `review's node shows its loop and its rounds (${good.loop})`);
+      // The effort each runs at, and its tools: what it sets, or its harness's own.
+      await expectVisible(node('review').locator('dd', { hasText: new RegExp(`^${good.effort}$`) }), `review's node says the effort it runs at (${good.effort})`);
+      await expectCount(node('implement').getByText("harness's own", { exact: true }), 2, "implement sets neither effort nor tools: its node says both are its harness's own");
       // Chips only: since B5 an edge's path carries `data-state` too, so the count is taken inside the nodes.
       await expectCount(graph.locator('.react-flow__node [data-state]'), 0, 'a step no run has started has no status chip');
       await expectCount(graph.getByText(/no attempt yet|^#\d/), 0, 'nor an attempt');
@@ -1120,6 +1153,31 @@ const PAGES: PageSpec[] = [
       const rules = section('Denied');
       for (const rule of denied) await expectVisible(rules.getByText(rule, { exact: true }), `the denied list has ${rule}`);
       await expectVisible(rules.getByText(`refuses ${server.name} · wipe`), `the denied list says which listed tool ${server.denied} refuses`);
+
+      // What each step gets: the checkout's dev — review fenced to its tools in dontAsk, implement on the harness's own set — and yours, on Codex.
+      const { good, yours } = WORKFLOWS;
+      const steps = section('What each step gets');
+      await expectVisible(steps.locator('h2 [data-count]', { hasText: /^3$/ }), "a row for each step of each workflow that reads: dev's two, and yours");
+      const review = steps.locator(`li[data-step="${good.name}/review"]`);
+      const declared = good.tools.split(', ');
+      for (const tool of declared) await expectVisible(review.locator(`[data-tool="${tool}"]`), `review has ${tool}, which its tools: names`);
+      await expectCount(review.locator('[data-tool]'), declared.length, `review has exactly the tools it declares (${good.tools})`);
+      await expectCount(review.locator('[data-measured]'), 0, 'and no measured set: it declares its own');
+      for (const command of CHECKOUT.allowed.map((rule) => rule.slice('Bash('.length, -1))) {
+        await expectVisible(review.locator(`[data-bash="${command}"]`), `review, in dontAsk, shows the Bash command the settings allow (${command})`);
+      }
+      await expectVisible(review.locator('[data-mcp-tool="echo"][data-not-allowed]'), "review's server tool no rule allows is marked: dontAsk denies it without a prompt");
+      await expectVisible(review.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`), `review's server tool the settings deny is marked denied (${server.denied})`);
+      const implement = steps.locator(`li[data-step="${good.name}/implement"]`);
+      await expectVisible(implement.locator('[data-measured="2026-09-14"]', { hasText: '2.1.270' }), "implement has the harness's own set, with the date and version it was measured on");
+      await expectVisible(implement.locator('[data-tool="WebFetch"]:not([data-inferred])'), 'a tool the measurement named is shown as measured (WebFetch)');
+      for (const tool of ['Edit', 'Bash']) await expectVisible(implement.locator(`[data-tool="${tool}"][data-inferred]`), `a tool no unfenced measurement named is marked inferred (${tool})`);
+      await expectVisible(implement.locator(`[data-removed="${good.disallow}"]`), `implement's disallow: takes ${good.disallow} from it`);
+      await expectCount(implement.locator(`[data-tool="${good.disallow}"]`), 0, `and ${good.disallow} is not among its tools`);
+      await expectVisible(implement.locator(`[data-skill="${skill.name}"]`), `implement, with Skill, can load the repository's skill (${skill.name})`);
+      const codexed = steps.locator(`li[data-step="${yours.name}/${yours.steps[0]}"]`);
+      await expectVisible(codexed.locator('[data-not-claimed]', { hasText: /was not measured.*reads no \.claude\/settings\.json/ }), `yours, on Codex, claims no tool it was not measured to have, and no rule of settings it does not read`);
+      await expectCount(codexed.locator('[data-tool], [data-bash], [data-allowed]'), 0, 'and shows none');
     },
   },
 ];
@@ -1242,6 +1300,8 @@ async function main(): Promise<void> {
   seedWorkflows(checkout, store);
   // After the checkout's files, which its base commits.
   seedDiamond(checkout, store);
+  // Over every journal the seed wrote: where the api reads when each task was filed.
+  seedFeed(store);
   // A `claude` that lists the store's sessions (REGISTRY) — HELD's, blocked — first on the api's PATH. The engine observes `claude
   // agents` on every list; the pages are about the store, not about the sessions on this machine. And where Claude Code keeps its
   // transcripts, in the store (CLAUDE_CONFIG_DIR): the engine reads a session's conversation from there, never from this machine's.

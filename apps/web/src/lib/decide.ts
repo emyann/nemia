@@ -39,7 +39,13 @@ export const decisionStamp = (
 
 /**
  * The Factory card's line for a run waiting on you: `touched 2 packages · +979 −12`. Every group the branches it reads
- * touched, counted once; the lines of every change, a binary one adding none; and how many branches git could not read.
+ * touched, counted once; the lines of every file, each file counted once; and how many branches git could not read.
+ *
+ * Once per file, not once per branch: each branch is diffed against the run's base, and a follower in a worktree of its own starts from
+ * its parent's branch, so a fan-out's result branches each carry the parent's changes, and summing them counted the parent's lines once
+ * per branch. A file on several branches counts the change with the most lines among them — the parent's plus a follower's own on top of
+ * it. Two siblings that each changed one file apart count the larger alone: the card is a line for triage, and `wf decide`, which prints
+ * each branch on its own, is where the whole of it is. A binary file adds no lines.
  */
 export function touchedSummary(touched: readonly Touched[]): string {
   const read = touched.flatMap((t) => ('error' in t.radius ? [] : [t.radius]));
@@ -47,11 +53,17 @@ export function touchedSummary(touched: readonly Touched[]): string {
   if (!touched.length) return 'touched nothing — no branch to read';
   if (!read.length) return `touched not known — ${unread === 1 ? 'its branch' : `${unread} branches`} could not be read`;
   const groups = new Set(read.flatMap((r) => r.groups.map((g) => g.name))).size;
+  const files = new Map<string, { added: number; removed: number }>();
+  for (const c of read.flatMap((r) => r.changes)) {
+    const lines = { added: c.added ?? 0, removed: c.removed ?? 0 };
+    const seen = files.get(c.path);
+    if (!seen || lines.added + lines.removed > seen.added + seen.removed) files.set(c.path, lines);
+  }
   let added = 0;
   let removed = 0;
-  for (const c of read.flatMap((r) => r.changes)) {
-    added += c.added ?? 0;
-    removed += c.removed ?? 0;
+  for (const lines of files.values()) {
+    added += lines.added;
+    removed += lines.removed;
   }
   return `touched ${groups} package${groups === 1 ? '' : 's'} · +${added} −${removed}${unread ? ` · ${unread} not read` : ''}`;
 }

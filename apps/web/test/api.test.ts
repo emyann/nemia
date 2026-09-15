@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { decisionQuery, runQuery, sayToStep, withGraph, type RunDetail } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
@@ -14,8 +15,10 @@ function answering(t: { after: (fn: () => void) => void }, body: object) {
 }
 
 const graph = { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] };
+/** A run's totals on the clock, with nothing filed: what a detail carries once its api has the timeline. */
+const TOTALS = { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } };
 /** A detail cut to what the check reads: the run as an api from before `graph` answers it, give or take the rest. */
-const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], ...extra }) as unknown as RunDetail;
+const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], timeline: TOTALS, ...extra }) as unknown as RunDetail;
 
 const refusesStale = (err: Error) =>
   /^The api answered run 'r-1' without its graph, so it is older than this board/.test(err.message) && /Restart the api/.test(err.message);
@@ -46,7 +49,7 @@ test("a run's detail whose steps come without their tries is refused, naming the
   assert.throws(() => withGraph('r-1', stale), refusesTries);
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesTries);
-  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [], said: [] }] })));
+  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [], said: [], timeline: [] }] })));
 });
 
 test("a run's detail whose steps come without what was said to them is refused, naming the step and the fix — an api started before the session page showed it", async (t) => {
@@ -56,6 +59,20 @@ test("a run's detail whose steps come without what was said to them is refused, 
   assert.throws(() => withGraph('r-1', stale), refusesSaid);
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesSaid);
+});
+
+test("REFUSED: a run's detail without where its time went — a step's timeline, or the run's totals — naming what is missing and the fix", async (t) => {
+  const timed = { name: 'implement', tries: [], said: [], timeline: [] };
+  const refuses = (what: string) => (err: Error) =>
+    err.message.startsWith(`The api answered run 'r-1' without ${what}, so it is older than this board`) && /Restart the api/.test(err.message);
+  const stale = detail({ graph, steps: [timed, { name: 'review', tries: [], said: [] }] });
+  assert.throws(() => withGraph('r-1', stale), refuses("the timeline of its step 'review'"));
+  answering(t, stale);
+  await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refuses("the timeline of its step 'review'"));
+  for (const totals of [undefined, null, {}, { rounds: [] }, { run: TOTALS.run }]) {
+    assert.throws(() => withGraph('r-1', detail({ graph, steps: [timed], timeline: totals })), refuses('the timeline of the run'), JSON.stringify(totals));
+  }
+  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [timed] })));
 });
 
 test("saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so", async (t) => {
@@ -202,8 +219,12 @@ test("a run's decision is asked for once while a live step's engine word moves, 
   answers[1]!(second);
   await until(() => !observer.getCurrentResult().isPlaceholderData);
   assert.deepEqual(observer.getCurrentResult().data, second);
-  // From the first answer on, never nothing: the section does not blink out.
-  assert.ok(shown.slice(shown.indexOf(first)).every((data) => data !== undefined), JSON.stringify(shown));
+  // From the first answer on, never nothing: the section does not blink out. The observer hands back its own copy of what was answered, so
+  // the first answer is found by what it says, not by identity — `indexOf` found none, and `slice(-1)` held only the last value to it.
+  const from = shown.findIndex((data) => isDeepStrictEqual(data, first));
+  assert.ok(from >= 0, `the first answer is among what was shown: ${JSON.stringify(shown)}`);
+  assert.ok(shown.length - from > 2, `every value from the first answer on is held to it, not the last alone: ${JSON.stringify(shown)}`);
+  assert.ok(shown.slice(from).every((data) => data !== undefined), JSON.stringify(shown));
 });
 
 

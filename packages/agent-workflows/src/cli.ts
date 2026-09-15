@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
 import { workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -110,7 +110,9 @@ closeout:
   lesson    whether the run changed a file where the next agent reads, or that it wrote nothing there
   in full   the whole diff of the check-affecting files: what a change could edit to make its check pass
 
-and beside each step's check, what its session consumed — used, cost — or that nobody measured it. Under
+and beside each step's check, what its session consumed — used, cost — or that nobody measured it, then
+its timeline: for each try's session and each try's check, when it was filed, spawned and ended (UTC), how
+long it queued for a slot and how long it ran; after the steps, each round's and the run's totals. Under
 each step, before its closeout, what a person said to its sessions while they ran (wf say), with when.
 
   --sensitive <globs>  comma-separated globs whose changed files are printed in full instead, for this
@@ -394,7 +396,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, used, answers, answering, waiting, said } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, used, answers, answering, waiting, said, timeline } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${given ? `\n  ${given}` : ''}`;
@@ -471,6 +473,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         }
         // What its session consumed, beside the check's word on it — or that nobody measured it.
         for (const line of usedLines(used[name])) console.log(`    ${line}`);
+        // Where its time went, try by try and check by check: when each was filed, spawned and ended, how long it queued and ran.
+        for (const line of timelineLines(timeline.steps[name] ?? [])) console.log(`    ${line}`);
         // What a person said to this try, beside what the try before it needed: the question and its answer, before what the try made of them.
         const answer = answers[name];
         if (answer?.needs) console.log(`    try ${answer.try - 1} needs: ${answer.needs.split('\n').join('\n    ')}`);
@@ -492,6 +496,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         for (const line of files) console.log(`    ${line}`);
       }
       console.log();
+      // And the run's: each round's time when its loop went round, then the whole run's.
+      const totals = timelineTotalLines(timeline);
+      if (totals.length) {
+        for (const line of totals) console.log(`  ${line}`);
+        console.log();
+      }
 
       for (const branch of decision.branches) {
         const stat = diffStat(run, branch);

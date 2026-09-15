@@ -11,9 +11,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - `npm test` — from the root, turbo runs `node --test test/*.test.ts` in every package
   (181 engine · 169 workflows · 21 api · 33 web at 2026-09-13). Runs from a package directory
   too. Not bare `node --test` from the root: `agent-engine/test/facade.test.ts` is cwd-relative.
-  It runs the packages one at a time (`--concurrency=1`), on purpose: the api tests hit the machine's
-  live `claude agents` registry and die under contention (plan §4b), and a check must be
-  deterministic before it is fast. `npx turbo run test` is the parallel form when you want it.
+  It runs the packages in parallel. Until 2026-09-14 it ran them one at a time: the api's tests asked the machine's
+  live `claude agents` registry and died under contention (plan §4b). Every api test file now imports
+  `apps/api/test/harness.ts` first — a fake `claude` first on PATH, the harness the api's engine runs — and
+  `harness.test.ts` refuses a file that does not, so a new api test file imports it first. Measured parallel three
+  times in a row with `npx turbo run test --force`: without `--force` turbo replays a cached pass and measures nothing.
 - `npm run typecheck` — `tsc --noEmit` per package. **This is the lint.** There is no eslint or
   biome, on purpose, until one replaces more code than it adds.
 - Run both before you commit. Green is the floor, not the bar: a change that makes the suite
@@ -43,6 +45,12 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).
+- **The engine's task view carries no filing time; its feed does.** A slot wait is filed → first attempt, so the timeline
+  reads filings off `e.feed` (`readFilings`). A store written by hand — the e2e's seed — writes `engine/feed.jsonl` too
+  (`seedFeed`), or every queue time reads `not known` (learned by the run that added the timeline).
+- **A browser's `requestAnimationFrame` throws when called off another object.** `{ request: requestAnimationFrame }`
+  lost every live event of the session stream with no error on the page; call it as `(f) => requestAnimationFrame(f)`
+  (`animationFrames`, learned by the say page's e2e).
 - **A guard is not proven by a test that asks whether it allows.** Every new refusal — a parser
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's

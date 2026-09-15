@@ -951,8 +951,9 @@ screen shows what the branch touched, read out of git:
   for a slot behind other runs; *ran*, spawned → ended. The spawn and the end are the engine's attempts; the
   filing is on the engine's feed, since a task's view carries no filing time, and a queue the feed cannot
   time says `not known`, never `0s`. A try still running says `no end yet`, and a try a recheck reached says
-  whose session it checked again. After the steps, a total for each round of a loop that went round, then
-  the run's: queued and ran summed — so steps side by side add up to more than the wall — and the wall,
+  whose session it checked again. After the steps, a total for each round of a loop that went round — the
+  steps that round files again, and none before or after the loop; named by its looping step when two loops
+  went round — then the run's, every step's: queued and ran summed — so steps side by side add up to more than the wall — and the wall,
   first filed → last ended, `still going` while anything is in flight.
 
 The three lists are globs, written once in `src/radius.ts` and printed by `wf decide --help`. A branch

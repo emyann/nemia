@@ -152,11 +152,11 @@ const settledTimeline = (taskId: string) => [{
   used: { usage: null, used: 'not measured', cost: 'not measured' },
 }];
 
-/** The run's time over that one task: a round, and the run, both with a queue and a wall nobody can know. */
-const oneTaskTotals = () => {
-  const total = { tasks: 1, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: 'not known', ran: '0s', wall: 'not known' };
-  return { rounds: [{ round: 1, ...total }], run: { round: null, ...total } };
-};
+/** The run's time over that one task, in a workflow with no loop: no round is totalled, and the run is, with a queue and a wall nobody can know. */
+const oneTaskTotals = () => ({
+  rounds: [],
+  run: { loop: null, round: null, tasks: 1, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: 'not known', ran: '0s', wall: 'not known' },
+});
 
 test('a run in full: the brief, each step\'s spec and prose, what it was told, and how it went', async () => {
   settledTask('t-2', blocked);

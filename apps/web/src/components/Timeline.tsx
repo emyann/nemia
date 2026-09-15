@@ -10,14 +10,17 @@ import type { RunDetail, StepTimelineTry, TaskSpan, TimelineTotal } from '../lib
 export function Timeline({ run }: { run: RunDetail }) {
   const steps = run.steps.filter((step) => step.timeline.length > 0);
   if (!steps.length) return null;
-  const totals = [...(run.timeline.rounds.length > 1 ? run.timeline.rounds : []), run.timeline.run];
+  // Each round of each loop that went round — named by its looping step where more than one did — then the run's, every step's.
+  const { rounds } = run.timeline;
+  const went = [...new Set(rounds.map((r) => r.loop))].filter((loop) => rounds.filter((r) => r.loop === loop).length > 1);
+  const totals = [...rounds.filter((r) => went.includes(r.loop)), run.timeline.run];
 
   return (
     <section aria-label="Timeline" className="space-y-2">
       <h2 className="text-sm font-medium">Timeline</h2>
       <p className="text-xs text-neutral-500">
         Queued is filed → spawned: the wait for a slot. Ran is spawned → ended. A total sums its tasks, so steps side by side add up to more than
-        its wall, first filed → last ended.
+        its wall, first filed → last ended. A round's counts only the steps its loop files again.
       </p>
       <div className="overflow-x-auto rounded border border-neutral-200 dark:border-neutral-800">
         <table className="w-full text-left text-xs tabular-nums">
@@ -35,7 +38,7 @@ export function Timeline({ run }: { run: RunDetail }) {
             ]))}
           </tbody>
           <tfoot className="border-t border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-            {totals.map((total) => <TotalRow key={total.round ?? 'run'} total={total} />)}
+            {totals.map((total) => <TotalRow key={`${total.loop}:${total.round}`} total={total} named={went.length > 1} />)}
           </tfoot>
         </table>
       </div>
@@ -81,10 +84,11 @@ function SpanRow({ step, label, task, span, used }: { step: string; label: strin
   );
 }
 
-function TotalRow({ total }: { total: TimelineTotal }) {
+/** A total's row: the run's, or a round's — named by its loop's looping step when `named`, as when two loops went round. */
+function TotalRow({ total, named }: { total: TimelineTotal; named: boolean }) {
   return (
-    <tr data-total={total.round === null ? 'run' : `round-${total.round}`} className="font-medium">
-      <td colSpan={2} className={CELL}>{total.round === null ? 'run' : `round ${total.round}`}</td>
+    <tr data-total={total.round === null ? 'run' : `round-${total.round}`} data-loop={total.loop ?? undefined} className="font-medium">
+      <td colSpan={2} className={CELL}>{total.round === null ? 'run' : `${named ? `${total.loop} ` : ''}round ${total.round}`}</td>
       <td colSpan={3} data-cell="wall" className={`${CELL} font-mono`}>wall {total.wall}</td>
       <td data-cell="queued" className={`${CELL} font-mono`}>{total.queued}</td>
       <td data-cell="ran" className={`${CELL} font-mono`}>{total.ran}</td>

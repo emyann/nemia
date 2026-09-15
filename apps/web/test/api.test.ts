@@ -16,7 +16,7 @@ function answering(t: { after: (fn: () => void) => void }, body: object) {
 
 const graph = { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] };
 /** A run's totals on the clock, with nothing filed: what a detail carries once its api has the timeline. */
-const TOTALS = { rounds: [], run: { round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } };
+const TOTALS = { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } };
 /** A detail cut to what the check reads: the run as an api from before `graph` answers it, give or take the rest. */
 const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], timeline: TOTALS, ...extra }) as unknown as RunDetail;
 

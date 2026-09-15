@@ -383,7 +383,7 @@ const SETTINGS = '.claude/settings.json';
 const bashRule = (rule: string, except: string[] = []) => ({ rule, command: rule.slice('Bash('.length, -1), except });
 
 /** Nothing of the settings taken back or out of reach, and no reason for no Bash: what `allowed` has beside `rules` and `bash` on a plain step. */
-const nothingElse = { takenBack: [], unused: [], why: null };
+const nothingElse = { takenBack: [], unused: [], exceptions: [], why: null };
 
 test('a step with `tools:` gets exactly those — no skill without Skill, the tools of each server the checkout enables, and the settings\' deny', async () => {
   const { 'dev/review': review } = await stepsOf(stepsRepo());
@@ -447,6 +447,7 @@ test('REFUSED: `disallow` takes away — a tool, one of a family, a server\'s to
     takenBack: [{ rule: 'Bash(npm run build)', by: { rule: 'Bash(npm run build)', source: DISALLOW } }],
     unused: [],
     bash: [bashRule('Bash(npm test)'), bashRule('Bash(git diff:*)')],
+    exceptions: [],
     dontAsk: false,
     why: null,
   });
@@ -464,6 +465,7 @@ test('a `dontAsk` step under the settings shows what Bash commands are allowed �
     // Its tools have no WebSearch: `--tools` gives it exactly Read, Grep, Glob and Bash.
     unused: ['WebSearch'],
     bash: [bashRule('Bash(npm test)'), bashRule('Bash(git diff:*)'), bashRule('Bash(npm run build)')],
+    exceptions: [],
     dontAsk: true,
     why: null,
   });
@@ -514,6 +516,7 @@ test('REFUSED: a deny takes back every allow whose commands it matches, however 
     bashRule('Bash(npx turbo run test:*)', ['Bash(npx turbo run test build)']),
     bashRule('Bash(node --version)'),
   ]);
+  assert.deepEqual(review.allowed.exceptions, [{ rule: 'Bash(npx turbo run test:*)', except: ['Bash(npx turbo run test build)'] }]);
   assert.ok(!review.allowed.bash.some((b: { command: string }) => ['npm run build', 'git diff:*', 'git log', 'npm test'].includes(b.command)), 'no command a deny refuses is one it may run');
 
   // `Bash(*)` is `Bash`: the tool is removed, every Bash allow taken back by it, and no command listed, with why.
@@ -532,7 +535,7 @@ test('REFUSED: a `dontAsk` step without Bash runs no command, whatever the setti
   });
   const { 'dev/reader': reader, 'dev/denied': denied } = await stepsOf(repo);
   assert.deepEqual(reader.allowed, {
-    rules: ['Read'], takenBack: [], unused: ['Bash(npm test)', 'Bash(git diff:*)'], bash: [], dontAsk: true,
+    rules: ['Read'], takenBack: [], unused: ['Bash(npm test)', 'Bash(git diff:*)'], bash: [], exceptions: [], dontAsk: true,
     why: 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.',
   });
   assert.ok(!denied.tools.names.includes('Bash'), 'the measured set, less the Bash its disallow: names whole');
@@ -545,7 +548,7 @@ test('a Codex step shows its fence, and nothing it was not measured to get or do
   const { 'codexed/plan': plan } = await stepsOf(stepsRepo());
   assert.deepEqual([plan.harness, plan.claudeCode, plan.tools, plan.skills, plan.mcp, plan.denied], ['codex', false, null, null, null, []]);
   assert.deepEqual(plan.fence, { tools: null, disallow: [], permissionMode: null, effort: null, mcp: null });
-  assert.deepEqual(plan.allowed, { rules: [], takenBack: [], unused: [], bash: [], dontAsk: false, why: 'codex reads no .claude/settings.json, so none of its rules is claimed for this step.' });
+  assert.deepEqual(plan.allowed, { rules: [], takenBack: [], unused: [], bash: [], exceptions: [], dontAsk: false, why: 'codex reads no .claude/settings.json, so none of its rules is claimed for this step.' });
 });
 
 test('a workflow the loader refuses has no step on the page, and a repository with a workflow and nothing else still says what its step gets', async () => {
@@ -557,4 +560,34 @@ test('a workflow the loader refuses has no step on the page, and a repository wi
   assert.deepEqual(Object.keys(steps), ['lone/implement']);
   // No harness named: the engine's first, Claude Code. No settings: nothing denied or allowed; no `.mcp.json`: no server.
   assert.deepEqual([steps['lone/implement'].harness, steps['lone/implement'].tools.from, steps['lone/implement'].mcp, steps['lone/implement'].allowed], ['claude', 'measured', [], { rules: [], bash: [], dontAsk: false, ...nothingElse }]);
+});
+
+test('REFUSED: a deny of a whole MCP server takes back an allow of one of its tools, or of all of them — as its tools row reads the deny — and a deny of one tool is an exception to an allow of the server', async () => {
+  const repo = repoWith({
+    '.claude/settings.json': {
+      enabledMcpjsonServers: ['fixture'],
+      permissions: { allow: ['mcp__fixture__echo', 'mcp__fixture', 'mcp__other__x', 'mcp__third__*'], deny: ['mcp__third__wipe', 'mcp__other__*'] },
+    },
+    '.mcp.json': { mcpServers: { fixture: fixture() } },
+    'workflows/dev/shut.md': '---\nharness: claude\ndisallow: mcp__fixture\n---\nWork.\n',
+    'workflows/dev/open.md': '---\nharness: claude\n---\nWork.\n',
+  });
+  const { 'dev/shut': shut, 'dev/open': open } = await stepsOf(repo);
+  const settings = (rule: string) => ({ rule, source: SETTINGS });
+  const disallowed = { rule: 'mcp__fixture', source: DISALLOW };
+  assert.deepEqual(shut.allowed.takenBack, [
+    { rule: 'mcp__fixture__echo', by: disallowed },
+    { rule: 'mcp__fixture', by: disallowed },
+    // `mcp__<server>__*` is every tool of the server, as `mcp__<server>` is.
+    { rule: 'mcp__other__x', by: settings('mcp__other__*') },
+  ]);
+  assert.deepEqual(shut.allowed.rules, ['mcp__third__*']);
+  // Its tools row and its allow rules say the same of echo: denied, and not allowed.
+  assert.deepEqual(shut.mcp[0].tools.find((t: { name: string }) => t.name === 'echo'), { name: 'echo', denied: disallowed, allowed: false });
+  // A deny of one tool leaves an allow of the whole server standing, with that exception.
+  assert.deepEqual(shut.allowed.exceptions, [{ rule: 'mcp__third__*', except: ['mcp__third__wipe'] }]);
+
+  // The step beside it denies nothing of its own: echo is allowed on both, and only the settings' whole-server deny takes anything back.
+  assert.deepEqual(open.allowed.takenBack, [{ rule: 'mcp__other__x', by: settings('mcp__other__*') }]);
+  assert.deepEqual(open.mcp[0].tools.find((t: { name: string }) => t.name === 'echo'), { name: 'echo', denied: null, allowed: true });
 });

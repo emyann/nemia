@@ -2251,12 +2251,15 @@ export type TaskSpan = {
 export type TimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used?: Consumed };
 
 /**
- * The time of several tasks together: a round's, or the run's (`round` null). `tasks` counts the sessions and checks in it — a recheck's try
+ * The time of several tasks together: a round of a loop (`loop` and `round`), counting the steps that round files again (`loopSpan`) — a step
+ * before the loop or after it is in no round — or the whole run's, every step's (both null). `tasks` counts the sessions and checks in it — a recheck's try
  * adds its check, and not its session again — and `inFlight` those that have not ended. `queuedMs` sums the queue times that are known, and
  * `ranMs` the run times of the tasks that ended: sums, so a fan-out's run time is more than its wall. `wallMs` is first filed → last ended,
  * null while a task is in flight or a filing is not known. `queued`, `ran` and `wall` are the three in words, each saying what it leaves out.
  */
 export type TimelineTotal = {
+  /** The looping step whose loop this is a round of; null for the run's total. */
+  loop: string | null;
   round: number | null;
   tasks: number;
   inFlight: number;
@@ -2268,7 +2271,7 @@ export type TimelineTotal = {
   wall: string;
 };
 
-/** Where a run's time went: every step's tries, in the record's order; a total per round of its loop, and the run's. */
+/** Where a run's time went: every step's tries, in the record's order; a total per round of each loop, by loop — and the run's. */
 export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineTotal[]; run: TimelineTotal };
 
 /**
@@ -2277,32 +2280,39 @@ export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineT
  * `views` must hold every task of every try — the tries behind the current one too, and each try's check; a task it does not hold reads as
  * one the engine has no record of. `filed` is each task's filing time, off the engine's feed (`readFilings` in runner.ts); without it every
  * queue time is `not known`. A step not filed has no try on the clock.
+ *
+ * `steps` are the workflow the run is judged by — the one it froze, by default — whose loops its rounds are of. Without them no round is totalled.
  */
-export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, filed: ReadonlyMap<string, string> = new Map()): Timeline {
-  const steps: Record<string, TimelineTry[]> = {};
-  const counted: Array<{ round: number; span: TaskSpan }> = [];
+export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, filed: ReadonlyMap<string, string> = new Map(), steps: readonly Workflow[] = run.workflow ?? []): Timeline {
+  // The loop a step's rounds are of: each step a round of it files again (`loopSpan`), by its looping step. A step in no span is in no round:
+  // one before the loop was filed once, and one after it once the loop was done, and counting either in round 1 made round 1 the whole run.
+  const loops = steps.filter((s) => s.loop);
+  const loopOf = new Map(loops.flatMap((looping) => loopSpan(steps, looping).map((name) => [name, looping.name] as const)));
+  const byStep: Record<string, TimelineTry[]> = {};
+  const counted: Array<{ loop: string | null; round: number; span: TaskSpan }> = [];
   for (const [name, record] of Object.entries(run.steps)) {
     const earlier = record.tries ?? [];
     const tries = [
       ...earlier.map((t, i) => ({ taskId: t.taskId, check: t.check?.taskId, round: roundIn({ taskId: null, tries: earlier.slice(0, i) }) })),
       ...(record.taskId ? [{ taskId: record.taskId, check: record.check?.taskId, round: roundIn(record) }] : []),
     ];
-    steps[name] = tries.map((t, i): TimelineTry => {
+    byStep[name] = tries.map((t, i): TimelineTry => {
       // A recheck replaced only the check: the try after it has the same task, whose session is counted once, on the try that ran it.
       const first = tries.findIndex((u) => u.taskId === t.taskId);
       const session = first === i ? spanOf(t.taskId, views.get(t.taskId), filed.get(t.taskId)) : null;
       const check = t.check ? spanOf(t.check, views.get(t.check), filed.get(t.check)) : null;
-      for (const span of [session, check]) if (span) counted.push({ round: t.round, span });
+      for (const span of [session, check]) if (span) counted.push({ loop: loopOf.get(name) ?? null, round: t.round, span });
       const used = session ? taskUsage(views.get(t.taskId)) : undefined;
       return { try: i + 1, round: t.round, session, sessionOf: first === i ? null : first + 1, check, ...(used ? { used } : {}) };
     });
   }
-  const rounds = [...new Set(counted.map((c) => c.round))].sort((a, b) => a - b);
-  return {
-    steps,
-    rounds: rounds.map((round) => totalOf(round, counted.filter((c) => c.round === round).map((c) => c.span))),
-    run: totalOf(null, counted.map((c) => c.span)),
-  };
+  // By loop, in the workflow's order, then by round: the rounds of two loops are not the same rounds.
+  const rounds = loops.flatMap((looping) => {
+    const of = counted.filter((c) => c.loop === looping.name);
+    return [...new Set(of.map((c) => c.round))].sort((a, b) => a - b)
+      .map((round) => totalOf(looping.name, round, of.filter((c) => c.round === round).map((c) => c.span)));
+  });
+  return { steps: byStep, rounds, run: totalOf(null, null, counted.map((c) => c.span)) };
 }
 
 const between = (from: string | null, to: string | null): number | null => (from && to ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
@@ -2332,7 +2342,7 @@ function spanOf(taskId: string, view: TaskClock | undefined, filedAt: string | u
 }
 
 /** Several tasks' time together (`TimelineTotal`). */
-function totalOf(round: number | null, spans: readonly TaskSpan[]): TimelineTotal {
+function totalOf(loop: string | null, round: number | null, spans: readonly TaskSpan[]): TimelineTotal {
   const inFlight = spans.filter((s) => s.at === 'queued' || s.at === 'starting' || s.at === 'running');
   const queuedMs = spans.reduce((n, s) => n + (s.queuedMs ?? 0), 0);
   const ranMs = spans.reduce((n, s) => n + (s.ranMs ?? 0), 0);
@@ -2350,6 +2360,7 @@ function totalOf(round: number | null, spans: readonly TaskSpan[]): TimelineTota
     [known ? durationWord(ms) : '', pending[0] ? `${pending[0]} ${pending[1]}` : '', unknown ? (known || pending[0] ? `${unknown} not known` : 'not known') : '']
       .filter(Boolean).join(', ') || '—';
   return {
+    loop,
     round,
     tasks: spans.length,
     inFlight: inFlight.length,
@@ -2405,11 +2416,16 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
   return rowsUnder('timeline', rows);
 }
 
-/** A run's totals as `wf decide` prints them, after its steps: each round's, when its loop went round, then the run's. */
+/**
+ * A run's totals as `wf decide` prints them, after its steps: each round of each loop that went round — named by its looping step where more
+ * than one did — then the run's, every step's.
+ */
 export function timelineTotalLines(t: Timeline): string[] {
   if (!t.run.tasks) return [];
   const said = (total: TimelineTotal) => `queued ${total.queued}  ran ${total.ran}  wall ${total.wall}`;
-  return rowsUnder('timeline', [...(t.rounds.length > 1 ? t.rounds.map((r): [string, string] => [`round ${r.round}`, said(r)]) : []), ['run', said(t.run)]]);
+  const went = [...new Set(t.rounds.map((r) => r.loop))].filter((loop) => t.rounds.filter((r) => r.loop === loop).length > 1);
+  const shown = t.rounds.filter((r) => went.includes(r.loop)).map((r): [string, string] => [`${went.length > 1 ? `${r.loop} ` : ''}round ${r.round}`, said(r)]);
+  return rowsUnder('timeline', [...shown, ['run', said(t.run)]]);
 }
 
 /** Rows under a label, the label on the first and the rest aligned under it, each row's name padded to the longest. */

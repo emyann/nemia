@@ -100,7 +100,7 @@ function runWith(note: string | null): RunDetail {
       }],
       timeline: [],
     }],
-    timeline: { rounds: [], run: { round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } },
+    timeline: { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } },
   };
 }
 
@@ -1050,8 +1050,8 @@ test("the run page's timeline: a row per try's session and per check, in the api
   const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
   const span = (taskId: string, at: TaskSpan['at'], queued: string, ran: string, times: Partial<TaskSpan> = {}): TaskSpan =>
     ({ taskId, at, filedAt: null, spawnedAt: null, endedAt: null, attempts: 1, queuedMs: null, ranMs: null, queued, ran, ...times });
-  const total = (round: number | null, queued: string, ran: string, wall: string): TimelineTotal =>
-    ({ round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall });
+  const total = (round: number | null, queued: string, ran: string, wall: string, loop: string | null = round === null ? null : 'review'): TimelineTotal =>
+    ({ loop, round, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued, ran, wall });
   const base = runWith(null);
   const used = { usage: { turns: 54 }, used: '54 turns · tool calls not measured · tokens in not measured · tokens out not measured', cost: 'not measured' };
   const run: RunDetail = {
@@ -1088,6 +1088,19 @@ test("the run page's timeline: a row per try's session and per check, in the api
   // A loop that went round: each round's total, then the run's.
   const looped = { ...run, timeline: { rounds: [total(1, '30s', '13m30s', '15m00s'), total(2, '1m10s', '6m50s', '9m00s')], run: total(null, '1m40s', '20m20s', '25m00s') } };
   assert.deepEqual([...renderToStaticMarkup(createElement(Timeline, { run: looped })).matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]), ['round-1', 'round-2', 'run']);
+  // Two loops that went round, and a third that did not: each round of the two, named by its looping step; none of the third's.
+  const twoLoops = {
+    ...run,
+    timeline: {
+      rounds: [
+        total(1, '0s', '1m00s', '1m00s'), total(2, '0s', '1m00s', '1m00s'),
+        total(1, '0s', '2m00s', '2m00s', 'proofread'), total(2, '0s', '2m00s', '2m00s', 'proofread'), total(1, '0s', '3m00s', '3m00s', 'lint'),
+      ],
+      run: total(null, '0s', '9m00s', '9m00s'),
+    },
+  };
+  const labels = [...renderToStaticMarkup(createElement(Timeline, { run: twoLoops })).matchAll(/<tr data-total="round-\d+"[^>]*><td[^>]*>([^<]+)</g)].map((m) => m[1]);
+  assert.deepEqual(labels, ['review round 1', 'review round 2', 'proofread round 1', 'proofread round 2']);
   // Nothing filed: no timeline at all.
   assert.equal(renderToStaticMarkup(createElement(Timeline, { run: { ...run, steps: run.steps.map((step) => ({ ...step, timeline: [] })) } })), '');
 });

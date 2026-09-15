@@ -39,6 +39,8 @@ export type AllowedFor = {
   takenBack: Array<{ rule: string; by: DeniedRule }>;
   unused: string[];
   bash: Array<{ rule: string; command: string; except: string[] }>;
+  /** Every rule of `rules` that a narrower deny still refuses part of — a Bash command, one tool of a server — with those denies. */
+  exceptions: Array<{ rule: string; except: string[] }>;
   dontAsk: boolean;
   why: string | null;
 };
@@ -104,19 +106,49 @@ export function bashCovers(outer: string, inner: string): boolean {
   return bashMatches(o, i) && (bare === null || bashMatches(o, bare));
 }
 
+/** A rule naming an MCP server's tools: the server, and one tool — null for every tool of it, as `mcp__<server>` and `mcp__<server>__*` both are. */
+function mcpRuleOf(rule: string): { server: string; tool: string | null } | null {
+  const m = /^mcp__(.+?)(?:__(.+))?$/.exec(rule);
+  return m ? { server: m[1]!, tool: m[2] === undefined || m[2] === '*' ? null : m[2] } : null;
+}
+
 /**
  * The deny rule that takes an allow rule back whole, or undefined. Deny comes before allow whatever either's specificity, so a deny takes back
  * the allow when it matches every call the allow does: one of the same words; one naming the allow's tool whole; a Bash deny that covers the
- * allow's commands (`bashCovers`). A deny narrower than a Bash allow leaves it standing, with that exception (`AllowedFor.bash`).
+ * allow's commands (`bashCovers`); a deny of the whole of an MCP server, over an allow of one of its tools or of all of them — a server's tool
+ * read as `denyingRule` reads it for the tools row, so the row and the allow rules say the same.
  */
 function takenBackBy(allow: string, denied: readonly DeniedRule[]): DeniedRule | undefined {
+  const server = mcpRuleOf(allow);
   const a = ruleOf(allow);
   return denied.find((d) => {
     if (d.rule === allow) return true;
+    if (server) {
+      if (server.tool !== null) return denyingRule([d.rule], server.server, server.tool) !== null;
+      const x = mcpRuleOf(d.rule);
+      return x !== null && x.server === server.server && x.tool === null;
+    }
     const r = ruleOf(d.rule);
     if (!a || !r || r.tool !== a.tool) return false;
     return r.scope === null || (a.tool === 'Bash' && a.scope !== null && bashCovers(r.scope, a.scope));
   });
+}
+
+/**
+ * The deny rules narrower than an allow that stands, which still refuse some of what it allows: a Bash deny among a Bash allow's commands
+ * (`bashCovers`), and a deny of one tool of a server an allow names whole.
+ */
+function narrowerDenies(allow: string, denied: readonly DeniedRule[]): string[] {
+  const server = mcpRuleOf(allow);
+  const a = ruleOf(allow);
+  return denied.filter((d) => {
+    if (server) {
+      const x = mcpRuleOf(d.rule);
+      return server.tool === null && x !== null && x.server === server.server && x.tool !== null;
+    }
+    const x = ruleOf(d.rule);
+    return a?.tool === 'Bash' && x?.tool === 'Bash' && x.scope !== null && (a.scope === null || bashCovers(a.scope, x.scope));
+  }).map((d) => d.rule);
 }
 
 /** What each step of each workflow that reads gets. A folder the loader refuses has no step to give anything to. */
@@ -134,7 +166,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
   if (!CLAUDE_CODE.has(harness)) {
     return {
       ...reach, claudeCode: false, tools: null, skills: null, mcp: null, denied: [],
-      allowed: { rules: [], takenBack: [], unused: [], bash: [], dontAsk, why: `${harness} reads no ${SETTINGS}, so none of its rules is claimed for this step.` },
+      allowed: { rules: [], takenBack: [], unused: [], bash: [], exceptions: [], dontAsk, why: `${harness} reads no ${SETTINGS}, so none of its rules is claimed for this step.` },
     };
   }
 
@@ -170,7 +202,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
           : `Its tools have no \`Skill\`, so it cannot load a skill — its session still lists the repository's skills (measured, ${MEASURED_TOOLS.harness} ${MEASURED_TOOLS.version}).`,
       };
 
-  const allowed: AllowedFor = { rules: [], takenBack: [], unused: [], bash: [], dontAsk, why: null };
+  const allowed: AllowedFor = { rules: [], takenBack: [], unused: [], bash: [], exceptions: [], dontAsk, why: null };
   for (const { rule } of capabilities.allowed) {
     const by = takenBackBy(rule, denied);
     const tool = ruleOf(rule)?.tool;
@@ -178,16 +210,13 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
     else if (tool !== undefined && !has(tool)) allowed.unused.push(rule);
     else allowed.rules.push(rule);
   }
+  allowed.exceptions = allowed.rules.map((rule) => ({ rule, except: narrowerDenies(rule, denied) })).filter((e) => e.except.length > 0);
   const bashTaken = removed.find((r) => r.name === 'Bash');
   if (names.includes('Bash')) {
     allowed.bash = allowed.rules.flatMap((rule) => {
       const r = ruleOf(rule);
       if (r?.tool !== 'Bash') return [];
-      const except = denied.filter((d) => {
-        const x = ruleOf(d.rule);
-        return x?.tool === 'Bash' && x.scope !== null && (r.scope === null || bashCovers(r.scope, x.scope));
-      });
-      return [{ rule, command: r.scope ?? '*', except: except.map((d) => d.rule) }];
+      return [{ rule, command: r.scope ?? '*', except: narrowerDenies(rule, denied) }];
     });
   } else {
     allowed.why = bashTaken

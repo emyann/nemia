@@ -726,7 +726,8 @@ async function detail(run: Run): Promise<RunDetail> {
   // Off the views already read: no observation of its own.
   const used = consumption(views, run);
   // Off the same views — every task in the store, so every try's — and the feed's filing times: no observation either.
-  const clock = timeline(run, views, await filedTimes());
+  // And the steps the run is judged by, whose loops its rounds are of.
+  const clock = timeline(run, views, await filedTimes(), steps);
   return {
     id: run.id,
     brief: run.brief,

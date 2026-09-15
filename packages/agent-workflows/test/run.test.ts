@@ -1989,8 +1989,8 @@ test('the timeline of a step with two tries and two checks: each filed, spawned 
   assert.equal(second!.used, undefined);
 
   // No loop went round: one round, and the run's total is its sums — 12s + 1s + 3s + 0s queued; 19m42s + 58s + 5m35s + 57s ran — and its wall, first filed → last ended.
-  assert.deepEqual(t.rounds.map((round) => round.round), [1]);
-  assert.deepEqual({ ...t.run }, { round: null, tasks: 4, inFlight: 0, queuedMs: 16_000, ranMs: 1_632_000, wallMs: 1_657_000, queued: '16s', ran: '27m12s', wall: '27m37s' });
+  assert.deepEqual(t.rounds, [], 'no loop: no round is totalled, and the run is');
+  assert.deepEqual({ ...t.run }, { loop: null, round: null, tasks: 4, inFlight: 0, queuedMs: 16_000, ranMs: 1_632_000, wallMs: 1_657_000, queued: '16s', ran: '27m12s', wall: '27m37s' });
 
   assert.deepEqual(timelineLines(t.steps.implement!), [
     'timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 turns · 146 tool calls · 17M in · 210k out',
@@ -2073,7 +2073,7 @@ test('a recheck ran no session: the try it reached names the session it checked 
     ['v2', task([[clock(21), clock(21, 40), clock(25)]], 'succeeded')],
   ]);
   const loopFiled = new Map([['i1', clock(0)], ['v1', clock(11)], ['i2', clock(16)], ['v2', clock(21)]]);
-  const lt = timeline(looped, loopViews, loopFiled);
+  const lt = timeline(looped, loopViews, loopFiled, [step('implement'), { ...step('review', ['implement']), loop: 'implement', rounds: 3 }]);
   assert.deepEqual(lt.steps.review!.map((x) => x.round), [1, 2]);
   assert.deepEqual(lt.rounds.map((x) => [x.round, x.queued, x.ran, x.wall]), [[1, '30s', '13m30s', '15m00s'], [2, '1m10s', '6m50s', '9m00s']]);
   assert.deepEqual(timelineTotalLines(lt), [
@@ -2087,4 +2087,44 @@ test('a recheck ran no session: the try it reached names the session it checked 
 
 test('durations read as the operator measures them', () => {
   assert.deepEqual([0, 999, 58_000, 60_000, 1_182_000, 3_900_000, 90_061_000, -5].map(durationWord), ['0s', '0s', '58s', '1m00s', '19m42s', '1h05m', '1d01h', '0s']);
+});
+
+test("REFUSED: a round's total counts only the steps its loop files again — a plan before the loop and a ship after it are in the run's total alone — and two loops total apart, named", () => {
+  // plan 08:00–08:10; round 1: implement 08:11–08:20, review 08:21–08:25; round 2: implement 08:26–08:30, review 08:31–08:35; ship 08:40–09:40.
+  const once = (from: number, to: number) => task([[clock(from), clock(from), clock(to)]], 'succeeded');
+  const steps: Workflow[] = [step('plan'), step('implement', ['plan']), { ...step('review', ['implement']), loop: 'implement', rounds: 3 }, step('ship', ['review'])];
+  const r = run({}, {
+    steps: {
+      plan: { taskId: 'p' },
+      implement: { taskId: 'i2', tries: [{ taskId: 'i1', then: 'round' }] },
+      review: { taskId: 'v2', tries: [{ taskId: 'v1', then: 'round' }] },
+      ship: { taskId: 's' },
+    },
+  });
+  const views = new Map<string, TaskClock>([['p', once(0, 10)], ['i1', once(11, 20)], ['v1', once(21, 25)], ['i2', once(26, 30)], ['v2', once(31, 35)], ['s', once(40, 100)]]);
+  const filed = new Map([['p', clock(0)], ['i1', clock(11)], ['v1', clock(21)], ['i2', clock(26)], ['v2', clock(31)], ['s', clock(40)]]);
+  const t = timeline(r, views, filed, steps);
+  assert.deepEqual(t.rounds.map((x) => [x.loop, x.round, x.tasks, x.ran, x.wall]), [
+    // implement 08:11 → review 08:25: not plan's 08:00, and not ship's 09:40.
+    ['review', 1, 2, '13m00s', '14m00s'],
+    ['review', 2, 2, '8m00s', '9m00s'],
+  ]);
+  assert.deepEqual([t.run.tasks, t.run.ran, t.run.wall], [6, '1h31m', '1h40m'], "plan and ship are in the run's");
+  assert.deepEqual(timelineTotalLines(t), [
+    'timeline  round 1  queued 0s  ran 13m00s  wall 14m00s',
+    '          round 2  queued 0s  ran 8m00s  wall 9m00s',
+    '          run      queued 0s  ran 1h31m  wall 1h40m',
+  ]);
+  // Given no steps — a record from before runs froze their workflow, with no folder — no round is totalled at all, rather than a guess.
+  assert.deepEqual(timeline(r, views, filed, []).rounds, []);
+
+  // Two loops: implement ⇄ review, then docs ⇄ proofread. Their rounds are not the same rounds: totalled apart, and named by the looping step.
+  const two: Workflow[] = [step('implement'), { ...step('review', ['implement']), loop: 'implement', rounds: 3 }, step('docs', ['review']), { ...step('proofread', ['docs']), loop: 'docs', rounds: 3 }];
+  const both = run({}, {
+    steps: Object.fromEntries(['implement', 'review', 'docs', 'proofread'].map((name) => [name, { taskId: `${name}-2`, tries: [{ taskId: `${name}-1`, then: 'round' }] }])),
+  });
+  const bothViews = new Map<string, TaskClock>(['implement', 'review', 'docs', 'proofread'].flatMap((name, i) => [1, 2].map((n) => [`${name}-${n}`, once(i * 10 + n, i * 10 + n + 1)] as [string, TaskClock])));
+  const bt = timeline(both, bothViews, new Map([...bothViews.keys()].map((id) => [id, bothViews.get(id)!.state.attempts[0]!.startedAt])), two);
+  assert.deepEqual(bt.rounds.map((x) => [x.loop, x.round, x.tasks]), [['review', 1, 2], ['review', 2, 2], ['proofread', 1, 2], ['proofread', 2, 2]]);
+  assert.deepEqual(timelineTotalLines(bt).map((line) => line.slice(10).split('  ')[0]), ['review round 1', 'review round 2', 'proofread round 1', 'proofread round 2', 'run']);
 });

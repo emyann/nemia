@@ -1911,7 +1911,7 @@ export async function decide(e: Engine, id: string): Promise<{
     answering: answerLines(steps, run, d, phaseOf, reader, asked),
     waiting: waitsOf(run, await parentsOf(e, run)),
     said,
-    timeline: timeline(run, everyTry, filed),
+    timeline: timeline(run, everyTry, filed, steps),
   };
 }
 

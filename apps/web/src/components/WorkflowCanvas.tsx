@@ -33,7 +33,7 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
       tries: [{ try: 1, round: 1, then: null, current: true, taskId: null, note: null, status: 'waiting', attempts: { count: 0, latest: null }, check: null, closeout: null, answer: null }],
       timeline: [],
     })),
-    timeline: { rounds: [], run: { round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } },
+    timeline: { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } },
   };
 }
 

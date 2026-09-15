@@ -237,8 +237,12 @@ export type TaskSpan = {
  */
 export type StepTimelineTry = { try: number; round: number; session: TaskSpan | null; sessionOf: number | null; check: TaskSpan | null; used: StepUsed | null };
 
-/** Mirrors `TimelineTotal` in agent-workflows' run.ts: a round's time, or the run's (`round` null) — sums over its tasks, and its wall, in words. */
+/**
+ * Mirrors `TimelineTotal` in agent-workflows' run.ts: a round of a loop — `loop` its looping step, counting the steps that round files again — or
+ * the run's, every step's (`loop` and `round` null); sums over its tasks, and its wall, in words.
+ */
 export type TimelineTotal = {
+  loop: string | null;
   round: number | null;
   tasks: number;
   inFlight: number;
@@ -428,6 +432,8 @@ export type StepReach = {
     takenBack: Array<{ rule: string; by: Rule }>;
     unused: string[];
     bash: Array<{ rule: string; command: string; except: string[] }>;
+    /** Every standing rule a narrower deny still refuses part of — a Bash command, one tool of a server — with those denies. */
+    exceptions: Array<{ rule: string; except: string[] }>;
     dontAsk: boolean;
     why: string | null;
   };

@@ -212,7 +212,7 @@ const STRUCK = 'bg-red-50 text-red-800 line-through decoration-red-500 dark:bg-r
 function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools }) {
   const { fence, tools, skills, mcp, denied, allowed } = step;
   const whyInferred = new Map(measured.inferred.map((t) => [t.name, t.why]));
-  const exceptOf = (rule: string) => allowed.bash.find((b) => b.rule === rule)?.except ?? [];
+  const exceptOf = (rule: string) => allowed.exceptions.find((e) => e.rule === rule)?.except ?? [];
 
   return (
     <li aria-label={`Step ${step.workflow} · ${step.step}`} data-step={`${step.workflow}/${step.step}`} className="space-y-3 px-3 py-3">

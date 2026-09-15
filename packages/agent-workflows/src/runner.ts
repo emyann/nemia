@@ -18,13 +18,13 @@ export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { artifactLines, dueNote, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, saidLines, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Wait } from './run.ts';
+export type { CloseoutAsked, ParentCloseout, ParentRun, ParentStep, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Wait } from './run.ts';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -299,7 +299,7 @@ async function adoptChecks(
   views: Map<string, TaskView>,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
-  asked: (taskId: string) => boolean,
+  asked: (taskId: string) => CloseoutAsked,
 ): Promise<string[]> {
   const adopted: string[] = [];
   for (const step of steps) {
@@ -329,7 +329,7 @@ async function adoptTries(
   views: Map<string, TaskView>,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
-  asked: (taskId: string) => boolean,
+  asked: (taskId: string) => CloseoutAsked,
   verdictOf: (step: string) => Verdict | undefined,
   asks: readonly RetryAsk[],
 ): Promise<string[]> {
@@ -361,7 +361,7 @@ async function adoptRounds(
   views: Map<string, TaskView>,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined,
-  asked: (taskId: string) => boolean,
+  asked: (taskId: string) => CloseoutAsked,
   asks: readonly RoundAsk[],
 ): Promise<string[]> {
   const adopted: string[] = [];
@@ -377,12 +377,16 @@ async function adoptRounds(
 }
 
 /**
- * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing. What tells a
- * step that ended without one — `unsigned` — from a task that was never asked. Exported, log-free, for a consumer
- * that words a step as `wf ls` does.
+ * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing — and `unsigned` when its last
+ * attempt ended without it, the reason the engine records on a session that went quiet before it settles the task `failed`. What
+ * tells a step that ended without one — `unsigned` — from a task that was never asked, and from one that failed. Exported,
+ * log-free, for a consumer that words a step as `wf ls` does.
  */
-export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): boolean =>
-  Boolean(views.get(taskId)?.state.closeoutSchema);
+export const closeoutAsked = (views: ReadonlyMap<string, TaskView>) => (taskId: string): CloseoutAsked => {
+  const state = views.get(taskId)?.state;
+  if (!state?.closeoutSchema) return false;
+  return state.attempts.at(-1)?.reason === 'unsigned' ? 'unsigned' : true;
+};
 
 /**
  * Whether the harness marked a task's session blocked while its attempt runs — the engine's `needs-human` — off views already read. What

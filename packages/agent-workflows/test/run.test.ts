@@ -592,6 +592,31 @@ test('a task that was never asked for a closeout is not held to one — a run fr
   assert.deepEqual(a.ready, ['review']);
 });
 
+test('UNSIGNED, though the engine settles it `failed`: a session that went quiet without its closeout waits on you and blocks the run, and a nudge is told it gave none — failed for another reason, stopped, still nudged or signed off blocked, it reads as before', () => {
+  const r = run({ implement: 't1', review: null });
+  const failed = phases({ t1: 'failed' });
+  const none = () => undefined;
+  /** The engine's record: asked for a closeout, and its last attempt ended `unsigned`. */
+  const quiet = () => 'unsigned' as const;
+  assert.equal(stepStatus(STEPS[0]!, r, failed, none, quiet), 'unsigned');
+  assert.equal(stepStatus(STEPS[0]!, r, failed, none, asked), 'failed', 'its attempt ended for another reason');
+  assert.equal(stepStatus(STEPS[0]!, r, phases({ t1: 'stopped' }), none, quiet), 'stopped', 'a person stopped it');
+  assert.equal(stepStatus(STEPS[0]!, r, phases({ t1: 'running' }), none, quiet), 'running', 'nudged, and not settled');
+  assert.equal(stepStatus(STEPS[0]!, r, failed, () => said('blocked'), quiet), 'blocked');
+
+  const brief = (askedCloseout: typeof asked | typeof quiet) => composeBrief(STEPS[0]!, r, STEPS, undefined, undefined, undefined,
+    { try: 2, by: 'ask', mode: 'nudge', resumed: true, status: stepStatus(STEPS[0]!, r, failed, none, askedCloseout) });
+  const quietly = decision(STEPS, r, failed, nothingShipped, none, quiet);
+  assert.deepEqual(quietly.kind === 'awaiting' && [quietly.outcome, quietly.unsigned, quietly.failed], ['blocked', ['implement'], []]);
+  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, quiet).waitingOnYou, ['implement']);
+  assert.match(brief(quiet), /The last try ended without the closeout the run asked for/);
+
+  const broke = decision(STEPS, r, failed, nothingShipped, none, asked);
+  assert.deepEqual(broke.kind === 'awaiting' && [broke.outcome, broke.unsigned, broke.failed], ['failed', [], ['implement']]);
+  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, asked).waitingOnYou, []);
+  assert.match(brief(asked), /session ended `failed` before it signed off/);
+});
+
 test('a cancelled run files no check, however due', () => {
   const a = assess(CHECKED, withCheck(null, CANCELLED), phases({ t1: 'succeeded' }), signedDone, asked);
   assert.deepEqual(a.check, []);

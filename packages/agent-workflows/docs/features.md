@@ -16,7 +16,8 @@ the harness blocked tried again, `shipped` with nothing past the base, an ask fi
 closeouts (`wf plan`, the rest of §4 P), and telling a running step something (`wf say`, with its route and the session page's
 prompt box: the steering channel's upper half), and six small items — `radius` reading workspace globs as npm does, a run's steps
 in the order they run, `wf start --input`, artifacts collected from the workspace, a stale ask honoured, and `wf start` on a card
-file (§6 items 6–9, 24, 25) — have shipped.
+file (§6 items 6–9, 24, 25) — and a step gone quiet without its closeout reading `unsigned` again after the engine began
+settling it `failed` — have shipped.
 
 ## Shipped: the check
 
@@ -1276,6 +1277,58 @@ What it leaves:
 - **A card's `workflow:` is read from the folder the card is in.** A card copied out of its plan folder reads a relative
   `workflow:` from where it is now.
 - **The board's start form takes no card.** `wf plan` and `wf start` are how a card is started.
+
+## Shipped: quiet without a closeout is `unsigned` again
+
+From agent-engine's open issues, *Quiet without a closeout* (bug 1, fixed by E7). The engine used to settle a session that went
+quiet `succeeded`, closeout or not, and `stepStatus` read one that gave none as `unsigned`. Since E7, a task with a closeout schema
+whose session goes quiet without its closeout ends that attempt `failed` with reason `unsigned`, is nudged if it has attempts left,
+and settles `failed`. `stepStatus` returned a failed task's phase before it looked at the closeout, so the same step read `failed`,
+and three things moved with the word. The run's outcome was `failed` instead of `blocked`. `wf ls` dropped the step from "waiting
+on you". And a nudged try was told its session "ended `failed` before it signed off", not that it gave no closeout, which is the
+one thing it has to fix.
+
+What was built:
+
+- `closeoutAsked` in runner.ts now answers `CloseoutAsked`: `false` for a task never asked for a closeout, `true` for one asked,
+  and `unsigned` for one asked whose last attempt ended with that reason. It is still the one reading of the engine's view, so the
+  tick, `wf ls`, `wf decide` and apps/api, which hands `closeoutAsked(views)` to `listing`, `assess` and `decision`, all get the
+  third answer with no change of their own. The type is exported beside the package's other types.
+- `stepStatus` reads a task settled `failed` with no closeout whose answer is `unsigned` as `unsigned`, before it returns the
+  engine's phase. It stays pure. Only `failed`: a task a person stopped while it was being nudged reads `stopped`, one not settled
+  reads `running`, and a closeout that says `blocked` still reads `blocked` first.
+- Every `askedCloseout` parameter in run.ts takes the wider type. A caller with only a yes or a no still passes one.
+- The comment on `stepStatus` says what the engine does now. `StepStatus`'s doc and the README's table say an `unsigned` step
+  *ended* without its closeout, where they said it *succeeded* without one: both ways still reach the word.
+
+What was measured:
+
+- `test/run.test.ts` (1 new), pure. A failed task whose answer is `unsigned` reads `unsigned`, and one only asked reads `failed`.
+  With the `unsigned` answer, a stopped task reads `stopped`, a running one `running`, and a closeout saying `blocked` reads
+  `blocked`. `decision` calls the first run `blocked`, its step under `unsigned`, and the second `failed`, under `failed`.
+  `listing` puts only the first step in `waitingOnYou`. The nudge's brief says "ended without the closeout the run asked for" for
+  the first, and "ended `failed` before it signed off" for the second.
+- `test/store.test.ts` (1 new): `start`, `advance`, `list`, `decide` and `retry` for real, over the fake engine view. The fake's
+  `settle` now takes an attempt's reason, and an attempt given one ended `failed`. Implement's task settles `failed` with no
+  closeout, its attempt ended `unsigned` in one run and `harness` in the other, and `phaseOfView` says `failed` for both while
+  `closeoutAsked` says `unsigned` and `true`. In the first run, review is blocked, `wf ls` says `unsigned` with implement waiting
+  on you, `wf decide` is `blocked` with implement unsigned, and `wf retry --nudge` files try 2 told it gave no closeout. In the
+  second, the same pass blocks review, `wf ls` says `failed` with nobody waited on, `wf decide` is `failed`, and try 2 is told its
+  session ended `failed`.
+- Each rule was broken on purpose and the tests rerun:
+  - `stepStatus` ignoring the `unsigned` answer fails 2 tests;
+  - `closeoutAsked` never giving it fails 1;
+  - a stopped task read as `unsigned` too fails 1.
+- `npm test && npm run typecheck` from the root exited 0: agent-engine 284 (278 passed, 6 skipped), agent-workflows 371 (370
+  passed, 1 skipped), api 114 and web 158, all passing. Typecheck clean in all four.
+
+What it leaves:
+
+- **A step's line does not say which way it went unsigned.** `wf ls` and `wf decide` say `unsigned` for a session settled
+  `succeeded` with nothing said and for one that went quiet and settled `failed`. The engine's note on the task says which
+  (`1 attempt(s), none succeeded: the last went quiet without the closing statement it was asked for`), and nothing here prints it.
+- **At defaults the engine's nudge is not spent on a step.** agent-workflows files one attempt unless a step declares
+  `maxAttempts`, so a quiet session's task settles `failed` at once, and a person's `wf retry --nudge` is the nudge.
 
 ## 1. Forgetting a run (`wf rm`)
 

@@ -703,6 +703,10 @@ owner is not mid-run.
   step is not final. A tick that recognises this one message on a `blocked` session and resumes it is the
   fix in the run; the harness's is a shared refresh lock across processes. → agent-workflows, small; and
   a Claude Code report.
+### Settled
+
+Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+
 - **E6's usage assertion cannot tell the retry's count from the first try's (E6's review):**
   `packages/agent-engine/test/resume.test.ts:134` expects the same usage the first try recorded, so the
   refusal rests on the view assertion alone; have the retry write a different number of responses. → the
@@ -726,10 +730,7 @@ owner is not mid-run.
   appear once per result branch; `wf decide` prints each branch on its own line and never sums. Count each
   file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
   last value only (`indexOf` on parsed objects is −1). → apps, with B7.
-
-### Settled
-
-Recorded at merge time and since addressed by a run or by hand (kept for the reasoning; D1, merged 2026-09-14 as `825be29`, closed the last three).
+  *E7, `9709867`.*
 
 - **agent-workflows and the board (step order):** `run.steps` is keyed in the folder's file order —
   alphabetical — so `wf ls` and the board show `implement · respond · review` for a workflow that
@@ -938,7 +939,8 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done. In flight 2026-09-14: B9 (apps, items 11–15 in one) as
 `five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
-`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. Left after them: item 20 (settings).
+`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 (its agent-workflows
+follow-up) filed; B9 in round 2. Left after them: items 20 (settings) and 27 (engine, small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -1005,9 +1007,17 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 15. api tests off the live registry. *B9.*
 
 **agent-engine, small**
-16. `resume.test.ts`'s usage assertion (the retry writes a different count). *E7.*
-17. A runner verb that finds one session by name (an open stream is two `claude agents` calls a second). *E7.*
-18. Bug 1 of the evaluation — quiet without a closeout settles `succeeded` — half-verified in open-issues since day one. *E7.*
+16. `resume.test.ts`'s usage assertion (the retry writes a different count). *Done, E7, `9709867`.*
+17. A runner verb that finds one session by name (an open stream is two `claude agents` calls a second). *Done, E7,
+    `9709867`: `find` off the registration files.* Left by its review: a `view` of a task whose harness has no `find` (a
+    check, codex) still observes every harness; observe the task's own, as `transcript` does. engine, small — item 27.
+18. Bug 1 of the evaluation — quiet without a closeout settles `succeeded` — half-verified in open-issues since day one.
+    *Done, E7, `9709867`: the attempt ends `unsigned`, a nudge, then `failed` with the reason.* Follow-up in agent-workflows:
+    read that failure as `unsigned` again (outcome `blocked`, waiting on you, the retry brief's wording) — W6, filed
+    2026-09-15 as `one-small-item-in-agent-work`-… from `./workflows/dev`.
+
+27. A `view` of a task whose harness has no `find` observes every harness (E7's last review): observe the task's own
+    harness instead, as `transcript` does, and fix the README's saving claim. engine, small.
 
 **Documentation**
 19. The ledger reordered: open first, settled below. *Done, `55acbde`.*

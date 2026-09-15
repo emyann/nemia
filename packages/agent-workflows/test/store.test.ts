@@ -2660,10 +2660,11 @@ test("a step's `budget:` is frozen on the run with the rest of its keys: the fol
 });
 
 test("REFUSED past its budget at shipped defaults: a claude step whose ended tries cost more than its `budget:` is not tried again by `retries:` — `wf ls` says over budget with the amounts — `wf retry` is refused without `--budget` or with one not above what it spent, and one above it files the try, the cap on the record", async () => {
-  const { run, e, tasks, filings, settle } = await throughCheck('check: npm test\nretries: 2\nbudget: 3', 'failed', 1);
+  const { run, e, tasks, filings, settle, logs } = await throughCheck('check: npm test\nretries: 2\nbudget: 3', 'failed', 1);
   const implement = `${run.id}-implement`;
-  // The engine's view of the settled try, with what it cost on it.
+  // The engine's view of the settled try, with what it cost on it — and its check's log, which `wf ls` and `wf decide` read the exit off.
   settle(implement, 'succeeded', SIGNED, undefined, undefined, { costUsd: 4.25 });
+  logs.set(`${implement}-check`, 'not ok 1 - parses\n\n[wf check] exit 1\n');
   for (let i = 0; i < 2; i++) {
     const pass = await advance(e, readRun(run.id));
     assert.deepEqual([pass.tried, pass.filed, pass.checked, pass.blocked, pass.status], [[], [], [], ['review'], 'failed'], `pass ${i + 1}`);
@@ -2690,12 +2691,13 @@ test("REFUSED past its budget at shipped defaults: a claude step whose ended tri
   const spec = tasks.get(try2)!.spec;
   assert.deepEqual([spec.resumeFrom, spec.budgetUsd], [`native-${implement}`, undefined]);
   assert.match(spec.brief, /A person asked for this try: `wf retry --nudge --budget 10`, raising this step's budget to \$10\./);
-  assert.match(spec.brief, /this step's tries had together cost more than its budget/);
+  assert.match(spec.brief, /^## Try 2\n\nAfter the last try signed off, the run executed this step's check, and it did not pass\.\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\n/);
 
   // Try 2 costs $6 more — $10.25 of $10 — and its check refuses: over again, and `retries:` files nothing on its own.
   settle(try2, 'succeeded', SIGNED, undefined, undefined, { costUsd: 6 });
   assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
   settle(`${try2}-check`, 'failed', undefined, 1);
+  logs.set(`${try2}-check`, '[wf check] exit 1\n');
   assert.deepEqual((await advance(e, readRun(run.id))).tried, []);
   const again = await list(e, readRun(run.id));
   assert.deepEqual([again.steps[0]!.status, again.steps[0]!.note], ['over budget $10.25 of $10', 'try 2, nudged on your word, budget $10']);
@@ -2724,7 +2726,7 @@ test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a se
   await retry(e, run.id, 'implement', { mode: 'fresh', budget: 8 });
   assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
   const spec = tasks.get(`${implement}-try2`)!.spec;
-  assert.deepEqual([spec.harness, spec.budgetUsd, spec.resumeFrom], ['claude-detached', 8, undefined]);
+  assert.deepEqual([spec.harness, spec.budgetUsd, spec.resumeFrom], ['claude-detached', 4.98, undefined], 'what is left of $8 after the $3.02 its tries cost');
   assert.match(spec.brief, /The last try's session was ended by its harness at this step's budget, before it signed off\./);
 });
 
@@ -2770,4 +2772,37 @@ test('REFUSED by the CLI before a run is read: `wf retry --budget` with no amoun
   ];
   for (const [argv, pattern] of cases) await assert.rejects(main(['retry', 'no-such-run', 'implement', ...argv], e), refusedWith(pattern), argv.join(' '));
   await assert.rejects(main(['retry', 'no-such-run', 'implement', '--budget=5'], e), /^Error: no such run: no-such-run/, 'read, and the run is looked for');
+});
+
+test("a claude-detached step's tries share its cap: `retries:` files the next try with what is left of it, not a cap of its own — and at the cap, nothing left, files none", async () => {
+  const { run, e, tasks, settle, logs } = await throughCheck('harness: claude-detached\ncheck: npm test\nretries: 2\nbudget: 3', 'failed', 1);
+  const implement = `${run.id}-implement`;
+  assert.equal(tasks.get(implement)!.spec.budgetUsd, 3, 'the first filing: nothing spent, the whole cap');
+  settle(implement, 'succeeded', SIGNED, undefined, undefined, { costUsd: 2.9 });
+  logs.set(`${implement}-check`, '[wf check] exit 1\n');
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement'], '$2.90 of $3: `retries:` tries it');
+  const try2 = `${implement}-try2`;
+  assert.equal(tasks.get(try2)!.spec.budgetUsd, 0.1, 'what is left of $3 after $2.90');
+
+  settle(try2, 'succeeded', SIGNED, undefined, undefined, { costUsd: 0.1 });
+  assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
+  settle(`${try2}-check`, 'failed', undefined, 1);
+  logs.set(`${try2}-check`, '[wf check] exit 1\n');
+  const pass = await advance(e, readRun(run.id));
+  assert.deepEqual([pass.tried, pass.blocked], [[], ['review']], '$3.00 of $3: nothing left, and `retries: 2` does not spend the try it has');
+  assert.equal((await list(e, readRun(run.id))).steps[0]!.status, 'over budget $3.00 of $3');
+});
+
+test("a nudge past a budget is told why its last try ended on its own work — here, without its closeout — beside the budget a person raised, and not in its place", async () => {
+  const run = started(folder('budget: 3'));
+  const { e, tasks, settle } = board();
+  await advance(e, readRun(run.id));
+  const implement = `${run.id}-implement`;
+  settle(implement, 'succeeded', undefined, undefined, undefined, { costUsd: 4.25 });
+  assert.equal((await list(e, readRun(run.id))).steps[0]!.status, 'over budget $4.25 of $3');
+  await retry(e, run.id, 'implement', { mode: 'nudge', budget: 10 });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  const brief = tasks.get(`${implement}-try2`)!.spec.brief;
+  assert.match(brief, /^## Try 2\n\nThe last try ended without the closeout the run asked for, or without a field its `output:` declares, so nothing that waits on this step started\.\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\nA person asked for this try: `wf retry --nudge --budget 10`/);
+  assert.doesNotMatch(brief, /The last try ended `over budget`/);
 });

@@ -24,7 +24,7 @@ export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, runCostLines, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -1023,7 +1023,8 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
           ...(r.budget !== undefined ? { budget: r.budget } : {}), resumed: Boolean(resumeFrom),
           // What was said to the session a nudge continues: it may never have read it (agent-engine open issue 16).
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
-          status: stepStatus(step, run, phaseOf, signedOff, asked, steps, spendOf), ...(refusal ? { refusal } : {}),
+          // How the last try ended on its own work — unsigned, failed, its check — and not `over budget`, which is why nothing was filed: `budget` says that.
+          status: ownStatus(step, run, phaseOf, signedOff, asked, steps, spendOf), ...(refusal ? { refusal } : {}),
         }, undefined, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
@@ -1035,8 +1036,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         disallowedTools: step.disallow,
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
-        // The cap a person raised with the try, or the one in force: handed to a harness that keeps one (`budgetUsdFor`).
-        budgetUsd: budgetUsdFor(step, r.budget ?? budgetOf(step, record)),
+        // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
+        // that keeps a cap (`budgetUsdFor`), so it holds the tries together to it.
+        budgetUsd: budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, spendOf)),
         resumeFrom,
         // A loop's target tried again within a round still owes its answers to the findings it was handed.
         closeoutSchema: closeoutSchemaOf(step, owesReplies(steps, run, r.step)),
@@ -1078,7 +1080,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
         disallowedTools: target.disallow,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
-        budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record)),
+        budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
         resumeFrom,
         closeoutSchema: closeoutSchemaOf(target, true),
       });
@@ -1169,8 +1171,9 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       disallowedTools: step.disallow,
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
-      // What one session may spend, where its harness keeps a cap: `claude-detached`. On `claude` the run holds the cap between tries.
-      budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name])),
+      // What is left of the cap for this session, where its harness keeps one: `claude-detached`. A step on a later round has spent some of it.
+      // On `claude` the run holds the cap between tries.
+      budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
       // The shape of the step's closing statement, with the fields its `output:` declares — from the
       // workflow this run froze, never the folder. The engine hands it to the harness and records the
@@ -1949,7 +1952,7 @@ export async function decide(e: Engine, id: string): Promise<{
     run, decision: d, closeouts, checks,
     retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
     rounding: run.cancelledAt ? [] : roundsDue(steps, run, phaseOf, reader, asked, rounds, spendOf),
-    offers: [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf)],
+    offers: [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phaseOf, reader, asked, spendOf, verdictOf)],
     used,
     costs,
     runCost: runCostLines(run, spendOf),

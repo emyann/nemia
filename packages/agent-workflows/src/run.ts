@@ -106,9 +106,10 @@ export type Run = {
  *   verified         its check exited 0
  *   unverified       signed off, and it declared no `check:` — nothing but its own word says it worked
  *   exhausted        verified or unverified, and it asked for another round of its `loop:` on the last one `rounds:` allows
- *   over budget      its tries have together cost more than its `budget:`, and the way on is another session of it — its last try
- *                    ended without letting what waits on it run, or its loop asks for a round that would file it again — or, on a
- *                    looping step that asked for one, a step of its loop is
+ *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
+ *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
+ *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
+ *                    for one, a step of its loop is
  *   budget exhausted its harness ended its session at the step's `budget:` (`claude-detached`: the engine's reason `budget`)
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
@@ -179,7 +180,7 @@ export function assess(
   // Nor its checks: a suite nobody will read the verdict of is a suite nobody asked for. Nor a try, nor a round.
   if (run.cancelledAt) return { ready: [], check: [], retry: [], round: [], blocked: [], status: 'cancelled' };
 
-  const status = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)]));
+  const status = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   // A step about to be tried again is not final: what waits on it waits, and the run is still going.
   const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
   for (const r of retry) status.set(r.step, 'running');
@@ -386,11 +387,13 @@ export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<R
  * loop's target owes `replies` beside what it declares (`owedFields`), which is why `steps` is asked for.
  *
  * **A budget is spent once the engine says so.** A task whose harness ended its last attempt at its cap is `budget exhausted`, whatever
- * else its session left. A step whose ended tries have together cost more than the cap in force on it (`overBudget`) is `over budget`
- * where another session of it would be the way on (`held`): its try ended without letting what waits on it run — which `retries:` would
- * try again, or a person — or its loop asks for a round that would file it again. A step that did the work and is not asked for again
- * keeps its word: nothing more is filed for it anyway, and what waits on it runs. Only what the engine measured counts, so a `claude`
- * session still running, whose cost is written as its process exits, counts once it has ended — and a step can overrun by one try.
+ * else its session left. A step whose ended tries have together cost the cap in force on it or more (`overBudget`), leaving nothing to
+ * spend, is `over budget` where another session of it would be the way on (`held`): its try ended without letting what waits on it run —
+ * which `retries:` would try again, or a person — or its loop asks for a round that would file it again. A check that did not finish is no
+ * such end: its way on is the check again, which costs nothing, so the step reads `failed (check)` as before, and only a check that
+ * refused (`refusedCheck`, off `verdictOf`) holds it. A step that did the work and is not asked for again keeps its word: nothing more is
+ * filed for it anyway, and what waits on it runs. Only what the engine measured counts, so a `claude` session still running, whose cost
+ * is written as its process exits, counts once it has ended — and a step can overrun by one try.
  */
 export function stepStatus(
   step: Workflow,
@@ -402,17 +405,23 @@ export function stepStatus(
   steps: readonly Workflow[] = [],
   /** What each task's sessions cost (`taskSpend`). Left out, nothing is known spent: no step is over budget, nor ended at one. */
   spendOf: SpendOf = () => undefined,
+  /**
+   * What each step's current check exited with (`refusedCheck`): only a check that refused holds a step over its budget. Left out, no check
+   * is taken to have refused, so a step whose check did not pass reads `failed (check)`, as `retriesDue` reads it: no try due.
+   */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): StepStatus {
-  return standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf).status;
+  return standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status;
 }
 
 /** Where a step stands (`stepStatus`), and where it would stand but for being over its budget (`own`): a try's ways are its own status's. */
 function standing(
   step: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): { status: StepStatus; own: StepStatus } {
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
-  return { own, status: held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf) ? 'over budget' : own };
+  return { own, status: held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf) ? 'over budget' : own };
 }
 
 /** The statuses a try takes a step on from (`retryable`): a step over its budget in one waits for a person to raise the cap. */
@@ -421,15 +430,18 @@ const SETTLED: ReadonlySet<TaskPhase> = new Set(['succeeded', 'failed', 'stopped
 
 /**
  * Whether a step reads `over budget`: over it (`overBudget`) with another session of it the way on — a try, from a status a try is taken from
- * (a step signed off blocked, once its session has settled), or a round its loop asks for (`roundWanted`). A looping step that asked for a
- * round is held by any step of its loop over budget, itself included: the round would file each of them again.
+ * (a step signed off blocked, once its session has settled; a check that refused, and not one that did not finish, whose way on is the
+ * check again), or a round its loop asks for (`roundWanted`). A looping step that asked for a round is held by any step of its loop over
+ * budget, itself included: the round would file each of them again.
  */
 function held(
   step: Workflow, run: Run, own: StepStatus, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf,
+  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf, verdictOf: (step: string) => Verdict | undefined,
 ): boolean {
-  const taskId = run.steps[step.name]?.taskId;
+  const record = run.steps[step.name];
+  const taskId = record?.taskId;
   if (!taskId) return false;
+  if (own === 'failed (check)' && !(record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name)))) return false;
   if (TRIED_FROM.has(own)) return (own !== 'blocked' || SETTLED.has(phaseOf(taskId))) && Boolean(overBudget(step, run, spendOf));
   if (!satisfiesAfter(own)) return false;
   const looping = loopOf(steps, step.name);
@@ -445,8 +457,12 @@ function roundWanted(
   return satisfiesAfter(ownStatus(looping, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)) && closeoutOf(looping.name)?.output?.again === true;
 }
 
-/** Where a step stands on its own work, its budget aside: `stepStatus`, but never `over budget`. */
-function ownStatus(
+/**
+ * Where a step stands on its own work, its budget aside: `stepStatus`, but never `over budget` — `budget exhausted` is the harness's end of
+ * the session, and its own. What a try's brief says the last try ended as (`retrySection`): being over budget is why nothing was filed, not
+ * how the try ended.
+ */
+export function ownStatus(
   step: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf,
 ): StepStatus {
@@ -526,12 +542,16 @@ export const runSpend = (run: Run, spendOf: SpendOf): Spend => addSpend(Object.k
 export const budgetOf = (step: Workflow, record: StepRecord | undefined): number | undefined =>
   [...(record?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget ?? step.budget;
 
-/** A step whose tries have together cost more than the cap in force on it: what they cost, and the cap. Undefined for any other. Pure. */
+/**
+ * A step whose tries have together cost the cap in force on it or more — nothing left to spend, since any session spends something: what they
+ * cost, and the cap. Undefined for any other. Pure. At the cap and not only past it, so a session filed for a step not held always has
+ * something left, which `budgetUsdFor` hands a harness that keeps a cap.
+ */
 export function overBudget(step: Workflow, run: Run, spendOf: SpendOf): { spent: Spend; cap: number } | undefined {
   const cap = budgetOf(step, run.steps[step.name]);
   if (cap === undefined) return undefined;
   const spent = stepSpend(run, step.name, spendOf);
-  return spent.usd > cap ? { spent, cap } : undefined;
+  return spent.usd >= cap ? { spent, cap } : undefined;
 }
 
 /** The steps of a looping step's loop (`loopSpan`) that are over budget, in its order: what holds its next round. */
@@ -546,10 +566,18 @@ export const loopOver = (steps: readonly Workflow[], looping: Workflow, run: Run
 export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${dollars(s.usd)}`;
 
 /**
- * The `budgetUsd` a step is filed with: the cap in force, on `claude-detached` only, whose `claude -p` ends a session at it. The engine refuses
- * one on `claude`, whose `--bg` sessions keep none (agent-engine's open issue 17): there the run holds the cap between tries, and nothing else.
+ * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, on `claude-detached` only, whose
+ * `claude -p` ends a session at it — so the harness holds the tries together to the cap, and not each session to a whole cap of its own. The
+ * engine refuses one on `claude`, whose `--bg` sessions keep none (agent-engine's open issue 17): there the run holds the cap between tries.
+ *
+ * To the millionth of a dollar, rounded up, so the harness is handed digits and never `0`, which the engine refuses: a step with nothing
+ * left is `over budget`, and filed nothing (`overBudget`). An attempt the engine starts again within one filing (`maxAttempts:`) is handed
+ * the same amount, since the engine counts no spend of its own.
  */
-export const budgetUsdFor = (step: Workflow, cap: number | undefined): number | undefined => (step.harness === 'claude-detached' ? cap : undefined);
+export function budgetUsdFor(step: Workflow, cap: number | undefined, spent: Spend = NOTHING_SPENT): number | undefined {
+  if (step.harness !== 'claude-detached' || cap === undefined) return undefined;
+  return Math.max(Math.ceil((cap - spent.usd) * 1e6 - 1e-6) / 1e6, 1e-6);
+}
 
 /**
  * What a person's try of a step over its budget, or ended at it, has to carry: a `--budget` above `above` — what its tries have cost, or the
@@ -766,8 +794,9 @@ export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): bo
  *
  * A step `over budget` from a try is tried the ways its own status takes, and one `budget exhausted` as a session that failed — each with
  * `raise`: a session filed for it has to carry a `--budget` above what it has spent, since spending past the cap on anyone's word but a
- * person's raising it is what a cap forbids. A recheck costs nothing, and needs none. `raise` is on those two statuses only. A step over
- * budget whose loop's round waits (`held`) has no try: going round is `wf round`'s.
+ * person's raising it is what a cap forbids. A recheck costs nothing, and needs none. So `raise` is on a settled step over its budget, or
+ * ended at it, that may be tried: those two statuses, and a `failed (check)` whose check did not finish past its budget, which is offered
+ * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `wf round`'s.
  */
 export function retryable(
   step: Workflow,
@@ -780,8 +809,10 @@ export function retryable(
   harnessBlocked: (taskId: string) => boolean = () => false,
   /** What each task's sessions cost (`taskSpend`). Left out, no step is over budget, and none carries `raise`. */
   spendOf: SpendOf = () => undefined,
+  /** What each step's current check exited with (`stepStatus`): a check that refused holds a step over its budget, one that did not finish does not. */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean; raise?: Raise } {
-  const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+  const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
   const blockedByHarness = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
@@ -790,7 +821,7 @@ export function retryable(
     tried === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
     : tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || (tried === 'blocked' && settled) || tried === 'budget exhausted' || blockedByHarness ? ['nudge', 'fresh']
     : [];
-  const raise = modes.length && (status === 'over budget' || status === 'budget exhausted') ? raiseOf(step, run, spendOf) : undefined;
+  const raise = settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
   return { status, modes, blockedByHarness, ...(raise ? { raise } : {}) };
 }
 
@@ -834,7 +865,7 @@ export function retriesDue(
   const due: Retry[] = [];
   for (const step of steps) {
     const record = run.steps[step.name];
-    const { status, modes, blockedByHarness, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf);
+    const { status, modes, blockedByHarness, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
     if (!record?.taskId) continue;
     const phase = phaseOf(record.taskId);
     const unsettled = phase === 'pending' || phase === 'running';
@@ -917,7 +948,7 @@ export function retryRefusal(
     return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.`;
   }
   const next = tryOf(run, name) + 1;
-  const { status, modes, blockedByHarness, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf);
+  const { status, modes, blockedByHarness, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
   const pending = asks.find((a) => a.step === name && a.try === next);
   if (pending && !carries(pending, raise)) {
     return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --budget <amount>.`;
@@ -943,11 +974,16 @@ export function retryRefusal(
     return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`;
   }
   if (raise && how.mode !== 'recheck' && how.budget === undefined) {
-    return `${name} ${raiseWords(status, raise)}, and the run spends nothing more on it until a person raises the cap. Raise it with the try, above ${aboveWord(raise)}: ${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}.`;
+    const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
+    // A check that did not finish is no verdict: run again as the work stands, it costs nothing, and may pass.
+    if (status === 'failed (check)') {
+      return `${name}'s check did not finish, and ${name} ${raiseWords(status, raise)}. Run its check again, which needs no --budget: ${command} --recheck — or raise the cap for a new session, above ${aboveWord(raise)}: ${withTry}.`;
+    }
+    return `${name} ${raiseWords(status, raise)}, and the run spends nothing more on it until a person raises the cap. Raise it with the try, above ${aboveWord(raise)}: ${withTry}.`;
   }
   if (raise && how.budget !== undefined && how.budget <= raise.above) {
     const what = raise.above > raise.spent.usd ? `the ${budgetWord(raise.cap)} budget ${name}'s session was ended at` : `what ${name}'s tries have cost`;
-    return `--budget ${how.budget} is not above ${aboveWord(raise)}, ${what}: a try under it would read ${status} again as soon as it ended. Give more than ${aboveWord(raise)}: ${command} --budget <amount>.`;
+    return `--budget ${how.budget} is not above ${aboveWord(raise)}, ${what}: a try under it would read ${status === 'budget exhausted' ? status : 'over budget'} again as soon as it ended. Give more than ${aboveWord(raise)}: ${command} --budget <amount>.`;
   }
   if (!raise && how.budget !== undefined) {
     const cap = budgetOf(step, run.steps[name]);
@@ -1021,19 +1057,23 @@ export function retryLines(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is offered its try with `--budget`. */
   spendOf: SpendOf = () => undefined,
+  /** What each step's current check exited with (`stepStatus`): a check that refused past a budget is offered `--budget`, one that did not finish the recheck. */
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
 ): string[] {
   if (d.kind !== 'awaiting') return [];
   const lines: string[] = [];
   for (const step of steps) {
-    const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf);
+    const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
     if (!modes.length) continue;
     const command = `wf retry ${run.id} ${step.name}`;
     const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
-    if (raise) {
+    // A check that did not finish first, past a budget or not: run again as the work stands, it costs nothing. A session needs the raise.
+    if (d.unfinishedCheck.includes(step.name)) {
+      const session = raise ? `  (a new session needs --budget above ${aboveWord(raise)}: its tries have cost ${spentWord(raise.spent)} of ${budgetWord(raise.cap)})` : '';
+      lines.push(`${step.name}: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  ${command} --recheck${session}`);
+    } else if (raise) {
       const recheck = modes.includes('recheck') ? '; --recheck runs its check again, and needs no --budget' : '';
       lines.push(`${step.name}: ${status}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}. Raise its cap above ${aboveWord(raise)} and continue its session:  ${command} --budget <amount>  (--fresh, or --model <m>, for a new session${spent}${recheck})`);
-    } else if (d.unfinishedCheck.includes(step.name)) {
-      lines.push(`${step.name}: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  ${command} --recheck`);
     } else {
       lines.push(`${step.name}: ${status}. Continue its session, told what happened:  ${command}  (--fresh, or --model <m>, for a new session${spent})`);
     }
@@ -1865,7 +1905,7 @@ export type Decision =
       unverified: string[];
       /** Looping steps that asked for another round on the last one their `rounds:` allows. */
       exhausted: string[];
-      /** Steps over their `budget:` where another session of them is the way on, and looping steps whose round waits on one (`stepStatus`). */
+      /** Steps whose tries cost their `budget:` or more where another session of them is the way on, and looping steps whose round waits on one (`stepStatus`). */
       overBudget: string[];
       /** Steps whose harness ended their session at their `budget:`. */
       budgetExhausted: string[];
@@ -1905,7 +1945,7 @@ export function decision(
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
   const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf);
-  const statusOf = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)]));
+  const statusOf = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
     // whose check is still running is one of them: its agent has finished, its verdict has not.
@@ -2073,7 +2113,7 @@ export function listing(
     // A root of a run waiting on runs names them, where the engine's `pending` would be once it is filed: what waits on a root still says `waiting`.
     if (!taskId) return { name, status: waiting.length && !step.after.length ? waitWord(waiting) : 'waiting', branch };
 
-    const { status, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf);
+    const { status, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
     const onYou = status === 'blocked' || status === 'unsigned' || status === 'failed (check)' || status === 'exhausted' || status === 'over budget' || status === 'budget exhausted';
     if (onYou && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
     // A cap reached says so, with what was spent and the cap in force: `over budget $4.20 of $3`.
@@ -2285,7 +2325,7 @@ export type RetryBriefing = {
   model?: string;
   /** Whether this try continues the last one's session. A nudge whose last try left no session to continue starts a new one. */
   resumed: boolean;
-  /** Where the last try stood: why it is being tried again. */
+  /** Where the last try stood on its own work (`ownStatus`): why it is being tried again. Not `over budget`, which is why nothing was filed — `budget` says a person raised it. */
   status: StepStatus;
   /** What the last try's check said, when it did not pass. */
   refusal?: CheckRefusal;
@@ -2319,9 +2359,12 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
     blocked: 'The last try signed off `blocked`. What it needed may have been settled since.',
     failed: "The last try's session ended `failed` before it signed off.",
     stopped: "The last try's session was stopped before it signed off.",
-    'over budget': "The last try ended, and this step's tries had together cost more than its budget, so the run filed nothing more for it until a person raised the cap.",
     'budget exhausted': "The last try's session was ended by its harness at this step's budget, before it signed off.",
   };
+  // Beside why the last try ended, never in its place: a budget reached is why nothing more was filed, not what the session has to fix.
+  const pastBudget = r.budget !== undefined && r.status !== 'budget exhausted'
+    ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
+    : [];
   const who = r.by === 'retries'
     ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
     : `A person asked for this try: \`wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ' --message' : ''}\``
@@ -2333,7 +2376,7 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
   const answer = r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : [];
   // What was said to the session while it ran comes before the answer given now, in the order a person said them.
   const told = r.resumed ? saidSection(r.said) : [];
-  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, who, '', where, ...told, ...answer, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
+  return ['', `## Try ${r.try}`, '', why[r.status] ?? `The last try ended \`${r.status}\`.`, ...pastBudget, who, '', where, ...told, ...answer, ...(r.refusal ? [refusalSection(r.refusal)] : [])].join('\n');
 }
 
 /**

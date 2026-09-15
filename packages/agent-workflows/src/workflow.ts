@@ -73,10 +73,11 @@ export type Workflow = {
   maxAttempts?: number;
   /**
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
-   * ended try cost off the engine, and once they have together cost more, files nothing more for the step on its own — no `retries:`
+   * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
    * try, no round of a loop it is in — until a person raises it (`wf retry --budget`, `wf round --budget`). A `claude` session is never
    * stopped by it mid-flight: `--bg` keeps no cap, and writes its cost only as its process exits, so a step can overrun by one try. On
-   * `claude-detached` it is handed to the engine as `budgetUsd` too, and the harness ends a session at it. Refused on codex, which has none.
+   * `claude-detached` what is left of it is handed to the engine as `budgetUsd` too, and the harness ends a session once the tries together
+   * reach it. Refused on codex, which has none.
    */
   budget?: number;
   /**
@@ -489,7 +490,7 @@ function budgetOf(step: string, budget: string | undefined, harness: string | un
   if (budget === undefined) return undefined;
   const named = `${step}: \`budget: ${budget}\``;
   if (harness === 'codex') {
-    refuse(`${named} ${CODEX_KEEPS_NO_CAP}. Delete the line, or run the step on claude, where the run files nothing more for it once its tries have cost more, or on claude-detached, whose harness also ends a session at the cap.`);
+    refuse(`${named} ${CODEX_KEEPS_NO_CAP}. Delete the line, or run the step on claude, where the run files nothing more for it once its tries have cost the budget, or on claude-detached, whose harness also ends a session at the cap.`);
   }
   const amount = dollarsOf(budget);
   if (amount !== undefined) return amount;

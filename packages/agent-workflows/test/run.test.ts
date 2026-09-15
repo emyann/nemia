@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, budgetOf, costLine, runCostLines, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, budgetOf, costLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -2185,7 +2185,7 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
   const r = refusedTwice();
   const p = phases(REFUSED_TWICE);
   const spent = spends({ t0: 1.75, t1: 2.5 });
-  assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, spent), 'over budget');
+  assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, spent, () => 1), 'over budget');
   const a = assess(BUDGETED, r, p, signedDone, asked, () => 1, [], [], () => false, spent);
   assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed'], '`retries: 2` has one left, and spends nothing past the cap');
   assert.deepEqual(cancelPlan(BUDGETED, r, p, signedDone, asked, () => 1, [], [], spent), { kind: 'finished', status: 'failed' }, 'no tick would file anything');
@@ -2194,18 +2194,22 @@ test("REFUSED past its budget, at shipped defaults: a claude step whose ended tr
   assert.deepEqual([l.steps[0]!.status, l.steps[0]!.note, l.waitingOnYou], ['over budget $4.25 of $3', 'try 2, by retries: 2', ['implement']]);
   const d = decision(BUDGETED, r, p, nothingShipped, signedDone, asked, () => 1, [], [], () => false, spent);
   assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.overBudget, d.failedCheck, d.failed], ['blocked', ['implement'], [], []]);
-  assert.deepEqual(retryLines(BUDGETED, r, d, p, signedDone, asked, spent), [
+  assert.deepEqual(retryLines(BUDGETED, r, d, p, signedDone, asked, spent, () => 1), [
     'implement: over budget, $4.25 of $3. Raise its cap above $4.25 and continue its session:  wf retry r-1 implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 1 spent; --recheck runs its check again, and needs no --budget)',
   ]);
 
-  // At its cap, under it, or with no cost measured, it reads as it did: its check refused, and `retries:` tries it again.
-  for (const [why, under] of [['at the cap', spends({ t0: 1.5, t1: 1.5 })], ['under it', spends({ t0: 1 })], ['no cost measured', () => undefined]] as Array<[string, SpendOf]>) {
-    assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, under), 'failed (check)', why);
+  // At its cap nothing is left, and any session spends something: held as past it.
+  const atCap = spends({ t0: 1.5, t1: 1.5 });
+  assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, atCap, () => 1), 'over budget', '$3.00 of $3');
+  assert.deepEqual(assess(BUDGETED, r, p, signedDone, asked, () => 1, [], [], () => false, atCap).retry, [], 'at the cap, no try');
+  // Under it, or with no cost measured, it reads as it did: its check refused, and `retries:` tries it again.
+  for (const [why, under] of [['under it', spends({ t0: 1.5, t1: 1.4999 })], ['no cost measured', () => undefined]] as Array<[string, SpendOf]>) {
+    assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, under, () => 1), 'failed (check)', why);
     assert.deepEqual(assess(BUDGETED, r, p, signedDone, asked, () => 1, [], [], () => false, under).retry, [{ step: 'implement', try: 3, mode: 'nudge', by: 'retries' }], why);
     assert.equal(listing(BUDGETED, r, shown(REFUSED_TWICE), signedOff({ implement: said('done') }), asked, () => 1, [], [], [], [], () => 0, under).steps[0]!.status, 'failed ✗ check (exit 1)', why);
   }
   // A step with no `budget:` is never over one; nor is one read with nothing of what was spent.
-  assert.equal(stepStatus(RETRIED[0]!, r, p, signedDone, asked, RETRIED, spent), 'failed (check)');
+  assert.equal(stepStatus(RETRIED[0]!, r, p, signedDone, asked, RETRIED, spent, () => 1), 'failed (check)');
   assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED), 'failed (check)');
 });
 
@@ -2225,8 +2229,8 @@ test("a step over its budget is tried again only on a person's `--budget` above 
   const on3: Run = { ...r, steps: { ...r.steps, implement: { ...raised, check: { taskId: 'c2' } } } };
   assert.equal(budgetOf(BUDGETED[0]!, on3.steps.implement), 10, 'in force from the try it was raised for');
   const p3 = phases({ ...REFUSED_TWICE, t2: 'succeeded', c2: 'failed' });
-  assert.equal(stepStatus(BUDGETED[0]!, on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2: 5 })), 'failed (check)', '$9.25 of $10: `retries:` may try it');
-  assert.equal(stepStatus(BUDGETED[0]!, on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2: 6 })), 'over budget', '$10.25 of $10: held again');
+  assert.equal(stepStatus(BUDGETED[0]!, on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2: 5 }), () => 1), 'failed (check)', '$9.25 of $10: `retries:` may try it');
+  assert.equal(stepStatus(BUDGETED[0]!, on3, p3, signedDone, asked, BUDGETED, spends({ t0: 1.75, t1: 2.5, t2: 6 }), () => 1), 'over budget', '$10.25 of $10: held again');
 });
 
 test('REFUSED by name: `wf retry` of a step over its budget without `--budget`, or with one not above what it spent; `--budget` on a step that is not; on `--recheck`; and an ask left waiting without one', () => {
@@ -2268,7 +2272,7 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
   assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['blocked', ['implement'], []]);
   assert.deepEqual(retryable(DETACHED[0]!, r, p, nothingSaid, asked, DETACHED, () => false, ended),
     { status: 'budget exhausted', modes: ['nudge', 'fresh'], blockedByHarness: false, raise: { above: 3.02, spent: { usd: 3.02, measured: 1, unmeasured: 0 }, cap: 3 } });
-  assert.deepEqual(retryable(STEPS[0]!, run({ implement: 't1', review: null }), phases({ t1: 'failed' }), nothingSaid, asked, STEPS, () => false, ended).raise, undefined, 'raise, on those two statuses only');
+  assert.deepEqual(retryable(STEPS[0]!, run({ implement: 't1', review: null }), phases({ t1: 'failed' }), nothingSaid, asked, STEPS, () => false, ended).raise, undefined, 'no `budget:`, nothing to raise');
   assert.deepEqual(retryLines(DETACHED, r, d, p, nothingSaid, asked, ended),
     ['implement: budget exhausted, $3.02 of $3. Raise its cap above $3.02 and continue its session:  wf retry r-1 implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 0 spent)']);
 
@@ -2282,13 +2286,17 @@ test("a step its harness ended at its budget reads budget exhausted, with the am
   assert.equal(listing(DETACHED, r, shown({ t1: 'failed' }), signedOff({}), asked, () => undefined, [], [], [], [], () => 0, unmeasured).steps[0]!.status, 'budget exhausted at $3');
 });
 
-test('`budgetUsdFor`: the cap in force goes to the engine on claude-detached, whose harness keeps it — never on claude, whose `--bg` sessions keep none, nor with no cap', () => {
+test("`budgetUsdFor`: what is left of the cap in force, once the step's tries are taken off, goes to the engine on claude-detached — so its harness holds the tries together to the cap — never on claude, whose `--bg` sessions keep none, nor with no cap", () => {
   const detached: Workflow = { ...step('implement'), harness: 'claude-detached', budget: 3 };
-  assert.equal(budgetUsdFor(detached, budgetOf(detached, { taskId: 't1' })), 3);
-  assert.equal(budgetUsdFor(detached, budgetOf(detached, { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge', budget: 10 }] })), 10);
-  assert.equal(budgetUsdFor({ ...step('implement'), budget: 3 }, 3), undefined, 'no harness: claude');
+  const cost = (usd: number) => ({ usd, measured: 1, unmeasured: 0 });
+  assert.equal(budgetUsdFor(detached, budgetOf(detached, { taskId: 't1' })), 3, 'nothing spent: the whole cap');
+  assert.equal(budgetUsdFor(detached, 3, cost(2.9)), 0.1, 'a try under the cap leaves the next what is left, not a cap of its own');
+  assert.equal(budgetUsdFor(detached, budgetOf(detached, { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge', budget: 10 }] }), cost(4.25)), 5.75, 'a raised cap, less what was spent');
+  assert.equal(String(budgetUsdFor(detached, 3, cost(2.9999999))), '0.000001', 'digits, rounded up to a millionth: never 0, which the engine refuses');
+  assert.equal(String(budgetUsdFor(detached, 0.3, cost(0.1))), '0.2');
+  assert.equal(budgetUsdFor({ ...step('implement'), budget: 3 }, 3, cost(1)), undefined, 'no harness: claude');
   assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude', budget: 3 }, 3), undefined);
-  assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude-detached' }, undefined), undefined);
+  assert.equal(budgetUsdFor({ ...step('implement'), harness: 'claude-detached' }, undefined, cost(1)), undefined);
 });
 
 test('REFUSED past a budget in a loop: `again: true` files no round while a step of the loop is over its budget — both read over budget — and `wf round` goes once more only with `--budget` above what that step spent, which the round keeps', () => {
@@ -2422,4 +2430,57 @@ test('a try on the timeline says what its session cost beside what it used, wher
   assert.deepEqual(timelineLines(timeline(r, views, new Map([['t1', clock(0)]])).steps.implement!), [
     'timeline  try 1  filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 turns · tool calls not measured · tokens in not measured · tokens out not measured · api 8m06s · tools not measured  cost $3.01',
   ]);
+});
+
+test("REFUSED as a verdict past a budget: a step whose check did not finish reads failed (check), not over budget — `wf decide` says its check did not finish and offers the recheck first, which costs nothing — and a new session of it still needs `--budget`", () => {
+  const r = refusedTwice();
+  const spent = spends({ t0: 1.75, t1: 2.5 });
+  const cases: Array<[string, Record<string, TaskPhase>, Verdict | undefined]> = [
+    ['stopped, with no verdict read', { ...REFUSED_TWICE, c1: 'stopped' }, undefined],
+    ['failed with no exit code: stopped at its deadline', REFUSED_TWICE, 'unfinished'],
+  ];
+  for (const [why, m, verdict] of cases) {
+    const p = phases(m);
+    const v = () => verdict;
+    assert.equal(stepStatus(BUDGETED[0]!, r, p, signedDone, asked, BUDGETED, spent, v), 'failed (check)', why);
+    const a = assess(BUDGETED, r, p, signedDone, asked, v, [], [], () => false, spent);
+    assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed'], why);
+    const d = decision(BUDGETED, r, p, nothingShipped, signedDone, asked, v, [], [], () => false, spent);
+    assert.deepEqual(d.kind === 'awaiting' && [d.unfinishedCheck, d.failedCheck, d.overBudget], [['implement'], [], []], why);
+    assert.deepEqual(retryLines(BUDGETED, r, d, p, signedDone, asked, spent, v), [
+      'implement: its check did not finish, so no retry was spent on it. Run the check again, and nothing else:  wf retry r-1 implement --recheck  (a new session needs --budget above $4.25: its tries have cost $4.25 of $3)',
+    ], why);
+    const l = listing(BUDGETED, r, shown(m), signedOff({ implement: said('done') }), asked, v, [], [], [], [], () => 0, spent);
+    assert.deepEqual([l.steps[0]!.status, l.steps[0]!.cost, l.waitingOnYou], ['failed ✗ check (unfinished)', '$4.25', ['implement']], why);
+
+    const refusal = (how: RetryHow) => retryRefusal(BUDGETED, r, 'implement', how, p, signedDone, asked, v, [], () => false, spent);
+    assert.equal(refusal({ mode: 'recheck' }), null, `${why}: the recheck costs nothing`);
+    assert.equal(refusal({ mode: 'nudge' }), "implement's check did not finish, and implement is over budget: its tries have cost $4.25 of its $3 budget. Run its check again, which needs no --budget: wf retry r-1 implement --recheck — or raise the cap for a new session, above $4.25: wf retry r-1 implement --budget <amount>.", why);
+    assert.match(refusal({ mode: 'nudge', budget: 4 })!, /^--budget 4 is not above \$4\.25, what implement's tries have cost: a try under it would read over budget again/, why);
+    assert.equal(refusal({ mode: 'fresh', budget: 10 }), null, why);
+    assert.deepEqual(retriesDue(BUDGETED, r, p, signedDone, asked, v, [askFor(3)], () => false, spent), [], `${why}: a session asked for without --budget is not honoured`);
+    assert.deepEqual(retriesDue(BUDGETED, r, p, signedDone, asked, v, [askFor(3, 'recheck')], () => false, spent), [{ step: 'implement', try: 3, mode: 'recheck', by: 'ask' }], why);
+  }
+  // The same step whose check refused is over budget, as before: the verdict is what tells the two apart.
+  assert.equal(stepStatus(BUDGETED[0]!, r, phases(REFUSED_TWICE), signedDone, asked, BUDGETED, spent, () => 1), 'over budget');
+});
+
+test("a try past a budget is told why its last try ended on its own work — unsigned, failed, stopped, blocked, its check — and, beside it, that its budget was reached and raised; one ended at its budget is told that once", () => {
+  const brief = (status: StepStatus, budget?: number) =>
+    retrySection(step('implement'), { try: 2, by: 'ask', mode: 'nudge', resumed: true, status, ...(budget !== undefined ? { budget } : {}) });
+  assert.match(brief('unsigned', 10), /^\n## Try 2\n\nThe last try ended without the closeout the run asked for, [^\n]*\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\nA person asked for this try: `wf retry --nudge --budget 10`, raising this step's budget to \$10\./);
+  for (const [status, sentence] of [['failed', /ended `failed` before it signed off/], ['stopped', /was stopped before it signed off/], ['blocked', /signed off `blocked`/], ['failed (check)', /check, and it did not pass/]] as const) {
+    assert.match(brief(status, 10), sentence, status);
+    assert.match(brief(status, 10), /had together cost its budget or more/, status);
+  }
+  const ended = brief('budget exhausted', 10);
+  assert.match(ended, /ended by its harness at this step's budget/);
+  assert.doesNotMatch(ended, /had together cost its budget or more/, 'said once');
+  assert.doesNotMatch(brief('unsigned'), /budget/, 'a try with no raise says nothing of a budget');
+
+  // What the tick hands it: the step's own status, not the word that held it.
+  const B: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
+  const r = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  assert.deepEqual([stepStatus(B[0]!, r, p, () => undefined, asked, B, spends({ t1: 4 })), ownStatus(B[0]!, r, p, () => undefined, asked, B, spends({ t1: 4 }))], ['over budget', 'unsigned']);
 });

@@ -71,7 +71,7 @@ agent is told is prose.
   wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
   · unverified (no check: declared) · unsigned (ended without its closeout, or without a field its
   output: declares) · BLOCKED · rounds exhausted (asked for another round on the last)
-  · over budget $4.20 of $3 (its tries have cost more than its budget:, and nothing more is filed for
+  · over budget $4.20 of $3 (its tries have cost their budget: or more, and nothing more is filed for
   it on the run's word) · budget exhausted (its harness ended its session at its budget:).
 
   WF_ROOT            where runs and the engine's board live
@@ -466,7 +466,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // A reviewer still asking after the rounds its workflow allows is the sign of a design question or a decision, and it is yours.
       if (decision.exhausted.length) console.log(`  ROUNDS EXHAUSTED, waiting on you: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`);
       // A cap reached is a person's to raise: the run spends nothing more on the step on its own word.
-      if (decision.overBudget.length) console.log(`  OVER BUDGET, waiting on you: ${decision.overBudget.join(', ')}  — its tries have cost more than its budget:, and the run files nothing more for it on its own; nothing after it ran`);
+      if (decision.overBudget.length) console.log(`  OVER BUDGET, waiting on you: ${decision.overBudget.join(', ')}  — its tries have cost its budget: or more, and the run files nothing more for it on its own; nothing after it ran`);
       if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED, waiting on you: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
       // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.

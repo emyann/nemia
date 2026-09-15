@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, round, runCostLines, runSpend, saidCount, say, sensitiveDiff, spendReader, spentWord, stepSpend, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Spend, type SpendOf, type Timeline, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
-import { addSpend, answerOf, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, loopOver, overBudget, overBudgetLine, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote, waitsOf } from 'agent-workflows/run';
+import { addSpend, answerOf, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, loopOver, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
@@ -75,8 +75,14 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
  * over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `wf round --budget`, `POST …/round` — for a looping
  * step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more than, as the package
  * refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars (`dollars`).
+ *
+ * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
+ * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
+ * blocked, whose try is answered with its raise (`wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it), `unsigned`,
+ * `failed (check)`, `failed`, `stopped` or `budget exhausted`. Over its budget, a step's word is `over budget`, so the word alone no longer
+ * says which. For a round, no modes, and `own` null: a round is asked for as it is, with a budget.
  */
-export type StepRaise = { by: 'retry' | 'round'; above: number; said: string };
+export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
 
 /**
  * What a run started `--after` still waits on, as `wf ls` and `wf decide` say it — never worded here.
@@ -669,12 +675,16 @@ function costOf(run: Run, name: string, steps: readonly Workflow[], views: Views
  */
 function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Views, spendOf: SpendOf): StepRaise | null {
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
-  const { status, modes, raise } = retryable(step, run, phase, closeoutReader(views, run), closeoutAsked(views), steps, () => false, spendOf, exitVerdicts(views, run));
-  if (raise && modes.length) return { by: 'retry', above: raise.above, said: dollars(raise.above) };
+  const reader = closeoutReader(views, run);
+  const asked = closeoutAsked(views);
+  const { status, modes, raise } = retryable(step, run, phase, reader, asked, steps, () => false, spendOf, exitVerdicts(views, run));
+  if (raise && modes.length) {
+    return { by: 'retry', above: raise.above, said: dollars(raise.above), modes, own: ownStatus(step, run, phase, reader, asked, steps, spendOf) };
+  }
   const over = step.loop && (status === 'over budget' || status === 'exhausted') ? loopOver(steps, step, run, spendOf) : [];
   if (!over.length) return null;
   const above = Math.max(0, ...over.map((o) => o.spent.usd));
-  return { by: 'round', above, said: dollars(above) };
+  return { by: 'round', above, said: dollars(above), modes: [], own: null };
 }
 
 /**

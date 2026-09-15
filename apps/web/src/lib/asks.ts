@@ -46,9 +46,10 @@ export const needLine = (need: Need): string => `${need.step} ${need.kind === 'a
  *   answer     it signed off blocked: an answer to its `needs`, carried into a nudge, or a fresh session
  *   try-again  its check refused it, or it ended without its closeout: another session, with something to say if you like — and
  *              where a check did not pass, the check run again; first, when it did not finish
- *   raise      it is over its budget, or ended at it: its cap raised above what the package says it has to pass (`StepRaise`), with its
- *              try — `wf retry --budget`, a nudge or a new session — or with its loop's round, `wf round --budget`. `status` is its word,
- *              with the amounts
+ *   raise      a try of it, or its loop's round, has to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check
+ *              that did not finish past it. With its try — `wf retry --budget`, a nudge or a new session, and for a step that signed off
+ *              blocked the answer to its `needs` beside it (`--message`), or its check again, which needs no raise — or with its loop's
+ *              round, `wf round --budget`. `status` is its word, with the amounts; `unfinished` whether its check did not finish
  *   continue   the harness blocked its session, with nothing signed: a nudge, with something to say if you like, which the package takes
  *              as `wf retry` does — the tick stops the session, then files the try. The banner offers it, beside what the session said last
  *   asked      a person asked for its next try, which the next tick files: `wf ls`'s note says so
@@ -56,7 +57,7 @@ export const needLine = (need: Need): string => `${need.step} ${need.kind === 'a
 export type Offer =
   | { step: string; kind: 'answer'; needs: string | null }
   | { step: string; kind: 'try-again'; recheck: boolean; unfinished: boolean }
-  | ({ step: string; kind: 'raise'; status: string } & NonNullable<RunDetail['steps'][number]['raise']>)
+  | ({ step: string; kind: 'raise'; status: string; needs: string | null; unfinished: boolean } & NonNullable<RunDetail['steps'][number]['raise']>)
   | { step: string; kind: 'continue' }
   | { step: string; kind: 'asked'; try: number; note: string | null };
 
@@ -67,8 +68,10 @@ export type Answer = Exclude<Offer, { kind: 'continue' }>;
  * The offers of a run's page, in the run's order: one per step waiting on you that a try can answer, one per session the harness blocked,
  * and each step a person asked for a try of. A session the harness blocked is not waiting on you in the package's words — it asked
  * nothing — and is offered Continue all the same. A loop out of rounds goes round with `wf round`, among the Decide section's commands, and
- * has none. A step past its budget is offered the raise the api says the package takes (`raise`), and none where it takes none: the target of
- * a loop held on its budget goes again with its looping step's round, whose row that is. Nothing on a run called off.
+ * has none. A step the api carries a raise for (`raise`) is offered that, whatever its word: over its budget its word is `over budget`,
+ * whether it signed off blocked, ended unsigned or was refused by its check, and a check that did not finish past its budget reads as any
+ * such check — and a try of either that files a session is refused without the raise. None where the package takes none: the target of a
+ * loop held on its budget goes again with its looping step's round, whose row that is. Nothing on a run called off.
  */
 export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'>): Offer[] {
   if (run.cancelledAt !== null) return [];
@@ -76,11 +79,12 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
     if (step.asked) return [{ step: step.name, kind: 'asked', try: step.asked.try, note: step.note }];
     if (step.blockedByHarness) return [{ step: step.name, kind: 'continue' }];
     if (!run.waitingOnYou.includes(step.name)) return [];
+    const unfinished = step.check?.verdict === 'unfinished';
+    if (step.raise) return [{ step: step.name, kind: 'raise', status: step.status, needs: step.needs, unfinished, ...step.raise }];
     const state = stepState(step.status, false);
     if (state === 'blocked') return [{ step: step.name, kind: 'answer', needs: step.needs }];
-    if (state === 'failed-check') return [{ step: step.name, kind: 'try-again', recheck: true, unfinished: step.check?.verdict === 'unfinished' }];
+    if (state === 'failed-check') return [{ step: step.name, kind: 'try-again', recheck: true, unfinished }];
     if (state === 'unsigned') return [{ step: step.name, kind: 'try-again', recheck: false, unfinished: false }];
-    if ((state === 'over-budget' || state === 'budget-exhausted') && step.raise) return [{ step: step.name, kind: 'raise', status: step.status, ...step.raise }];
     return [];
   });
 }

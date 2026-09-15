@@ -223,20 +223,30 @@ const AMOUNT =
   'w-24 rounded border border-neutral-300 bg-white px-2 py-1 font-mono text-sm focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:focus:border-neutral-400';
 
 /**
- * A step past its budget — over it, or ended at it — and the raise of its cap the package takes (`raise`): its word, with the amounts; a box
- * for the cap to raise it to, started at the first whole dollar above what the package says it has to pass (`raiseTo`); and the button that
- * asks — with its try, as `wf retry --budget` does, continuing its session or in a new one, or with its loop's round, as `wf round --budget`
- * does. The box takes any amount: the package refuses one not above what was spent, and its sentence shows beside the box, verbatim, the
- * amount still in it. Once the api has the ask, what the tick does with it, until the run is read again and the step's note says it.
+ * A step past its budget — over it, ended at it, or a check that did not finish past it — and the raise of its cap the package takes (`raise`):
+ * its word, with the amounts; a box for the cap to raise it to, started at the first whole dollar above what the package says it has to pass
+ * (`raiseTo`); and the button that asks — with its try, as `wf retry --budget` does, continuing its session or in a new one, or with its loop's
+ * round, as `wf round --budget` does. The box takes any amount: the package refuses one not above what was spent, and its sentence shows
+ * beside the box, verbatim, the amount still in it. Once the api has the ask, what the tick does with it, until the run is read again and the
+ * step's note says it.
+ *
+ * A try carries what an answer row's would, beside the raise. For a step that signed off blocked, its question and a box for the answer, which
+ * the button waits for — `wf retry --budget <amount> --message "<answer>"`, as `wf decide` offers it: once a try is asked, a second ask
+ * carrying the answer is refused as already asked. For any other, a box for anything to tell it. And where a check did not pass, its check
+ * again (`recheck`), which costs nothing and needs no raise — chosen first where it did not finish — with the amount and the box closed.
  */
 export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answer, { kind: 'raise' }> }) {
   const [amount, setAmount] = useState(() => String(raiseTo(offer.above)));
-  const [mode, setMode] = useState<'nudge' | 'fresh'>('nudge');
+  const [message, setMessage] = useState('');
+  const [mode, setMode] = useState<RetryMode>(offer.unfinished && offer.modes.includes('recheck') ? 'recheck' : 'nudge');
   const field = useId();
-  const tried = useAsk(runId, offer.step, () => {});
+  const tried = useAsk(runId, offer.step, () => setMessage(''));
   const rounded = useRound(runId);
   const ask = offer.by === 'retry' ? tried : rounded;
-  const command = `wf ${offer.by} ${runId} ${offer.step} --budget <amount>`;
+  const asks = offer.by === 'retry' && offer.own === 'blocked';
+  // A recheck files no session: it takes no budget, and `messageRefusal` refuses a message on one.
+  const rechecking = offer.by === 'retry' && mode === 'recheck';
+  const command = `wf ${offer.by} ${runId} ${offer.step} --budget <amount>${asks ? ' --message "<answer>"' : ''}`;
 
   if (tried.isSuccess || rounded.isSuccess) {
     return (
@@ -254,40 +264,93 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
       <p className="break-words">
         <strong>{offer.step}</strong> <span className="font-mono text-xs">{offer.status}</span>
       </p>
+      {asks && (
+        <p data-asks className="line-clamp-4 whitespace-pre-wrap break-words" title={offer.needs ?? undefined}>
+          {offer.needs ? `asks: ${offer.needs}` : 'signed off blocked, and said nothing of what it needs'}
+        </p>
+      )}
       <p className="text-xs break-words text-neutral-600 dark:text-neutral-400">
         The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
         {offer.by === 'round' ? ", with its loop's next round" : ''}, as <code>{command}</code> raises it.
+        {offer.modes.includes('recheck') && ' Its check again costs nothing, and needs no raise.'}
       </p>
       <form
         aria-label={`Raise ${offer.step}'s budget`}
-        className="flex flex-wrap items-center gap-x-4 gap-y-2"
+        className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
-          // As typed: an amount the package refuses is refused in its words, beside the box — and an empty box sends none, which it refuses too.
-          const budget = amount.trim() === '' ? {} : { budget: Number(amount) };
-          if (offer.by === 'retry') tried.mutate({ mode, ...budget });
-          else rounded.mutate({ step: offer.step, ...budget });
+          if (offer.by === 'round') {
+            // As typed: an amount the package refuses is refused in its words, beside the box — and an empty box sends none, which it refuses too.
+            rounded.mutate({ step: offer.step, ...(amount.trim() === '' ? {} : { budget: Number(amount) }) });
+          } else if (rechecking) {
+            tried.mutate({ mode: 'recheck' });
+          } else {
+            // An answer goes as it was typed, as `--message` takes it; something to tell a try is optional, and none when nothing was written.
+            const said = asks || message.trim() ? { message } : {};
+            tried.mutate({ mode, ...(amount.trim() === '' ? {} : { budget: Number(amount) }), ...said });
+          }
         }}
       >
-        <label htmlFor={field} className="flex items-center gap-1 text-xs">
-          <span className="sr-only">{`The cap to raise ${offer.step} to, in dollars`}</span>
-          <span aria-hidden className="font-mono">$</span>
-          <input id={field} type="number" step="any" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} className={AMOUNT} />
-        </label>
-        <button type="submit" disabled={ask.isPending} className={BUTTON}>
-          {ask.isPending ? 'Asking…' : offer.by === 'retry' ? 'Raise the budget and try again' : 'Raise the budget and go round again'}
-        </button>
         {offer.by === 'retry' && (
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-            <legend className="sr-only">How to try {offer.step} again</legend>
-            {(['nudge', 'fresh'] as const).map((m) => (
-              <label key={m} className="flex cursor-pointer items-center gap-1.5">
-                <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
-                {MODES[m]} <code className="text-neutral-500">--{m}</code>
-              </label>
-            ))}
-          </fieldset>
+          <>
+            <label htmlFor={`${field}-message`} className="sr-only">
+              {asks ? `Your answer to ${offer.step}` : `What to tell ${offer.step}, if anything`}
+            </label>
+            <textarea
+              id={`${field}-message`}
+              value={message}
+              onChange={(event) => setMessage(event.target.value)}
+              rows={asks ? 3 : 2}
+              disabled={rechecking}
+              placeholder={
+                rechecking
+                  ? 'A recheck runs the check again and files no session: there is nobody to tell.'
+                  : asks
+                    ? 'Your answer: the next try is told it, under “Your answer”.'
+                    : 'Anything to tell it (optional): the next try is told it.'
+              }
+              className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
+            />
+          </>
         )}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <label htmlFor={field} className="flex items-center gap-1 text-xs">
+            <span className="sr-only">{`The cap to raise ${offer.step} to, in dollars`}</span>
+            <span aria-hidden className="font-mono">$</span>
+            <input
+              id={field}
+              type="number"
+              step="any"
+              inputMode="decimal"
+              value={amount}
+              disabled={rechecking}
+              onChange={(event) => setAmount(event.target.value)}
+              className={cn(AMOUNT, 'disabled:cursor-not-allowed disabled:opacity-50')}
+            />
+          </label>
+          <button type="submit" disabled={ask.isPending || (asks && !message.trim())} className={BUTTON}>
+            {ask.isPending
+              ? 'Asking…'
+              : offer.by === 'round'
+                ? 'Raise the budget and go round again'
+                : rechecking
+                  ? 'Run its check again'
+                  : asks
+                    ? 'Raise the budget and answer'
+                    : 'Raise the budget and try again'}
+          </button>
+          {offer.by === 'retry' && (
+            <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              <legend className="sr-only">How to try {offer.step} again</legend>
+              {offer.modes.map((m) => (
+                <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                  <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
+                  {MODES[m]} <code className="text-neutral-500">--{m}</code>
+                </label>
+              ))}
+            </fieldset>
+          )}
+        </div>
       </form>
       {ask.isError && <Refusal error={ask.error} />}
     </li>

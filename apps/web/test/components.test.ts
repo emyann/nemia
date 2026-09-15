@@ -1208,30 +1208,65 @@ test("the Decide section says why a step past its budget is held — `wf decide`
   assert.match(none, /<dt[^>]*>every try<\/dt><dd[^>]*>—<\/dd>/, 'nothing ended yet: a dash, not $0');
 });
 
-test("a step past its budget is offered a raise: its word with the amounts, a box started above what it cost with no floor of the board's, and Raise the budget and try again — or go round again, for its loop", () => {
+test("a step past its budget is offered a raise: its word with the amounts, a box started above what it cost with no floor of the board's, and Raise the budget and try again — answer, for a step that asks; its check again, where one did not pass; go round again, for its loop", () => {
+  type RetryMode = import('../src/lib/api.ts').RetryMode;
+  const checkRaise = { by: 'retry' as const, above: 4.25, said: '$4.25', modes: ['nudge', 'fresh', 'recheck'] as RetryMode[], own: 'failed (check)', needs: null, unfinished: false };
   const html = offersMarkup([
-    { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', by: 'retry', above: 4.25, said: '$4.25' },
-    { step: 'review', kind: 'raise', status: 'over budget — implement $2.10 of $2', by: 'round', above: 2.1, said: '$2.10' },
+    { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', ...checkRaise },
+    {
+      step: 'palette', kind: 'raise', status: 'over budget $1.50 of $1', by: 'retry', above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'], own: 'blocked',
+      needs: 'Warm colours, or cool ones?', unfinished: false,
+    },
+    { step: 'types', kind: 'raise', status: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
+    { step: 'review', kind: 'raise', status: 'over budget — implement $2.10 of $2', by: 'round', above: 2.1, said: '$2.10', modes: [], own: null, needs: null, unfinished: false },
   ]);
   const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2]!, { kind: m[1]!, html: m[3]! }]));
-  assert.deepEqual([...rows].map(([name, { kind }]) => [name, kind]), [['tokens', 'raise'], ['review', 'raise']]);
+  assert.deepEqual([...rows].map(([name, { kind }]) => [name, kind]), [['tokens', 'raise'], ['palette', 'raise'], ['types', 'raise'], ['review', 'raise']]);
   const buttons = (name: string) => [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
   const radios = (name: string) => [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
-  // The number box, and the amount it starts at, whatever order a server render writes its attributes in.
-  const box = (name: string) => { const input = /<input [^>]*type="number"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? ""; return /\bvalue="([^"]*)"/.exec(input)?.[1]; };
+  // The number box, and the amount it starts at, whatever order a server render writes its attributes in — and whether it is closed.
+  const input = (name: string) => /<input [^>]*type="number"[^>]*>/.exec(rows.get(name)!.html)?.[0] ?? '';
+  const box = (name: string) => /\bvalue="([^"]*)"/.exec(input(name))?.[1];
+  const boxClosed = (name: string) => /\bdisabled=""/.test(input(name));
+  // The box for what to tell the try: its label, and whether it is closed; none on a row that has none.
+  const said = (name: string) => {
+    const label = /<label for="[^"]+" class="sr-only">([^<]*)<\/label><textarea [^>]*>/.exec(rows.get(name)!.html);
+    return label ? [unescaped(label[1]!), /\bdisabled=""/.test(label[0])] : null;
+  };
 
   const tokens = textsOf(rows.get('tokens')!.html);
   assert.ok(tokens.includes('over budget $4.25 of $3') && tokens.includes('wf retry r-1 tokens --budget <amount>') && tokens.includes('$4.25'), tokens.join(' | '));
   assert.equal(box('tokens'), '5');
   assert.deepEqual(buttons('tokens'), [['submit', false, 'Raise the budget and try again']]);
-  assert.deepEqual(radios('tokens'), [['nudge', true], ['fresh', false]]);
+  // Its check refused: its check again is a way on, which needs no raise, and a nudge is first.
+  assert.deepEqual(radios('tokens'), [['nudge', true], ['fresh', false], ['recheck', false]]);
+  assert.ok(rows.get('tokens')!.html.includes('Its check again costs nothing, and needs no raise.'), rows.get('tokens')!.html);
+  assert.deepEqual(said('tokens'), ['What to tell tokens, if anything', false]);
+  assert.equal(boxClosed('tokens'), false);
   assert.match(rows.get('tokens')!.html, /<span class="sr-only">The cap to raise tokens to, in dollars<\/span>/);
+
+  // Signed off blocked past its budget: its question, and the answer with the raise — the button waits for the answer, as an answer row's does.
+  const palette = textsOf(rows.get('palette')!.html);
+  assert.ok(palette.includes('asks: Warm colours, or cool ones?'), palette.join(' | '));
+  assert.ok(palette.includes('wf retry r-1 palette --budget <amount> --message "<answer>"'), palette.join(' | '));
+  assert.equal(box('palette'), '2');
+  assert.deepEqual(said('palette'), ['Your answer to palette', false]);
+  assert.deepEqual(buttons('palette'), [['submit', true, 'Raise the budget and answer']]);
+  assert.deepEqual(radios('palette'), [['nudge', true], ['fresh', false]]);
+  assert.doesNotMatch(rows.get('tokens')!.html, /data-asks/, 'a step that asked nothing has no question on its row');
+
+  // A check that did not finish past its budget: its check again first, which files no session — so no amount, and nobody to tell.
+  assert.deepEqual(radios('types'), [['nudge', false], ['fresh', false], ['recheck', true]]);
+  assert.deepEqual(buttons('types'), [['submit', false, 'Run its check again']]);
+  assert.equal(boxClosed('types'), true);
+  assert.deepEqual(said('types'), ['What to tell types, if anything', true]);
 
   const review = textsOf(rows.get('review')!.html);
   assert.ok(review.includes('wf round r-1 review --budget <amount>'), review.join(' | '));
   assert.equal(box('review'), '3');
   assert.deepEqual(buttons('review'), [['submit', false, 'Raise the budget and go round again']]);
   assert.deepEqual(radios('review'), [], 'a round has no mode');
+  assert.equal(said('review'), null, 'and nothing to tell: a round carries no message');
   // The package refuses a cap not above what was spent, in its words: the board sets no floor of its own that would keep that from it.
   assert.doesNotMatch(html, /\bmin="|\brequired=""/);
 });

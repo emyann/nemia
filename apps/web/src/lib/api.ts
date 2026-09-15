@@ -47,9 +47,11 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
 
 /**
  * Mirrors `StepRaise` in apps/api/src/app.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its loop's round
- * (`round`) — and what the budget has to be more than, as the package refuses less.
+ * (`round`) — and what the budget has to be more than, as the package refuses less. For a try, the ways the package takes it (`modes`,
+ * `recheck` among them where a check did not pass, needing no raise) and how the step ended on its own work, its budget aside (`own`, the
+ * package's word: `blocked`, `unsigned`, `failed (check)` …), which its word — `over budget` — no longer says. For a round, none, and null.
  */
-export type StepRaise = { by: 'retry' | 'round'; above: number; said: string };
+export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: string | null };
 
 /**
  * Mirrors `RunWaiting` in apps/api/src/app.ts: what a run started `--after` still waits on, in the package's words. `runs` are each run

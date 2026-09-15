@@ -726,9 +726,6 @@ owner is not mid-run.
   appear once per result branch; `wf decide` prints each branch on its own line and never sums. Count each
   file once, or print per branch as the CLI does. And `api.test.ts:95`'s "never nothing" assertion tests the
   last value only (`indexOf` on parsed objects is −1). → apps, with B7.
-  *S3 `7762c46` + S4 `1fe141e`: `ae say`/`wf say` hand the words to the session over its inbox socket and the engine journals
-  them; `wf decide` prints them under the step, a continued session is handed them again, and the session page has the
-  prompt box. The ask-file shape was not needed: the engine's journal is the one record.*
 
 ### Settled
 
@@ -939,8 +936,9 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 ## 6. The queue
 
-Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done; nothing in flight. Left: the apps bundle (11–15), the engine
-bundle (16–18), and item 20 (settings, the owner's call).
+Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done. In flight 2026-09-14: B9 (apps, items 11–15 in one) as
+`five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
+`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. Left after them: item 20 (settings).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -1000,16 +998,16 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
     drop a settings block that parses as a card. agent-workflows, small. *Done, W5, `d69a5fd`.*
 
 **apps, small**
-11. The timeline — per try and per check, on the run page and in `wf decide`; `effort`/`tools` on the Workflows page's node.
-12. The card's touched line double-counts a fan-out.
-13. The session stream after a reconnect (clear the retry error on `open`).
-14. The Capabilities page per step: what a step gets, measured.
-15. api tests off the live registry.
+11. The timeline — per try and per check, on the run page and in `wf decide`; `effort`/`tools` on the Workflows page's node. *B9.*
+12. The card's touched line double-counts a fan-out. *B9.*
+13. The session stream after a reconnect (clear the retry error on `open`). *B9.*
+14. The Capabilities page per step: what a step gets, measured. *B9.*
+15. api tests off the live registry. *B9.*
 
 **agent-engine, small**
-16. `resume.test.ts`'s usage assertion (the retry writes a different count).
-17. A runner verb that finds one session by name (an open stream is two `claude agents` calls a second).
-18. Bug 1 of the evaluation — `decide` stalled — half-verified in open-issues since day one.
+16. `resume.test.ts`'s usage assertion (the retry writes a different count). *E7.*
+17. A runner verb that finds one session by name (an open stream is two `claude agents` calls a second). *E7.*
+18. Bug 1 of the evaluation — quiet without a closeout settles `succeeded` — half-verified in open-issues since day one. *E7.*
 
 **Documentation**
 19. The ledger reordered: open first, settled below. *Done, `55acbde`.*

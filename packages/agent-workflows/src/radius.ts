@@ -281,10 +281,13 @@ export function lessonLine(touched: readonly Touched[]): string {
   return `lesson  ${written.length ? written.join(' · ') : 'nothing written where the next agent reads'}`;
 }
 
-/** What a session consumed, as the engine's `Usage` carries it: a count nobody measured is absent, never 0. */
-export type Consumed = { turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number };
+/**
+ * What a session consumed, as the engine's `Usage` carries it: a count nobody measured is absent, never 0. `costUsd` is the harness's own
+ * figure, and `apiMs` and `toolMs` the time it counted waiting on the model and running tools — each read once a session has ended.
+ */
+export type Consumed = { turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number; apiMs?: number; toolMs?: number };
 
-const FIELDS = ['turns', 'toolCalls', 'inputTokens', 'outputTokens', 'costUsd'] as const;
+const FIELDS = ['turns', 'toolCalls', 'inputTokens', 'outputTokens', 'costUsd', 'apiMs', 'toolMs'] as const;
 
 /**
  * Several attempts' usage as one. A count is the sum only when every attempt measured it: a sum over
@@ -316,22 +319,39 @@ export function count(n: number): string {
   return String(n);
 }
 
+/** A duration for a person, as the operator measures one: `58s`, `19m42s`, `1h05m`, `2d03h`. */
+export function durationWord(ms: number): string {
+  const s = Math.floor(Math.max(0, ms) / 1000);
+  const two = (n: number) => String(n).padStart(2, '0');
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m${two(s % 60)}s`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h${two(m % 60)}m`;
+  return `${Math.floor(h / 24)}d${two(h % 24)}h`;
+}
+
 /**
  * What a step consumed, beside its check: `used` and `cost`. Unmeasured says so, never `0` — a zero
- * that means "nobody counted" reads as "cost nothing". Cost prints a number only when a runner was told
- * one, and none of the runners `wf` files on is.
+ * that means "nobody counted" reads as "cost nothing". Cost prints a number only where the engine measured
+ * one: the harness's own figure, read once a session has ended (agent-engine's README, *What an attempt consumed*).
+ * The api and tool time go beside the counts once either was measured, and each says not measured where the
+ * other was — `claude-detached` counts api time and no tool time — and neither is said where nothing timed it.
  */
 export function usedLines(u: Consumed | undefined): string[] {
-  // Three figures, not two decimals: a session's $0.004 rounded to "$0.00" is the zero this line refuses.
-  const cost = `cost  ${u?.costUsd !== undefined ? `$${Number(u.costUsd.toPrecision(3))}` : 'not measured'}`;
+  const cost = `cost  ${u?.costUsd !== undefined ? dollars(u.costUsd) : 'not measured'}`;
   if (!u) return ['used  not measured', cost];
   const said = (n: number | undefined, what: string, unmeasured: string) => (n === undefined ? `${unmeasured} not measured` : `${count(n)} ${what}`);
+  // A measured moment is not nothing: under a second reads `<1s`, never `0s`.
+  const took = (ms: number | undefined, what: string) => (ms === undefined ? `${what} not measured` : `${what} ${ms > 0 && ms < 1000 ? '<1s' : durationWord(ms)}`);
+  const timed = u.apiMs !== undefined || u.toolMs !== undefined ? [took(u.apiMs, 'api'), took(u.toolMs, 'tools')] : [];
   return [
     `used  ${[
       said(u.turns, 'turns', 'turns'),
       said(u.toolCalls, 'tool calls', 'tool calls'),
       said(u.inputTokens, 'in', 'tokens in'),
       said(u.outputTokens, 'out', 'tokens out'),
+      ...timed,
     ].join(' · ')}`,
     cost,
   ];

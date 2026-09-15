@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, budgetOf, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, budgetOf, costLine, runCostLines, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -2371,4 +2371,55 @@ test('a step that signed off blocked past its budget reads blocked while its ses
   const d = decision(B, r, settled, nothingShipped, stuck, asked, () => undefined, [], [], () => false, spent);
   assert.deepEqual(answerLines(B, r, d, settled, stuck, asked, spent), { implement: 'to answer it, its cap raised above $4.00:  wf retry r-1 implement --budget <amount> --message "<answer>"' });
   assert.deepEqual(answerLines(B, r, d, settled, stuck, asked), { implement: 'to answer it:  wf retry r-1 implement --message "<answer>"' }, 'read with nothing spent, it is blocked, and answered as before');
+});
+
+// ─── what a step and a run cost ─────────────────────────────────────────────
+
+test("`wf ls`' words: each step's tries' cost beside its word once one was measured — `≥` where an ended attempt has none — and the run's; a step at its budget says it in its word, and nothing beside it", () => {
+  const p = shown(REFUSED_TWICE);
+  const done = signedOff({ implement: said('done') });
+  const l = listing(BUDGETED, refusedTwice(), p, done, asked, () => 1, [], [], [], [], () => 0, spends({ t0: 1, t1: 1.25 }));
+  assert.deepEqual([l.steps[0], l.steps[1], l.cost], [
+    { name: 'implement', status: 'failed ✗ check (exit 1)', branch: null, note: 'try 3 due — retries: 2, 1 spent', cost: '$2.25' },
+    { name: 'review', status: 'waiting', branch: null },
+    '$2.25',
+  ]);
+  const partly: SpendOf = (id) => (id === 't0' ? { usd: 1, measured: 1, unmeasured: 0, budgetEnded: false } : id === 't1' ? { usd: 0, measured: 0, unmeasured: 1, budgetEnded: false } : undefined);
+  const part = listing(BUDGETED, refusedTwice(), p, done, asked, () => 1, [], [], [], [], () => 0, partly);
+  assert.deepEqual([part.steps[0]!.cost, part.cost], ['≥$1.00', '≥$1.00'], 'a part never reads as the whole');
+  const over = listing(BUDGETED, refusedTwice(), p, done, asked, () => 1, [], [], [], [], () => 0, spends({ t0: 1.75, t1: 2.5 }));
+  assert.deepEqual([over.steps[0], over.cost], [{ name: 'implement', status: 'over budget $4.25 of $3', branch: null, note: 'try 2, by retries: 2' }, '$4.25']);
+  // Nothing measured, or nothing read: no cost at all, as before.
+  for (const none of [() => undefined, spends({}, [])] as SpendOf[]) {
+    const bare = listing(BUDGETED, refusedTwice(), p, done, asked, () => 1, [], [], [], [], () => 0, none);
+    assert.deepEqual(['cost' in bare, bare.steps.map((s) => 'cost' in s)], [false, [false, false]]);
+  }
+});
+
+test("`costLine`: a step's cost on `wf decide` — its current try's, and where its tries ran more than one session, theirs together — beside the cap in force; `runCostLines`: the run's, after its steps", () => {
+  const B: Workflow = { ...step('implement'), budget: 5 };
+  const one = run({ implement: 't1' });
+  assert.equal(costLine(B, one, 'implement', { costUsd: 3.012 }, spends({ t1: 3.012 })), 'cost  $3.01 · budget $5');
+  assert.equal(costLine(step('implement'), one, 'implement', { turns: 3 }, () => undefined), 'cost  not measured', 'as `usedLines` says it, with no budget');
+  const three = onTry([{ taskId: 't-a', then: 'retries' }, { taskId: 't-b', then: 'nudge', budget: 10 }], null);
+  const all = spends({ 't-a': 1.5, 't-b': 1.51, t1: 1.19 });
+  assert.equal(costLine(B, three, 'implement', { costUsd: 1.19 }, all), 'cost  $1.19 this try · $4.20 over 3 tries · budget $10');
+  const partly: SpendOf = (id) => (id === 't-a' ? { usd: 1.5, measured: 1, unmeasured: 0, budgetEnded: false } : id === 't-b' ? { usd: 0, measured: 0, unmeasured: 1, budgetEnded: false } : undefined);
+  assert.equal(costLine(B, three, 'implement', undefined, partly), 'cost  this try not measured · ≥$1.50 over 3 tries · budget $10');
+  // A recheck ran no session of its own: one session, its cost once.
+  const rechecked = onTry([{ taskId: 't1', check: { taskId: 'c0' }, then: 'recheck' }], 'c1');
+  assert.equal(costLine(step('implement'), rechecked, 'implement', { costUsd: 2 }, spends({ t1: 2 })), 'cost  $2.00');
+
+  assert.deepEqual(runCostLines(three, all), ['cost  run $4.20']);
+  assert.deepEqual(runCostLines(three, partly), ['cost  run $1.50 measured · 1 attempt not measured']);
+  assert.deepEqual(runCostLines(three, spends({}, ['t1'])), ['cost  run not measured']);
+  assert.deepEqual(runCostLines(three, () => undefined), [], 'nothing has ended');
+});
+
+test('a try on the timeline says what its session cost beside what it used, where the engine measured it', () => {
+  const r = run({ implement: 't1' });
+  const views = new Map([['t1', task([[clock(0, 5), clock(0, 12), clock(19, 54)]], 'succeeded', { turns: 54, costUsd: 3.012, apiMs: 486_000 })]]);
+  assert.deepEqual(timelineLines(timeline(r, views, new Map([['t1', clock(0)]])).steps.implement!), [
+    'timeline  try 1  filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 turns · tool calls not measured · tokens in not measured · tokens out not measured · api 8m06s · tools not measured  cost $3.01',
+  ]);
 });

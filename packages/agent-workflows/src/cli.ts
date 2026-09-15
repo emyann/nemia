@@ -21,7 +21,8 @@ const HELP = `wf — run a workflow of agent steps
                                --after the runs of the cards its after: names (wf plan --help)
   wf tick                      one pass: tick the engine, file what became ready
   wf up [ms]                   the same, on a timer
-  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>
+  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>;
+                               what each step's tries and the run have cost, where measured
   wf cancel <runId>            stop what it has in flight; file nothing more
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
@@ -384,13 +385,16 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (!runs.length) return console.log('no runs');
       for (const run of runs) {
         const calledOff = run.cancelledAt ? '  (cancelled)' : '';
-        console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}`);
-        const { steps, waitingOnYou, waiting } = await list(e, run);
+        const { steps, waitingOnYou, waiting, cost } = await list(e, run);
+        // What the run has cost so far, on its line, where the engine measured it.
+        console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
+        // Each step's word, and what its tries have cost beside it: `verified ✓  $3.01`.
+        const said = steps.map((s) => `${s.status}${s.cost ? `  ${s.cost}` : ''}`);
         // As wide as this run's longest status, so its branches still line up beside it.
-        const width = Math.max(20, ...steps.map((s) => s.status.length));
-        for (const s of steps) {
+        const width = Math.max(20, ...said.map((w) => w.length));
+        for (const [i, s] of steps.entries()) {
           // The try a step is on, or the try due, beside its line: `try 2 asked (--nudge)`, `try 2, by retries: 1`.
-          console.log(`   ${s.name.padEnd(14)} ${s.status.padEnd(width)} ${s.branch ?? ''}${s.note ? `  · ${s.note}` : ''}`);
+          console.log(`   ${s.name.padEnd(14)} ${said[i]!.padEnd(width)} ${s.branch ?? ''}${s.note ? `  · ${s.note}` : ''}`);
         }
         // The step a person has to act on, and where to act. Said here and not left to the result
         // line, because a run blocked on its first step has no result branch yet.
@@ -430,7 +434,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, used, answers, answering, waiting, said, timeline } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, used, costs, runCost, answers, answering, waiting, said, timeline } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${given ? `\n  ${given}` : ''}`;
@@ -508,8 +512,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
             if (!check.passed && text) console.log(`      ${stream}:\n        ${text.split('\n').join('\n        ')}`);
           }
         }
-        // What its session consumed, beside the check's word on it — or that nobody measured it.
-        for (const line of usedLines(used[name])) console.log(`    ${line}`);
+        // What its session consumed, beside the check's word on it — or that nobody measured it — and what its tries cost, against its budget.
+        const [usedLine, costOfTry] = usedLines(used[name]);
+        console.log(`    ${usedLine}`);
+        console.log(`    ${costs[name] ?? costOfTry}`);
         // Where its time went, try by try and check by check: when each was filed, spawned and ended, how long it queued and ran.
         for (const line of timelineLines(timeline.steps[name] ?? [])) console.log(`    ${line}`);
         // What a person said to this try, beside what the try before it needed: the question and its answer, before what the try made of them.
@@ -533,8 +539,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         for (const line of files) console.log(`    ${line}`);
       }
       console.log();
-      // And the run's: each round's time when its loop went round, then the whole run's.
-      const totals = timelineTotalLines(timeline);
+      // And the run's: what it cost, every step's tries together; then each round's time when its loop went round, and the whole run's.
+      const totals = [...runCost, ...timelineTotalLines(timeline)];
       if (totals.length) {
         for (const line of totals) console.log(`  ${line}`);
         console.log();

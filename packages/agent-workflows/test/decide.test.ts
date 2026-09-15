@@ -316,3 +316,42 @@ test("`wf decide` on a try a person answered: its line says so, and under it wha
   assert.ok(head < question && question < indexOf(lines, '    needs: And the README, too?'), 'the question and its answer, then what the try made of them');
   assert.ok(!fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8').includes('The flag is public'), 'composed on read: the record keeps no message');
 });
+
+test("a measured cost on both screens: `wf decide` prints each step's beside what it used, with the api and tool time, and the run's after the steps; `wf ls` puts each step's beside its word and the run's on its line — and a run nobody measured prints no dollar", async (t) => {
+  const repo = aRepo();
+  const run = start({ brief: 'add sub', repo, workflowDir: folder(), isolate: false });
+  const { e, settle, logs } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED, { ...USAGE, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 });
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-check`, 'succeeded');
+  logs.set(`${run.id}-implement-check`, '# pass 1\n\n[wf check] exit 0\n');
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', SIGNED, { costUsd: 0.5 });
+
+  const lines = await screen(t, e, run.id);
+  const check = indexOf(lines, /^    check  npm test  →/);
+  assert.deepEqual(lines.slice(check + 1, check + 3), ['    used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s', '    cost  $3.01']);
+  assert.match(lines[check + 3]!, /^    timeline  try 1 .*  used 29 turns · 93 tool calls · 6\.35M in · 112k out · api 8m06s · tools 2s  cost \$3\.01$/);
+  const review = indexOf(lines, '  review');
+  assert.deepEqual(lines.slice(review + 1, review + 3), ['    used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured', '    cost  $0.50']);
+  const total = indexOf(lines, '  cost  run $3.51');
+  assert.ok(review < total && total < indexOf(lines, /^  timeline  run /), 'after the steps, beside the run\'s time');
+
+  const ls = async (id: string): Promise<string[]> => {
+    const out: string[] = [];
+    const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.map(String).join(' ')); });
+    try { await main(['ls', id], e); } finally { log.mock.restore(); }
+    return out;
+  };
+  const listed = await ls(run.id);
+  assert.equal(listed[0], `${run.id}  add sub  $3.51`);
+  assert.match(listed[1]!, /^   implement      verified ✓  \$3\.01 +\S/);
+  assert.match(listed[2]!, /^   review         unverified · done  \$0\.50 +\S/);
+
+  // The run the other screen tests read measured no cost: no dollar on either screen, and the run's cost says not measured.
+  const unmeasured = await awaiting();
+  assert.ok(!(await ls(unmeasured.run.id)).some((l) => l.includes('$')));
+  const bare = await screen(t, unmeasured.e, unmeasured.run.id);
+  assert.ok(bare.includes('  cost  run not measured') && !bare.some((l) => l.includes('$')), bare.join('\n'));
+});

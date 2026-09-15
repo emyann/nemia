@@ -14,7 +14,9 @@
 import path from 'node:path';
 import { checkContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
 import { depsLines, type Provisioned } from './deps.ts';
-import { budgetWord, dollars, sumUsage, usedLines, type Consumed } from './radius.ts';
+import { budgetWord, dollars, durationWord, sumUsage, usedLines, type Consumed } from './radius.ts';
+
+export { durationWord };
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, type Workflow } from './workflow.ts';
 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
@@ -1973,11 +1975,16 @@ export type Listing = {
    * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
    * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on.
    */
-  steps: Array<{ name: string; status: string; branch: string | null; note?: string }>;
+  steps: Array<{ name: string; status: string; branch: string | null; note?: string; cost?: string }>;
   /** Steps a person has to act on — blocked, unsigned, or refused by their check, with no try due — on a run nobody has called off. */
   waitingOnYou: string[];
   /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
   waiting: Wait[];
+  /**
+   * What the run has cost so far, every step's ended tries together (`runSpend`): `$12.40`, and `≥$12.40` where an ended attempt has no cost
+   * on it. Absent until a cost was measured. Each step's own is `cost` on its line, beside its word — and in it, for a step at its budget.
+   */
+  cost?: string;
 };
 
 /**
@@ -2040,8 +2047,13 @@ export function listing(
   const exhausted = new Set<string>();
   /** Looping steps whose round waits on a step of their loop's budget. */
   const heldLoops = new Set<string>();
+  /** Steps whose word says what they spent: `over budget $4.20 of $3`. Their line carries no `cost` beside it. */
+  const priced = new Set<string>();
   const rows = steps.map((step) => {
     const row = lineOf(step);
+    const spent = stepSpend(run, step.name, spendOf);
+    // What its tries have cost so far, beside its word, once a cost was measured.
+    const cost = spent.measured && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
     const tried = retry ? dueNote(step, run, retry)
@@ -2051,7 +2063,7 @@ export function listing(
       : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
     // A step its current try's session was told something, said beside the try it is on: a person's word the reviewer has to weigh.
     const note = [tried, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
-    return note ? { ...row, note } : row;
+    return { ...row, ...(note ? { note } : {}), ...cost };
   });
 
   function lineOf(step: Workflow): Listing['steps'][number] {
@@ -2067,6 +2079,7 @@ export function listing(
     // A cap reached says so, with what was spent and the cap in force: `over budget $4.20 of $3`.
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
+      priced.add(name);
       return { name, status: budgetStatus(step, status), branch };
     }
     // A loop out of rounds says so in a word of its own: its check passed or it had none, and it still stops what follows.
@@ -2102,7 +2115,36 @@ export function listing(
 
   // A run somebody called off is waiting on nobody — `wf decide` says there is nothing to decide —
   // though each step still signed off the way it did, and its line still says so.
-  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting };
+  const total = runSpend(run, spendOf);
+  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting, ...(total.measured ? { cost: spentWord(total) } : {}) };
+}
+
+/**
+ * A step's `cost` line on `wf decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) — and for a step whose
+ * tries ran more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where
+ * nobody measured, never $0.
+ */
+export function costLine(step: Workflow | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
+  const current = usedLines(used)[1]!.replace(/^cost\s+/, '');
+  const record = run.steps[name];
+  const sessions = sessionTasks(record).length;
+  const all = stepSpend(run, name, spendOf);
+  const spent = sessions > 1
+    ? `${current === 'not measured' ? 'this try not measured' : `${current} this try`} · ${all.measured ? spentWord(all) : 'not measured'} over ${tryOf(run, name)} tries`
+    : current;
+  const cap = step ? budgetOf(step, record) : undefined;
+  return `cost  ${spent}${cap !== undefined ? ` · budget ${budgetWord(cap)}` : ''}`;
+}
+
+/**
+ * The run's `cost` on `wf decide`, after its steps: every step's tries together (`runSpend`), with how many ended attempts have no cost on
+ * them — or `not measured`. Pure. None before any attempt has ended.
+ */
+export function runCostLines(run: Run, spendOf: SpendOf): string[] {
+  const spent = runSpend(run, spendOf);
+  if (!spent.measured && !spent.unmeasured) return [];
+  if (!spent.measured) return ['cost  run not measured'];
+  return [`cost  run ${dollars(spent.usd)}${spent.unmeasured ? ` measured · ${spent.unmeasured} attempt${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`];
 }
 
 /**
@@ -2734,22 +2776,10 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
   };
 }
 
-/** A duration for a person, as the operator measures one: `58s`, `19m42s`, `1h05m`, `2d03h`. */
-export function durationWord(ms: number): string {
-  const s = Math.floor(Math.max(0, ms) / 1000);
-  const two = (n: number) => String(n).padStart(2, '0');
-  if (s < 60) return `${s}s`;
-  const m = Math.floor(s / 60);
-  if (m < 60) return `${m}m${two(s % 60)}s`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h${two(m % 60)}m`;
-  return `${Math.floor(h / 24)}d${two(h % 24)}h`;
-}
-
 /**
  * A step's timeline as `wf decide` prints it, under its `used`: a row per try's session and per try's check, in the order they ran. Each
  * says when it was filed, spawned and ended — UTC, with the day where it is not the first row's — then its queue and run time, and beside a
- * session what it used. Empty for a step not filed.
+ * session what it used and, where the engine measured it, what it cost. Empty for a step not filed.
  */
 export function timelineLines(tries: readonly TimelineTry[]): string[] {
   const instants = tries.flatMap((t) => [t.session, t.check]).flatMap((s) => (s ? [s.filedAt, s.spawnedAt, s.endedAt] : [])).filter((at): at is string => at !== null);
@@ -2769,8 +2799,10 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
   const rows = tries.flatMap((t): Array<[string, string]> => {
     const label = `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
     const used = usedLines(t.used)[0]!.replace(/^used\s+/, '');
+    // What the session cost, beside what it used, where the engine measured it.
+    const cost = t.used?.costUsd !== undefined ? `  cost ${dollars(t.used.costUsd)}` : '';
     return [
-      [label, t.session ? `${words(t.session)}  used ${used}` : `its session is try ${t.sessionOf}'s, checked again`],
+      [label, t.session ? `${words(t.session)}  used ${used}${cost}` : `its session is try ${t.sessionOf}'s, checked again`],
       ...(t.check ? [[`try ${t.try} check`, words(t.check)] satisfies [string, string]] : []),
     ];
   });

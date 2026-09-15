@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { decisionQuery, runQuery, sayToStep, withGraph, type RunDetail } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
@@ -218,8 +219,12 @@ test("a run's decision is asked for once while a live step's engine word moves, 
   answers[1]!(second);
   await until(() => !observer.getCurrentResult().isPlaceholderData);
   assert.deepEqual(observer.getCurrentResult().data, second);
-  // From the first answer on, never nothing: the section does not blink out.
-  assert.ok(shown.slice(shown.indexOf(first)).every((data) => data !== undefined), JSON.stringify(shown));
+  // From the first answer on, never nothing: the section does not blink out. The observer hands back its own copy of what was answered, so
+  // the first answer is found by what it says, not by identity — `indexOf` found none, and `slice(-1)` held only the last value to it.
+  const from = shown.findIndex((data) => isDeepStrictEqual(data, first));
+  assert.ok(from >= 0, `the first answer is among what was shown: ${JSON.stringify(shown)}`);
+  assert.ok(shown.length - from > 2, `every value from the first answer on is held to it, not the last alone: ${JSON.stringify(shown)}`);
+  assert.ok(shown.slice(from).every((data) => data !== undefined), JSON.stringify(shown));
 });
 
 

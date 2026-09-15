@@ -489,7 +489,7 @@ import fs from 'node:fs';
 test('tools, disallowedTools, effort and mcp are declared by the task and reach every attempt untouched', async () => {
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
-  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp }));
+  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, budgetUsd: 0.5 }));
   await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'failed' });
   await b.run(tick());
@@ -499,6 +499,7 @@ test('tools, disallowedTools, effort and mcp are declared by the task and reach 
     assert.deepEqual(r.disallowedTools, ['Bash(npm run build)'], 'and denied the same');
     assert.equal(r.effort, 'low');
     assert.deepEqual(r.mcp, mcp, 'and given the same servers');
+    assert.equal(r.budgetUsd, 0.5, 'and the same cap');
   }
 
   const plain = board();
@@ -508,13 +509,33 @@ test('tools, disallowedTools, effort and mcp are declared by the task and reach 
   assert.equal(plain.spawned[0]!.disallowedTools, undefined, 'no deny list');
   assert.equal(plain.spawned[0]!.effort, undefined);
   assert.equal(plain.spawned[0]!.mcp, undefined, 'no map, no servers of its own');
+  assert.equal(plain.spawned[0]!.budgetUsd, undefined, 'no budget, no cap');
 });
 
-test('decide never reads tools, effort, MCP servers, usage, an exit code, an end time or what a person said — carried on the record, never judged', () => {
+test('decide never reads tools, effort, MCP servers, a budget, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said/);
+  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.costUsd/);
+});
+
+test('a session its harness ended at its budget ends failed, reason budget, with what it cost — and the task settles failed naming it, with an attempt left, even under resume: always', async () => {
+  const b = board();
+  const id = await b.run(file({ ...spec, maxAttempts: 2, resume: 'always', budgetUsd: 0.01 }));
+  await b.run(tick());
+  const first = [...b.sessions.keys()][0]!;
+  b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed', exitCode: 1, budgetSpent: true, usage: { costUsd: 0.018, apiMs: 718 } });
+  for (let i = 0; i < 3; i++) await b.run(tick());
+
+  const { state } = await b.run(view(id, new Map()));
+  const [a] = state.attempts;
+  assert.deepEqual([a!.ended, a!.reason, a!.exitCode], ['failed', 'budget', 1]);
+  assert.deepEqual(a!.usage, { costUsd: 0.018, apiMs: 718 }, 'and what it spent getting there');
+  assert.equal(state.settled, 'failed');
+  assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
+  assert.equal(b.spawned.length, 1, 'and nothing spawned for one');
+  const settled = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'settled');
+  assert.match(settled?.kind === 'settled' ? settled.note ?? '' : '', /^attempt 1 spent its budget\. File the task again with a larger one/);
 });
 
 // ─── usage: carried from the sighting, null when nobody measured ────────────
@@ -529,6 +550,29 @@ test('what a session consumed and how it exited go on the attempt, from the sigh
   const [a] = (await b.run(view(id, new Map()))).state.attempts;
   assert.deepEqual(a!.usage, usage);
   assert.equal(a!.exitCode, 0);
+});
+
+test('what a release reads once it has stopped a session is written on the attempt once, as measured — a session left listed is asked on every pass', async () => {
+  const sessions = new Map<string, Sighting>();
+  const ops = testOps({ sessions });
+  let asked = 0;
+  const layer = Layer.mergeAll(Journal.test(), Runner.layer({
+    ...ops,
+    // Stopped by the first call, as Claude Code writes a session's cost only then; listed still, as a worktree task's is.
+    release: () => Effect.sync(() => (++asked === 1 ? { turns: 2, costUsd: 0.5, apiMs: 900 } : undefined)),
+  }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file(spec));
+  await run(tick());
+  for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'done', usage: { turns: 2 } });
+  for (let i = 0; i < 3; i++) await run(tick());
+
+  assert.equal(asked, 3, 'released on every pass that still sees it');
+  const events = await run(Effect.flatMap(Journal, (j) => j.read(id)));
+  const ended = events.find((e) => e.kind === 'ended');
+  assert.deepEqual(ended?.kind === 'ended' && ended.usage, { turns: 2 }, 'its end, as the sighting that ended it said');
+  assert.deepEqual(events.filter((e) => e.kind === 'measured').map((e) => e.kind === 'measured' && e.usage), [{ turns: 2, costUsd: 0.5, apiMs: 900 }], 'written once');
+  assert.deepEqual(fold(id, events).attempts[0]!.usage, { turns: 2, costUsd: 0.5, apiMs: 900 });
 });
 
 test('an attempt nobody measured records null — not zeros that would read as free', async () => {

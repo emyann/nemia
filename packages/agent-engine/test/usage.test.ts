@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/runner.ts';
 import { codexOutput } from '../src/runner-detached.ts';
-import { attemptLine, usageLine } from '../src/cli.ts';
+import { attemptLine, taskLine, usageLine, usd } from '../src/cli.ts';
 import { fold, type Event } from '../src/domain.ts';
 
 const line = (o: object) => JSON.stringify(o);
@@ -57,6 +57,122 @@ test('tokens are absent, not 0, when a counted response did not carry them — a
   assert.equal('costUsd' in u, false);
 });
 
+// ─── cost: Claude Code's cost-state lines ───────────────────────────────────
+
+/**
+ * A `cost-state` line as Claude Code writes it (2.1.272, `modelUsage` trimmed): no time of its own, the session's
+ * totals, and when its count began. Written twice as the session's process exits, and never per turn.
+ */
+const costState = (totalCostUSD: number, totalAPIDuration: number, totalToolDuration: number, startTime: number, hasUnknownModelCost = false) =>
+  line({ type: 'cost-state', sessionId: 's-1', totalCostUSD, totalAPIDuration, totalToolDuration, totalDuration: 1, startTime, hasUnknownModelCost });
+const agentName = (name: string) => line({ type: 'agent-name', agentName: name, sessionId: 's-1' });
+const prompt = (at: string) => line({ type: 'user', timestamp: at, message: { content: 'the prompt' } });
+
+test("a transcript's cost is the cost-state its session wrote as its process exited, with the harness's own API and tool time", () => {
+  const since = Date.parse('2026-09-12T09:00:00Z');
+  const jsonl = [
+    agentName('ae/t/1'),
+    prompt('2026-09-12T09:00:00.500Z'),
+    response('2026-09-12T09:00:01Z', 'msg_1', [{ type: 'tool_use', id: 'tu_1', name: 'Read' }]),
+    costState(0.1925, 44777, 217, since - 300),
+    costState(0.1925, 44777, 217, since - 300),
+  ].join('\n');
+  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 1, toolCalls: 1, inputTokens: 1110, outputTokens: 5, costUsd: 0.1925, apiMs: 44777, toolMs: 217 });
+});
+
+test('no cost-state written since the attempt began is no cost — not 0, and not the cost of the session it continues', () => {
+  const since = Date.parse('2026-09-13T04:06:15Z');
+  const running = [
+    response('2026-09-13T03:55:08Z', 'msg_parent', []),
+    costState(28.3161, 2655415, 312510, Date.parse('2026-09-13T03:00:00Z')),
+    prompt('2026-09-13T04:06:16Z'),
+    response('2026-09-13T04:06:20Z', 'msg_child', []),
+  ].join('\n');
+  const u = transcriptUsage(running, since);
+  assert.equal(u.turns, 1);
+  for (const key of ['costUsd', 'apiMs', 'toolMs', 'unpricedModel']) assert.equal(key in u, false, `${key}: its process has not exited, and the parent's total is not its own`);
+});
+
+test("a resumed session's cost is its own: the total it exited with, less the total its session had when it began", () => {
+  // As one real session continued twice was written (2.1.272): each process's pair at its exit, then the next process's
+  // name, all under the first process's startTime — the count carried on.
+  const first = Date.parse('2026-09-15T00:04:43.817Z');
+  const second = Date.parse('2026-09-15T01:12:01Z');
+  const jsonl = [
+    agentName('ae/impl/1'),
+    prompt('2026-09-15T00:04:44Z'),
+    response('2026-09-15T00:10:00Z', 'msg_1', []),
+    costState(28.3161, 2655415, 312510, first),
+    costState(28.3161, 2655415, 312510, first),
+    agentName('ae/impl-try2/1'),
+    prompt('2026-09-15T01:12:05Z'),
+    response('2026-09-15T01:20:00Z', 'msg_2', []),
+    costState(43.0383, 3335346, 341815, first),
+    costState(43.0383, 3335346, 341815, first),
+    agentName('ae/impl-try3/1'),
+    prompt('2026-09-15T02:47:57Z'),
+    response('2026-09-15T02:50:00Z', 'msg_3', []),
+    costState(47.2087, 3771263, 356266, first),
+  ].join('\n');
+  const own = transcriptUsage(jsonl, second);
+  assert.deepEqual(own, { turns: 1, toolCalls: 0, inputTokens: 1110, outputTokens: 5, costUsd: 14.7222, apiMs: 679931, toolMs: 29305 },
+    'the second process: its total less the first, and its tokens only — not the third, which continued it under another name');
+  assert.equal(transcriptUsage(jsonl, first).costUsd, 28.3161, "the first, read again while its session is still listed: its own, not what the later ones spent");
+  assert.equal(transcriptUsage(jsonl, Date.parse('2026-09-15T02:47:53Z')).costUsd, 4.1704, 'the third');
+});
+
+test('a count carried on from a total the transcript does not show is no cost', () => {
+  const since = Date.parse('2026-09-15T01:12:01Z');
+  const jsonl = [prompt('2026-09-15T01:12:05Z'), costState(43.0383, 3335346, 341815, Date.parse('2026-09-15T00:04:43Z'))].join('\n');
+  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 }, 'its count began an hour before it did, and nothing says at what');
+
+  const otherCount = [
+    costState(5, 1000, 100, Date.parse('2026-09-14T22:00:00Z')),
+    prompt('2026-09-15T01:12:05Z'),
+    costState(43.0383, 3335346, 341815, Date.parse('2026-09-15T00:04:43Z')),
+  ].join('\n');
+  assert.equal('costUsd' in transcriptUsage(otherCount, since), false, 'a line before it from a count that began at another time is not what this one carried on from');
+});
+
+test('a session that used a model its harness could not price has no cost — a total too low reads as the whole — and says why', () => {
+  const since = Date.parse('2026-09-12T09:00:00Z');
+  const jsonl = [prompt('2026-09-12T09:00:01Z'), costState(0.05, 900, 10, since, true)].join('\n');
+  const u = transcriptUsage(jsonl, since);
+  assert.equal('costUsd' in u, false);
+  assert.equal(u.unpricedModel, true);
+  assert.equal(u.apiMs, 900, 'the time it waited is still a measurement');
+
+  const priced = transcriptUsage([prompt('2026-09-12T09:00:01Z'), costState(0.05, 900, 10, since)].join('\n'), since);
+  assert.equal(priced.costUsd, 0.05);
+  assert.equal('unpricedModel' in priced, false);
+});
+
+test("fold carries a cost onto the attempt — on its end, or measured after it — and a journal written before cost was measured folds as it did", () => {
+  const at = '2026-09-12T09:05:00Z';
+  const begun: Event[] = [
+    { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
+    { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
+  ];
+  const counted = { turns: 3, toolCalls: 5, inputTokens: 10, outputTokens: 2 };
+  const legacy = fold('t', [...begun, { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: counted }]);
+  assert.deepEqual(legacy.attempts[0]!.usage, counted, 'as recorded: no cost, and nothing standing in for one');
+
+  const printed = fold('t', [...begun, { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: { costUsd: 0.018, apiMs: 718 } }]);
+  assert.deepEqual(printed.attempts[0]!.usage, { costUsd: 0.018, apiMs: 718 }, 'on its end, as claude -p printed it');
+
+  const measured = fold('t', [
+    ...begun,
+    { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: counted },
+    { kind: 'measured', at, attempt: 1, usage: { ...counted, costUsd: 0.42, apiMs: 900, toolMs: 30 } },
+    { kind: 'measured', at, attempt: 2, usage: { costUsd: 9 } },
+  ]);
+  assert.deepEqual(measured.attempts[0]!.usage, { ...counted, costUsd: 0.42, apiMs: 900, toolMs: 30 }, 'measured once its session exited');
+  assert.equal(measured.attempts.length, 1, 'and one for an attempt that never started changes nothing');
+
+  const unmeasuredEnd = fold('t', [...begun, { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' }, { kind: 'measured', at, attempt: 1, usage: { costUsd: 1 } }]);
+  assert.deepEqual(unmeasuredEnd.attempts[0]!.usage, { costUsd: 1 });
+});
+
 test('an attempt its runner measured nothing about records null, and a person reads "not measured"', () => {
   const events: Event[] = [
     { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
@@ -75,13 +191,34 @@ test('a measured attempt prints what was measured, and names what was not', () =
     usageLine({ turns: 12, toolCalls: 31, inputTokens: 1_234_567, outputTokens: 20_400 }),
     '12 turns · 31 tool calls · 1.2M in · 20.4k out · cost not measured',
   );
-  assert.equal(usageLine({ turns: 4, toolCalls: 2, costUsd: 0.1054 }), '4 turns · 2 tool calls · tokens not measured · $0.105');
+  assert.equal(usageLine({ turns: 4, toolCalls: 2, costUsd: 0.1054 }), '4 turns · 2 tool calls · tokens not measured · $0.11');
   const [a] = fold('t', [
     { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1 },
     { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
     { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'harness', exitCode: 3, usage: { turns: 1, toolCalls: 0 } },
   ]).attempts;
   assert.equal(attemptLine(a!), 'attempt 1  failed  09:00:01 → 09:05:00 (4m 59s)  exit 3  1 turns · 0 tool calls · tokens not measured · cost not measured');
+});
+
+test('ae show and ae ls print what an attempt cost to the cent — never $0.00 for a cost under one — or that nobody measured it, and why', () => {
+  assert.equal(usd(3.0054), '$3.01');
+  assert.equal(usd(0.0042), '<$0.01', 'a resumed claude -p that spent less than a cent did not spend nothing');
+  assert.equal(usd(0), '$0.00');
+  assert.equal(usageLine({ turns: 1, toolCalls: 0, apiMs: 900, unpricedModel: true }), '1 turns · 0 tool calls · tokens not measured · cost not measured (a model without a price)');
+
+  const base: Event[] = [
+    { kind: 'filed', at: '2026-09-15T09:00:00Z', brief: 'read the notes\nforty times', cwd: '/r', maxAttempts: 1, harness: 'claude-detached', budgetUsd: 0.01 },
+    { kind: 'starting', at: '2026-09-15T09:00:01Z', attempt: 1 },
+  ];
+  const spent = fold('t-1', [...base, { kind: 'ended', at: '2026-09-15T09:00:04Z', attempt: 1, sessionId: 's', observed: 'failed', reason: 'budget', exitCode: 1, usage: { costUsd: 0.01804, apiMs: 718 } }]);
+  assert.equal(attemptLine(spent.attempts[0]!), 'attempt 1  failed (budget)  09:00:01 → 09:00:04 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02');
+
+  const shown = (state: ReturnType<typeof fold>, usage?: object) => taskLine({ id: 't-1', state, phase: state.settled ?? 'running (working)', sessionId: null, ...(usage ? { usage } : {}) });
+  assert.match(shown(spent), /  1\/1  \$0\.02  read the notes$/);
+  const measured = fold('t-1', [...base, { kind: 'ended', at: '2026-09-15T09:05:00Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: { turns: 12 } }, { kind: 'measured', at: '2026-09-15T09:05:01Z', attempt: 1, usage: { turns: 12, costUsd: 3.0054 } }]);
+  assert.match(shown(measured), /  1\/1  \$3\.01 · 12t  read the notes$/, 'measured once its session was let go');
+  assert.match(shown(fold('t-1', base), { turns: 3 }), /  1\/1  cost not measured · 3t  read the notes$/, 'running: no cost written yet');
+  assert.match(shown(fold('t-1', base.slice(0, 1))), /  0\/1  read the notes$/, 'no attempt, nothing to cost');
 });
 
 test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {

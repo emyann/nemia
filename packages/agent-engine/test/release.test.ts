@@ -35,6 +35,7 @@ const fakeClaude = () => {
   const registry = path.join(bin, 'registry.json');
   const calls = path.join(bin, 'calls.jsonl');
   const rmFails = path.join(bin, 'rm-fails');
+  const costOnStop = path.join(bin, 'cost-on-stop');
   fs.writeFileSync(registry, '[]');
   fs.writeFileSync(calls, '');
   fs.writeFileSync(path.join(bin, 'claude'), `#!${process.execPath}
@@ -48,6 +49,11 @@ if (args[0] === 'stop' || args[0] === 'rm') {
   const at = rows.findIndex((r) => r.sessionId.split('-')[0] === args[1]);
   if (at === -1) { process.stderr.write("No job matching '" + args[1] + "'\\n"); process.exit(1); }
   if (args[0] === 'rm' && fs.existsSync(${JSON.stringify(rmFails)})) { process.stderr.write('could not remove\\n'); process.exit(1); }
+  // As Claude Code does as a session's process exits, before \`stop\` returns: its cost, twice, into its transcript.
+  if (args[0] === 'stop' && fs.existsSync(${JSON.stringify(costOnStop)})) {
+    const cost = { type: 'cost-state', sessionId: rows[at].sessionId, ...JSON.parse(fs.readFileSync(${JSON.stringify(costOnStop)}, 'utf8')), startTime: rows[at].startedAt };
+    fs.appendFileSync(${JSON.stringify(path.join(config, 'projects', 'fake-project'))} + '/' + rows[at].sessionId + '.jsonl', JSON.stringify(cost) + '\\n' + JSON.stringify(cost) + '\\n');
+  }
   if (args[0] === 'stop') rows[at].state = 'stopped'; else rows.splice(at, 1);
   save();
   process.exit(0);
@@ -65,6 +71,8 @@ if (args[0] === '--bg') {
     releases: () => fs.readFileSync(calls, 'utf8').split('\n').filter(Boolean)
       .map((l) => JSON.parse(l) as string[]).filter((a) => a[0] === 'stop' || a[0] === 'rm'),
     rmFails: (fails: boolean) => (fails ? fs.writeFileSync(rmFails, '') : fs.rmSync(rmFails, { force: true })),
+    /** From now on, `stop` writes these totals into the session's transcript as a `cost-state` pair. */
+    costOnStop: (totals: object) => fs.writeFileSync(costOnStop, JSON.stringify(totals)),
   };
 };
 
@@ -121,6 +129,55 @@ test('a task that gave its closeout settles, and its session is stopped and remo
     assert.equal(v.phase, 'succeeded');
     assert.equal(v.sessionId, row!.sessionId, 'its id, as recorded when its attempt ended');
     assert.match(await engine.logs(id), /the prompt/, "and its transcript still read, through the task's own harness");
+  });
+});
+
+test("a session's cost, which Claude Code writes only as its process exits, is read once its release has stopped it — and put on the attempt once", async () => {
+  // Measured on 2.1.272: a session that gave its closeout still has its process, and its transcript no cost, until it is
+  // stopped — which is after its end is on the record.
+  for (const worktree of [false, true]) {
+    const claude = fakeClaude();
+    claude.costOnStop({ totalCostUSD: 0.25, totalAPIDuration: 4000, totalToolDuration: 300, hasUnknownModelCost: false });
+    await onPath(claude.bin, async () => {
+      const engine = createEngine({ root: tmp('root') });
+      const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: { type: 'object' }, ...(worktree ? { worktree: true } : {}) });
+      await engine.tick();
+      const [row] = claude.rows();
+      await sleep(10);
+      said(row!, { outcome: 'done' });
+
+      for (let i = 0; i < 3; i++) await engine.tick();
+      const at = `worktree: ${worktree}`;
+      const { state } = await engine.view(id);
+      assert.equal(state.settled, 'succeeded', at);
+      const entries = (await engine.feed(0)).entries.filter((e) => e.taskId === id).map((e) => e.event);
+      const ended = entries.find((e) => e.kind === 'ended');
+      assert.equal(ended?.kind === 'ended' ? ended.usage?.costUsd : 'no end', undefined, `${at}: its end was read while its process ran, with no cost in it`);
+      assert.equal(entries.filter((e) => e.kind === 'measured').length, 1, `${at}: measured once over three passes, though a worktree task's session stays listed`);
+      assert.deepEqual(state.attempts[0]?.usage, { turns: 1, toolCalls: 1, costUsd: 0.25, apiMs: 4000, toolMs: 300 }, `${at}: on the attempt`);
+      assert.deepEqual(claude.releases().map((c) => c[0]), worktree ? ['stop'] : ['stop', 'rm'], `${at}: released as before`);
+    });
+  }
+});
+
+test('a session listed done whose process still runs is stopped before it goes — its cost is written only then', async () => {
+  // Measured on 2.1.272: a `--bg` session that ended its turn was listed `done`, idle, with its pid, and its transcript had
+  // no cost until `claude stop`. Removed without a stop, nothing would have read what it cost.
+  const claude = fakeClaude();
+  claude.costOnStop({ totalCostUSD: 0.0143, totalAPIDuration: 1081, totalToolDuration: 0, hasUnknownModelCost: false });
+  await onPath(claude.bin, async () => {
+    const engine = createEngine({ root: tmp('root') });
+    const id = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    await engine.tick();
+    const [row] = claude.rows();
+    wrote(row!, 0);
+    claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done', pid: 424242 })));
+
+    await engine.tick();
+    const { state } = await engine.view(id);
+    assert.equal(state.settled, 'succeeded');
+    assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], 'stopped, since its process ran, then removed');
+    assert.equal(state.attempts[0]?.usage?.costUsd, 0.0143, 'and what it cost read in between');
   });
 });
 

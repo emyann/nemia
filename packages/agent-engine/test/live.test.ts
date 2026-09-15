@@ -43,7 +43,11 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { Effect, Layer } from 'effect';
 import { createEngine, type Engine, type Said, type TaskView } from '../src/facade.ts';
+import { file, tick, view } from '../src/engine.ts';
+import { Journal } from '../src/journal.ts';
+import { Runner } from '../src/runner.ts';
 
 const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
@@ -338,6 +342,78 @@ test('a settled --bg session is stopped and removed from claude agents — and a
     for (const s of sessions) {
       for (const verb of ['stop', 'rm']) {
         try { execFileSync('claude', [verb, s.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 }); } catch { /* released already */ }
+      }
+    }
+  }
+});
+
+const NOTES = Array.from({ length: 2000 }, (_, i) =>
+  `line ${i + 1}: ${i % 7 === 0 ? 'a note' : 'nothing here'} — the quick brown fox jumps over the lazy dog, again and again and again`).join('\n');
+/**
+ * A session that spends: a long file, read fifty lines a call. Told to read one short file forty times over, haiku did once
+ * (by hand) and once declined it as a waste and asked what was wanted, which Claude Code lists `blocked` — so every call
+ * reads lines it has not read.
+ */
+const LOOP_BRIEF = [
+  'NOTES.txt has 2000 lines. Read all of it with your Read tool, 50 lines per call — offset 1, then 51, then 101, and so on',
+  'to the end — one call at a time, saying nothing in between. Then reply with how many of its lines say "a note".',
+].join(' ');
+const notesIn = (label: string) => {
+  const dir = tmp(label);
+  fs.writeFileSync(path.join(dir, 'NOTES.txt'), NOTES);
+  return dir;
+};
+
+test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reason budget, with what it cost — and its task settles failed, with no attempt 2', {
+  skip,
+  timeout: 12 * 60_000,
+}, async (t) => {
+  const engine = createEngine({ root: tmp('budget-board') });
+  const ids = {
+    capped: await engine.file({
+      brief: LOOP_BRIEF, cwd: notesIn('budget-p'), harness: 'claude-detached', model: 'haiku', tools: ['Read'],
+      budgetUsd: 0.01, maxAttempts: 2, resume: 'always', deadlineSeconds: 480,
+    }),
+  };
+  await settleThenCheck(engine, ids, (views) => {
+    const { state } = views.capped!;
+    t.diagnostic(`settled ${state.settled}: ${JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom })))}`);
+    assert.equal(state.settled, 'failed', `settled: ${views.capped?.phase}`);
+    const [first] = state.attempts;
+    assert.deepEqual([first?.ended, first?.reason, first?.exitCode], ['failed', 'budget', 1], 'it ended at its cap, as the harness printed it');
+    assert.ok((first?.usage?.costUsd ?? 0) >= 0.01, `and cost at least its cap: ${first?.usage?.costUsd}`);
+    assert.equal(state.attempts.length, 1, 'a budget spent is spent: maxAttempts 2 and resume always start no attempt 2');
+  });
+});
+
+test('a claude --bg session given --max-budget-usd 0.01 spends past it and ends on its own — why file() refuses a budget on claude — and what it spent is measured once it is let go', {
+  skip,
+  timeout: 12 * 60_000,
+}, async (t) => {
+  // Through the Effect door, which refuses nothing: `createEngine().file()` refuses this task.
+  const root = tmp('bg-budget-board');
+  const layer = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), Runner.claude({ root }));
+  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
+  const id = await run(file({ brief: LOOP_BRIEF, cwd: notesIn('bg-budget'), model: 'haiku', tools: ['Read'], budgetUsd: 0.01, deadlineSeconds: 480 }));
+  let v = await run(view(id, new Map()));
+  try {
+    const until = Date.now() + 10 * 60_000;
+    while (!v.state.settled && Date.now() < until) {
+      await run(tick());
+      v = await run(view(id, new Map()));
+      if (!v.state.settled) await new Promise((r) => setTimeout(r, 5_000));
+    }
+    const [a] = v.state.attempts;
+    t.diagnostic(`settled ${v.state.settled}, attempt 1 ended ${a?.ended} (${a?.reason}), usage ${JSON.stringify(a?.usage)}`);
+    assert.equal(v.state.settled, 'succeeded', 'Claude Code ended it on its own terms, not at a cap');
+    // `claude -p` at this cap stopped after its first response or two, under $0.03.
+    assert.ok((a?.usage?.toolCalls ?? 0) >= 5, `it kept reading past the cap: ${a?.usage?.toolCalls} tool calls. If it stopped early, Claude Code may keep --max-budget-usd under --bg now: measure it, and lift the refusal in claudeBgRefuses`);
+    assert.ok((a?.usage?.costUsd ?? 0) > 0.03, `and what it spent, past the cap, was read once its release stopped it: ${a?.usage?.costUsd}`);
+  } finally {
+    const session = v.sessionId ?? v.state.attempts.at(-1)?.nativeId;
+    if (session) {
+      for (const verb of ['stop', 'rm']) {
+        try { execFileSync('claude', [verb, session.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 }); } catch { /* released already */ }
       }
     }
   }

@@ -38,7 +38,7 @@ Definition of done — a closed list, and it is closed:
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
 change seems to belong in here, check it against the boundary above first: it almost certainly
-knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp` — is a field
+knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp`, `budgetUsd` — is a field
 carried on the task and read by a runner, never a callback into `decide`.
 
 ### The one real decision in here: resume policy
@@ -48,7 +48,7 @@ carried on the task and read by a runner, never a callback into `decide`.
 | | continues when |
 |---|---|
 | `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating — or **unsigned**: it went quiet without the closing statement it was asked for |
-| `always` | any failure, including one the harness reported |
+| `always` | any failure, including one the harness reported — but a session that spent its budget |
 | `never` | nothing; every attempt starts clean |
 
 The default distinguishes *lost* from *failed* because they are different facts. A lost session's
@@ -56,6 +56,9 @@ transcript is real work that nobody judged. A failed one is a conclusion — and
 back into the context that produced a conclusion tends to reproduce it. `EndReason` is recorded on
 the `ended` event rather than inferred later, because by the time the next attempt starts, the
 evidence is gone.
+
+An attempt its harness ended at its spend cap — reason `budget`, below — is followed by no attempt under any policy: its
+task settles `failed`. A budget spent is spent.
 
 Verified against the live harness: attempt 2 resumed attempt 1 under **its own name**, got a fresh
 session id from the harness, and genuinely continued the conversation (`COUNT.txt` came back
@@ -89,7 +92,9 @@ word: a session whose end is on the record because it went quiet, or gave its cl
 working as far as `claude agents` is concerned. It is I/O applied to the record, not a
 decision — `decide` is not asked — and it is level-triggered: asked on every pass that still sees such
 a session, so a crash between writing the end and releasing is repaired by the next pass, and a
-release the harness refuses is asked again.
+release the harness refuses is asked again. A session listed `done` whose process still runs is stopped before it is
+removed too, and what it cost is read once it is stopped: Claude Code writes a session's cost only as its process exits
+([What an attempt consumed](#what-an-attempt-consumed)).
 
 **Measured before relying on it** (`test/live.test.ts`, Claude Code 2.1.270): a session told a word
 settled and was released in the same pass; it was gone from `claude agents`, `ae logs` still read its
@@ -228,12 +233,13 @@ after a space starts a comment. The keys are a closed list:
 | `closeoutSchema` | a JSON Schema file — the workload ends by answering in that shape |
 | `tools` | `Read, Grep, Glob` — the only tools the session has; see below |
 | `effort` | how hard the harness thinks, in its own words — see below |
+| `budgetUsd` | the most one attempt may spend, in dollars, digits only — `claude-detached` only; see below |
 
 **Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
 of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
-and stop its task on the first pass), a `resume` that is not a policy, a `cwd` or schema file that
+and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `resume` that is not a policy, a `cwd` or schema file that
 is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks:
@@ -241,7 +247,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -366,6 +372,38 @@ refused at spawn, `unstartable`: Codex would merge the two, and run the task's c
 operator's args and env.
 
 `ae start` has no `mcp` key: a brief's values are one line each, so the map is the API's for now.
+
+## What a session may spend: `budgetUsd`
+
+`budgetUsd: 0.25` is the most one attempt's session may spend, in dollars: a field on the task like `tools`, carried on
+the `filed` event and `State` and read only by a runner. `decide` never reads it, nor a cost — a test reads `decide` to keep
+it so. What `decide` learns is that a harness *ended* a session on its cap, a fact the harness printed:
+
+| harness | given | a session that reaches the cap |
+|---|---|---|
+| `claude-detached` | `--max-budget-usd 0.25` | ends: exit 1, and a result whose `subtype` is `error_max_budget_usd`. Its attempt ends `failed`, reason **`budget`**, with what it cost, and its task settles `failed` |
+| `claude` | refused at `file()`: a `--bg` session keeps no cap | — |
+| `codex` | refused at `file()`: `codex exec` has no spend cap, and its stream no cost | — |
+
+**Measured before it was built** (Claude Code 2.1.272, haiku, a $0.01 cap, a session told to read a file forty times).
+`claude -p` stopped after two responses: exit 1, `is_error`, `terminal_reason: budget_exhausted`, "Reached maximum budget
+($0.01)", and `total_cost_usd` $0.018 — the cap is checked after the response that crosses it, so a session spends past it
+by up to one response. `claude --bg` took the same flag without a word, read the file 42 times, spent $0.19 and was listed
+`done`; neither the registry nor its transcript said anything of a budget, and the flag's help says it "only works with
+--print". A cap that caps nothing is a guard that is silently inert, so `file()` refuses a budget on `claude`, naming
+`claude-detached`. The `--bg` runner still passes the flag to a task that reaches it through the Effect API, which refuses
+nothing (open issue 6), and `test/live.test.ts` fails the day a `--bg` session keeps it. What that leaves unbounded is
+open issue 17.
+
+**A budget spent is spent.** An attempt that ended on its budget ends its task: it settles `failed`, noting `attempt N
+spent its budget`, and no attempt follows — resumed or clean, whatever `maxAttempts` and `resume` say. To run it again,
+file the task again with a larger budget; to continue that session, with `resumeFrom` its id: `claude -p --resume` counts
+only its own process's spend (measured: a resumed session reported $0.0042 of its own, where the one it continued had
+spent $0.018). The harness counts one session's spend, and the engine counts none: an attempt that fails *under* its cap —
+the harness's verdict, or lost — is retried under the same cap, so `maxAttempts: 3` can still spend nearly three caps
+before one is reached.
+
+`ae start` takes `budgetUsd: 0.25` in a brief, digits only.
 
 ## What "done" means, and who decides it
 
@@ -579,8 +617,9 @@ and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 
 ## What an attempt consumed
 
-Every attempt records `usage` — `{ turns?, toolCalls?, inputTokens?, outputTokens?, costUsd? }` — and
-`exitCode`, copied from the sighting that ended it. **Each is `null` when nothing measured it,
+Every attempt records `usage` — `{ turns?, toolCalls?, inputTokens?, outputTokens?, costUsd?, apiMs?, toolMs?,
+unpricedModel? }` — and `exitCode`, copied from the sighting that ended it, or, for what a harness writes only as its
+session exits, read once the session was let go (`measured`, below). **Each is `null` when nothing measured it,
 never `0`**: a zero that means "nobody counted" reads as "cost nothing". A count its runner could not
 see is absent from `usage` in the same way, and `ae show` names it not measured. `decide` reads neither.
 An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of its `starting` and
@@ -588,10 +627,30 @@ An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of it
 
 | runner | `usage` | `exitCode` |
 |---|---|---|
-| `claude` | from the transcript it already reads: responses, tool calls and tokens since the session's own start; no cost | `null` — the process is the harness's |
-| `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens from `turn.completed`; no turns — a Codex turn is a prompt, not a model response — and no cost | the worker's record of the process |
-| `claude-detached` | `null` — not measured ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
+| `claude` | from the transcript it already reads: responses, tool calls and tokens since the session's own start; its cost, API time and tool time from the `cost-state` Claude Code writes as the session's process exits, read once the engine has let it go | `null` — the process is the harness's |
+| `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens from `turn.completed`; no turns — a Codex turn is a prompt, not a model response — and no cost: the stream carries none (seventeen runs of codex-cli 0.154.0 read) | the worker's record of the process |
+| `claude-detached` | its cost and API time, from the result `claude -p` prints (`total_cost_usd`, `duration_api_ms`); no turns, tokens or tool calls ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
 | `sdkRunner()` | from the SDK's result message, cost included when the SDK gives one | `null` |
+
+**What a session cost is the harness's figure, never a price worked out here.** Claude Code writes it into a `--bg`
+session's transcript as a `cost-state` line — `totalCostUSD`, `totalAPIDuration`, `totalToolDuration`, `startTime`,
+`hasUnknownModelCost` — and, measured on this machine's transcripts from 2.1.246 to 2.1.272 and by stopping sessions by
+hand, writes it **twice as the session's process exits, and never per turn**; `claude stop` returns once it has. A session
+that gives its closeout or goes quiet still has its process when the engine writes its end — so does one listed `done` —
+so that end has no cost. The engine's release of the session stops it and reads the transcript again, and the pass
+journals what it read as a **`measured`** entry for the attempt, which `fold` merges into its `usage`. Once: a session left
+listed is released on every pass, and a second read says nothing the record lacks. A session that had exited before its end
+was written has its cost on the end itself.
+
+**A resumed attempt's cost is its own.** `--resume` carries a session's count on: one session continued twice wrote
+$28.32, $43.04 and $47.21, each under its first process's `startTime`. So an attempt records the total its session exited
+with, less the total it had when the attempt began — the last `cost-state` before the attempt's first line — and not the
+session's total. That makes a cost mean what the attempt's tokens already mean, only what came after its start, and what a
+resumed `claude -p` reports, its own process's spend. A `cost-state` has no time of its own, so it belongs to the attempt
+whose lines it follows, and lines after the session was continued under another name (an `agent-name` line) are not the
+attempt's. No cost is given, rather than a wrong one: while no line has been written since the attempt began; when the
+count was carried on from a total the transcript does not show; and, for `costUsd` alone, when Claude Code could not price
+a model the session used — `unpricedModel: true`, since a total too low reads as the whole.
 
 Two measured traps shape the transcript count. A response is written as one line per content block,
 each repeating its message id and usage, so responses are counted once, by id. And a resumed
@@ -599,11 +658,13 @@ transcript holds its parent's conversation with the parent's timestamps, so only
 the session's `startedAt` in `claude agents --json` is counted; a row with no start reports no
 usage rather than a wrong one. A count read from a finished session is kept as its statement is: for
 that start, while the transcript is unchanged. `ae show` prints one line per attempt — when it ran, then what it
-consumed, naming what was not measured — and an attempt still running as `running since <start>`:
+consumed, naming what was not measured, and its cost to the cent (`<$0.01` under one: `$0.00` would read as free) — and an
+attempt still running as `running since <start>`. `ae ls` prints the latest attempt's cost beside its turns, `$3.01 · 12t`:
 
 ```
-attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · cost not measured
+attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · $4.87
 attempt 2  failed  09:05:02 → 09:05:40 (38s)  exit 1  usage not measured
+attempt 3  failed (budget)  09:05:41 → 09:05:44 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02
 ```
 
 Codex's stream is read by the same rule. Tokens are given only when every turn that started completed
@@ -865,8 +926,9 @@ reason `Runner` is a seam and not an import.
 | owns the session | the **harness** | **this process** |
 | engine dies mid-session | session runs on, next tick adopts it | session dies with it |
 | run state | `claude agents --json` | an in-memory map |
-| usage | turns, tool calls and tokens from the transcript, once the session is idle; no cost | from the SDK's result, cost included |
+| usage | turns, tool calls and tokens from the transcript, once the session is idle; its cost once the engine lets it go, from the `cost-state` Claude Code writes as the process exits | from the SDK's result, cost included |
 | narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session; `disallowedTools` → `--disallowedTools` | not wired: it passes only `model` and `permissionMode` |
+| a spend cap | refused: a `--bg` session keeps no `--max-budget-usd` (measured) — `claude-detached` keeps one | not wired |
 | MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json` and the task's `mcp`, never the operator's | not wired |
 | the conversation as events | `transcript`, from the session's transcript | not wired: no `transcript` |
 | one session by its name | `find`, from the session's registration | not wired: every read observes |
@@ -933,15 +995,16 @@ selector, and it is why no attempt can ever run twice.
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
-| `test/release.test.ts` | letting a finished Claude Code session go, at shipped defaults — a fake `claude` that keeps a registry |
+| `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
+| `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `budget` and settles its task, with attempts left; the flag reaches both Claude runners on every attempt |
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
-| `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
+| `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, and a session that ends its turn without its closing statement, against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, and a `--bg` session spending past one, its cost read once let go, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 
@@ -963,7 +1026,7 @@ MD
 node bin/ae.ts start brief.md    # file it
 node bin/ae.ts up                # reconcile on a timer — this is the daemon
 node bin/ae.ts ls                # every task, desired vs observed
-node bin/ae.ts show <id>         # the journal, then one line per attempt
+node bin/ae.ts show <id>         # the journal, then one line per attempt, with what it cost
 node bin/ae.ts logs <id>         # the session's own output
 node bin/ae.ts say <id> "…"      # tell its running session something; journalled
 node bin/ae.ts stop <id>
@@ -1032,8 +1095,8 @@ engine, not the worst.
 ## Deliberately missing
 
 Not "todo" — *excluded*, so the core stays legible: no board, no DAG or dependencies, no worktree
-management (the harness cuts worktrees; the engine only asks for one), no pull requests, no budget
-ceilings, no approvals, no multi-machine anything. Each is a kind built **on** this one, the way
+management (the harness cuts worktrees; the engine only asks for one), no pull requests, no spend
+ceilings across tasks (one attempt's own cap is a field on its task, `budgetUsd`), no approvals, no multi-machine anything. Each is a kind built **on** this one, the way
 `tekton.dev` is built on `batch/v1`. None of them requires changing `decide`, which is the test of
 whether this core is the right size.
 

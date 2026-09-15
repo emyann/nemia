@@ -80,6 +80,12 @@ export type Sighting = {
    * so `decide` reads this, and no runner turns it into `done`.
    */
   quietMs?: number;
+  /**
+   * The harness ended the session because it spent the budget its task gave it — as the harness printed it (`claude -p`'s
+   * result, `subtype: error_max_budget_usd`), never a cost compared with a budget, which nothing here does. `decide`
+   * records it as the end's reason, and settles the task: no attempt follows one that spent its budget.
+   */
+  budgetSpent?: true;
 };
 
 /**
@@ -100,8 +106,21 @@ export type Usage = {
   /** Every input token the model read, cached ones included. */
   inputTokens?: number;
   outputTokens?: number;
-  /** Only a runner that is told the cost has one. A transcript does not say. */
+  /**
+   * What the session cost, in dollars, as its harness priced it — never computed here from tokens. Claude Code writes a
+   * session's total into its transcript as its process exits (`cost-state`), and `claude -p` prints it as it exits
+   * (`total_cost_usd`). This attempt's own: a resumed session's total, which carries the one before it, less that one.
+   */
   costUsd?: number;
+  /** Milliseconds spent waiting on the model's API, as the harness counted them. This attempt's own, as `costUsd` is. */
+  apiMs?: number;
+  /** Milliseconds spent running tools, as the harness counted them. This attempt's own, as `costUsd` is. */
+  toolMs?: number;
+  /**
+   * The harness used a model it has no price for, so its total is not the whole cost: `costUsd` is absent rather than
+   * too low, and this says why (Claude Code's `hasUnknownModelCost`).
+   */
+  unpricedModel?: true;
 };
 
 /** The join key. Deterministic, so it survives anything that kills this process. */
@@ -123,11 +142,13 @@ const NUDGE = 'You stopped without giving your closing statement, and this task 
  *   `unsigned`     the session went quiet without the closing statement its task asked for. It stopped; it may
  *                  have finished, and it did not say so, which is all a statement is for. Recorded `failed`.
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
+ *   `budget`       the harness ended the session at the spend cap its task gave it. It was cut off, not concluded. The
+ *                  cap is the task's, once: the task settles `failed`, and no attempt follows, resumed or clean.
  *
  * Everything about resume policy hangs on this distinction, which is why it is recorded rather
  * than inferred later.
  */
-export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable';
+export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'budget';
 
 /** What a new attempt does with the one before it. A workload property, not a callback. */
 export type ResumePolicy =
@@ -180,6 +201,12 @@ export type Event =
        * read here: a runner hands them to its harness, and `decide` never learns what a server is.
        */
       mcp?: Record<string, McpServer>;
+      /**
+       * The most one attempt's session may spend, in dollars — per attempt, as the harness keeps it: `claude -p
+       * --max-budget-usd` counts one process's spend. Carried, never read here: a runner hands it to its harness, and
+       * `decide` learns only that a harness ended a session on it (`Sighting.budgetSpent`).
+       */
+      budgetUsd?: number;
     }
   /**
    * INTENT: we are about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is told instead of
@@ -197,6 +224,12 @@ export type Event =
    * come from the same sighting, when its runner measured them; `decide` reads neither.
    */
   | { kind: 'ended'; at: string; attempt: number; sessionId: string; observed: Observed; reason: EndReason; nativeId?: string; closeout?: unknown; usage?: Usage; exitCode?: number; error?: string }
+  /**
+   * What an ended attempt consumed, read once its session was let go — for a harness that writes part of it only as the
+   * session's process exits, which is after the end was written (Claude Code's cost). Merged into the attempt's `usage`.
+   * A fact for the record, written once; `decide` never reads it.
+   */
+  | { kind: 'measured'; at: string; attempt: number; usage: Usage }
   /** The operator asked for it to stop. */
   | { kind: 'stop-requested'; at: string }
   /**
@@ -265,6 +298,8 @@ export type State = {
   disallowedTools?: string[];
   effort?: string;
   mcp?: Record<string, McpServer>;
+  /** The spend cap, per attempt. See the `filed` event. `decide` never reads it. */
+  budgetUsd?: number;
   attempts: Attempt[];
   /** What a person said to the task's sessions while they ran, in the order it was said. Carried, never read. */
   said: Said[];
@@ -286,7 +321,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';
         s.resumeFrom = e.resumeFrom;
         s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
-        s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.effort = e.effort; s.mcp = e.mcp;
+        s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.effort = e.effort; s.mcp = e.mcp; s.budgetUsd = e.budgetUsd;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}), usage: null, exitCode: null });
@@ -299,6 +334,11 @@ export function fold(taskId: string, events: readonly Event[]): State {
       case 'ended': {
         const a = s.attempts.find((x) => x.n === e.attempt);
         if (a) { a.ended = e.observed; a.endedAt = e.at; a.reason = e.reason; a.nativeId = e.nativeId ?? a.nativeId; a.closeout = e.closeout; a.usage = e.usage ?? null; a.exitCode = e.exitCode ?? null; a.error = e.error ?? a.error; }
+        break;
+      }
+      case 'measured': {
+        const a = s.attempts.find((x) => x.n === e.attempt);
+        if (a) a.usage = { ...a.usage, ...e.usage };
         break;
       }
       case 'stop-requested': s.stopRequested = true; break;
@@ -380,6 +420,8 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   if (!last || last.ended !== null) {
     if (last?.ended === 'done') return { do: 'settle', outcome: 'succeeded' };
     if (last?.ended === 'stopped') return { do: 'settle', outcome: 'stopped', note: 'session stopped' };
+    // A budget spent is spent: the cap is the task's, once. No attempt follows, whatever `maxAttempts` or `resume` says.
+    if (last?.reason === 'budget') return { do: 'settle', outcome: 'failed', note: `attempt ${last.n} spent its budget. File the task again with a larger one to run it again` };
     if (state.attempts.length >= state.maxAttempts) {
       const why = last?.reason === 'unsigned' ? ': the last went quiet without the closing statement it was asked for' : '';
       return { do: 'settle', outcome: 'failed', note: `${state.attempts.length} attempt(s), none succeeded${why}` };
@@ -409,7 +451,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     }
     const unsigned = quiet && state.closeoutSchema !== undefined && sighting.closeout === undefined;
     return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: unsigned ? 'failed' : quiet ? 'done' : sighting.state,
-      reason: unsigned ? 'unsigned' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
+      reason: unsigned ? 'unsigned' : sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
   }
 
   if (!last.spawnedAt) return { do: 'spawn', attempt: last.n, name: nameFor(state.taskId, last.n) };

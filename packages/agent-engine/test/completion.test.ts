@@ -265,6 +265,14 @@ test('at shipped defaults Claude Code is given neither --tools nor --effort', as
   assert.equal(args.includes('--tools'), false, 'no list: every tool the harness has');
   assert.equal(args.includes('--disallowedTools'), false, 'no deny list: nothing denied beyond the settings');
   assert.equal(args.includes('--effort'), false, "no effort: the harness's own");
+  assert.equal(args.includes('--max-budget-usd'), false, 'no budget: no cap');
+});
+
+test('a budget reaches Claude Code as --max-budget-usd, and the prompt still comes last', async () => {
+  // `file()` refuses a budget on this harness, which keeps none under `--bg`; a task that reaches the runner with one gets it.
+  const args = await argvOf({ budgetUsd: 0.5, tools: ['Read'] });
+  assert.equal(args[args.indexOf('--max-budget-usd') + 1], '0.5');
+  assert.equal(args.at(-1), 'the prompt');
 });
 
 test('tools reach Claude Code as --tools, and a flag ends the list before the prompt', async () => {

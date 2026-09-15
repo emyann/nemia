@@ -103,6 +103,8 @@ export type HarnessOutput = {
   closeout?: { payload: unknown };
   /** What the session consumed, as far as the output says: every field a measurement, absent when not. */
   usage?: Usage;
+  /** The harness says it ended the session because it spent its budget. */
+  budgetSpent?: true;
 };
 
 /** How long a run file may go unbeaten before `observe` calls it dead. Worker beats every 5s. */
@@ -267,6 +269,7 @@ export const detachedOps = (spec: HarnessSpec, root: string): RunnerOps => {
           // killed by a signal, or never started — and that is reported as no code, not as a code.
           ...(typeof run.exitCode === 'number' && run.exitCode >= 0 ? { exitCode: run.exitCode } : {}),
           ...(output?.read.usage ? { usage: output.read.usage } : {}),
+          ...(output?.read.budgetSpent ? { budgetSpent: true as const } : {}),
         });
       }
       return m;
@@ -598,6 +601,11 @@ export const codex: HarnessSpec = {
     if (task.disallowedTools?.length) {
       return `\`disallowedTools: ${JSON.stringify(task.disallowedTools)}\` is a deny list, and Codex has no tool list to take from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` runs commands and writes nothing. Leave \`disallowedTools\` off a Codex task, and name the sandbox.`;
     }
+    // A cap would be dropped without a word: `codex exec --help` (0.154.0) has no spend cap, and its stream counts tokens,
+    // not dollars — its config's budgets are token budgets.
+    if (task.budgetUsd !== undefined) {
+      return `\`budgetUsd: ${task.budgetUsd}\` is a spend cap in dollars, and \`codex exec\` has none: 0.154.0 has no such flag, and reports no cost to cap. Leave \`budgetUsd\` off a Codex task, or file it on \`claude-detached\`, which ends a session at its cap.`;
+    }
     const sse = Object.entries(task.mcp ?? {}).find(([, s]) => 'url' in s && s.type === 'sse');
     if (sse) {
       return `\`mcp.${sse[0]}\` is an SSE server, and Codex connects only to stdio and streamable HTTP servers. Give \`type: "http"\` if the server speaks it, or leave the server off a Codex task.`;
@@ -645,13 +653,23 @@ export const codex: HarnessSpec = {
 };
 
 /**
- * The final answer in `claude -p --output-format json`'s output: the `structured_output` of its one
- * `result` object, which Claude Code fills when it was given `--json-schema` and the session answered
- * in that shape. The last result line is taken and every other line skipped — the worker captures
- * stderr beside it. No result, a result without the field, or one whose field is `null`, is no answer.
+ * What `claude -p --output-format json` says in its one `result` object. The last result line is taken and every other
+ * line skipped — the worker captures stderr beside it.
+ *
+ * The final answer is its `structured_output`, which Claude Code fills when it was given `--json-schema` and the session
+ * answered in that shape. No result, a result without the field, or one whose field is `null`, is no answer.
+ *
+ * What the session cost is its `total_cost_usd`, and the time it waited on the API its `duration_api_ms` (2.1.272). The
+ * cost is the process's own: a `claude -p --resume` printed $0.0042 of its own where the session it continued had
+ * spent $0.018 — so it is the attempt's own, as the Claude runner's difference is. The result counts no tool time, and
+ * its turns and tokens are not read here: its `usage` said 0 tokens beside a `modelUsage` that counted thousands.
+ *
+ * A session that stopped at its `--max-budget-usd` says so as its `subtype`, `error_max_budget_usd` — measured on 2.1.272
+ * at a $0.01 cap: exit 1, `is_error`, `terminal_reason: budget_exhausted`, "Reached maximum budget ($0.01)", and a
+ * `total_cost_usd` of $0.018, since the cap is checked after the response that crosses it.
  */
 export const claudeResultOutput = (output: string): HarnessOutput => {
-  let result: { type?: unknown; structured_output?: unknown } | undefined;
+  let result: { type?: unknown; subtype?: unknown; structured_output?: unknown; total_cost_usd?: unknown; duration_api_ms?: unknown } | undefined;
   for (const line of output.split('\n')) {
     if (!line.includes('"result"')) continue;
     try {
@@ -659,7 +677,15 @@ export const claudeResultOutput = (output: string): HarnessOutput => {
       if (parsed?.type === 'result') result = parsed;
     } catch { /* not the result line */ }
   }
-  return result?.structured_output != null ? { closeout: { payload: result.structured_output } } : {};
+  if (!result) return {};
+  const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
+  const [costUsd, apiMs] = [n(result.total_cost_usd), n(result.duration_api_ms)];
+  const usage: Usage = { ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
+  return {
+    ...(result.structured_output != null ? { closeout: { payload: result.structured_output } } : {}),
+    ...(Object.keys(usage).length ? { usage } : {}),
+    ...(result.subtype === 'error_max_budget_usd' ? { budgetSpent: true as const } : {}),
+  };
 };
 
 /** Claude Code run the same way — detached by us rather than by the harness. For comparison. */
@@ -685,6 +711,8 @@ export const claudeDetached: HarnessSpec = {
       ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),
       ...(r.worktree ? ['--worktree', worktreeName(r)] : []),
+      // The spend cap: `claude -p` ends the session once a response takes it past, and says so in its result.
+      ...(r.budgetUsd !== undefined ? ['--max-budget-usd', String(r.budgetUsd)] : []),
     ],
   }),
   readOutput: claudeResultOutput,

@@ -979,10 +979,11 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 
 Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done. In flight 2026-09-14: B9 (apps, items 11–15 in one) as
 `five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
-`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 done, `26ebf0e`. In flight: E8 `cost-measured-and-a-budget-s-eou6`
-(engine, `./workflows/dev`) and W7 `cost-measured-and-a-budget-s-ophw` (agent-workflows, `--after` E8 — the first real use of
-the edge; restarted once with an amended brief after E8 measured that a `--bg` session ignores `--max-budget-usd`: the
-tick holds the cap for `claude` steps by reading `costUsd` each pass and stopping past it). Then B10 (the board's cost).
+`three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 done, `26ebf0e`; E8 done, `fc493e6`. In flight: W7 `cost-measured-and-a-budget-s-tdan` (agent-workflows, `--after` E8 — the first real use of
+the edge; restarted twice with an amended brief as E8 measured: a `--bg` session ignores `--max-budget-usd`, and writes no
+cost until its process exits, so a budget on a `claude` step bounds *further* spend — `over budget` once a try's cost is
+known, no retry or round on the run's own word, `wf retry --budget` to raise it; `claude-detached` is capped by the
+harness). Then B10 (the board's cost).
 Left after them: items 20 (settings), 27, 28, 30 (small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
@@ -1075,7 +1076,7 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
     measured". E8 (engine: cost read from the harness into `usage`, `budgetUsd` on the task → `--max-budget-usd`, how a
     capped session ends, measured live), W7 (agent-workflows: `budget:` on a step, carried on every filing; cost per
     step and per run in `wf ls`/`wf decide`; `budget exhausted` in the vocabulary, `wf retry --budget`), then B10
-    (apps: cost on the card, the run page and the timeline). *E8's round-1 review measured on 2.1.270 that a
+    (apps: cost on the card, the run page and the timeline). *E8 done, `fc493e6`. E8's round-1 review measured on 2.1.270 that a
     `claude --bg` session ignores `--max-budget-usd`, so the engine refuses `budgetUsd` on `claude` and takes it on
     `claude-detached` only; the operator's decisions went to E8's session by `wf say` (a spent budget is spent: no
     retry under `maxAttempts`; keep the refusal, record the measurement) and W7's brief was amended: the tick holds the

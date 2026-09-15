@@ -1345,18 +1345,21 @@ What was built:
   value, each naming the fix. Refused on codex in the engine's words, which `test/vocabulary.test.ts` holds the copy to. Frozen on the
   run.
 - **Two words in the status vocabulary.** `over budget` (`stepStatus`, still pure) means the step's ended tries have together cost
-  more than the cap in force, and another session of it is the way on: a try, from a status a try is taken from, or a round its loop
-  asks for. `budget exhausted` means its harness ended its session at the cap, the engine's reason `budget`. Both stop what follows
+  the cap in force or more, so nothing is left, and another session of it is the way on: a try, from a status a try is taken from (a
+  check that refused, not one that did not finish), or a round its loop asks for. `budget exhausted` means its harness ended its session at the cap, the engine's reason `budget`. Both stop what follows
   and wait on a person. `decision` lists them under `overBudget` and `budgetExhausted`, and calls the run `blocked`.
 - **The run's own word spends nothing past the cap.** `retries:` files no try of such a step. A looping step whose round would file a
   step of its loop over its budget reads `over budget` itself, so no round goes and nothing after the loop is filed.
 - **A person raises it**, with `wf retry <run> <step> --budget <amount>` or `wf round <run> [<step>] --budget <amount>`. `retryable`
-  carries `raise` for the two statuses only. `retryRefusal` and `roundAsk` refuse, by name, a try or a round of them without
+  carries `raise` for the two statuses, and for a step whose check did not finish past its budget, whose free recheck is offered first. `retryRefusal` and `roundAsk` refuse, by name, a try or a round of them without
   `--budget` or with one not above what was spent, and `--budget` anywhere else. The amount rides on the ask file, which the tick
   also refuses to honour when it is not dollars or rides on a recheck. The tick keeps it on the try the ask replaced
   (`EarlierTry.budget`), and `budgetOf` reads the cap in force off the record, so it holds after a restart.
-- **On `claude-detached` the cap goes to the engine as `budgetUsd`** on the first filing, every try and every round (`budgetUsdFor`).
-  On `claude` it never does, since the engine refuses it there.
+- **On `claude-detached` what is left of the cap goes to the engine as `budgetUsd`**: the cap less what the step's tries have cost, on
+  the first filing, every try and every round (`budgetUsdFor`), so the harness holds the tries together to it. On `claude` it never
+  does, since the engine refuses it there.
+- **A try's brief says how its last try ended on its own work** (`ownStatus`: unsigned, failed, its check). Beside that it says the
+  budget was reached and raised, and never in its place.
 - **Cost on the screens.** `wf ls` puts each step's tries' cost beside its word (`$3.01`, or `≥$3.01` where an ended attempt has
   none) and the run's total on its line. On `wf decide`, `used` gains `api 8m06s · tools 2s`. `cost` prints the dollars, the tries
   together where there were several, and the cap in force. The run's total follows the steps, and each try's cost is on the
@@ -1372,6 +1375,15 @@ What was decided, and why:
   filed for it, so there is nothing to hold, and holding its followers would fail a run over work that passed.
 - **A round is held by any step of the loop over its budget**, not only the one `loop:` names, since the round files each of them again.
 - **A recheck needs no `--budget`.** It runs the check, which costs nothing.
+- **Held at the cap, not only past it.** With nothing left, any session spends past the cap; and a `claude-detached` step with nothing
+  left would be handed a `budgetUsd` of 0, which the engine refuses at `file()`.
+- **A check that did not finish holds nothing.** It is no verdict on the work (CLAUDE.md), and its way on is the check again, for
+  nothing. So the step reads `failed (check)` past its budget, as without one. A new session of it still needs `--budget`, since that
+  would spend past the cap.
+
+Round 2's review found three of these missing, and each was fixed: an unfinished check held as `over budget`, which hid
+`CHECK DID NOT FINISH` and offered a raise where a free recheck was the way on; each `claude-detached` filing handed the whole cap, so
+`retries: 2` could spend nearly three; and a try's brief told the budget sentence in place of why its last try ended.
 
 What was measured:
 
@@ -1379,12 +1391,15 @@ What was measured:
   refusal held to the engine's.
 - `test/run.test.ts` (12 new), all pure:
   - `taskSpend` over ended, running and unstartable attempts;
-  - a claude step over its budget reads it with the amounts, files no `retries:` try, and is offered `--budget`; at, under or
-    without a measured cost it reads as before;
+  - a claude step over its budget reads it with the amounts, files no `retries:` try, and is offered `--budget`; at the cap it is
+    held too; under it, or without a measured cost, it reads as before;
+  - a step whose check did not finish past its budget, stopped or at its deadline, reads `failed (check)`: `wf decide` says its check
+    did not finish, offers `--recheck` first, and a session is refused without `--budget`;
+  - a try's brief past a budget keeps why its last try ended, for each status, with the budget sentence beside it;
   - an ask needs a `--budget` above what was spent, the record keeps it, and a try past the new cap is held again;
   - each `wf retry` refusal, by name;
   - `budget exhausted` and its refusals, including a session cut off before its cost was written;
-  - `budgetUsdFor`;
+  - `budgetUsdFor`: what is left, to the millionth, never 0;
   - a loop held on implement's budget, `wf round --budget`, and the cap the round keeps; the same at the cap;
   - a step signed off blocked, before and after its session settles;
   - `wf ls`' cost words, `costLine` and `runCostLines`, and a try's cost on the timeline.
@@ -1392,7 +1407,9 @@ What was measured:
   - the frozen key;
   - a claude step whose check refused past its budget is not re-filed, is refused `wf retry` without `--budget` or under what it
     spent, is filed with a larger one, and is held again past the new cap;
-  - a `claude-detached` step's `budgetUsd` on its filings, `budget exhausted`, and a try whose larger cap is carried;
+  - a `claude-detached` step's `budgetUsd` on its filings, `budget exhausted`, and a try whose larger cap is carried less what was spent;
+  - a `claude-detached` step's tries sharing its cap: `retries:` files try 2 with what is left, and at the cap files none;
+  - a nudge of an unsigned step past its budget told that it gave no closeout, beside the budget;
   - a loop held on implement's budget, and `wf round --budget`;
   - the CLI's `--budget` refusals.
 - `test/radius.test.ts` (1 new) and `test/decide.test.ts` (1 new): `used` with the api and tool time, and both screens with a
@@ -1406,9 +1423,12 @@ What was measured:
   - `budgetUsd` handed to every harness: 3, and to none: 2;
   - `budget:` on codex taken: 1;
   - `budget: 0` taken: 2;
-  - the raised cap not kept on the record: 2.
-- From the root, `npx turbo run test --force` and `npm run typecheck` passed: agent-engine 307 (299 passed, 8 skipped),
-  agent-workflows 400 (399 passed, 1 skipped), api 129 and web 164. Typecheck was clean in all four.
+  - the raised cap not kept on the record: 2;
+  - round 2's guards: a check that did not finish held as over budget, 1; the whole cap handed each filing, 3; held only past the cap,
+    2; the budget offer before the recheck, 1; the brief's budget sentence dropped, 3; the brief handed the masked status, 2;
+    `wf decide`'s offers read with no verdict, 1.
+- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 404 (403 passed,
+  1 skipped), api 129 and web 164. Typecheck was clean in all four.
 
 What it leaves:
 
@@ -1424,6 +1444,9 @@ What it leaves:
   try ended moments earlier can be filed before that cost is on the view, without the `--budget` it would have needed. That try is
   the overrun.
 - **The cap is per step.** Nothing sets a budget for a run or a workflow: the run's total is shown, and held to nothing.
+- **`maxAttempts:` on a `claude-detached` step hands each attempt what is left.** The engine starts an attempt that failed under its cap
+  again within one filing, with the same `budgetUsd`, and counts no spend of its own. So `maxAttempts: 3` can spend nearly three times
+  what was left. The run's own default is one attempt.
 - **Only what was measured counts.** An attempt killed before its harness wrote a cost, or run on a model it could not price, adds
   nothing to what a step has spent. `wf ls` marks such a step's cost `≥`, and a step that such an attempt took past its cap is not
   held.

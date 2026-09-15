@@ -43,24 +43,28 @@ test('working + busy is running, however long it lasts', async () => {
   try {
     let t = 0;
     const ops = claudeOps({ now: () => t, transcriptTime: async () => 1 });
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'working');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined);
     t += 10 * QUIESCENT_AFTER_MS;
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'working', 'busy is never quiescent');
+    const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
+    assert.equal(seen?.state, 'working');
+    assert.equal(seen?.quietMs, undefined, 'busy is never quiet');
   } finally { restore(); }
 });
 
-test('working + idle becomes done only after the window, not before', async () => {
+test("working + idle is reported quiet only after the window, not before — and stays working: what quiet means is the engine's", async () => {
   const restore = withFakeClaude(row('working', 'idle'));
   try {
     let t = 0;
     // The window is measured from the transcript's last write, so that is where the clock starts.
     const ops = claudeOps({ now: () => t, transcriptTime: async () => 0 });
 
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'working', 'it just spoke');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined, 'it just spoke');
     t = QUIESCENT_AFTER_MS - 1;
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'working', 'one millisecond short');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined, 'one millisecond short');
     t = QUIESCENT_AFTER_MS;
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'done', 'and now it is finished');
+    const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
+    assert.equal(seen?.quietMs, QUIESCENT_AFTER_MS, 'and now it has stopped, for this long');
+    assert.equal(seen?.state, 'working', 'reported, not concluded: never `done` — a task that asked for a statement and got none has not finished');
   } finally { restore(); }
 });
 
@@ -75,13 +79,13 @@ test('a transcript that moves PUSHES THE DEADLINE OUT — it was between steps, 
 
     t = QUIESCENT_AFTER_MS - 1_000;
     written = t;                         // the session wrote something: it is alive
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'working');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined);
 
     t += QUIESCENT_AFTER_MS - 1_000;     // past the ORIGINAL deadline, not the new one
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'working', 'deadline moved with it');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined, 'deadline moved with it');
 
     t += 1_000;
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'done', 'quiet again, and now past it');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, QUIESCENT_AFTER_MS, 'quiet again, and now past it');
   } finally { restore(); }
 });
 
@@ -92,7 +96,7 @@ test('a cold transcript is NOT silence while the session is busy', async () => {
   const restore = withFakeClaude(row('working', 'busy'));
   try {
     const ops = claudeOps({ now: () => 100 * QUIESCENT_AFTER_MS, transcriptTime: async () => 0 });
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'working');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined);
   } finally { restore(); }
 });
 
@@ -105,8 +109,8 @@ test('the verdict does not depend on WHO is asking, or for how long', async () =
     const at = (t: number) => claudeOps({ now: () => t, transcriptTime: async () => 0 });
     const first = await Effect.runPromise(at(QUIESCENT_AFTER_MS).observe);
     const second = await Effect.runPromise(at(QUIESCENT_AFTER_MS).observe);   // a fresh runner, no history
-    assert.equal(first.get('ae/t-1/1')?.state, 'done');
-    assert.equal(second.get('ae/t-1/1')?.state, 'done', 'a runner that has never seen this session agrees');
+    assert.equal(first.get('ae/t-1/1')?.quietMs, QUIESCENT_AFTER_MS);
+    assert.equal(second.get('ae/t-1/1')?.quietMs, QUIESCENT_AFTER_MS, 'a runner that has never seen this session agrees');
   } finally { restore(); }
 });
 
@@ -114,7 +118,7 @@ test('no transcript, no verdict — we do not settle on one idle sample', async 
   const restore = withFakeClaude(row('working', 'idle'));
   try {
     const ops = claudeOps({ now: () => 100 * QUIESCENT_AFTER_MS, transcriptTime: async () => undefined });
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'working', 'the deadline handles this one');
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined, 'the deadline handles this one');
   } finally { restore(); }
 });
 
@@ -125,7 +129,23 @@ test('blocked is never quiescent — a session waiting on a person is not finish
     const ops = claudeOps({ now: () => t, transcriptTime: async () => 500 });
     await Effect.runPromise(ops.observe);
     t += 10 * QUIESCENT_AFTER_MS;
-    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.state, 'blocked');
+    const seen = (await Effect.runPromise(ops.observe)).get('ae/t-1/1');
+    assert.equal(seen?.state, 'blocked');
+    assert.equal(seen?.quietMs, undefined, 'never quiet');
+  } finally { restore(); }
+});
+
+test('quiet is counted from the later of its last write and its own start: a session resumed over a cold transcript has just begun', async () => {
+  // `--resume` continues a transcript that may have been cold for an hour. Measured from the transcript alone, the
+  // continuation would be quiet the moment the registry listed it idle, and its attempt would end before it began.
+  const started = 10 * QUIESCENT_AFTER_MS;
+  const restore = withFakeClaude(JSON.stringify([{ name: 'ae/t-1/2', sessionId: 's-1', state: 'working', status: 'idle', kind: 'background', startedAt: started }]));
+  try {
+    let t = started + 1_000;
+    const ops = claudeOps({ now: () => t, transcriptTime: async () => 0, closeoutFrom: async () => undefined, usageFrom: async () => undefined });
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/2')?.quietMs, undefined, 'its transcript is cold, and it started a second ago');
+    t = started + QUIESCENT_AFTER_MS;
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/2')?.quietMs, QUIESCENT_AFTER_MS, 'quiet for the window since it started');
   } finally { restore(); }
 });
 

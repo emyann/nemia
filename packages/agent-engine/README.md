@@ -47,7 +47,7 @@ carried on the task and read by a runner, never a callback into `decide`.
 
 | | continues when |
 |---|---|
-| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating |
+| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating — or **unsigned**: it went quiet without the closing statement it was asked for |
 | `always` | any failure, including one the harness reported |
 | `never` | nothing; every attempt starts clean |
 
@@ -72,7 +72,7 @@ JOIN KEY  a name we choose        →  claude --name ae/<task>/<attempt>
 ```
 
 That's the whole engine. `decide()` is pure, total, and returns exactly one step; everything
-effectful is the four verbs of `Runner`, and three optional ones: one that lets a finished session go, one that reads its conversation, and one that hands a running session a person's words. Kubernetes' control plane for the loop, durable
+effectful is the four verbs of `Runner`, and four optional ones: one that finds a session by its name for less than observing them all, one that lets a finished session go, one that reads its conversation, and one that hands a running session a person's words. Kubernetes' control plane for the loop, durable
 execution's journal for the memory, and the local harness as the kubelet.
 
 **The engine never holds a session.** `claude --bg` hands it to the harness, which already owns
@@ -85,8 +85,8 @@ Claude Code keeps every `--bg` session in `claude agents` until something remove
 has given its closeout stays there `working/idle` for good — every run used to leave its sessions
 behind, to be cleared by hand. So once an attempt's end is on the record, the engine **releases** its
 session: `claude stop` if it still runs, then `claude rm`. Whether it still runs is the registry's
-word, not the runner's: a session quiet for ninety seconds is reported `done`, and `claude agents`
-still has it working. It is I/O applied to the record, not a
+word: a session whose end is on the record because it went quiet, or gave its closeout, is still
+working as far as `claude agents` is concerned. It is I/O applied to the record, not a
 decision — `decide` is not asked — and it is level-triggered: asked on every pass that still sees such
 a session, so a crash between writing the end and releasing is repaired by the next pass, and a
 release the harness refuses is asked again.
@@ -145,7 +145,7 @@ Bring your own harness — three ways, in order of how much you have to write:
 |---|---|
 | `'claude-bg'` | Claude Code's background sessions; it keeps the registry |
 | a `HarnessSpec` | any CLI that runs a prompt and exits — a command and an exit code |
-| a `PromiseRunner` | four async methods, and three optional ones, `release`, `transcript` and `say`, for anything else at all |
+| a `PromiseRunner` | four async methods, and four optional ones, `find`, `release`, `transcript` and `say`, for anything else at all |
 
 **`src/cli.ts` imports `createEngine`, and types, and nothing else from the engine.** That is
 deliberate and it is the test: if the Promise API were not enough to write the CLI with, it would
@@ -367,7 +367,7 @@ operator's args and env.
 
 `ae start` has no `mcp` key: a brief's values are one line each, so the map is the API's for now.
 
-## What "done" means, and why the harness decides it
+## What "done" means, and who decides it
 
 **`state: done` is not a reliable completion signal for the work this engine is for.** Measured
 across five sessions:
@@ -449,12 +449,15 @@ Two fields, two questions. Reading them as `state ?? status` discarded the usefu
 an interactive session's `status: idle` be recorded as a *failure*, since `idle` is not a state at
 all. `busy` is likewise a status, and no longer sits in `Observed` pretending otherwise.
 
-So `claudeOps` answers the question itself:
+So `claudeOps` answers the half of the question that is its harness's vocabulary — whether a session has stopped:
 
 ```
-done  ⟸  state = done
-      ⟸  state = working AND not busy AND transcript quiet, for 90 seconds
+done   ⟸  state = done
+quiet  ⟸  state = working AND not busy AND nothing written for 90 seconds,
+          counted from its last write or its own start, whichever is later
 ```
+
+and reports quiet as a fact, `quietMs`, with the state left `working`. What quiet means is `decide`'s (below).
 
 **The clock is the transcript's, not the observer's.** A session that speaks pushes its own
 deadline out, which is what keeps a pause between self-driven steps from being mistaken for an
@@ -478,8 +481,41 @@ middle of a long tool call — which writes nothing for minutes at a time (35 se
 session we sampled). It is one gate rather than two, held deliberately, and pinned by a test. A
 session whose transcript cannot be read gets no verdict at all; the deadline is for those.
 
-The quiet rule still ends a task that asked for a closeout and never gave one as `succeeded` —
-open issue 1 in `docs/open-issues.md`, deferred, with the reason there.
+### Quiet, when a closing statement was asked for and none came
+
+Quiet used to be `done`, for every task. A task that had asked for a closeout, and whose session ended its turn
+without one — a crash, a rate limit, a model that forgot — settled `succeeded` with nothing said, and whatever waited
+on it ran: a false completion, the one failure worse than a stall. Measured at shipped defaults before the fix, with a
+fake `claude` listing the session working and idle over a transcript quiet for ten minutes: `ended: done`, `reason:
+harness`, `settled: succeeded`, no closeout. Only the journal knows whether a statement was asked for, so the runner
+reports how long a session has been quiet, and `decide` says what that means:
+
+| the task | quiet ends the attempt | and then |
+|---|---|---|
+| asked for no `closeoutSchema` | `done`, reason `harness` | `succeeded`, as before: quiet is all such a task has |
+| asked for one, and this attempt gave one | `done`, with the statement | `succeeded` |
+| asked for one, and none came — or only one made before the attempt began | `failed`, reason **`unsigned`** | the resume policy: continued with a nudge while attempts remain, `failed` when they run out |
+
+`unsigned` is continued under `interrupted` and `always`, as `lost` is: the work in the transcript is real, and nobody
+has judged it, the session included. Its session is stopped first if it still runs — quiet is not gone — and the next
+attempt `--resume`s it, told why it is back instead of the brief it already has: *"You stopped without giving your
+closing statement, and this task asks for one. If the work is done, give it now. If it is not, finish the work, then
+give it. If you cannot finish, give it anyway, saying what stops you."* The nudge is journalled on the attempt's
+`starting` entry, and read as `state.attempts[n].nudge`. Out of attempts, the task settles `failed` with the note
+`N attempt(s), none succeeded: the last went quiet without the closing statement it was asked for`.
+
+Quiet is counted from the later of the transcript's last write and the session's own start in `claude agents`: a
+continuation `--resume`s a transcript that may have been cold for an hour, and measured by the transcript alone it
+would end the moment the registry listed it idle.
+
+**What is not measured.** `test/unsigned.test.ts` holds all of this with a fake `claude`; no live session has gone
+quiet unsigned under it. On the record on the machine this was written on, 144 Claude Code tasks asked for a closeout,
+and 2 of their attempts ended `done` without one — both the read fixed in `00e301b`, not a session that said nothing —
+so the case has not been seen live either way. Claude Code 2.1.271's bundle has a retry count for structured output
+(`MAX_STRUCTURED_OUTPUT_RETRIES`) and an error for running out of it. Whether a `--bg` session is nudged by the harness
+when its turn ends without the call, and whether it then ends itself `done` with nothing said — a way to a success
+without a statement that quiet does not cover — is what `test/live.test.ts` measures (`AE_LIVE=1`), and it has not been
+run.
 
 ### The workload's own word
 
@@ -532,11 +568,12 @@ It layers UNDER the harness's own answer rather than replacing it. [Hermes
 Kanban](https://hermes-agent.nousresearch.com/docs/user-guide/features/kanban) solves the same
 problem with a terminal tool call, `kanban_complete(...)`, which it can require because every worker
 is its own. Here a structured final answer is the fast path and observation is the floor: a workload
-that never gives one ends exactly as it did before.
+that never gives one ends by quiet — unsigned, where one was asked for (above).
 
 **It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
 engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
-job of a runner. `decide` did not change. Codex, which ends by exiting, needs none of this and gets
+job of a runner. What a quiet session means is `decide`'s, since only the journal knows whether a statement was
+asked for. Codex, which ends by exiting, needs none of this and gets
 none of it. And because it is a translation rather than a judgement, it tests with an injected clock
 and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 
@@ -648,7 +685,8 @@ could not say whether a result was an error. What the records do not give, and s
 **Which session is read.** An attempt that has ended — or whose task settled with it open — is read by the
 session id the journal recorded, and no registry is asked: a board that re-reads a finished step costs no
 `claude agents`, and a registry that cannot be read does not stop it. An attempt in flight is found by
-observing its task's harness, alone. A registry that cannot be read this time counts as nothing observed,
+name when its task's harness can `find` it — for Claude Code, from the session's registration, with no `claude
+agents` call — and by observing that harness alone when it cannot, or finds none (below). A registry that cannot be read this time counts as nothing observed,
 as a pass counts it. So does a session not started yet: no events, and the cursor asked with (or one from
 the start). Neither is a refusal: ask again.
 
@@ -726,6 +764,56 @@ the fix is to continue a session that has ended, the sentence says so: a new tas
 what `wf retry --message` does. A registry that cannot be read, or words the harness did not take, reject
 without an exit code: nothing was said, so ask again.
 
+## What a read asks of the harness: `observe` and `find`
+
+`observe` lists every session a harness has, and for Claude Code that is `claude agents --all --json`: about a third
+of a second a call on the machine this was measured on (2.1.271, 231 rows). A pass needs it, since it decides for every
+task at once. A person's read needs less, and used to pay the same: every `view` observed, so a board's open stream on a
+running step made two such calls a second (its `view` and its `transcript`), and the api's list of runs one for every
+step on every poll (plan §4 S2).
+
+So a harness may also answer `find(name)`: the one session running under a name the engine chose, found without
+observing every other — which session it is, and nothing of its state. Claude Code's runner reads it off the session's
+registration, `~/.claude/sessions/<pid>.json`, which a running session writes for itself with its `pid`, `sessionId`,
+`name` and `kind`: the file `say` finds an inbox through. Each read asks only what it needs:
+
+| read | needs | Claude Code asks |
+|---|---|---|
+| `tick` | every session's state | `observe`, once a pass |
+| `list()` | every task's phase | `observe`, once |
+| `view(id)`, attempt in flight | its session's state — working, idle, blocked | `observe` |
+| `view(id)`, any other task | its phase, and its session's id once an attempt has ended: both on the record | nothing; `find` for a session whose id the record lacks |
+| `logs(id)` | the session's id | as `view(id)` |
+| `transcript(id)`, attempt in flight | which session it is | `find`; `observe` when no registration names it |
+| `transcript(id)`, attempt ended | the id on the record | nothing |
+| `say(id)` | its state, and its process | `observe`, then the registration by the pid listed |
+
+A view of a task with no attempt in flight carries no `usage`: an ended attempt's is on `state.attempts`. Measured on
+a loop of twenty reads each against that machine's board (236 tasks), before and after:
+
+| read | before | after |
+|---|---|---|
+| `view` of a settled task | 320 ms | 0.2 ms |
+| `transcript` of a running task, read whole | 334 ms | 14 ms, most of it the transcript |
+| `view` of a running task | 323 ms | about the same: it observes |
+| `list()` | 339 ms | about the same: it observes |
+
+So the open stream on a running step makes one `claude agents` call a second, not two, and a list of runs asks the
+registry only for the steps still running. `find` itself took about 2 ms to find a session and 6 ms to find none among
+the 21 registrations there.
+
+**A registration outlives its process** — 18 of those 21 had none — so one is taken only when it is a file this user
+owns, named for the pid it holds, of a `bg` session (an interactive one is never the engine's); a process this user may
+signal runs under that pid; and, where there is `/proc`, that process started when the registration says
+(`procStart`), so a pid another process has taken since is not the session. Without `/proc` (macOS) that last check is
+not made. A registration refused, or not there, refuses nothing: the read observes, as it did before.
+
+**Where a registration and the registry disagree, every read that observes takes the registry's word** — a view's phase
+and session, `say`, and the pass, which never uses `find`. `transcript` of an attempt in flight is the one read that
+takes a registration's, and only for which session to read: every live registration on that machine named the session
+`claude agents` listed for its pid, under the same name. A `PromiseRunner` without `find` is observed as it always was
+(`test/find.test.ts`).
+
 ## Letting a sandboxed Codex step commit
 
 Codex's `workspace-write` sandbox keeps `.git` read-only on purpose — including the real git
@@ -781,6 +869,7 @@ reason `Runner` is a seam and not an import.
 | narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session; `disallowedTools` → `--disallowedTools` | not wired: it passes only `model` and `permissionMode` |
 | MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json` and the task's `mcp`, never the operator's | not wired |
 | the conversation as events | `transcript`, from the session's transcript | not wired: no `transcript` |
+| one session by its name | `find`, from the session's registration | not wired: every read observes |
 | telling a running session something | `say`, a line on the session's inbox socket | not wired: no `say` |
 | good for | the fleet, long work, unattended | one task in the foreground, with a human watching |
 
@@ -830,7 +919,7 @@ selector, and it is why no attempt can ever run twice.
 | `src/index.ts` | the Effect API's export list — the boundary; `decide` is not on it |
 | `src/cli.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `src/journal.ts` | append-only JSONL per task, plus the board-wide feed |
-| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `release`, `transcript` and `say` — Claude Code's runner, words and usage, its inbox, and the one transcript reader |
+| `src/runner.ts` | the compute seam — `spawn`/`observe`/`stop`/`logs`, and the optional `find`, `release`, `transcript` and `say` — Claude Code's runner, words and usage, its registrations and inbox, and the one transcript reader |
 | `src/runner-detached.ts` | a runner for any harness that runs a prompt and exits; the Codex and `claude -p` specs, and Codex's rollout read as a transcript |
 | `src/runner-composite.ts` | dispatch by harness, merge what they all see |
 | `src/runner-sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
@@ -838,7 +927,8 @@ selector, and it is why no attempt can ever run twice.
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
 | `test/engine.test.ts` | the crash cases, the ceiling, the fields carried, against a fake harness |
-| `test/completion.test.ts` | Claude Code's "done", its argv and its usage, with a fake `claude` on `PATH` |
+| `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
+| `test/unsigned.test.ts` | a session gone quiet without the closing statement its task asked for: unsigned, continued with a nudge, then failed saying why; quiet with none asked for still succeeds — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
@@ -849,8 +939,9 @@ selector, and it is why no attempt can ever run twice.
 | `test/usage.test.ts` | the transcript count, and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
+| `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, and `say` into a working session, against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, and a session that ends its turn without its closing statement, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 

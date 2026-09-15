@@ -62,6 +62,63 @@ test('a blocked session is running, and says why', () => {
   assert.match(a.why, /needs a person/);
 });
 
+// ─── quiet: stopped, and whether it said it had finished ───────────────────
+
+/** Attempt 1 in flight, and the task filed with a closing statement asked for, or not. */
+const inFlight = (schema: boolean, maxAttempts = 1, resume?: 'interrupted' | 'always' | 'never'): Event[] => [
+  { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts, resume, ...(schema ? { closeoutSchema: { type: 'object' } } : {}) },
+  { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 },
+];
+const quiet = (extra: Partial<Sighting> = {}): Map<string, Sighting> =>
+  new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'working' as const, busy: false, quietMs: 120_000, ...extra }]]);
+
+test('a QUIET session that was asked for no statement is done — quiet is all such a task has', () => {
+  assert.deepEqual(decide(fold(TASK, inFlight(false)), quiet(), now(5)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: undefined });
+});
+
+test('a QUIET session asked for a statement that gave none ends UNSIGNED: failed, not done', () => {
+  assert.deepEqual(decide(fold(TASK, inFlight(true)), quiet(), now(5)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1', closeout: undefined });
+  const said = decide(fold(TASK, inFlight(true)), quiet({ closeout: { payload: { ok: true }, at: 3 } }), now(5));
+  assert.equal(said.do === 'record-end' && said.observed, 'done', 'with a statement, done');
+});
+
+test('quiet ends only a WORKING session: not a blocked one, and no session its runner has not called quiet', () => {
+  assert.equal(decide(fold(TASK, inFlight(true)), quiet({ state: 'blocked' }), now(5)).do, 'nothing', 'blocked waits on a person, however quiet');
+  assert.equal(decide(fold(TASK, inFlight(true)), quiet({ quietMs: undefined }), now(5)).do, 'nothing', 'idle, but not quiet for long enough');
+});
+
+const unsigned = (maxAttempts: number, resume?: 'interrupted' | 'always' | 'never'): Event[] => [
+  ...inFlight(true, maxAttempts, resume),
+  { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1' },
+];
+
+test('UNSIGNED with an attempt left: its session is stopped while it still runs, then continued with a nudge', () => {
+  const s = fold(TASK, unsigned(2));
+  assert.deepEqual(decide(s, quiet(), now(9)), { do: 'stop', sessionId: 's0', why: 'to continue it' }, 'still running, quiet: stopped first');
+  const a = decide(s, seen(), now(9));
+  assert.equal(a.do, 'start');
+  assert.equal(a.do === 'start' && a.resumeFrom, 'n1', 'continues the session: nobody judged that work, the session included');
+  assert.match(a.do === 'start' ? a.nudge ?? '' : '', /stopped without giving your closing statement/);
+  assert.deepEqual(decide(s, seen([N1, 'stopped']), now(9)), a, 'a stopped session is let go enough');
+});
+
+test("UNSIGNED under `resume: never` starts clean, and a clean start is told the brief, not a nudge", () => {
+  assert.deepEqual(decide(fold(TASK, unsigned(2, 'never')), seen(), now(9)), { do: 'start', attempt: 2, resumeFrom: undefined });
+});
+
+test('UNSIGNED with no attempt left settles failed, and says why', () => {
+  assert.deepEqual(decide(fold(TASK, unsigned(1)), quiet(), now(9)),
+    { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded: the last went quiet without the closing statement it was asked for' });
+});
+
+test('a nudge is on the attempt it started, from the journal', () => {
+  const s = fold(TASK, [...unsigned(2), { kind: 'starting', at: at(4), attempt: 2, resumeFrom: 'n1', nudge: 'finish' }]);
+  assert.deepEqual(s.attempts.map((a) => a.nudge), [undefined, 'finish']);
+  assert.equal('nudge' in s.attempts[0]!, false, 'and no key on one that had none');
+});
+
 test('a spawned session the harness has not registered yet is given a grace window', () => {
   const s = fold(TASK, [filed(), { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }]);
   assert.equal(decide(s, seen(), now(1_000)).do, 'nothing');

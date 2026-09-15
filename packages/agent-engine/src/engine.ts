@@ -123,9 +123,9 @@ export const step = Effect.fn('step')(function* (
       // The intent is journalled BEFORE the spawn, and the session's name is derivable from it.
       // That ordering is the whole crash-safety story: a session we asked for always has a record,
       // and the record implies the name, so a restart finds it instead of starting a second one.
-      // `resumeFrom` is journalled with it, so what an attempt was told to continue is a fact on
-      // the record rather than something re-derived by a later reader.
-      yield* journal.append(taskId, { kind: 'starting', at: at(), attempt: action.attempt, resumeFrom: action.resumeFrom });
+      // `resumeFrom` is journalled with it, and the nudge a continued session is told, so what an attempt
+      // was told to continue, and what it was told, are facts on the record rather than re-derived later.
+      yield* journal.append(taskId, { kind: 'starting', at: at(), attempt: action.attempt, resumeFrom: action.resumeFrom, nudge: action.nudge });
       break;
 
     case 'spawn': {
@@ -140,14 +140,15 @@ export const step = Effect.fn('step')(function* (
       // bound, and a retry beside it. So the call is written down as having returned — `spawned`,
       // with its error — and the grace window `decide` already keeps for a session the harness has
       // not registered tells which it was: adopted if it shows up, `lost` if it never does.
+      // What it continues and what it is told are taken from the journal rather than recomputed: the decision was
+      // made when the attempt was started, possibly by an engine that has since died.
+      const attempt = state.attempts.find((a) => a.n === action.attempt);
       const failed = yield* runner.spawn({
-        name: action.name, brief: state.brief, cwd: state.cwd,
+        name: action.name, brief: attempt?.nudge ?? state.brief, cwd: state.cwd,
         model: state.model, permissionMode: state.permissionMode, harness: state.harness,
         worktree: state.worktree, closeoutSchema: state.closeoutSchema,
         tools: state.tools, disallowedTools: state.disallowedTools, effort: state.effort, mcp: state.mcp,
-        // Taken from the journal rather than recomputed: the decision was made when the attempt
-        // was started, possibly by an engine that has since died.
-        resumeFrom: state.attempts.find((a) => a.n === action.attempt)?.resumeFrom,
+        resumeFrom: attempt?.resumeFrom,
       }).pipe(
         Effect.as(undefined),
         Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),

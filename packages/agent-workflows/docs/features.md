@@ -1385,6 +1385,13 @@ Round 2's review found three of these missing, and each was fixed: an unfinished
 `CHECK DID NOT FINISH` and offered a raise where a free recheck was the way on; each `claude-detached` filing handed the whole cap, so
 `retries: 2` could spend nearly three; and a try's brief told the budget sentence in place of why its last try ended.
 
+Round 3's review found the person's screen still hid it. A step past its budget whose session failed, was stopped or ended unsigned
+was filed under `overBudget` alone: `wf decide` printed neither `FAILED:` with its logs nor `UNSIGNED:`, and the run's outcome read
+`blocked`. `decision` now names each step by how it ended on its own work, with `overBudget` beside that, so a refused check past its
+budget reads `failed` too. The offer says `over budget (failed)`. The OVER BUDGET line (`overBudgetLine`) gives each step its own
+reason: it had given one reason for every step, and so said a looping step held on implement's budget had spent its own. And `wf ls`
+puts such a looping step's own cost beside its word, which shows only implement's.
+
 What was measured:
 
 - `test/workflow.test.ts` (2 new) and `test/vocabulary.test.ts` (1 new): the amounts taken, each refusal's words, and the codex
@@ -1412,7 +1419,8 @@ What was measured:
   - a nudge of an unsigned step past its budget told that it gave no closeout, beside the budget;
   - a loop held on implement's budget, and `wf round --budget`;
   - the CLI's `--budget` refusals.
-- `test/radius.test.ts` (1 new) and `test/decide.test.ts` (1 new): `used` with the api and tool time, and both screens with a
+- `test/radius.test.ts` (1 new) and `test/decide.test.ts` (2 new): `used` with the api and tool time, the `wf decide` screen of a step
+  that failed or ended unsigned past its budget (`FAILED:` or `UNSIGNED:` beside the OVER BUDGET line), and both screens with a
   measured cost and with none.
 - Each guard was broken on purpose and the tests rerun:
   - `over budget` never read: 6 failing;
@@ -1426,8 +1434,11 @@ What was measured:
   - the raised cap not kept on the record: 2;
   - round 2's guards: a check that did not finish held as over budget, 1; the whole cap handed each filing, 3; held only past the cap,
     2; the budget offer before the recheck, 1; the brief's budget sentence dropped, 3; the brief handed the masked status, 2;
-    `wf decide`'s offers read with no verdict, 1.
-- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 404 (403 passed,
+    `wf decide`'s offers read with no verdict, 1;
+  - round 3's guards: `decision` naming a step past its budget by its masked status, 4 failing; the offer without why it stopped, 4;
+    the cost dropped beside every over-budget word, 1; the OVER BUDGET line losing a looping step's reason, 1; `wf decide` printing
+    no OVER BUDGET line, 1.
+- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 406 (405 passed,
   1 skipped), api 129 and web 164. Typecheck was clean in all four.
 
 What it leaves:

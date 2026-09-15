@@ -19,6 +19,13 @@ import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, LOOP_REPLIES, loopSpan, outputFields, 
 /** What the engine says about one step's task. `unknown` is a task we filed and cannot find. */
 export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stopped' | 'unknown';
 
+/**
+ * What the engine's record of a task says of its closeout: `false`, never asked for one — a task from before closeouts; `true`,
+ * asked; `unsigned`, asked, and its last attempt ended without it — the attempt's `reason`, on a session that went quiet, which the
+ * engine settles `failed`. `stepStatus` reads it; a caller with only a yes or a no gives that (`closeoutAsked` in runner.ts reads all three).
+ */
+export type CloseoutAsked = boolean | 'unsigned';
+
 export type Run = {
   id: string;
   /** The repository the work is about. */
@@ -91,7 +98,7 @@ export type Run = {
  *   waiting          not filed
  *   running          filed, and not settled — or a task the engine cannot find
  *   blocked          it signed off `blocked`: it finished its session, not the work
- *   unsigned         it succeeded without the closeout it was asked for, or without a field its `output:` declares
+ *   unsigned         it ended without the closeout it was asked for, or without a field its `output:` declares
  *   checking         signed off, and its `check:` is due or running
  *   verified         its check exited 0
  *   unverified       signed off, and it declared no `check:` — nothing but its own word says it worked
@@ -143,7 +150,7 @@ export function assess(
    */
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   /** Whether a task was asked for a closeout: the schema on the engine's record of its filing. */
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   /**
    * What each step's current check exited with. Read only for a check that did not pass — see `refusedCheck`.
    * Left out, no check is taken to have refused, so no try of `retries:` is due.
@@ -342,12 +349,16 @@ export function tipsSeen(run: Run, branches: readonly string[], seen: Readonly<R
  * **`blocked` first.** A step that signed off `blocked` did not do the work, whatever became of its
  * session — it ended as cleanly as one that finished, which is why the engine cannot tell them apart.
  *
- * **`unsigned` before any check.** The engine settles a session `succeeded` when it ends, and the
- * Claude runner ends one after ninety seconds of quiet whether or not a closeout came (engine open
- * issue 1). A step that was asked for a closeout and gave none has not said it finished, so the run
- * does not say it for it, and does not spend a suite on work nobody signed. An unreadable closeout
- * counts as none: the run cannot read that the work is done. A task never asked — a run from before
- * closeouts — is not held to one.
+ * **`unsigned` before any check.** A step that was asked for a closeout and gave none has not said it
+ * finished, so the run does not say it for it, and does not spend a suite on work nobody signed. The
+ * engine ends a session that goes quiet without it `failed`, with reason `unsigned`, nudges it under
+ * its resume policy, and out of attempts settles the task `failed` (engine open issues, *Quiet without
+ * a closeout*). That failure is this word, as it was when the engine settled the same session
+ * `succeeded`: read as `failed`, the run would be called failed rather than waiting on you, and a
+ * nudged try told its session broke rather than that it gave no closeout. Only a `failed` task — one
+ * a person stopped is `stopped`. A task that settled `succeeded` with nothing said is `unsigned` too.
+ * An unreadable closeout counts as none: the run cannot read that the work is done. A task never
+ * asked — a run from before closeouts — is not held to one.
  *
  * **A declared output is part of the closeout.** A step whose `output:` declares fields and whose
  * closeout lacks one did not say what it was asked to say, and a step that reads it would be handed
@@ -369,7 +380,7 @@ export function stepStatus(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   /** The run's steps: what says whether this one is a loop's target, and owes `replies`. */
   steps: readonly Workflow[] = [],
 ): StepStatus {
@@ -379,9 +390,11 @@ export function stepStatus(
   if (said?.outcome === 'blocked') return 'blocked';
 
   const phase = phaseOf(st.taskId);
+  const asked = askedCloseout(st.taskId);
+  if (phase === 'failed' && !said && asked === 'unsigned') return 'unsigned';
   if (phase === 'failed' || phase === 'stopped') return phase;
   if (phase !== 'succeeded') return 'running';
-  if (!said && (askedCloseout(st.taskId) || step.output)) return 'unsigned';
+  if (!said && (asked || step.output)) return 'unsigned';
   if (said && declaredOutput(step, said, owedFields(step, run, steps)).missing.length) return 'unsigned';
   if (said && step.loop && typeof said.output?.again !== 'boolean') return 'unsigned';
   const signed = (s: 'verified' | 'unverified'): StepStatus =>
@@ -569,7 +582,7 @@ export function retryable(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   steps: readonly Workflow[] = [],
   /** Whether the harness marked a task's session blocked while its attempt runs: the engine's `needs-human` (`harnessBlocked` in runner.ts). */
   harnessBlocked: (taskId: string) => boolean = () => false,
@@ -607,7 +620,7 @@ export function retriesDue(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
   /** Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to stop it first. */
@@ -676,7 +689,7 @@ export function retryRefusal(
   how: RetryHow,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
   /** Whether a task's session is blocked by its harness (`retryable`). Left out, a step whose session is blocked is running, and refused. */
@@ -773,7 +786,7 @@ export function retryLines(
   d: Decision,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
 ): string[] {
   if (d.kind !== 'awaiting') return [];
   const lines: string[] = [];
@@ -802,7 +815,7 @@ export function answerLines(
   d: Decision,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
 ): Record<string, string> {
   if (d.kind !== 'awaiting') return {};
   const lines: Record<string, string> = {};
@@ -941,7 +954,7 @@ export function roundsDue(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   asks: readonly RoundAsk[] = [],
 ): Round[] {
   const due: Round[] = [];
@@ -992,7 +1005,7 @@ export function roundAsk(
   name: string | undefined,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   asks: readonly RoundAsk[] = [],
 ): { step: string; round: number } | { refusal: string } {
   const no = (refusal: string) => ({ refusal });
@@ -1107,7 +1120,7 @@ export function cancelPlan(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
@@ -1563,7 +1576,7 @@ export function decision(
   phaseOf: (taskId: string) => TaskPhase,
   shipped: (branch: string) => Shipped,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   /** What each step's current check exited with: a refusal and a check that did not finish are told apart. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   asks: readonly RetryAsk[] = [],
@@ -1669,7 +1682,7 @@ export function listing(
   /** The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is. */
   phaseOf: (taskId: string) => string,
   closeoutOf: (step: string) => Closeout | { error: string } | undefined,
-  askedCloseout: (taskId: string) => boolean = () => false,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   /** What a refused check exited with, as its log tells it. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   /** What people asked for with `wf retry`, and the run has not consumed yet. */

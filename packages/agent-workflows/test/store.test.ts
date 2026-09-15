@@ -218,7 +218,7 @@ const gitOut = (cwd: string, ...args: string[]) => execFileSync('git', args, { c
  */
 const board = () => {
   type Filed = { id: string; brief: string; harness?: string; cwd: string; closeoutSchema?: object } & Record<string, unknown>;
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string }>();
   const filings: string[] = [];
   const stopped: string[] = [];
   const logs = new Map<string, string>();
@@ -235,7 +235,8 @@ const board = () => {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
           brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: said.get(id) ?? [],
-          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null }],
+          // An attempt given a reason ended `failed` with it, as the engine records a session that went quiet unsigned, or broke.
+          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, ...(t.reason ? { ended: 'failed', reason: t.reason } : {}) }],
         },
       };
     },
@@ -257,7 +258,7 @@ const board = () => {
       return entry;
     },
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason });
   return { e, tasks, filings, stopped, settle, logs, said, deaf };
 };
 
@@ -1384,6 +1385,45 @@ test("`phaseOfView` and `closeoutAsked` say what `wf ls` says: `unknown` for a t
   const { e: old } = engineWith({ 't-before': 'succeeded' });
   const oldViews = await viewsOf(old, before);
   assert.deepEqual([phaseOfView(oldViews.get('t-before')), closeoutAsked(oldViews)('t-before'), (await list(old, before)).steps[0]!.status], ['succeeded', false, 'unverified']);
+});
+
+test('UNSIGNED at shipped defaults, now that the engine settles it `failed`: a step whose session went quiet without its closeout waits on you, the run is blocked, and a nudge is told it gave none — a step that failed for another reason still reads `failed`', async () => {
+  // Each as the engine records it (agent-engine's open issues, *Quiet without a closeout*): the attempt ended `failed` with its reason, the
+  // task settled `failed`, and nothing said.
+  const through = async (reason: 'unsigned' | 'harness') => {
+    const b = board();
+    const run = started(folder());
+    await advance(b.e, readRun(run.id));
+    b.settle(`${run.id}-implement`, 'failed', undefined, undefined, reason);
+    return { ...b, run };
+  };
+  const quiet = await through('unsigned');
+  const broke = await through('harness');
+  const askedOf = async (b: typeof quiet) => {
+    const views = await viewsOf(b.e, readRun(b.run.id));
+    return [phaseOfView(views.get(`${b.run.id}-implement`)), closeoutAsked(views)(`${b.run.id}-implement`)];
+  };
+  assert.deepEqual(await askedOf(quiet), ['failed', 'unsigned']);
+  assert.deepEqual(await askedOf(broke), ['failed', true]);
+
+  const cases = [
+    { b: quiet, word: 'unsigned', outcome: 'blocked', onYou: ['implement'], told: 'The last try ended without the closeout the run asked for' },
+    { b: broke, word: 'failed', outcome: 'failed', onYou: [], told: "The last try's session ended `failed` before it signed off." },
+  ];
+  for (const { b, word, outcome, onYou, told } of cases) {
+    const pass = await advance(b.e, readRun(b.run.id));
+    assert.deepEqual([pass.filed, pass.blocked], [[], ['review']], word);
+    const l = await list(b.e, readRun(b.run.id));
+    assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], [word, onYou], word);
+    const { decision: d } = await decide(b.e, b.run.id);
+    assert.deepEqual(d.kind === 'awaiting' && { outcome: d.outcome, unsigned: d.unsigned, failed: d.failed },
+      { outcome, unsigned: word === 'unsigned' ? ['implement'] : [], failed: word === 'failed' ? ['implement'] : [] }, word);
+
+    await retry(b.e, b.run.id, 'implement', { mode: 'nudge' });
+    assert.deepEqual((await advance(b.e, readRun(b.run.id))).tried, ['implement'], word);
+    const brief = b.tasks.get(`${b.run.id}-implement-try2`)!.spec.brief;
+    assert.ok(brief.includes(told), `${word}: the try is told ${told}`);
+  }
 });
 
 test("`wf retry --message` writes the answer on the person's ask and nothing else; the tick carries it into the try's brief as `## Your answer`, once, and `wf ls` says the try was answered", async () => {

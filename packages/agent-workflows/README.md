@@ -566,7 +566,7 @@ another repository and change that line.
 | `waiting` | not filed yet | — |
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | the engine's word: `running (working)`, `needs-human` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
-| `unsigned` | it succeeded without the closeout it was asked for, or without a field its `output:` declares | **never runs** |
+| `unsigned` | it ended without the closeout it was asked for — its session settled `succeeded`, or went quiet and settled `failed` — or without a field its `output:` declares | **never runs** |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |

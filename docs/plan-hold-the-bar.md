@@ -940,7 +940,9 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done. In flight 2026-09-14: B9 (apps, items 11–15 in one) as
 `five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
 `three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 in its last round. Left after B9: items 20 (settings), 27 (engine, small),
-28 (agent-workflows, tiny), and the cost/budget work the operator asked about on 2026-09-15 (not yet filed).
+28 (agent-workflows, tiny). Cost and budget (item 29) filed 2026-09-15: E8 `cost-measured-and-a-budget-s-eou6`
+(engine, `./workflows/dev`) and W7 `cost-measured-and-a-budget-s-5rg0` (agent-workflows, `--after` E8 — the first real
+use of the edge); B10 (the board's cost) after B9 lands.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -1023,6 +1025,15 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
 28. `closeoutAsked` reads the last attempt's `reason`, and no test makes a two-attempt task (attempt 1 unsigned,
     attempt 2 lost) read `failed` rather than `unsigned` (W6's review). A store test with `maxAttempts: 2`. agent-
     workflows, tiny.
+
+29. **Cost measured and a budget set** (operator, 2026-09-15: the old hkb had a budget per worker and a precise cost
+    per piece of work). Measured: a `--bg` transcript carries `cost-state` lines (`totalCostUSD`, per-model tokens,
+    API and tool durations), the `-p` result carries `total_cost_usd`, and `claude --max-budget-usd` caps spend; the
+    engine's `Usage.costUsd` is never filled and no budget flag is passed, so every `wf decide` says "cost not
+    measured". E8 (engine: cost read from the harness into `usage`, `budgetUsd` on the task → `--max-budget-usd`, how a
+    capped session ends, measured live), W7 (agent-workflows: `budget:` on a step, carried on every filing; cost per
+    step and per run in `wf ls`/`wf decide`; `budget exhausted` in the vocabulary, `wf retry --budget`), then B10
+    (apps: cost on the card, the run page and the timeline).
 
 **Documentation**
 19. The ledger reordered: open first, settled below. *Done, `55acbde`.*

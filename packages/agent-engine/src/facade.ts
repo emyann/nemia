@@ -148,8 +148,10 @@ export type TaskSpec = {
   /**
    * The most one attempt's session may spend, in dollars — `0.25`, `5`. Given to Claude Code as `--max-budget-usd`:
    * `claude -p` ends the session once a response takes it past the cap, and the attempt ends `failed`, reason `budget`,
-   * with what it cost — never continued, whatever `resume` says, since a nudge would spend past it. Per attempt, as the
-   * harness counts it. Refused unless a positive number, and on a harness that keeps no cap: `claude`, whose `--bg`
+   * with what it cost — and the task settles `failed`, saying so: a budget spent is spent, so no attempt follows, whatever
+   * `maxAttempts` or `resume` says. File the task again with a larger one to run it again. The harness counts one
+   * session's spend, so an attempt that fails under the cap is retried under the same cap. Refused unless a positive
+   * number, and on a harness that keeps no cap: `claude`, whose `--bg`
    * sessions spend past one (measured), and `codex`. Carried on the task; `decide` never reads it.
    */
   budgetUsd?: number;

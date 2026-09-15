@@ -57,8 +57,8 @@ back into the context that produced a conclusion tends to reproduce it. `EndReas
 the `ended` event rather than inferred later, because by the time the next attempt starts, the
 evidence is gone.
 
-A session its harness ended at its spend cap — reason `budget`, below — is continued under no policy: a nudge would
-spend past the cap.
+An attempt its harness ended at its spend cap — reason `budget`, below — is followed by no attempt under any policy: its
+task settles `failed`. A budget spent is spent.
 
 Verified against the live harness: attempt 2 resumed attempt 1 under **its own name**, got a fresh
 session id from the harness, and genuinely continued the conversation (`COUNT.txt` came back
@@ -381,7 +381,7 @@ it so. What `decide` learns is that a harness *ended* a session on its cap, a fa
 
 | harness | given | a session that reaches the cap |
 |---|---|---|
-| `claude-detached` | `--max-budget-usd 0.25` | ends: exit 1, and a result whose `subtype` is `error_max_budget_usd`. Its attempt ends `failed`, reason **`budget`**, with what it cost |
+| `claude-detached` | `--max-budget-usd 0.25` | ends: exit 1, and a result whose `subtype` is `error_max_budget_usd`. Its attempt ends `failed`, reason **`budget`**, with what it cost, and its task settles `failed` |
 | `claude` | refused at `file()`: a `--bg` session keeps no cap | — |
 | `codex` | refused at `file()`: `codex exec` has no spend cap, and its stream no cost | — |
 
@@ -395,11 +395,13 @@ by up to one response. `claude --bg` took the same flag without a word, read the
 nothing (open issue 6), and `test/live.test.ts` fails the day a `--bg` session keeps it. What that leaves unbounded is
 open issue 17.
 
-**Per attempt, and never continued.** The harness counts one process's spend, so the cap is per attempt: `maxAttempts: 3`
-may spend three caps. An attempt that ended on its budget is resumed under no policy — continuing it would spend past its
-cap — so the next attempt, if one remains, starts clean under the same cap. To continue such a session, file a task with
-`resumeFrom` its id and a budget of its own: `claude -p --resume` counts only its own process's spend (measured: a
-resumed session reported $0.0042 of its own, where the one it continued had spent $0.018).
+**A budget spent is spent.** An attempt that ended on its budget ends its task: it settles `failed`, noting `attempt N
+spent its budget`, and no attempt follows — resumed or clean, whatever `maxAttempts` and `resume` say. To run it again,
+file the task again with a larger budget; to continue that session, with `resumeFrom` its id: `claude -p --resume` counts
+only its own process's spend (measured: a resumed session reported $0.0042 of its own, where the one it continued had
+spent $0.018). The harness counts one session's spend, and the engine counts none: an attempt that fails *under* its cap —
+the harness's verdict, or lost — is retried under the same cap, so `maxAttempts: 3` can still spend nearly three caps
+before one is reached.
 
 `ae start` takes `budgetUsd: 0.25` in a brief, digits only.
 
@@ -994,7 +996,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
-| `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `budget`, and is not continued; the flag reaches both Claude runners on every attempt |
+| `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `budget` and settles its task, with attempts left; the flag reaches both Claude runners on every attempt |
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |

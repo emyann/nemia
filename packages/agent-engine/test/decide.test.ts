@@ -19,7 +19,7 @@ const seen = (...pairs: Array<[string, Observed]>): Map<string, Sighting> =>
 const filed = (maxAttempts = 1): Event =>
   ({ kind: 'filed', at: at(0), brief: 'do the thing', cwd: '/repo', maxAttempts });
 
-test('a session its harness ended at its spend cap ends failed, reason budget — and is not continued, whatever the policy', () => {
+test('a session its harness ended at its spend cap ends failed, reason budget — and the task settles failed saying so, with attempts left, whatever the policy', () => {
   for (const resume of ['interrupted', 'always'] as const) {
     const events: Event[] = [
       { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 2, resume, budgetUsd: 0.01 },
@@ -30,7 +30,9 @@ test('a session its harness ended at its spend cap ends failed, reason budget �
     assert.deepEqual(decide(fold(TASK, events), spent, now(5)),
       { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'budget', nativeId: 'native-1', closeout: undefined }, resume);
     const ended = fold(TASK, [...events, { kind: 'ended', at: at(6), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'budget', nativeId: 'native-1' }]);
-    assert.deepEqual(decide(ended, new Map(), now(7)), { do: 'start', attempt: 2, resumeFrom: undefined }, `${resume}: a clean start — a nudge would spend past the cap`);
+    const settled = { do: 'settle', outcome: 'failed', note: 'attempt 1 spent its budget. File the task again with a larger one to run it again' };
+    assert.deepEqual(decide(ended, new Map(), now(7)), settled, `${resume}: a budget spent is spent — no attempt 2, resumed or clean`);
+    assert.deepEqual(decide(ended, new Map(), now(7, 30_000, 3, 3)), settled, `${resume}: a terminal answer, so a full board does not hold it`);
   }
   // The control: the same failure with no word from the harness about a budget is its verdict, and `always` continues it.
   const always = fold(TASK, [

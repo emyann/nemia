@@ -32,7 +32,7 @@ const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
 const runsIn = (log: string) => fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
 const valueOf = (args: string[], flag: string) => (args.includes(flag) ? args[args.indexOf(flag) + 1] : undefined);
 
-test('claude-detached at shipped defaults: a session that stops at its budget ends its attempt failed, reason budget, with what it cost — and the retry starts clean, under the same cap', async () => {
+test('claude-detached at shipped defaults: a session that stops at its budget ends its attempt failed, reason budget, with what it cost — and its task settles failed, with no attempt 2', async () => {
   const bin = tmp('bin');
   const runs = path.join(bin, 'runs.jsonl');
   // What `claude -p --output-format json` printed when a session crossed its `--max-budget-usd` (2.1.272, keys trimmed).
@@ -57,22 +57,20 @@ process.exitCode = 1;
       await engine.tick();
       await sleep(100);
     }
+    for (let i = 0; i < 3; i++) await engine.tick();
     const { state } = await engine.view(id);
     assert.equal(state.settled, 'failed');
-    assert.equal(state.attempts.length, 2);
-    for (const a of state.attempts) {
-      assert.deepEqual([a.ended, a.reason, a.exitCode], ['failed', 'budget', 1], `attempt ${a.n} ended at its cap`);
-      assert.deepEqual(a.usage, { costUsd: 0.01804, apiMs: 718 }, `attempt ${a.n}: what it spent getting there`);
-    }
-    assert.equal(state.attempts[0]!.nativeId, result.session_id, 'a session that could have been continued');
-    assert.equal(state.attempts[1]!.resumeFrom, undefined, 'and was not, though the policy is always: a nudge would spend past its cap');
+    assert.equal(state.attempts.length, 1, 'a budget spent is spent: maxAttempts 2 and resume always start no attempt 2');
+    const [a] = state.attempts;
+    assert.deepEqual([a!.ended, a!.reason, a!.exitCode], ['failed', 'budget', 1], 'it ended at its cap');
+    assert.deepEqual(a!.usage, { costUsd: 0.01804, apiMs: 718 }, 'with what it spent getting there');
+    assert.equal(a!.nativeId, result.session_id, 'a session a new filing could continue');
+    const settled = (await engine.feed(0)).entries.find((e) => e.taskId === id && e.event.kind === 'settled')?.event;
+    assert.match(settled?.kind === 'settled' ? settled.note ?? '' : '', /spent its budget\. File the task again with a larger one/, 'and the task says why it settled');
 
     const argvs = runsIn(runs);
-    assert.equal(argvs.length, 2);
-    for (const args of argvs) {
-      assert.equal(valueOf(args, '--max-budget-usd'), '0.01', 'the cap, on the first attempt and on the retry');
-      assert.equal(args.includes('--resume'), false);
-    }
+    assert.equal(argvs.length, 1, 'claude -p ran once');
+    assert.equal(valueOf(argvs[0]!, '--max-budget-usd'), '0.01', 'with the cap');
   });
 });
 

@@ -519,20 +519,23 @@ test('decide never reads tools, effort, MCP servers, a budget, usage, a cost, an
   assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.costUsd/);
 });
 
-test('a session its harness ended at its budget ends failed, reason budget, with what it cost — and its retry starts clean under the same cap, even under resume: always', async () => {
+test('a session its harness ended at its budget ends failed, reason budget, with what it cost — and the task settles failed naming it, with an attempt left, even under resume: always', async () => {
   const b = board();
   const id = await b.run(file({ ...spec, maxAttempts: 2, resume: 'always', budgetUsd: 0.01 }));
   await b.run(tick());
   const first = [...b.sessions.keys()][0]!;
   b.sessions.set(first, { ...b.sessions.get(first)!, state: 'failed', exitCode: 1, budgetSpent: true, usage: { costUsd: 0.018, apiMs: 718 } });
-  await b.run(tick());
+  for (let i = 0; i < 3; i++) await b.run(tick());
 
-  const [a] = (await b.run(view(id, new Map()))).state.attempts;
+  const { state } = await b.run(view(id, new Map()));
+  const [a] = state.attempts;
   assert.deepEqual([a!.ended, a!.reason, a!.exitCode], ['failed', 'budget', 1]);
   assert.deepEqual(a!.usage, { costUsd: 0.018, apiMs: 718 }, 'and what it spent getting there');
-  assert.equal(b.spawned.length, 2, 'attempts remained, so a second was started');
-  assert.equal(b.spawned[1]!.resumeFrom, undefined, 'clean: continuing that session would spend past its cap');
-  assert.equal(b.spawned[1]!.budgetUsd, 0.01, 'under the same cap');
+  assert.equal(state.settled, 'failed');
+  assert.equal(state.attempts.length, 1, 'a budget spent is spent: no attempt 2');
+  assert.equal(b.spawned.length, 1, 'and nothing spawned for one');
+  const settled = (await b.run(Effect.flatMap(Journal, (j) => j.read(id)))).find((e) => e.kind === 'settled');
+  assert.match(settled?.kind === 'settled' ? settled.note ?? '' : '', /^attempt 1 spent its budget\. File the task again with a larger one/);
 });
 
 // ─── usage: carried from the sighting, null when nobody measured ────────────

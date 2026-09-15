@@ -197,10 +197,20 @@ attempt — into the continuation's brief, as `wf retry --message` carries an an
 
 ### 17. A `claude --bg` session keeps no spend cap
 
-**Measured** (2026-09-15, Claude Code 2.1.272, `--model haiku`, by hand). `claude --bg --max-budget-usd 0.01`, told to read a
-file forty times, took the flag without a word, read it 42 times, spent $0.19 and was listed `done`; nothing in `claude
-agents` or its transcript names a budget. The flag's help says it "only works with --print". The same brief under `claude
--p` stopped after two responses, at $0.018.
+**Measured** (2026-09-15, Claude Code 2.1.272, by hand). Sent: `claude --bg --name ae-probe/budget-… --tools Read
+--permission-mode acceptEdits --strict-mcp-config --no-chrome --model haiku --max-budget-usd 0.01 "Read the file NOTES.txt
+with your Read tool. Then read it again. Keep reading it, one Read call at a time, at least 40 times, and say nothing in
+between. Then reply done."`, in a directory holding a 200-line `NOTES.txt`. The session took the flag without a word, made
+42 tool calls, replied `done`, and was listed `done`, idle, with its process; nothing in `claude agents`, its registration
+file or its transcript named a budget. Stopped, it wrote its cost: $0.1925. The flag's help says it "only works with
+--print". The same brief as `claude -p … --output-format json --max-budget-usd 0.01` stopped after two responses: exit 1,
+`subtype: error_max_budget_usd`, $0.018. `test/live.test.ts` measured it again under the engine (Verified live, below).
+
+**Not a cap the upper layer can keep from the view either.** The view of a running `--bg` attempt carries no `costUsd`. The
+runner reads the transcript's last `cost-state` at or after the attempt's start on every observe of a session that is not
+busy, but Claude Code writes none until the process exits (issue 18): a session listed `done`, idle, had none, and two once
+`claude stop` returned. So a layer that stops a `--bg` session once `costUsd` passes a cap, reading it each pass, never
+sees a cost while the session runs, and sees one only after the engine has let it go.
 
 **Effect.** `file()` refuses `budgetUsd` on `claude` (engine `26020c1`), so nothing bounds what a `--bg` session spends — and
 `claude` is the harness agent-workflows runs its steps on. A task can have a cap only on `claude-detached`, which gives up
@@ -261,8 +271,10 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 
 - **A spend cap, and a `--bg` session's cost** (engine `26020c1`, `9d075f7`). `test/live.test.ts` on Claude Code 2.1.272,
   2026-09-15, `--model haiku`, told to read a 2000-line file fifty lines a call. On `claude-detached` at a $0.01 cap, with
-  `maxAttempts: 2` and `resume: always`, both attempts ended `failed`, reason `budget`, exit 1, at $0.0212 and $0.0154, and
-  the second did not continue the first. The same brief as a `claude --bg` session given `--max-budget-usd 0.01` (through
+  `maxAttempts: 2` and `resume: always`, under the first version, which retried a budget end clean: both attempts ended
+  `failed`, reason `budget`, exit 1, at $0.0212 and $0.0154, and the second did not continue the first. Run again under
+  the operator's rule that a budget spent is spent (round 2, the same day): one attempt, `failed`, reason `budget`, exit 1,
+  $0.0179, and the task settled `failed` with no attempt 2. The same brief as a `claude --bg` session given `--max-budget-usd 0.01` (through
   the Effect door) made 40 tool calls, ended `done` and settled `succeeded`, and its attempt recorded $0.3439, 125.6 s of API
   time and 247 ms of tool time, read once its release had stopped it (issues 17, 18). The first version of this brief —
   read one short file forty times — was declined by haiku as a waste, which Claude Code listed `blocked`.
@@ -416,7 +428,7 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 | a task that asked for a closeout settled `succeeded` when its session went quiet without one (bug 1): at shipped defaults, `ended: done`, `reason: harness`, no closeout | the Claude runner reports how long a session has been quiet (`quietMs`), from its last write or its own start; `decide` ends a quiet attempt `done` when no statement was asked for, and `failed`, `unsigned`, when one was and none came — continued with a nudge by the resume policy, and settled `failed` saying so when attempts run out | engine, §6 item 18 (last section) |
 | a nudged retry that `--resume`d its session was recorded with no closeout and its first try's usage, to the byte; and a statement given after a `view` had seen the session listed final was never read, until the daemon restarted | the Claude runner keeps a read of a finished session for one attempt — the row's name, its session, the registry's start — and only while the transcript has not been written since | engine `00e301b` |
 | no attempt recorded what it cost — `Usage.costUsd` was declared and never filled, and every `wf decide` said "cost not measured" | the Claude runner reads Claude Code's `cost-state`, written as a session's process exits, once its release has stopped the session, and the pass journals it as `measured`; a resumed attempt records its own share, not its session's total; `claude -p`'s `total_cost_usd` goes on its end (issues 4, 18) | engine `9d075f7` |
-| nothing could bound what a session spends | `budgetUsd` on the task, `--max-budget-usd` from both Claude runners, and a session `claude -p` ended at its cap recorded `failed`, reason `budget`, and never continued; refused on `claude`, whose `--bg` sessions keep no cap (issue 17), and on `codex` | engine `26020c1` |
+| nothing could bound what a session spends | `budgetUsd` on the task, `--max-budget-usd` from both Claude runners, and a session `claude -p` ended at its cap recorded `failed`, reason `budget`, its task settled `failed` with no further attempt (the operator's call, round 2); refused on `claude`, whose `--bg` sessions keep no cap (issue 17), and on `codex` | engine `26020c1`, round 2 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

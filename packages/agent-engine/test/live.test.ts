@@ -364,7 +364,7 @@ const notesIn = (label: string) => {
   return dir;
 };
 
-test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reason budget, with what it cost — and the next attempt does not continue it', {
+test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reason budget, with what it cost — and its task settles failed, with no attempt 2', {
   skip,
   timeout: 12 * 60_000,
 }, async (t) => {
@@ -378,14 +378,11 @@ test('claude -p given a $0.01 budget stops at it: the attempt ends failed, reaso
   await settleThenCheck(engine, ids, (views) => {
     const { state } = views.capped!;
     t.diagnostic(`settled ${state.settled}: ${JSON.stringify(state.attempts.map((a) => ({ n: a.n, ended: a.ended, reason: a.reason, exitCode: a.exitCode, usage: a.usage, resumeFrom: a.resumeFrom })))}`);
-    assert.ok(state.settled, `settled: ${views.capped?.phase}`);
-    const [first, second] = state.attempts;
-    assert.deepEqual([first?.ended, first?.reason, first?.exitCode], ['failed', 'budget', 1], 'the first ended at its cap, as the harness printed it');
+    assert.equal(state.settled, 'failed', `settled: ${views.capped?.phase}`);
+    const [first] = state.attempts;
+    assert.deepEqual([first?.ended, first?.reason, first?.exitCode], ['failed', 'budget', 1], 'it ended at its cap, as the harness printed it');
     assert.ok((first?.usage?.costUsd ?? 0) >= 0.01, `and cost at least its cap: ${first?.usage?.costUsd}`);
-    // How the second ends is the model's — on a warm cache it can finish under the cap. That it starts clean is the engine's.
-    assert.ok(second, 'attempts remained, so a second was started');
-    assert.equal(second.resumeFrom, undefined, 'clean, though the policy is always: continuing the first would spend past its cap');
-    for (const a of state.attempts.filter((x) => x.reason === 'budget')) assert.ok((a.usage?.costUsd ?? 0) >= 0.01, `attempt ${a.n} cost at least its cap`);
+    assert.equal(state.attempts.length, 1, 'a budget spent is spent: maxAttempts 2 and resume always start no attempt 2');
   });
 });
 

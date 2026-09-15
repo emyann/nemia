@@ -124,6 +124,8 @@ test('runs are read from the workflow store and summarized, with what each step 
     waiting: null,
     status: 'cancelled',
     moving: false,
+    // Nothing of it was measured: no cost, which is not $0.
+    cost: null,
     steps: [
       // t-1 is on the record and not in this engine's store: a fresh WF_ROOT has no tasks at all.
       { name: 'implement', taskId: 't-1', branch: 'wf/r-1/implement', status: 'unknown', note: null, needs: null, blockedByHarness: false },
@@ -149,13 +151,13 @@ const r2 = {
 const settledTimeline = (taskId: string) => [{
   try: 1, round: 1, sessionOf: null, check: null,
   session: { taskId, at: 'ended', filedAt: null, spawnedAt: at, endedAt: at, attempts: 1, queuedMs: null, ranMs: 0, queued: 'not known', ran: '0s' },
-  used: { usage: null, used: 'not measured', cost: 'not measured' },
+  used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
 }];
 
 /** The run's time over that one task, in a workflow with no loop: no round is totalled, and the run is, with a queue and a wall nobody can know. */
 const oneTaskTotals = () => ({
   rounds: [],
-  run: { loop: null, round: null, tasks: 1, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: 'not known', ran: '0s', wall: 'not known' },
+  run: { loop: null, round: null, tasks: 1, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: 'not known', ran: '0s', wall: 'not known', cost: null },
 });
 
 test('a run in full: the brief, each step\'s spec and prose, what it was told, and how it went', async () => {
@@ -170,7 +172,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', workflowDir, baseRef: 'def456',
     branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', cancelledAt: null, after: [], waiting: null,
     // implement signed off blocked, so review can never be filed: the run is over, and failed.
-    status: 'failed', moving: false, waitingOnYou: ['implement'], warning: null,
+    status: 'failed', moving: false, cost: null, waitingOnYou: ['implement'], warning: null,
     graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }] },
     steps: undefined,
     timeline: oneTaskTotals(),
@@ -194,7 +196,8 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     needs: 'Which database?', blockedByHarness: false, lastLine: null, said: [], asked: null,
     ...implementTry,
     // Its journal carries no usage: nobody measured it, which is not 0.
-    used: { usage: null, used: 'not measured', cost: 'not measured' },
+    used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
+    spent: null, budget: null, raise: null,
     tries: firstTry(implementTry),
     timeline: settledTimeline('t-2'),
   });
@@ -213,6 +216,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     ...reviewTry,
     // Not filed: it consumed nothing, and has no try on the clock.
     used: null,
+    spent: null, budget: null, raise: null,
     tries: firstTry(reviewTry),
     timeline: [],
   });
@@ -280,14 +284,15 @@ test('a run whose workflow folder is gone still answers, from its record', async
       workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
       note: null, needs: 'Which database?', blockedByHarness: false, lastLine: null, said: [], asked: null,
       ...implementTry,
-      used: { usage: null, used: 'not measured', cost: 'not measured' },
+      used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
+      spent: null, budget: null, raise: null,
       tries: firstTry(implementTry),
       timeline: settledTimeline('t-2'),
     },
     {
       name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, note: null,
       needs: null, blockedByHarness: false, lastLine: null, said: [], asked: null,
-      ...reviewTry, used: null, tries: firstTry(reviewTry), timeline: [],
+      ...reviewTry, used: null, spent: null, budget: null, raise: null, tries: firstTry(reviewTry), timeline: [],
     },
   ]);
 
@@ -335,7 +340,8 @@ test('a folder changed since the run started keeps the steps that ran, and names
     workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
     note: null, needs: 'Which database?', blockedByHarness: false, lastLine: null, said: [], asked: null,
     ...originalTry,
-    used: { usage: null, used: 'not measured', cost: 'not measured' },
+    used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
+    spent: null, budget: null, raise: null,
     tries: firstTry(originalTry),
     timeline: settledTimeline('t-6'),
   });
@@ -1306,7 +1312,7 @@ test("the detail carries where each step's time went — per try and per check, 
   assert.deepEqual(words(implement.timeline[0].check), { at: 'ended', filedAt: T(19, 56), spawnedAt: T(19, 57), endedAt: T(20, 55), queued: '1s', ran: '58s' });
   assert.deepEqual(words(implement.timeline[1].check), { at: 'running', filedAt: T(26, 40), spawnedAt: T(26, 41), endedAt: null, queued: '1s', ran: 'still running, no end yet' });
   // What each session used, in `wf decide`'s words, as the step's `used` is.
-  assert.deepEqual(implement.timeline[0].used, { usage: { turns: 54, toolCalls: 146 }, used: '54 turns · 146 tool calls · tokens in not measured · tokens out not measured', cost: 'not measured' });
+  assert.deepEqual(implement.timeline[0].used, { usage: { turns: 54, toolCalls: 146 }, used: '54 turns · 146 tool calls · tokens in not measured · tokens out not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null });
   assert.deepEqual(review.timeline, [], 'a step not filed has no try on the clock');
   assert.deepEqual([run.timeline.run.tasks, run.timeline.run.inFlight, run.timeline.run.queued, run.timeline.run.ran, run.timeline.run.wall], [4, 1, '17s', '26m15s, 1 still running', 'still going']);
 
@@ -1315,7 +1321,9 @@ test("the detail carries where each step's time went — per try and per check, 
   const views = new Map((await e.list()).map((view) => [view.id, view]));
   const { filed } = await readFilings(e);
   const theirs = timeline(readRun('r-60'), views, filed);
-  assert.deepEqual(run.timeline, JSON.parse(JSON.stringify({ rounds: theirs.rounds, run: theirs.run })));
+  // The totals carry what their sessions cost beside it, which the package's `timeline` does not: nobody priced these.
+  const lessCost = ({ cost, ...total }: { cost: unknown }) => (assert.equal(cost, null), total);
+  assert.deepEqual({ rounds: run.timeline.rounds.map(lessCost), run: lessCost(run.timeline.run) }, JSON.parse(JSON.stringify({ rounds: theirs.rounds, run: theirs.run })));
   // Each try as the package has it, less `used`, which the api words as `wf decide` does (asserted above).
   const lessUsed = (tries: ReadonlyArray<{ used?: unknown }>) => JSON.parse(JSON.stringify(tries.map(({ used: _, ...x }) => x)));
   assert.deepEqual(lessUsed(implement.timeline), lessUsed(theirs.steps.implement!));

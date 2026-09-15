@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, saidCount, say, sensitiveDiff, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
-import { answerOf, assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote, waitsOf } from 'agent-workflows/run';
-import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
+import { branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, round, runCostLines, runSpend, saidCount, say, sensitiveDiff, spendReader, spentWord, stepSpend, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Spend, type SpendOf, type Timeline, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
+import { addSpend, answerOf, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, loopOver, overBudget, overBudgetLine, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote, waitsOf } from 'agent-workflows/run';
+import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -37,6 +37,8 @@ export type RunSummary = {
    * person — no such run, a cancelled one, a result branch gone (`RunWaiting.onYou`): nothing the tick reads will change on its own.
    */
   moving: boolean;
+  /** What the run has cost so far, every step's tries together, as `wf ls` adds it up on the run's line (`runSpend`); null until a cost was measured. */
+  cost: Spent | null;
   /**
    * `status` is what `wf ls` prints for the step — see `judge` for the one word it corrects. `note` is what `wf ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
@@ -46,6 +48,35 @@ export type RunSummary = {
   /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds — on a run nobody has called off. */
   waitingOnYou: string[];
 };
+
+/**
+ * What sessions cost, as the package adds it up off the engine's `usage.costUsd` (`Spend`: `stepSpend`, `runSpend`): the dollars of the
+ * attempts that ended with a cost on them, how many did (`measured`), and how many ended with none (`unmeasured`) — a `claude --bg` session's
+ * cost is known only once its attempt ends (agent-engine's open issue 17), and one killed first, or on a model its harness could not price,
+ * has none. An attempt still running is in neither. `said` is the package's word for it (`spentWord`): `$4.20`, and `≥$4.20` where an ended
+ * attempt has no cost on it, so a part never reads as the whole. Null wherever no attempt was measured: a cost nobody measured is not $0.
+ */
+export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
+
+/** A spend as the board is given it (`Spent`), or null when nothing of it was measured. */
+const spentOf = (spend: Spend): Spent | null =>
+  spend.measured ? { usd: spend.usd, measured: spend.measured, unmeasured: spend.unmeasured, said: spentWord(spend) } : null;
+
+/**
+ * A step's cap, and what its tries have cost of it. `usd` is the cap in force (`budgetOf`): the `budget:` the run froze, until a person raises
+ * it (`wf retry --budget`, `wf round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of` what the step's
+ * tries have cost of it, as `wf ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is whether they have cost
+ * the cap or more (`overBudget`): what holds the step, where another session of it is the way on.
+ */
+export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
+
+/**
+ * A raise of a step's cap the package takes, and how it is asked for: `retry` — `wf retry --budget`, the board's `POST …/retry` — for a step
+ * over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `wf round --budget`, `POST …/round` — for a looping
+ * step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more than, as the package
+ * refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars (`dollars`).
+ */
+export type StepRaise = { by: 'retry' | 'round'; above: number; said: string };
 
 /**
  * What a run started `--after` still waits on, as `wf ls` and `wf decide` say it — never worded here.
@@ -220,6 +251,8 @@ export type RunDetail = {
   status: RunStatus;
   /** As on `RunSummary`. */
   moving: boolean;
+  /** As on `RunSummary`. */
+  cost: Spent | null;
   waitingOnYou: string[];
   /** Set when the workflow folder cannot be read, or no longer has the steps the run started with. */
   warning: string | null;
@@ -265,6 +298,12 @@ export type RunDetail = {
     attempts: StepAttempts;
     /** What its current try consumed, in `wf decide`'s words; null for a step not filed, which consumed nothing. */
     used: StepUsed | null;
+    /** What every try of it has cost together, each session once, as `wf ls` puts it beside the step's word (`stepSpend`); null until a cost was measured. */
+    spent: Spent | null;
+    /** Its cap in force, and what its tries have cost of it (`StepBudget`); null for a step with no `budget:`. */
+    budget: StepBudget | null;
+    /** The raise of its cap the package takes, and how (`StepRaise`); null for a step no raise takes on, and on a run called off. */
+    raise: StepRaise | null;
     /**
      * Every try, earliest first, the current one last and marked: `attempts` counts the current try's task alone, and each
      * round of a loop, and each try within one, is a task of its own.
@@ -273,9 +312,15 @@ export type RunDetail = {
     /** Where the step's time went, try by try and check by check (`StepTimelineTry`); empty for a step not filed. */
     timeline: StepTimelineTry[];
   }>;
-  /** The run's time together, in the package's words (`timeline`): each round of its loop, and the whole run. */
-  timeline: { rounds: TimelineTotal[]; run: TimelineTotal };
+  /** The run's time together, in the package's words (`timeline`): each round of its loop, and the whole run — with what the sessions in each cost. */
+  timeline: { rounds: StepTimelineTotal[]; run: StepTimelineTotal };
 };
+
+/**
+ * A total of the run's time, as the package's `timeline` has it (`TimelineTotal`), and what the sessions it counts cost (`Spent`): the run's,
+ * every step's tries (`runSpend`), or a round's — each session of a try its loop filed again in that round (`roundSpend`).
+ */
+export type StepTimelineTotal = TimelineTotal & { cost: Spent | null };
 
 /**
  * One try of a step on the clock, as the package's `timeline` has it (`TimelineTry`): its session's task and its check's, each filed, spawned
@@ -289,8 +334,10 @@ export type Usage = NonNullable<ReturnType<typeof consumption>[string]>;
 /**
  * What a step consumed, summed over the attempts of its current try (`consumption`), and in the words `wf decide`
  * prints beside its check (`usedLines`) — `used` and `cost`, each `not measured` where nobody counted, never `0`.
+ * `costUsd`, `apiMs` and `toolMs` are the engine's, off the same usage — what the harness priced the session at, and the
+ * time it counted waiting on the model and running tools — each null where nobody measured it.
  */
-export type StepUsed = { usage: Usage | null; used: string; cost: string };
+export type StepUsed = { usage: Usage | null; used: string; cost: string; costUsd: number | null; apiMs: number | null; toolMs: number | null };
 
 /** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
 export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
@@ -324,6 +371,13 @@ export type Decidable = {
   used: Record<string, StepUsed>;
   /** Every filed step's `used` summed: a count only where every one of them measured it. */
   total: StepUsed;
+  /**
+   * What the run has cost, as `wf decide` prints it after its steps (`runCostLines`), without its label: `run $12.40`, with how many ended
+   * attempts had no cost on them — or `run not measured`. Null before any attempt has ended.
+   */
+  cost: string | null;
+  /** `wf decide`'s OVER BUDGET line, saying why each step held on its budget is held (`overBudgetLine`); null when none is. */
+  overBudget: string | null;
   commands: DecideCommand[];
 };
 
@@ -371,16 +425,18 @@ type TaskView = Awaited<ReturnType<typeof e.view>>;
 type Views = ReadonlyMap<string, TaskView>;
 
 /**
- * The engine's view of every task a run's current tries have filed — each step's, and each check's — for its decision.
+ * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for its
+ * decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhases` in runner.ts).
  * Each `view` observes every harness — a `claude agents` call, a scan of detached runs — so this is an
  * observation per filed task, read once for each state of a run. A run's page, which is polled, and the list of every
  * run read theirs with `everyView`.
  */
 async function viewsOf(run: Run): Promise<Views> {
   const views = new Map<string, TaskView>();
-  for (const { taskId, check } of Object.values(run.steps)) {
+  for (const { taskId, check, tries } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
     if (check) views.set(check.taskId, await e.view(check.taskId));
+    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
   }
   return views;
 }
@@ -522,6 +578,10 @@ type Judged = {
   asked: ReadonlyMap<string, Retry>;
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a try was answered (`answerOf`). */
   answers: readonly RetryAsk[];
+  /** What each task's sessions cost, off the views read (`spendReader`): what holds a step to its `budget:`. */
+  spendOf: SpendOf;
+  /** What the run has cost, every step's tries (`runSpend`); null until a cost was measured. */
+  cost: Spent | null;
 };
 
 /**
@@ -553,14 +613,18 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   // And what people said with them, as `list` reads it: without it a try a person answered reads as one they did not.
   const answers = readAnswers(run.id);
   // And how many times a person said something to each step's current try (`wf say`), as `list` counts it: the note says so.
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run));
+  // And what each task's sessions cost, as `list` reads it (`spendReader`), off views that hold every try's task: a step whose tries have
+  // cost its cap says `over budget $4.25 of $3`, waits on you, and is filed nothing more — without it, it read as one with no cap.
+  const spendOf = spendReader(views);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf);
   const waiting = waitingOf(run, said.waiting);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
   // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
   // And the harness's word, as the tick has it (`harnessBlocked`): a person's try of a step whose session the harness blocked is due, the
   // session stopped first. Without it that try is in `listing`'s note, which reads the engine's word, and neither `asked` nor `moving`.
-  const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views));
+  // And the cost, as the tick has it: a step over its budget is not tried, nor its loop sent round, on the run's word, so it does not move.
+  const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
   // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
   // for it, whatever its bare steps would make ready: the tick fails on it.
   const tickReads = Boolean(run.workflow ?? folder);
@@ -578,7 +642,50 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
     waiting,
     asked: new Map(retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
     answers,
+    spendOf,
+    cost: spentOf(runSpend(run, spendOf)),
   };
+}
+
+/**
+ * What a step's tries have cost, against its cap, and the raise of that cap the package takes (`Spent`, `StepBudget`, `StepRaise`) — off the
+ * views the request already read, with no observation of its own. `steps` are the workflow the run is judged by: a step it does not have has
+ * no `budget:`.
+ */
+function costOf(run: Run, name: string, steps: readonly Workflow[], views: Views, spendOf: SpendOf): { spent: Spent | null; budget: StepBudget | null; raise: StepRaise | null } {
+  const step = steps.find((s) => s.name === name);
+  const spent = spentOf(stepSpend(run, name, spendOf));
+  const cap = step ? budgetOf(step, run.steps[name]) : undefined;
+  const budget = step && cap !== undefined
+    ? { usd: cap, said: budgetWord(cap), of: spent && `${spent.said} of ${budgetWord(cap)}`, over: Boolean(overBudget(step, run, spendOf)) }
+    : null;
+  return { spent, budget, raise: step && !run.cancelledAt ? raiseOf(run, step, steps, views, spendOf) : null };
+}
+
+/**
+ * The raise of a step's cap the package takes (`StepRaise`), or null. A try's, where `retryable` carries one — a settled step over its budget
+ * or ended at it, that a try takes on — and it may be tried; else a round's, for a looping step over its budget or out of rounds whose loop has
+ * a step over its budget (`loopOver`): `wf round --budget` has to pass the most any of them has cost, as `roundAsk` refuses less.
+ */
+function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Views, spendOf: SpendOf): StepRaise | null {
+  const phase = (taskId: string) => phaseOfView(views.get(taskId));
+  const { status, modes, raise } = retryable(step, run, phase, closeoutReader(views, run), closeoutAsked(views), steps, () => false, spendOf, exitVerdicts(views, run));
+  if (raise && modes.length) return { by: 'retry', above: raise.above, said: dollars(raise.above) };
+  const over = step.loop && (status === 'over budget' || status === 'exhausted') ? loopOver(steps, step, run, spendOf) : [];
+  if (!over.length) return null;
+  const above = Math.max(0, ...over.map((o) => o.spent.usd));
+  return { by: 'round', above, said: dollars(above) };
+}
+
+/**
+ * What a round of a loop cost: the session of each try the package's `timeline` counts in that round — the steps the loop files again
+ * (`loopSpan`), a session each once, which a try a recheck reached has none of — as `taskSpend` reads it, added up (`addSpend`). The
+ * package's `timeline` times a round and carries no cost of one; this adds up the sessions of its own tries, with its own functions.
+ */
+function roundSpend(clock: Timeline, steps: readonly Workflow[], total: TimelineTotal, spendOf: SpendOf): Spend {
+  const looping = steps.find((s) => s.name === total.loop);
+  const names = looping ? loopSpan(steps, looping) : [];
+  return addSpend(names.flatMap((name) => (clock.steps[name] ?? []).flatMap((t) => (t.round === total.round && t.session ? [spendOf(t.session.taskId)] : []))));
 }
 
 /**
@@ -612,6 +719,7 @@ async function summarize(run: Run, views: Views): Promise<RunSummary> {
     waiting: judged.waiting,
     status: judged.status,
     moving: judged.moving,
+    cost: judged.cost,
     steps: names.map((name) => ({
       name,
       taskId: run.steps[name]?.taskId ?? null,
@@ -742,6 +850,7 @@ async function detail(run: Run): Promise<RunDetail> {
     waiting: judged.waiting,
     status: judged.status,
     moving: judged.moving,
+    cost: judged.cost,
     waitingOnYou: judged.waitingOnYou,
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
     // The steps `judge` words: the judged workflow, then a `bare` step for each one the page shows beside it.
@@ -773,11 +882,16 @@ async function detail(run: Run): Promise<RunDetail> {
         asked: askedOf(judged.asked.get(name)),
         ...current,
         used: taskId ? usedOf(used[name]) : null,
+        // Off the same views, which hold every try's task: no observation.
+        ...costOf(run, name, steps, views, judged.spendOf),
         tries: triesOf(run, name, steps, views, current, judged.answers),
         timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used) : null })),
       };
     })),
-    timeline: { rounds: clock.rounds, run: clock.run },
+    timeline: {
+      rounds: clock.rounds.map((r) => ({ ...r, cost: spentOf(roundSpend(clock, steps, r, judged.spendOf)) })),
+      run: { ...clock.run, cost: judged.cost },
+    },
   };
 }
 
@@ -927,10 +1041,14 @@ function triesOf(
 /** A usage in `wf decide`'s words: `usedLines`, each line without the label it starts with. */
 function usedOf(usage: Usage | undefined): StepUsed {
   const [used = '', cost = ''] = usedLines(usage);
-  return { usage: usage ?? null, used: used.replace(/^used\s+/, ''), cost: cost.replace(/^cost\s+/, '') };
+  return {
+    usage: usage ?? null, used: used.replace(/^used\s+/, ''), cost: cost.replace(/^cost\s+/, ''),
+    costUsd: usage?.costUsd ?? null, apiMs: usage?.apiMs ?? null, toolMs: usage?.toolMs ?? null,
+  };
 }
 
-const USAGE_FIELDS = ['turns', 'toolCalls', 'inputTokens', 'outputTokens', 'costUsd'] as const;
+/** The counts `sumUsage` adds up, as agent-workflows' radius.ts names them (`FIELDS`): the time the harness counted among them. */
+const USAGE_FIELDS = ['turns', 'toolCalls', 'inputTokens', 'outputTokens', 'costUsd', 'apiMs', 'toolMs'] as const;
 
 /**
  * Several usages as one, by `sumUsage`'s rule in agent-workflows' radius.ts, which the package does not export: a count is
@@ -992,8 +1110,11 @@ function lessonOf(touched: readonly Touched[]): Lesson {
   return { said, state: touched.some((t) => !('error' in t.radius) && t.radius.lessons.length) ? 'written' : 'nothing' };
 }
 
-/** A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, or `wf round <run> <step>`, after the colon and two spaces. */
-const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck)?)/;
+/**
+ * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, or `wf round <run> <step>` — with `--budget <amount>`
+ * past a cap — after the colon and two spaces.
+ */
+const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck| --budget <amount>)?)/;
 
 /**
  * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, then ship it and drop it
@@ -1045,9 +1166,12 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
+  const verdicts = exitVerdicts(views, run);
   const { asks, rounds } = readAsks(run.id);
-  // With the harness's word, as `wf decide` reads it: a person's try of a session the harness blocked is waited on too.
-  const d = decision(steps, run, phase, (branch) => isShipped(run, branch), reader, asked, exitVerdicts(views, run), asks, rounds, harnessBlocked(views));
+  // With the harness's word, as `wf decide` reads it: a person's try of a session the harness blocked is waited on too. And what each
+  // task's sessions cost (`spendReader`): a step over its budget, or ended at it, is waited on, and offered its try or round with `--budget`.
+  const { spendOf } = judged;
+  const d = decision(steps, run, phase, (branch) => isShipped(run, branch), reader, asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
   if (d.kind === 'cancelled') return { nothing: `cancelled at ${d.at} — nothing to decide` };
   if (d.kind === 'shipped') return { nothing: `shipped — ${d.branches.join(', ')} is already on ${run.branch}` };
 
@@ -1059,13 +1183,15 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
-  const offers = [...roundLines(steps, run, d), ...retryLines(steps, run, d, phase, reader, asked)];
+  const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
   return {
     touched,
     lesson: lessonOf(touched),
     sensitive: touched.map((t) => sensitiveOf(run, t)),
     used: Object.fromEntries(filed.map((name) => [name, usedOf(consumed[name])])),
     total: usedOf(sumUsages(filed.map((name) => consumed[name]))),
+    cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
+    overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
     commands: commandsOf(run, d, offers),
   };
 }
@@ -1253,7 +1379,21 @@ async function send(stream: SSEStreamingApi, read: Read): Promise<void> {
 }
 
 /** The body `POST …/retry` takes: `wf retry`'s flags, as JSON. */
-const RETRY_SHAPE = '`{ "mode": "nudge" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>" }`';
+const RETRY_SHAPE = '`{ "mode": "nudge" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount> }`';
+
+/** The body `POST …/round` takes: `wf round`'s arguments, as JSON. */
+const ROUND_SHAPE = '`{ "step"?: "<looping step>", "budget"?: <amount> }`';
+
+/** An ask for another round of a run's loop, as the guard's refusals word it (guard.ts). */
+const roundGuard = (id: string): Guarded => ({
+  route: `POST /api/runs/${id}/round`,
+  does: "asks for another round of a run's loop",
+  forAnother: 'ask for one',
+  why: "the next tick files the round a person asks for, which runs the loop's steps again in this repository, past the cap a budget carried where it raises one",
+  reach: "raise it from the run's page on the board",
+  instead: `Raise it from the run's page on the board, or with \`wf round ${id} [<step>] --budget <amount>\``,
+  shape: ROUND_SHAPE,
+});
 
 /** An ask for another try of a step, as the guard's refusals word it (guard.ts). */
 const retryGuard = (id: string, step: string): Guarded => ({
@@ -1283,13 +1423,23 @@ const sayGuard = (id: string, step: string): Guarded => ({
 });
 
 /**
- * How a try is asked for, off `POST …/retry`'s body — or why the body is not an ask (400): `wf retry`'s one way, the model its
- * `--model` names, which is a new session's, and `--message`. Whether the message may ride on the ask is the package's to say
- * (`messageRefusal`), and whether the step may be tried again that way (`retryRefusal`).
+ * Why a `budget` in a body is not a number (400), in the api's words, or null: the package's `--budget` is typed as digits, and has no words
+ * for JSON. A number not above zero is the package's to refuse.
  */
-function howOf(body: unknown): RetryHow | Refusal {
+function budgetTypeRefusal(budget: unknown, as: string, shape: string): Refusal | null {
+  if (budget === undefined || typeof budget === 'number') return null;
+  return { status: 400, error: `\`budget\` is the cap to raise to, as \`${as} --budget <amount>\` takes it: dollars, as a JSON number above zero, like 5 or 2.50. This request's was ${JSON.stringify(budget)}: ${shape}.` };
+}
+
+/**
+ * How a try is asked for, off `POST …/retry`'s body — or why the body is not an ask (400): `wf retry`'s one way, the model its
+ * `--model` names, which is a new session's, `--message`, and `--budget`, the cap a step over its budget is raised to — a JSON number above
+ * zero, one that is not refused in the package's words (`budgetRefusal`). Whether the message and the budget may ride on the ask is the
+ * package's to say (`messageRefusal`, `budgetRefusal`), and whether the step may be tried again that way, with that cap (`retryRefusal`).
+ */
+function howOf(body: unknown, command: string): RetryHow | Refusal {
   if (!isObject(body)) return { status: 400, error: `POST …/retry takes a JSON object: ${RETRY_SHAPE}.` };
-  const { mode, model, message } = body;
+  const { mode, model, message, budget } = body;
   if (mode !== 'nudge' && mode !== 'fresh' && mode !== 'recheck') {
     return {
       status: 400,
@@ -1305,7 +1455,29 @@ function howOf(body: unknown): RetryHow | Refusal {
   if (message !== undefined && typeof message !== 'string') {
     return { status: 400, error: `\`message\` is what to tell the step, as \`wf retry --message "<answer>"\` takes it: text, or left out. This request's was ${JSON.stringify(message)}.` };
   }
-  return { mode, ...(model !== undefined ? { model } : {}), ...(message !== undefined ? { message } : {}) };
+  const typed = budgetTypeRefusal(budget, 'wf retry', RETRY_SHAPE);
+  if (typed) return typed;
+  const how: RetryHow = { mode, ...(model !== undefined ? { model } : {}), ...(message !== undefined ? { message } : {}), ...(budget !== undefined ? { budget: budget as number } : {}) };
+  // Not above zero: not an amount, as `wf retry --budget` refuses one, in the package's words.
+  if (how.budget !== undefined && !(how.budget > 0)) return { status: 400, error: budgetRefusal(how, command)! };
+  return how;
+}
+
+/**
+ * What a round is asked for with, off `POST …/round`'s body — or why the body is not an ask (400): the looping step, which `wf round` takes
+ * when the run has more than one loop, and `--budget`, the cap each step of the loop over its budget is raised to. Whether the loop may go
+ * round, with that cap, is the package's to say (`roundAsk`, through `round()`).
+ */
+function roundHowOf(body: unknown, id: string): { step?: string; budget?: number } | Refusal {
+  if (!isObject(body)) return { status: 400, error: `POST …/round takes a JSON object: ${ROUND_SHAPE}.` };
+  const { step, budget } = body;
+  if (step !== undefined && (typeof step !== 'string' || !step.trim())) {
+    return { status: 400, error: `\`step\` names the looping step whose loop goes round again, as \`wf round ${id} <step>\` does: a name, or left out for a run with one loop. This request's was ${JSON.stringify(step)}: ${ROUND_SHAPE}.` };
+  }
+  // A number not above zero is refused by `round()`, in the package's words, before anything of the run is decided (`roundAsk`).
+  const typed = budgetTypeRefusal(budget, `wf round ${id}`, ROUND_SHAPE);
+  if (typed) return typed;
+  return { ...(step !== undefined ? { step } : {}), ...(budget !== undefined ? { budget: budget as number } : {}) };
 }
 
 export const app = new Hono()
@@ -1365,9 +1537,10 @@ export const app = new Hono()
     } catch {
       return c.json({ error: `POST …/retry takes a JSON body: ${RETRY_SHAPE}.` }, 400);
     }
-    const how = howOf(body);
+    const how = howOf(body, `wf retry ${id} ${step}`);
     if ('status' in how) return c.json({ error: how.error }, how.status);
-    const wrong = messageRefusal(how, `wf retry ${id} ${step}`);
+    // A budget on a recheck, which files no session to spend it, is the package's to refuse before the run is read, as a message on one is.
+    const wrong = messageRefusal(how, `wf retry ${id} ${step}`) ?? budgetRefusal(how, `wf retry ${id} ${step}`);
     if (wrong) return c.json({ error: wrong }, 422);
     try {
       const { ask, file, stopFirst } = await retry(e, id, step, how, { stopBlocked: true });
@@ -1378,6 +1551,38 @@ export const app = new Hono()
       const said = err instanceof Error ? err.message : String(err);
       if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
       return c.json({ error: `Could not ask for another try of step '${step}': ${said}. \`wf retry ${id} ${step}\` asks the same way from the command line.` }, 502);
+    }
+  })
+  // A person's ask for another round of a run's loop — the loop out of rounds, or held on a step of it past its budget, with the cap raised —
+  // made by the package's `round()`, `wf round`'s own, which writes the ask file and nothing else; the next tick honours it once. Guarded as a
+  // try is (guard.ts). Refused in the package's words, verbatim: a budget not above zero (400), before anything is decided of the run; a round
+  // the loop may not go, or a budget not above what its steps have cost (`roundAsk`, 409).
+  .post('/api/runs/:id/round', async (c) => {
+    const id = c.req.param('id');
+    const refused = refusedBeforeReading(roundGuard(id), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    if (!findRun(id)) return c.json({ error: noSuchRun(id) }, 404);
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: `POST …/round takes a JSON body: ${ROUND_SHAPE}.` }, 400);
+    }
+    const how = roundHowOf(body, id);
+    if ('status' in how) return c.json({ error: how.error }, how.status);
+    if (how.step !== undefined) {
+      const found = taskOfStep(id, how.step);
+      if ('error' in found) return c.json({ error: found.error }, 404);
+    }
+    try {
+      const { ask, file } = await round(e, id, how.step, how.budget);
+      // Accepted, and not yet done: the round is filed by the next tick, as one asked for at the command line is.
+      return c.json({ step: ask.step, round: ask.round, file }, 202);
+    } catch (err) {
+      const said = err instanceof Error ? err.message : String(err);
+      // `roundAsk` refuses a budget not above zero first, whatever the run: a body that is not an amount, in its words.
+      if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, how.budget !== undefined && !(how.budget > 0) ? 400 : 409);
+      return c.json({ error: `Could not ask for another round of ${id}'s loop: ${said}. \`wf round ${id}\` asks the same way from the command line.` }, 502);
     }
   })
   // The board's third write: a person's words to a step's running session, through the package's `say()` — `wf say`'s own — which hands them

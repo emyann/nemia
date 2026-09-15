@@ -241,15 +241,19 @@ export const HELD = {
  * A fifth run: what it cost. `tokens` has `budget: 3`, and its two tries — the second a person's nudge — cost $1.75 and $2.50, each refused by
  * its check: `over budget $4.25 of $3`, raised with its try. `implement` has `budget: 2`, and `review` loops back to it: implement's two rounds
  * cost $1.20 and $0.90, review's two sessions ran on Codex, which prices nothing, and review asked for a third round, which would file implement
- * again past its cap — so both read `over budget`, raised with review's round. The run cost `≥$6.35`: review's sessions have no cost on them.
- * Nothing of it moves, and it waits on you: finished, off the Factory's floor until finished runs are shown. Newer than every run but the diamond's.
+ * again past its cap — so both read `over budget`, raised with review's round. `palette` has `budget: 1`, and its one session cost $1.50 and
+ * signed off blocked with a question: `over budget $1.50 of $1`, answered with its raise. The run cost `≥$7.85`: review's sessions have no cost
+ * on them. Nothing of it moves, and it waits on you: finished, off the Factory's floor until finished runs are shown. Newer than every run but
+ * the diamond's.
  */
 export const COSTLY = {
   id: 'what-it-cost-e2e10',
   title: 'What it cost',
-  steps: ['implement', 'review', 'tokens'],
+  steps: ['implement', 'review', 'tokens', 'palette'],
   /** What the run cost, on its card, its row on Runs and its page's header: `≥`, since review's sessions were not priced. */
-  cost: '≥$6.35',
+  cost: '≥$7.85',
+  /** The step that signed off blocked past its budget, answered with its raise: its word, what it cost of its cap, its question, and where its raise starts. */
+  asks: { step: 'palette', status: 'over budget $1.50 of $1', of: '$1.50 of $1', needs: 'Warm colours for the dark theme, or cool ones?', startsAt: '2' },
   /** The step over its own budget, raised with its try: its word, what its tries cost of its cap, and the amount its raise starts at. */
   over: { step: 'tokens', status: 'over budget $4.25 of $3', of: '$4.25 of $3', startsAt: '5' },
   /** A raise the package refuses: not above the $4.25 tokens' tries cost. */
@@ -257,7 +261,7 @@ export const COSTLY = {
   /** The loop held on implement's budget: its looping step, its word, the amount its round's raise starts at, and implement's own word. */
   held: { step: 'review', status: 'over budget — implement $2.10 of $2', startsAt: '3', target: 'implement', targetStatus: 'over budget $2.10 of $2' },
   /** What each try's session cost, on the timeline: implement's two rounds, review's two unpriced, and tokens' two tries. */
-  sessions: { implement: ['$1.20', '$0.90'], review: ['not measured', 'not measured'], tokens: ['$1.75', '$2.50'] },
+  sessions: { implement: ['$1.20', '$0.90'], review: ['not measured', 'not measured'], tokens: ['$1.75', '$2.50'], palette: ['$1.50'] },
   /** What each round of review's loop cost: implement's session and review's, which has no cost on it. */
   rounds: ['≥$1.20', '≥$0.90'],
 } as const;
@@ -799,9 +803,11 @@ export function seed(root: string, now = Date.now()): void {
   write(path.join(costDir, 'review.md'), '---\nharness: codex\nafter: implement\nloop: implement\noutput: review.json\n---\nReview it, and say whether it needs another round.\n');
   write(path.join(costDir, 'review.json'), `${JSON.stringify(again, null, 2)}\n`);
   write(path.join(costDir, 'tokens.md'), '---\nharness: claude\nbudget: 3\ncheck: npm test\n---\nPick the colour tokens.\n');
+  write(path.join(costDir, 'palette.md'), '---\nharness: claude\nbudget: 1\n---\nPick the palette for the dark theme.\n');
   const cost = (name: string) => `${COSTLY.id}-${name}`;
   const costLane = path.join(root, 'worktrees', COSTLY.id, 'implement');
   const tokensLane = path.join(root, 'worktrees', COSTLY.id, 'tokens');
+  const paletteLane = path.join(root, 'worktrees', COSTLY.id, 'palette');
   write(path.join(root, 'runs', `${COSTLY.id}.json`), JSON.stringify({
     id: COSTLY.id, repo: '/code/hkb-v2', workspace: '/code/hkb-v2', baseRef: '19c9365', branch: 'main', isolate: true,
     brief: `${COSTLY.title}\n\nA fifth run seeded by npm run e2e: tokens' tries cost more than its budget, and review's loop would file implement again past its own.`,
@@ -813,6 +819,7 @@ export function seed(root: string, now = Date.now()): void {
         loop: 'implement', rounds: 3, output: { file: 'review.json', schema: again },
       },
       { name: 'tokens', after: [], body: 'Pick the colour tokens.', harness: 'claude', budget: 3, check: 'npm test' },
+      { name: 'palette', after: [], body: 'Pick the palette for the dark theme.', harness: 'claude', budget: 1 },
     ],
     createdAt: ago(1.5),
     steps: {
@@ -822,6 +829,7 @@ export function seed(root: string, now = Date.now()): void {
         taskId: cost('tokens-try2'), workspace: tokensLane, branch: `wf/${COSTLY.id}/tokens`, check: { taskId: cost('tokens-try2-check') },
         tries: [{ taskId: cost('tokens'), check: { taskId: cost('tokens-check') }, then: 'nudge' }],
       },
+      palette: { taskId: cost('palette'), workspace: paletteLane, branch: `wf/${COSTLY.id}/palette` },
     },
   }, null, 2));
   /** A session that ran once — filed, spawned and ended `at` minutes ago — and signed off with `closeout`, with the usage the engine read. */
@@ -867,4 +875,8 @@ export function seed(root: string, now = Date.now()): void {
     turns: 18, toolCalls: 36, inputTokens: 1_530_000, outputTokens: 19_700, costUsd: 2.5, apiMs: 560_000, toolMs: 31_000,
   });
   refused(cost('tokens-try2-check'), tokensLane, [1.0, 0.95]);
+  // palette signed off blocked, having spent more than its cap to get there: a question for a person, and a budget to raise with the answer.
+  priced(cost('palette'), 'claude', paletteLane, 'Pick the palette for the dark theme.', [1.49, 1.48, 1.2], {
+    outcome: 'blocked', summary: 'Drafted a warm palette and a cool one, and cannot choose between them.', needs: COSTLY.asks.needs, artifacts: [],
+  }, { turns: 11, toolCalls: 19, inputTokens: 980_000, outputTokens: 12_300, costUsd: 1.5, apiMs: 290_000, toolMs: 9_000 });
 }

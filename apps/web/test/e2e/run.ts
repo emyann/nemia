@@ -988,21 +988,28 @@ const PAGES: PageSpec[] = [
     route: `/runs/${COSTLY.id}`,
     expect: async (page) => {
       await sidebar(page);
-      const { over, held } = COSTLY;
+      const { over, held, asks: askingStep } = COSTLY;
       await expectCount(page.getByText(/no longer reads as a workflow|has changed since this run started/), 0, 'no warning about the workflow folder: it reads as the budgets the run froze');
       await expectVisible(page.locator('article header [data-run-cost]', { hasText: `cost ${COSTLY.cost}` }), `the run's header says what it cost (${COSTLY.cost})`);
-      await expectVisible(page.getByText(`Waiting on you: ${COSTLY.steps.join(', ')}`), "the banner says every step past its budget waits on you, in the package's words");
+      // Whole: implement and review did their work, and are held on implement's budget alone — the reason has to be among those the banner gives.
+      const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, out of rounds, or past its budget — wf decide ${COSTLY.id}`;
+      await expectVisible(page.locator('section[aria-label="Waiting on you"] > p', { hasText: reasons }), `the banner says every step past its budget waits on you, and why: ${reasons}`);
+      await expectVisible(
+        page.locator(`section[aria-label="Waiting on you"] [data-need="asks"][data-step="${askingStep.step}"]`, { hasText: `${askingStep.step} asks: ${askingStep.needs}` }),
+        `the banner says what ${askingStep.step}, signed off blocked past its budget, asks`,
+      );
 
       // On the graph: each step's word with its amounts, amber and a human gate, and what its tries cost of its cap — red past it.
       const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
       const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);
       await expectCount(graph.locator('.react-flow__node'), COSTLY.steps.length, `the run's graph has a node per step (${COSTLY.steps.join(', ')})`);
-      for (const [name, status] of [[over.step, over.status], [held.step, held.status], [held.target, held.targetStatus]] as const) {
+      for (const [name, status] of [[over.step, over.status], [held.step, held.status], [held.target, held.targetStatus], [askingStep.step, askingStep.status]] as const) {
         await expectVisible(node(name).locator('[data-state="over-budget"]', { hasText: status }), `${name}'s chip on the graph says ${status}, amber`);
         await expectVisible(node(name).getByText('human gate'), `${name}, past a budget, is drawn as a human gate`);
       }
       await expectVisible(node(over.step).locator('[data-cost="over"]', { hasText: over.of }), `${over.step}'s node says what its tries cost of its cap (${over.of}), red past it`);
       await expectVisible(node(held.target).locator('[data-cost="over"]', { hasText: '$2.10 of $2' }), `${held.target}'s node says what its rounds cost of its cap`);
+      await expectVisible(node(askingStep.step).locator('[data-cost="over"]', { hasText: askingStep.of }), `${askingStep.step}'s node says what its session cost of its cap (${askingStep.of})`);
       await expectCount(node(held.step).locator('[data-cost]'), 0, `${held.step}, with no cap and no session priced, has no cost row: not $0`);
 
       // The timeline's cost column: each session's, `not measured` for the Codex sessions nobody priced, nothing for a check, and the totals.
@@ -1022,14 +1029,16 @@ const PAGES: PageSpec[] = [
       // What `wf decide` says of steps held on their budget, and the raises: tokens' with its try, review's with its round, and none of implement's own.
       const decide = page.locator('section[aria-label="Decide"]');
       await expectVisible(
-        decide.locator('[data-over-budget]', { hasText: 'OVER BUDGET, waiting on you: implement ($2.10 of $2), review (held: its round would file implement again' }),
+        decide.locator('[data-over-budget]', { hasText: 'OVER BUDGET, waiting on you: implement ($2.10 of $2), palette ($1.50 of $1), review (held: its round would file implement again' }),
         "the Decide section says why each step past its budget is held, in wf decide's words",
       );
-      await expectVisible(decide.locator('section[aria-label="Used"] dd', { hasText: 'run $6.35 measured · 2 attempts not measured' }), "and what every try of the run cost, in wf decide's words");
+      await expectVisible(decide.locator('section[aria-label="Used"] dd', { hasText: 'run $7.85 measured · 2 attempts not measured' }), "and what every try of the run cost, in wf decide's words");
       const answers = decide.locator('section[aria-label="Answer"]');
       const raiseRow = (p: Page | Locator, name: string) => p.locator(`section[aria-label="Answer"] [data-offer="raise"][data-step="${name}"]`);
       const amountOf = (row: Locator, name: string) => row.getByRole('spinbutton', { name: new RegExp(`^The cap to raise ${name} to, in dollars`) });
-      for (const [name, startsAt, button] of [[over.step, over.startsAt, 'Raise the budget and try again'], [held.step, held.startsAt, 'Raise the budget and go round again']] as const) {
+      for (const [name, startsAt, button] of [
+        [over.step, over.startsAt, 'Raise the budget and try again'], [held.step, held.startsAt, 'Raise the budget and go round again'], [askingStep.step, askingStep.startsAt, 'Raise the budget and answer'],
+      ] as const) {
         const row = raiseRow(decide, name);
         await expectVisible(amountOf(row, name), `a box for the cap to raise ${name} to`);
         const value = await amountOf(row, name).inputValue();
@@ -1037,6 +1046,19 @@ const PAGES: PageSpec[] = [
         await expectVisible(row.getByRole('button', { name: button }), `${name}'s row offers ${button}`);
       }
       await expectVisible(raiseRow(decide, over.step).getByRole('radio', { name: /^a new session/ }), `a new session as an option to continuing ${over.step}'s`);
+      // Its check refused: its check again is a way on too, which needs no raise; and anything to tell a new session, if you like.
+      await expectVisible(raiseRow(decide, over.step).getByRole('radio', { name: /^its check again/ }), `its check again as an option for ${over.step}, whose check refused`);
+      await expectVisible(raiseRow(decide, over.step).getByRole('textbox', { name: `What to tell ${over.step}, if anything` }), `a box for anything to tell ${over.step}`);
+      // Signed off blocked past its budget: its question on its row, and the answer beside the raise — the button waits for it, and is not pressed.
+      const answering = raiseRow(decide, askingStep.step);
+      await expectVisible(answering.locator('[data-asks]', { hasText: `asks: ${askingStep.needs}` }), `${askingStep.step}'s row says what it asks`);
+      const answerBox = answering.getByRole('textbox', { name: `Your answer to ${askingStep.step}` });
+      await expectVisible(answerBox, `an answer box for ${askingStep.step}, which asks, beside its raise`);
+      const raiseAndAnswer = answering.getByRole('button', { name: 'Raise the budget and answer' });
+      if (await raiseAndAnswer.isEnabled()) throw new Refused(`Raise the budget and answer is disabled while there is no answer — it was enabled with none`);
+      await answerBox.fill('Warm ones.');
+      if (!(await raiseAndAnswer.isEnabled())) throw new Refused('Raise the budget and answer is enabled once an answer is written — it stayed disabled');
+      await answerBox.fill('');
       await expectCount(raiseRow(decide, held.step).getByRole('radio'), 0, 'a round has no mode to choose');
       await expectCount(answers.locator(`[data-step="${held.target}"]`), 0, `${held.target} has no row of its own: it goes again with ${held.step}'s round`);
       await expectVisible(decide.locator('[data-command="once more"] code', { hasText: `wf retry ${COSTLY.id} ${over.step} --budget <amount>` }), 'once more: the try with its cap raised, as a line');

@@ -384,14 +384,46 @@ export type McpServer = {
   checkedAt: string | null;
 };
 
-/** Mirrors `Capabilities` in apps/api/src/capabilities.ts: what the repository the api runs in offers a step. */
+/** A permission rule, and where it was read: the settings' file, or a step's `disallow:`. */
+export type Rule = { rule: string; source: string };
+
+/**
+ * Mirrors `MEASURED_TOOLS` in apps/api/src/capabilities.ts: what a Claude Code step with no `tools:` has, as measured on `measuredAt` with
+ * `version` — data, never claimed current.
+ */
+export type MeasuredTools = { harness: string; version: string; measuredAt: string; source: string; tools: string[]; lacks: string[] };
+
+/**
+ * Mirrors `StepReach` in apps/api/src/reach.ts: what a step of a workflow gets — its fence as its file declares it, and, on Claude Code, the
+ * built-in tools it has (`declared` or `measured`, less what a deny rule takes), the skills it can load, each enabled server's tools; the deny
+ * rules that hold for it, and what the settings allow it, `bash` their commands and `dontAsk` whether the rest is denied without a prompt.
+ */
+export type StepReach = {
+  workflow: string;
+  from: 'repo' | 'yours';
+  step: string;
+  harness: string;
+  claudeCode: boolean;
+  fence: { tools: string[] | null; disallow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
+  tools: { from: 'declared' | 'measured'; names: string[]; removed: Array<{ name: string; rule: string; source: string; of: string | null }> } | null;
+  skills: { names: string[]; why: string | null } | null;
+  mcp: Array<{ server: string; tools: Array<{ name: string; denied: Rule | null; allowed: boolean }> | null; why: string | null }> | null;
+  denied: Rule[];
+  allowed: { rules: string[]; bash: string[]; dontAsk: boolean };
+};
+
+/** Mirrors `CapabilitiesWithSteps` in apps/api/src/reach.ts: what the repository the api runs in offers a step, and what each step gets. */
 export type Capabilities = {
   repo: string;
   skills: Described[];
   agents: Described[];
   mcp: McpServer[];
-  denied: Array<{ rule: string; source: string }>;
+  denied: Rule[];
+  /** `permissions.allow` in the settings, in its order. */
+  allowed: Rule[];
   warnings: string[];
+  measured: MeasuredTools;
+  steps: StepReach[];
 };
 
 /**
@@ -413,6 +445,8 @@ export type WorkflowStepSpec = {
   input: string[];
   permissionMode: string | null;
   tools: string[] | null;
+  /** What the session may not have (`disallow:`): empty where the step denies nothing. */
+  disallow: string[];
   deadlineSeconds: number | null;
   maxAttempts: number | null;
   check: string | null;

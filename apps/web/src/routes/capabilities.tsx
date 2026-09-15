@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { when } from '../components/Facts';
-import { capabilitiesQuery, type Capabilities, type Described, type McpServer } from '../lib/api';
+import { capabilitiesQuery, type Capabilities, type Described, type McpServer, type MeasuredTools, type StepReach } from '../lib/api';
 
 export const Route = createFileRoute('/capabilities')({
   loader: ({ context }) => context.queryClient.ensureQueryData(capabilitiesQuery),
@@ -21,7 +21,7 @@ export const Route = createFileRoute('/capabilities')({
 /** What the repository offers a step, section by section, each thing with the file it was read from. */
 function CapabilitiesPage() {
   const { data } = useSuspenseQuery(capabilitiesQuery);
-  const { repo, skills, agents, mcp, denied, warnings } = data;
+  const { repo, skills, agents, mcp, denied, warnings, measured, steps } = data;
 
   return (
     <article className="space-y-8">
@@ -54,6 +54,14 @@ function CapabilitiesPage() {
         empty={<>Nothing denied: <Path path=".claude/settings.json" /> has no <code className="font-mono text-xs">permissions.deny</code>.</>}
       >
         {denied.map(({ rule, source }) => <DeniedRow key={rule} rule={rule} source={source} refuses={refusedBy(mcp, rule)} />)}
+      </Section>
+
+      <Section
+        title="What each step gets"
+        count={steps.length}
+        empty={<>No steps: no workflow under <Path path="workflows/" />, or yours, reads as one.</>}
+      >
+        {steps.map((step) => <StepRow key={`${step.from}:${step.workflow}/${step.step}`} step={step} measured={measured} />)}
       </Section>
     </article>
   );
@@ -188,5 +196,186 @@ function DeniedRow({ rule, source, refuses }: { rule: string; source: string; re
         <Path path={source} />
       </span>
     </li>
+  );
+}
+
+const OWN = "the harness's own";
+
+/**
+ * What one step of a workflow gets: the fence its file declares, then — on Claude Code, whose set was measured — the tools it has, the skills it
+ * can load and the tools of each server the checkout enables; the deny rules that hold for it; and what the settings allow it. A Codex step is
+ * its fence and nothing more: what a Codex session is given was not measured.
+ */
+function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools }) {
+  const { fence, tools, skills, mcp, denied, allowed } = step;
+
+  return (
+    <li aria-label={`Step ${step.workflow} · ${step.step}`} data-step={`${step.workflow}/${step.step}`} className="space-y-3 px-3 py-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-medium">
+          {step.workflow} <span className="text-neutral-400">·</span> {step.step}
+        </span>
+        <span className={`${CHIP} bg-neutral-100 text-neutral-600 dark:bg-neutral-800 dark:text-neutral-300`}>{step.harness}</span>
+        {step.from === 'yours' && <span className={`${CHIP} bg-violet-100 text-violet-800 dark:bg-violet-950 dark:text-violet-300`}>yours</span>}
+      </div>
+
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-0.5 text-xs">
+        {([
+          ['tools', fence.tools ? fence.tools.join(', ') || 'none' : `${OWN} set`],
+          ['disallow', fence.disallow.join(', ') || 'nothing'],
+          ['permission mode', fence.permissionMode ?? OWN],
+          ['effort', fence.effort ?? OWN],
+          ['mcp', 'none named: a step has no mcp: key'],
+        ] as const).map(([label, value]) => (
+          <div key={label} className="contents">
+            <dt className="text-neutral-500">{label}</dt>
+            <dd className="min-w-0 break-words font-mono">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      {!step.claudeCode ? (
+        <p className="text-sm text-neutral-500">
+          Runs on {step.harness}, which has no tool list: its fence is the sandbox its permission mode names. What a {step.harness} session is given
+          was not measured, so no tool, skill or server is claimed for it.
+        </p>
+      ) : (
+        <>
+          {tools && (
+            <Reach label="Tools">
+              <span className="flex flex-wrap gap-1">
+                {tools.names.map((name) => (
+                  <span key={name} data-tool={name} className={`${CHIP} bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300`}>{name}</span>
+                ))}
+                {tools.removed.map((r) => (
+                  <span
+                    key={r.name}
+                    data-removed={r.name}
+                    title={`Denied by ${r.rule} (${r.source})${r.of ? `, one of ${r.of}` : ''}`}
+                    className={`${CHIP} bg-red-50 text-red-800 line-through decoration-red-500 dark:bg-red-950/60 dark:text-red-300`}
+                  >
+                    {r.name}
+                  </span>
+                ))}
+              </span>
+              {tools.from === 'measured' && (
+                <p data-measured={measured.measuredAt} className="text-xs text-neutral-500">
+                  {measured.harness}'s own set, as measured on {measured.measuredAt} with {measured.version} ({measured.source}); without{' '}
+                  {measured.lacks.join(' or ')}. Not asked again: a later version may give another.
+                </p>
+              )}
+            </Reach>
+          )}
+
+          {skills && (
+            <Reach label="Skills">
+              {skills.why ? (
+                <p className="text-xs text-neutral-500">{skills.why}</p>
+              ) : skills.names.length ? (
+                <span className="flex flex-wrap gap-1">
+                  {skills.names.map((name) => <span key={name} data-skill={name} className={`${CHIP} bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300`}>{name}</span>)}
+                </span>
+              ) : (
+                <p className="text-xs text-neutral-500">The repository has no skill.</p>
+              )}
+            </Reach>
+          )}
+
+          {mcp && (
+            <Reach label="MCP tools">
+              {mcp.length ? (
+                mcp.map((server) => (
+                  <div key={server.server} data-server={server.server} className="space-y-1">
+                    <p className="font-mono text-xs">{server.server}</p>
+                    {server.tools ? (
+                      <span className="flex flex-wrap gap-1">
+                        {server.tools.map((tool) => {
+                          const refused = tool.denied !== null || (allowed.dontAsk && !tool.allowed);
+                          return (
+                            <span
+                              key={tool.name}
+                              data-mcp-tool={tool.name}
+                              data-denied={tool.denied?.rule}
+                              data-not-allowed={tool.denied === null && allowed.dontAsk && !tool.allowed ? true : undefined}
+                              title={
+                                tool.denied
+                                  ? `Denied by ${tool.denied.rule} (${tool.denied.source})`
+                                  : refused
+                                    ? 'No rule allows it, so dontAsk denies it without a prompt'
+                                    : `mcp__${server.server}__${tool.name}`
+                              }
+                              className={`${CHIP} ${
+                                tool.denied
+                                  ? 'bg-red-50 text-red-800 line-through decoration-red-500 dark:bg-red-950/60 dark:text-red-300'
+                                  : refused
+                                    ? 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300'
+                                    : 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300'
+                              }`}
+                            >
+                              {tool.name}
+                            </span>
+                          );
+                        })}
+                      </span>
+                    ) : (
+                      <p className="text-xs text-neutral-500">{server.why}</p>
+                    )}
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs text-neutral-500">No server the checkout enables.</p>
+              )}
+            </Reach>
+          )}
+        </>
+      )}
+
+      <Reach label="Denied">
+        {denied.length ? (
+          <span className="flex flex-wrap gap-x-3 gap-y-0.5">
+            {denied.map(({ rule, source }) => (
+              <span key={`${source}:${rule}`} className="font-mono text-xs" title={source}>
+                {rule} <span className="text-neutral-500">· {source}</span>
+              </span>
+            ))}
+          </span>
+        ) : (
+          <p className="text-xs text-neutral-500">Nothing: the settings deny nothing, and neither does the step.</p>
+        )}
+      </Reach>
+
+      <Reach label={allowed.dontAsk ? 'Bash it may run' : 'Allowed without asking'}>
+        {allowed.dontAsk ? (
+          <>
+            <p className="text-xs text-neutral-500">In dontAsk, a command no rule allows is denied without a prompt. The settings allow it:</p>
+            {allowed.bash.length ? (
+              <span className="flex flex-wrap gap-1">
+                {allowed.bash.map((command) => (
+                  <code key={command} data-bash={command} className={`${CHIP} bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300`}>{command}</code>
+                ))}
+              </span>
+            ) : (
+              <p className="text-xs text-neutral-500">No Bash command at all.</p>
+            )}
+          </>
+        ) : allowed.rules.length ? (
+          <span className="flex flex-wrap gap-1">
+            {allowed.rules.map((rule) => <code key={rule} data-allowed={rule} className={`${CHIP} bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300`}>{rule}</code>)}
+          </span>
+        ) : (
+          <p className="text-xs text-neutral-500">Nothing: the settings allow nothing, so what asks is its permission mode's to decide.</p>
+        )}
+      </Reach>
+    </li>
+  );
+}
+
+/** One part of what a step gets, under its label. */
+function Reach({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[8rem_minmax(0,1fr)]">
+      <p className="text-xs font-medium text-neutral-500">{label}</p>
+      <div className="min-w-0 space-y-1">{children}</div>
+    </div>
   );
 }

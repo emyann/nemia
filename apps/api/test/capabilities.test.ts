@@ -7,7 +7,8 @@ import path from 'node:path';
 // agent-workflows locates its store when the module loads, so point it at a scratch directory before app.ts imports it.
 process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-capabilities-'));
 const { app } = await import('../src/app.ts');
-const { HOME_REPO, capabilitiesOf, denyingRule, frontmatterOf, repoOf } = await import('../src/capabilities.ts');
+const { HOME_REPO, MEASURED_TOOLS, capabilitiesOf, denyingRule, frontmatterOf, repoOf } = await import('../src/capabilities.ts');
+const { DISALLOW } = await import('../src/reach.ts');
 
 const FIXTURE_SERVER = path.join(import.meta.dirname, 'fixtures', 'mcp-server.ts');
 
@@ -92,7 +93,7 @@ test('a repository with none of it — or no repository at all — is empty list
   for (const repo of [repoWith({}), gone, repoWith({ '.claude/skills': 'a file', '.claude/agents': 'a file' })]) {
     const { status, body } = await served(repo);
     assert.equal(status, 200, repo);
-    assert.deepEqual(body, { repo, skills: [], agents: [], mcp: [], denied: [], warnings: [] }, repo);
+    assert.deepEqual(body, { repo, skills: [], agents: [], mcp: [], denied: [], allowed: [], warnings: [], measured: MEASURED_TOOLS, steps: [] }, repo);
   }
 });
 
@@ -347,4 +348,100 @@ test("unset, the api serves its own checkout: Playwright's server lists browser_
   const unsafe = playwright.tools.find((tool: { name: string }) => tool.name === 'browser_run_code_unsafe');
   assert.equal(unsafe.denied, 'mcp__playwright__browser_run_code_unsafe');
   assert.ok(body.denied.some((d: { rule: string }) => d.rule === 'mcp__playwright__browser_run_code_unsafe'));
+});
+
+// ─── what each step gets ─────────────────────────────────────────────────────
+
+/**
+ * A checkout with workflows: `dev`'s implement on Claude Code with no `tools:` and a `disallow:`, its review fenced to four tools in `dontAsk`;
+ * and `codexed`, one step on Codex. The settings enable the fixture server, deny one of its tools and a push, and allow three Bash commands and a
+ * search. The fixture server lists `echo` and `wipe`.
+ */
+const stepsRepo = () => repoWith({
+  '.claude/settings.json': {
+    enabledMcpjsonServers: ['fixture'],
+    permissions: { deny: ['Bash(git push:*)', 'mcp__fixture__wipe'], allow: ['Bash(npm test)', 'Bash(git diff:*)', 'Bash(npm run build)', 'WebSearch'] },
+  },
+  '.mcp.json': { mcpServers: { fixture: fixture() } },
+  '.claude/skills/review/SKILL.md': '---\nname: code-review\ndescription: Review a diff.\n---\n',
+  'workflows/dev/implement.md': '---\nharness: claude\ndisallow: SendMessage, CronCreate, mcp__fixture__echo, Bash(npm run build)\n---\nImplement it.\n',
+  'workflows/dev/review.md': '---\nharness: claude\nafter: implement\ntools: Read, Grep, Glob, Bash\npermissionMode: dontAsk\neffort: high\n---\nReview it.\n',
+  'workflows/codexed/plan.md': '---\nharness: codex\n---\nPlan it.\n',
+});
+
+/** The steps GET /api/capabilities says each step gets, by `<workflow>/<step>`. */
+const stepsOf = async (repo: string): Promise<Record<string, any>> => {
+  const { status, body } = await served(repo);
+  assert.equal(status, 200);
+  return Object.fromEntries(body.steps.map((s: { workflow: string; step: string }) => [`${s.workflow}/${s.step}`, s]));
+};
+
+const SETTINGS = '.claude/settings.json';
+
+test('a step with `tools:` gets exactly those — no skill without Skill, the tools of each server the checkout enables, and the settings\' deny', async () => {
+  const { 'dev/review': review } = await stepsOf(stepsRepo());
+  assert.deepEqual(review.fence, { tools: ['Read', 'Grep', 'Glob', 'Bash'], disallow: [], permissionMode: 'dontAsk', effort: 'high', mcp: null });
+  assert.deepEqual(review.tools, { from: 'declared', names: ['Read', 'Grep', 'Glob', 'Bash'], removed: [] });
+  assert.equal(review.claudeCode, true);
+  assert.deepEqual(review.skills.names, []);
+  assert.match(review.skills.why, /^Its tools have no `Skill`, so it cannot load a skill/);
+  assert.deepEqual(review.denied, [{ rule: 'Bash(git push:*)', source: SETTINGS }, { rule: 'mcp__fixture__wipe', source: SETTINGS }]);
+  assert.deepEqual(review.mcp.map((s: { server: string }) => s.server), ['fixture']);
+});
+
+test('a step without `tools:` gets the harness\'s own set, as measured — with its date and version, never claimed current — and every skill, with Skill in it', async () => {
+  const body = (await served(stepsRepo())).body;
+  assert.deepEqual({ harness: body.measured.harness, version: body.measured.version, measuredAt: body.measured.measuredAt }, { harness: 'Claude Code', version: '2.1.270', measuredAt: '2026-09-14' });
+  assert.match(body.measured.source, /what a worker gets, measured/);
+  const implement = body.steps.find((s: { step: string }) => s.step === 'implement');
+  assert.equal(implement.tools.from, 'measured');
+  // Its own set, less the one tool its `disallow:` names whole.
+  assert.deepEqual(implement.tools.names, MEASURED_TOOLS.tools.filter((name: string) => name !== 'SendMessage'));
+  assert.deepEqual(implement.skills, { names: ['code-review'], why: null });
+  assert.deepEqual(implement.fence, { tools: null, disallow: ['SendMessage', 'CronCreate', 'mcp__fixture__echo', 'Bash(npm run build)'], permissionMode: null, effort: null, mcp: null });
+});
+
+test('REFUSED: `disallow` takes away — a tool, one of a family, a server\'s tool — and a command it denies is not allowed, though the settings allow it', async () => {
+  const { 'dev/implement': implement, 'dev/review': review } = await stepsOf(stepsRepo());
+  assert.ok(!implement.tools.names.includes('SendMessage'), 'SendMessage is not among its tools');
+  assert.deepEqual(implement.tools.removed, [
+    { name: 'SendMessage', rule: 'SendMessage', source: DISALLOW, of: null },
+    // One of a family the measurement names as one: the family stays, and the tool is named as taken.
+    { name: 'CronCreate', rule: 'CronCreate', source: DISALLOW, of: 'Cron*' },
+  ]);
+  assert.ok(implement.tools.names.includes('Cron*'));
+  assert.deepEqual(implement.mcp[0].tools, [
+    { name: 'echo', denied: { rule: 'mcp__fixture__echo', source: DISALLOW }, allowed: false },
+    { name: 'wipe', denied: { rule: 'mcp__fixture__wipe', source: SETTINGS }, allowed: false },
+  ]);
+  // A deny beats an allow: `npm run build` is allowed by the settings, and denied by the step.
+  assert.deepEqual(implement.allowed, { rules: ['Bash(npm test)', 'Bash(git diff:*)', 'WebSearch'], bash: ['npm test', 'git diff:*'], dontAsk: false });
+  assert.deepEqual(implement.denied.slice(2).map((d: { rule: string }) => d.rule), ['SendMessage', 'CronCreate', 'mcp__fixture__echo', 'Bash(npm run build)']);
+  // And none of it reaches the step beside it, which denies nothing of its own.
+  assert.ok(review.allowed.bash.includes('npm run build'));
+  assert.equal(review.mcp[0].tools[0].denied, null);
+});
+
+test('a `dontAsk` step under the settings shows what Bash commands are allowed, and a server\'s tool no rule allows runs no more than a denied one', async () => {
+  const { 'dev/review': review, 'dev/implement': implement } = await stepsOf(stepsRepo());
+  assert.deepEqual(review.allowed, { rules: ['Bash(npm test)', 'Bash(git diff:*)', 'Bash(npm run build)', 'WebSearch'], bash: ['npm test', 'git diff:*', 'npm run build'], dontAsk: true });
+  assert.deepEqual(review.mcp[0].tools, [{ name: 'echo', denied: null, allowed: false }, { name: 'wipe', denied: { rule: 'mcp__fixture__wipe', source: SETTINGS }, allowed: false }]);
+  assert.equal(implement.allowed.dontAsk, false, 'a step in no mode is not dontAsk');
+});
+
+test('a Codex step shows its fence, and nothing it was not measured to get: no tools, skills or servers are claimed for it', async () => {
+  const { 'codexed/plan': plan } = await stepsOf(stepsRepo());
+  assert.deepEqual([plan.harness, plan.claudeCode, plan.tools, plan.skills, plan.mcp], ['codex', false, null, null, null]);
+  assert.deepEqual(plan.fence, { tools: null, disallow: [], permissionMode: null, effort: null, mcp: null });
+});
+
+test('a workflow the loader refuses has no step on the page, and a repository with a workflow and nothing else still says what its step gets', async () => {
+  const repo = repoWith({
+    'workflows/broken/review.md': '---\nafer: implement\n---\nReview it.\n',
+    'workflows/lone/implement.md': 'Implement it.\n',
+  });
+  const steps = await stepsOf(repo);
+  assert.deepEqual(Object.keys(steps), ['lone/implement']);
+  // No harness named: the engine's first, Claude Code. No settings: nothing denied or allowed; no `.mcp.json`: no server.
+  assert.deepEqual([steps['lone/implement'].harness, steps['lone/implement'].tools.from, steps['lone/implement'].mcp, steps['lone/implement'].allowed], ['claude', 'measured', [], { rules: [], bash: [], dontAsk: false }]);
 });

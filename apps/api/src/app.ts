@@ -5,8 +5,9 @@ import { branchesToRead, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf
 import { answerOf, assess, type Assessment, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, parseCloseout, retryLines, roundIn, roundLines, type Run, type StepRecord, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
-import { capabilitiesOf, repoOf } from './capabilities.ts';
+import { repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
+import { capabilitiesWithSteps } from './reach.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { workflows } from './workflows.ts';
 
@@ -1308,10 +1309,10 @@ function howOf(body: unknown): RetryHow | Refusal {
 
 export const app = new Hono()
   .get('/api/health', (c) => c.json({ ok: true }))
-  // What the repository offers a step, read from the checkout on each request (capabilities.ts). Each MCP server
-  // the settings enable is started and asked for its tools once while the api runs; one that fails is an `error`
-  // on its entry, never a failed request.
-  .get('/api/capabilities', async (c) => c.json(await capabilitiesOf(repoOf())))
+  // What the repository offers a step, read from the checkout on each request (capabilities.ts), and what each step of each workflow
+  // gets of it (reach.ts). Each MCP server the settings enable is started and asked for its tools once while the api runs; one that
+  // fails is an `error` on its entry, never a failed request.
+  .get('/api/capabilities', async (c) => c.json(await capabilitiesWithSteps(repoOf())))
   // A repository's workflows, listed, and a run of one started — the board's first write (workflows.ts).
   .route('/', workflows)
   .get('/api/runs', async (c) => {

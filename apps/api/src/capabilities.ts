@@ -38,6 +38,7 @@ export type McpServer = {
   checkedAt: string | null;
 };
 
+/** A permission rule of the settings, and the file it was read from. */
 export type DeniedRule = { rule: string; source: string };
 
 export type Capabilities = {
@@ -47,6 +48,8 @@ export type Capabilities = {
   agents: Described[];
   mcp: McpServer[];
   denied: DeniedRule[];
+  /** `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking — in `dontAsk`, all it runs of what asks. */
+  allowed: DeniedRule[];
   /** A file that is there and does not read: what was left out because of it, and the fix. */
   warnings: string[];
 };
@@ -71,6 +74,7 @@ export async function capabilitiesOf(
   const warnings: string[] = [];
   const settings = jsonAt(repo, SETTINGS, warnings, 'nothing is read as denied or enabled from it');
   const deny = stringsAt(settings, ['permissions', 'deny'], warnings);
+  const allow = stringsAt(settings, ['permissions', 'allow'], warnings);
   const enabled = enabledBy(settings, warnings);
   const declared = declaredServers(jsonAt(repo, MCP_JSON, warnings, 'no MCP server is listed from it'), warnings);
   const mcp = await Promise.all(declared.map(async (server): Promise<McpServer> => {
@@ -108,9 +112,30 @@ export async function capabilitiesOf(
     agents: agentsOf(repo, warnings),
     mcp,
     denied: deny.map((rule) => ({ rule, source: SETTINGS })),
+    allowed: allow.map((rule) => ({ rule, source: SETTINGS })),
     warnings,
   };
 }
+
+/**
+ * What a Claude Code step with no `tools:` has: the harness's own set, as measured — `claude -p` spawned with the engine's flags, as an
+ * `implement` step, on 2026-09-14, Claude Code 2.1.270 (docs/plan-hold-the-bar.md §4b, "what a worker gets, measured"). Data with its date and
+ * version, and nothing here asks the harness again: a later Claude Code may give another set, so the page says when and on which version this
+ * was measured, and never that it is current.
+ *
+ * `tools` are the built-in tools the measurement names, as it writes them — `Cron*` and `Task*` a family each — with those the same measurement
+ * found on a fenced step, which an unfenced one has too (Bash, Glob, Grep, Read, Skill), and Edit and Write, which every `implement` of this
+ * repository makes its change with. `lacks` are the ones it found absent. MCP tools are not in it: the checkout's servers reach a step whatever
+ * its `tools:` (packages/agent-workflows/docs/features.md, measured), and each lists its own.
+ */
+export const MEASURED_TOOLS = {
+  harness: 'Claude Code',
+  version: '2.1.270',
+  measuredAt: '2026-09-14',
+  source: 'docs/plan-hold-the-bar.md §4b, "what a worker gets, measured"',
+  tools: ['Agent', 'Bash', 'Cron*', 'Edit', 'Glob', 'Grep', 'Monitor', 'NotebookEdit', 'Read', 'RemoteTrigger', 'ScheduleWakeup', 'SendMessage', 'Skill', 'Task*', 'WebFetch', 'WebSearch', 'Workflow', 'Write'],
+  lacks: ['Artifact', 'AskUserQuestion'],
+} as const;
 
 /**
  * The rule in `deny` that refuses the tool `mcp__<server>__<tool>`, if one does: one naming the tool, the whole

@@ -59,7 +59,7 @@ write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields`. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null,
+  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [],
   deadlineSeconds: null, maxAttempts: null, check: null, retries: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -267,10 +267,11 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
   for (const [name, check] of [['dev', 'npm test && npm run typecheck'], ['dev-build', 'npm test && npm run typecheck && npm run build && npm run e2e']] as const) {
     const w = listed.find((x) => x.name === name)!;
     assert.deepEqual(w.steps, [
-      { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check }) },
+      // Denied by name what no step needs and an unattended session otherwise has.
+      { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
       {
         name: 'review',
-        spec: spec({ harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], permissionMode: 'dontAsk', output: 'review.schema.json', loop: 'implement', rounds: 3 }),
+        spec: spec({ harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', output: 'review.schema.json', loop: 'implement', rounds: 3 }),
       },
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;

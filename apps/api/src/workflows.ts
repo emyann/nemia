@@ -34,6 +34,8 @@ export type WorkflowStepSpec = {
   input: string[];
   permissionMode: string | null;
   tools: string[] | null;
+  /** What the session may not have, in Claude Code's permission rules (`disallow:`): empty where the step denies nothing. */
+  disallow: string[];
   deadlineSeconds: number | null;
   maxAttempts: number | null;
   check: string | null;
@@ -89,6 +91,7 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
   input: step.input ?? [],
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,
+  disallow: step.disallow ?? [],
   deadlineSeconds: step.deadlineSeconds ?? null,
   maxAttempts: step.maxAttempts ?? null,
   check: step.check ?? null,

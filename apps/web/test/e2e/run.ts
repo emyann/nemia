@@ -1153,6 +1153,27 @@ const PAGES: PageSpec[] = [
       const rules = section('Denied');
       for (const rule of denied) await expectVisible(rules.getByText(rule, { exact: true }), `the denied list has ${rule}`);
       await expectVisible(rules.getByText(`refuses ${server.name} · wipe`), `the denied list says which listed tool ${server.denied} refuses`);
+
+      // What each step gets: the checkout's dev — review fenced to its tools in dontAsk, implement on the harness's own set — and yours, on Codex.
+      const { good, yours } = WORKFLOWS;
+      const steps = section('What each step gets');
+      await expectVisible(steps.locator('h2 [data-count]', { hasText: /^3$/ }), "a row for each step of each workflow that reads: dev's two, and yours");
+      const review = steps.locator(`li[data-step="${good.name}/review"]`);
+      const declared = good.tools.split(', ');
+      for (const tool of declared) await expectVisible(review.locator(`[data-tool="${tool}"]`), `review has ${tool}, which its tools: names`);
+      await expectCount(review.locator('[data-tool]'), declared.length, `review has exactly the tools it declares (${good.tools})`);
+      await expectCount(review.locator('[data-measured]'), 0, 'and no measured set: it declares its own');
+      for (const command of CHECKOUT.allowed.map((rule) => rule.slice('Bash('.length, -1))) {
+        await expectVisible(review.locator(`[data-bash="${command}"]`), `review, in dontAsk, shows the Bash command the settings allow (${command})`);
+      }
+      await expectVisible(review.locator('[data-mcp-tool="echo"][data-not-allowed]'), "review's server tool no rule allows is marked: dontAsk denies it without a prompt");
+      await expectVisible(review.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`), `review's server tool the settings deny is marked denied (${server.denied})`);
+      const implement = steps.locator(`li[data-step="${good.name}/implement"]`);
+      await expectVisible(implement.locator('[data-measured="2026-09-14"]', { hasText: '2.1.270' }), "implement has the harness's own set, with the date and version it was measured on");
+      await expectVisible(implement.locator(`[data-removed="${good.disallow}"]`), `implement's disallow: takes ${good.disallow} from it`);
+      await expectCount(implement.locator(`[data-tool="${good.disallow}"]`), 0, `and ${good.disallow} is not among its tools`);
+      await expectVisible(implement.locator(`[data-skill="${skill.name}"]`), `implement, with Skill, can load the repository's skill (${skill.name})`);
+      await expectVisible(steps.locator(`li[data-step="${yours.name}/${yours.steps[0]}"]`).getByText(/was not measured/), `yours, on Codex, claims no tool it was not measured to have`);
     },
   },
 ];

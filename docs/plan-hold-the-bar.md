@@ -980,8 +980,7 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done. In flight 2026-09-14: B9 (apps, items 11–15 in one) as
 `five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
 `three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 done, `26ebf0e`; E8 done, `1944644`; W7 done, `60e5606` (three rounds; restarted twice on E8's measurements and once when the
-background daemon was down). In flight: B10 `cost-on-the-board-what-a-ste-x662` (apps, `./workflows/dev-build`: cost on the
-api and the board, a step held on its budget, the raise offer). Left after it: items 20 (settings), 27, 28, 30, 31 (small).
+background daemon was down). B10 done, `b19596a`. **Item 29 is done.** Nothing in flight. Left: items 20 (settings), 27, 28, 30, 31 (all small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**
@@ -1075,7 +1074,7 @@ A line moves to *done* with the commit that landed it; the reasoning behind each
     step and per run in `wf ls`/`wf decide`; `budget exhausted` in the vocabulary, `wf retry --budget`), then B10
     (apps: cost on the card, the run page and the timeline). *E8 done, `1944644`; W7 done, `60e5606` — the shipped
     reviewers carry `budget: 20` (a review measured $3.7 for one try, $10.5 over three rounds; W7's own run cost $43.59);
-    B10 filed. E8's round-1 review measured on 2.1.270 that a
+    B10 done, `b19596a` (its run cost $43.72). **Done.** E8's round-1 review measured on 2.1.270 that a
     `claude --bg` session ignores `--max-budget-usd`, so the engine refuses `budgetUsd` on `claude` and takes it on
     `claude-detached` only; the operator's decisions went to E8's session by `wf say` (a spent budget is spent: no
     retry under `maxAttempts`; keep the refusal, record the measurement) and W7's brief was amended: the tick holds the

@@ -1628,7 +1628,7 @@ What was built:
   package's refusals (`exitCode` 2) get a status by what is on disk once refused: 404 when the card's file is not there, 409 when a record
   names the card, 422 for the rest (a card that does not read, a blank brief, `afterRefusal`). The answer is
   `{ id, card, removed, why? }`: a card whose removal failed started all the same.
-- **The page** (`apps/web/src/routes/inbox.tsx`, Inbox in the sidebar):
+- **The page** (`apps/web/src/routes/inbox.tsx`, Inbox first in the sidebar):
   - a box that files a card: the idea, a workflow among those that read (none by default), and the repository, the api's own
     (`GET /api/repository`) until a person changes it;
   - the cards, newest first (`newestCardsFirst`), each with its first line, name, workflow, repository and filing time, and Start and Remove;

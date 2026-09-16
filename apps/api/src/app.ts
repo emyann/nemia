@@ -9,6 +9,7 @@ import { repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
 import { capabilitiesWithSteps } from './reach.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
+import { inbox } from './inbox.ts';
 import { workflows } from './workflows.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
@@ -1498,8 +1499,10 @@ export const app = new Hono()
   // gets of it (reach.ts). Each MCP server the settings enable is started and asked for its tools once while the api runs; one that
   // fails is an `error` on its entry, never a failed request.
   .get('/api/capabilities', async (c) => c.json(await capabilitiesWithSteps(repoOf())))
-  // A repository's workflows, listed, and a run of one started — the board's first write (workflows.ts).
+  // A repository's workflows, listed, and a run of one started — the board's first write — or of an inbox card (workflows.ts).
   .route('/', workflows)
+  // The inbox: its cards listed, one filed, one dropped — two writes, guarded as a start is (inbox.ts).
+  .route('/', inbox)
   .get('/api/runs', async (c) => {
     // What one request costs, however many runs there are: one harness observation (one
     // `claude agents --json`, one scan of the detached runs' files), a read of every task journal in

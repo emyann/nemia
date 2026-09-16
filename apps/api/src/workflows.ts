@@ -7,12 +7,14 @@
  * so one `wf start` would refuse is listed with the loader's refusal, never hidden.
  *
  * The start is the package's `start()`, `wf start`'s own: it writes the run's record and files nothing — `wf tick` or
- * `wf up` files the first step, as it does for a run started at the command line. Nothing else here writes.
+ * `wf up` files the first step, as it does for a run started at the command line. A start that names an inbox card (`card`) is the
+ * package's `startFromInbox()` instead, `wf start <inbox>/<name>.md`'s own: the same record, with `from` on it, and the card removed.
+ * Nothing else here writes; the inbox's own writes are inbox.ts's.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { HOME, start } from 'agent-workflows';
+import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
 import { loadWorkflows, workflowDescription, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
@@ -128,7 +130,7 @@ const messageOf = (err: unknown): string => (err instanceof Error ? err.message 
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const SHAPE = '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, and `"after": ["<runId>", …]` for the runs it waits on';
+const SHAPE = '`{ "workflow": "<name>", "brief": "<what to do>" }`, with `"from": "repo"` or `"yours"` when both have a workflow of that name, `"after": ["<runId>", …]` for the runs it waits on, and `"card": "<name>"` for an inbox card it starts';
 
 /** A start, as the guard's refusals word it (guard.ts). */
 const START: Guarded = {
@@ -137,7 +139,7 @@ const START: Guarded = {
   forAnother: 'start one',
   why: "a run's brief is what an agent acts on in this repository",
   reach: 'start the run from the board',
-  instead: "Start it from the board's Workflows page, or with `wf start`",
+  instead: "Start it from the board's Workflows or Inbox page, or with `wf start`",
   shape: SHAPE,
 };
 
@@ -145,7 +147,7 @@ const START: Guarded = {
  * The workflow folder a start names, found among the folders the sources have — never joined from what was sent, so no
  * name reaches a folder outside them — or why not: none of that name, or one in each source and no `from` to choose.
  */
-function folderOf(name: string, from: WorkflowSource | undefined, repo: string, home: string): { dir: string } | Refusal {
+export function folderOf(name: string, from: WorkflowSource | undefined, repo: string, home: string): { dir: string } | Refusal {
   const sources = sourcesOf(repo, home);
   const found = sources.filter((s) => (!from || s.from === from) && foldersIn(s.dir).includes(name));
   if (found.length === 1) return { dir: path.join(found[0]!.dir, name) };
@@ -165,16 +167,24 @@ function folderOf(name: string, from: WorkflowSource | undefined, repo: string, 
   };
 }
 
+/** What `POST /api/runs` starts: a workflow's folder, with a brief — or, for an inbox card, the card and the brief given in place of its body. */
+export type Asked = { dir: string; brief: string; after: string[] | undefined; card?: undefined } | { dir: string; brief: string | undefined; after: string[] | undefined; card: string };
+
 /**
  * What `POST /api/runs` starts, or why it does not: the body's shape (400), the workflow it names (404, 409), and the
  * brief (422) — the api's own, since `start()` takes any string and `wf start` prints its help for none.
  *
  * `after` is only shaped here: a list of run ids, as `wf start --after <runId>` takes each, and never a blank one, which the CLI refuses
  * too (`--after=`). Whether this run may wait on each is `start()`'s to say (`afterRefusal`), in its words.
+ *
+ * `card` names an inbox card to start, as `wf inbox` lists it: refused here only for a name that is not a card's (`inboxNameRefusal`, 400,
+ * in the package's words), before any folder is read. Whether the card is there, and may start, is `startFromInbox`'s to say. With a card the
+ * brief is what the person made of its body, and may be left out, for the body as it is; a blank one is the package's to refuse, as
+ * `wf start <card> --brief ""` is.
  */
-function startOf(body: unknown, repo: string, home: string): { dir: string; brief: string; after: string[] | undefined } | Refusal {
+function startOf(body: unknown, repo: string, home: string): Asked | Refusal {
   if (!isObject(body)) return { status: 400, error: `POST /api/runs takes a JSON object: ${SHAPE}.` };
-  const { workflow, brief, from, after } = body;
+  const { workflow, brief, from, after, card } = body;
   if (typeof workflow !== 'string' || !workflow) return { status: 400, error: `POST /api/runs names the workflow to start in \`workflow\`, a folder's name: ${SHAPE}.` };
   if (from !== undefined && from !== 'repo' && from !== 'yours') {
     return { status: 400, error: `\`from\` is where the workflow is read from: "repo" or "yours", or left out when only one has a workflow named '${workflow}'.` };
@@ -185,12 +195,34 @@ function startOf(body: unknown, repo: string, home: string): { dir: string; brie
       error: `\`after\` is the runs this one waits on, by id, as \`wf start --after <runId>\` takes each: a list of run ids, such as \`"after": ["add-a-cache-k2q9"]\`, or left out for a run that waits on none. This request's was ${JSON.stringify(after)}. GET /api/runs lists the runs there are.`,
     };
   }
+  if (card !== undefined) {
+    if (typeof card !== 'string') {
+      return { status: 400, error: `\`card\` names the inbox card to start, as \`wf inbox\` lists it: a name, such as \`"card": "cache-the-views-k2q9"\`, or left out for a run that starts from no card. This request's was ${JSON.stringify(card)}. GET /api/inbox lists the cards.` };
+    }
+    const refused = inboxNameRefusal(card);
+    if (refused) return { status: 400, error: refused };
+    if (brief !== undefined && typeof brief !== 'string') {
+      return { status: 400, error: `\`brief\` is what the run is asked to do in place of the card's body, as \`wf start <card> --brief "<brief>"\` takes it: text, or left out for the card's body. This request's was ${JSON.stringify(brief)}.` };
+    }
+  }
   const folder = folderOf(workflow, from, repo, home);
   if ('status' in folder) return folder;
+  if (card !== undefined) return { dir: folder.dir, brief: brief as string | undefined, after, card: card as string };
   if (typeof brief !== 'string' || !brief.trim()) {
     return { status: 422, error: `A run needs a brief: what to do, as \`wf start <brief>\` takes it. Write it in \`brief\` — the run's steps are told it, under "What was asked for".` };
   }
   return { dir: folder.dir, brief: brief.trim(), after };
+}
+
+/**
+ * The status of a card's start that `startFromInbox` refused, in its words (`exitCode` 2): 404 for a card not there — its file gone, so no
+ * other refusal can have read it — 409 for one a run's record already names, and 422 for the rest: a card that does not read, a workflow that
+ * does not load, a blank brief, and what `start()` refuses.
+ */
+function cardRefusalStatus(card: string): 404 | 409 | 422 {
+  if (!fs.existsSync(path.join(inboxDir(), `${card}.md`))) return 404;
+  if (listRuns().some((run) => run.from?.inbox === card)) return 409;
+  return 422;
 }
 
 export const workflows = new Hono()
@@ -204,7 +236,8 @@ export const workflows = new Hono()
   })
   // The repository a start runs in: what the start form lists the runs of, for a run to wait on.
   .get('/api/repository', (c) => c.json({ repo: repoOf() }))
-  // The board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder> --repo <repo> --after <runId>`.
+  // The board's first write, and the one a person makes at the command line: `wf start <brief> --workflows <folder> --repo <repo> --after <runId>`,
+  // or, with `card`, `wf start <inbox>/<card>.md --brief <brief> --workflows <folder> --after <runId>`.
   .post('/api/runs', async (c) => {
     const refused = refusedBeforeReading(START, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
     if (refused) return c.json({ error: refused.error }, refused.status);
@@ -217,6 +250,18 @@ export const workflows = new Hono()
     }
     const asked = startOf(body, repo, HOME);
     if ('status' in asked) return c.json({ error: asked.error }, asked.status);
+    if (asked.card !== undefined) {
+      try {
+        // The api's repository is the caller's, as `.` is `wf start`'s: the card's `repo:` is over it. The folder is the one `folderOf` found.
+        const started = startFromInbox({ name: asked.card, callerRepo: repo, workflow: asked.dir, ...(asked.brief !== undefined ? { brief: asked.brief } : {}), ...(asked.after ? { after: asked.after } : {}) });
+        c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
+        // Started all the same when the card could not be removed: the run is written, and the card lists as started until it is dropped.
+        return c.json({ id: started.run.id, card: started.card.name, removed: started.removed, ...(started.removed ? {} : { why: started.why }) }, 201);
+      } catch (err) {
+        const status = (err as { exitCode?: unknown }).exitCode === 2 ? cardRefusalStatus(asked.card) : 422;
+        return c.json({ error: messageOf(err) }, status);
+      }
+    }
     try {
       const { id } = start({ brief: asked.brief, repo, workflowDir: asked.dir, ...(asked.after ? { after: asked.after } : {}) });
       c.header('Location', `/api/runs/${encodeURIComponent(id)}`);

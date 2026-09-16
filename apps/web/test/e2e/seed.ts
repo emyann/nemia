@@ -18,7 +18,8 @@
  * work, registered as Claude Code registers a session, with an inbox run.ts listens on (SAYING).
  *
  * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
- * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS.
+ * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS. And the cards the Inbox page
+ * lists, in the store's `inbox/`: CARDS.
  *
  * Written by hand rather than through agent-workflows: the web app imports no package, and a record
  * format that moves under the pages should fail here, where a person would see it.
@@ -480,6 +481,42 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(bad, 'implement.md'), 'Implement what was asked.\n');
   write(path.join(bad, 'review.md'), '---\nafer: implement\n---\nReview the change.\n');
   write(path.join(root, 'workflows', yours.name, 'plan.md'), '---\nharness: codex\n---\nWrite PLAN.md.\n');
+}
+
+/**
+ * The inbox the Inbox page lists: two cards in the store's `inbox/`, as `wf inbox add` writes them. `planned` names the checkout's `dev` and
+ * the checkout as the repository it is about, and was filed an hour ago; `bare` names neither, and was filed ten minutes ago, so it is listed
+ * first. Each body has a second paragraph, which the list does not show and a start's brief is prefilled with.
+ */
+export const CARDS = {
+  planned: {
+    name: 'cache-the-engine-s-views-bet-9prl',
+    title: "Cache the engine's views between passes",
+    body: "Cache the engine's views between passes\n\nThe tick reads each task's journal twice a pass.",
+    workflow: 'dev',
+    filedMinutesAgo: 60,
+  },
+  bare: {
+    name: 'show-what-a-step-cost-on-the-c3cw',
+    title: 'Show what a step cost on the board',
+    body: 'Show what a step cost on the board\n\nBeside its status, in dollars.',
+    filedMinutesAgo: 10,
+  },
+} as const;
+
+/** Write CARDS into the store at `root`, `planned` about the checkout at `repo`, each file dated when it was filed. */
+export function seedInbox(root: string, repo: string, now = Date.now()): void {
+  const { planned, bare } = CARDS;
+  const cards = [
+    { card: planned, text: `---\nworkflow: ${planned.workflow}\nrepo: ${repo}\n---\n${planned.body}\n` },
+    { card: bare, text: `${bare.body}\n` },
+  ];
+  for (const { card, text } of cards) {
+    const file = path.join(root, 'inbox', `${card.name}.md`);
+    write(file, text);
+    const filed = new Date(now - card.filedMinutesAgo * 60_000);
+    fs.utimesSync(file, filed, filed);
+  }
 }
 
 const write = (file: string, text: string | Buffer): void => {

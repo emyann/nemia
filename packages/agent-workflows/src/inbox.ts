@@ -14,11 +14,16 @@
  *
  * **The keys are a closed list**, as a plan card's are: a key nothing reads is a constraint nobody enforces.
  *
- * Pure: handed a card's text, and whether a path is a directory, never reading one (runner.ts reads the folder).
+ * Nothing about a run changes. A card started is a run like any other, whose record carries `from: { inbox: <name> }`, and the card is
+ * removed; a card still there whose name a record carries is one whose removal failed, and `wf inbox` says it was started, composed on read.
+ *
+ * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one (runner.ts
+ * reads them).
  */
 import path from 'node:path';
-import { bodyOf, frontmatterKeys } from './plan.ts';
-import { splitFrontmatter, WorkflowError } from './workflow.ts';
+import { bodyOf, frontmatterKeys, type PlanFile } from './plan.ts';
+import type { Run } from './run.ts';
+import { isReadme, splitFrontmatter, WorkflowError } from './workflow.ts';
 
 export type InboxCard = {
   /** Its file's name in the inbox, minus `.md`: what `wf inbox rm` and a start name it by. */
@@ -47,10 +52,7 @@ function refuse(why: string): never {
  */
 export function parseInboxCard(file: string, text: string, isDirectory: (at: string) => boolean): InboxCard {
   const { block, body } = splitFrontmatter(file, text);
-  const keys = block === null ? {} : frontmatterKeys(file, block, INBOX_KEYS, (key) => (key === 'after'
-    ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — wf start <inbox>/${file} --after <runId>. Delete the line.`
-    : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, and the repository it is about; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`));
-  const { repo, workflow } = keys;
+  const { repo, workflow } = block === null ? {} : inboxKeys(file, block);
   if (repo !== undefined && !path.isAbsolute(repo)) {
     refuse(`${file}: \`repo: ${repo}\` is not an absolute path. \`repo:\` is the repository the idea is about, from the root — \`repo: /home/me/code/app\` — since a relative one would name a different repository from wherever the card is started.`);
   }
@@ -64,4 +66,122 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
     ...(repo !== undefined ? { repo } : {}),
     body: bodyOf(file, body),
   };
+}
+
+/** An inbox card's frontmatter as key → value: `workflow:` and `repo:`, each at most once, to something; any other key refused by name. */
+function inboxKeys(file: string, block: string): Partial<Record<(typeof INBOX_KEYS)[number], string>> {
+  return frontmatterKeys(file, block, INBOX_KEYS, (key) => (key === 'after'
+    ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — wf start <inbox>/${file} --after <runId>. Delete the line.`
+    : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, and the repository it is about; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`));
+}
+
+/**
+ * Why `name` cannot name a card, or undefined when it can: empty; a slash, `.` or `..`, which would reach outside the inbox; or a leading
+ * dot, a hidden file `wf inbox` never lists. Whether a card of that name is there is the folder's to say (`noCardLine`).
+ */
+export function inboxNameRefusal(name: string): string | undefined {
+  if (!name.trim()) return 'A card is named by its file in the inbox, minus .md, as wf inbox lists it, and this name is empty. Give the name: wf inbox lists them.';
+  if (/[\\/\0]/.test(name) || name === '.' || name === '..') {
+    return `\`${name}\` is not a card's name: a name stays in the inbox, with no slash and not . or .., since it names a file there. Give the name wf inbox lists — cache-the-views-k2q9, say.`;
+  }
+  if (name.startsWith('.')) return `\`${name}\` is not a card's name: a name that starts with a dot is a hidden file, and wf inbox lists none. Give the name wf inbox lists — cache-the-views-k2q9, say.`;
+  return undefined;
+}
+
+/**
+ * That the inbox has no card `name`, and which it has — the cards `wf inbox` lists, by name — with the name without its `.md` when that is
+ * one of them.
+ */
+export function noCardLine(name: string, cards: readonly string[]): string {
+  const bare = name.endsWith('.md') && cards.includes(name.slice(0, -'.md'.length)) ? ` A card is named without its .md: \`${name.slice(0, -'.md'.length)}\`.` : '';
+  return `no card ${name} in the inbox.${bare} ${cards.length ? `Its cards are: ${[...cards].sort().join(', ')}.` : 'The inbox is empty.'}`;
+}
+
+/** A card as `wf inbox` lists it, or an entry of the folder that does not read as one — `error` says why — in which case `name` is its file's. */
+export type InboxListing = {
+  name: string;
+  file: string;
+  /** The first line of its body. */
+  title: string | null;
+  workflow: string | null;
+  repo: string | null;
+  /** The runs whose record's `from` names this card: a card still here was started, and its removal failed. */
+  startedAs: string[];
+  /** Why the entry does not read as a card: its card's refusal, or not a `.md` file. Null for a card. */
+  error: string | null;
+};
+
+/**
+ * The inbox as `wf inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each card
+ * with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a README are
+ * not listed: the one is an editor's, the other says what the folder is for.
+ */
+export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run, 'id' | 'from'>[], isDirectory: (at: string) => boolean): InboxListing[] {
+  return files
+    .filter((f) => !f.file.startsWith('.') && !isReadme(f.file))
+    .sort((a, b) => a.file.localeCompare(b.file))
+    .map(({ file, text }): InboxListing => {
+      if (!file.endsWith('.md')) {
+        return {
+          name: file, file, title: null, workflow: null, repo: null, startedAs: [],
+          error: `${file}: not a card. The inbox holds one markdown file per card, <name>.md — move it out, or, for a card, name it <name>.md.`,
+        };
+      }
+      const name = file.slice(0, -'.md'.length);
+      const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
+      try {
+        const card = parseInboxCard(file, text, isDirectory);
+        return { name, file, title: card.body.split('\n')[0]!, workflow: card.workflow ?? null, repo: card.repo ?? null, startedAs, error: null };
+      } catch (err) {
+        return { name, file, title: null, workflow: null, repo: null, startedAs, error: (err as Error).message };
+      }
+    });
+}
+
+/**
+ * What `wf inbox` prints, a line per entry: the card's name, the first line of its body, its workflow and repository when it names them, and
+ * the runs it was started as — or, for an entry that does not read as a card, why.
+ */
+export function inboxLines(listing: readonly InboxListing[]): string[] {
+  const width = Math.max(0, ...listing.map((l) => l.name.length));
+  return listing.map((l) => {
+    const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
+    if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${started}`;
+    return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${started}`;
+  });
+}
+
+/**
+ * The file `wf inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused (`parseInboxCard`).
+ *
+ * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line `workflow:` or `repo:`, or an
+ * `after:`, which is refused by name — gives its keys and its body; any other text is the body whole, as `wf start` takes a brief that is not
+ * a card. `workflow` and `repo`, when given, are written over the text's own. Refused too: text with nothing in it.
+ */
+export function ideaCard(from: string, text: string, given: { workflow?: string; repo?: string }, isDirectory: (at: string) => boolean): { text: string; body: string } {
+  if (!text.trim()) {
+    refuse(`wf inbox add takes the idea, and ${from} has nothing in it. Give it as text — wf inbox add "<idea>" — or as a file: wf inbox add ./idea.md. Nothing was filed.`);
+  }
+  for (const [flag, value] of Object.entries(given)) {
+    if (value !== undefined && /[\r\n]/.test(value)) refuse(`${from}: the ${flag} given, ${JSON.stringify(value)}, is more than one line, and a card's ${flag}: is one. Give the one line it names.`);
+  }
+  let keys: { workflow?: string; repo?: string } = {};
+  let body = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').trim();
+  let split: { block: string | null; body: string } | undefined;
+  try { split = splitFrontmatter(from, text); } catch { /* a rule that never closes: the text is the body */ }
+  const lines = (split?.block ?? '').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  const isCardLine = (line: string) => line.indexOf(':') > 0 && ([...INBOX_KEYS, 'after'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
+  if (split && lines.length && lines.every(isCardLine)) {
+    // Its keys, to be written over; whether what they say holds is asked of the card written, below.
+    keys = inboxKeys(from, split.block!);
+    body = split.body;
+  }
+  const workflow = given.workflow ?? keys.workflow;
+  const repo = given.repo ?? keys.repo;
+  const frontmatter = [...(workflow !== undefined ? [`workflow: ${workflow}`] : []), ...(repo !== undefined ? [`repo: ${repo}`] : [])];
+  // A body that opens with a rule of its own is kept from being read as the card's frontmatter by a frontmatter before it.
+  if (!frontmatter.length && body.startsWith('---')) frontmatter.push('# the idea below opens with a rule of its own');
+  const card = `${frontmatter.length ? `---\n${frontmatter.join('\n')}\n---\n` : ''}${body}\n`;
+  parseInboxCard(from, card, isDirectory);
+  return { text: card, body };
 }

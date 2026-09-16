@@ -22,8 +22,9 @@ export type { CloseoutAsked, ParentCloseout, ParentRun, ParentStep, Raise, Retry
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
-export { INBOX_KEYS, parseInboxCard } from './inbox.ts';
-export type { InboxCard } from './inbox.ts';
+export { INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard } from './inbox.ts';
+export type { InboxCard, InboxListing } from './inbox.ts';
+import { ideaCard, inboxListing, inboxNameRefusal, parseInboxCard, type InboxCard, type InboxListing } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
@@ -878,6 +879,70 @@ export function startPlan(opts: { dir: string; repo: string; startRun?: typeof s
     }
   }
   return { started, folderOf };
+}
+
+const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
+
+/** The inbox's entries as the pure half takes a folder's: a folder by its name and a trailing `/`, a markdown file with its text. None when there is no inbox yet. */
+function inboxFiles(): Array<{ file: string; text: string }> {
+  let names: string[];
+  try { names = fs.readdirSync(inboxDir()); } catch { return []; }
+  return names.map((name) => {
+    const at = path.join(inboxDir(), name);
+    if (isDirectory(at)) return { file: `${name}/`, text: '' };
+    try { return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' }; } catch { return { file: name, text: '' }; }
+  });
+}
+
+/** The names of the inbox's cards, as `wf inbox` lists them. */
+const inboxCards = (): string[] => inboxListing(inboxFiles(), [], () => true).filter((l) => l.file.endsWith('.md')).map((l) => l.name);
+
+/**
+ * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does not
+ * read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as started.
+ */
+export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory);
+
+/**
+ * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
+ * alike are two cards. `text` is a note, or a file's text; `from` is what a refusal calls it. `workflow` and `repo` are written as the card's
+ * keys: `repo` an absolute path to a directory, `workflow` a name or a path, as `wf start --workflows` would be given it.
+ */
+export function addToInbox(opts: { text: string; from?: string; workflow?: string; repo?: string }): { card: InboxCard; file: string } {
+  const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory);
+  fs.mkdirSync(inboxDir(), { recursive: true });
+  for (;;) {
+    const name = runId(body.split('\n')[0]!);
+    const file = path.join(inboxDir(), `${name}.md`);
+    try {
+      // `wx`: a name already taken is drawn again, never written over.
+      fs.writeFileSync(file, text, { flag: 'wx' });
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'EEXIST') continue;
+      throw err;
+    }
+    return { card: parseInboxCard(`${name}.md`, text, isDirectory), file };
+  }
+}
+
+/** What `wf inbox rm` did: the card's file removed, or no card of that name, and the cards the inbox has. */
+export type InboxDropped = { removed: true; file: string } | { removed: false; cards: string[] };
+
+/**
+ * `wf inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name with no
+ * card is normal — dropped already, or never filed — and says which cards there are.
+ */
+export function dropFromInbox(name: string): InboxDropped {
+  const refused = inboxNameRefusal(name);
+  if (refused) throw new WorkflowError(refused);
+  const file = path.join(inboxDir(), `${name}.md`);
+  try {
+    fs.rmSync(file);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { removed: false, cards: inboxCards() };
+    throw Object.assign(new Error(`wf inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`), { exitCode: 1 });
+  }
+  return { removed: true, file };
 }
 
 /**

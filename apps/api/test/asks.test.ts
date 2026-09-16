@@ -210,8 +210,9 @@ test('REFUSED at shipped defaults: the list observes the harness once however ma
   assert.equal(observations() - before, 1, 'GET /api/runs, with three sessions the harness blocked: one `claude agents`, for every task at once');
   before = observations();
   await detail();
-  // One for every task at once, one for theme's refused check's output (`checksOf`), and one for each blocked session's last line.
-  assert.equal(observations() - before, 1 + 1 + 3, 'GET /api/runs/:id');
+  // One for every task at once, and one for each blocked session's last line. Theme's refused check's output (`checksOf`) is
+  // read on the check's own harness, which runs no `claude agents` (the engine's view observes a task's own harness alone).
+  assert.equal(observations() - before, 1 + 3, 'GET /api/runs/:id');
 });
 
 test("a blocked session's last line follows its conversation: words written since are read from where the last read stopped, and a call alone moves nothing", async () => {

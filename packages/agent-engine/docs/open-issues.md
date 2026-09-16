@@ -304,7 +304,8 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
   record (0.2 ms), and a `transcript` of one in flight finds its session by name from the session's registration (`find`:
   about 2 ms to find one, 6 ms to find none among 21 files; the whole read, 14 ms, mostly the transcript). A view of an
   attempt in flight, `list`, `say` and a pass still observe, and a view still makes the runner's second pass over every
-  idle `ae/` session it lists. So a board's open stream on a running step makes one `claude agents` call a second, not
+  idle `ae/` session it lists. A view observes its task's own harness only (§6 item 27): a view of a `check` or a Codex
+  task, which cannot `find`, runs no `claude agents` — checked with a fake runner per harness that counts its observes. So a board's open stream on a running step makes one `claude agents` call a second, not
   two. Verified with a fake `claude` that counts its calls and registration files the test writes
   (`test/find.test.ts`): each of the registration read's refusals — a symlink, another user's file, another name, an
   interactive session, a pid other than the file's, an empty or missing session id, a dead process, a pid another
@@ -429,6 +430,7 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 | a nudged retry that `--resume`d its session was recorded with no closeout and its first try's usage, to the byte; and a statement given after a `view` had seen the session listed final was never read, until the daemon restarted | the Claude runner keeps a read of a finished session for one attempt — the row's name, its session, the registry's start — and only while the transcript has not been written since | engine `00e301b` |
 | no attempt recorded what it cost — `Usage.costUsd` was declared and never filled, and every `wf decide` said "cost not measured" | the Claude runner reads Claude Code's `cost-state`, written as a session's process exits, once its release has stopped the session, and the pass journals it as `measured`; a resumed attempt records its own share, not its session's total; `claude -p`'s `total_cost_usd` goes on its end (issues 4, 18) | engine `9d075f7` |
 | nothing could bound what a session spends | `budgetUsd` on the task, `--max-budget-usd` from both Claude runners, and a session `claude -p` ended at its cap recorded `failed`, reason `budget`, its task settled `failed` with no further attempt (the operator's call, round 2); refused on `claude`, whose `--bg` sessions keep no cap (issue 17), and on `codex` | engine `26020c1`, round 2 |
+| a `view` of a task whose harness cannot `find` — a `check`, a Codex step — or of any attempt in flight observed every harness, so each read of one cost a `claude agents` call and a Codex listing (§6 item 27, E7's last review) | a view observes its task's own harness, the one `harnessOf` names for `logs` and `transcript`, and the fallback's for a harness the engine no longer has | engine, §6 item 27 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

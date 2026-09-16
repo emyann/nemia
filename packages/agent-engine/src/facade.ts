@@ -183,6 +183,7 @@ export type Engine = {
    * registry has that. Any other task is read off its record — its phase is there, and so is its session's id once an
    * attempt has ended — and the registry is not asked. A session whose id the record lacks is found by name when its
    * harness can `find` one, and observed when it cannot or finds none; a harness without `find` is observed as ever.
+   * Whatever is observed is observed on the task's own harness — the one `logs` and `transcript` ask — and no other.
    * `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
   view(taskId: string): Promise<TaskView>;
@@ -399,12 +400,19 @@ export function createEngine(options: EngineOptions = {}): Engine {
    * a detached runner's handle for a session is not the id on the record. Otherwise the record holds the phase and,
    * once an attempt has ended, its session's id, which a registry could only confirm. A session whose id the record
    * lacks — a task settled with its attempt open, before `settled` carried one — is found by name, or observed.
+   *
+   * Observed on the task's own harness alone, as `transcript` and `logs` reach it: no other registry can name its
+   * session, and asking every one made a view of a `check` or a Codex task a `claude agents` call. A registry that
+   * cannot be read this time is nothing observed, as `composite` reads it for a pass.
    */
   const viewOf = (taskId: string) => Effect.gen(function* () {
-    const observed = Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => view(taskId, o)));
     const state = fold(taskId, yield* Effect.flatMap(Journal, (j) => j.read(taskId)));
     const last = state.attempts.at(-1);
-    const { find } = runners[harnessOf(state)]!;
+    const { find, observe } = runners[harnessOf(state)]!;
+    const observed = observe.pipe(
+      Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
+      Effect.flatMap((o) => view(taskId, o)),
+    );
     if (!find || (!state.settled && last?.ended === null)) return yield* observed;
     if (!last || last.nativeId) return yield* view(taskId, new Map());
     const found = yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined)));

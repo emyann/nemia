@@ -859,9 +859,12 @@ a loop of twenty reads each against that machine's board (236 tasks), before and
 | `view` of a running task | 323 ms | about the same: it observes |
 | `list()` | 339 ms | about the same: it observes |
 
-So the open stream on a running step makes one `claude agents` call a second, not two, and a list of runs asks the
-registry only for the steps still running. `find` itself took about 2 ms to find a session and 6 ms to find none among
-the 21 registrations there.
+So the open stream on a running step makes one `claude agents` call a second, not two, and a list of runs asks
+`claude agents` only for the Claude Code steps still running. Every read asks the task's own harness and no other —
+`view` as `transcript` and `logs` do — so a view of a `check` or a Codex task, whose harnesses cannot `find`, observes
+that harness's run files and never runs `claude agents`. Until plan §6 item 27 such a view observed every harness, and
+so cost a `claude agents` call and a Codex listing on every read, settled or not. `find` itself took about 2 ms to find
+a session and 6 ms to find none among the 21 registrations there.
 
 **A registration outlives its process** — 18 of those 21 had none — so one is taken only when it is a file this user
 owns, named for the pid it holds, of a `bg` session (an interactive one is never the engine's); a process this user may
@@ -872,8 +875,9 @@ not made. A registration refused, or not there, refuses nothing: the read observ
 **Where a registration and the registry disagree, every read that observes takes the registry's word** — a view's phase
 and session, `say`, and the pass, which never uses `find`. `transcript` of an attempt in flight is the one read that
 takes a registration's, and only for which session to read: every live registration on that machine named the session
-`claude agents` listed for its pid, under the same name. A `PromiseRunner` without `find` is observed as it always was
-(`test/find.test.ts`).
+`claude agents` listed for its pid, under the same name. A `PromiseRunner` without `find` is observed as it always was,
+on its own and no other harness; a task whose harness the engine no longer has is viewed on the fallback, where its
+`logs` are read (`test/find.test.ts`).
 
 ## Letting a sandboxed Codex step commit
 
@@ -1002,7 +1006,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
-| `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree |
+| `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/readme.test.ts` | this file, held to the code |
 | `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, and a `--bg` session spending past one, its cost read once let go, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |

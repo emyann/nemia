@@ -10,6 +10,10 @@ wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it unti
 wf start ./ui.md --repo ~/code/myapp --input ./mock.png   # copied into the run's inputs/, named on every step's brief
 wf plan ./plans/flag --repo ~/code/myapp               # a folder of cards: a run each, parents first, with their edges
 wf start ./plans/flag/d.md --repo ~/code/myapp --after r-b --after r-c   # one card by hand: its body is the brief
+wf inbox add "Cache the views between passes" --repo ~/code/myapp   # park an idea as a card, to start later
+wf inbox                                               # the cards parked, name and first line each
+wf start ~/.agent-workflows/inbox/cache-the-views-between-pass-k2q9.md --workflows dev   # start one: it leaves the inbox
+wf inbox rm cache-the-views-between-pass-k2q9          # or drop one unstarted
 wf up
 wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
@@ -1161,8 +1165,83 @@ run 'wf tick' (or 'wf up') to start them
   frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
   card's `workflow:`, found from its plan folder as `wf plan` finds it. A card whose `after:` names cards is refused
   without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
-  A file is a card only when every line of its frontmatter is `workflow:` or `after:`. A brief with any other key, or one
-  that opens with a `---` it never closes, is taken whole, as before.
+  A file is a card only when every line of its frontmatter is `workflow:` or `after:` — or an inbox card's `repo:`, which a
+  plan's card refuses by name, since its repository is `--repo`. A brief with any other key, or one that opens with a `---`
+  it never closes, is taken whole, as before.
+
+## An inbox: cards before they are started — `wf inbox`
+
+An idea about the project had nowhere to be parked. The unit already existed — a card: a workflow, a brief — but a card
+lived only inside a plan folder, started whole by `wf plan`, or was started by hand and left where it was. The old hkb
+filed such a note with `hkb new --triage`, and `hkb ls --phase triage` was the inbox; its ADR-015 records that triage was a
+phase pushed into the machinery because a person needed an inbox. Here an unstarted card is a file in a folder, and nothing
+about a run changes.
+
+```text
+$ wf inbox add "Cache the engine's views between passes" --workflow dev --repo ~/code/myapp
+cache-the-engine-s-views-bet-9prl  Cache the engine's views between passes  workflow: dev  repo: /home/me/code/myapp
+filed: /home/me/.agent-workflows/inbox/cache-the-engine-s-views-bet-9prl.md — start it with wf start /home/me/.agent-workflows/inbox/cache-the-engine-s-views-bet-9prl.md
+$ wf inbox add "Show what a step cost on the board"
+$ wf inbox
+cache-the-engine-s-views-bet-9prl  Cache the engine's views between passes  workflow: dev  repo: /home/me/code/myapp
+show-what-a-step-cost-on-the-c3cw  Show what a step cost on the board
+
+start one: wf start /home/me/.agent-workflows/inbox/<name>.md [--workflows <w>] [--repo <r>] — drop one: wf inbox rm <name>
+$ wf start ~/.agent-workflows/inbox/show-what-a-step-cost-on-the-c3cw.md --repo ~/code/myapp --workflows dev \
+    --brief "Show each step's cost beside its status on the run page, in dollars."
+show-each-step-s-cost-beside-42g6  2 step(s): implement → review
+from inbox card show-what-a-step-cost-on-the-c3cw — removed from the inbox
+workspace: /home/me/code/myapp
+run 'wf tick' (or 'wf up') to start it
+```
+
+- **The inbox is `$WF_ROOT/inbox/`**, in the store beside `runs/`, not in a repository: one card per file, `<name>.md`. A
+  person has one inbox, whatever repository an idea is about.
+- **A card is a plan's card with two differences**, and its keys are a closed list all the same:
+
+  ```md
+  ---
+  workflow: dev                  # optional: what runs it, chosen at start when the card does not say
+  repo: /home/me/code/myapp      # optional: the repository the idea is about, as an absolute path
+  ---
+  Cache the engine's views between passes. The tick reads each task twice.
+  ```
+
+  `workflow:` is optional, since an idea often does not know its workflow. `repo:` is a key of its own. An inbox card has no
+  `after:`: what it waits on is said at start, with `--after`, once the runs it could wait on are known. A plan's card keeps
+  its rules, and refuses `repo:`: a plan's repository is `wf plan --repo`.
+- **`repo:` is what makes one inbox serve several repositories.** A card that names its repository starts on it from
+  wherever `wf start` is typed, and a board that one day serves more than one repository can group its inbox by it. A card
+  without one is about the repository its start names: `--repo`, else `.`.
+- **`wf inbox add "<idea>"`, or `wf inbox add <file>`, files one.** Its name is the slug a run id makes of the idea's first
+  line, suffix included, so two ideas alike are two cards. `--workflow <name>` and `--repo <path>` write the keys, over a
+  file's own; a repo, and a workflow given as a path, are written absolute. A file whose frontmatter is an inbox card's gives
+  its keys and its body. Any other text is the body whole, as `wf start` takes a brief that is not a card.
+- **`wf inbox` lists the cards**: name, first line, workflow and repo when set, and `started as <runId>` for a card whose
+  name a run's record carries in its `from`, composed on read. An entry that does not read as a card is listed with its
+  refusal, never hidden. A hidden file and a README are not listed.
+- **`wf inbox rm <name>` drops a card** without starting it. A name with no card is normal: it says so, names the cards
+  there are, and exits 0.
+- **`wf start <inbox>/<name>.md` starts one**, through the function the board calls too (`startFromInbox`):
+  - the brief is the card's body, or `--brief "<brief>"` in its place, as text or a file: the note rewritten into work at
+    the moment of starting, as hkb let `queue` rewrite it;
+  - the workflow is `--workflows`, else the card's `workflow:`, else refused, naming the repository's workflows. A card's
+    `workflow:` is found from the inbox folder, as a plan card's is from its plan folder: a name is `<repo>/workflows/<name>`,
+    and a relative path is read from the inbox, so `../workflows/mine` is one of yours in the store;
+  - the repository is `--repo`, else the card's `repo:`, else `.`;
+  - `--after`, `--input` and `--no-worktree` are `wf start`'s, as for any brief.
+- **The record is written first, then the card is removed.** The record carries `from: { inbox: <name> }`, and `wf decide`
+  prints `from inbox card <name>` under the run's line. A removal that fails leaves a card `wf inbox` lists as
+  `started as <runId>` — never a run with no trace of its card — and `wf start` refuses that card, naming its run, until
+  `wf inbox rm` drops it. A plan's card started with `wf start` is never removed.
+- **Refused by name**, exit 2, with the fix, before anything is written:
+  - a key an inbox card does not have, `after:` among them, with where what it waits on is said instead;
+  - `workflow:` or `repo:` set to nothing or twice, a `repo:` that is not an absolute path to a directory, and an empty body;
+  - `wf inbox add` with no idea, or one with nothing in it;
+  - a name that would leave the folder — a slash, `..` — or a hidden one, given to `wf inbox rm` or a start;
+  - a start naming a card that is not there, with the cards that are;
+  - a start with no workflow from the card or the flag, and a card's workflow that does not load, behind the card;
+  - an empty `--brief`, and `--brief` on anything but an inbox card.
 
 ## Calling a run off
 
@@ -1293,12 +1372,25 @@ holding a concurrency slot forever.
 |---|---|
 | `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a word the step's harness does not take, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run; find a workflow folder by a path or by its name under `<repo>/workflows/` |
 | `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
+| `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing and a `repo:` that is not an absolute directory; the card `wf inbox add` writes; a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records; and which path is a card of the inbox |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), and what a step is told, `## From <step>`, `## From run <id>`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
-| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine, and a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine, a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, dropped and started from (`readInbox`, `addToInbox`, `dropFromInbox`, `startFromInbox`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/cli.ts` | the verbs |
+
+The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
+
+| path | |
+|---|---|
+| `runs/<id>.json` | a run's record, the tick's to write; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` |
+| `runs/<id>/` | the run's own files, outside every workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/` |
+| `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
+| `worktrees/<id>/<step>/` | each step's workspace |
+| `checks/` | each check's stderr |
+| `engine/` | the engine's board: `AE_ROOT` for `ae watch` |
+| `workflows/` | your workflows, beside the repository's, as the board lists them |
 
 `assess()` is pure and has no idea the engine exists; `runner.ts` is the only file that imports it,
 and `test/boundary.test.ts` fails the suite the day another file does — a type import included. Same

@@ -4,7 +4,7 @@ The features agent-workflows is still missing, in the order I would take them. E
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
-State as of 2026-09-15: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
+State as of 2026-09-16: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
@@ -18,7 +18,7 @@ prompt box: the steering channel's upper half), and six small items — `radius`
 in the order they run, `wf start --input`, artifacts collected from the workspace, a stale ask honoured, and `wf start` on a card
 file (§6 items 6–9, 24, 25) — and a step gone quiet without its closeout reading `unsigned` again after the engine began
 settling it `failed` — and a step's `budget:`, with what a step and a run cost on `wf ls` and `wf decide` (plan §6 item 29, its
-workflow half) — have shipped.
+workflow half) — and an inbox of cards parked before they are started (`wf inbox`, its package half) — have shipped.
 
 ## Shipped: the check
 
@@ -1461,6 +1461,120 @@ What it leaves:
 - **Only what was measured counts.** An attempt killed before its harness wrote a cost, or run on a model it could not price, adds
   nothing to what a step has spent. `wf ls` marks such a step's cost `≥`, and a step that such an attempt took past its cap is not
   held.
+
+## Shipped: an inbox — cards parked before they are started
+
+An idea about the project had nowhere to be parked. The unit for one already existed: a card, a workflow and a brief. But a card lived only
+in a plan folder, started whole by `wf plan`, or was started by hand and left where it was. The old hkb parked such a note with
+`hkb new --triage` and listed them with `hkb ls --phase triage`, and its ADR-015 records that triage became a phase in the machinery
+because a person needed an inbox. Here an unstarted card is a file in a folder, and a run is what it was. Read first: CLAUDE.md, the
+README's plan and inputs sections, `plan.ts`, and `start`, `readPlan` and `startPlan` in `runner.ts`.
+
+What was built:
+
+- **The folder.** `$WF_ROOT/inbox/`, beside `runs/`, holds one `<name>.md` per card (`inboxDir`). A card is a plan's card with two
+  differences. `workflow:` is optional. `repo:` is a key of its own, also optional: the absolute path of the repository the idea is about.
+  `parseInboxCard` in the new `src/inbox.ts` is pure and closes the keys through `frontmatterKeys`, which a plan's card now uses too. It
+  refuses `after:` by name, saying where a wait is given instead (`wf start --after`). It refuses a `repo:` that is not absolute, or that
+  names no directory, asking a predicate so the module reads no disk. `test/boundary.test.ts` holds `inbox.ts` to that.
+- **A plan's card refuses `repo:`** by name, since a plan's repository is `wf plan --repo`. `cardToStart` reads `repo:` as a card's line,
+  so an inbox card carried out of the inbox is refused by `wf start`. It is no longer taken as a brief with its frontmatter in it.
+- **`wf inbox`** lists the cards through `readInbox`, which hands the folder's entries and every run record to `inboxListing`, pure. Each
+  card gets its name, first line, and workflow and repo when set. A card whose name a record's `from` carries gets `started as <runId>`,
+  composed on read. An entry that does not read as a card is listed with its refusal, as the board lists a workflow folder that does not
+  load. `inboxLines` words the list.
+- **`wf inbox add "<idea>"` or `<file>`** files a card through `addToInbox`, which writes what `ideaCard` returns. The card is named by
+  `runId` of its first line, suffix included, and written `wx`, so a taken name is drawn again. `--workflow` and `--repo` write the keys
+  over a file's own. The CLI makes a repo, and a workflow given as a path, absolute. A file whose frontmatter is an inbox card's gives its
+  keys; any other text is the body whole. The card written is parsed back before it is written, so nothing lands in the inbox that
+  `wf inbox` would list as refused.
+- **`wf inbox rm <name>`** drops a card through `dropFromInbox`. A name with no card exits 0 and names the cards there are (`noCardLine`).
+  The request lists this among the refusals, but also says a name with no card is normal. The more specific sentence was kept, as
+  `wf cancel` says "already finished" and exits 0.
+- **Starting a card.** `startFromInbox` in `runner.ts` is the one function the CLI calls and the board will call. It takes the card's name,
+  a brief to replace the body, the workflow (the given one, else the card's `workflow:`, else refused naming the repository's workflows),
+  the repository (the given one, else `repo:`, else the caller's), and `after`, `isolate` and `inputs`. It calls `start()`, which now
+  takes `from` and writes `from: { inbox: <name> }` on the record. Then it removes the card. `wf start <inbox>/<name>.md` goes through it,
+  recognised by `inboxNameAt` (links resolved, then `inboxNameOf`, pure), with `--brief "<brief>"` as text or a file. `wf decide` prints
+  `from inbox card <name>` under the run's line (`fromNote`). A card's `workflow:` is found from the inbox folder, as a plan card's is
+  from its plan folder.
+- **One refusal the request did not name:** a card that a record already names. That card's removal failed after its run was written.
+  Started again, it would run the idea twice, so the start is refused, naming the run and `wf inbox rm`.
+
+What was measured:
+
+- `test/inbox.test.ts` (10 tests, pure):
+  - the card with each key and neither, saved on Windows, and a comment-only frontmatter over a body that opens with a rule;
+  - every refusal of a card: an unknown key, `after:`, a key set to nothing or twice, a relative `repo:`, one naming no directory, an
+    empty body, and a frontmatter that never closes;
+  - the listing, with records naming a card twice, a card that does not read, a stray file, a folder, a hidden file and a README;
+  - the lines, and `noCardLine` with and without `.md`;
+  - the name refusals: `../runs/r-1`, `..`, `.`, a slash, a backslash, a NUL, a hidden name and an empty one;
+  - `ideaCard`: keys from a file, flags over them, text taken whole, and a refusal for an empty idea, a key on two lines or given empty,
+    and a relative or missing repo;
+  - `inboxNameOf` for seven paths, the no-workflow and already-started refusals, and `fromNote`.
+- `test/inbox-store.test.ts` (8 tests, a temporary `WF_ROOT`, through `main`):
+  - `wf inbox` on no folder;
+  - `add` of text, of text with flags, of a file with the flag over its key, and by the function with a workflow path;
+  - `wf inbox` listing started, refused, stray, hidden and README entries;
+  - `rm`, including a name with no card and one given with `.md`;
+  - the CLI's refusals for add and rm. A `../runs/…` name is refused, and the record it would reach is still there;
+  - a start from a card with `workflow:` and `repo:`: the brief, repo, workflow and `from` on the record, the card gone, and `wf decide`'s
+    line. A typed run has no `from`, and a plan's card started by `wf start` stays;
+  - flags over the card, the caller's `.` found by `process.chdir`, the board's call with an absolute folder, `--brief` as a file, and
+    `--after`;
+  - every start refusal, each writing no run and leaving the card: no card, three bad names, no workflow (with workflows and without),
+    `workflow: nope`, `--workflows nope`, a hand-edited `after:`, a `repo:` gone, an empty `--brief` (CLI and function), `--brief`
+    twice and on a typed brief, and an `--after` `start()` refuses;
+  - a removal made to fail with a read-only inbox. The run is written, the start says the card is still there, `wf inbox` lists
+    `started as`, a second start is refused through the CLI and the function, and `wf inbox rm` clears it. The test skips as root, which
+    removes the file anyway; here it ran.
+- `test/plan.test.ts` refuses `repo:` on a plan's card, and on a card `wf start` is given. `test/store.test.ts` has one refusal's wording
+  updated: `wf start`'s unknown-flag message now names `--brief`.
+- Each guard was broken on purpose and the four test files rerun. 29 breaks, each failing at least one test:
+  - `repo:` not read as a card's line: 1; `repo:` taken on a plan's card: 2;
+  - on an inbox card, `after:` taken: 5; any key taken: 6; a relative `repo:`: 3; a `repo:` naming no directory: 4; an empty body: 2;
+  - in `add`: an empty idea taken: 2; a key on two lines: 1; a file's keys over the flags: 2; the card not parsed back: 2;
+  - a slash or `..` in a name: 3; a hidden name: 2; `rm` not checking the name: 1; a start not checking it: 1;
+  - an inbox path taken as a brief: 5; no workflow falling back to `./workflows`: 1; a card already started started again: 1;
+  - the card removed before the record: 2; never removed: 2; `from` not on the record: 3; the card's `repo:` ignored: 4; its
+    `workflow:` over the flag: 1; an empty brief taken: 1; the brief ignored: 1; `--brief` on any start: 1;
+  - `wf decide` naming no card: 1; `started as` not composed: 4; a stray entry hidden: 3.
+- The verbs were run by hand in a scratch `WF_ROOT` on this repository: add twice, list, a start refused for no workflow, a start with
+  `--brief`, the list after, `rm` of a name with no card, and `wf decide`'s head. The README shows that output.
+- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 424 (423 passed,
+  1 skipped), api 137 and web 174. Typecheck was clean in all four.
+
+What it leaves:
+
+- **Two starts of one card at once both start.** Each reads no record naming the card before the other writes one. The CLI and the board
+  together could do it. A claim file taken `wx` before `start()` would close it, but a claim left by a crash would then need clearing.
+- **A card's `workflow:` is not checked when it is filed.** A name is found in a repository, and that may not be known until the start.
+  `wf inbox add --workflow nope` files, and the start refuses by name.
+- **Every record is read for `from`.** Both `readInbox` and `startFromInbox` read them all, as `wf ls` does. A record that does not parse
+  breaks all three.
+- **A card filed by hand under a name a record carries** lists as `started as` and is refused a start. `wf inbox add` names carry a
+  random suffix, so this takes a hand-named file.
+- **`wf ls` does not say a run came from the inbox.** Only `wf decide` does.
+- **`bin/wf.ts` exits 1 on every refusal**, whatever `exitCode` it carries. This was here before the inbox, and was not changed. The tests
+  read `exitCode` off what `main` throws.
+- **The board has no inbox.** The next run, `the-inbox-on-the-board-a-pag-ryny`, gives the api its routes and the board its page.
+
+The exports that run should call, from `agent-workflows` (`src/runner.ts`) unless noted:
+
+- `readInbox(): InboxListing[]` lists the inbox, `started as` included.
+- `addToInbox({ text, from?, workflow?, repo? }): { card: InboxCard; file: string }` files a card. `repo` must be absolute. `from` is
+  what a refusal calls the idea.
+- `dropFromInbox(name): InboxDropped` drops one. It returns `{ removed: true, file }`, or `{ removed: false, cards }` for a name with no
+  card: a 404, worded by `noCardLine(name, cards)`.
+- `startFromInbox(opts: InboxStart): InboxStarted` starts one. Pass the workflow folder the api's own `folderOf` found as `workflow`,
+  absolute; the board's repository as `callerRepo`; and `brief` and `after` from the body. `removed: false` carries `why`.
+- `inboxNameRefusal(name)` refuses a name in the route before anything is read.
+- `inboxDir()`, `fromNote(run)` for the run page, `INBOX_KEYS`, `parseInboxCard`, and the types `InboxCard`, `InboxListing`, `InboxStart`,
+  `InboxStarted` and `InboxDropped`.
+- From `agent-workflows/run`: `Run.from`, `{ inbox: string }` or absent.
+- Refusals in the card's or the start's words throw with `exitCode` 2. `start()`'s own refusals, for `--after` and `--input`, do too. A git
+  failure has none.
 
 ## 1. Forgetting a run (`wf rm`)
 

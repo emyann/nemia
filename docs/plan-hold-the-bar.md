@@ -994,7 +994,9 @@ start a workflow on it; decided: the home store, a `repo:` key on the card for a
 the card removed once started, a page of its own for now): `an-inbox-cards-parked-before-ri7j` from `./workflows/dev` — the
 package half, `$WF_ROOT/inbox/`, `wf inbox`, `wf start` on an inbox card — two rounds, $22.97, **merged, `aef14f0`**; and
 `the-inbox-on-the-board-a-pag-ryny` from `./workflows/dev-build` `--after` it, the api's routes and the page, filed 22:12Z the same
-day, in flight. Left: items 20 (settings), 27, 28, 30, 31 (all small).
+day by the tick once the package half was on main — three rounds, $35.89, **merged, `07984b9`**. **The inbox is done end to end.**
+The daemon runs with `WF_MAX_CONCURRENT=4` since 2026-09-16 23:20Z (was the default 2); Remote Control on a step, a supervisor, and
+the queue are registered as features.md §2 and §3, not filed. Nothing in flight. Left: items 20 (settings), 27, 28, 30, 31 (all small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**

@@ -1539,7 +1539,7 @@ What was measured:
   compared as written, 1 (the run held, its worktree read as a stray).
 - On a copy of this machine's `node_modules` (684 MB, 27,488 files) in a throwaway `WF_ROOT`: `wf rm` refused the running run in 2 ms, and
   once its step failed, forgot it in 550 ms, committing the file left in the worktree and leaving git's list with the repository alone.
-- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 423 (422 passed,
+- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 424 (423 passed,
   1 skipped), api 137 and web 174. Typecheck was clean in all four.
 
 What it leaves:

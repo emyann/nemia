@@ -524,7 +524,7 @@ What it leaves:
   answered one for its `needs`: one more view per answered step, and no question printed if the engine has lost
   that task.
 - **A plan is not steps.** `plan`'s `steps` are prose for one `implement`; a run that files steps from a plan
-  is still §2 below.
+  is still §1 below.
 
 ## Shipped: the steering channel — `wf say`
 
@@ -1719,7 +1719,8 @@ What it leaves:
 - **A person's word in the moment `wf rm` works.** The judgement comes before the worktrees go. A `wf retry` or `wf round` typed on a run
   judged over, in the half-second its worktrees take to remove, can have a pass file a try into a worktree that is going, and the pass's
   write can land before `wf rm` removes the record. Closing it needs a mark of its own that `wf retry`, `wf round` and the tick read, such as
-  `runs/<id>.forgetting`. The cancel-then-`wf rm` case is closed: all a pass does after its last re-read is `e.file`, one journal append.
+  `runs/<id>.forgetting`. The cancel-then-`wf rm` case is narrow, not closed: after its last re-read (`mayFile()`) a pass still awaits the engine's views and makes
+  the artifacts directory before `e.file`, a few milliseconds in which a scripted `wf cancel x && wf rm x` could land (the last review).
 - **`npm ci` still running when `wf rm` removes its worktree.** The pass files nothing after it, but an install writing by absolute path may
   put a `node_modules` back under `worktrees/<id>/`. Not measured with a real `npm`. A `wf rm` of the id then names the directory, and leaves
   it for a person.

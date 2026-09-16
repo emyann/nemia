@@ -1215,19 +1215,25 @@ run 'wf tick' (or 'wf up') to start it
   without one is about the repository its start names: `--repo`, else `.`.
 - **`wf inbox add "<idea>"`, or `wf inbox add <file>`, files one.** Its name is the slug a run id makes of the idea's first
   line, suffix included, so two ideas alike are two cards. `--workflow <name>` and `--repo <path>` write the keys, over a
-  file's own; a repo, and a workflow given as a path, are written absolute. A file whose frontmatter is an inbox card's gives
-  its keys and its body. Any other text is the body whole, as `wf start` takes a brief that is not a card.
+  file's own. A file whose frontmatter is an inbox card's gives its keys and its body. Any other text is the body whole, as
+  `wf start` takes a brief that is not a card. A repo, and a workflow given as a path, are written absolute: the flag's from
+  where `wf inbox add` is typed, and a file's own `workflow:` from the file's folder, as a plan card's is read from its plan
+  folder. Left relative, `../workflows/dev` in `~/code/myapp/plans/idea.md` would be read from the inbox at start, and name
+  the store's `workflows/dev`.
 - **`wf inbox` lists the cards**: name, first line, workflow and repo when set, and `started as <runId>` for a card whose
   name a run's record carries in its `from`, composed on read. An entry that does not read as a card is listed with its
   refusal, never hidden. A hidden file and a README are not listed.
 - **`wf inbox rm <name>` drops a card** without starting it. A name with no card is normal: it says so, names the cards
   there are, and exits 0.
-- **`wf start <inbox>/<name>.md` starts one**, through the function the board calls too (`startFromInbox`):
+- **`wf start <inbox>/<name>.md` starts one**, or `wf start <inbox>/<name>`, the name as `wf inbox` lists it, through the
+  function the board calls too (`startFromInbox`):
+  - every path under the inbox goes through it, and one that names no card is refused by name, never started as a brief
+    whose text is the path;
   - the brief is the card's body, or `--brief "<brief>"` in its place, as text or a file: the note rewritten into work at
     the moment of starting, as hkb let `queue` rewrite it;
   - the workflow is `--workflows`, else the card's `workflow:`, else refused, naming the repository's workflows. A card's
     `workflow:` is found from the inbox folder, as a plan card's is from its plan folder: a name is `<repo>/workflows/<name>`,
-    and a relative path is read from the inbox, so `../workflows/mine` is one of yours in the store;
+    and a relative path written into a card by hand is read from the inbox, so `../workflows/mine` is one of yours in the store;
   - the repository is `--repo`, else the card's `repo:`, else `.`;
   - `--after`, `--input` and `--no-worktree` are `wf start`'s, as for any brief.
 - **The record is written first, then the card is removed.** The record carries `from: { inbox: <name> }`, and `wf decide`
@@ -1235,11 +1241,13 @@ run 'wf tick' (or 'wf up') to start it
   `started as <runId>` — never a run with no trace of its card — and `wf start` refuses that card, naming its run, until
   `wf inbox rm` drops it. A plan's card started with `wf start` is never removed.
 - **Refused by name**, exit 2, with the fix, before anything is written:
-  - a key an inbox card does not have, `after:` among them, with where what it waits on is said instead;
+  - a key an inbox card does not have, `after:` among them, with where what it waits on is said instead: for a file
+    `wf inbox add` is given, delete the line, file the idea, and give `--after` when starting the card;
   - `workflow:` or `repo:` set to nothing or twice, a `repo:` that is not an absolute path to a directory, and an empty body;
   - `wf inbox add` with no idea, or one with nothing in it;
   - a name that would leave the folder — a slash, `..` — or a hidden one, given to `wf inbox rm` or a start;
-  - a start naming a card that is not there, with the cards that are;
+  - a start naming a card that is not there, with the cards that are: any path under the inbox, a file there that is not a
+    card and one in a folder inside it included;
   - a start with no workflow from the card or the flag, and a card's workflow that does not load, behind the card;
   - an empty `--brief`, and `--brief` on anything but an inbox card.
 

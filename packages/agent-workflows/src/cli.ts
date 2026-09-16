@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, addToInbox, dropFromInbox, fromNote, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, addToInbox, dropFromInbox, fromNote, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -441,11 +441,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const how = inboxAddHow(args.slice(1));
         const at = fs.statSync(idea!, { throwIfNoEntry: false });
         if (at?.isDirectory()) usage(`${idea} is a directory, and wf inbox add takes the idea as text or as one file: wf inbox add "<idea>", or wf inbox add ./idea.md.`);
-        // A workflow given as a path is kept absolute, so it names the same folder from the inbox; a name stays a name, found in the repository at start.
-        const workflow = how.workflow !== undefined && (/[\\/]/.test(how.workflow) || how.workflow === '.' || how.workflow === '..') ? path.resolve(how.workflow) : how.workflow;
+        // A workflow given as a path is kept absolute, so it names the same folder from the inbox; a name stays a name, found in the repository at
+        // start. The flag's is read from here; a file's own `workflow:`, from the file's folder.
+        const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
         const { card, file } = addToInbox({
           text: at ? fs.readFileSync(idea!, 'utf8') : idea!,
-          ...(at ? { from: idea } : {}),
+          ...(at ? { from: idea, dir: path.dirname(path.resolve(idea!)) } : { dir: process.cwd() }),
           ...(workflow !== undefined ? { workflow } : {}),
           ...(how.repo !== undefined ? { repo: path.resolve(how.repo) } : {}),
         });

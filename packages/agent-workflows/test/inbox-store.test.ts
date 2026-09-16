@@ -95,6 +95,13 @@ test("`wf inbox add` files a card under the slug of its first line and a suffix 
   assert.equal(fs.readFileSync(given, 'utf8').includes('/nowhere/at/all'), true, 'the file given is left as it was');
   const byPath = addToInbox({ text: 'Store the flag', workflow: path.join(repo, 'workflows', 'dev') });
   assert.equal(byPath.card.workflow, path.join(repo, 'workflows', 'dev'));
+  // --workflow given as a path from here: written absolute, so the inbox reads the same folder.
+  const relative = path.relative(process.cwd(), path.join(repo, 'workflows', 'ui'));
+  assert.match(relative, /\//, 'a path, not a name');
+  await printedBy(t, 'inbox', 'add', 'Store the flag by path', '--workflow', relative);
+  const fourth = inInbox().find((f) => f.startsWith('store-the-flag-by-path'))!;
+  assert.equal(fs.readFileSync(path.join(INBOX, fourth), 'utf8'), `---\nworkflow: ${path.join(repo, 'workflows', 'ui')}\n---\nStore the flag by path\n`);
+  fs.rmSync(path.join(INBOX, fourth));
 
   // Listed: a card a record names as started, a card that does not read, a file that is not a card; a hidden file and a README are not.
   writeRecord('show-the-flag-on-the-settin-zz99', { inbox: third.slice(0, -3) });
@@ -150,7 +157,7 @@ test("REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   await assert.rejects(add(dir), refusedWith(new RegExp(`^${escaped(dir)} is a directory, and wf inbox add takes the idea as text or as one file`)));
   const waits = path.join(dir, 'd.md');
   fs.writeFileSync(waits, '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n');
-  await assert.rejects(add(waits), refusedWith(new RegExp(`^${escaped(waits)}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started`)));
+  await assert.rejects(add(waits), refusedWith(new RegExp(`^${escaped(waits)}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known\\. Delete the line and file the idea, then give the wait when you start the card wf inbox add names: wf start <inbox>/<name>\\.md --after <runId>\\.$`)));
   await assert.rejects(add('an idea', '--repo', empty), refusedWith(new RegExp(`^the idea: \`repo: ${escaped(empty)}\` names no directory\\.`)));
   await assert.rejects(add('an idea', '--repo', path.join(ROOT, 'no-such-repo')), refusedWith(/^the idea: `repo: .*no-such-repo` names no directory\./));
   assert.throws(() => addToInbox({ text: 'an idea', repo: 'code/app' }), refusedWith(/^the idea: `repo: code\/app` is not an absolute path\./));
@@ -205,6 +212,55 @@ test("`wf start <inbox>/<name>.md` starts the card — its body the brief, its `
   const planned = readRun((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0]!.split(' ')[0]!);
   assert.deepEqual([planned.brief, planned.from], ['Parse the flag', undefined]);
   assert.ok(fs.existsSync(path.join(plan, 'a.md')), "the plan's card stays");
+});
+
+test("`wf start <inbox>/<name>`, the name as `wf inbox` lists it, starts the card as `<name>.md` does — and a path under the inbox that names no card is refused by name, never started as a brief whose text is the path or the file", async (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  const { card, file } = addToInbox({ text: 'Cache the views between passes', workflow: 'dev', repo });
+  const other = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
+  const before = runsWritten();
+  const starting = (...argv: string[]) => main(['start', ...argv], NO_ENGINE);
+
+  // A name with no card, typed without its .md: refused, where it used to start a run asked to do its own path.
+  await assert.rejects(starting(path.join(INBOX, 'cache-the-views'), '--repo', repo),
+    refusedWith(new RegExp(`^no card cache-the-views in the inbox\\. Its cards are: ${escaped([card.name, other.card.name].sort().join(', '))}\\. Start one of those`)));
+  // A file in the inbox that is not a card, and one in a folder inside it: refused, not read as a brief.
+  fs.writeFileSync(path.join(INBOX, 'notes.txt'), 'Refactor everything.\n');
+  await assert.rejects(starting(path.join(INBOX, 'notes.txt'), '--workflows', 'dev', '--repo', repo), refusedWith(/^no card notes\.txt in the inbox\./));
+  fs.mkdirSync(path.join(INBOX, 'drafts'));
+  fs.writeFileSync(path.join(INBOX, 'drafts', 'idea.md'), 'Refactor everything.\n');
+  await assert.rejects(starting(path.join(INBOX, 'drafts', 'idea.md'), '--workflows', 'dev', '--repo', repo), refusedWith(/^`drafts\/idea` is not a card's name: a name stays in the inbox, with no slash/));
+  assert.equal(runsWritten(), before, 'no run written');
+
+  const printed = await printedBy(t, 'start', path.join(INBOX, card.name));
+  const run = readRun(printed[0]!.split(' ')[0]!);
+  assert.deepEqual([run.brief, run.workflowDir, run.from], ['Cache the views between passes', path.join(repo, 'workflows', 'dev'), { inbox: card.name }]);
+  assert.equal(printed[1], `from inbox card ${card.name} — removed from the inbox`);
+  assert.equal(fs.existsSync(file), false, 'the card left the inbox');
+  assert.ok(fs.existsSync(other.file), 'and the other card is where it was');
+});
+
+test("`wf inbox add <file>` writes a path in the file's own `workflow:` absolute against the file's folder, so the card starts on the workflow the file meant — not on the store's workflow of that name, read from the inbox", async (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  // The trap: a workflow of the same name in the store, which `../workflows/dev` names when read from the inbox.
+  const theStores = path.join(ROOT, 'workflows', 'dev');
+  fs.mkdirSync(theStores, { recursive: true });
+  fs.writeFileSync(path.join(theStores, 'implement.md'), 'the store\'s own\n');
+  fs.mkdirSync(path.join(repo, 'plans'));
+  const idea = path.join(repo, 'plans', 'idea.md');
+  fs.writeFileSync(idea, `---\nworkflow: ../workflows/dev\nrepo: ${repo}\n---\nCache the views between passes\n`);
+  try {
+    await printedBy(t, 'inbox', 'add', idea);
+    const [filed] = inInbox();
+    assert.equal(fs.readFileSync(path.join(INBOX, filed!), 'utf8'), `---\nworkflow: ${path.join(repo, 'workflows', 'dev')}\nrepo: ${repo}\n---\nCache the views between passes\n`);
+    const run = readRun((await printedBy(t, 'start', path.join(INBOX, filed!)))[0]!.split(' ')[0]!);
+    assert.equal(run.workflowDir, path.join(repo, 'workflows', 'dev'));
+    assert.equal(fs.readFileSync(idea, 'utf8').includes('workflow: ../workflows/dev'), true, 'the file given is left as it was');
+  } finally {
+    fs.rmSync(path.join(ROOT, 'workflows'), { recursive: true, force: true });
+  }
 });
 
 test("a start says what the card does not, over what it does: --workflows over `workflow:`, --repo over `repo:`, the caller's repository without either, --brief in place of the body, and --after to wait on", async (t) => {

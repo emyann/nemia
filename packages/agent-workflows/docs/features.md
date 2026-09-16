@@ -1485,8 +1485,8 @@ What was built:
   load. `inboxLines` words the list.
 - **`wf inbox add "<idea>"` or `<file>`** files a card through `addToInbox`, which writes what `ideaCard` returns. The card is named by
   `runId` of its first line, suffix included, and written `wx`, so a taken name is drawn again. `--workflow` and `--repo` write the keys
-  over a file's own. The CLI makes a repo, and a workflow given as a path, absolute. A file whose frontmatter is an inbox card's gives its
-  keys; any other text is the body whole. The card written is parsed back before it is written, so nothing lands in the inbox that
+  over a file's own. A file whose frontmatter is an inbox card's gives its keys; any other text is the body whole. A repo, and a workflow
+  given as a path, are written absolute (`workflowAt`): the flag's from where it is typed, a file's own `workflow:` from the file's folder. The card written is parsed back before it is written, so nothing lands in the inbox that
   `wf inbox` would list as refused.
 - **`wf inbox rm <name>`** drops a card through `dropFromInbox`. A name with no card exits 0 and names the cards there are (`noCardLine`).
   The request lists this among the refusals, but also says a name with no card is normal. The more specific sentence was kept, as
@@ -1494,16 +1494,26 @@ What was built:
 - **Starting a card.** `startFromInbox` in `runner.ts` is the one function the CLI calls and the board will call. It takes the card's name,
   a brief to replace the body, the workflow (the given one, else the card's `workflow:`, else refused naming the repository's workflows),
   the repository (the given one, else `repo:`, else the caller's), and `after`, `isolate` and `inputs`. It calls `start()`, which now
-  takes `from` and writes `from: { inbox: <name> }` on the record. Then it removes the card. `wf start <inbox>/<name>.md` goes through it,
-  recognised by `inboxNameAt` (links resolved, then `inboxNameOf`, pure), with `--brief "<brief>"` as text or a file. `wf decide` prints
+  takes `from` and writes `from: { inbox: <name> }` on the record. Then it removes the card. `wf start` on any path under the inbox goes
+  through it — `<inbox>/<name>.md`, or `<inbox>/<name>` as `wf inbox` lists it — recognised by `inboxNameAt` (links resolved, then
+  `inboxNameOf`, pure), with `--brief "<brief>"` as text or a file. `wf decide` prints
   `from inbox card <name>` under the run's line (`fromNote`). A card's `workflow:` is found from the inbox folder, as a plan card's is
   from its plan folder.
 - **One refusal the request did not name:** a card that a record already names. That card's removal failed after its run was written.
   Started again, it would run the idea twice, so the start is refused, naming the run and `wf inbox rm`.
+- **From review, round 2**, three findings, each fixed:
+  - `wf start <inbox>/<name>`, the name copied from `wf inbox`, was not a card's path: only `<name>.md` was. No file of that name exists,
+    so the path's text became the brief of a run that was written, and the card stayed. Every path under the inbox now goes to the
+    start, and one that names no card — a name not there, a file that is not a card, one in a folder inside the inbox — is refused by name.
+  - `wf inbox add <file>` copied a relative `workflow:` as written, and the start read it from the inbox. `../workflows/dev` in
+    `<repo>/plans/idea.md` then named the store's `workflows/dev`, used silently if it existed. It is now written absolute against the
+    file's folder, as the flag's is against where it is typed.
+  - `after:`'s refusal for a file `wf inbox add` is given built `wf start <inbox>/./ideas/d.md`, a command naming no card. It now says
+    to delete the line, file the idea, and give `--after` when starting the card.
 
 What was measured:
 
-- `test/inbox.test.ts` (10 tests, pure):
+- `test/inbox.test.ts` (11 tests, pure):
   - the card with each key and neither, saved on Windows, and a comment-only frontmatter over a body that opens with a rule;
   - every refusal of a card: an unknown key, `after:`, a key set to nothing or twice, a relative `repo:`, one naming no directory, an
     empty body, and a frontmatter that never closes;
@@ -1512,10 +1522,17 @@ What was measured:
   - the name refusals: `../runs/r-1`, `..`, `.`, a slash, a backslash, a NUL, a hidden name and an empty one;
   - `ideaCard`: keys from a file, flags over them, text taken whole, and a refusal for an empty idea, a key on two lines or given empty,
     and a relative or missing repo;
-  - `inboxNameOf` for seven paths, the no-workflow and already-started refusals, and `fromNote`.
-- `test/inbox-store.test.ts` (8 tests, a temporary `WF_ROOT`, through `main`):
+  - `inboxNameOf` for every path under the inbox (with `.md`, without, a file that is not a card, a folder inside it) and for seven outside
+    it or the inbox itself; `workflowAt`, and `ideaCard` writing a file's relative `workflow:` absolute against its folder — a name, an
+    absolute path and the flag's left as given; the no-workflow and already-started refusals, and `fromNote`.
+- `test/inbox-store.test.ts` (10 tests, a temporary `WF_ROOT`, through `main`):
   - `wf inbox` on no folder;
-  - `add` of text, of text with flags, of a file with the flag over its key, and by the function with a workflow path;
+  - `add` of text, of text with flags, of a file with the flag over its key, by the function with a workflow path, and of text with
+    `--workflow` given as a relative path, written absolute;
+  - `add` of `<repo>/plans/idea.md` with `workflow: ../workflows/dev`, while the store has a `workflows/dev` of its own: the card names
+    the repository's, and the run starts on it;
+  - `wf start <inbox>/<name>` without `.md` starts the card and leaves the other; a name with no card, `<inbox>/notes.txt` and
+    `<inbox>/drafts/idea.md` are refused by name, and no run is written;
   - `wf inbox` listing started, refused, stray, hidden and README entries;
   - `rm`, including a name with no card and one given with `.md`;
   - the CLI's refusals for add and rm. A `../runs/…` name is refused, and the record it would reach is still there;
@@ -1540,9 +1557,12 @@ What was measured:
   - the card removed before the record: 2; never removed: 2; `from` not on the record: 3; the card's `repo:` ignored: 4; its
     `workflow:` over the flag: 1; an empty brief taken: 1; the brief ignored: 1; `--brief` on any start: 1;
   - `wf decide` naming no card: 1; `started as` not composed: 4; a stray entry hidden: 3.
+  - round 2's: only `<inbox>/<name>.md` a card's path, as before: 2; a path outside the inbox taken as a card's: 9; a file's
+    `workflow:` path not written absolute: 2; the CLI giving no folder for a file: 1; the flag's path left relative: 1; a bare name
+    resolved as a path: 2; the filing `after:` refusal naming the given path: 2.
 - The verbs were run by hand in a scratch `WF_ROOT` on this repository: add twice, list, a start refused for no workflow, a start with
   `--brief`, the list after, `rm` of a name with no card, and `wf decide`'s head. The README shows that output.
-- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 424 (423 passed,
+- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 427 (426 passed,
   1 skipped), api 137 and web 174. Typecheck was clean in all four.
 
 What it leaves:
@@ -1563,14 +1583,15 @@ What it leaves:
 The exports that run should call, from `agent-workflows` (`src/runner.ts`) unless noted:
 
 - `readInbox(): InboxListing[]` lists the inbox, `started as` included.
-- `addToInbox({ text, from?, workflow?, repo? }): { card: InboxCard; file: string }` files a card. `repo` must be absolute. `from` is
-  what a refusal calls the idea.
+- `addToInbox({ text, from?, dir?, workflow?, repo? }): { card: InboxCard; file: string }` files a card. `repo` must be absolute, and
+  `workflow` a name or an absolute path: `workflowAt(given, dir)` makes one. `from` is what a refusal calls the idea; `dir` is the folder
+  a relative `workflow:` inside `text` is read from, and without it such a path is written as it is.
 - `dropFromInbox(name): InboxDropped` drops one. It returns `{ removed: true, file }`, or `{ removed: false, cards }` for a name with no
   card: a 404, worded by `noCardLine(name, cards)`.
 - `startFromInbox(opts: InboxStart): InboxStarted` starts one. Pass the workflow folder the api's own `folderOf` found as `workflow`,
   absolute; the board's repository as `callerRepo`; and `brief` and `after` from the body. `removed: false` carries `why`.
 - `inboxNameRefusal(name)` refuses a name in the route before anything is read.
-- `inboxDir()`, `fromNote(run)` for the run page, `INBOX_KEYS`, `parseInboxCard`, and the types `InboxCard`, `InboxListing`, `InboxStart`,
+- `inboxDir()`, `workflowAt`, `fromNote(run)` for the run page, `INBOX_KEYS`, `parseInboxCard`, and the types `InboxCard`, `InboxListing`, `InboxStart`,
   `InboxStarted` and `InboxDropped`.
 - From `agent-workflows/run`: `Run.from`, `{ inbox: string }` or absent.
 - Refusals in the card's or the start's words throw with `exitCode` 2. `start()`'s own refusals, for `--after` and `--input`, do too. A git

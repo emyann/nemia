@@ -68,11 +68,25 @@ export function parseInboxCard(file: string, text: string, isDirectory: (at: str
   };
 }
 
-/** An inbox card's frontmatter as key → value: `workflow:` and `repo:`, each at most once, to something; any other key refused by name. */
-function inboxKeys(file: string, block: string): Partial<Record<(typeof INBOX_KEYS)[number], string>> {
+/**
+ * An inbox card's frontmatter as key → value: `workflow:` and `repo:`, each at most once, to something; any other key refused by name.
+ * `filing` is true for a file `wf inbox add` is given, which is not a card yet: `after:`'s refusal then says to file it before the start that
+ * gives the wait, since `file` is where the idea is now, and no card's path.
+ */
+function inboxKeys(file: string, block: string, filing = false): Partial<Record<(typeof INBOX_KEYS)[number], string>> {
   return frontmatterKeys(file, block, INBOX_KEYS, (key) => (key === 'after'
-    ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — wf start <inbox>/${file} --after <runId>. Delete the line.`
+    ? filing
+      ? `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known. Delete the line and file the idea, then give the wait when you start the card wf inbox add names: wf start <inbox>/<name>.md --after <runId>.`
+      : `${file}: \`after\` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — wf start <inbox>/${file} --after <runId>. Delete the line.`
     : `${file}: \`${key}\` is not a key an inbox card has. An inbox card's keys are: ${INBOX_KEYS.join(', ')}, each optional — what runs it, and the repository it is about; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`));
+}
+
+/**
+ * A card's workflow as the card writes it: a path — one with a slash, or `.` or `..` — absolute against `dir`, where it was written from, so
+ * it names the same folder from the inbox; a bare name as it is, a workflow the repository has, found at start. `dir` is absolute.
+ */
+export function workflowAt(given: string, dir: string): string {
+  return /[\\/]/.test(given) || given === '.' || given === '..' ? path.resolve(dir, given) : given;
 }
 
 /**
@@ -157,8 +171,12 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
  * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line `workflow:` or `repo:`, or an
  * `after:`, which is refused by name — gives its keys and its body; any other text is the body whole, as `wf start` takes a brief that is not
  * a card. `workflow` and `repo`, when given, are written over the text's own. Refused too: text with nothing in it.
+ *
+ * `dir` is the folder a `workflow:` of the text's own that is a path was written from — the file's, as a plan card's is its plan folder —
+ * and such a path is written absolute against it (`workflowAt`). Left relative, the start would read it from the inbox, and
+ * `../workflows/dev` would name a workflow of the store's rather than the one beside the file. Without `dir`, it is written as it is.
  */
-export function ideaCard(from: string, text: string, given: { workflow?: string; repo?: string }, isDirectory: (at: string) => boolean): { text: string; body: string } {
+export function ideaCard(from: string, text: string, given: { workflow?: string; repo?: string }, isDirectory: (at: string) => boolean, dir?: string): { text: string; body: string } {
   if (!text.trim()) {
     refuse(`wf inbox add takes the idea, and ${from} has nothing in it. Give it as text — wf inbox add "<idea>" — or as a file: wf inbox add ./idea.md. Nothing was filed.`);
   }
@@ -173,8 +191,9 @@ export function ideaCard(from: string, text: string, given: { workflow?: string;
   const isCardLine = (line: string) => line.indexOf(':') > 0 && ([...INBOX_KEYS, 'after'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
   if (split && lines.length && lines.every(isCardLine)) {
     // Its keys, to be written over; whether what they say holds is asked of the card written, below.
-    keys = inboxKeys(from, split.block!);
+    keys = inboxKeys(from, split.block!, true);
     body = split.body;
+    if (keys.workflow !== undefined && dir !== undefined) keys.workflow = workflowAt(keys.workflow, dir);
   }
   const workflow = given.workflow ?? keys.workflow;
   const repo = given.repo ?? keys.repo;
@@ -187,12 +206,18 @@ export function ideaCard(from: string, text: string, given: { workflow?: string;
 }
 
 /**
- * The name of the inbox card `at` is — a path to `<dir>/<name>.md`, directly in the inbox `dir` — or null for any other path: what makes
- * `wf start <path>` start a card out of the inbox. Both paths are taken as given; runner.ts resolves links first. Whether the card is there
- * is `startFromInbox`'s to say, so a card already started, or mistyped, is refused by name rather than taken as a brief.
+ * The name of the inbox card `at` names — a path under the inbox `dir`, as its path from there, less a trailing `.md`, so `<dir>/<name>` is
+ * the card `wf inbox` lists as `<name>` — or null for a path outside it, and for the inbox itself: what makes `wf start <path>` start a card
+ * out of the inbox. Both paths are taken as given; runner.ts resolves links first.
+ *
+ * Every path under the inbox goes to the start, never to a brief: whether the card is there, and whether the name is a card's — a folder
+ * inside the inbox gives one with a slash — is `startFromInbox`'s to say, by name. Taken as a brief, a card's name typed without its `.md`
+ * would start a run asked to do its own path, and leave the card where it was.
  */
 export function inboxNameOf(at: string, dir: string): string | null {
-  return path.dirname(at) === dir && at.endsWith('.md') ? path.basename(at).slice(0, -'.md'.length) : null;
+  const rel = path.relative(dir, at);
+  if (!rel || path.isAbsolute(rel) || rel === '..' || rel.startsWith(`..${path.sep}`)) return null;
+  return rel.endsWith('.md') ? rel.slice(0, -'.md'.length) : rel;
 }
 
 /**

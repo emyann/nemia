@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ideaCard, INBOX_KEYS, inboxLines, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, type InboxListing } from '../src/inbox.ts';
+import { ideaCard, INBOX_KEYS, inboxLines, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, workflowAt, type InboxListing } from '../src/inbox.ts';
 import { fromNote } from '../src/run.ts';
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
@@ -123,13 +123,30 @@ test("`ideaCard`: a note is the body; a file whose frontmatter is an inbox card'
   assert.equal(ideaCard('the idea', '---\nA note that opens with a rule.\n', {}, isDirectory).body, '---\nA note that opens with a rule.');
 });
 
+test("`ideaCard` writes a file's own `workflow:` that is a path absolute against the file's folder — as a plan card's is read from its plan folder — and leaves a name a name, an absolute path as it is, and a flag's over it", () => {
+  const plans = '/home/me/code/app/plans';
+  const filed = (workflow: string, given: { workflow?: string } = {}, dir: string | null = plans) =>
+    parseInboxCard('x-ab12.md', ideaCard('./plans/idea.md', `---\nworkflow: ${workflow}\n---\nCache the views.\n`, given, isDirectory, dir ?? undefined).text, isDirectory).workflow;
+  assert.equal(filed('../workflows/dev'), '/home/me/code/app/workflows/dev', 'not the store\'s workflows/dev, read from the inbox');
+  assert.equal(filed('./flows/ui'), '/home/me/code/app/plans/flows/ui');
+  assert.equal(filed('..'), '/home/me/code/app');
+  assert.equal(filed('dev'), 'dev', 'a name is the repository\'s, found at start');
+  assert.equal(filed('/srv/workflows/dev'), '/srv/workflows/dev');
+  assert.equal(filed('../workflows/dev', { workflow: '/home/me/mine' }), '/home/me/mine', 'the flag over it, as the CLI resolved it');
+  assert.equal(filed('../workflows/dev', {}, null), '../workflows/dev', 'with no folder given, as written');
+  assert.deepEqual(['dev', '../workflows/dev', 'flows/ui', '.', '/abs/dev'].map((w) => workflowAt(w, '/home/me/code/app/plans')),
+    ['dev', '/home/me/code/app/workflows/dev', '/home/me/code/app/plans/flows/ui', '/home/me/code/app/plans', '/abs/dev']);
+});
+
 test("REFUSED by name at shipped defaults: `wf inbox add` with nothing in the idea, a file whose card has `after:` or a key it does not have, a workflow or repo given empty or on two lines, and a repo that is not an absolute directory", () => {
   for (const text of ['', '   ', '\n\n']) {
     assert.throws(() => ideaCard('the idea', text, {}, isDirectory),
       refusedWith(/^wf inbox add takes the idea, and the idea has nothing in it\. Give it as text — wf inbox add "<idea>" — or as a file: wf inbox add \.\/idea\.md\. Nothing was filed\.$/));
   }
   assert.throws(() => ideaCard('./empty.md', '---\nworkflow: dev\n---\n', {}, isDirectory), refusedWith(/^\.\/empty\.md: the body is empty\./));
-  assert.throws(() => ideaCard('./d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', {}, isDirectory), refusedWith(/^\.\/d\.md: `after` is not a key an inbox card has:/));
+  // Not a card yet, so the refusal names no card's path: file the idea, then give the wait at start.
+  assert.throws(() => ideaCard('./ideas/d.md', '---\nworkflow: dev\nafter: b, c\n---\nShow the flag.\n', {}, isDirectory),
+    refusedWith(/^\.\/ideas\/d\.md: `after` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known\. Delete the line and file the idea, then give the wait when you start the card wf inbox add names: wf start <inbox>\/<name>\.md --after <runId>\.$/));
   assert.throws(() => ideaCard('./d.md', '---\nworkflow: dev\nrepo: /home/me/code/app\nrepo: /home/me/code/app\n---\nx\n', {}, isDirectory), refusedWith(/^\.\/d\.md: `repo` is set twice/));
   assert.throws(() => ideaCard('the idea', 'x', { workflow: '' }, isDirectory), refusedWith(/^the idea: `workflow` has no value\./));
   assert.throws(() => ideaCard('the idea', 'x', { repo: ' ' }, isDirectory), refusedWith(/^the idea: `repo` has no value\./));
@@ -140,12 +157,16 @@ test("REFUSED by name at shipped defaults: `wf inbox add` with nothing in the id
   assert.throws(() => ideaCard('the idea', 'x', { repo: '/home/me/code/app\r\n---' }, isDirectory), refusedWith(/^the idea: the repo given, .* is more than one line/));
 });
 
-test('`inboxNameOf`: a path to `<inbox>/<name>.md`, directly in the inbox, is that card — any other path is not, a card of a plan and a folder inside the inbox included', () => {
+test('`inboxNameOf`: every path under the inbox names a card — `<inbox>/<name>.md`, and `<inbox>/<name>` as `wf inbox` lists it — for the start to refuse by name when it is not one; a path outside the inbox, and the inbox itself, names none', () => {
   const inbox = '/home/me/.agent-workflows/inbox';
   assert.equal(inboxNameOf(`${inbox}/cache-the-views-k2q9.md`, inbox), 'cache-the-views-k2q9');
+  assert.equal(inboxNameOf(`${inbox}/cache-the-views-k2q9`, inbox), 'cache-the-views-k2q9', 'the name wf inbox lists, typed after the folder');
   assert.equal(inboxNameOf(`${inbox}/gone-a1b2.md`, inbox), 'gone-a1b2', 'whether it is there is the start\'s to say');
-  assert.equal(inboxNameOf(`${inbox}/.md`, inbox), '', 'and whether it is a name, the start\'s too');
-  for (const at of [`${inbox}/drafts/idea.md`, `${inbox}/notes.txt`, inbox, '/home/me/plans/q3/a.md', '/home/me/.agent-workflows/inbox-old/idea.md', '/home/me/.agent-workflows/idea.md']) {
+  assert.equal(inboxNameOf(`${inbox}/notes.txt`, inbox), 'notes.txt', 'and whether it is a card');
+  assert.equal(inboxNameOf(`${inbox}/drafts/idea.md`, inbox), 'drafts/idea', 'and whether it is a name');
+  assert.equal(inboxNameOf(`${inbox}/.md`, inbox), '');
+  assert.equal(inboxNameOf(`${inbox}/..hidden.md`, inbox), '..hidden');
+  for (const at of [inbox, `${inbox}/`, '/home/me/plans/q3/a.md', '/home/me/.agent-workflows/inbox-old/idea.md', '/home/me/.agent-workflows/idea.md', `${inbox}/../runs/r-1.json`, '/']) {
     assert.equal(inboxNameOf(at, inbox), null, at);
   }
 });

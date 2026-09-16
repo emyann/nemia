@@ -22,7 +22,7 @@ export type { CloseoutAsked, ParentCloseout, ParentRun, ParentStep, Raise, Retry
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, workflowsIn, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
-export { INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard } from './inbox.ts';
+export { INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, workflowAt } from './inbox.ts';
 export type { InboxCard, InboxListing } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, type InboxCard, type InboxListing } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
@@ -908,11 +908,12 @@ export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRu
 
 /**
  * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
- * alike are two cards. `text` is a note, or a file's text; `from` is what a refusal calls it. `workflow` and `repo` are written as the card's
- * keys: `repo` an absolute path to a directory, `workflow` a name or a path, as `wf start --workflows` would be given it.
+ * alike are two cards. `text` is a note, or a file's text; `from` is what a refusal calls it; `dir` is the folder a path in the text's own
+ * `workflow:` is read from — the file's — and it is written absolute (`ideaCard`). `workflow` and `repo` are written as the card's keys, over
+ * the text's own: `repo` an absolute path to a directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
  */
-export function addToInbox(opts: { text: string; from?: string; workflow?: string; repo?: string }): { card: InboxCard; file: string } {
-  const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory);
+export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): { card: InboxCard; file: string } {
+  const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory, opts.dir);
   fs.mkdirSync(inboxDir(), { recursive: true });
   for (;;) {
     const name = runId(body.split('\n')[0]!);
@@ -949,8 +950,9 @@ export function dropFromInbox(name: string): InboxDropped {
 }
 
 /**
- * The name of the inbox card `given` is a path to — `<inbox>/<name>.md`, links resolved on the way to both — or null for any other path, and
- * for text: what makes `wf start <path>` go through `startFromInbox`. A card not there is still a card's path, refused by name at start.
+ * The name of the inbox card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on the
+ * way to both (`inboxNameOf`) — or null for a path outside it, and for text: what makes `wf start <path>` go through `startFromInbox`. A card
+ * not there is still a card's path, refused by name at start.
  */
 export function inboxNameAt(given: string): string | null {
   const real = (at: string): string => { try { return fs.realpathSync(at); } catch { return at; } };

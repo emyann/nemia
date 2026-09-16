@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -24,6 +24,14 @@ const HELP = `wf — run a workflow of agent steps
   wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>;
                                what each step's tries and the run have cost, where measured
   wf cancel <runId>            stop what it has in flight; file nothing more
+  wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
+                               forget runs that are over, a line each: a run's worktrees removed
+                               through git, what one held uncommitted committed first, then its
+                               record and every file under WF_ROOT keyed by its id. Refused while
+                               a task of it is in flight, anything is due to be filed or asked
+                               for, or a run waiting on it has not started. Its branches are kept:
+                               --delete-branches deletes those merged into the run's base branch,
+                               and --force-unmerged beside it the others, with their work
   wf decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (wf decide --help)
   wf retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"] [--budget <amount>]
@@ -236,6 +244,26 @@ function planHow(argv: string[]): { repo?: string } {
   return { repo: values['--repo']?.[0] };
 }
 
+/**
+ * `wf rm`'s arguments: the runs to forget, each once, and its two switches. Refused before any run is read: a flag it does not take, and
+ * `--force-unmerged` without `--delete-branches` — it forces what that flag deletes, and alone would delete nothing, silently.
+ */
+function rmHow(argv: string[]): { ids: string[]; how: ForgetHow } {
+  const ids: string[] = [];
+  const how: ForgetHow = {};
+  for (const arg of argv) {
+    if (arg === '--delete-branches') how.deleteBranches = true;
+    else if (arg === '--force-unmerged') how.forceUnmerged = true;
+    else if (arg.startsWith('-')) usage(`wf rm does not take ${arg}. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]].`);
+    else if (!ids.includes(arg)) ids.push(arg);
+  }
+  if (how.forceUnmerged && !how.deleteBranches) {
+    usage('--force-unmerged forces --delete-branches to delete a branch not merged into its run\'s base branch, and alone deletes nothing: wf rm <runId> --delete-branches --force-unmerged.');
+  }
+  if (!ids.length && argv.length) usage('wf rm takes the runs to forget, by id: wf rm <runId> [<runId> ...] — wf ls lists them.');
+  return { ids, how };
+}
+
 /** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
 const RETRY_FLAGS: readonly string[] = ['--nudge', '--fresh', '--recheck', '--model', '--message', '--budget'];
 
@@ -420,6 +448,30 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       console.log(plan.kind === 'already-cancelled' ? `${run.id}  already cancelled at ${plan.at}` : `${run.id}  cancelled`);
       if (plan.stop.length) console.log(`   asked to stop: ${plan.stop.map((s) => s.name).join(', ')}  (the engine stops it on its next tick)`);
       else if (plan.kind === 'cancel') console.log(`   nothing was in flight — no further steps will be filed`);
+      return;
+    }
+
+    // Forgetting a run that is over: never cancelling one. Each run is judged on its own and gets its line, a refusal included; a run not
+    // forgotten makes the verb fail once every run has had its say, so a script sees it.
+    case 'rm': {
+      const { ids, how } = rmHow(rest);
+      if (!ids.length) return console.log(HELP);
+      const notForgotten: string[] = [];
+      let failed = false;
+      for (const id of ids) {
+        try {
+          const forgot = await forget(e, id, how);
+          console.log(forgetLine(forgot));
+          if (forgot.kind === 'refused' || forgot.kind === 'held') notForgotten.push(id);
+        } catch (err) {
+          console.log(`${id}  not forgotten: ${(err as Error).message}`);
+          notForgotten.push(id);
+          if ((err as { exitCode?: number }).exitCode !== 2) failed = true;
+        }
+      }
+      if (notForgotten.length) {
+        throw Object.assign(new Error(`wf rm: ${notForgotten.join(', ')} not forgotten — its line above says why, and what to do.`), { exitCode: failed ? 1 : 2 });
+      }
       return;
     }
 

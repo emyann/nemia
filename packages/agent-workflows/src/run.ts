@@ -1522,6 +1522,17 @@ export function cancelPlan(
  */
 export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
 
+/**
+ * Why `wf rm` will not take this as a run's id — or null. Pure, and asked before anything is read. A run's id names files and directories
+ * under `WF_ROOT` (`runs/<id>`, `worktrees/<id>`), so only a name is taken: letters, digits, dots, dashes and underscores, starting with a
+ * letter or a digit. Anything else — `..`, a path, an empty id — would name a directory that is not the run's, and removing it could take
+ * the store with it.
+ */
+export function idRefusal(id: string): string | null {
+  if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) return null;
+  return `${JSON.stringify(id)} is not a run's id, and wf rm removes what is under WF_ROOT by id: give the id wf ls prints, as in wf rm add-a-flag-x1y2.`;
+}
+
 /** An ask as `wf rm` names it: a try (`retry`) or a round (`round`), of which step, and its number — what `askAt` finds its file by. */
 export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
 
@@ -1731,8 +1742,11 @@ export type Forgot = {
   handedOff: Array<{ step: string; branch?: string; commit: string }>;
   /** Worktrees whose directory was already gone. */
   gone: string[];
-  /** What is still there: locked (with git's reason), refused by git (in its words), or a directory git does not know as a worktree. */
-  left: Array<{ path: string; locked?: string; git?: string; unknown?: true }>;
+  /**
+   * What is still there: locked (with git's reason), refused by git (in its words), a directory git does not know as a worktree — or, for a
+   * run with no record, its worktrees' directory, which nothing says whose worktrees are in.
+   */
+  left: Array<{ path: string; locked?: string; git?: string; unknown?: true; orphaned?: true }>;
   branches: BranchFate[];
   /** What was removed besides the worktrees, from `WF_ROOT`: the record first. */
   files: string[];
@@ -1745,7 +1759,7 @@ export function forgetLine(f: Forgot): string {
   const them = (n: number) => (n > 1 ? 'them' : 'it');
   if (f.kind === 'refused') return `${f.id}  not forgotten: ${f.refusal}`;
   const files = f.files.length ? `removed ${f.files.join(', ')}` : '';
-  if (f.kind === 'missing') return `${f.id}  no such run — ${files ? `nothing to forget but what was left under its id: ${files}` : 'nothing to forget'}${leftWords(f)}`;
+  if (f.kind === 'missing') return `${f.id}  no such run — ${files ? `nothing to forget but what was left under its id: ${files}` : 'nothing to forget'}${f.left.length ? `;${leftWords(f)}` : ''}`;
 
   const worktrees = [
     f.removed.length ? `removed ${f.removed.length} worktree${f.removed.length > 1 ? 's' : ''}` : '',
@@ -1779,6 +1793,8 @@ function leftWords(f: Forgot): string {
     ? ` ${l.path} is locked${l.locked ? ` (${l.locked})` : ''}, and git will not remove it — unlock it if nothing needs it: git -C ${f.repo} worktree unlock ${l.path}`
     : l.git !== undefined
       ? ` git would not remove ${l.path} — ${l.git}`
+      : l.orphaned
+      ? ` ${l.path} is still there, and with no record wf rm cannot say whose worktrees are in it — git worktree list in their repository, and git worktree remove each`
       : ` ${l.path} is not a worktree git knows, and wf rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted`)).join(';');
 }
 

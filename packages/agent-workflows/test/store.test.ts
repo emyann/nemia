@@ -6,7 +6,7 @@
  * its mind. `wf cancel` is meant to be typed while `wf up` is running — that is the whole point of
  * the verb — so "what happens when they overlap" is a property worth pinning down.
  */
-import { test } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, list, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan, stepsOf } = await import('../src/runner.ts');
+const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, forget, forgetLine: forgetLineOf, list, listRuns, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan, stepsOf } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -2805,4 +2805,274 @@ test("a nudge past a budget is told why its last try ended on its own work — h
   const brief = tasks.get(`${implement}-try2`)!.spec.brief;
   assert.match(brief, /^## Try 2\n\nThe last try ended without the closeout the run asked for, or without a field its `output:` declares, so nothing that waits on this step started\.\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\nA person asked for this try: `wf retry --nudge --budget 10`/);
   assert.doesNotMatch(brief, /The last try ended `over budget`/);
+});
+
+// ─── forgetting a run: `wf rm` ──────────────────────────────────────────────
+
+/** A repository whose `.gitignore` names what a worktree is given and what a check leaves: not work, and never committed. */
+const anIgnoringRepo = (): string => {
+  const repo = aRepo();
+  fs.writeFileSync(path.join(repo, '.gitignore'), 'node_modules\n.e2e/\n');
+  gitIn(repo, 'add', '-A');
+  gitIn(repo, 'commit', '-q', '-m', 'ignore');
+  return repo;
+};
+const worktreesOf = (repo: string) => gitIn(repo, 'worktree', 'list', '--porcelain').split('\n').filter((l) => l.startsWith('worktree ')).map((l) => l.slice('worktree '.length));
+const hasBranch = (repo: string, branch: string) => gitIn(repo, 'branch', '--list', branch) !== '';
+const under = (...parts: string[]) => fs.existsSync(path.join(ROOT, ...parts));
+/** `wf rm`, through the CLI, as a person types it: the lines it printed, and the error it ended with, if it did. */
+const rmTyped = async (t: TestContext, e: Engine, ...args: string[]) => {
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...a: unknown[]) => { printed.push(a.join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  try {
+    await main(['rm', ...args], e);
+    return { printed, error: undefined };
+  } catch (err) {
+    return { printed, error: err as Error & { exitCode?: number } };
+  } finally {
+    log.mock.restore();
+  }
+};
+
+test("`wf rm` forgets a run that is over, at shipped defaults: its worktree removed through git, which lists it no more — what the failed step left uncommitted committed on its branch first, what git ignores not, and nothing a link in it leads to touched — then the record and every file under its id; its branch kept, and said so; the engine's board untouched; a second `wf rm` says there is no such run, and exits 0", async (t) => {
+  const repo = anIgnoringRepo();
+  const b = board();
+  const run = start({ brief: 'add a flag', repo, workflowDir: folder() });
+  await advance(b.e, readRun(run.id));
+  const wt = readRun(run.id).steps.implement!.workspace!;
+  assert.equal(wt, path.join(ROOT, 'worktrees', run.id, 'implement'));
+  b.settle(`${run.id}-implement`, 'failed');
+  await advance(b.e, readRun(run.id));   // the pass that hands the failed step off: nothing to commit yet
+
+  // Written after the last pass: work, ignored files, and a link out of the worktree to something that must survive.
+  fs.writeFileSync(path.join(wt, 'fix.ts'), 'export const fixed = true;\n');
+  const outside = fs.mkdtempSync(path.join(ROOT, 'outside-'));
+  fs.writeFileSync(path.join(outside, 'precious.txt'), 'keep me\n');
+  fs.mkdirSync(path.join(wt, 'node_modules'));
+  fs.symlinkSync(outside, path.join(wt, 'node_modules', 'linked'));
+  fs.mkdirSync(path.join(wt, '.e2e'));
+  fs.writeFileSync(path.join(wt, '.e2e', 'shot.png'), 'png');
+  // Its files, keyed by its id — and another run's check log, whose id starts with this one's.
+  fs.writeFileSync(path.join(ROOT, 'runs', run.id, 'artifacts', 'implement', 'report.md'), 'report\n');
+  fs.mkdirSync(path.join(ROOT, 'checks'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'checks', `${run.id}-implement-check.stderr`), 'boom\n');
+  fs.writeFileSync(path.join(ROOT, 'checks', `${run.id}-x2-implement-check.stderr`), 'not mine\n');
+  writeRun(aRun(`${run.id}-x2`, { implement: { taskId: `${run.id}-x2-implement` } }));
+  fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'done'), { recursive: true });
+  const filings = [...b.filings];
+
+  const { printed, error } = await rmTyped(t, b.e, run.id);
+  assert.equal(error, undefined);
+  const branch = `wf/${run.id}/implement`;
+  const commit = gitIn(repo, 'rev-parse', branch);
+  assert.deepEqual(printed, [
+    `${run.id}  forgotten: removed 1 worktree, committed what implement left uncommitted on ${branch} as ${commit.slice(0, 7)}; `
+    + `removed runs/${run.id}.json, runs/${run.id}.asks/, runs/${run.id}/, checks/${run.id}-implement-check.stderr, worktrees/${run.id}/; `
+    + `kept ${branch} — branches are kept unless asked: --delete-branches deletes those merged into ${run.branch}`,
+  ]);
+
+  assert.ok(!worktreesOf(repo).includes(wt), 'git lists the worktree no more');
+  assert.ok(!fs.existsSync(wt) && !under('worktrees', run.id));
+  assert.equal(gitIn(repo, 'log', '-1', '--format=%s', branch), 'implement: hand off what was left uncommitted, before its run was forgotten');
+  assert.deepEqual(gitIn(repo, 'show', '--name-only', '--format=', branch).split('\n'), ['fix.ts'], 'the work, and nothing git ignores');
+  assert.equal(fs.readFileSync(path.join(outside, 'precious.txt'), 'utf8'), 'keep me\n', 'a link in node_modules is not followed');
+  for (const gone of [[`${run.id}.json`], [run.id], [`${run.id}.asks`]]) assert.ok(!under('runs', ...gone), `runs/${gone.join('/')} removed`);
+  assert.ok(!under('checks', `${run.id}-implement-check.stderr`));
+  assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "another run's check log is left");
+  assert.deepEqual([b.filings, b.stopped, b.tasks.has(`${run.id}-implement`)], [filings, [], true], "the engine's board is the engine's");
+  assert.throws(() => readRun(run.id), (err: Error) => /^no such run: /.test(err.message));
+
+  const again = await rmTyped(t, b.e, run.id);
+  assert.deepEqual([again.printed, again.error], [[`${run.id}  no such run — nothing to forget`], undefined]);
+  assert.ok(under('checks', `${run.id}-x2-implement-check.stderr`), "with no record, still not another stored run's");
+  fs.rmSync(path.join(ROOT, 'runs', `${run.id}-x2.json`));
+});
+
+test('REFUSED at shipped defaults: `wf rm` on a run with a step in flight, one whose next step is ready, one with an unspent ask, and one another run waits on — each named on its line with what to do, nothing of it removed, exit 2 — while a run beside them in the same `wf rm` is forgotten', async (t) => {
+  const repo = aRepo();
+  const b = board();
+  const running = start({ brief: 'still running', repo, workflowDir: folder() });
+  await advance(b.e, readRun(running.id));
+  const ready = start({ brief: 'review is ready', repo, workflowDir: folder() });
+  await advance(b.e, readRun(ready.id));
+  b.settle(`${ready.id}-implement`, 'succeeded', SIGNED);
+  const asked = start({ brief: 'a try asked for', repo, workflowDir: folder() });
+  await advance(b.e, readRun(asked.id));
+  b.settle(`${asked.id}-implement`, 'succeeded');   // no closeout: unsigned, and waiting on a person
+  await retry(b.e, asked.id, 'implement', { mode: 'nudge' });
+  const parent = await aParent(repo, b, { work: 'parent.txt' });
+  const child = start({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] });
+  const over = await aParent(repo, b, { work: 'over.txt' });
+
+  const { printed, error } = await rmTyped(t, b.e, running.id, ready.id, asked.id, parent.run.id, over.run.id);
+  assert.equal(error?.exitCode, 2);
+  assert.equal(error?.message, `wf rm: ${running.id}, ${ready.id}, ${asked.id}, ${parent.run.id} not forgotten — its line above says why, and what to do.`);
+  assert.deepEqual(printed.slice(0, 4), [
+    `${running.id}  not forgotten: implement is pending. Forgetting is not cancelling: wf cancel ${running.id} stops what is in flight and files nothing more, then wf rm ${running.id} once what was in flight has settled (wf ls ${running.id}).`,
+    `${ready.id}  not forgotten: review is ready to be filed, and a pass may be filing it now. Forgetting is not cancelling: wf cancel ${ready.id} files nothing more, then wf rm ${ready.id}.`,
+    `${asked.id}  not forgotten: try 2 of implement is due (wf retry --nudge), and a pass may be filing it now. Forgetting is not cancelling: wf cancel ${asked.id} files nothing more, then wf rm ${asked.id}.`,
+    `${parent.run.id}  not forgotten: ${child.id} waits on it and has not started: forgotten, it would read waiting on ${parent.run.id} (no such run) for ever. Let it start first, on the pass after wf decide says ${parent.run.id} has shipped, or call it off: wf cancel ${child.id}.`,
+  ]);
+  assert.match(printed[4]!, new RegExp(`^${escaped(over.run.id)}  forgotten: removed 1 worktree; `));
+  for (const id of [running.id, ready.id, asked.id, parent.run.id]) {
+    assert.ok(under('runs', `${id}.json`) && under('worktrees', id, 'implement'), `${id}: record and worktree kept`);
+  }
+  assert.ok(under('runs', `${asked.id}.asks`, 'retry-implement-2'), 'and the ask');
+  assert.deepEqual(b.stopped, [], 'nothing stopped: cancelling is its own verb');
+
+  // A person cancels: what is in flight is stopped by a tick, and the run is forgotten once it has settled — not before.
+  await cancel(b.e, running.id);
+  assert.match((await forget(b.e, running.id)).refusal!, /^implement is pending\. It was cancelled at .*, and a tick stops what is in flight: wf rm .* once it has settled/);
+  b.settle(`${running.id}-implement`, 'stopped');
+  assert.equal((await forget(b.e, running.id)).kind, 'forgotten');
+  // A cancelled run files nothing and honours no ask; a child called off strands nothing.
+  await cancel(b.e, ready.id);
+  await cancel(b.e, asked.id);
+  await cancel(b.e, child.id);
+  for (const id of [ready.id, asked.id, parent.run.id]) assert.equal((await forget(b.e, id)).kind, 'forgotten', id);
+  assert.ok(!under('runs', `${asked.id}.asks`) && !under('runs', `${asked.id}.cancelled`), 'its ask and its cancellation go with it');
+});
+
+test("REFUSED at shipped defaults: a locked worktree — git will not remove it, and neither does `wf rm`: the run is held, its record, files and branch kept, exit 2, with the command that unlocks it; unlocked, `wf rm` again finishes. A directory in the run's own that git does not know is held the same way", async (t) => {
+  const repo = aRepo();
+  const b = board();
+  const locked = await aParent(repo, b, { work: 'locked.txt' });
+  gitIn(repo, 'worktree', 'lock', '--reason', 'a person holds it', locked.wt);
+  markCancelled(locked.run.id);
+
+  const held = await rmTyped(t, b.e, locked.run.id);
+  assert.equal(held.error?.exitCode, 2);
+  assert.deepEqual(held.printed, [
+    `${locked.run.id}  not forgotten: ${locked.wt} is locked (a person holds it), and git will not remove it — unlock it if nothing needs it: git -C ${repo} worktree unlock ${locked.wt}. Its record, files and branches are kept until every worktree is gone: wf rm ${locked.run.id} again then.`,
+  ]);
+  assert.ok(fs.existsSync(path.join(locked.wt, 'locked.txt')) && worktreesOf(repo).includes(locked.wt));
+  assert.ok(readRun(locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
+
+  gitIn(repo, 'worktree', 'unlock', locked.wt);
+  assert.equal((await forget(b.e, locked.run.id)).kind, 'forgotten');
+  assert.ok(!worktreesOf(repo).includes(locked.wt) && !under('runs', `${locked.run.id}.cancelled`) && hasBranch(repo, locked.branch));
+
+  // Something in the run's directory that git does not list: never deleted behind git's back.
+  const stray = await aParent(repo, b, { work: 'stray.txt' });
+  const odd = path.join(ROOT, 'worktrees', stray.run.id, 'notes');
+  fs.mkdirSync(odd);
+  fs.writeFileSync(path.join(odd, 'mine.txt'), 'mine\n');
+  const f = await forget(b.e, stray.run.id);
+  assert.equal(forgetLineOf(f), `${stray.run.id}  not forgotten: ${odd} is not a worktree git knows, and wf rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted; removed 1 worktree. Its record, files and branches are kept until every worktree is gone: wf rm ${stray.run.id} again then.`);
+  assert.ok(fs.existsSync(path.join(odd, 'mine.txt')) && under('runs', `${stray.run.id}.json`));
+  fs.rmSync(odd, { recursive: true });
+  const finished = await forget(b.e, stray.run.id);
+  assert.deepEqual([finished.kind, finished.removed, finished.gone], ['forgotten', [], [stray.wt]], 'its worktree was already gone, and that is normal');
+});
+
+test("`wf rm --delete-branches` deletes a branch merged into its run's base and keeps one that is not, saying why; `--force-unmerged` beside it deletes that one too; the base branch a `--no-worktree` run worked on is never touched — and the CLI refuses `--force-unmerged` alone, a flag it does not take, and an id that is not a name, before anything is read", async (t) => {
+  const repo = aRepo();
+  const b = board();
+  const merged = await aParent(repo, b, { work: 'merged.txt' });
+  gitIn(repo, 'merge', '-q', '--no-ff', '-m', 'Merge it', merged.branch);
+  const unmerged = await aParent(repo, b, { work: 'unmerged.txt' });
+  const forced = await aParent(repo, b, { work: 'forced.txt' });
+  const base = merged.run.branch;
+
+  const one = await rmTyped(t, b.e, merged.run.id, unmerged.run.id, '--delete-branches');
+  assert.equal(one.error, undefined);
+  assert.match(one.printed[0]!, new RegExp(`; deleted ${escaped(merged.branch)} \\(merged into ${base}\\)$`));
+  assert.match(one.printed[1]!, new RegExp(`; kept ${escaped(unmerged.branch)}: not merged into ${base} — --force-unmerged deletes it, and the work on it$`));
+  assert.deepEqual([hasBranch(repo, merged.branch), hasBranch(repo, unmerged.branch)], [false, true]);
+
+  const two = await rmTyped(t, b.e, forced.run.id, '--force-unmerged', '--delete-branches');
+  assert.match(two.printed[0]!, new RegExp(`; deleted ${escaped(forced.branch)} \\(not merged into ${base}, forced\\)$`));
+  assert.equal(hasBranch(repo, forced.branch), false);
+
+  const direct = start({ brief: 'on the base itself', repo, workflowDir: oneStep(), isolate: false });
+  await advance(b.e, readRun(direct.id));
+  b.settle(`${direct.id}-implement`, 'succeeded', SIGNED);
+  const three = await rmTyped(t, b.e, direct.id, '--delete-branches', '--force-unmerged');
+  assert.deepEqual(three.printed, [`${direct.id}  forgotten: no worktrees, it worked in ${repo} itself; removed runs/${direct.id}.json, runs/${direct.id}/; no branch of its own`]);
+  assert.ok(hasBranch(repo, base) && fs.existsSync(path.join(repo, '.git')), 'the base branch and the repository are where they were');
+
+  const kept = await aParent(repo, b, { work: 'kept.txt' });
+  const refused = async (args: string[], pattern: RegExp) => {
+    const { printed, error } = await rmTyped(t, b.e, ...args);
+    assert.equal(error?.exitCode, 2, args.join(' '));
+    assert.match(error!.message, pattern);
+    assert.deepEqual(printed, [], 'refused before any run is read');
+    assert.ok(under('runs', `${kept.run.id}.json`) && hasBranch(repo, kept.branch));
+  };
+  await refused([kept.run.id, '--force-unmerged'], /^--force-unmerged forces --delete-branches to delete a branch not merged into its run's base branch, and alone deletes nothing: /);
+  await refused([kept.run.id, '--force'], /^wf rm does not take --force\. It takes the runs to forget, then --delete-branches, and --force-unmerged beside it: /);
+  await refused(['--delete-branches'], /^wf rm takes the runs to forget, by id: /);
+
+  // An id that is not a name names a directory that is not the run's: `..` is the store itself.
+  for (const id of ['..', '.', 'runs/../..', '']) {
+    const { printed, error } = await rmTyped(t, b.e, id);
+    assert.equal(error?.exitCode, 2, JSON.stringify(id));
+    assert.deepEqual(printed, [`${id}  not forgotten: ${JSON.stringify(id)} is not a run's id, and wf rm removes what is under WF_ROOT by id: give the id wf ls prints, as in wf rm add-a-flag-x1y2.`]);
+    assert.ok(under('runs', `${kept.run.id}.json`) && under('worktrees', kept.run.id, 'implement'), 'the store is where it was');
+  }
+});
+
+test("REFUSED at shipped defaults: a pass that read a run before `wf rm` forgot it writes nothing back — the record stays gone — and a pass that reaches a run's asks as they are removed does not make their directory again; a record gone between the store's listing and its read is no run, and no failure", async (t) => {
+  const repo = aRepo();
+  const b = board();
+  const p = await aParent(repo, b, { work: 'done.txt' });
+  // The pass after it finished records its branch's tip, and writes the record: held on the engine, after it has read the run.
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const slow = { ...b.e, view: async (id: string) => { await gate; return b.e.view(id); } } as Engine;
+  const pass = advance(slow, readRun(p.run.id));
+  assert.equal((await forget(b.e, p.run.id)).kind, 'forgotten');
+  release();
+  const after = await pass;
+  assert.equal(after.status, 'succeeded');
+  assert.ok(after.run.tips, 'the pass had tips to write');
+  assert.ok(!under('runs', `${p.run.id}.json`), 'and did not write them into a record it made again');
+  assert.deepEqual(listRuns().filter((r) => r.id === p.run.id), []);
+
+  // A spent ask, still in the directory: the pass moves it into `done/`, and `wf rm` removes the directory as it does.
+  const q = await aParent(repo, b, { work: 'asked.txt' });
+  const asks = path.join(ROOT, 'runs', `${q.run.id}.asks`);
+  fs.mkdirSync(asks);
+  fs.writeFileSync(path.join(asks, 'retry-implement-1'), JSON.stringify({ step: 'implement', try: 1, mode: 'nudge', at: '2026-09-16T00:00:00.000Z' }));
+  const mkdir = fs.mkdirSync;
+  t.mock.method(fs, 'mkdirSync', (at: string, ...rest: unknown[]) => {
+    if (String(at).startsWith(asks)) fs.rmSync(asks, { recursive: true, force: true });   // removed, as the pass reaches it
+    return (mkdir as (...a: unknown[]) => unknown)(at, ...rest);
+  });
+  await advance(b.e, readRun(q.run.id));
+  (fs.mkdirSync as unknown as { mock: { restore: () => void } }).mock.restore();
+  assert.ok(!fs.existsSync(asks), 'no asks directory made again');
+
+  // Listed, then gone before it is read: a dangling link reads as exactly that.
+  const vanished = path.join(ROOT, 'runs', 'vanished-a1b2.json');
+  fs.symlinkSync(path.join(ROOT, 'nowhere.json'), vanished);
+  try {
+    assert.ok(listRuns().length > 0);
+    assert.ok(!listRuns().some((r) => r.id === 'vanished-a1b2'));
+  } finally {
+    fs.rmSync(vanished);
+  }
+});
+
+test("a run whose tasks the engine no longer knows is forgotten; so is a record from before runs froze their workflow whose folder is gone — which every pass, `wf ls` and `wf decide` read and died on — and the line says so; a run with no record is `no such run`, and what was left under its id is removed and named", async (t) => {
+  const { e } = recording();   // a board that has never heard of anything
+  const legacyDir = fs.mkdtempSync(path.join(ROOT, 'legacy-'));
+  fs.writeFileSync(path.join(legacyDir, 'implement.md'), 'implement it\n');
+  const legacy = { ...aRun('legacy-run-9z9z', { implement: { taskId: 'legacy-run-9z9z-implement' } }), workflowDir: legacyDir };
+  writeRun(legacy);
+  assert.equal(stepsOf(readRun(legacy.id)).length, 1, 'read from the folder, since the record froze nothing');
+  fs.rmSync(legacyDir, { recursive: true });
+  assert.throws(() => stepsOf(readRun(legacy.id)), (err: Error) => /^no workflow folder at /.test(err.message));
+
+  const { printed, error } = await rmTyped(t, e, legacy.id);
+  assert.equal(error, undefined);
+  assert.deepEqual(printed, [`${legacy.id}  forgotten: no worktrees, it worked in /repo itself; removed runs/${legacy.id}.json; no branch of its own; its workflow was never frozen, and no workflow folder at ${legacyDir}`]);
+
+  // No record, and files left under the id: a cancellation typed as it went, an asks directory.
+  fs.writeFileSync(path.join(ROOT, 'runs', 'gone-run-3c4d.cancelled'), '2026-09-16T00:00:00.000Z');
+  fs.mkdirSync(path.join(ROOT, 'runs', 'gone-run-3c4d.asks', 'done'), { recursive: true });
+  const leftover = await rmTyped(t, e, 'gone-run-3c4d');
+  assert.deepEqual([leftover.printed, leftover.error], [['gone-run-3c4d  no such run — nothing to forget but what was left under its id: removed runs/gone-run-3c4d.cancelled, runs/gone-run-3c4d.asks/'], undefined]);
+  assert.ok(!under('runs', 'gone-run-3c4d.asks') && !under('runs', 'gone-run-3c4d.cancelled'));
 });

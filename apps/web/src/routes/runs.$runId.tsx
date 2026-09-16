@@ -85,6 +85,12 @@ function Run({ run }: { run: RunDetail }) {
 
       <section className="space-y-4">
         <div className="whitespace-pre-wrap leading-relaxed">{run.brief}</div>
+        {/* Under the brief, as `wf decide` puts it under the run's line: the inbox card it was started from. */}
+        {run.fromNote && (
+          <p data-from={run.from?.inbox} className="text-sm text-neutral-500">
+            {run.fromNote}
+          </p>
+        )}
         <Facts
           rows={[
             ['repo', code(run.repo)],

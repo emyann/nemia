@@ -192,6 +192,10 @@ export type RunDetail = {
   cancelledAt: string | null;
   /** As on `RunSummary`. */
   after: string[];
+  /** The inbox card the run was started from, as its record carries it; absent for a run started without one. */
+  from?: { inbox: string };
+  /** Where it came from, in `wf decide`'s words (`fromNote` in agent-workflows): absent with `from`. */
+  fromNote?: string;
   waiting: RunWaiting | null;
   status: RunStatus;
   moving: boolean;

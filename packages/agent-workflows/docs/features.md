@@ -1693,7 +1693,9 @@ What was measured:
 
 What it leaves:
 
-- **The run's page does not say a run came from a card.** `fromNote` exists, but `RunDetail` does not carry `from`. `wf decide` says it.
+- **Only the run's page says a run came from a card.** `RunDetail` carries the record's `from` and `fromNote`'s sentence, which the page
+  shows under the brief, as `wf decide` prints it under the run's line (three small items, 2026-09-16). The Runs list and the Factory's card
+  do not, as `wf ls` does not.
 - **The board lists the api's repository's workflows alone.** A card about another repository that names its workflow by name presets
   nothing. The page names that repository and offers `wf start`, which finds the workflow there. A workflow picked from the list runs its
   folder on the card's `repo:`.

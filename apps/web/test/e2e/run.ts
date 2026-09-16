@@ -378,6 +378,7 @@ const PAGES: PageSpec[] = [
         page.locator(`article header a[href="/workflows"][data-workflow="${FAKE.workflow}"]`),
         `the run's header names its workflow (${FAKE.workflow}), linked to the Workflows page`,
       );
+      await expectCount(page.locator('[data-from]'), 0, 'a run started with no card says it came from none');
       const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
       await expectCount(graph.locator('.react-flow__node'), FAKE.steps.length, `the run's graph has a node per step (${FAKE.steps.join(', ')})`);
       for (const step of FAKE.steps) await expectVisible(graph.locator(`.react-flow__node[data-id="${step}"]`), `the graph has ${step}`);
@@ -1384,6 +1385,10 @@ const PAGES: PageSpec[] = [
         if (removed !== true) throw new Refused(`the api says the card left the inbox — it answered removed: ${removed}`);
         await starting.waitForURL(`**/runs/${id}`, { timeout: WAIT_MS });
         await expectVisible(starting.locator('h1', { hasText: id }), `the start opens the run's page (${id})`);
+        await expectVisible(
+          starting.locator(`[data-from="${planned.name}"]`, { hasText: new RegExp(`^from inbox card ${planned.name}$`) }),
+          `and the run's page says, under the brief, the card it came from, as wf decide does (from inbox card ${planned.name})`,
+        );
         const record = JSON.parse(fs.readFileSync(path.join(runsDir, `${id}.json`), 'utf8')) as { from?: { inbox?: string }; brief?: string; workflowDir?: string; repo?: string };
         const expected = { from: { inbox: planned.name }, brief: STARTED, workflowDir: path.join(checkout, 'workflows', WORKFLOWS.good.name), repo: checkout };
         const got = { from: record.from, brief: record.brief, workflowDir: record.workflowDir, repo: record.repo };

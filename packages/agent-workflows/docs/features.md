@@ -1950,6 +1950,38 @@ the packages renders a step back to markdown.
 
 About one package run and one or two `dev-build` runs; the second if the inspector's form is its own piece of work.
 
+## 5. Markdown rendered on the board, and a card's page with its keys explained
+
+**Registered** 2026-09-16, by the operator: the board shows every piece of prose as preformatted text, and a person
+should be able to open a card and read it rendered, with its frontmatter keys laid out — a way to learn what the engine
+does from the thing itself.
+
+**What exists.** `apps/web` has shiki for code (`components/ai-elements/code-block.tsx`) and no markdown renderer;
+prose is `whitespace-pre` in a dozen components (`Closeout`, `Decide`, `Needs`, `StartRun`, the run page, the Workflows
+page, the inbox page, the conversation's `Turns`). The api hands the page a run's `brief`, a closeout's `summary` and
+replies, a step's `body`, a folder's `description` and a card's `body`, all markdown as the agents and the folders
+write it. The package's keys are closed lists with a table of what each count means (`STEP_KEYS`, `COUNTS` in
+`workflow.ts`; `INBOX_KEYS` in `inbox.ts`), and the README explains each key in prose.
+
+**What it needs.**
+
+- **One renderer**, `react-markdown` with `remark-gfm` (tables, task lists), raw HTML left unrendered as it is by
+  default — the text is agents' and folders', not the board's — links opening in a new tab, code blocks through the
+  shiki component already there, and one `Markdown` component with the board's typography in both themes. A second
+  dependency only if it replaces more code than it adds.
+- **Where it renders:** a run's brief; a closeout's summary and each reply; a step's body on the Workflows page and
+  the step's page; a card's body; the conversation's assistant turns; a blocked step's needs. `wf decide`'s screen
+  stays as the CLI prints it.
+- **A card's page**, `/inbox/<name>`: the body rendered, then its keys as a table — each key, its value, and one line of
+  what it means — and a source toggle showing the file as written, frontmatter included. The same page for a workflow's
+  step, from its block on the Workflows page. The one-line meanings come from the package, a small exported table per
+  key beside `STEP_KEYS` and `INBOX_KEYS`, so the board and the README say the same thing; the apps run may add that
+  table and nothing else in the package.
+- **e2e:** a card with headings, a list, a table and a code block in the seed; the card's page and a step's page in
+  both themes; nothing written.
+
+One `dev-build` run.
+
 ## Engine-side work
 
 Not agent-workflows features, listed so nothing is lost:

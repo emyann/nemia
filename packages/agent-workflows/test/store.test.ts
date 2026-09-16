@@ -2934,6 +2934,22 @@ test('REFUSED at shipped defaults: `wf rm` on a run with a step in flight, one w
   assert.ok(!under('runs', `${asked.id}.asks`) && !under('runs', `${asked.id}.cancelled`), 'its ask and its cancellation go with it');
 });
 
+test('REFUSED at shipped defaults: a check a pass filed and died before writing down is in flight too — on a cancelled run, which files nothing, it is what holds `wf rm` until it settles', async () => {
+  const run = start({ brief: 'a check nobody wrote down', repo: aRepo(), workflowDir: folder('check: npm test') });
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  b.settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await b.e.file({ id: `${run.id}-implement-check`, brief: 'npm test', cwd: '/', harness: 'check' } as never);   // filed; the record never says so
+  const at = markCancelled(run.id);
+  assert.equal(readRun(run.id).steps.implement!.check, undefined);
+
+  const held = await forget(b.e, run.id);
+  assert.equal(held.refusal, `implement's check is pending. It was cancelled at ${at}, and a tick stops what is in flight: wf rm ${run.id} once it has settled (wf ls ${run.id}).`);
+  assert.ok(under('runs', `${run.id}.json`) && under('worktrees', run.id, 'implement'));
+  b.settle(`${run.id}-implement-check`, 'stopped');
+  assert.equal((await forget(b.e, run.id)).kind, 'forgotten');
+});
+
 test("REFUSED at shipped defaults: a locked worktree — git will not remove it, and neither does `wf rm`: the run is held, its record, files and branch kept, exit 2, with the command that unlocks it; unlocked, `wf rm` again finishes. A directory in the run's own that git does not know is held the same way", async (t) => {
   const repo = aRepo();
   const b = board();

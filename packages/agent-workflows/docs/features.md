@@ -18,7 +18,7 @@ prompt box: the steering channel's upper half), and six small items — `radius`
 in the order they run, `wf start --input`, artifacts collected from the workspace, a stale ask honoured, and `wf start` on a card
 file (§6 items 6–9, 24, 25) — and a step gone quiet without its closeout reading `unsigned` again after the engine began
 settling it `failed` — and a step's `budget:`, with what a step and a run cost on `wf ls` and `wf decide` (plan §6 item 29, its
-workflow half) — and an inbox of cards parked before they are started (`wf inbox`, its package half) — have shipped.
+workflow half) — and an inbox of cards parked before they are started (`wf inbox`, and its page on the board) — have shipped.
 
 ## Shipped: the check
 
@@ -1578,7 +1578,8 @@ What it leaves:
 - **`wf ls` does not say a run came from the inbox.** Only `wf decide` does.
 - **`bin/wf.ts` exits 1 on every refusal**, whatever `exitCode` it carries. This was here before the inbox, and was not changed. The tests
   read `exitCode` off what `main` throws.
-- **The board has no inbox.** The next run, `the-inbox-on-the-board-a-pag-ryny`, gives the api its routes and the board its page.
+- **The board had no inbox.** The next run, `the-inbox-on-the-board-a-pag-ryny`, gave the api its routes and the board its page: *The board
+  half*, below.
 
 The exports that run should call, from `agent-workflows` (`src/runner.ts`) unless noted:
 
@@ -1596,6 +1597,97 @@ The exports that run should call, from `agent-workflows` (`src/runner.ts`) unles
 - From `agent-workflows/run`: `Run.from`, `{ inbox: string }` or absent.
 - Refusals in the card's or the start's words throw with `exitCode` 2. `start()`'s own refusals, for `--after` and `--input`, do too. A git
   failure has none.
+
+### The board half
+
+An idea is had where the project is looked at, so the inbox got a page of the board's own. Whether its cards belong on the Factory canvas is
+left for later. Read first: the apps/web lines of CLAUDE.md, the exports above, and `POST /api/runs`, `folderOf` and `guard.ts` in apps/api.
+
+What was built:
+
+- **`GET /api/inbox`** (`apps/api/src/inbox.ts`) lists `readInbox()` as it is, read from disk on each request. Each entry also carries `body`,
+  parsed again from its file with `parseInboxCard`, since the listing has only the first line and a start's brief is prefilled with the whole
+  body. It carries `filedAt` too, the file's mtime, since a card has no time of its own and the page orders cards newest first.
+- **`POST /api/inbox`** takes `{ "body", "workflow"?, "from"?, "repo"? }` and files through `addToInbox`. The request named `body`, `workflow`
+  and `repo`. `from` was added beside `workflow`, as a start takes it, for a name both the repository and yours have. `workflow` must be a
+  name, found among the api's folders with `folderOf` (404, 409): a card filed from the board never names a path that was sent. It is written
+  by name when it is the repository's and the card is about the api's repository. Otherwise it is written as the absolute folder `folderOf`
+  found: a name on a card is looked for under the card's repository at start, where yours is not, so `wf start <card>` from a terminal would
+  refuse it. The package's refusals are 422s, word for word. The body's shape is the api's own, 400.
+- **`DELETE /api/inbox/:name`** drops through `dropFromInbox`. `inboxNameRefusal` is a 400 before anything is read, and a card that is not
+  there is a 404 worded by `noCardLine`.
+- **Both writes pass the guard** (`refusedBeforeReading`), with guard words of their own. `guard.ts` now counts six writes. A drop sends no
+  body, but its content type is held to `application/json` all the same, as every guarded write's is.
+- **`POST /api/runs` takes `card`** beside `workflow`, `brief` and `after`, and starts through `startFromInbox`. The workflow is the folder
+  `folderOf` found, the caller's repository is the api's, and the card's `repo:` is over it. With a card, `brief` may be left out, for the body.
+  A blank one is the package's to refuse. `card` is shaped first (400, `inboxNameRefusal` for a name), before any folder is read. The
+  package's refusals (`exitCode` 2) get a status by what is on disk once refused: 404 when the card's file is not there, 409 when a record
+  names the card, 422 for the rest (a card that does not read, a blank brief, `afterRefusal`). The answer is
+  `{ id, card, removed, why? }`: a card whose removal failed started all the same.
+- **The page** (`apps/web/src/routes/inbox.tsx`, Inbox in the sidebar):
+  - a box that files a card: the idea, a workflow among those that read (none by default), and the repository, the api's own
+    (`GET /api/repository`) until a person changes it;
+  - the cards, newest first (`newestCardsFirst`), each with its first line, name, workflow, repository and filing time, and Start and Remove;
+  - a card a record names links to its run and offers Remove only;
+  - an entry that does not read shows its refusal, and offers Remove when it is a `.md`;
+  - an empty inbox says to file an idea in the box, or with `wf inbox add`.
+- **Start** opens the start form: the workflow preset by `presetOf`, the brief prefilled from the body, and `StartRun` with its `AfterPicker`.
+  `presetOf` finds the card's workflow as `workflowFolder` does: a name is the repository's workflow, never yours, and an absolute path is
+  that folder. A start the api took opens the run's page. A card that stayed says why, and the page stays. `StartRun` and `AfterPicker`
+  moved from the Workflows page into `components/StartRun.tsx`, and that page behaves as before. For a card, the picker lists the runs of
+  the card's `repo:`.
+
+What was measured:
+
+- `apps/api/test/inbox.test.ts`, 13 tests: the listing (none, bodies, filing times, a refused entry with no body, `started as`, a card
+  dropped between requests); filing by name, yours by folder, one both have by `from`, one about another repository by folder; every shape
+  refusal; the package's refusals compared with `addToInbox`'s own message; a drop, and a drop's 404 and 400s (a hidden name, and `/` and `\`
+  sent encoded, which the route decodes); the guard on both writes (three content types and none, three sites, three hosts), then the board's
+  own headers taken; a card started with an edited brief, a workflow over the card's, and `after`, with `from` on the record and the card gone;
+  a start with no brief, from the body; a card not there (404, the package's sentence compared with `startFromInbox`'s own), with `.md` too;
+  started already (409), a blank brief, a card that does not read and an `after` that does not exist (422); `card` and `brief` of the wrong
+  type; the guard on a card start, the card kept.
+- Each api guard was broken on purpose and the file rerun. 22 breaks, each failing 1 or 2 tests: either write unguarded; the drop's name not
+  refused in the route; a drop of no card answered 200; a workflow path taken; `from` without a workflow taken; a non-string idea or repo
+  taken; yours written by name; the repository's by folder; another repository's by name; the package's filing refusal as 500; the body not
+  read; the card's name not refused in the route; a non-string card or brief taken; a missing card as 422; a started card as 422; every card
+  refusal 422; and the card start dropping `after`, `brief` or the workflow found.
+- `apps/web/test/inbox.test.ts`, 6 tests: the order, including ties and an unknown time; the preset for a name, a path, and a path with a
+  trailing slash; no preset for none, an unknown name, one that does not read, a name only yours has, relative paths, and `.` and `..`;
+  `fileCard`, `dropCard` and `startRun` with `card`: what is sent, and the api's refusal verbatim. Eight breaks: seven failed a test. The one
+  that did not was the relative-path check in `presetOf`, which was dead code, since no such path is a workflow's name. It was removed.
+- `npm run e2e`, the `inbox` page, in both themes:
+  - the seed writes two cards into the store's `inbox/` (`seedInbox`), one with `workflow:` and `repo:` and one with neither, dated apart;
+  - the page lists both newest first, each by its first line alone, and only the first names a workflow;
+  - a card filed from the box, with a workflow and the prefilled repository, is written as `wf inbox add` writes it, listed first, then
+    removed with its Remove, both through the proxy;
+  - the start form shows the preset workflow, the prefilled brief and the six runs to wait on;
+  - in pages of their own: a card started with an edited brief, which opens the run's page, writes `from`, `brief`, `workflowDir` and `repo`,
+    and removes the card, all taken back; a card a record names, linked, with no Start; an empty inbox; and a start refused because the card was
+    dropped behind the page's back, whose 404 and its console line are all its watch sees, with the sentence beside the form verbatim and no
+    record written;
+  - the pictures (`inbox`, `inbox-start`, `inbox-started-as`, `inbox-empty`, `inbox-refused`, each in both themes) were read. They showed the
+    box's workflow option cut short, and a rule drawn twice in a card's start form. Both were fixed and photographed again. Then, in a browser
+    on a scratch store: a filing refused for a relative repository, and a card filed with `wf inbox add` and started with another workflow,
+    which opened its run and left the inbox.
+- From the root, `npx turbo run test --force && npm run typecheck && npm run build && npm run e2e` exited 0: agent-engine 307 (299 passed,
+  8 skipped), agent-workflows 427 (426 passed, 1 skipped), api 150 and web 180.
+
+What it leaves:
+
+- **The run's page does not say a run came from a card.** `fromNote` exists, but `RunDetail` does not carry `from`. `wf decide` says it.
+- **A card's workflow is preset from the api's own listing.** A card about another repository names a workflow of that repository by name.
+  The page looks for it among the api's repository's workflows: it presets that one, or none, with a note to pick. The start runs the folder
+  picked, on the card's `repo:`.
+- **A card whose workflow is not listed** (a relative path, a folder elsewhere, one that does not read) presets nothing, and the page says so.
+  The board starts only a workflow it lists, as a start from the Workflows page does.
+- **The filing time is the file's mtime.** A card edited by hand moves up the list. The package has no filing time to give.
+- **The listing does not carry the body.** The api reads every card twice a request: once in `readInbox`, once for its body. A card that is
+  gone, or no longer reads, between the two is listed as `readInbox` saw it, with no body.
+- **Two starts of one card at once both start**, as the package half left it. The board's Start is disabled while its request is pending,
+  which covers one page, not two.
+- **Remove asks nothing first.** A card dropped is gone, as with `wf inbox rm`.
+- **The page is not polled.** A card filed or dropped in a terminal shows on the next visit.
 
 ## 1. Forgetting a run (`wf rm`)
 

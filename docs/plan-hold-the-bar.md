@@ -980,7 +980,12 @@ No lint tool: `tsc --noEmit` is the lint until one earns its place.
 Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B8, S3, S4, W5 all done. In flight 2026-09-14: B9 (apps, items 11–15 in one) as
 `five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
 `three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 done, `26ebf0e`; E8 done, `1944644`; W7 done, `60e5606` (three rounds; restarted twice on E8's measurements and once when the
-background daemon was down). B10 done, `b19596a`. **Item 29 is done.** Nothing in flight. Left: items 20 (settings), 27, 28, 30, 31 (all small).
+background daemon was down). B10 done, `b19596a`. **Item 29 is done.** In flight 2026-09-16: `wf rm` (features.md item 1) as
+`forget-a-run-that-is-over-wf-auru` from `./workflows/dev`. When it lands: forget the five `hold-the-bar` runs of 2026-09-13
+with it, then delete `~/.agent-workflows/workflows/hold-the-bar` — their records predate the run freezing its workflow and read
+the folder on every pass; with it renamed away, `wf ls`, `wf decide` and `wf tick` died for every run (measured 2026-09-16).
+The other two home-store folders, `hold-the-bar-checked` and `-build`, were removed the same day: all 25 of their records
+froze the workflow. Left: items 20 (settings), 27, 28, 30, 31 (all small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**

@@ -72,6 +72,12 @@ export type Run = {
    */
   from?: { inbox: string };
   /**
+   * When the cap on runs in flight (`WF_MAX_RUNS`) first held this run, with nothing of it filed: written once, by the pass that held it. What
+   * says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held, and on every record
+   * from before there was a cap.
+   */
+  slotHeldAt?: string;
+  /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (`isShipped` in runner.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished, and on
@@ -250,6 +256,84 @@ export function waitingOn(run: Run, shipped: (runId: string) => boolean): string
  * boundary is the human gate. Pure. True for a run that is not `gated`, without asking.
  */
 export const runReady = (run: Run, shipped: (runId: string) => boolean): boolean => waitingOn(run, shipped).length === 0;
+
+// ─── a cap on runs in flight ────────────────────────────────────────────────
+
+/**
+ * The cap on runs in flight (`WF_MAX_RUNS`), and how many are in flight as a run with nothing filed is judged: every run that has started and
+ * is in flight on the pass (`slotNeed`), then each run with nothing filed admitted before it, oldest first (`admissionOrder`) — serial, as the
+ * engine admits its tasks, so a run admitted on a pass counts for the next one on the same pass. `cap` 0 is no cap.
+ */
+export type RunSlot = { inFlight: number; cap: number };
+
+/**
+ * `WF_MAX_RUNS` as a cap: a whole count, 0 — or unset, or empty — for none, today's behaviour. Refused by name, exit 2, when it is anything
+ * else: read as no cap, a mistyped value would lift the cap it was set to hold.
+ */
+export function runCapOf(value: string | undefined): number {
+  if (value === undefined || !value.trim()) return 0;
+  if (!/^\d+$/.test(value.trim())) {
+    throw Object.assign(new Error(`WF_MAX_RUNS=${value} is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.`), { exitCode: 2 });
+  }
+  return Number(value.trim());
+}
+
+/**
+ * What a run asks of the cap on a pass. Pure.
+ *
+ * `inFlight`: it counts against the cap — a task of it, a step's or a check's, filed and not settled (`inFlight`), or, on a run that has
+ * started and nobody called off, something the pass files (a step ready, a check, try or round due): a run between two steps is still in
+ * flight. A cancelled run counts while the engine is still stopping what it had in flight; one that waits on a person, or has finished, does not.
+ *
+ * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is what
+ * it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
+ */
+export function slotNeed(run: Run, phaseOf: (taskId: string) => TaskPhase, a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round'>, shipped: (runId: string) => boolean): { inFlight: boolean; wants: boolean } {
+  const started = hasStarted(run);
+  const due = a.ready.length + a.check.length + a.retry.length + a.round.length > 0;
+  return {
+    inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
+    wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, shipped),
+  };
+}
+
+/**
+ * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that has
+ * started — the cap holds only a run with nothing filed — and for one judged with no slot, which is `advance` called outside a tick.
+ */
+export const runAdmitted = (run: Run, slot: RunSlot | undefined): boolean => hasStarted(run) || !slot || slot.cap <= 0 || slot.inFlight < slot.cap;
+
+/** Runs in the order a pass admits them: oldest by `createdAt`, then by id. Pure. */
+export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: readonly R[]): R[] =>
+  [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+
+/**
+ * The runs the cap holds, each with the count it was held at, as a pass would judge them from the store as it stands (`slotNeed`): every run
+ * in flight counted, then each that wants a slot admitted oldest first while one is free — and counted — and held once none is. Pure. What
+ * `wf ls` and `wf decide` say between passes; none with no cap.
+ */
+export function heldRuns(runs: ReadonlyArray<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }>, cap: number): Map<string, RunSlot> {
+  const held = new Map<string, RunSlot>();
+  if (cap <= 0) return held;
+  let inFlight = runs.filter((r) => r.inFlight).length;
+  for (const r of admissionOrder(runs.filter((x) => x.wants))) {
+    if (inFlight < cap) inFlight++;
+    else held.set(r.id, { inFlight, cap });
+  }
+  return held;
+}
+
+/** A run the cap holds, as `wf ls` says it on its roots: `waiting for a run slot (2 of 2 in flight)`. */
+export const slotWord = (slot: RunSlot): string => `waiting for a run slot (${slot.inFlight} of ${slot.cap} in flight)`;
+
+/**
+ * The daemon's two ceilings, as `wf up` says them when it starts: sessions per harness (`WF_MAX_CONCURRENT`), with checks in a pool of their
+ * own, and runs in flight (`WF_MAX_RUNS`) — `no cap` when none.
+ */
+export const ceilingLines = (c: { sessions: number; runs: number }): string[] => [
+  `sessions per harness: at most ${c.sessions} at once, checks in a pool of their own (WF_MAX_CONCURRENT)`,
+  `runs in flight: ${c.runs > 0 ? `at most ${c.runs} at once — a run with nothing filed waits for a slot, oldest first` : 'no cap'} (WF_MAX_RUNS)`,
+];
 
 /**
  * A run another waits on, as the tick reads it on the pass that asks (`parentOf` in runner.ts): its record, when the store has one;
@@ -2383,6 +2467,8 @@ export type Listing = {
   waitingOnYou: string[];
   /** The runs this run's roots wait on (`waitsOf`): none once it has started, or on a run nobody has called off. */
   waiting: Wait[];
+  /** The cap on runs in flight holding this run, and the count it is held at (`heldRuns`): absent unless it holds a run with nothing filed. */
+  slot?: RunSlot;
   /**
    * What the run has cost so far, every step's ended tries together (`runSpend`): `$12.40`, and `≥$12.40` where an ended attempt has no cost
    * on it. Absent until a cost was measured. Each step's own is `cost` on its line, beside its word — and in it, for a step at its budget.
@@ -2428,9 +2514,12 @@ export function listing(
   saidTo: (step: string) => number = () => 0,
   /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, with the amounts. */
   spendOf: SpendOf = () => undefined,
+  /** The cap on runs in flight holding this run (`heldRuns`), if it does: what its roots say where `waiting` would be. */
+  slot?: RunSlot,
 ): Listing {
-  // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run.
+  // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run — or for a run slot.
   const waiting = gated(run) ? [...waits] : [];
+  const held = slot && !waiting.length && !hasStarted(run) && !run.cancelledAt ? slot : undefined;
   // The engine's word for a settled task IS its outcome, and `unknown` a task it has no record of, which the tick stops nothing of; any other
   // word is a task still going.
   const settledOf = (taskId: string): TaskPhase => {
@@ -2475,8 +2564,9 @@ export function listing(
     const { name } = step;
     const taskId = run.steps[name]?.taskId;
     const branch = run.steps[name]?.branch ?? null;
-    // A root of a run waiting on runs names them, where the engine's `pending` would be once it is filed: what waits on a root still says `waiting`.
-    if (!taskId) return { name, status: waiting.length && !step.after.length ? waitWord(waiting) : 'waiting', branch };
+    // A root of a run waiting on runs names them, where the engine's `pending` would be once it is filed — and one the cap on runs in flight
+    // holds says so, with the count: what waits on a root still says `waiting`.
+    if (!taskId) return { name, status: step.after.length ? 'waiting' : waiting.length ? waitWord(waiting) : held ? slotWord(held) : 'waiting', branch };
 
     const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
     const status = refiled.has(name) ? own : stands;
@@ -2524,7 +2614,7 @@ export function listing(
   // A run somebody called off is waiting on nobody — `wf decide` says there is nothing to decide —
   // though each step still signed off the way it did, and its line still says so.
   const total = runSpend(run, spendOf);
-  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting, ...(total.measured ? { cost: spentWord(total) } : {}) };
+  return { steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting, ...(held ? { slot: held } : {}), ...(total.measured ? { cost: spentWord(total) } : {}) };
 }
 
 /**
@@ -3085,8 +3175,19 @@ export type TimelineTotal = {
   wall: string;
 };
 
-/** Where a run's time went: every step's tries, in the record's order; a total per round of each loop, by loop — and the run's. */
-export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineTotal[]; run: TimelineTotal };
+/**
+ * A run's wait for a run slot (`WF_MAX_RUNS`), on a run the cap held (`slotHeldAt`): from `createdAt` — or, on a run that waited on runs
+ * (`--after`), from the pass the cap first held it, since the wait before was for those runs — to its first task's filing. `filedAt` is that
+ * filing, null while nothing is filed or when the feed has no filing of it; `ms` the wait, null where it cannot be measured; `queued` the wait
+ * in words: a duration, `still waiting` while nothing is filed, and `not known` where the feed does not say when the first task was filed.
+ */
+export type SlotWait = { from: string; filedAt: string | null; ms: number | null; queued: string };
+
+/**
+ * Where a run's time went: every step's tries, in the record's order; a total per round of each loop, by loop — and the run's, which counts
+ * its wait for a run slot as queued time — and that wait, on a run the cap held (`slot`; null on any other).
+ */
+export type Timeline = { steps: Record<string, TimelineTry[]>; rounds: TimelineTotal[]; run: TimelineTotal; slot: SlotWait | null };
 
 /**
  * Where a run's time went, per try and per check of every step, off the engine's views of their tasks and the run's `tries`. Pure.
@@ -3126,7 +3227,22 @@ export function timeline(run: Run, views: ReadonlyMap<string, TaskClock>, filed:
     return [...new Set(of.map((c) => c.round))].sort((a, b) => a - b)
       .map((round) => totalOf(looping.name, round, of.filter((c) => c.round === round).map((c) => c.span)));
   });
-  return { steps: byStep, rounds, run: totalOf(null, null, counted.map((c) => c.span)) };
+  const slot = slotWaitOf(run, filed);
+  return { steps: byStep, rounds, run: totalOf(null, null, counted.map((c) => c.span), slot), slot };
+}
+
+/** A run's wait for a run slot (`SlotWait`), off its record and the filing times; null on a run the cap never held. */
+function slotWaitOf(run: Run, filed: ReadonlyMap<string, string>): SlotWait | null {
+  if (!run.slotHeldAt) return null;
+  const from = run.after?.length ? run.slotHeldAt : run.createdAt;
+  if (!hasStarted(run)) return { from, filedAt: null, ms: null, queued: 'still waiting' };
+  const tasks = Object.values(run.steps).flatMap((record) => [
+    ...(record.tries ?? []).flatMap((t) => [t.taskId, t.check?.taskId]),
+    record.taskId, record.check?.taskId,
+  ]);
+  const filedAt = tasks.flatMap((id) => (id && filed.has(id) ? [filed.get(id)!] : [])).sort()[0] ?? null;
+  const ms = between(from, filedAt);
+  return { from, filedAt, ms, queued: ms === null ? 'not known' : durationWord(ms) };
 }
 
 const between = (from: string | null, to: string | null): number | null => (from && to ? Math.max(0, Date.parse(to) - Date.parse(from)) : null);
@@ -3155,13 +3271,13 @@ function spanOf(taskId: string, view: TaskClock | undefined, filedAt: string | u
   return { taskId, at, filedAt: filedAt ?? null, spawnedAt, endedAt, attempts: attempts.length, queuedMs, ranMs, queued, ran };
 }
 
-/** Several tasks' time together (`TimelineTotal`). */
-function totalOf(loop: string | null, round: number | null, spans: readonly TaskSpan[]): TimelineTotal {
+/** Several tasks' time together (`TimelineTotal`) — the run's with its wait for a run slot, when the cap held it, counted as queued. */
+function totalOf(loop: string | null, round: number | null, spans: readonly TaskSpan[], slot: SlotWait | null = null): TimelineTotal {
   const inFlight = spans.filter((s) => s.at === 'queued' || s.at === 'starting' || s.at === 'running');
-  const queuedMs = spans.reduce((n, s) => n + (s.queuedMs ?? 0), 0);
+  const queuedMs = spans.reduce((n, s) => n + (s.queuedMs ?? 0), slot?.ms ?? 0);
   const ranMs = spans.reduce((n, s) => n + (s.ranMs ?? 0), 0);
-  const waiting = spans.filter((s) => s.at === 'queued' || s.at === 'starting').length;
-  const queueUnknown = spans.filter((s) => s.queued === 'not known' || s.at === 'unknown').length;
+  const waiting = spans.filter((s) => s.at === 'queued' || s.at === 'starting').length + (slot?.queued === 'still waiting' ? 1 : 0);
+  const queueUnknown = spans.filter((s) => s.queued === 'not known' || s.at === 'unknown').length + (slot?.queued === 'not known' ? 1 : 0);
   const running = spans.filter((s) => s.at === 'running').length;
   const ranUnknown = spans.filter((s) => s.ran === 'not known' || s.at === 'unknown').length;
   const firsts = spans.map((s) => s.filedAt);
@@ -3181,7 +3297,7 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
     queuedMs,
     ranMs,
     wallMs,
-    queued: said(spans.filter((s) => s.queuedMs !== null).length, queuedMs, [waiting, 'waiting'], queueUnknown),
+    queued: said(spans.filter((s) => s.queuedMs !== null).length + (slot?.ms != null ? 1 : 0), queuedMs, [waiting, 'waiting'], queueUnknown),
     ran: said(spans.filter((s) => s.ranMs !== null).length, ranMs, [running, 'still running'], ranUnknown),
     wall: wallMs !== null ? durationWord(wallMs) : inFlight.length ? 'still going' : 'not known',
   };
@@ -3222,14 +3338,15 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
 
 /**
  * A run's totals as `wf decide` prints them, after its steps: each round of each loop that went round — named by its looping step where more
- * than one did — then the run's, every step's.
+ * than one did — then, on a run the cap on runs in flight held, its wait for a run slot, then the run's, every step's, that wait among its queue.
  */
 export function timelineTotalLines(t: Timeline): string[] {
   if (!t.run.tasks) return [];
   const said = (total: TimelineTotal) => `queued ${total.queued}  ran ${total.ran}  wall ${total.wall}`;
   const went = [...new Set(t.rounds.map((r) => r.loop))].filter((loop) => t.rounds.filter((r) => r.loop === loop).length > 1);
   const shown = t.rounds.filter((r) => went.includes(r.loop)).map((r): [string, string] => [`${went.length > 1 ? `${r.loop} ` : ''}round ${r.round}`, said(r)]);
-  return rowsUnder('timeline', [...shown, ['run', said(t.run)]]);
+  const slot: Array<[string, string]> = t.slot ? [['run slot', `queued ${t.slot.queued}`]] : [];
+  return rowsUnder('timeline', [...shown, ...slot, ['run', said(t.run)]]);
 }
 
 /** Rows under a label, the label on the first and the rest aligned under it, each row's name padded to the longest. */

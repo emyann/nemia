@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, addToInbox, dropFromInbox, fromNote, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, ceilingLines, ceilings, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -29,8 +29,9 @@ const HELP = `wf — run a workflow of agent steps
   wf inbox rm <name>           drop a card without starting it
   wf tick                      one pass: tick the engine, file what became ready
   wf up [ms]                   the same, on a timer
-  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>;
-                               what each step's tries and the run have cost, where measured
+  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>,
+                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in
+                               flight); what each step's tries and the run have cost, where measured
   wf cancel <runId>            stop what it has in flight; file nothing more
   wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
                                forget runs that are over, a line each: a run's worktrees removed
@@ -91,7 +92,10 @@ agent is told is prose.
   it on the run's word) · budget exhausted (its harness ended its session at its budget:).
 
   WF_ROOT            where runs and the engine's board live
-  WF_MAX_CONCURRENT  sessions per harness at once (default 2)
+  WF_MAX_CONCURRENT  sessions per harness at once (default 2): each harness counted apart, a check in a
+                     pool of its own, and one run's review competing with another run's implement
+  WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
+                     slot, oldest first; a run waiting on --after counts once it is filed
 
 To follow what the engine is doing, use the engine — a run's task ids carry the run and the step,
 so its output already names the work. Point it at this board:
@@ -501,7 +505,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
         const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
         const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
-        const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : '';
+        const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : r.held ? `  ${slotWord(r.held)}` : '';
         console.log(`${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`);
         for (const note of r.notes) console.log(`   ${note}`);
       }
@@ -511,6 +515,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'up': {
       const every = Number(rest[0]) || 4_000;
       console.log(`up — every ${every}ms, ^C to stop`);
+      // Both ceilings, in words, before the first pass: what the daemon holds work to.
+      for (const line of ceilingLines(ceilings())) console.log(`   ${line}`);
       for (;;) {
         for (const r of await tick(e)) {
           for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
@@ -526,9 +532,11 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'ls': {
       const runs = rest[0] ? [readRun(rest[0])] : listRuns();
       if (!runs.length) return console.log('no runs');
+      // Which runs the cap on runs in flight holds, judged over the whole store: a run is held by the runs beside it.
+      const held = await runSlots(e);
       for (const run of runs) {
         const calledOff = run.cancelledAt ? '  (cancelled)' : '';
-        const { steps, waitingOnYou, waiting, cost } = await list(e, run);
+        const { steps, waitingOnYou, waiting, cost } = await list(e, run, held.get(run.id));
         // What the run has cost so far, on its line, where the engine measured it.
         console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
         // Each step's word, and what its tries have cost beside it: `verified ✓  $3.01`.
@@ -601,7 +609,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, waiting, said, timeline } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, waiting, said, timeline, held } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -612,6 +620,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
       // Nothing of it is filed: the runs it waits on are the whole of what there is to say, and nothing else is offered.
       if (waiting.length) return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}`);
+      // Nor while the cap on runs in flight holds it: the tick files its roots once a run in flight settles.
+      if (held) return console.log(`${head}\n\n  ${slotWord(held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`);
       if (decision.kind === 'running') {
         console.log(`${head}\n\n  still running: ${decision.waiting.join(', ')}`);
         // A try the next tick files is why a run that had stopped is running again: said, with whose word it is.

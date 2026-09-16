@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, roundSpans, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, afterRefusal, answerLines, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -255,6 +255,89 @@ test('a fan-in step is told it is holding merged work, and that conflicts are it
   const brief = composeBrief(merge, run({ a: 't1', b: 't2', integrate: null }), [step('a'), step('b'), merge]);
   assert.match(brief, /work of a and b has been merged/);
   assert.match(brief, /yours to resolve/);
+});
+
+// ─── a cap on runs in flight ────────────────────────────────────────────────
+
+test('REFUSED by name at shipped defaults: `WF_MAX_RUNS` that is not a whole count — a word, a negative, a fraction, a unit — while unset, empty and 0 are no cap', () => {
+  assert.deepEqual([runCapOf(undefined), runCapOf(''), runCapOf('  '), runCapOf('0'), runCapOf('2'), runCapOf(' 3 ')], [0, 0, 0, 0, 2, 3]);
+  for (const value of ['two', '-1', '1.5', '2 runs', '0x2', '1e3']) {
+    assert.throws(() => runCapOf(value), (err: Error & { exitCode?: number }) => err.exitCode === 2
+      && err.message === `WF_MAX_RUNS=${value} is not a count. It is the most runs in flight at once, a whole number: WF_MAX_RUNS=2 — or 0, or unset, for no cap.`, value);
+  }
+});
+
+test('`slotNeed`: a run is in flight while a task of it is filed and not settled, or it has started and a pass files something — between two steps too; a run with nothing filed and a root ready wants a slot, unless it waits on a run or was called off', () => {
+  const need = (r: Run, p: Record<string, TaskPhase>, shipped = true) =>
+    slotNeed(r, phases(p), assess(STEPS, r, phases(p), signedDone, asked), () => shipped);
+  assert.deepEqual(need(run({ implement: 't1', review: null }), { t1: 'pending' }), { inFlight: true, wants: false }, 'filed, waiting for a session');
+  assert.deepEqual(need(run({ implement: 't1', review: null }), { t1: 'running' }), { inFlight: true, wants: false });
+  assert.deepEqual(need(run({ implement: 't1', review: null }), { t1: 'succeeded' }), { inFlight: true, wants: false }, 'between two steps: review is filed on this pass');
+  assert.deepEqual(need(run({ implement: 't1', review: 't2' }), { t1: 'succeeded', t2: 'succeeded' }), { inFlight: false, wants: false }, 'finished');
+  assert.deepEqual(need(run({ implement: 't1', review: null }), { t1: 'failed' }), { inFlight: false, wants: false }, 'waiting on a person');
+  const checked = withCheck('c1');
+  assert.deepEqual(slotNeed(checked, phases({ t1: 'succeeded', c1: 'running' }), assess(CHECKED, checked, phases({ t1: 'succeeded', c1: 'running' }), signedDone, asked), () => true),
+    { inFlight: true, wants: false }, 'a check running');
+  assert.deepEqual(need(run({ implement: 't1', review: null }, CANCELLED), { t1: 'running' }), { inFlight: true, wants: false }, 'cancelled, and still being stopped');
+  assert.deepEqual(need(run({ implement: 't1', review: null }, CANCELLED), { t1: 'stopped' }), { inFlight: false, wants: false }, 'cancelled, and stopped');
+
+  assert.deepEqual(need(run({ implement: null, review: null }), {}), { inFlight: false, wants: true }, 'nothing filed, a root ready');
+  assert.deepEqual(need(run({ implement: null, review: null }, CANCELLED), {}), { inFlight: false, wants: false }, 'called off before its first pass');
+  const waits = run({ implement: null, review: null }, { after: ['a-1x2y'] });
+  assert.deepEqual(need(waits, {}, false), { inFlight: false, wants: false }, 'waiting on a run: it counts once it is filed');
+  assert.deepEqual(need(waits, {}, true), { inFlight: false, wants: true }, 'once that run has shipped');
+});
+
+test('REFUSED at a cap: `runAdmitted` files the roots of a run with nothing filed only while fewer runs are in flight than the cap — never holds a run that has started — and with no cap, or judged outside a tick, admits as before', () => {
+  const fresh = run({ implement: null, review: null });
+  assert.equal(runAdmitted(fresh, { inFlight: 2, cap: 2 }), false, '2 of 2 in flight: held');
+  assert.equal(runAdmitted(fresh, { inFlight: 3, cap: 2 }), false);
+  assert.equal(runAdmitted(fresh, { inFlight: 1, cap: 2 }), true);
+  assert.equal(runAdmitted(fresh, { inFlight: 5, cap: 0 }), true, 'cap 0: no cap');
+  assert.equal(runAdmitted(fresh, undefined), true, 'advance called outside a tick');
+  assert.equal(runAdmitted(run({ implement: 't1', review: null }), { inFlight: 9, cap: 2 }), true, 'a run that has started is never held');
+  assert.equal(runAdmitted(run({ implement: null, review: null }, { steps: { implement: { taskId: null, tries: [{ taskId: 't1', then: 'round' }] }, review: { taskId: null } } }), { inFlight: 2, cap: 2 }), true, 'nor one a round moved behind');
+  assert.equal(slotWord({ inFlight: 2, cap: 2 }), 'waiting for a run slot (2 of 2 in flight)');
+});
+
+test('`heldRuns`: every run in flight counted, then each that wants a slot admitted oldest first and counted for the next, and the rest held at the count — none with no cap, and a run waiting on runs neither counted nor held', () => {
+  const at = (h: number) => `2026-09-16T0${h}:00:00.000Z`;
+  const runs = [
+    { id: 'c-young', createdAt: at(5), inFlight: false, wants: true },
+    { id: 'a-busy', createdAt: at(1), inFlight: true, wants: false },
+    { id: 'b-old', createdAt: at(3), inFlight: false, wants: true },
+    { id: 'b-old-twin', createdAt: at(3), inFlight: false, wants: true },
+    { id: 'z-after', createdAt: at(0), inFlight: false, wants: false },
+    { id: 'y-done', createdAt: at(0), inFlight: false, wants: false },
+  ];
+  assert.deepEqual(admissionOrder(runs).map((r) => r.id), ['y-done', 'z-after', 'a-busy', 'b-old', 'b-old-twin', 'c-young'], 'by createdAt, then id');
+  assert.deepEqual([...heldRuns(runs, 2)], [['b-old-twin', { inFlight: 2, cap: 2 }], ['c-young', { inFlight: 2, cap: 2 }]], 'b-old admitted into the one free slot, and counted');
+  assert.deepEqual([...heldRuns(runs, 1)], [['b-old', { inFlight: 1, cap: 1 }], ['b-old-twin', { inFlight: 1, cap: 1 }], ['c-young', { inFlight: 1, cap: 1 }]]);
+  assert.deepEqual([...heldRuns(runs, 4)], [], 'room for all');
+  assert.deepEqual([...heldRuns(runs, 0)], [], 'no cap');
+});
+
+test("`wf ls` on a run the cap holds: its roots say `waiting for a run slot (2 of 2 in flight)` where `waiting` would be, what waits on a root still says `waiting` — and a run that started, was called off or waits on a run is not said to wait for a slot", () => {
+  const slot = { inFlight: 2, cap: 2 };
+  const fresh = run({ implement: null, review: null });
+  const held = listing(STEPS, fresh, shown({}), () => undefined, asked, () => undefined, [], [], [], [], () => 0, () => undefined, slot);
+  assert.deepEqual([held.steps.map((s) => s.status), held.slot, held.waitingOnYou], [['waiting for a run slot (2 of 2 in flight)', 'waiting'], slot, []]);
+  assert.equal(Object.hasOwn(listing(STEPS, fresh, shown({}), () => undefined, asked).steps[0]!, 'slot'), false);
+  assert.equal(Object.hasOwn(listing(STEPS, fresh, shown({}), () => undefined, asked), 'slot'), false, 'no slot, no key');
+  const started = listing(STEPS, run({ implement: 't1', review: null }), shown({ t1: 'running' }), () => undefined, asked, () => undefined, [], [], [], [], () => 0, () => undefined, slot);
+  assert.deepEqual([started.steps[0]!.status, started.slot], ['running', undefined]);
+  const cancelled = listing(STEPS, run({ implement: null, review: null }, CANCELLED), shown({}), () => undefined, asked, () => undefined, [], [], [], [], () => 0, () => undefined, slot);
+  assert.deepEqual([cancelled.steps[0]!.status, cancelled.slot], ['waiting', undefined]);
+  const waits = listing(STEPS, run({ implement: null, review: null }, { after: ['a-1x2y'] }), shown({}), () => undefined, asked, () => undefined, [], [], [], [{ run: 'a-1x2y' }], () => 0, () => undefined, slot);
+  assert.deepEqual([waits.steps[0]!.status, waits.slot], ['waiting on a-1x2y', undefined]);
+});
+
+test('`wf up` says both ceilings in words: sessions per harness, checks apart, and runs in flight — `no cap` when none', () => {
+  assert.deepEqual(ceilingLines({ sessions: 4, runs: 0 }), [
+    'sessions per harness: at most 4 at once, checks in a pool of their own (WF_MAX_CONCURRENT)',
+    'runs in flight: no cap (WF_MAX_RUNS)',
+  ]);
+  assert.equal(ceilingLines({ sessions: 2, runs: 2 })[1], 'runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)');
 });
 
 test('a run id is readable, and step ids share its prefix', async () => {
@@ -2103,6 +2186,32 @@ test('REFUSED: a queue time the feed cannot give is `not known`, never 0 — and
   const lost = timeline(r, views, B4().filed).steps.implement![1]!.check!;
   assert.deepEqual([lost.at, lost.queued, lost.ran], ['unknown', 'not on the record', 'not on the record']);
   assert.equal(timelineLines(timeline(r, views, B4().filed).steps.implement!).at(-1), '          try 2 check  the engine has no record of c2');
+});
+
+test("a run the cap on runs in flight held counts its wait as queued — `createdAt` to its first filing, or from the pass that held it on a run that waited on runs — and says `still waiting`, or `not known` where the feed does not say; a run the cap never held has no such wait", () => {
+  const { r, views, filed } = B4();
+  // Started at 07:48, held from 07:48:03, first filed at 08:00.
+  const held = { ...r, createdAt: new Date(Date.UTC(2026, 8, 13, 7, 48)).toISOString(), slotHeldAt: new Date(Date.UTC(2026, 8, 13, 7, 48, 3)).toISOString() };
+  const t = timeline(held, views, filed);
+  assert.deepEqual(t.slot, { from: held.createdAt, filedAt: clock(0), ms: 720_000, queued: '12m00s' });
+  // The run's queue is the tasks' 16s and the 12m wait for a slot; the wall is still first filed → last ended.
+  assert.deepEqual([t.run.queuedMs, t.run.queued, t.run.wall], [736_000, '12m16s', '27m37s']);
+  assert.deepEqual(timelineTotalLines(t), [
+    'timeline  run slot  queued 12m00s',
+    '          run       queued 12m16s  ran 27m12s  wall 27m37s',
+  ]);
+  // The wait before it for runs it waited on is not a wait for a slot: counted from when the cap first held it.
+  assert.deepEqual(timeline({ ...held, after: ['a-1x2y'] }, views, filed).slot, { from: held.slotHeldAt, filedAt: clock(0), ms: 717_000, queued: '11m57s' });
+
+  const unknown = timeline(held, views);
+  assert.deepEqual([unknown.slot, unknown.run.queued], [{ from: held.createdAt, filedAt: null, ms: null, queued: 'not known' }, 'not known'], 'no filing on the feed: not known, never 0');
+  assert.equal(timelineTotalLines(unknown)[0], 'timeline  run slot  queued not known');
+  const waiting = timeline({ ...run({ implement: null }), slotHeldAt: held.slotHeldAt }, new Map());
+  assert.deepEqual([waiting.slot?.queued, waiting.run.queued], ['still waiting', '1 waiting']);
+
+  const never = timeline(r, views, filed);
+  assert.equal(never.slot, null);
+  assert.deepEqual([never.run.queued, timelineTotalLines(never)], ['16s', ['timeline  run  queued 16s  ran 27m12s  wall 27m37s']], 'as before');
 });
 
 test('a recheck ran no session: the try it reached names the session it checked again, counted once in the totals; each round of a loop totals apart', () => {

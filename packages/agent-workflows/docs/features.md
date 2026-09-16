@@ -1860,6 +1860,75 @@ What it leaves:
   `wf ls` and `wf decide` between the ask and the tick. Breaking the fix in `assess`, `listing` or `decision`, or taking only the looping
   step, fails a test each.
 
+## Shipped: the queue — a cap on runs in flight
+
+§3 of this list, registered 2026-09-16 by the operator: a Factory canvas filled for a week, cards queued, picked whenever a slot frees. The
+workflow layer built its engine with `WF_MAX_CONCURRENT`, named in no document: a cap on sessions per harness, not on runs. Every run
+started was filed on the next pass, however many were at work. This is the first half: a cap on runs in flight.
+
+What was built:
+
+- **`WF_MAX_RUNS`**, read beside `WF_MAX_CONCURRENT` (`ceilings` in runner.ts), unset or 0 for no cap, today's behaviour. Anything but a
+  whole count is refused by name, exit 2 (`runCapOf`), by `wf up`, `wf tick` and `wf ls`: read as no cap, a typo would lift the cap.
+- **A pure admission gate beside `runReady`.** `slotNeed` says what a run asks of the cap: in flight — a step's or a check's task filed and
+  not settled, or a started run nobody called off that the pass files something of — and whether it wants a slot: nothing filed, not called
+  off, its `--after` runs shipped, a root ready. `runAdmitted` files a run's roots only while fewer runs than the cap are in flight, and never
+  holds a run that has started. `admissionOrder` is oldest by `createdAt`, then id. `heldRuns` judges a whole store as a pass would.
+- **`tick` in two halves.** Every started run is advanced first, and counted in flight once its pass is done (`Advanced.inFlight`: in flight
+  when read, or it filed something). Then each run with nothing filed, oldest first, is advanced with the slot as counted so far (`advance(e,
+  run, slot)`), and counted once it filed. Results come back in the store's order. Nothing is carried between passes.
+- **The words.** `wf ls` says `waiting for a run slot (2 of 2 in flight)` on a held run's roots (`listing`'s `slot`, `slotWord`), judged over
+  the store by `runSlots`; `wf tick` on the run's line; `wf decide` in place of `still running`. `wf up` prints both ceilings in words when it
+  starts (`ceilingLines`).
+- **The wait on the timeline.** The first pass that holds a run writes `slotHeldAt` on its record, and says so once in its notes. `timeline`
+  then counts `createdAt` → first filing as the run's `slot` (`SlotWait`) and in its total's `queued`, on a `run slot` row of `wf decide`'s
+  timeline: `still waiting` while nothing is filed, `not known` where the feed has no filing.
+
+What was decided, and why:
+
+- **In flight includes a started run between two steps.** The spec's words were a task not settled, or a check running. But a run whose step
+  just settled has nothing filed for the length of one pass, and judged then, a held run took its slot and the pass filed both. So a started
+  run with something due counts, and `tick` advances started runs before it judges any other, which makes `wf ls` between passes and the pass
+  itself agree.
+- **A cancelled run counts until the engine has stopped what it had in flight.** The engine settles a stop on its tick, which `tick` asks for
+  first, so a slot frees on the pass after `wf cancel` for a task that had not started, and a pass or two later for a live session.
+- **Waiting on runs is from the hold, not from `createdAt`.** The time a run waited on its `--after` runs is not a wait for a slot, so on such
+  a run the slot wait runs from `slotHeldAt`.
+- **The record, and nothing else, says the cap held a run.** One field, written once by the tick, the record's one writer. A run the cap never
+  held has no `slot` on its timeline at all, rather than `not known` on every run from before the cap.
+- **No new field on a shape the board compares whole.** `TimelineTotal` keeps its keys (the slot wait goes into its `queued`), and `Listing`'s
+  `slot` is there only on a held run, since `apps/api`'s tests compare those objects whole.
+
+What was measured:
+
+- `test/run.test.ts` (7 new), pure: `WF_MAX_RUNS` refused as a word, a negative, a fraction and a unit, and unset, empty and 0 read as no cap;
+  `slotNeed` for a task pending, running, between two steps, finished, waiting on a person, a check running, cancelled and still stopping or
+  stopped, nothing filed, called off first, and waiting on a run before and after it ships; `runAdmitted` refusing at 2 of 2 and 3 of 2, and
+  admitting below it, at cap 0, with no slot and for a started run; `heldRuns` oldest first with ties by id, a run in flight counted, a run
+  waiting on runs neither counted nor held, and none with no cap; `listing` on a held run's roots and followers, and not on one started,
+  called off, or waiting on a run; `ceilingLines`; the timeline's slot wait — measured, from the hold on a run that waited on runs, `not
+  known` with no feed, `still waiting` with nothing filed, and none on a run never held.
+- `test/queue-store.test.ts` (6, a file of its own since `tick` reads every run under `WF_ROOT`), over a fake engine that settles a stop on
+  its tick: at a cap of 2, a third run not filed, and `wf tick`, `wf ls`, `wf ls <run>` and `wf decide` saying so, the hold written once; at a
+  cap of 1, a run finishing and a run cancelled each freeing a slot on the next pass, taken by the run held longest, whose `wf decide`
+  timeline shows the `run slot` wait; a run waiting on `--after` not counted, and the one after it held at 2 of 2; no cap and cap 0 filing
+  all three at once; the oldest by `createdAt` admitted first against the id order; `wf up`'s two ceilings, and `WF_MAX_RUNS=two` refused by
+  `wf up`, `wf tick` and `wf ls`.
+- Each guard broken and the suites rerun: no gate, 5 failing; started runs not counted, and the rest admitted in the store's order, 4; admission by id, 2; a run with nothing filed
+  counted in flight for what is due, 4; a run waiting on runs wanting a slot, 1; the hold written on every pass, 1.
+
+What it leaves:
+
+- **The board.** `apps/api` passes no slot to `listing`, so the Factory and the run page say `waiting` on a held run, and draw no ghost for
+  a queued card. Left for the board.
+- **`wf ls` and `wf decide` read every run twice** when a cap is set and some run has nothing filed: once to judge the cap, once to list. Each
+  view of a task in flight observes its harness.
+- **`WF_MAX_CONCURRENT` is still read with `Number() || 2`**: a value that is not a number is 2, silently. Not asked; left as it was.
+- **The cap counts runs, not sessions.** A run fanning out to three steps is one run in flight and three sessions against
+  `WF_MAX_CONCURRENT`.
+- **The ceiling that matters over a week is still the merge.** A child waits on its parent's merge, and every later run is cut from a main
+  missing unmerged results: the operator merges daily, or a workflow's last step merges on a green trial merge. Not decided here.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
@@ -1904,31 +1973,19 @@ auto-registration with Remote Control fits.
   is told and what it may do is its own design; nothing here decides it.
 - Board: the run page says a step's session is reachable from the phone when it is.
 
-## 3. The queue: a cap on runs in flight, and cards that start themselves
+## 3. The queue: cards that start themselves
 
 **Registered** 2026-09-16, by the operator: a Factory canvas filled for a week — cards queued, picked whenever a slot frees.
 
-**What exists.** The engine caps sessions per harness (`AE_MAX_CONCURRENT`, default 3). The workflow layer builds its
-engine with `WF_MAX_CONCURRENT`, default 2 (`src/runner.ts`, `engine`), named in no document until this entry. The count is
-sessions, not runs: both steps of `dev` are on `claude`, so one run's review competes with another run's implement; a
-check has a pool of its own; a session the harness lists `blocked` holds its slot until the step's deadline (`LIVE` in the
-engine's `engine.ts`), and `claude` and `claude-detached` are counted apart though they share one subscription. `--after`
-and `wf plan` give order, and a run that waited is cut from main as it is when filed; a run started plainly is cut from
-main at `wf start`. The inbox parks cards and starts none.
+**What exists.** The cap on runs in flight has shipped (*Shipped: the queue — a cap on runs in flight*, above). `--after` and
+`wf plan` give order, and a run that waited is cut from main as it is when filed; a run started plainly is cut from main at
+`wf start`. The inbox parks cards and starts none.
 
 **What it needs.**
 
-- A pure admission gate beside `runReady`: a run with nothing filed is admitted only while runs in flight are below
-  `WF_MAX_RUNS` (0: no cap, today's behaviour), oldest first, serial within a pass, level-triggered. `wf ls` says
-  `waiting for a run slot (2 of 2 in flight)`, the run's timeline counts the wait as queued, and `wf up` prints both
-  ceilings when it starts.
 - Cards that start themselves: an inbox card marked to start on its own (`wf inbox queue <name>`). The tick starts the
   oldest such card when a run slot frees, through `startFromInbox`, so its base is main at that moment and its brief is
   frozen then. `--after` stays for cards that depend on one another. The Factory draws queued cards as ghosts.
-- The README names `WF_MAX_CONCURRENT` beside `WF_MAX_RUNS`, what each counts, and that checks are apart.
-- The ceiling that matters over a week is the merge: a child waits on its parent's merge, and every later run is cut
-  from a main missing unmerged results. Either the operator merges daily, or a workflow's last step merges on a green
-  trial merge — a change to "a person merges" that this entry does not decide.
 
 ## Engine-side work
 
@@ -1937,7 +1994,7 @@ Not agent-workflows features, listed so nothing is lost:
 - waking the tick loop on harness registry changes instead of a timer (agent-engine README);
 - the hkb migration ([agent-engine/docs/hkb-migration.md](../../agent-engine/docs/hkb-migration.md));
 - a task field for Remote Control (§2 above);
-- a `blocked` session holding a concurrency slot (§3 above): count `working` only toward the ceiling and keep the wider
+- a `blocked` session holding a concurrency slot (*Shipped: the queue*, above): count `working` only toward the ceiling and keep the wider
   set for what else `LIVE` guards; the README's sentence that a deadline is the only thing that frees such a slot, and the
   comment in `decide`, change with it; a test that refuses — two blocked sessions at a cap of two, and a third task starts.
   A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the ceiling exists for:

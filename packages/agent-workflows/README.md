@@ -621,6 +621,7 @@ another repository and change that line.
 |---|---|---|
 | `waiting` | not filed yet | — |
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
+| `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
 | the engine's word: `running (working)`, `needs-human` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
 | `unsigned` | it ended without the closeout it was asked for — its session settled `succeeded`, or went quiet and settled `failed` — or without a field its `output:` declares | **never runs** |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
@@ -1253,6 +1254,40 @@ run 'wf tick' (or 'wf up') to start it
   - a start with no workflow from the card or the flag, and a card's workflow that does not load, behind the card;
   - an empty `--brief`, and `--brief` on anything but an inbox card.
 
+## How much runs at once: `WF_MAX_CONCURRENT` and `WF_MAX_RUNS`
+
+Two ceilings, both read from the environment `wf up` runs in, and both said in words when it starts:
+
+```text
+$ WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up
+up — every 4000ms, ^C to stop
+   sessions per harness: at most 4 at once, checks in a pool of their own (WF_MAX_CONCURRENT)
+   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)
+```
+
+- **`WF_MAX_CONCURRENT`, 2 unless set, counts sessions, not runs.** It is the engine's ceiling (`maxConcurrent`), per harness: `claude`,
+  `claude-detached` and `codex` are each counted apart — though `claude` and `claude-detached` share one subscription — and a step's check
+  runs on the `check` harness, a pool of its own, so a suite never waits behind a session. Both steps of `dev` are on `claude`, so one run's
+  review competes with another run's implement for the same slots. A task filed past the ceiling waits for a slot, `pending`; the timeline
+  counts that wait as queued. A session its harness lists `blocked` holds its slot until the step's deadline.
+- **`WF_MAX_RUNS`, unset or 0 for no cap, counts runs in flight.** A run is in flight while a task of it — a step's or a check's — is filed
+  and not settled, or while it has started and the tick files something of it on the pass: a run between two steps is still in flight. One
+  that waits on a person, or has finished, is not; one called off is, until the engine has stopped what it had in flight. A run with nothing
+  filed files its roots only while fewer runs than the cap are in flight (`runAdmitted`, pure, beside `runReady`). Anything else is refused by
+  name, exit 2, by `wf up`, `wf tick` and `wf ls`: read as no cap, `WF_MAX_RUNS=two` would lift the cap it was set to hold.
+- **A pass admits serially, oldest first, and carries nothing.** The tick advances every run that has started first — the cap never holds
+  one — and counts those in flight once each pass is done. Then it takes the runs with nothing filed by `createdAt` (`admissionOrder`), each
+  judged against the count so far and counted, once it has filed, for the next — as the engine admits its tasks. The next pass counts again,
+  so a run finishing, or called off and stopped, frees its slot on the pass that sees it.
+- **A run waiting on `--after` counts only once it is filed.** Until its parents ship it wants no slot, and a run started after it takes one;
+  once they have, it waits for a slot in `createdAt` order like any other.
+- **`wf ls` says it on the roots**, where `waiting` would be: `waiting for a run slot (2 of 2 in flight)`, judged over the whole store as the
+  next pass would judge it (`heldRuns`). `wf tick` puts it on the run's line, `wf decide` says it and nothing else, and the first pass that
+  holds a run writes when on its record (`slotHeldAt`) and says so once.
+- **The wait is on the timeline.** A run the cap held counts `createdAt` → its first filing as queued — from the pass that first held it, on a
+  run that waited on runs — on a `run slot` row of its own, and in the run's `queued`: `still waiting` while nothing is filed, `not known`
+  where the engine's feed does not say when its first task was filed. A run the cap never held has no such row.
+
 ## Calling a run off
 
 A run could be started and watched but never stopped: the only recourse was killing the session by
@@ -1473,11 +1508,11 @@ holding a concurrency slot forever.
 | `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a word the step's harness does not take, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run; find a workflow folder by a path or by its name under `<repo>/workflows/` |
 | `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing and a `repo:` that is not an absolute directory; the card `wf inbox add` writes; a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records; and which path is a card of the inbox |
-| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, and what a step is told, `## From <step>`, `## From run <id>`, `## Try <n>` and `## Round <n> of <N>` included |
+| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`runAdmitted`**, whether the cap on runs in flight leaves them a slot, and which runs it holds (`heldRuns`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, and what a step is told, `## From <step>`, `## From run <id>`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
-| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine, a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, dropped and started from (`readInbox`, `addToInbox`, `dropFromInbox`, `startFromInbox`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine and the two ceilings (`ceilings`), a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, dropped and started from (`readInbox`, `addToInbox`, `dropFromInbox`, `startFromInbox`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/cli.ts` | the verbs |
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):

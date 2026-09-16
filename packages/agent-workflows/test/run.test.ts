@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, branchFates, checkLogsOf, forgetLine, forgetRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -2507,4 +2507,192 @@ test("REFUSED to hide why a step stopped past its budget: one whose session fail
     assert.equal(overBudgetLine(B, r, d, spent), 'OVER BUDGET, waiting on you: implement ($3.40 of $3)  — the run files nothing more for it on its own; nothing after it ran', phase);
   }
   assert.equal(overBudgetLine(B, r, decision(B, r, phases({ t1: 'failed' }), nothingShipped, nothingSaid, asked), spent), undefined, 'read with nothing spent: no step over budget, no line');
+});
+
+// ─── forgetting a run: `wf rm` ──────────────────────────────────────────────
+
+test('`forgetRefusal`: a run that is over is forgotten — finished, failed with what waits on it blocked, cancelled with its tasks settled or never filed, and one whose tasks the engine no longer knows', () => {
+  assert.equal(forgetRefusal(STEPS, run({ implement: 't1', review: 't2' }), DONE, [], signedDone, asked), null);
+  assert.equal(forgetRefusal(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' })), null, 'review can never be filed');
+  assert.equal(forgetRefusal(STEPS, run({ implement: 't1', review: null }, CANCELLED), phases({ t1: 'stopped' })), null);
+  assert.equal(forgetRefusal(STEPS, run({ implement: null, review: null }, CANCELLED), phases({})), null, 'a cancelled run files nothing');
+  // A task the engine has no record of reads `unknown`: in flight nowhere, and nothing after it is ready (`0e7b02a`).
+  assert.equal(forgetRefusal(STEPS, run({ implement: 't-forgotten', review: null }), phases({})), null);
+});
+
+test('REFUSED at shipped defaults: a run with a task in flight — steps running and queued, a check running — names each, and says forgetting is not cancelling; a cancelled run whose tasks a tick is still stopping says to wait for them', () => {
+  const fan = [step('a'), step('b'), step('merge', ['a', 'b'])];
+  assert.equal(
+    forgetRefusal(fan, run({ a: 't1', b: 't2', merge: null }), phases({ t1: 'running', t2: 'pending' })),
+    'a is running and b is pending. Forgetting is not cancelling: wf cancel r-1 stops what is in flight and files nothing more, then wf rm r-1 once what was in flight has settled (wf ls r-1).',
+  );
+  assert.match(forgetRefusal(CHECKED, withCheck('c1'), phases({ t1: 'succeeded', c1: 'running' }), [], signedDone, asked)!, /^implement's check is running\. Forgetting is not cancelling: wf cancel r-1 stops/);
+  assert.equal(
+    forgetRefusal(STEPS, run({ implement: 't1', review: null }, CANCELLED), phases({ t1: 'running' })),
+    'implement is running. It was cancelled at 2026-01-02T00:00:00Z, and a tick stops what is in flight: wf rm r-1 once it has settled (wf ls r-1).',
+  );
+});
+
+test('REFUSED at shipped defaults: a run with anything a pass would file — a step ready, a check due, a try `retries:` covers, a round `again: true` asks for, roots waiting on a run — since a pass may be filing it now; cancelled, each is forgotten', () => {
+  const ready = run({ implement: 't1', review: null });
+  assert.equal(
+    forgetRefusal(STEPS, ready, phases({ t1: 'succeeded' }), [], signedDone, asked),
+    'review is ready to be filed, and a pass may be filing it now. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
+  );
+  assert.match(forgetRefusal(STEPS, run({ implement: null, review: null }), phases({}))!, /^implement is ready to be filed, and a pass may be filing it now\./, 'a run no tick has reached yet');
+  assert.match(forgetRefusal(CHECKED, withCheck(null), phases({ t1: 'succeeded' }), [], signedDone, asked)!, /^implement's check is due, and a pass may be filing it now\./);
+  assert.match(forgetRefusal(RETRIED, onTry(), phases({ t1: 'succeeded', c1: 'failed' }), [], signedDone, asked, () => 1)!, /^try 2 of implement is due \(retries: 2\), and a pass may be filing it now\./);
+  assert.match(forgetRefusal(LOOP, inRound(1), ALL_SUCCEEDED, [], saidIn(1, true), asked)!, /^round 2 of review's loop is due \(again: true\), and a pass may be filing it now\./);
+  assert.equal(
+    forgetRefusal(STEPS, run({ implement: null, review: null }, { after: ['p-1', 'p-2'] }), phases({})),
+    'it waits on p-1 and p-2, and files implement once they have shipped. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.',
+  );
+
+  assert.equal(forgetRefusal(STEPS, { ...ready, ...CANCELLED }, phases({ t1: 'succeeded' }), [], signedDone, asked), null);
+  assert.equal(forgetRefusal(CHECKED, withCheck(null, CANCELLED), phases({ t1: 'succeeded' }), [], signedDone, asked), null);
+  assert.equal(forgetRefusal(RETRIED, onTry([], 'c1', CANCELLED), phases({ t1: 'succeeded', c1: 'failed' }), [], signedDone, asked, () => 1), null);
+  assert.equal(forgetRefusal(LOOP, inRound(1, CANCELLED), ALL_SUCCEEDED, [], saidIn(1, true), asked), null);
+  assert.equal(forgetRefusal(STEPS, run({ implement: null, review: null }, { after: ['p-1'], ...CANCELLED }), phases({})), null);
+});
+
+test("REFUSED at shipped defaults: a person's ask no pass has spent — one the next pass files, and one no pass files as the run stands, taken back by deleting its file; a spent ask, and any ask on a cancelled run, holds nothing", () => {
+  // implement ended without its closeout: a nudge may be asked for, and a recheck may not.
+  const unsigned = run({ implement: 't1', review: null });
+  const p = phases({ t1: 'succeeded' });
+  const none = () => undefined;
+  assert.match(forgetRefusal(STEPS, unsigned, p, [], none, asked, undefined, [askFor(2)])!, /^try 2 of implement is due \(wf retry --nudge\), and a pass may be filing it now\. Forgetting is not cancelling/);
+  const at = (a: { kind: string; step: string; n: number }) => `/wf/runs/r-1.asks/${a.kind}-${a.step}-${a.n}`;
+  assert.equal(
+    forgetRefusal(STEPS, unsigned, p, [], none, asked, undefined, [askFor(2, 'recheck')], [], undefined, at),
+    'try 2 of implement is asked for, and no pass files it as the run stands. Take that ask back, then wf rm r-1: rm /wf/runs/r-1.asks/retry-implement-2.',
+  );
+  const loop = LOOP.slice(0, 2);
+  assert.equal(
+    forgetRefusal(loop, inRound(1), ALL_SUCCEEDED, [], saidIn(1, false), asked, undefined, [], [roundAskFor(2)], undefined, at),
+    "round 2 of review's loop is asked for, and no pass files it as the run stands. Take that ask back, then wf rm r-1: rm /wf/runs/r-1.asks/round-review-2.",
+  );
+
+  // Spent: the record holds try 2, whose closeout is the one that counts.
+  const tried = run({}, { steps: { implement: { taskId: 't1', tries: [{ taskId: 't0', then: 'nudge' }] }, review: { taskId: 't2' } } });
+  assert.equal(forgetRefusal(STEPS, tried, DONE, [], signedDone, asked, undefined, [askFor(2)]), null);
+  assert.equal(forgetRefusal(loop, inRound(2), ALL_SUCCEEDED, [], saidIn(2, false), asked, undefined, [], [roundAskFor(2)]), null);
+  // A cancelled run honours no ask.
+  assert.equal(forgetRefusal(STEPS, { ...unsigned, ...CANCELLED }, p, [], none, asked, undefined, [askFor(2), askFor(3, 'recheck')]), null);
+});
+
+test('REFUSED at shipped defaults: a run another run waits on and has not started names the runs it would strand, and how to free it; a child that started, was called off, or waits on another run strands nothing', () => {
+  const parent = run({ implement: 't1', review: 't2' });
+  const child = (id: string, rest: Partial<Run> = {}) => run({ implement: null, review: null }, { id, after: ['r-1'], ...rest });
+  assert.equal(
+    forgetRefusal(STEPS, parent, DONE, [child('c-2'), child('c-1')], signedDone, asked),
+    'c-1 and c-2 wait on it and have not started: forgotten, each would read waiting on r-1 (no such run) for ever. Let them start first, on the pass after wf decide says r-1 has shipped, or call them off: wf cancel c-1, wf cancel c-2.',
+  );
+  assert.match(forgetRefusal(STEPS, parent, DONE, [child('c-1', { after: ['p-0', 'r-1'] })], signedDone, asked)!, /^c-1 waits on it and has not started: forgotten, it would read/);
+  const started = run({ implement: 'x1', review: null }, { id: 'c-1', after: ['r-1'] });
+  assert.equal(forgetRefusal(STEPS, parent, DONE, [started, child('c-2', CANCELLED), child('c-3', { after: ['r-9'] })], signedDone, asked), null);
+});
+
+test('`forgetRefusal` names every reason at once — and a record from before the freeze whose folder no longer reads is judged on its tasks in flight, its asks and the runs that wait on it: nothing ready, since no pass can file it', () => {
+  const both = forgetRefusal(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'running' }), [run({ implement: null }, { id: 'c-1', after: ['r-1'] })])!;
+  assert.match(both, /^implement is running; c-1 waits on it and has not started: .*\. Forgetting is not cancelling: wf cancel r-1 stops .*\. Let it start first, .*: wf cancel c-1\.$/);
+
+  const unfrozen = run({ implement: 't1', review: null });
+  assert.equal(forgetRefusal(undefined, unfrozen, phases({ t1: 'succeeded' })), null, 'review is never filed without the folder');
+  assert.match(forgetRefusal(undefined, unfrozen, phases({ t1: 'running' }))!, /^implement is running\. Forgetting is not cancelling/);
+  assert.match(forgetRefusal(undefined, unfrozen, phases({ t1: 'succeeded' }), [], undefined, undefined, undefined, [askFor(2)])!, /^try 2 of implement is asked for, and no pass files it as the run stands\. Take that ask back/);
+  assert.match(forgetRefusal(undefined, unfrozen, phases({ t1: 'succeeded' }), [run({ implement: null }, { id: 'c-1', after: ['r-1'] })])!, /^c-1 waits on it/);
+});
+
+test("`parseWorktrees` and `runWorktrees`: a run's worktrees are those git lists inside its own directory — never the repository a `--no-worktree` run worked in, nor those of a run whose id starts with this one's — each with the step a hand-off commits under", () => {
+  const porcelain = [
+    'worktree /repo', 'HEAD abc', 'branch refs/heads/main', '',
+    'worktree /wf/worktrees/r-1/implement', 'HEAD def', 'branch refs/heads/wf/r-1/implement', '',
+    'worktree /wf/worktrees/r-1/cut', 'HEAD def', 'branch refs/heads/wf/r-1/cut', 'locked a person holds it', '',
+    'worktree /wf/worktrees/r-1/lost', 'HEAD def', 'detached', 'prunable gitdir file points to non-existent location', '',
+    'worktree /wf/worktrees/r-1-x2/implement', 'HEAD 123', 'branch refs/heads/wf/r-1-x2/implement', '',
+  ].join('\n');
+  const listed = parseWorktrees(porcelain);
+  assert.deepEqual(listed, [
+    { path: '/repo', branch: 'main' },
+    { path: '/wf/worktrees/r-1/implement', branch: 'wf/r-1/implement' },
+    { path: '/wf/worktrees/r-1/cut', branch: 'wf/r-1/cut', locked: 'a person holds it' },
+    { path: '/wf/worktrees/r-1/lost', prunable: true },
+    { path: '/wf/worktrees/r-1-x2/implement', branch: 'wf/r-1-x2/implement' },
+  ]);
+  assert.deepEqual(parseWorktrees('worktree /a b\nlocked\n'), [{ path: '/a b', locked: '' }], 'a path with a space, and a lock with no reason');
+
+  // review inherits implement's directory: what it holds uncommitted is review's. `cut` was cut by a pass that died before filing it.
+  const r = run({}, { steps: {
+    implement: { taskId: 't1', workspace: '/wf/worktrees/r-1/implement', branch: 'wf/r-1/implement' },
+    review: { taskId: 't2', workspace: '/wf/worktrees/r-1/implement', branch: 'wf/r-1/implement' },
+    fixup: { taskId: 't3', workspace: '/wf/worktrees/r-1/fixup', branch: 'wf/r-1/fixup' },
+  } });
+  const { worktrees, unlisted } = runWorktrees(r, ['implement', 'review', 'fixup'], '/wf/worktrees/r-1', listed);
+  assert.deepEqual(worktrees.map((w) => [w.path, w.step]), [['/wf/worktrees/r-1/implement', 'review'], ['/wf/worktrees/r-1/cut', 'cut'], ['/wf/worktrees/r-1/lost', 'lost']]);
+  assert.deepEqual(unlisted, ['/wf/worktrees/r-1/fixup']);
+
+  const direct = run({}, { isolate: false, steps: { implement: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
+  assert.deepEqual(runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', [...listed, { path: '/wf/worktrees/r-1' }]).worktrees.map((w) => w.path),
+    ['/wf/worktrees/r-1/implement', '/wf/worktrees/r-1/cut', '/wf/worktrees/r-1/lost'], 'never the repository, nor the run\'s directory itself');
+  assert.deepEqual(runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', listed.slice(0, 1)), { worktrees: [], unlisted: [] });
+});
+
+test("REFUSED at shipped defaults: `branchFates` keeps every branch unless asked; asked, deletes one merged into the base and keeps one that is not unless forced — and never names the base branch, nor a branch of a run whose id starts with this one's", () => {
+  const listed = ['main', 'wf/r-1/review', 'wf/r-1/implement', 'wf/r-1-x2/implement', 'wf/r-12/implement'];
+  const merged = (b: string) => b !== 'wf/r-1/review';
+  const r = { id: 'r-1' };
+  assert.deepEqual(branchFates(r, listed, merged), [
+    { branch: 'wf/r-1/implement', deleted: false, why: 'default' },
+    { branch: 'wf/r-1/review', deleted: false, why: 'default' },
+  ]);
+  assert.deepEqual(branchFates(r, listed, merged, { deleteBranches: true }), [
+    { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
+    { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' },
+  ]);
+  assert.deepEqual(branchFates(r, listed, merged, { deleteBranches: true, forceUnmerged: true }), [
+    { branch: 'wf/r-1/implement', deleted: true, why: 'merged' },
+    { branch: 'wf/r-1/review', deleted: true, why: 'forced' },
+  ]);
+  assert.deepEqual(branchFates(r, listed, merged, { forceUnmerged: true }).map((b) => b.deleted), [false, false], '--force-unmerged alone deletes nothing');
+});
+
+test("`checkLogsOf`: a run's check logs are its steps' checks on every try — not another run's whose id starts with this one's; with no record to name the steps, any under its id but those", () => {
+  const listing = [
+    'r-1-implement-check.stderr', 'r-1-implement-try2-check.stderr', 'r-1-review-check.stderr', 'r-1-x2-implement-check.stderr',
+    'r-1-implement-tryX-check.stderr', 'r-1-implement.log', 'r-10-implement-check.stderr',
+  ];
+  assert.deepEqual(checkLogsOf('r-1', ['implement', 'review'], listing), ['r-1-implement-check.stderr', 'r-1-implement-try2-check.stderr', 'r-1-review-check.stderr']);
+  assert.deepEqual(checkLogsOf('r-1', undefined, listing, ['r-1-x2', 'r-10']),
+    ['r-1-implement-check.stderr', 'r-1-implement-try2-check.stderr', 'r-1-implement-tryX-check.stderr', 'r-1-review-check.stderr']);
+});
+
+test('`forgetLine` says in one line what happened to each run: forgotten, with what was handed off and what became of each branch; not forgotten, with why and what to do; no such run', () => {
+  const forgotten: Forgot = {
+    id: 'r-1', kind: 'forgotten', repo: '/repo', base: 'main', isolate: true,
+    removed: ['/wf/worktrees/r-1/implement', '/wf/worktrees/r-1/review'], handedOff: [{ step: 'review', branch: 'wf/r-1/review', commit: '1a2b3c4d5e6f' }],
+    gone: [], left: [], files: ['runs/r-1.json', 'runs/r-1/', 'checks/r-1-implement-check.stderr'],
+    branches: [{ branch: 'wf/r-1/implement', deleted: false, why: 'default' }, { branch: 'wf/r-1/review', deleted: false, why: 'default' }],
+  };
+  assert.equal(forgetLine(forgotten),
+    'r-1  forgotten: removed 2 worktrees, committed what review left uncommitted on wf/r-1/review as 1a2b3c4; removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr; kept wf/r-1/implement, wf/r-1/review — branches are kept unless asked: --delete-branches deletes those merged into main');
+  assert.equal(forgetLine({ ...forgotten, removed: [], handedOff: [], gone: ['/wf/worktrees/r-1/implement'], branches: [
+    { branch: 'wf/r-1/implement', deleted: true, why: 'merged' }, { branch: 'wf/r-1/fix', deleted: true, why: 'forced' },
+    { branch: 'wf/r-1/review', deleted: false, why: 'unmerged' }, { branch: 'wf/r-1/odd', deleted: false, why: { git: 'error: it is checked out elsewhere' } },
+  ], unfrozen: 'no workflow folder at /wf/dev' }),
+    'r-1  forgotten: 1 worktree was already gone; removed runs/r-1.json, runs/r-1/, checks/r-1-implement-check.stderr; deleted wf/r-1/implement (merged into main), wf/r-1/fix (not merged into main, forced); kept wf/r-1/review: not merged into main — --force-unmerged deletes it, and the work on it; kept wf/r-1/odd: git would not delete it — error: it is checked out elsewhere; its workflow was never frozen, and no workflow folder at /wf/dev');
+  assert.equal(forgetLine({ ...forgotten, isolate: false, removed: [], handedOff: [], branches: [], files: ['runs/r-1.json'] }),
+    'r-1  forgotten: no worktrees, it worked in /repo itself; removed runs/r-1.json; no branch of its own');
+
+  assert.equal(forgetLine({ ...forgotten, kind: 'held', handedOff: [], removed: ['/wf/worktrees/r-1/review'], files: [], left: [
+    { path: '/wf/worktrees/r-1/implement', locked: 'a person holds it' },
+    { path: '/wf/worktrees/r-1/fix', git: "fatal: '/wf/worktrees/r-1/fix' contains modified or untracked files, use --force to delete it" },
+    { path: '/wf/worktrees/r-1/stray', unknown: true },
+  ] }),
+    "r-1  not forgotten: /wf/worktrees/r-1/implement is locked (a person holds it), and git will not remove it — unlock it if nothing needs it: git -C /repo worktree unlock /wf/worktrees/r-1/implement; git would not remove /wf/worktrees/r-1/fix — fatal: '/wf/worktrees/r-1/fix' contains modified or untracked files, use --force to delete it; /wf/worktrees/r-1/stray is not a worktree git knows, and wf rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted; removed 1 worktree. Its record, files and branches are kept until every worktree is gone: wf rm r-1 again then.");
+
+  assert.equal(forgetLine({ id: 'r-1', kind: 'refused', refusal: 'implement is running. Forgetting is not cancelling: …', removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] }),
+    'r-1  not forgotten: implement is running. Forgetting is not cancelling: …');
+  const missing: Forgot = { id: 'r-9', kind: 'missing', removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] };
+  assert.equal(forgetLine(missing), 'r-9  no such run — nothing to forget');
+  assert.equal(forgetLine({ ...missing, files: ['runs/r-9.asks/', 'runs/r-9.cancelled'] }), 'r-9  no such run — nothing to forget but what was left under its id: removed runs/r-9.asks/, runs/r-9.cancelled');
 });

@@ -1795,6 +1795,9 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
 export const inputsLine = (dir: string | undefined, names: readonly string[] | undefined): string | undefined =>
   (dir && names?.length ? `Files given with it (\`wf start --input\`), in \`${dir}\`: ${names.map((n) => `\`${n}\``).join(', ')}.` : undefined);
 
+/** What `wf decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at `wf start`. */
+export const fromNote = (run: Pick<Run, 'from'>): string | undefined => (run.from ? `from inbox card ${run.from.inbox}` : undefined);
+
 /** What `wf decide` says under a run's line when `wf start --input` gave it files: each by name, and where they are. Undefined for a run given none. */
 export const inputsNote = (dir: string, names: readonly string[] | undefined): string | undefined =>
   (names?.length ? `inputs  ${names.join(', ')}  —  in ${dir}` : undefined);

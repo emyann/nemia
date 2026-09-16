@@ -185,3 +185,32 @@ export function ideaCard(from: string, text: string, given: { workflow?: string;
   parseInboxCard(from, card, isDirectory);
   return { text: card, body };
 }
+
+/**
+ * The name of the inbox card `at` is — a path to `<dir>/<name>.md`, directly in the inbox `dir` — or null for any other path: what makes
+ * `wf start <path>` start a card out of the inbox. Both paths are taken as given; runner.ts resolves links first. Whether the card is there
+ * is `startFromInbox`'s to say, so a card already started, or mistyped, is refused by name rather than taken as a brief.
+ */
+export function inboxNameOf(at: string, dir: string): string | null {
+  return path.dirname(at) === dir && at.endsWith('.md') ? path.basename(at).slice(0, -'.md'.length) : null;
+}
+
+/**
+ * Why a card cannot be started on no workflow: it names none, and none was given — with the workflows the repository has to name one of, and
+ * how. `where` is what `wf start` is given for the card.
+ */
+export function noWorkflowRefusal(card: Pick<InboxCard, 'file'>, where: string, repo: string, workflows: readonly string[]): string {
+  const dir = path.join(repo, 'workflows');
+  return `${card.file}: no workflow — the card names none, and none was given, so nothing says what runs it. `
+    + (workflows.length
+      ? `The repository's workflows are: ${workflows.join(', ')}, in ${dir}. Name one: wf start ${where} --workflows ${workflows[0]}, or write \`workflow: ${workflows[0]}\` in the card.`
+      : `${dir} has no workflows. Give a workflow folder: wf start ${where} --workflows <dir>, or write \`workflow:\` in the card.`);
+}
+
+/**
+ * Why a card is not started again: a run's record names it (`from`), so it was started, and is still in the inbox because its removal failed.
+ * Started again, the idea would run twice.
+ */
+export function startedRefusal(card: Pick<InboxCard, 'name' | 'file'>, where: string, runs: readonly string[]): string {
+  return `${card.file}: this card was started as ${runs.join(', ')} — ${runs.length === 1 ? 'that run\'s record says' : 'their records say'} so — and is still in the inbox because its removal failed. Drop it with wf inbox rm ${card.name}; to run the idea again, park it again under a name of its own first: wf inbox add ${where}.`;
+}

@@ -3,7 +3,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ideaCard, INBOX_KEYS, inboxLines, inboxListing, inboxNameRefusal, noCardLine, parseInboxCard, type InboxListing } from '../src/inbox.ts';
+import { ideaCard, INBOX_KEYS, inboxLines, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, type InboxListing } from '../src/inbox.ts';
+import { fromNote } from '../src/run.ts';
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
@@ -137,4 +138,28 @@ test("REFUSED by name at shipped defaults: `wf inbox add` with nothing in the id
   assert.throws(() => ideaCard('the idea', 'x', { workflow: 'dev\nharness: codex' }, isDirectory),
     refusedWith(/^the idea: the workflow given, "dev\\nharness: codex", is more than one line, and a card's workflow: is one\. Give the one line it names\.$/));
   assert.throws(() => ideaCard('the idea', 'x', { repo: '/home/me/code/app\r\n---' }, isDirectory), refusedWith(/^the idea: the repo given, .* is more than one line/));
+});
+
+test('`inboxNameOf`: a path to `<inbox>/<name>.md`, directly in the inbox, is that card — any other path is not, a card of a plan and a folder inside the inbox included', () => {
+  const inbox = '/home/me/.agent-workflows/inbox';
+  assert.equal(inboxNameOf(`${inbox}/cache-the-views-k2q9.md`, inbox), 'cache-the-views-k2q9');
+  assert.equal(inboxNameOf(`${inbox}/gone-a1b2.md`, inbox), 'gone-a1b2', 'whether it is there is the start\'s to say');
+  assert.equal(inboxNameOf(`${inbox}/.md`, inbox), '', 'and whether it is a name, the start\'s too');
+  for (const at of [`${inbox}/drafts/idea.md`, `${inbox}/notes.txt`, inbox, '/home/me/plans/q3/a.md', '/home/me/.agent-workflows/inbox-old/idea.md', '/home/me/.agent-workflows/idea.md']) {
+    assert.equal(inboxNameOf(at, inbox), null, at);
+  }
+});
+
+test('a card with no workflow is refused naming the workflows the repository has, and how to name one — or that it has none; a card a record names as started, naming the run and how to drop it; `wf decide` names the card a run came from', () => {
+  const card = { name: 'cache-the-views-k2q9', file: 'cache-the-views-k2q9.md' };
+  const where = '/home/me/.agent-workflows/inbox/cache-the-views-k2q9.md';
+  assert.equal(noWorkflowRefusal(card, where, '/home/me/code/app', ['dev', 'ui']),
+    'cache-the-views-k2q9.md: no workflow — the card names none, and none was given, so nothing says what runs it. The repository\'s workflows are: dev, ui, in /home/me/code/app/workflows. Name one: wf start /home/me/.agent-workflows/inbox/cache-the-views-k2q9.md --workflows dev, or write `workflow: dev` in the card.');
+  assert.equal(noWorkflowRefusal(card, where, '/home/me/code/app', []),
+    'cache-the-views-k2q9.md: no workflow — the card names none, and none was given, so nothing says what runs it. /home/me/code/app/workflows has no workflows. Give a workflow folder: wf start /home/me/.agent-workflows/inbox/cache-the-views-k2q9.md --workflows <dir>, or write `workflow:` in the card.');
+  assert.equal(startedRefusal(card, where, ['cache-the-views-ab12']),
+    `cache-the-views-k2q9.md: this card was started as cache-the-views-ab12 — that run's record says so — and is still in the inbox because its removal failed. Drop it with wf inbox rm cache-the-views-k2q9; to run the idea again, park it again under a name of its own first: wf inbox add ${where}.`);
+  assert.match(startedRefusal(card, where, ['a-1', 'b-2']), /^cache-the-views-k2q9\.md: this card was started as a-1, b-2 — their records say so — /);
+  assert.equal(fromNote({ from: { inbox: 'cache-the-views-k2q9' } }), 'from inbox card cache-the-views-k2q9');
+  assert.equal(fromNote({}), undefined);
 });

@@ -645,7 +645,7 @@ function noStepsBecause(dir: string, entries: readonly string[]): string {
 }
 
 /** The folders in `dir` that hold steps, sorted: the workflows a folder of workflows has. None for a folder that is not there. */
-function workflowsIn(dir: string, entries?: readonly string[]): string[] {
+export function workflowsIn(dir: string, entries?: readonly string[]): string[] {
   let names: readonly string[];
   try { names = entries ?? fs.readdirSync(dir); } catch { return []; }
   return names.filter((name) => {

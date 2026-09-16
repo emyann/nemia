@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-engine';
 import type { Run } from '../src/run.ts';
 
@@ -18,7 +19,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { addToInbox, dropFromInbox, inboxDir, readInbox } = await import('../src/runner.ts');
+const { addToInbox, dropFromInbox, inboxDir, readInbox, readRun, start, startFromInbox } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 /** No verb here asks the engine anything. */
@@ -39,6 +40,21 @@ const printedBy = async (t: { mock: { method: (o: object, m: string, f: (...a: u
 /** The cards in the inbox, by file. */
 const inInbox = () => (fs.existsSync(INBOX) ? fs.readdirSync(INBOX).sort() : []);
 const emptyInbox = () => fs.rmSync(INBOX, { recursive: true, force: true });
+
+/** A repository with one commit, so a start has a base to record — and a workflow of one step under its workflows/ for each name. */
+const aRepoWith = (...workflows: string[]): string => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'base');
+  for (const name of workflows) {
+    fs.mkdirSync(path.join(repo, 'workflows', name), { recursive: true });
+    fs.writeFileSync(path.join(repo, 'workflows', name, 'implement.md'), `implement it, on ${name}\n`);
+  }
+  return repo;
+};
+
+const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
 
 /** A run record, as `start()` writes one — only what the listing reads of it matters here. */
 const writeRecord = (id: string, from?: Run['from']) => fs.writeFileSync(path.join(ROOT, 'runs', `${id}.json`), JSON.stringify({
@@ -160,4 +176,131 @@ test("REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   assert.ok(fs.existsSync(path.join(ROOT, 'runs', 'r-outside.json')), 'the record outside the inbox is still there');
   assert.ok(fs.existsSync(file), 'and so is the card');
   fs.rmSync(path.join(ROOT, 'runs', 'r-outside.json'));
+});
+
+// ─── starting a card ────────────────────────────────────────────────────────
+
+test("`wf start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and removes the card; `wf decide` names the card under the run's line; a plan's card started so stays where it is", async (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev', 'ui');
+  const { card, file } = addToInbox({ text: 'Cache the views between passes\n\nThe tick reads each task twice.', workflow: 'dev', repo });
+  const printed = await printedBy(t, 'start', file);
+  const id = printed[0]!.split(' ')[0]!;
+  assert.match(id, /^cache-the-views-between-pass-[a-z0-9]{4}$/, 'the run id from the body');
+  const run = readRun(id);
+  assert.deepEqual([run.brief, run.repo, run.workflowDir, run.from], ['Cache the views between passes\n\nThe tick reads each task twice.', repo, path.join(repo, 'workflows', 'dev'), { inbox: card.name }]);
+  assert.deepEqual(printed.slice(0, 3), [`${id}  1 step(s): implement`, `from inbox card ${card.name} — removed from the inbox`, `workspace: ${repo}`]);
+  assert.equal(fs.existsSync(file), false, 'the card left the inbox');
+  assert.deepEqual(readInbox(), []);
+  const decided = await printedBy(t, 'decide', id);
+  assert.deepEqual(decided.slice(0, 2), [`${id}  Cache the views between passes`, `  from inbox card ${card.name}`]);
+  // A run typed at wf start carries no `from`, and its decide screen names no card.
+  const typed = start({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') });
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${typed.id}.json`), 'utf8')), 'from'), false);
+  assert.doesNotMatch((await printedBy(t, 'decide', typed.id)).join('\n'), /from inbox card/);
+
+  // A plan's card: started by wf start, and never removed.
+  const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
+  fs.writeFileSync(path.join(plan, 'a.md'), '---\nworkflow: dev\n---\nParse the flag\n');
+  const planned = readRun((await printedBy(t, 'start', path.join(plan, 'a.md'), '--repo', repo))[0]!.split(' ')[0]!);
+  assert.deepEqual([planned.brief, planned.from], ['Parse the flag', undefined]);
+  assert.ok(fs.existsSync(path.join(plan, 'a.md')), "the plan's card stays");
+});
+
+test("a start says what the card does not, over what it does: --workflows over `workflow:`, --repo over `repo:`, the caller's repository without either, --brief in place of the body, and --after to wait on", async (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  const other = aRepoWith('ui');
+  const mine = fs.mkdtempSync(path.join(ROOT, 'mine-'));
+  fs.writeFileSync(path.join(mine, 'implement.md'), 'implement it, mine\n');
+
+  const over = addToInbox({ text: 'Show the flag', workflow: 'dev', repo });
+  const run = readRun((await printedBy(t, 'start', over.file, '--workflows', mine, '--repo', other, '--brief', 'Show the flag on the settings page, beside the theme toggle.'))[0]!.split(' ')[0]!);
+  assert.deepEqual([run.workflowDir, run.repo, run.brief, run.from], [mine, other, 'Show the flag on the settings page, beside the theme toggle.', { inbox: over.card.name }]);
+  assert.match(run.id, /^show-the-flag-on-the-setting-[a-z0-9]{4}$/, 'the id from the brief it was started with');
+
+  // No repo: on the card and none given: the caller's — `wf start`'s `.` — and its workflow: found there, by name.
+  const bare = addToInbox({ text: 'Store the flag', workflow: 'ui' });
+  const cwd = process.cwd();
+  process.chdir(other);
+  let here: Run;
+  try {
+    here = readRun((await printedBy(t, 'start', bare.file))[0]!.split(' ')[0]!);
+  } finally { process.chdir(cwd); }
+  assert.deepEqual([here.repo, here.workflowDir], [fs.realpathSync(other), path.join(fs.realpathSync(other), 'workflows', 'ui')]);
+  const given = addToInbox({ text: 'Document the flag' });
+  const byBoard = startFromInbox({ name: given.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo });
+  assert.deepEqual([byBoard.run.repo, byBoard.run.workflowDir, byBoard.removed], [repo, path.join(repo, 'workflows', 'dev'), true]);
+
+  // A brief from a file, and what the card waits on, said at start.
+  const brief = path.join(mine, 'work.md');
+  fs.writeFileSync(brief, 'Parse the flag in cli.ts.\n');
+  const waits = addToInbox({ text: 'Parse the flag', workflow: 'dev', repo });
+  const child = readRun((await printedBy(t, 'start', waits.file, '--brief', brief, '--after', byBoard.run.id))[0]!.split(' ')[0]!);
+  assert.deepEqual([child.brief, child.after, child.from], ['Parse the flag in cli.ts.', [byBoard.run.id], { inbox: waits.card.name }]);
+});
+
+test("REFUSED by name at shipped defaults, before a run is written and with the card left in the inbox: a card not there — naming those there are — a name that would leave the inbox, no workflow from the card or the flag, a workflow that does not load, a card that does not read, an empty --brief, --brief on anything but an inbox card, and an --after start() refuses", async () => {
+  emptyInbox();
+  const repo = aRepoWith('dev', 'ui');
+  const kept = addToInbox({ text: 'Cache the views', repo });
+  const before = runsWritten();
+  const starting = (...argv: string[]) => main(['start', ...argv], NO_ENGINE);
+
+  await assert.rejects(starting(path.join(INBOX, 'cache-the-view.md')),
+    refusedWith(new RegExp(`^no card cache-the-view in the inbox\\. Its cards are: ${escaped(kept.card.name)}\\. Start one of those — wf start ${escaped(path.join(INBOX, '<name>.md'))} — or park the idea first: wf inbox add "<idea>"\\.$`)));
+  assert.throws(() => startFromInbox({ name: '../runs/x', callerRepo: repo }), refusedWith(/^`\.\.\/runs\/x` is not a card's name: a name stays in the inbox/));
+  assert.throws(() => startFromInbox({ name: 'a/b', callerRepo: repo }), refusedWith(/^`a\/b` is not a card's name/));
+  assert.throws(() => startFromInbox({ name: '', callerRepo: repo }), refusedWith(/^A card is named by its file in the inbox, minus \.md, as wf inbox lists it, and this name is empty\./));
+
+  await assert.rejects(starting(kept.file),
+    refusedWith(new RegExp(`^${escaped(kept.card.file)}: no workflow — the card names none, and none was given, so nothing says what runs it\\. The repository's workflows are: dev, ui, in ${escaped(path.join(repo, 'workflows'))}\\. Name one: wf start ${escaped(kept.file)} --workflows dev, or write \`workflow: dev\` in the card\\.$`)));
+  const loose = addToInbox({ text: 'Anywhere at all' });
+  assert.throws(() => startFromInbox({ name: loose.card.name, callerRepo: fs.mkdtempSync(path.join(ROOT, 'bare-')) }), refusedWith(/: no workflow — .* has no workflows\. Give a workflow folder:/));
+
+  const nope = addToInbox({ text: 'Store the flag', workflow: 'nope', repo });
+  await assert.rejects(starting(nope.file),
+    refusedWith(new RegExp(`^${escaped(nope.card.file)}: \`workflow: nope\` — no workflow folder at ${escaped(path.join(INBOX, 'nope'))}, nor a workflow named nope in ${escaped(path.join(repo, 'workflows'))}\\. The repository's workflows are: dev, ui`)));
+  await assert.rejects(starting(kept.file, '--workflows', 'nope'), refusedWith(/^no workflow folder at .*nope, nor a workflow named nope in /));
+
+  fs.writeFileSync(path.join(INBOX, 'hand-written-a1b2.md'), `---\nworkflow: dev\nrepo: ${repo}\nafter: ${kept.card.name}\n---\nShow the flag\n`);
+  await assert.rejects(starting(path.join(INBOX, 'hand-written-a1b2.md')), refusedWith(/^hand-written-a1b2\.md: `after` is not a key an inbox card has: what a card waits on is said when it is started/));
+  fs.writeFileSync(path.join(INBOX, 'moved-repo-a1b2.md'), `---\nworkflow: dev\nrepo: ${path.join(ROOT, 'moved-away')}\n---\nShow the flag\n`);
+  await assert.rejects(starting(path.join(INBOX, 'moved-repo-a1b2.md')), refusedWith(/^moved-repo-a1b2\.md: `repo: .*moved-away` names no directory\./));
+
+  await assert.rejects(starting(kept.file, '--workflows', 'dev', '--brief', ''), refusedWith(/^--brief takes what the run is asked to do in place of an inbox card's body/));
+  assert.throws(() => startFromInbox({ name: kept.card.name, workflow: 'dev', brief: '  \n', callerRepo: repo }),
+    refusedWith(new RegExp(`^${escaped(kept.card.file)}: the brief given in place of the card's body is empty\\. Give what the run is asked to do, or leave it out`)));
+  await assert.rejects(starting('add a flag', '--workflows', path.join(repo, 'workflows', 'dev'), '--repo', repo, '--brief', 'x'),
+    refusedWith(new RegExp(`^wf start takes --brief only for a card of the inbox, in place of its body: wf start ${escaped(path.join(INBOX, '<name>.md'))} --brief "<brief>"\\.`)));
+  await assert.rejects(starting(kept.file, '--workflows', 'dev', '--brief', 'x', '--brief', 'y'), refusedWith(/^wf start takes --brief once: a run is asked one thing\.$/));
+  await assert.rejects(starting(kept.file, '--workflows', 'dev', '--after', 'no-such-run-zz99'), refusedWith(/no-such-run-zz99/));
+
+  assert.equal(runsWritten(), before, 'no run written');
+  for (const f of [kept.file, loose.file, nope.file, path.join(INBOX, 'hand-written-a1b2.md'), path.join(INBOX, 'moved-repo-a1b2.md')]) assert.ok(fs.existsSync(f), `${f} is still in the inbox`);
+});
+
+test("REFUSED at shipped defaults: a card whose removal fails after its run is written is listed `started as` that run, and not started again until a person drops it", { skip: process.getuid?.() === 0 && 'root removes a file from a folder it may not write' }, async (t) => {
+  emptyInbox();
+  const repo = aRepoWith('dev');
+  const { card, file } = addToInbox({ text: 'Cache the views', workflow: 'dev', repo });
+  const before = runsWritten();
+  fs.chmodSync(INBOX, 0o555);
+  let printed: string[];
+  try {
+    printed = await printedBy(t, 'start', file);
+  } finally { fs.chmodSync(INBOX, 0o755); }
+  const id = printed[0]!.split(' ')[0]!;
+  assert.equal(runsWritten(), before + 1, 'the run is written');
+  assert.deepEqual(readRun(id).from, { inbox: card.name });
+  assert.match(printed[1]!, new RegExp(`^from inbox card ${escaped(card.name)} — still in the inbox: ${escaped(file)} could not be removed — .*\\. wf inbox lists it as started as ${escaped(id)}: drop it with wf inbox rm ${escaped(card.name)}$`));
+  assert.deepEqual(readInbox().map((l) => [l.name, l.startedAs]), [[card.name, [id]]]);
+  assert.match((await printedBy(t, 'inbox'))[0]!, new RegExp(`^${escaped(card.name)}  Cache the views  workflow: dev  repo: ${escaped(repo)}  started as ${escaped(id)}$`));
+
+  await assert.rejects(main(['start', file], NO_ENGINE),
+    refusedWith(new RegExp(`^${escaped(card.file)}: this card was started as ${escaped(id)} — that run's record says so — and is still in the inbox because its removal failed\\. Drop it with wf inbox rm ${escaped(card.name)};`)));
+  assert.throws(() => startFromInbox({ name: card.name, callerRepo: repo }), refusedWith(/: this card was started as /));
+  assert.equal(runsWritten(), before + 1, 'not started twice');
+  await printedBy(t, 'inbox', 'rm', card.name);
+  assert.deepEqual(readInbox(), []);
 });

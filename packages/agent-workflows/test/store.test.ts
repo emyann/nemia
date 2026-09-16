@@ -3092,3 +3092,47 @@ test("a run whose tasks the engine no longer knows is forgotten; so is a record 
   assert.deepEqual([leftover.printed, leftover.error], [['gone-run-3c4d  no such run — nothing to forget but what was left under its id: removed runs/gone-run-3c4d.cancelled, runs/gone-run-3c4d.asks/'], undefined]);
   assert.ok(!under('runs', 'gone-run-3c4d.asks') && !under('runs', 'gone-run-3c4d.cancelled'));
 });
+
+test("REFUSED at shipped defaults: a pass that read a run before `wf cancel` and is still cutting its step's worktree — `npm ci`, a minute — files nothing once the run is called off and forgotten under it: no session on the board, no record, no worktree made again", async (t) => {
+  // A main checkout with a lockfile its worktree does not have: the pass runs `npm ci` there, on an `npm` that waits to be let go.
+  const repo = aRepo();
+  fs.writeFileSync(path.join(repo, 'package-lock.json'), '{}\n');
+  const bin = fs.mkdtempSync(path.join(ROOT, 'bin-'));
+  const started = path.join(bin, 'started');
+  const release = path.join(bin, 'release');
+  fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\n: > '${started}'\nwhile [ ! -e '${release}' ]; do sleep 0.02; done\n`, { mode: 0o755 });
+  const PATH = process.env.PATH;
+  process.env.PATH = `${bin}${path.delimiter}${PATH}`;
+  t.after(() => { process.env.PATH = PATH; fs.writeFileSync(release, ''); });
+
+  const b = board();
+  const run = start({ brief: 'called off while it is cut', repo, workflowDir: folder() });
+  const pass = advance(b.e, readRun(run.id));
+  while (!fs.existsSync(started)) await new Promise((r) => setTimeout(r, 10));
+  const wt = path.join(ROOT, 'worktrees', run.id, 'implement');
+  assert.ok(worktreesOf(repo).includes(wt), 'the pass has cut the worktree, and not filed the step');
+
+  assert.deepEqual((await cancel(b.e, run.id)).plan, { kind: 'cancel', stop: [] }, 'nothing in flight to stop');
+  assert.equal((await forget(b.e, run.id)).kind, 'forgotten');
+  fs.writeFileSync(release, '');
+  await pass;
+
+  assert.deepEqual(b.filings, [], 'the step is not filed into a worktree that is gone');
+  assert.ok(!under('runs', `${run.id}.json`) && !under('runs', run.id) && !under('worktrees', run.id), 'nothing of the run made again');
+});
+
+test("REFUSED at shipped defaults: a step a pass filed and died before writing down, on a run then cancelled — `wf rm` finds it on the engine, in flight, and says a tick stops it; the next tick does, and once it has settled the run is forgotten", async () => {
+  const b = board();
+  const run = start({ brief: 'filed and never written down', repo: aRepo(), workflowDir: folder() });
+  const taskId = `${run.id}-implement`;
+  await b.e.file({ id: taskId, brief: 'implement it', cwd: '/' } as never);   // the pass that filed it died here
+  const at = markCancelled(run.id);
+  assert.equal(readRun(run.id).steps.implement!.taskId, null, 'the record never names it');
+
+  assert.equal((await forget(b.e, run.id)).refusal, `implement is pending. It was cancelled at ${at}, and a tick stops what is in flight: wf rm ${run.id} once it has settled (wf ls ${run.id}).`);
+  assert.ok(under('runs', `${run.id}.json`));
+  const pass = await advance(b.e, readRun(run.id));
+  assert.deepEqual([b.stopped, pass.filed, b.filings], [[taskId], [], [taskId]], 'stopped, and nothing filed');
+  b.settle(taskId, 'stopped');
+  assert.equal((await forget(b.e, run.id)).kind, 'forgotten');
+});

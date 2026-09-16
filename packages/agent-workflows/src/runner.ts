@@ -426,6 +426,38 @@ async function adoptRounds(
 }
 
 /**
+ * Steps a pass filed and never wrote down: each step `assess` calls ready — blind to a cancellation, as a pass that read the run before it
+ * was called off calls it — whose task, under the id that pass files it by, the engine holds. Looked up as `adoptChecks` looks up a check,
+ * and put in `views`; it answers with them and changes nothing on the run. `forget` adopts them in memory, so a step being filed is in
+ * flight, and `advance` stops them on a cancelled run, whose record would otherwise hide them from every stop.
+ */
+async function unrecordedSteps(
+  e: Engine,
+  run: Run,
+  steps: readonly Workflow[],
+  views: Map<string, TaskView>,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+  asked: (taskId: string) => CloseoutAsked,
+  verdictOf: (step: string) => Verdict | undefined,
+  asks: readonly RetryAsk[],
+  rounds: readonly RoundAsk[],
+  spendOf: SpendOf,
+): Promise<Array<{ name: string; taskId: string }>> {
+  const { cancelledAt: _, ...live } = run;
+  const { ready } = assess(steps, live, phaseOf, closeoutOf, asked, verdictOf, asks, rounds, () => false, spendOf);
+  const found: Array<{ name: string; taskId: string }> = [];
+  for (const name of ready) {
+    const taskId = stepTaskId(run, name, tryOf(run, name));
+    const view = views.get(taskId) ?? await e.view(taskId);
+    if (!view.state.brief) continue;   // not filed
+    views.set(taskId, view);
+    found.push({ name, taskId });
+  }
+  return found;
+}
+
+/**
  * Whether a task was asked for a closeout: the schema the engine keeps on its record of the filing — and `unsigned` when its last
  * attempt ended without it, the reason the engine records on a session that went quiet before it settles the task `failed`. What
  * tells a step that ended without one — `unsigned` — from a task that was never asked, and from one that failed. Exported,
@@ -967,7 +999,10 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // mark is the desired state and every tick reconciles toward it, instead of the system trusting
   // that one command did everything.
   if (run.cancelledAt) {
-    for (const { taskId } of inFlight(run, phaseOf)) {
+    // A step a pass filed and died before writing down is stopped too: the record does not name it, and nothing else would.
+    const unrecorded = await unrecordedSteps(e, run, steps, views, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, spendOf);
+    const live = unrecorded.filter(({ taskId }) => ['pending', 'running'].includes(phaseOf(taskId)));
+    for (const { taskId } of [...inFlight(run, phaseOf), ...live]) {
       // Skipped once the engine already has the request on its record, so a task taking a tick or
       // two to settle does not collect a stop-requested event every four seconds.
       if (!views.get(taskId)?.state.stopRequested) await e.stop(taskId);
@@ -1010,6 +1045,12 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   const tried: string[] = [];
   const rechecked: string[] = [];
   const notes: string[] = [...askNotes, ...collected];
+  // Read again at the moment of filing, and not only when this pass read the run: a person may have called it off, and `wf rm` forgotten it,
+  // while this pass was at work — cutting a worktree, whose `npm ci` takes a minute. Filed then, a session would work in a worktree that is
+  // gone, for a record no pass reads, and no stop would reach it. The world as it stands decides, and once called off, nothing more is
+  // filed on this pass.
+  let calledOff = false;
+  const mayFile = (): boolean => !(calledOff ||= !fs.existsSync(runFile(run.id)) || fs.existsSync(cancelFile(run.id)));
   for (const r of retry) {
     const step = steps.find((s) => s.name === r.step)!;
     const record = run.steps[r.step]!;
@@ -1025,6 +1066,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
       }
       continue;
     }
+    if (!mayFile()) continue;
     tried.push(r.step);
     notes.push(`${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : `wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}`}`);
     // A recheck files no session. Its check is filed below with the others, under the new try's id.
@@ -1089,6 +1131,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // engine, this is one more task.
   const looped: string[] = [];
   for (const r of round) {
+    if (!mayFile()) break;
     const looping = steps.find((s) => s.name === r.step)!;
     const target = steps.find((s) => s.name === r.target)!;
     const record = run.steps[r.target]!;
@@ -1130,6 +1173,7 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // check to SETTLE, on a later one.
   const checked: string[] = [];
   for (const name of [...check, ...rechecked]) {
+    if (!mayFile()) break;
     const step = steps.find((s) => s.name === name)!;
     const workspace = run.steps[name]!.workspace ?? run.workspace;
     const taskId = checkTaskId(run, name);
@@ -1176,9 +1220,12 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
 
   const filed: string[] = [];
   for (const name of ready) {
+    if (!mayFile()) break;
     const step = steps.find((s) => s.name === name)!;
     const place = await workspaceFor(run, steps, step);
     notes.push(...place.notes.map((note) => `${name}: ${note}`));
+    // Asked again after the cut, which can take minutes: the worktree stays for `wf rm` to find, and nothing is filed into it.
+    if (!mayFile()) break;
     // Made before the step is told of it, so the directory its brief names is there when it starts.
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
@@ -1324,6 +1371,10 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
     await adoptRounds(e, run, steps, views, phaseOf, reader, asked, rounds, spendOf);
     await adoptTries(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, spendOf);
     await adoptChecks(e, run, steps, views, phaseOf, reader, asked, spendOf);
+    // And a step a pass filed and never wrote down — on a cancelled run too, where a pass that read it before the cancel may be filing it now.
+    for (const { name, taskId } of await unrecordedSteps(e, run, steps, views, phaseOf, reader, asked, verdictOf, asks, rounds, spendOf)) {
+      run.steps[name] = { ...run.steps[name]!, taskId };
+    }
   }
   const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
   const others = listRuns().filter((o) => o.id !== id);

@@ -3024,7 +3024,7 @@ test("`wf rm --delete-branches` deletes a branch merged into its run's base and 
   for (const id of ['..', '.', 'runs/../..', '']) {
     const { printed, error } = await rmTyped(t, b.e, id);
     assert.equal(error?.exitCode, 2, JSON.stringify(id));
-    assert.deepEqual(printed, [`${id}  not forgotten: ${JSON.stringify(id)} is not a run's id, and wf rm removes what is under WF_ROOT by id: give the id wf ls prints, as in wf rm add-a-flag-x1y2.`]);
+    assert.deepEqual(printed, [`${id}  not forgotten: ${JSON.stringify(id)} is not a run's id, and wf rm removes what is under WF_ROOT by id — lowercase letters, digits and dashes: give the id wf ls prints, as in wf rm add-a-flag-x1y2.`]);
     assert.ok(under('runs', `${kept.run.id}.json`) && under('worktrees', kept.run.id, 'implement'), 'the store is where it was');
   }
 });
@@ -3208,4 +3208,33 @@ test("REFUSED at shipped defaults: a worktree on no branch — its session stopp
   gitIn(q.wt, 'checkout', '-q', '--detach');
   const forgot = await forget(b.e, q.run.id);
   assert.deepEqual([forgot.kind, forgot.removed, forgot.handedOff], ['forgotten', [q.wt], []]);
+});
+
+test("REFUSED at shipped defaults: `wf rm` on a name that is a live run's id plus the suffix of one of its files — `<id>.json`, `<id>.cancelled`, `<id>.asks`, as `ls runs/` gives them — exit 2, saying the id to give; its record, cancellation and asks stay. Nor does a run with no record take a live run's check logs: `wf rm <id>-implement` leaves `<id>-implement-check.stderr`", async (t) => {
+  const repo = aRepo();
+  const b = board();
+  const live = await aParent(repo, b);   // implement filed, not settled: in flight
+  const id = live.run.id;
+  markCancelled(id);
+  const asks = path.join(ROOT, 'runs', `${id}.asks`);
+  fs.mkdirSync(asks, { recursive: true });
+  fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ step: 'implement', try: 2, mode: 'nudge', at: '2026-09-16T00:00:00.000Z' }));
+  fs.mkdirSync(path.join(ROOT, 'checks'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'checks', `${id}-implement-check.stderr`), 'the live run\'s\n');
+
+  for (const [named, suffix] of [[`${id}.json`, '.json'], [`${id}.cancelled`, '.cancelled'], [`${id}.asks`, '.asks']] as const) {
+    const { printed, error } = await rmTyped(t, b.e, named);
+    assert.equal(error?.exitCode, 2, named);
+    assert.deepEqual(printed, [`${named}  not forgotten: "${named}" is not a run's id: ${suffix} is on the name of one of its files under runs/, not on the run's. Give the id wf ls prints: wf rm ${id}.`]);
+  }
+  for (const other of ['R-XYZ', 'r_xyz', 'r.xyz']) {
+    const { printed, error } = await rmTyped(t, b.e, other);
+    assert.deepEqual([error?.exitCode, printed], [2, [`${other}  not forgotten: "${other}" is not a run's id, and wf rm removes what is under WF_ROOT by id — lowercase letters, digits and dashes: give the id wf ls prints, as in wf rm add-a-flag-x1y2.`]]);
+  }
+  assert.ok(under('runs', `${id}.json`) && under('runs', `${id}.cancelled`) && under('runs', `${id}.asks`, 'retry-implement-2'), 'the record, its cancellation and its ask stay');
+  assert.ok(readRun(id).cancelledAt);
+
+  const sibling = await rmTyped(t, b.e, `${id}-implement`);
+  assert.deepEqual([sibling.error, sibling.printed], [undefined, [`${id}-implement  no such run — nothing to forget`]]);
+  assert.ok(under('checks', `${id}-implement-check.stderr`), "the live run's check log stays");
 });

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -2676,6 +2676,19 @@ test("`checkLogsOf`: a run's check logs are its steps' checks on every try — n
   assert.deepEqual(checkLogsOf('r-1', ['implement', 'review'], listing), ['r-1-implement-check.stderr', 'r-1-implement-try2-check.stderr', 'r-1-review-check.stderr']);
   assert.deepEqual(checkLogsOf('r-1', undefined, listing, ['r-1-x2', 'r-10']),
     ['r-1-implement-check.stderr', 'r-1-implement-try2-check.stderr', 'r-1-implement-tryX-check.stderr', 'r-1-review-check.stderr']);
+  // No run `r-1-implement`: what starts with its name is `r-1`'s, a stored run whose id it starts with.
+  assert.deepEqual(checkLogsOf('r-1-implement', undefined, listing, ['r-1']), []);
+  assert.deepEqual(checkLogsOf('r-1-implement', undefined, listing, []), ['r-1-implement-check.stderr', 'r-1-implement-try2-check.stderr', 'r-1-implement-tryX-check.stderr']);
+});
+
+test("REFUSED at shipped defaults: `idRefusal` takes only what `runId` mints — lowercase letters, digits and dashes — and tells an id with a file's suffix on it the id to give", () => {
+  for (const id of ['add-a-flag-x1y2', 'r-1', '0abc']) assert.equal(idRefusal(id), null, id);
+  assert.equal(idRefusal('r-xyz.json'), '"r-xyz.json" is not a run\'s id: .json is on the name of one of its files under runs/, not on the run\'s. Give the id wf ls prints: wf rm r-xyz.');
+  assert.match(idRefusal('r-xyz.cancelled')!, /: \.cancelled is on the name .* wf rm r-xyz\.$/);
+  assert.match(idRefusal('r-xyz.asks')!, /: \.asks is on the name .* wf rm r-xyz\.$/);
+  for (const id of ['..', '.', '', '-r', 'R-XYZ', 'r_xyz', 'r.xyz', 'r xyz', 'runs/r-1', 'r-xyz.json.json']) {
+    assert.match(idRefusal(id)!, /is not a run's id, and wf rm removes what is under WF_ROOT by id — lowercase letters, digits and dashes: /, JSON.stringify(id));
+  }
 });
 
 test('`forgetLine` says in one line what happened to each run: forgotten, with what was handed off and what became of each branch; not forgotten, with why and what to do; no such run', () => {

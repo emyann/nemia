@@ -1523,14 +1523,17 @@ export function cancelPlan(
 export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
 
 /**
- * Why `wf rm` will not take this as a run's id — or null. Pure, and asked before anything is read. A run's id names files and directories
- * under `WF_ROOT` (`runs/<id>`, `worktrees/<id>`), so only a name is taken: letters, digits, dots, dashes and underscores, starting with a
- * letter or a digit. Anything else — `..`, a path, an empty id — would name a directory that is not the run's, and removing it could take
- * the store with it.
+ * Why `wf rm` will not take this as a run's id — or null. Pure, and asked before anything is read. A run's id names files under `WF_ROOT`
+ * with a suffix added — `runs/<id>.json`, `.cancelled`, `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId`
+ * mints is taken: lowercase letters, digits and dashes, starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives —
+ * names `runs/r-xyz.json` as a run's directory, which is another run's record, and a run with no record of its own is swept of it with
+ * nothing asked. `..` or a path would name a directory that is not the run's. One that is an id with a file's suffix on it is told the id.
  */
 export function idRefusal(id: string): string | null {
-  if (/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) return null;
-  return `${JSON.stringify(id)} is not a run's id, and wf rm removes what is under WF_ROOT by id: give the id wf ls prints, as in wf rm add-a-flag-x1y2.`;
+  if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
+  const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.asks)$/.exec(id);
+  if (file) return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id wf ls prints: wf rm ${file[1]}.`;
+  return `${JSON.stringify(id)} is not a run's id, and wf rm removes what is under WF_ROOT by id — lowercase letters, digits and dashes: give the id wf ls prints, as in wf rm add-a-flag-x1y2.`;
 }
 
 /** An ask as `wf rm` names it: a try (`retry`) or a round (`round`), of which step, and its number — what `askAt` finds its file by. */
@@ -1720,8 +1723,9 @@ export function branchFates(run: Pick<Run, 'id'>, listed: readonly string[], mer
 
 /**
  * The check logs in `checks/` that are the run's: `<id>-<step>-check.stderr` and `<id>-<step>-try<n>-check.stderr`, for each step the
- * record names (`checkStderr` in runner.ts). Pure. With no record to name the steps, any `<id>-…-check.stderr` — but not one that is
- * another run's, whose id starts with this one's.
+ * record names (`checkStderr` in runner.ts). Pure. With no record to name the steps, any `<id>-…-check.stderr` — but none that could be
+ * another stored run's: one whose id starts with this one's, or whose id this one starts with — `r-xyz-implement` is no run, and
+ * `r-xyz-implement-check.stderr` is `r-xyz`'s.
  */
 export function checkLogsOf(id: string, names: readonly string[] | undefined, listing: readonly string[], otherIds: readonly string[] = []): string[] {
   const suffix = '-check.stderr';
@@ -1733,7 +1737,7 @@ export function checkLogsOf(id: string, names: readonly string[] | undefined, li
         return file.startsWith(prefix) && /^(-try\d+)?$/.test(file.slice(prefix.length, -suffix.length));
       });
     }
-    return file.startsWith(`${id}-`) && !otherIds.some((o) => o !== id && o.startsWith(`${id}-`) && file.startsWith(`${o}-`));
+    return file.startsWith(`${id}-`) && !otherIds.some((o) => o !== id && file.startsWith(`${o}-`));
   }).sort();
 }
 

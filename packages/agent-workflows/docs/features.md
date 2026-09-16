@@ -1911,6 +1911,9 @@ main at `wf start`. The inbox parks cards and starts none.
   oldest such card when a run slot frees, through `startFromInbox`, so its base is main at that moment and its brief is
   frozen then. `--after` stays for cards that depend on one another. The Factory draws queued cards as ghosts.
 - The README names `WF_MAX_CONCURRENT` beside `WF_MAX_RUNS`, what each counts, and that checks are apart.
+- Which pending step gets a freed session is the engine's (Engine-side work, below: filing order and `priority`); until
+  that lands, two pending steps are ordered by the alphabet of their run ids, and a new run's first step can take the
+  slot a running run's next step is about to need.
 - The ceiling that matters over a week is the merge: a child waits on its parent's merge, and every later run is cut
   from a main missing unmerged results. Either the operator merges daily, or a workflow's last step merges on a green
   trial merge — a change to "a person merges" that this entry does not decide.
@@ -2014,4 +2017,16 @@ Not agent-workflows features, listed so nothing is lost:
   A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the ceiling exists for:
   reasoning, not a measurement;
 - pools by subscription: `claude` and `claude-detached` counted as one pool, a harness declaring its pool with its own name
-  as the default. Nothing hits it while the workflows run steps on `claude` only.
+  as the default. Nothing hits it while the workflows run steps on `claude` only;
+- **admission in filing order, and a task's priority.** The tick walks tasks in `journal.list`'s order, which is the ids
+  sorted (`readdirSync(...).sort()`), and admits each pending one while `used < max`: so which of two pending tasks gets a
+  slot is decided by the alphabet of their run ids, and a run never keeps its slot across its own steps — its next step is
+  filed a check and a pass after the last ended, and any task pending in that gap takes the slot (measured 2026-09-16:
+  a card's run filed at 23:53:07Z took the slot the engine lane's implement released at 23:53:18Z, and that lane's review,
+  filed 23:54:44Z, then waited behind four sessions). Fix, engine: pending tasks admitted oldest `filed` first (the
+  journal has the time), the ids' order kept only as a tiebreak; and a `priority` field on the task, a number read at
+  admission and nowhere else, higher first and filing order within — a knob on the workload, carried on the task, so the
+  workflow layer can give a run in flight its momentum by filing every step after its first above a new run's first
+  (Kubernetes: a pod's `priorityClassName`). Tests: two pending tasks, the later-filed one alphabetically first, the
+  earlier admitted; a higher priority admitted before an older lower one. agent-workflows then: `priority` on every
+  filing after a run's first step, and the run cap (§3) unchanged.

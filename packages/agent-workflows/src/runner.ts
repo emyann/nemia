@@ -22,6 +22,8 @@ export type { CloseoutAsked, ParentCloseout, ParentRun, ParentStep, Raise, Retry
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
+export { INBOX_KEYS, parseInboxCard } from './inbox.ts';
+export type { InboxCard } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { afterRefusal, artifactPlace, gated, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
@@ -30,6 +32,12 @@ export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workf
 
 const runsDir = () => path.join(HOME, 'runs');
 const runFile = (id: string) => path.join(runsDir(), `${id}.json`);
+
+/**
+ * The inbox: cards before they are started, one `<name>.md` per card (`parseInboxCard` in inbox.ts), in the store beside `runs/` — not in a
+ * repository, since a card's `repo:` says which one the idea is about.
+ */
+export const inboxDir = (): string => path.join(HOME, 'inbox');
 
 /**
  * A cancellation gets its OWN file, and this is the whole reason it does.

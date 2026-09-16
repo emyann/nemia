@@ -45,8 +45,6 @@ function refuse(why: string): never {
   throw new WorkflowError(why);
 }
 
-const isCardKey = (key: string): key is CardKey => (CARD_KEYS as readonly string[]).includes(key);
-
 /**
  * A plan folder's cards, sorted by name, from its files — or refused, naming the file and the fix: a file that is not markdown, a folder with
  * no card, a key a card does not have (or set twice, or to nothing), a card with no `workflow:` or an empty body, and an `after:` naming a
@@ -84,7 +82,7 @@ function parseCard(file: string, text: string): Card {
 }
 
 /** A card's body, its run's brief — refused when empty, since a card with nothing to ask is not a card. */
-function bodyOf(file: string, body: string): string {
+export function bodyOf(file: string, body: string): string {
   if (!body) refuse(`${file}: the body is empty. A card's body is its run's brief — what the run is asked to do — and a card with nothing to ask is not a card. Write it below the frontmatter.`);
   return body;
 }
@@ -104,9 +102,10 @@ function afterOf(file: string, after: string | undefined): string[] {
 export type StartCard = { file: string; workflow?: string; after: string[]; body: string };
 
 /**
- * A file `wf start` is given, read as a card when its frontmatter is a card's — every line of it `workflow:` or `after:` — or null when it is
- * not: no frontmatter, one with any other key or a line that is not a key, one with nothing in it, or one that never closes. Null means the
- * file's whole text is the brief, as it always was, so a brief that happens to start with `---` is not eaten. Pure.
+ * A file `wf start` is given, read as a card when its frontmatter is a card's — every line of it `workflow:` or `after:`, or an inbox card's
+ * `repo:`, which is refused by name — or null when it is not: no frontmatter, one with any other key or a line that is not a key, one with
+ * nothing in it, or one that never closes. Null means the file's whole text is the brief, as it always was, so a brief that happens to start
+ * with `---` is not eaten. Pure.
  *
  * `wf plan` prints `wf start <card> --after …` for each card it did not start, and this is what makes that command start the card's body.
  * Read as a card, a file is held to what `wf plan` holds a card to — a key set twice or to nothing, an empty body, an `after:` naming no card or
@@ -117,7 +116,8 @@ export function cardToStart(file: string, text: string, after: readonly string[]
   let split: { block: string | null; body: string };
   try { split = splitFrontmatter(file, text); } catch { return null; }
   const lines = (split.block ?? '').split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
-  const isCardLine = (line: string) => line.indexOf(':') > 0 && isCardKey(line.slice(0, line.indexOf(':')).trim());
+  // `repo:` is an inbox card's key, so a card carried out of the inbox reads as a card, and `readCardKeys` refuses the key by name.
+  const isCardLine = (line: string) => line.indexOf(':') > 0 && ([...CARD_KEYS, 'repo'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
   if (!lines.length || !lines.every(isCardLine)) return null;
   const keys = readCardKeys(file, split.block!);
   const body = bodyOf(file, split.body);
@@ -131,7 +131,18 @@ export function cardToStart(file: string, text: string, after: readonly string[]
 
 /** A card's frontmatter as key → value: every line a key a card has, set once, to something. */
 function readCardKeys(file: string, block: string): Partial<Record<CardKey, string>> {
-  const keys: Partial<Record<CardKey, string>> = {};
+  return frontmatterKeys(file, block, CARD_KEYS, (key) => (key === 'repo'
+    ? `${file}: \`repo\` is not a key a plan's card has: a plan works on one repository, the one wf plan <folder> --repo <r> is given, and a card started by hand works on wf start's --repo. \`repo:\` is an inbox card's — delete the line, or file the idea in the inbox: wf inbox add <file> --repo <r>.`
+    : `${file}: \`${key}\` is not a key a card has. A card's keys are: ${CARD_KEYS.join(', ')} — what runs it, and what ships first; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`));
+}
+
+/**
+ * A card's frontmatter as key → value, for the keys `keys` a card of its kind has — a plan's (`CARD_KEYS`) or the inbox's (`INBOX_KEYS` in
+ * inbox.ts) — each set once, to something. Refused by name: a line that is not `key: value`, a key set twice or to nothing, and any key
+ * not in `keys`, in the words `unknown` gives for it.
+ */
+export function frontmatterKeys<K extends string>(file: string, block: string, keys: readonly K[], unknown: (key: string) => string): Partial<Record<K, string>> {
+  const read: Partial<Record<K, string>> = {};
   for (const raw of block.split('\n')) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
@@ -139,16 +150,14 @@ function readCardKeys(file: string, block: string): Partial<Record<CardKey, stri
     if (i <= 0) refuse(`${file}: \`${line}\` is not \`key: value\`. Each frontmatter line is a key, a colon and its value, and a list stays on one line: \`after: a, b\`.`);
     const key = line.slice(0, i).trim();
     const value = line.slice(i + 1).trim();
-    if (!isCardKey(key)) {
-      refuse(`${file}: \`${key}\` is not a key a card has. A card's keys are: ${CARD_KEYS.join(', ')} — what runs it, and what ships first; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`);
-    }
-    if (Object.hasOwn(keys, key)) {
+    if (!(keys as readonly string[]).includes(key)) refuse(unknown(key));
+    if (Object.hasOwn(read, key)) {
       refuse(`${file}: \`${key}\` is set twice, and a card that says two things says nothing. Keep one line${key === 'after' ? ' and list every card on it: `after: a, b`' : ''}.`);
     }
     if (!value) refuse(`${file}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
-    keys[key] = value;
+    read[key as K] = value;
   }
-  return keys;
+  return read;
 }
 
 /**

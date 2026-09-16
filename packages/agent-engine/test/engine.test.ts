@@ -175,13 +175,13 @@ test('a finished task still settles when the board is full', async () => {
   assert.equal(await b.run(phaseOf(id, b)), 'succeeded', 'settling is not an admission');
 });
 
-test('the ceilings are per harness — two subscriptions are two pools', async () => {
+test('a harness no pool names is a pool of its own — two subscriptions are two pools', async () => {
   const b = board();
   await Promise.all([...Array(3)].map((_, i) => b.run(file({ ...spec, brief: `c${i}`, harness: 'claude' }))));
   await Promise.all([...Array(3)].map((_, i) => b.run(file({ ...spec, brief: `x${i}`, harness: 'codex' }))));
 
   await b.run(tick(2));
-  // The fake runner is one map, but the COUNTS are kept per harness, so each pool admits two.
+  // The fake runner is one map, but the COUNTS are kept per pool, and `tick` is given none: each harness admits two.
   assert.equal(b.sessions.size, 4, 'two claude and two codex, not two in total');
 });
 

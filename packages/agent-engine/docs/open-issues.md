@@ -5,12 +5,14 @@ it can be picked up later without reconstructing it from commit history. The las
 record of what was fixed, with commits, so the open items have their context. A fixed item leaves
 its number behind rather than renumbering the rest, so "bug 9" means the same thing everywhere.
 
-State as of 2026-09-14: agent-engine after the hold-the-bar engine work (repository
+State as of 2026-09-16: agent-engine after the hold-the-bar engine work (repository
 `docs/plan-hold-the-bar.md` §4 B and E4), bugs 3, 4, 7 and issue 10 (engine `7200295`), a
 session's conversation read as events (§4 S1), and `say`, a person's words into a running session on the
 record (§6 item 3, the engine half), `find`, one session by its name without `claude agents` (§6 item 17), and
 bug 1, a quiet session with no closeout recorded a success (§6 item 18), and what a session cost, read from its harness,
-with a spend cap on the task (engine `9d075f7`, `26020c1`); agent-workflows `0e7b02a`.
+with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small items: a view that observes its task's own
+harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20);
+agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -259,6 +261,30 @@ two end: nothing more is admitted while the count is at or past the ceiling. `te
 at the shipped counting: two blocked at a ceiling of two and a third task starts; two working and it does not; a blocked
 session working again fills the slot another's end freed, and blocking again gives it back.
 
+### 20. Pools are declared, and one ceiling fits every pool
+
+**What changed** (2026-09-16). The ceiling is counted per pool, not per harness. A harness declares the pool it is counted
+in — `pool` on a `HarnessSpec` or a `PromiseRunner` — and is a pool of its own, under the name it is configured under, when
+it declares none. `'claude-bg'` is counted in `claude` (`CLAUDE_POOL` in `agent-engine/src/runner.ts`), and so is the
+engine's `claudeDetached`, which names that pool, so no caller has to: agent-workflows passes the engine's harnesses and a
+`check`, and names none. Before, both ran Claude Code on one subscription and were counted apart, so a ceiling of 2 let
+four Claude Code sessions run. `test/pool.test.ts`, with fake `claude` and `codex`, at `createEngine()`'s own harnesses and
+at agent-workflows' map: a `claude-detached` session counts against `claude`'s ceiling, and `codex` and a `check` keep
+their own.
+
+**What is left.**
+
+- **One number for every pool.** `maxConcurrent` holds Claude Code's pool, Codex's and a `check`'s to the same count,
+  though a `check` is a shell command under no rate limit: agent-workflows' suites queue behind the number its sessions
+  do. A number per pool would be a map where the number is; nothing has asked for one.
+- **A pool is declared, never discovered.** A `PromiseRunner`, or an Effect-door `sdkRunner`, that drives Claude Code is a
+  pool of its own unless it says `claude`.
+- **A task whose harness the engine no longer has** runs on the fallback (`harnessOf`, `composite`) but is counted under
+  the name it was filed with, a pool of its own: a pass reads pools by harness name and knows no fallback. Only a board
+  whose harness map lost a harness with tasks still on it has one.
+- **The Effect door** counts per harness unless its caller passes `tick` the pools: it has no harness configs to read
+  them from. `createEngine` passes them.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
@@ -451,6 +477,7 @@ session working again fills the slot another's end freed, and blocking again giv
 | nothing could bound what a session spends | `budgetUsd` on the task, `--max-budget-usd` from both Claude runners, and a session `claude -p` ended at its cap recorded `failed`, reason `budget`, its task settled `failed` with no further attempt (the operator's call, round 2); refused on `claude`, whose `--bg` sessions keep no cap (issue 17), and on `codex` | engine `26020c1`, round 2 |
 | a `view` of a task whose harness cannot `find` — a `check`, a Codex step — or of any attempt in flight observed every harness, so each read of one cost a `claude agents` call and a Codex listing (§6 item 27, E7's last review) | a view observes its task's own harness, the one `harnessOf` names for `logs` and `transcript`, and the fallback's for a harness the engine no longer has | engine, §6 item 27 |
 | a session waiting on a permission prompt held a concurrency slot until a person answered or its deadline came, though it makes no API calls | the ceiling counts sessions observed `working`; `LIVE`, which still has `blocked`, keeps what else it guards (issue 19) | engine, 2026-09-16 |
+| two `claude` and two `claude-detached` sessions ran at a ceiling of 2 — four Claude Code sessions on one subscription, counted as two pools | a harness declares the pool it is counted in, its own name by default; `'claude-bg'` and the engine's `claudeDetached` are both counted in `claude`, with no caller saying so (issue 20) | engine, 2026-09-16 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

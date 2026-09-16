@@ -372,11 +372,12 @@ export type Now = {
   at: Date;
   graceMs: number;
   /**
-   * How many sessions of THIS TASK'S harness are already at work, and how many may. At work is
+   * How many sessions of THIS TASK'S pool are already at work, and how many may. At work is
    * `working`: a `blocked` session holds no slot.
    *
-   * Resolved by the caller rather than looked up here, because the ceiling is per harness — two
-   * subscriptions are two independent pools, and a Codex session must not use up a Claude slot.
+   * Resolved by the caller rather than looked up here, because the ceiling is per pool — one
+   * subscription is one pool, whichever harnesses run on it, and a Codex session must not use up a
+   * Claude slot.
    * `decide` only ever compares two numbers, which is all a pure function should need.
    */
   used: number;
@@ -431,7 +432,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
     // be allowed to settle when the board is full — otherwise a full board could never drain.
     if (now.used >= now.max) {
-      return { do: 'nothing', why: `at the ${state.harness ?? 'default'} ceiling (${now.used}/${now.max})` };
+      return { do: 'nothing', why: `${state.harness ?? 'default'}'s pool is at its ceiling (${now.used}/${now.max})` };
     }
     const resumeFrom = resumeTarget(state, last);
     // An unsigned session is quiet, not gone: stopped before it is continued, or two would share one conversation.

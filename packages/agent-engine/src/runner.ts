@@ -531,6 +531,13 @@ export const CLAUDE_PERMISSION_MODES: readonly string[] = ['acceptEdits', 'auto'
  */
 export const CLAUDE_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 
+/**
+ * The pool Claude Code's sessions are counted in under the concurrency ceiling, whichever of the engine's runners starts
+ * them: `claude --bg` and `claude -p` run on one subscription, under one rate limit. The name is the harness the engine
+ * configures by default, so a board that names no pools reads the same as before.
+ */
+export const CLAUDE_POOL = 'claude';
+
 /** What Claude Code cannot be asked for, as a sentence that says what to write instead. */
 export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
   if (task.permissionMode !== undefined && !CLAUDE_PERMISSION_MODES.includes(task.permissionMode)) {

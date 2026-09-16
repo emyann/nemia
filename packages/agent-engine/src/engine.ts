@@ -14,7 +14,7 @@ import { Runner, type McpServer } from './runner.ts';
 /** How long a spawned session may go unregistered by the harness before we call it gone. */
 export const GRACE_MS = 30_000;
 
-/** Sessions of one harness that may run at once. Your subscription's rate limit, mostly. */
+/** Sessions of one pool that may be at work at once. Your subscription's rate limit, mostly. */
 export const DEFAULT_MAX_CONCURRENT = 3;
 
 /** A live session is one the engine is still waiting on. `done`/`failed`/`stopped` are not. */
@@ -275,38 +275,50 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, ob
  * Observed at work, and only that: a `blocked` session is not counted, so blocked sessions that
  * move again can put a board past its ceiling. Nothing is stopped for it; nothing more is admitted
  * until the count is back under.
+ *
+ * Counted by POOL, because a ceiling is a rate limit and a rate limit is a subscription's, however
+ * many harnesses run on it. `pools` names the pool each harness is counted in; a harness it does not
+ * name is a pool of its own, under its own name. `createEngine` passes the pools its harnesses
+ * declare; a caller of this door passes its own.
  */
-export const tick = Effect.fn('tick')(function* (maxConcurrent = DEFAULT_MAX_CONCURRENT) {
+export const tick = Effect.fn('tick')(function* (
+  maxConcurrent = DEFAULT_MAX_CONCURRENT,
+  pools: Readonly<Record<string, string>> = {},
+) {
   const journal = yield* Journal;
   const runner = yield* Runner;
 
   const observed = yield* runner.observe;
   const ids = yield* journal.list;
 
-  // Which harness each session at work belongs to — the sighting does not say, so it comes from the
+  // Which pool each session at work is counted in — the sighting does not say, so it comes from the
   // task that owns the name. Two small file reads per task per pass; the board is local and tiny.
   // At work, not live: a `blocked` session holds no slot (`AT_WORK`).
+  const poolOf = (state: State) => {
+    const harness = state.harness ?? 'default';
+    return Object.hasOwn(pools, harness) ? pools[harness]! : harness;
+  };
   const used = new Map<string, number>();
   const states = new Map<string, State>();
   for (const id of ids) {
     const state = fold(id, yield* journal.read(id));
-    const harness = state.harness ?? 'default';
+    const pool = poolOf(state);
     states.set(id, state);
     const last = state.attempts.at(-1);
     if (last && last.ended === null) {
       const seen = observed.get(nameFor(id, last.n));
-      if (seen && AT_WORK.has(seen.state)) used.set(harness, (used.get(harness) ?? 0) + 1);
+      if (seen && AT_WORK.has(seen.state)) used.set(pool, (used.get(pool) ?? 0) + 1);
     }
   }
 
   const taken: Action[] = [];
   for (const id of ids) {
-    const harness = states.get(id)?.harness ?? 'default';
-    const before = used.get(harness) ?? 0;
+    const pool = poolOf(states.get(id)!);
+    const before = used.get(pool) ?? 0;
     const actions = yield* settleTask(id, observed, { used: before, max: maxConcurrent });
     taken.push(...actions);
     // A slot is spent the moment we journal the intent, not when the harness confirms it.
-    if (actions.some((a) => a.do === 'start')) used.set(harness, before + 1);
+    if (actions.some((a) => a.do === 'start')) used.set(pool, before + 1);
     // Against the journal as this pass left it — so an end written just now is let go now — read again
     // only when the pass wrote to it.
     yield* releaseFinished(actions.some((a) => PROGRESSES.has(a.do)) ? fold(id, yield* journal.read(id)) : states.get(id)!, observed);

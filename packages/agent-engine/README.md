@@ -29,7 +29,7 @@ Definition of done — a closed list, and it is closed:
 - [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`)
 - [x] attempts, stop, logs — as text, and as the conversation to follow (`transcript`)
 - [x] a person's words into a session while it runs, on the record (`say`)
-- [x] concurrency ceiling, per harness — two subscriptions are two pools
+- [x] concurrency ceiling, per pool — one subscription is one pool, however many harnesses run on it
 - [x] the feed — a cursored stream of everything that happened
 - [x] resume — an attempt continues the one before it, by policy
 - [x] deadline — wall clock across attempts; also the only thing that ends a `blocked` session,
@@ -199,7 +199,8 @@ price of running more than one harness. It is a handful of lines, because the en
 journal and a seam.
 
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
-optionally the words it refuses, a reader of what it prints, and where it keeps its conversation:
+optionally the words it refuses, a reader of what it prints, where it keeps its conversation, and
+the pool it is counted in under the ceiling:
 
 ```ts
 export const codex: HarnessSpec = {
@@ -1001,6 +1002,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `budget` and settles its task, with attempts left; the flag reaches both Claude runners on every attempt |
+| `test/pool.test.ts` | pools by subscription, at shipped defaults — fake `claude` and `codex` whose sessions run until the test lets them go: a `claude-detached` session counted against `claude`'s ceiling, `codex` and a `check` each in their own |
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |
@@ -1061,8 +1063,13 @@ The cursor is a byte offset into `feed.jsonl` and never expires: a consumer that
 week replays rather than being told to start over.
 
 `AE_ROOT` points at a different board, the way a kubeconfig points at a different cluster.
-`AE_MAX_CONCURRENT` (default 3) is how many sessions of **each** harness may run at once — the
-ceiling is per harness because your rate limits are. Only a session at work is counted: a `blocked` one is
+`AE_MAX_CONCURRENT` (default 3) is how many sessions may be at work at once in **each pool** — the
+ceiling is per pool because your rate limits are, and a rate limit is a subscription's, however many harnesses
+run on it. A harness declares the pool it is counted in — `pool` on a `HarnessSpec` or a `PromiseRunner` — and
+is a pool of its own, under its own name, when it declares none. `claude` and `claude-detached` both run Claude
+Code on one subscription, so the engine counts both in `claude`'s pool without being told: a ceiling of 2 is
+two Claude Code sessions, not four. `codex` keeps its own, and so does a harness you add, such as
+agent-workflows' `check`, unless it names another. Only a session at work is counted: a `blocked` one is
 not. A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the
 ceiling exists for — reasoning, not a measurement. It is counted again on the pass after it moves again, so
 blocked sessions that all move at once can put a board past its ceiling for a while; nothing is stopped for

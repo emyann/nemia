@@ -3238,3 +3238,26 @@ test("REFUSED at shipped defaults: `wf rm` on a name that is a live run's id plu
   assert.deepEqual([sibling.error, sibling.printed], [undefined, [`${id}-implement  no such run — nothing to forget`]]);
   assert.ok(under('checks', `${id}-implement-check.stderr`), "the live run's check log stays");
 });
+
+test("REFUSED at shipped defaults: a pass that read a `--no-worktree` run before `wf rm` forgot it hands nothing off and collects nothing afterwards — its workspace, the repository, is still there, and its files directory is not made again", async () => {
+  const repo = aRepo();
+  const b = board();
+  const run = start({ brief: 'notes on the base itself', repo, workflowDir: oneStep(), isolate: false });
+  await advance(b.e, readRun(run.id));
+  fs.writeFileSync(path.join(repo, 'notes.md'), 'notes\n');
+  b.settle(`${run.id}-implement`, 'succeeded', { ...SIGNED, artifacts: ['notes.md'] });
+  await advance(b.e, readRun(run.id));
+  assert.ok(under('runs', run.id, 'artifacts', 'implement', 'notes.md'), 'collected, as a step with no check is on every pass');
+
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const slow = { ...b.e, view: async (id: string) => { await gate; return b.e.view(id); } } as Engine;
+  const pass = advance(slow, readRun(run.id));
+  assert.equal((await forget(b.e, run.id)).kind, 'forgotten');
+  fs.writeFileSync(path.join(repo, 'later.txt'), 'a person\'s edit, after the run was forgotten\n');
+  release();
+  await pass;
+
+  assert.ok(!under('runs', run.id), 'no files directory without a record');
+  assert.equal(gitIn(repo, 'status', '--porcelain'), '?? later.txt', "and nothing of a person's checkout committed under the step's name");
+});

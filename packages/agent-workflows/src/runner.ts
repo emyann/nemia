@@ -1035,7 +1035,11 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   //
   // And on the same passes, what a finished step named from its workspace root is collected into its files directory: before its check
   // is filed, and before a step after it works in its workspace (`collectArtifacts`).
+  //
+  // Only while the record is there, read at the moment of each: a run `wf rm` forgot after this pass read it is not handed off — a
+  // `--no-worktree` run's workspace is a person's checkout — and its files directory is not made again.
   const collected = handOffDue(steps, run, phaseOf).flatMap((name) => {
+    if (!fs.existsSync(runFile(run.id))) return [];
     handOff(run.steps[name]!.workspace!, name);
     return collectArtifacts(run, name, signedOff(name));
   });

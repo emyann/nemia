@@ -24,7 +24,7 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import type { Locator, Page } from 'playwright';
+import type { Locator, Page, Response } from 'playwright';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
@@ -1539,8 +1539,19 @@ const PAGES: PageSpec[] = [
         }
       }
 
+      /** Waited on from before the answer, so the read of the inbox the answer asks for is not missed. */
+      const rereadOf = (p: Page) => p.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox', { timeout: WAIT_MS });
+      /** That a page saw the one refusal it made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else. */
+      const onlyRefusal = (p: Page, seen: string[], answered: Response) => {
+        const expected = `request answered ${answered.status()}: ${answered.request().method()} ${answered.url()}`;
+        const chromium = new RegExp(`^console error: Failed to load resource: the server responded with a status of ${answered.status()}\\b`);
+        const others = seen.filter((problem) => problem !== expected && !chromium.test(problem));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      };
+
       // Refused, in a page of its own whose one refusal is the point: the card dropped behind the page's back — `wf inbox rm` in a terminal —
-      // after its start form opened. The package's sentence, beside the form, word for word; no run written; the card put back.
+      // after its start form opened. The inbox is read again after the answer, so the card leaves the list, and the package's sentence stays,
+      // word for word, in the card's place; no run written; the card put back.
       const bareFile = path.join(inbox, `${bare.name}.md`);
       const bareAside = path.join(store!, `${bare.name}.md.aside`);
       const refused = await page.context().newPage();
@@ -1560,6 +1571,7 @@ const PAGES: PageSpec[] = [
         if ((await bareBrief.inputValue()) !== bare.body) throw new Refused(`the brief is prefilled from the card's body — it was ${JSON.stringify(await bareBrief.inputValue())}`);
         const before = fs.readdirSync(runsDir).sort();
         fs.renameSync(bareFile, bareAside);
+        const reread = rereadOf(refused);
         const [answered] = await Promise.all([
           refused.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
           form.getByRole('button', { name: 'Start' }).click(),
@@ -1569,22 +1581,105 @@ const PAGES: PageSpec[] = [
         if (answered.status() !== 404 || error !== sentence) {
           throw new Refused(`the api refuses to start a card that is not there, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`);
         }
-        await expectVisible(form.locator('[data-refused]'), 'the refusal is shown beside the form, not swallowed');
-        const shown = await form.locator('[data-refused] p.font-mono').textContent();
-        if (shown !== error) throw new Refused(`the refusal beside the form is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        const listing = (await (await reread).json()) as Array<{ name: string }>;
+        if (listing.some((e) => e.name === bare.name)) throw new Refused(`the inbox read again after the refusal no longer lists ${bare.name} — it listed ${JSON.stringify(listing.map((e) => e.name))}`);
+        await refused.waitForLoadState('networkidle');
+        await expectCount(item, 0, 'the card leaves the list once the inbox is read again after the refusal');
+        await expectCount(listed(refused), 1, `and only ${planned.name} is listed`);
+        const gone = refused.locator(`section[aria-label="Cards"] li[data-gone="${bare.name}"]`);
+        await expectVisible(gone.locator('[data-refused="start"]', { hasText: 'Not started. The api refused it:' }), 'the refusal stays, where the card was listed, not swallowed with the form');
+        const shown = await gone.locator('[data-refused] p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal in the card's place is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        if (JSON.stringify(await order(refused)) !== JSON.stringify([planned.name])) throw new Refused(`the cards listed are the inbox's — ${(await order(refused)).join(', ')}`);
         const after = fs.readdirSync(runsDir).sort();
         if (JSON.stringify(after) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
         await settled(refused);
         await refused.screenshot({ path: path.join(OUT, `inbox-refused-${await themeOf(refused)}.png`), fullPage: true });
         await refused.waitForLoadState('networkidle');
-        // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
-        const expected = `request answered 404: POST ${answered.url()}`;
-        const seen = problems();
-        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p));
-        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        onlyRefusal(refused, problems(), answered);
       } finally {
         await refused.close();
         if (fs.existsSync(bareAside)) fs.renameSync(bareAside, bareFile);
+      }
+
+      // Remove refused, in a page of its own: the card dropped behind the page's back before its Remove was clicked — a 404. As a start's: the
+      // card leaves the list once the inbox is read again, the package's sentence stays in its place, and Dismiss takes that away. Put back.
+      const plannedAside = path.join(store!, `${planned.name}.md.aside`);
+      const unremoved = await page.context().newPage();
+      try {
+        const { problems } = watch(unremoved);
+        await unremoved.goto(page.url(), { waitUntil: 'networkidle' });
+        const item = cardIn(unremoved, planned.name);
+        await expectVisible(item.getByRole('button', { name: 'Remove' }), `${planned.name} offers Remove`);
+        fs.renameSync(cardFile, plannedAside);
+        const reread = rereadOf(unremoved);
+        const [answered] = await Promise.all([
+          unremoved.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${planned.name}`, { timeout: WAIT_MS }),
+          item.getByRole('button', { name: 'Remove' }).click(),
+        ]);
+        const { error } = (await answered.json()) as { error?: string };
+        if (answered.status() !== 404 || !error?.startsWith(`no card ${planned.name} in the inbox.`)) {
+          throw new Refused(`the api refuses to drop a card that is not there, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        await reread;
+        await unremoved.waitForLoadState('networkidle');
+        await expectCount(item, 0, 'the card leaves the list once the inbox is read again after the refusal');
+        const gone = unremoved.locator(`section[aria-label="Cards"] li[data-gone="${planned.name}"]`);
+        await expectVisible(gone.locator('[data-refused="remove"]', { hasText: 'Not removed. The api refused it:' }), 'the refusal stays, where the card was listed');
+        const shown = await gone.locator('[data-refused] p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal in the card's place is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        await expectVisible(gone.locator('[data-title]', { hasText: planned.title }), 'with the first line of the card it was about');
+        await settled(unremoved);
+        await unremoved.screenshot({ path: path.join(OUT, `inbox-remove-refused-${await themeOf(unremoved)}.png`), fullPage: true });
+        await gone.getByRole('button', { name: 'Dismiss' }).click();
+        await expectCount(gone, 0, 'Dismiss takes the refusal of a card that is gone away');
+        await unremoved.waitForLoadState('networkidle');
+        onlyRefusal(unremoved, problems(), answered);
+      } finally {
+        await unremoved.close();
+        if (fs.existsSync(plannedAside)) fs.renameSync(plannedAside, cardFile);
+      }
+
+      // Start refused with a 409, in a page of its own: a run started the card behind the page's back — its removal failed — after its form
+      // opened. The inbox read again lists the card as started, so its form goes, and the package's sentence stays on the card. Taken back.
+      const conflicted = await page.context().newPage();
+      try {
+        const { problems } = watch(conflicted);
+        await conflicted.goto(page.url(), { waitUntil: 'networkidle' });
+        const item = cardIn(conflicted, planned.name);
+        await item.getByRole('button', { name: 'Start' }).click();
+        const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
+        await expectVisible(form.getByRole('button', { name: 'Start' }), `Start opens ${planned.name}'s start form`);
+        fs.writeFileSync(startedRecord, JSON.stringify({
+          id: STARTED_AS, repo: checkout, workspace: checkout, baseRef: 'HEAD', branch: 'main', isolate: true, brief: planned.body,
+          workflowDir: path.join(checkout, 'workflows', WORKFLOWS.good.name), workflow: [], steps: {}, createdAt: new Date().toISOString(), from: { inbox: planned.name },
+        }, null, 2));
+        const before = fs.readdirSync(runsDir).sort();
+        const reread = rereadOf(conflicted);
+        const [answered] = await Promise.all([
+          conflicted.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+          form.getByRole('button', { name: 'Start' }).click(),
+        ]);
+        const { error } = (await answered.json()) as { error?: string };
+        if (answered.status() !== 409 || !error?.includes(STARTED_AS)) {
+          throw new Refused(`the api refuses to start a card a run was started from, naming the run — it answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        await reread;
+        await conflicted.waitForLoadState('networkidle');
+        await expectVisible(item.locator(`[data-started-as] a[href="/runs/${STARTED_AS}"]`), `the card, read again, says it was started as ${STARTED_AS}`);
+        await expectCount(item.locator('[data-start-card]'), 0, 'its start form is gone: it may not start again');
+        await expectVisible(item.locator('[data-refused="start"]', { hasText: 'Not started. The api refused it:' }), 'and the refusal stays, on the card');
+        const shown = await item.locator('[data-refused] p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal on the card is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        const after = fs.readdirSync(runsDir).sort();
+        if (JSON.stringify(after) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
+        await settled(conflicted);
+        await conflicted.screenshot({ path: path.join(OUT, `inbox-conflict-${await themeOf(conflicted)}.png`), fullPage: true });
+        await conflicted.waitForLoadState('networkidle');
+        onlyRefusal(conflicted, problems(), answered);
+      } finally {
+        await conflicted.close();
+        fs.rmSync(startedRecord, { force: true });
       }
       await settled(page);
     },

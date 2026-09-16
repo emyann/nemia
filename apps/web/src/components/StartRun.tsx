@@ -14,12 +14,17 @@ import { standingOf, titleOf } from '../lib/factory';
  * start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows page gives none,
  * and says where the run is itself. `repo` is where the run starts, when the card names a
  * repository: what the runs to wait on are listed from.
+ *
+ * A card's inbox is read again after any answer to its start. Taken, the card leaves it; refused, it may have left behind the page's back — a
+ * 404 for a card dropped, a 409 for one started — and this form with it. So the caller given `onRefused` shows the refusal where it outlives
+ * the form, told the api's words, and null when the start is asked again; the form then shows none of its own.
  */
-export function StartRun({ workflow, card, repo, onStarted }: {
+export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
   workflow: WorkflowListing;
   card?: { name: string; body: string };
   repo?: string;
   onStarted?: (started: Started) => void;
+  onRefused?: (message: string | null) => void;
 }) {
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState(card?.body ?? '');
@@ -33,14 +38,18 @@ export function StartRun({ workflow, card, repo, onStarted }: {
         ...(asked.after.length ? { after: asked.after } : {}),
         ...(card ? { card: card.name } : {}),
       }),
+    onMutate: () => onRefused?.(null),
     onSuccess: (started) => {
       if (!card) {
         setBrief('');
         setAfter([]);
       }
       void queryClient.invalidateQueries({ queryKey: ['runs'] });
-      if (card) void queryClient.invalidateQueries({ queryKey: ['inbox'] });
       onStarted?.(started);
+    },
+    onError: (error) => onRefused?.(error.message),
+    onSettled: () => {
+      if (card) void queryClient.invalidateQueries({ queryKey: ['inbox'] });
     },
   });
   const field = useId();
@@ -91,7 +100,7 @@ export function StartRun({ workflow, card, repo, onStarted }: {
           {start.variables.after.length > 0 && <>, and {start.variables.after.join(' and ')} {start.variables.after.length > 1 ? 'have' : 'has'} shipped</>}.
         </p>
       )}
-      {start.isError && (
+      {start.isError && !onRefused && (
         <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
           <p className="text-sm font-medium text-red-800 dark:text-red-300">Not started. The api refused it:</p>
           <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{start.error.message}</p>

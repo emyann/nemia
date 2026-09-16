@@ -1702,6 +1702,11 @@ What it leaves:
 - **A card whose workflow is not listed** (a relative path, a folder elsewhere, one that does not read) presets nothing, and the page says so.
   The board starts only a workflow it lists, as a start from the Workflows page does.
 - **Why a card's removal failed is shown once.** Only the start's answer carries it. The next visit says the card was started, and not why.
+- **A refused Start or Remove is kept by the page, and by nothing else.** The page reads the inbox again after any answer to a start or a
+  drop (three small items, 2026-09-16; the board half's last review found a 404 or 409 left the card listed with its refusal until a reload).
+  A card gone behind the page's back leaves the list, and the api's sentence stays in its place, dashed, until Dismiss; one a run started
+  behind its back stays listed as started, with the sentence at its foot and no form. A reload, or the next visit, shows neither. The e2e
+  makes each refusal: a start of a card dropped (404), a drop of one (404), and a start of one a record names (409).
 - **A card written by hand with `repo: /code/app/`** is not normalised: `parseInboxCard` takes the path as written, and its run records it so.
   The board's filings and `wf inbox add` write it resolved. The package could resolve `repo:` when it parses a card.
 - **The filing time is the file's mtime.** A card edited by hand moves up the list. The package has no filing time to give.

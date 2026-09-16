@@ -996,7 +996,12 @@ package half, `$WF_ROOT/inbox/`, `wf inbox`, `wf start` on an inbox card — two
 `the-inbox-on-the-board-a-pag-ryny` from `./workflows/dev-build` `--after` it, the api's routes and the page, filed 22:12Z the same
 day by the tick once the package half was on main — three rounds, $35.89, **merged, `07984b9`**. **The inbox is done end to end.**
 The daemon runs with `WF_MAX_CONCURRENT=4` since 2026-09-16 23:20Z (was the default 2); Remote Control on a step, a supervisor, and
-the queue are registered as features.md §2 and §3, not filed. Nothing in flight. Left: items 20 (settings), 27, 28, 30, 31 (all small).
+the queue are registered as features.md §2 and §3. In flight 2026-09-16 23:30Z, three lanes at once on the new ceiling, one per
+package: E9 `three-small-items-in-agent-e-fiqe` (engine: item 27, a blocked session no longer holding a slot, pools by
+subscription) from `./workflows/dev`; W8 `four-items-in-agent-workflow-w4eb` (agent-workflows: items 28 and 31, the run cap
+`WF_MAX_RUNS`, `wf inbox queue` with the tick starting cards — features.md §3 without the board) from `./workflows/dev`; B11
+`three-small-items-on-the-boa-bmq6` (apps: item 30, the run page naming a run's inbox card, the inbox reloading after a refusal)
+from `./workflows/dev-build`. The Factory's ghosts for queued cards wait for W8. Left: items 20 (settings), 27, 28, 30, 31 (all small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**

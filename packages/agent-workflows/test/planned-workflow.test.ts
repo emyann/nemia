@@ -123,3 +123,13 @@ test("implement is dev's, after the plan and reading it: the plan reaches it und
   assert.deepEqual(JSON.parse(/## From plan\n[\s\S]*?\n(`{3,})json\n([\s\S]*?)\n\1/.exec(brief)![2]!), output);
   assert.doesNotMatch(brief, /PLANNER-ACCOUNT/);
 });
+
+test('dev-planned-build is dev-planned with dev-build\'s check on implement: the plan first, the same fence, the build and the e2e before implement is verified', () => {
+  const built = path.join(REPO, 'workflows', 'dev-planned-build');
+  const steps = loadWorkflows(built);
+  assert.deepEqual(steps.map((s) => s.name), loadWorkflows(PLANNED).map((s) => s.name), 'the same steps in the same order');
+  const byName = Object.fromEntries(steps.map((s) => [s.name, s]));
+  assert.equal(byName.implement?.check, 'npm test && npm run typecheck && npm run build && npm run e2e');
+  const plannedByName = Object.fromEntries(loadWorkflows(PLANNED).map((s) => [s.name, s]));
+  for (const name of ['plan', 'review']) assert.deepEqual({ ...byName[name], body: '' }, { ...plannedByName[name], body: '' }, `${name} is dev-planned's, key for key`);
+});

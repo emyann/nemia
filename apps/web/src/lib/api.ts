@@ -553,17 +553,25 @@ export const repositoryQuery = queryOptions({
   queryFn: () => get<{ repo: string }>('/api/repository'),
 });
 
+/** What a start answers: the new run — and, for an inbox card, whether the card left the inbox, and why not when it did not. */
+export type Started = { id: string; removed?: boolean; why?: string };
+
 /**
  * Start a run of a workflow, as `wf start` does: the api writes the run's record and files nothing. Resolves with the new
  * run's id; rejects with the api's refusal in full — the loader's, `wf start`'s (`afterRefusal`'s, for a run it will not wait
  * on), or the api's own about the request. `after` names the runs it waits on, as `--after` does; left out when there are none.
  *
+ * `card` starts an inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the card
+ * leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started already.
+ *
  * Sent as `application/json`, which the api requires of a start: the one body a page on another site cannot send it unasked.
  */
-export async function startRun(start: { workflow: string; from: WorkflowListing['from']; brief: string; after?: readonly string[] }): Promise<{ id: string }> {
+export async function startRun(start: { workflow: string; from: WorkflowListing['from']; brief: string; after?: readonly string[]; card?: string }): Promise<Started> {
   const res = await fetch('/api/runs', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(start) });
-  const body = (await res.json().catch(() => undefined)) as { id?: unknown; error?: unknown } | undefined;
-  if (res.ok && typeof body?.id === 'string') return { id: body.id };
+  const body = (await res.json().catch(() => undefined)) as { id?: unknown; removed?: unknown; why?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.id === 'string') {
+    return { id: body.id, ...(typeof body.removed === 'boolean' ? { removed: body.removed } : {}), ...(typeof body.why === 'string' ? { why: body.why } : {}) };
+  }
   if (res.ok) {
     // Written, it may well be: look before starting it again.
     throw new Error(
@@ -572,6 +580,65 @@ export async function startRun(start: { workflow: string; from: WorkflowListing[
     );
   }
   throw new Error(typeof body?.error === 'string' ? body.error : `POST /api/runs answered ${res.status} ${res.statusText}`);
+}
+
+/**
+ * Mirrors `InboxEntry` in apps/api/src/inbox.ts: a card as `wf inbox` lists it — or an entry of the inbox that does not read as one, `error`
+ * saying why — with its body, the brief a start is prefilled with, and when its file was written, which the page orders the cards by.
+ */
+export type InboxEntry = {
+  name: string;
+  file: string;
+  /** The first line of its body; null for an entry that does not read. */
+  title: string | null;
+  /** As the card writes it: a workflow's name, or the absolute folder of one. */
+  workflow: string | null;
+  repo: string | null;
+  /** The runs a record says it was started as: a card still here was started, and its removal failed. */
+  startedAs: string[];
+  error: string | null;
+  body: string | null;
+  filedAt: string | null;
+};
+
+/** The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit. */
+export const inboxQuery = queryOptions({
+  queryKey: ['inbox'],
+  queryFn: () => get<InboxEntry[]>('/api/inbox'),
+});
+
+/**
+ * File an idea as a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does. Resolves with the card's name; rejects with the api's
+ * refusal in full — the package's words for an idea with nothing in it or a repository that is not an absolute path to a directory, or the
+ * api's own about the request or a workflow it has none of.
+ *
+ * Sent as `application/json`, which the api requires of it, as of a start.
+ */
+export async function fileCard(card: { body: string; workflow?: string; from?: WorkflowListing['from']; repo?: string }): Promise<{ name: string }> {
+  const res = await fetch('/api/inbox', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(card) });
+  const body = (await res.json().catch(() => undefined)) as { name?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.name === 'string') return { name: body.name };
+  if (res.ok) {
+    throw new Error(
+      `POST /api/inbox answered ${res.status} ${res.statusText} without the card's name, so the api and this board disagree about what a filing answers. ` +
+        'The card may be filed: look in the inbox (`wf inbox`) before filing it again, and restart the api (`npm run dev`).',
+    );
+  }
+  throw new Error(typeof body?.error === 'string' ? body.error : `POST /api/inbox answered ${res.status} ${res.statusText}`);
+}
+
+/**
+ * Drop a card without starting it, as `wf inbox rm <name>` does. Rejects with the api's refusal in full: the package's words for a card that is
+ * not there, naming the cards that are, or for a name that is not a card's.
+ *
+ * Sent as `application/json`, with no body, which the api requires of it, as of every write: a request another site's page cannot make unasked.
+ */
+export async function dropCard(name: string): Promise<void> {
+  const route = `/api/inbox/${encodeURIComponent(name)}`;
+  const res = await fetch(route, { method: 'DELETE', headers: { 'content-type': 'application/json' } });
+  if (res.ok) return;
+  const body = (await res.json().catch(() => undefined)) as { error?: unknown } | undefined;
+  throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
 }
 
 /**

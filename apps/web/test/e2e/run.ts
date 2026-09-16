@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { arrivalLine, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -43,6 +43,7 @@ async function sidebar(page: Page): Promise<void> {
   await expectVisible(menu.getByRole('link', { name: 'Factory' }), 'the sidebar has Factory');
   await expectVisible(menu.getByRole('link', { name: 'Runs' }), 'the sidebar has Runs');
   await expectVisible(menu.getByRole('link', { name: 'Workflows' }), 'the sidebar has Workflows');
+  await expectVisible(menu.getByRole('link', { name: 'Inbox' }), 'the sidebar has Inbox');
   await expectVisible(menu.getByRole('link', { name: 'Capabilities' }), 'the sidebar has Capabilities');
 }
 
@@ -104,6 +105,16 @@ const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${D
 
 /** The theme a page is in, as its browser prefers it: what names a photograph taken beside the visit's own. */
 const themeOf = (page: Page): Promise<string> => page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+
+/** A card on the Inbox page, by its name. */
+const cardIn = (page: Page, name: string): Locator => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`);
+
+/** The idea the `inbox` page files from its box, and takes back with Remove. */
+const FILED = 'Give the inbox a keyboard shortcut\n\nN files a card from any page.';
+/** The brief the `inbox` page starts CARDS.planned with, in place of its body. */
+const STARTED = 'Cache the views between passes\n\nRead each journal once a pass; the api reads the same views.';
+/** The run a record says CARDS.bare was started as, on the page that shows a card started already. */
+const STARTED_AS = 'show-what-a-step-cost-on-the-e2e0';
 
 /** What the `answer` page answers FAKE's blocked step with. */
 const ANSWER = 'Keep it off the floor: a finished run is under Show finished.';
@@ -1268,6 +1279,228 @@ const PAGES: PageSpec[] = [
     },
   },
   {
+    // The inbox: the seeded cards, newest first; a card filed from the box, then removed with its Remove; a card's start form, preset from the
+    // card; and, each in a page of its own, a card started — which opens its run's page — a card started already, an empty inbox, and a start
+    // refused because the card is gone. Every write is taken back, so every page after this one, in either theme, reads the store as seeded.
+    name: 'inbox',
+    route: '/inbox',
+    expect: async (page) => {
+      await sidebar(page);
+      await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }), 'the sidebar lights Inbox on its page');
+      const { planned, bare } = CARDS;
+      const inbox = path.join(store!, 'inbox');
+      const checkout = path.join(store!, 'checkout');
+      const runsDir = path.join(store!, 'runs');
+      const listed = (p: Page) => p.locator('section[aria-label="Cards"] li[data-card]');
+      const order = (p: Page) => listed(p).evaluateAll((items) => items.map((item) => item.getAttribute('data-card')));
+
+      await expectCount(listed(page), 2, 'a card per file in the inbox: the two the store has');
+      if (JSON.stringify(await order(page)) !== JSON.stringify([bare.name, planned.name])) {
+        throw new Refused(`the cards are listed newest first — ${bare.name}, filed ${bare.filedMinutesAgo} minutes ago, then ${planned.name} — and they were listed ${(await order(page)).join(', ')}`);
+      }
+      for (const card of [planned, bare]) {
+        const item = cardIn(page, card.name);
+        await expectVisible(item.locator('[data-title]', { hasText: card.title }), `${card.name} is listed by its first line (${card.title})`);
+        await expectCount(item.getByText(card.body.split('\n\n')[1]!), 0, `and its first line alone: the rest of its body is the brief its start is prefilled with`);
+        await expectVisible(item.getByRole('button', { name: 'Start' }), `${card.name} offers Start`);
+        await expectVisible(item.getByRole('button', { name: 'Remove' }), `${card.name} offers Remove`);
+      }
+      await expectVisible(cardIn(page, planned.name).locator(`[data-workflow="${planned.workflow}"]`, { hasText: planned.workflow }), `${planned.name} names its workflow (${planned.workflow})`);
+      await expectCount(cardIn(page, bare.name).locator('[data-workflow]'), 0, `${bare.name} names no workflow, and shows none`);
+
+      // Filed from the box, with a workflow and the repository it is prefilled with — the api's own — then removed with its Remove.
+      const box = page.locator('form[aria-label="File a card"]');
+      const idea = box.getByRole('textbox', { name: 'An idea' });
+      const fileIt = box.getByRole('button', { name: 'File' });
+      await expectVisible(idea, 'the box has a field for the idea');
+      if (await fileIt.isEnabled()) throw new Refused('File is disabled while there is no idea — it was enabled with none');
+      const repository = box.getByRole('textbox', { name: 'Repository' });
+      if ((await repository.inputValue()) !== checkout) throw new Refused(`the repository is the api's own until a person changes it (${checkout}) — it was ${JSON.stringify(await repository.inputValue())}`);
+      await idea.fill(FILED);
+      await box.getByRole('combobox', { name: 'Workflow' }).selectOption({ label: WORKFLOWS.good.name });
+      const [filed] = await Promise.all([
+        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/inbox', { timeout: WAIT_MS }),
+        fileIt.click(),
+      ]);
+      if (filed.status() !== 201) throw new Refused(`the api files the card, through the board's proxy — it answered ${filed.status()}: ${await filed.text()}`);
+      const { name } = (await filed.json()) as { name: string };
+      const written = path.join(inbox, `${name}.md`);
+      try {
+        const text = fs.existsSync(written) ? fs.readFileSync(written, 'utf8') : undefined;
+        const card = `---\nworkflow: ${WORKFLOWS.good.name}\nrepo: ${checkout}\n---\n${FILED}\n`;
+        if (text !== card) throw new Refused(`the card is written as wf inbox add writes it, with its workflow and repository — ${written} holds ${JSON.stringify(text)}`);
+        await expectCount(listed(page), 3, 'the card filed is listed');
+        if ((await order(page))[0] !== name) throw new Refused(`the card filed is listed first, the newest — the list is ${(await order(page)).join(', ')}`);
+        await expectVisible(cardIn(page, name).locator('[data-title]', { hasText: FILED.split('\n')[0]! }), 'by its first line');
+        if ((await idea.inputValue()) !== '') throw new Refused('the box is emptied once the card is filed');
+        const [dropped] = await Promise.all([
+          page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${name}`, { timeout: WAIT_MS }),
+          cardIn(page, name).getByRole('button', { name: 'Remove' }).click(),
+        ]);
+        if (dropped.status() !== 200) throw new Refused(`the api drops the card, through the board's proxy — it answered ${dropped.status()}: ${await dropped.text()}`);
+        await expectCount(cardIn(page, name), 0, 'Remove takes the card off the list');
+        if (fs.existsSync(written)) throw new Refused(`and out of the inbox — ${written} is still there`);
+      } finally {
+        fs.rmSync(written, { force: true });
+      }
+
+      // A card's start form: the workflow preset from the card, the brief prefilled from its body, and the runs to wait on.
+      const plannedItem = cardIn(page, planned.name);
+      await plannedItem.getByRole('button', { name: 'Start' }).click();
+      const workflowPick = plannedItem.getByRole('combobox', { name: 'Workflow' });
+      await expectVisible(workflowPick, `Start opens ${planned.name}'s start form`);
+      const presetLabel = await workflowPick.locator('option:checked').textContent();
+      if (presetLabel !== planned.workflow) throw new Refused(`the workflow is preset from the card (${planned.workflow}) — it was ${JSON.stringify(presetLabel)}`);
+      const startForm = plannedItem.locator(`form[aria-label="Start ${planned.name}"]`);
+      const brief = startForm.getByRole('textbox', { name: 'Brief' });
+      if ((await brief.inputValue()) !== planned.body) throw new Refused(`the brief is prefilled from the card's body — it was ${JSON.stringify(await brief.inputValue())}`);
+      await expectCount(startForm.locator('ul[aria-label="Runs to wait on"] li'), DIAMOND_RUNS.length, `the start form offers the ${DIAMOND_RUNS.length} runs on its repository to wait on`);
+      await expectVisible(startForm.getByRole('button', { name: 'Start' }), 'and a Start button');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `inbox-start-${await themeOf(page)}.png`), fullPage: true });
+      await plannedItem.getByRole('button', { name: 'Close' }).click();
+      await expectCount(startForm, 0, 'Close folds the start form away');
+
+      // Started, in a page of its own: the brief as edited, posted with the card; the run's page opens; the record carries where it came from,
+      // and the card has left the inbox. Taken back: the record removed, and the card written again as it was.
+      const cardFile = path.join(inbox, `${planned.name}.md`);
+      const cardText = fs.readFileSync(cardFile, 'utf8');
+      const cardTime = fs.statSync(cardFile).mtime;
+      const runsBefore = fs.readdirSync(runsDir).sort();
+      const starting = await page.context().newPage();
+      try {
+        const { problems } = watch(starting);
+        await starting.goto(page.url(), { waitUntil: 'networkidle' });
+        const item = cardIn(starting, planned.name);
+        await item.getByRole('button', { name: 'Start' }).click();
+        const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
+        await form.getByRole('textbox', { name: 'Brief' }).fill(STARTED);
+        const [started] = await Promise.all([
+          starting.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+          form.getByRole('button', { name: 'Start' }).click(),
+        ]);
+        if (started.status() !== 201) throw new Refused(`the api starts the card, through the board's proxy — it answered ${started.status()}: ${await started.text()}`);
+        const { id, removed } = (await started.json()) as { id: string; removed: boolean };
+        if (removed !== true) throw new Refused(`the api says the card left the inbox — it answered removed: ${removed}`);
+        await starting.waitForURL(`**/runs/${id}`, { timeout: WAIT_MS });
+        await expectVisible(starting.locator('h1', { hasText: id }), `the start opens the run's page (${id})`);
+        const record = JSON.parse(fs.readFileSync(path.join(runsDir, `${id}.json`), 'utf8')) as { from?: { inbox?: string }; brief?: string; workflowDir?: string; repo?: string };
+        const expected = { from: { inbox: planned.name }, brief: STARTED, workflowDir: path.join(checkout, 'workflows', WORKFLOWS.good.name), repo: checkout };
+        const got = { from: record.from, brief: record.brief, workflowDir: record.workflowDir, repo: record.repo };
+        if (JSON.stringify(got) !== JSON.stringify(expected)) throw new Refused(`the record is the card's start — it holds ${JSON.stringify(got)}, and should hold ${JSON.stringify(expected)}`);
+        if (fs.existsSync(cardFile)) throw new Refused(`the card leaves the inbox once its run is written — ${cardFile} is still there`);
+        await starting.waitForLoadState('networkidle');
+        const seen = problems();
+        if (seen.length) throw new Refused(`no console error and no failed request while starting a card — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await starting.close();
+        for (const file of fs.readdirSync(runsDir)) if (!runsBefore.includes(file)) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
+        if (!fs.existsSync(cardFile)) {
+          fs.writeFileSync(cardFile, cardText);
+          fs.utimesSync(cardFile, cardTime, cardTime);
+        }
+      }
+
+      // A card a run's record already names — started, its removal failed — in a page of its own: linked to its run, Remove only. Taken back.
+      const startedRecord = path.join(runsDir, `${STARTED_AS}.json`);
+      const already = await page.context().newPage();
+      try {
+        fs.writeFileSync(startedRecord, JSON.stringify({
+          id: STARTED_AS, repo: checkout, workspace: checkout, baseRef: 'HEAD', branch: 'main', isolate: true, brief: bare.body,
+          workflowDir: path.join(checkout, 'workflows', WORKFLOWS.good.name), workflow: [], steps: {}, createdAt: new Date().toISOString(), from: { inbox: bare.name },
+        }, null, 2));
+        const { problems } = watch(already);
+        await already.goto(page.url(), { waitUntil: 'networkidle' });
+        const item = cardIn(already, bare.name);
+        await expectVisible(item.locator(`[data-started-as] a[href="/runs/${STARTED_AS}"]`), `a card a record names says it was started as ${STARTED_AS}, linked to the run`);
+        await expectCount(item.getByRole('button', { name: 'Start' }), 0, 'and offers no Start: started again, the idea would run twice');
+        await expectVisible(item.getByRole('button', { name: 'Remove' }), 'and offers Remove');
+        await settled(already);
+        await already.screenshot({ path: path.join(OUT, `inbox-started-as-${await themeOf(already)}.png`), fullPage: true });
+        await already.waitForLoadState('networkidle');
+        const seen = problems();
+        if (seen.length) throw new Refused(`no console error and no failed request on a card started already — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await already.close();
+        fs.rmSync(startedRecord, { force: true });
+      }
+
+      // An empty inbox, in a page of its own: both cards set aside, and put back.
+      const aside = path.join(store!, 'inbox-aside');
+      const empty = await page.context().newPage();
+      try {
+        fs.renameSync(inbox, aside);
+        const { problems } = watch(empty);
+        await empty.goto(page.url(), { waitUntil: 'networkidle' });
+        await expectVisible(
+          empty.locator('[data-empty]', { hasText: 'The inbox is empty. File an idea in the box above, or from the command line: wf inbox add "<idea>".' }),
+          'an empty inbox says how to file a card, here and with wf inbox add',
+        );
+        await expectVisible(empty.locator('form[aria-label="File a card"]'), 'and still has the box');
+        await settled(empty);
+        await empty.screenshot({ path: path.join(OUT, `inbox-empty-${await themeOf(empty)}.png`), fullPage: true });
+        await empty.waitForLoadState('networkidle');
+        const seen = problems();
+        if (seen.length) throw new Refused(`no console error and no failed request on an empty inbox — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await empty.close();
+        if (fs.existsSync(aside)) {
+          fs.rmSync(inbox, { recursive: true, force: true });
+          fs.renameSync(aside, inbox);
+        }
+      }
+
+      // Refused, in a page of its own whose one refusal is the point: the card dropped behind the page's back — `wf inbox rm` in a terminal —
+      // after its start form opened. The package's sentence, beside the form, word for word; no run written; the card put back.
+      const bareFile = path.join(inbox, `${bare.name}.md`);
+      const bareAside = path.join(store!, `${bare.name}.md.aside`);
+      const refused = await page.context().newPage();
+      try {
+        const { problems } = watch(refused);
+        await refused.goto(page.url(), { waitUntil: 'networkidle' });
+        const item = cardIn(refused, bare.name);
+        await item.getByRole('button', { name: 'Start' }).click();
+        const pick = item.getByRole('combobox', { name: 'Workflow' });
+        await expectVisible(pick, `Start opens ${bare.name}'s start form`);
+        if ((await pick.inputValue()) !== '') throw new Refused(`a card that names no workflow is preset to none — it was ${JSON.stringify(await pick.inputValue())}`);
+        await expectCount(item.locator(`form[aria-label="Start ${bare.name}"]`), 0, 'and has no Start until one is picked');
+        await pick.selectOption({ label: WORKFLOWS.good.name });
+        const form = item.locator(`form[aria-label="Start ${bare.name}"]`);
+        const bareBrief = form.getByRole('textbox', { name: 'Brief' });
+        await expectVisible(bareBrief, 'a workflow picked, the brief and Start');
+        if ((await bareBrief.inputValue()) !== bare.body) throw new Refused(`the brief is prefilled from the card's body — it was ${JSON.stringify(await bareBrief.inputValue())}`);
+        const before = fs.readdirSync(runsDir).sort();
+        fs.renameSync(bareFile, bareAside);
+        const [answered] = await Promise.all([
+          refused.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+          form.getByRole('button', { name: 'Start' }).click(),
+        ]);
+        const { error } = (await answered.json()) as { error?: string };
+        const sentence = `no card ${bare.name} in the inbox. Its cards are: ${planned.name}. Start one of those — wf start ${path.join(inbox, '<name>.md')} — or park the idea first: wf inbox add "<idea>".`;
+        if (answered.status() !== 404 || error !== sentence) {
+          throw new Refused(`the api refuses to start a card that is not there, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        await expectVisible(form.locator('[data-refused]'), 'the refusal is shown beside the form, not swallowed');
+        const shown = await form.locator('[data-refused] p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal beside the form is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        const after = fs.readdirSync(runsDir).sort();
+        if (JSON.stringify(after) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
+        await settled(refused);
+        await refused.screenshot({ path: path.join(OUT, `inbox-refused-${await themeOf(refused)}.png`), fullPage: true });
+        await refused.waitForLoadState('networkidle');
+        // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
+        const expected = `request answered 404: POST ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 404\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await refused.close();
+        if (fs.existsSync(bareAside)) fs.renameSync(bareAside, bareFile);
+      }
+      await settled(page);
+    },
+  },
+  {
     name: 'capabilities',
     route: '/capabilities',
     expect: async (page) => {
@@ -1450,6 +1683,7 @@ async function main(): Promise<void> {
   const checkout = path.join(store, 'checkout');
   seedCheckout(checkout, path.join(API, 'test', 'fixtures', 'mcp-server.ts'));
   seedWorkflows(checkout, store);
+  seedInbox(store, checkout);
   // After the checkout's files, which its base commits.
   seedDiamond(checkout, store);
   // Over every journal the seed wrote: where the api reads when each task was filed.

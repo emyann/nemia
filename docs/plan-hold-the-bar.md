@@ -985,7 +985,11 @@ background daemon was down). B10 done, `b19596a`. **Item 29 is done.** In flight
 with it, then delete `~/.agent-workflows/workflows/hold-the-bar` — their records predate the run freezing its workflow and read
 the folder on every pass; with it renamed away, `wf ls`, `wf decide` and `wf tick` died for every run (measured 2026-09-16).
 The other two home-store folders, `hold-the-bar-checked` and `-build`, were removed the same day: all 25 of their records
-froze the workflow. Left: items 20 (settings), 27, 28, 30, 31 (all small).
+froze the workflow. Also in flight 2026-09-16, the inbox (operator: a place on the board to park an idea and later
+start a workflow on it; decided: the home store, a `repo:` key on the card for a board that will serve several repositories,
+the card removed once started, a page of its own for now): `an-inbox-cards-parked-before-ri7j` from `./workflows/dev` — the
+package half, `$WF_ROOT/inbox/`, `wf inbox`, `wf start` on an inbox card — and `the-inbox-on-the-board-a-pag-ryny` from
+`./workflows/dev-build` `--after` it, the api's routes and the page. Left: items 20 (settings), 27, 28, 30, 31 (all small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**

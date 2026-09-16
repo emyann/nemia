@@ -20,6 +20,14 @@ export const DEFAULT_MAX_CONCURRENT = 3;
 /** A live session is one the engine is still waiting on. `done`/`failed`/`stopped` are not. */
 export const LIVE: ReadonlySet<Sighting['state']> = new Set(['working', 'blocked']);
 
+/**
+ * A session that holds a slot under the ceiling: one at work. Narrower than `LIVE` on purpose. A `blocked` session is
+ * live — the engine waits on it — but one on a permission prompt makes no API calls, so it costs nothing against the
+ * rate limit the ceiling exists for. Reasoning, not a measurement. Counted afresh every pass, so one that moves again
+ * counts again on the next.
+ */
+const AT_WORK: ReadonlySet<Sighting['state']> = new Set(['working']);
+
 export type TaskView = {
   id: string; state: State; phase: string;
   /** The session as its harness lists it — or, once the harness has let it go, its own id as recorded. */
@@ -95,7 +103,7 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
   // The harness has already answered; the statement rides along to the record and nothing more.
   // `blocked` is no answer: to `decide` it is live for ever. Measured — a step called
   // StructuredOutput, ended its turn, and was next seen `blocked`, idle — so a statement ends a
-  // blocked attempt exactly as it ends a working one, or that attempt holds its slot until a deadline.
+  // blocked attempt exactly as it ends a working one, or that attempt waits on a person until a deadline.
   if (!LIVE.has(seen.state)) return observed;
   // Still computing: a statement it may yet revise. Measured once, with the file — a step declared
   // itself done, kept going, found it could not commit, and rewrote the verdict to blocked.
@@ -263,6 +271,10 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, ob
  * The count starts from what is OBSERVED and grows as this pass starts things, because a session
  * started a moment ago is not in the harness's registry yet (see the grace window). Our own new
  * runs are not contention to be discovered later; they are slots we have just spent.
+ *
+ * Observed at work, and only that: a `blocked` session is not counted, so blocked sessions that
+ * move again can put a board past its ceiling. Nothing is stopped for it; nothing more is admitted
+ * until the count is back under.
  */
 export const tick = Effect.fn('tick')(function* (maxConcurrent = DEFAULT_MAX_CONCURRENT) {
   const journal = yield* Journal;
@@ -271,8 +283,9 @@ export const tick = Effect.fn('tick')(function* (maxConcurrent = DEFAULT_MAX_CON
   const observed = yield* runner.observe;
   const ids = yield* journal.list;
 
-  // Which harness each live session belongs to — the sighting does not say, so it comes from the
+  // Which harness each session at work belongs to — the sighting does not say, so it comes from the
   // task that owns the name. Two small file reads per task per pass; the board is local and tiny.
+  // At work, not live: a `blocked` session holds no slot (`AT_WORK`).
   const used = new Map<string, number>();
   const states = new Map<string, State>();
   for (const id of ids) {
@@ -282,7 +295,7 @@ export const tick = Effect.fn('tick')(function* (maxConcurrent = DEFAULT_MAX_CON
     const last = state.attempts.at(-1);
     if (last && last.ended === null) {
       const seen = observed.get(nameFor(id, last.n));
-      if (seen && LIVE.has(seen.state)) used.set(harness, (used.get(harness) ?? 0) + 1);
+      if (seen && AT_WORK.has(seen.state)) used.set(harness, (used.get(harness) ?? 0) + 1);
     }
   }
 

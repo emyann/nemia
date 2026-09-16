@@ -240,6 +240,25 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
   its parent's `startTime` (one session continued twice, 2026-09-15). Its cost is its total less its parent's. No resumed
   session has been measured end to end under the engine.
 
+### 19. A `blocked` session holds no slot, on reasoning rather than a measurement
+
+**What changed** (2026-09-16). The ceiling counts the sessions a pass observes `working`, and a `blocked` one is not
+counted (`AT_WORK` in `agent-engine/src/engine.ts`). It used to count `LIVE` — `working` and `blocked` — so a session
+waiting on a permission prompt kept the tasks behind it queued for as long as nobody answered, and only its deadline
+freed the slot. `LIVE` still says what the engine waits on: `decide` reads a blocked session as running, and a closing
+statement ends a blocked attempt as it ends a working one (`closedOut`).
+
+**Why.** The ceiling exists for the subscription's rate limit, and a session on a permission prompt makes no API calls, so
+it costs nothing against that limit. Reasoning, not a measurement: no blocked session's API traffic has been watched, and
+`claude agents` lists a session `blocked` for its own stalls too — a login refresh (issue 16) — whose calls are not known
+either.
+
+**What it costs.** A blocked session that moves again is counted again on the next pass, level-triggered, and nothing is
+stopped for it. A board at a ceiling of 2 whose two sessions block admits two more, and if both move again, four run until
+two end: nothing more is admitted while the count is at or past the ceiling. `test/engine.test.ts` makes each case happen
+at the shipped counting: two blocked at a ceiling of two and a third task starts; two working and it does not; a blocked
+session working again fills the slot another's end freed, and blocking again gives it back.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
@@ -431,6 +450,7 @@ transcript, and the pass journals a `measured` entry (engine `9d075f7`). What th
 | no attempt recorded what it cost — `Usage.costUsd` was declared and never filled, and every `wf decide` said "cost not measured" | the Claude runner reads Claude Code's `cost-state`, written as a session's process exits, once its release has stopped the session, and the pass journals it as `measured`; a resumed attempt records its own share, not its session's total; `claude -p`'s `total_cost_usd` goes on its end (issues 4, 18) | engine `9d075f7` |
 | nothing could bound what a session spends | `budgetUsd` on the task, `--max-budget-usd` from both Claude runners, and a session `claude -p` ended at its cap recorded `failed`, reason `budget`, its task settled `failed` with no further attempt (the operator's call, round 2); refused on `claude`, whose `--bg` sessions keep no cap (issue 17), and on `codex` | engine `26020c1`, round 2 |
 | a `view` of a task whose harness cannot `find` — a `check`, a Codex step — or of any attempt in flight observed every harness, so each read of one cost a `claude agents` call and a Codex listing (§6 item 27, E7's last review) | a view observes its task's own harness, the one `harnessOf` names for `logs` and `transcript`, and the fallback's for a harness the engine no longer has | engine, §6 item 27 |
+| a session waiting on a permission prompt held a concurrency slot until a person answered or its deadline came, though it makes no API calls | the ceiling counts sessions observed `working`; `LIVE`, which still has `blocked`, keeps what else it guards (issue 19) | engine, 2026-09-16 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

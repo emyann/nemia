@@ -303,7 +303,7 @@ test('a task past its deadline is stopped and settles failed', async () => {
   assert.equal(state.settled, 'failed');
 });
 
-test('a deadline frees a slot a blocked session would have held forever', async () => {
+test('a deadline ends a blocked session, which would otherwise wait on a person for ever — and the queue never waited on it', async () => {
   const b = board();
   // Ids are explicit because admission runs in sorted id order: with a ceiling of one, WHICH
   // task gets the slot has to be a fact of the test, not of the clock.
@@ -313,13 +313,77 @@ test('a deadline frees a slot a blocked session would have held forever', async 
   await b.run(tick(1));                       // ceiling of one: 'a-stuck' goes first
   assert.equal(b.sessions.size, 1);
   assert.ok(b.sessions.has(nameFor('a-stuck', 1)), 'the one with the deadline is the one running');
-  for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'blocked' });
+  b.sessions.set(nameFor('a-stuck', 1), { ...b.sessions.get(nameFor('a-stuck', 1))!, state: 'blocked' });
+
+  await b.run(tick(1));                       // blocked holds no slot: the second task is admitted
+  assert.equal(b.sessions.size, 2, 'the queue moved before any deadline');
   await pastIt();
 
   await b.run(tick(1));                       // deadline stops it
-  await b.run(tick(1));                       // it settles, freeing the slot
-  await b.run(tick(1));                       // and the second task is admitted
-  assert.equal(b.sessions.size, 2, 'the queue moved');
+  assert.equal(b.sessions.get(nameFor('a-stuck', 1))!.state, 'stopped');
+  await b.run(tick(1));                       // and it settles
+  assert.equal(await b.run(phaseOf('a-stuck', b)), 'failed');
+});
+
+// ─── what the ceiling counts ────────────────────────────────────────────────
+// A session at work is counted, and a blocked one is not: on a permission prompt it makes no API
+// calls, so it costs nothing against the rate limit the ceiling exists for. Reasoning, not a
+// measurement. Counted afresh on every pass, from what the harness says now.
+
+/** A board of tasks `ids`, filed in that order; admission runs in sorted id order. */
+const filed = async (ids: string[]) => {
+  const b = board();
+  for (const id of ids) await b.run(file({ ...spec, id, brief: id }));
+  const set = (id: string, state: Observed) => b.sessions.set(nameFor(id, 1), { ...b.sessions.get(nameFor(id, 1))!, state });
+  return { ...b, set };
+};
+
+test('two blocked sessions at a ceiling of two, and a third task starts', async () => {
+  const b = await filed(['a', 'b', 'c']);
+  await b.run(tick(2));
+  assert.deepEqual([...b.sessions.keys()], [nameFor('a', 1), nameFor('b', 1)]);
+  b.set('a', 'blocked');
+  b.set('b', 'blocked');
+
+  const report = await b.run(tick(2));
+  assert.ok(b.sessions.has(nameFor('c', 1)), 'a session waiting on a person holds no slot');
+  assert.deepEqual(report.running, { default: 1 }, 'the pass counted the one it started, and neither blocked one');
+});
+
+test('two working sessions at a ceiling of two, and a third task does not start', async () => {
+  const b = await filed(['a', 'b', 'c']);
+  await b.run(tick(2));
+  b.set('a', 'working');
+  b.set('b', 'working');
+
+  const report = await b.run(tick(2));
+  assert.equal(b.sessions.has(nameFor('c', 1)), false, 'the ceiling refuses it');
+  assert.deepEqual(report.running, { default: 2 });
+  assert.equal(await b.run(phaseOf('c', b)), 'pending');
+});
+
+test('a blocked session that works again counts again on the next pass — level-triggered, nothing remembered', async () => {
+  const b = await filed(['a', 'b', 'c', 'd']);
+  await b.run(tick(2));                       // a and b start
+  b.set('a', 'blocked');
+  await b.run(tick(2));                       // a holds no slot: c starts, d waits
+  assert.deepEqual([...b.sessions.keys()], [nameFor('a', 1), nameFor('b', 1), nameFor('c', 1)]);
+
+  // a moves again: three at work at a ceiling of two. Nothing is stopped, and nothing more admitted.
+  b.set('a', 'working');
+  assert.deepEqual((await b.run(tick(2))).running, { default: 3 });
+  assert.equal(b.sessions.size, 3, 'past the ceiling, so nothing is admitted');
+
+  // c finishes. Had a pass remembered a as blocked, the slot c frees would go to d.
+  b.set('c', 'done');
+  await b.run(tick(2));
+  assert.equal(await b.run(phaseOf('c', b)), 'succeeded');
+  assert.equal(b.sessions.has(nameFor('d', 1)), false, 'a counts again: a and b fill the ceiling');
+
+  // a blocks again, and the next pass sees that too.
+  b.set('a', 'blocked');
+  await b.run(tick(2));
+  assert.ok(b.sessions.has(nameFor('d', 1)), 'and its slot is free again');
 });
 
 // ─── isolation ──────────────────────────────────────────────────────────────

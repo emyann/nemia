@@ -32,8 +32,8 @@ Definition of done — a closed list, and it is closed:
 - [x] concurrency ceiling, per harness — two subscriptions are two pools
 - [x] the feed — a cursored stream of everything that happened
 - [x] resume — an attempt continues the one before it, by policy
-- [x] deadline — wall clock across attempts; also the only thing that frees a slot a `blocked`
-      session would hold forever
+- [x] deadline — wall clock across attempts; also the only thing that ends a `blocked` session,
+      which waits on a person forever — and holds no slot while it waits
 - [x] isolation — `--worktree`, declared per task, cut by the harness
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
@@ -992,7 +992,7 @@ selector, and it is why no attempt can ever run twice.
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
-| `test/engine.test.ts` | the crash cases, the ceiling, the fields carried, against a fake harness |
+| `test/engine.test.ts` | the crash cases, the ceiling and what it counts, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
 | `test/unsigned.test.ts` | a session gone quiet without the closing statement its task asked for: unsigned, continued with a nudge, then failed saying why; quiet with none asked for still succeeds — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
@@ -1062,7 +1062,11 @@ week replays rather than being told to start over.
 
 `AE_ROOT` points at a different board, the way a kubeconfig points at a different cluster.
 `AE_MAX_CONCURRENT` (default 3) is how many sessions of **each** harness may run at once — the
-ceiling is per harness because your rate limits are. Admission is serial within a pass, so the
+ceiling is per harness because your rate limits are. Only a session at work is counted: a `blocked` one is
+not. A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the
+ceiling exists for — reasoning, not a measurement. It is counted again on the pass after it moves again, so
+blocked sessions that all move at once can put a board past its ceiling for a while; nothing is stopped for
+that, and nothing more is admitted until the count is back under. Admission is serial within a pass, so the
 count is true rather than approximately true:
 
 ```

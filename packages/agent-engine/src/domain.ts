@@ -372,7 +372,8 @@ export type Now = {
   at: Date;
   graceMs: number;
   /**
-   * How many sessions of THIS TASK'S harness are already running, and how many may.
+   * How many sessions of THIS TASK'S harness are already at work, and how many may. At work is
+   * `working`: a `blocked` session holds no slot.
    *
    * Resolved by the caller rather than looked up here, because the ceiling is per harness — two
    * subscriptions are two independent pools, and a Codex session must not use up a Claude slot.
@@ -406,8 +407,9 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // ceiling has not started burning its time, and a deadline that expires in the queue would be
   // a ceiling that quietly fails work instead of delaying it.
   //
-  // This is also the only thing that frees a slot held by a `blocked` session — one waiting on a
-  // person is running, forever, as far as every other rule here is concerned.
+  // This is also the only thing that ends a `blocked` session — one waiting on a person is running,
+  // forever, as far as every other rule here is concerned. It holds no slot while it waits: `used`
+  // counts sessions at work, and one on a permission prompt makes no API calls.
   if (state.deadlineSeconds !== undefined && state.attempts.length > 0) {
     const ranFor = now.at.getTime() - new Date(state.attempts[0]!.startedAt).getTime();
     if (ranFor > state.deadlineSeconds * 1000) {

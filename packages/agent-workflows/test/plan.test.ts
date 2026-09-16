@@ -56,6 +56,9 @@ test('REFUSED by name at shipped defaults: a card with no `workflow:`, an empty 
   assert.throws(() => parsePlan([card('a', 'workflow: dev'), card('b', 'workflow: dev\nafter: a\nafter: a')]), refusedWith(/^b\.md: `after` is set twice.*list every card on it: `after: a, b`/));
   assert.throws(() => parsePlan([card('a', 'workflow:')]), refusedWith(/^a\.md: `workflow` has no value\./));
   assert.throws(() => parsePlan([card('a', 'workflow dev')]), refusedWith(/^a\.md: `workflow dev` is not `key: value`\./));
+  // `repo:` is an inbox card's key: a plan works on the one repository `wf plan --repo` is given.
+  assert.throws(() => parsePlan([card('a', 'workflow: dev\nrepo: /home/me/code/app')]),
+    refusedWith(/^a\.md: `repo` is not a key a plan's card has: a plan works on one repository, the one wf plan <folder> --repo <r> is given, and a card started by hand works on wf start's --repo\. `repo:` is an inbox card's — delete the line, or file the idea in the inbox: wf inbox add <file> --repo <r>\.$/));
   assert.throws(() => parsePlan([{ file: 'a.md', text: '---\nworkflow: dev\nParse the flag.\n' }]), refusedWith(/^a\.md: the frontmatter opened on the first line never closes/));
 });
 
@@ -145,4 +148,7 @@ test("`cardToStart`: a card file starts its body, with its `workflow:` and `afte
   assert.throws(() => cardToStart('a.md', '---\nworkflow:\n---\nx\n', []), refusedWith(/^a\.md: `workflow` has no value\./));
   assert.throws(() => cardToStart('a.md', '---\nafter: ,\n---\nx\n', ['r-b']), refusedWith(/^a\.md: `after: ,` names no card\./));
   assert.throws(() => cardToStart('a.md', '---\nafter: b, b\n---\nx\n', ['r-b']), refusedWith(/^a\.md: `after: b, b` names b twice\./));
+  // A card carried out of the inbox is a card, not a brief whose first lines are its frontmatter — and its `repo:` is refused, by name.
+  assert.throws(() => cardToStart('idea.md', '---\nworkflow: dev\nrepo: /home/me/code/app\n---\nx\n', []), refusedWith(/^idea\.md: `repo` is not a key a plan's card has:/));
+  assert.throws(() => cardToStart('idea.md', '---\nrepo: /home/me/code/app\n---\nx\n', []), refusedWith(/^idea\.md: `repo` is not a key a plan's card has:/));
 });

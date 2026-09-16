@@ -3,12 +3,12 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, addToInbox, dropFromInbox, fromNote, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
-  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...]
+  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--brief "<brief>"]
                                --after <runId>: file nothing of this run until wf decide says that
                                run has shipped — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
@@ -17,8 +17,16 @@ const HELP = `wf — run a workflow of agent steps
                                workflow: unless given, and its after: needs an --after for each
                                --input <file>: copied into the run's own inputs/ directory, and named
                                on every step's brief under what was asked for; once per file
+                               a card of the inbox (wf inbox --help) starts its body, or --brief
+                               "<brief>" in its place, and leaves the inbox: --workflows is its workflow:
+                               unless given, --repo its repo:
   wf plan <folder> [--repo .]  start a plan: one run per card in the folder, parents first, each
                                --after the runs of the cards its after: names (wf plan --help)
+  wf inbox                     the cards parked before they are started: name, first line, workflow
+                               and repo when set, and started as <runId> (wf inbox --help)
+  wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]
+                               park an idea as a card in the inbox, named from its first line
+  wf inbox rm <name>           drop a card without starting it
   wf tick                      one pass: tick the engine, file what became ready
   wf up [ms]                   the same, on a timer
   wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>;
@@ -106,6 +114,30 @@ each other, a file that is not .md, a folder with no card, and a card whose work
 The folder says what --after, --workflows and --no-worktree would, and wf plan refuses them. A wf start that
 refuses part-way stops the plan: the runs it started stand, and it prints a wf start for each card left.`;
 
+const INBOX_HELP = `wf inbox
+wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]
+wf inbox rm <name>
+
+An inbox is cards before they are started: \${WF_ROOT:-~/.agent-workflows}/inbox/, one <name>.md per card, beside
+runs/. A card is a plan's card with two differences — both keys optional, and no after:, since what it waits on
+is said at start:
+
+    ---
+    workflow: dev              # what runs it, chosen at start when the card does not say
+    repo: /home/me/code/app    # the repository it is about, as an absolute path
+    ---
+    Cache the engine's views between passes.
+
+  wf inbox       lists each card: its name, the first line of its body, its workflow and repo when set, and
+                 started as <runId> for a card a run's record says it was started as — a card whose removal failed.
+                 An entry that does not read as a card is listed with why.
+  wf inbox add   files an idea, text or a file, named with the slug a run id makes of its first line, suffix and
+                 all; --workflow and --repo write the keys, over a file's own.
+  wf inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
+
+Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
+directory, an add with no idea, and a name that would leave the folder.`;
+
 const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
 
 What the run produced, and the choice it leaves you. It prints the commands — ship it, drop it, once
@@ -188,7 +220,7 @@ function readFlags(argv: string[], rules: FlagRules): { values: Record<string, s
   return { values, switches };
 }
 
-type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[]; inputs: string[] };
+type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[]; inputs: string[]; brief?: string };
 
 /** What each of `wf start`'s value flags takes, as its refusal says it. */
 const START_TAKES = {
@@ -196,6 +228,7 @@ const START_TAKES = {
   '--repo': 'the repository the run works on: wf start <brief> --repo <r>',
   '--after': 'the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]',
   '--input': "a file to hand the run's steps: wf start <brief> --input <file> [--input <file> ...]",
+  '--brief': "what the run is asked to do in place of an inbox card's body, as text or a file: wf start <inbox>/<name>.md --brief \"<brief>\"",
 } as const;
 
 /**
@@ -208,11 +241,14 @@ function startHow(argv: string[]): StartHow {
     switches: ['--no-worktree'],
     repeats: ['--after', '--input'],
     unknown: (arg) => (arg.startsWith('-')
-      ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps.`
+      ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; and, for an inbox card, --brief "<brief>".`
       : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`),
-    twice: (flag) => `wf start takes ${flag} once: a run works on one ${flag === '--repo' ? 'repository' : 'workflow'}.`,
+    twice: (flag) => `wf start takes ${flag} once: a run ${flag === '--brief' ? 'is asked one thing' : `works on one ${flag === '--repo' ? 'repository' : 'workflow'}`}.`,
   });
-  return { workflows: values['--workflows']?.[0], repo: values['--repo']?.[0], isolate: !switches.length, after: values['--after'] ?? [], inputs: values['--input'] ?? [] };
+  return {
+    workflows: values['--workflows']?.[0], repo: values['--repo']?.[0], isolate: !switches.length, after: values['--after'] ?? [], inputs: values['--input'] ?? [],
+    ...(values['--brief'] ? { brief: values['--brief'][0] } : {}),
+  };
 }
 
 /**
@@ -234,6 +270,21 @@ function planHow(argv: string[]): { repo?: string } {
     twice: () => 'wf plan takes --repo once: a plan works on one repository.',
   });
   return { repo: values['--repo']?.[0] };
+}
+
+/** `wf inbox add`'s flags, after the idea: `--workflow <name>` and `--repo <path>`, once each. */
+function inboxAddHow(argv: string[]): { workflow?: string; repo?: string } {
+  const { values } = readFlags(argv, {
+    takes: {
+      '--workflow': 'the workflow to start the card on, by name or as a path: wf inbox add "<idea>" --workflow <name>',
+      '--repo': 'the repository the idea is about: wf inbox add "<idea>" --repo <path>',
+    },
+    unknown: (arg) => (arg.startsWith('-')
+      ? `wf inbox add does not take ${arg}. It takes the idea, then --workflow <name> and --repo <path>.`
+      : `wf inbox add takes one idea, and ${arg} is a second. Quote an idea with spaces — wf inbox add "<idea>" — or give it as a file: wf inbox add ./idea.md.`),
+    twice: (flag) => `wf inbox add takes ${flag} once: a card names one ${flag === '--repo' ? 'repository' : 'workflow'}.`,
+  });
+  return { workflow: values['--workflow']?.[0], repo: values['--repo']?.[0] };
 }
 
 /** `wf retry`'s own flags: after `--message`, one of these alone is an answer left out, not an answer. */
@@ -308,6 +359,35 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const arg = rest[0];
       if (!arg || arg.startsWith('--')) return console.log(HELP);
       const how = startHow(rest.slice(1));
+      const printStarted = (run: ReturnType<typeof start>, from?: string) => {
+        const steps = stepsOf(run);
+        console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.name).join(' → ')}`);
+        if (from) console.log(from);
+        console.log(`workspace: ${run.workspace}`);
+        if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
+        if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
+        console.log(`run 'wf tick' (or 'wf up') to start it`);
+      };
+      // A card of the inbox starts out of it, and leaves it. Its brief is its body, or --brief; its workflow and repository are the flags', else its own.
+      const inboxName = inboxNameAt(arg);
+      if (inboxName !== null) {
+        const brief = how.brief === undefined ? undefined : fs.statSync(how.brief, { throwIfNoEntry: false })?.isFile() ? fs.readFileSync(how.brief, 'utf8') : how.brief;
+        const started = startFromInbox({
+          name: inboxName,
+          ...(brief !== undefined ? { brief } : {}),
+          ...(how.workflows !== undefined ? { workflow: how.workflows } : {}),
+          ...(how.repo !== undefined ? { repo: path.resolve(how.repo) } : {}),
+          callerRepo: path.resolve('.'),
+          isolate: how.isolate,
+          after: how.after,
+          inputs: how.inputs,
+        });
+        printStarted(started.run, started.removed
+          ? `${fromNote(started.run)} — removed from the inbox`
+          : `${fromNote(started.run)} — still in the inbox: ${started.why}. wf inbox lists it as started as ${started.run.id}: drop it with wf inbox rm ${inboxName}`);
+        return;
+      }
+      if (how.brief !== undefined) usage(`wf start takes --brief only for a card of the inbox, in place of its body: wf start ${path.join(inboxDir(), '<name>.md')} --brief "<brief>". Anywhere else the brief is its first argument: wf start "<brief>".`);
       const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : undefined;
       // A card of a plan — what `wf plan` prints `wf start <card>` for — starts its body. Any other file is the brief whole, frontmatter and all.
       const card = text === undefined ? null : cardToStart(arg, text, how.after);
@@ -324,12 +404,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         after: how.after,
         inputs: how.inputs,
       });
-      const steps = stepsOf(run);
-      console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.name).join(' → ')}`);
-      console.log(`workspace: ${run.workspace}`);
-      if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
-      if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
-      console.log(`run 'wf tick' (or 'wf up') to start it`);
+      printStarted(run);
       return;
     }
 
@@ -347,6 +422,46 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       }
       console.log(`run 'wf tick' (or 'wf up') to start them`);
       return;
+    }
+
+    // Cards before they are started. Each writes one card's file, or removes one, and nothing else: a card is started with wf start.
+    case 'inbox': {
+      const [sub, ...args] = rest;
+      if (sub === '--help') return console.log(INBOX_HELP);
+      if (sub === undefined) {
+        const listing = readInbox();
+        if (!listing.length) return console.log(`the inbox is empty — park an idea with wf inbox add "<idea>"`);
+        for (const line of inboxLines(listing)) console.log(line);
+        console.log(`\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] — drop one: wf inbox rm <name>`);
+        return;
+      }
+      if (sub === 'add') {
+        const idea = args[0];
+        if (idea === undefined || idea.startsWith('--')) usage('wf inbox add takes the idea, first: wf inbox add "<idea>" [--workflow <name>] [--repo <path>], or a file: wf inbox add ./idea.md. Nothing was filed.');
+        const how = inboxAddHow(args.slice(1));
+        const at = fs.statSync(idea!, { throwIfNoEntry: false });
+        if (at?.isDirectory()) usage(`${idea} is a directory, and wf inbox add takes the idea as text or as one file: wf inbox add "<idea>", or wf inbox add ./idea.md.`);
+        // A workflow given as a path is kept absolute, so it names the same folder from the inbox; a name stays a name, found in the repository at
+        // start. The flag's is read from here; a file's own `workflow:`, from the file's folder.
+        const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
+        const { card, file } = addToInbox({
+          text: at ? fs.readFileSync(idea!, 'utf8') : idea!,
+          ...(at ? { from: idea, dir: path.dirname(path.resolve(idea!)) } : { dir: process.cwd() }),
+          ...(workflow !== undefined ? { workflow } : {}),
+          ...(how.repo !== undefined ? { repo: path.resolve(how.repo) } : {}),
+        });
+        console.log(`${card.name}  ${card.body.split('\n')[0]!.slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}`);
+        console.log(`filed: ${file} — start it with wf start ${file}${card.workflow ? '' : ' --workflows <w>'}`);
+        return;
+      }
+      if (sub === 'rm') {
+        const [name, ...more] = args;
+        if (name === undefined || name.startsWith('--')) usage('wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>.');
+        if (more.length) usage(`wf inbox rm drops one card, and ${more[0]} is a second: wf inbox rm <name>, once per card.`);
+        const dropped = dropFromInbox(name!);
+        return console.log(dropped.removed ? `${name}  dropped, and nothing started — ${dropped.file} removed` : `${noCardLine(name!, dropped.cards)} Nothing to drop.`);
+      }
+      return usage(`wf inbox does not take ${sub}. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", and drops one with wf inbox rm <name> (wf inbox --help).`);
     }
 
     case 'tick': {
@@ -437,7 +552,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, waiting, said, timeline } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
-      const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${given ? `\n  ${given}` : ''}`;
+      // And the inbox card it was started from, when it was.
+      const from = fromNote(run);
+      const head = `${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${from ? `\n  ${from}` : ''}${given ? `\n  ${given}` : ''}`;
       const steps = stepsOf(run);
 
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);

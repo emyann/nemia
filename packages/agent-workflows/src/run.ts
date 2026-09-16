@@ -66,6 +66,12 @@ export type Run = {
    */
   inputs?: string[];
   /**
+   * Where the run came from, when it was not typed at `wf start`: `{ inbox: <name> }` for a card started out of the inbox (`startFromInbox` in
+   * runner.ts), which removes the card once this record is written. `wf inbox` reads it to say a card still there was `started as` this run,
+   * and `wf decide` names the card under the run's line. Absent on a run started any other way, and on every record from before the inbox.
+   */
+  from?: { inbox: string };
+  /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `wf decide` offers to
    * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (`isShipped` in runner.ts) — by this run's own `wf decide`, and by a run that waits on it. Absent until the run has finished, and on
@@ -1788,6 +1794,9 @@ export function inputRefusal(inputs: readonly InputFile[]): string | null {
  */
 export const inputsLine = (dir: string | undefined, names: readonly string[] | undefined): string | undefined =>
   (dir && names?.length ? `Files given with it (\`wf start --input\`), in \`${dir}\`: ${names.map((n) => `\`${n}\``).join(', ')}.` : undefined);
+
+/** What `wf decide` says under a run's line of where the run came from: the inbox card it was started from. Undefined for a run typed at `wf start`. */
+export const fromNote = (run: Pick<Run, 'from'>): string | undefined => (run.from ? `from inbox card ${run.from.inbox}` : undefined);
 
 /** What `wf decide` says under a run's line when `wf start --input` gave it files: each by name, and where they are. Undefined for a run given none. */
 export const inputsNote = (dir: string, names: readonly string[] | undefined): string | undefined =>

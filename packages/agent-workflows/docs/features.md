@@ -1636,7 +1636,9 @@ What was built:
   - an empty inbox says to file an idea in the box, or with `wf inbox add`.
 - **Start** opens the start form: the workflow preset by `presetOf`, the brief prefilled from the body, and `StartRun` with its `AfterPicker`.
   `presetOf` finds the card's workflow as `workflowFolder` does: a name is the repository's workflow, never yours, and an absolute path is
-  that folder. A start the api took opens the run's page. A start whose card could not be removed stays on the page: the start form goes,
+  that folder. A name on a card whose `repo:` is another repository presets nothing (`namedElsewhere`). The start would look for it in that
+  repository, so the api's workflow of the same name is another workflow. The page says whose workflow the card names. From review, round 3:
+  it preset the api's `dev`, and Start ran it on the card's repository. A start the api took opens the run's page. A start whose card could not be removed stays on the page: the start form goes,
   and the card says it was started as the run, with the api's `why`. The page keeps that `why` itself (`kept`), since the inbox read again
   after the start names the run and not why. From review, round 2: the form showed `why` at first, but the re-read unmounted it at once. `StartRun` and `AfterPicker`
   moved from the Workflows page into `components/StartRun.tsx`, and that page behaves as before. For a card, the picker lists the runs of
@@ -1660,9 +1662,12 @@ What was measured:
   read; the card's name not refused in the route; a non-string card or brief taken; a missing card as 422; a started card as 422; every card
   refusal 422; and the card start dropping `after`, `brief` or the workflow found. From round 2, two more, each failing 1: the `repo` written
   as sent, and a relative one resolved against the api's directory.
-- `apps/web/test/inbox.test.ts`, 6 tests: the order, including ties and an unknown time; the preset for a name, a path, and a path with a
+- `apps/web/test/inbox.test.ts`, 7 tests: the order, including ties and an unknown time; the preset for a name, a path, and a path with a
   trailing slash; no preset for none, an unknown name, one that does not read, a name only yours has, relative paths, and `.` and `..`;
-  `fileCard`, `dropCard` and `startRun` with `card`: what is sent, and the api's refusal verbatim. Eight breaks: seven failed a test. The one
+  `fileCard`, `dropCard` and `startRun` with `card`: what is sent, and the api's refusal verbatim. From round 3: no preset for a name on a card
+  about another repository, one whose path starts with the api's included, and a preset for the api's own written with a trailing slash, and for
+  an absolute path whatever the card's repository. Three breaks, each failing 1 or 2: the card's repository ignored, a trailing slash read as
+  another repository, and a path treated as a name. Eight breaks: seven failed a test. The one
   that did not was the relative-path check in `presetOf`, which was dead code, since no such path is a workflow's name. It was removed.
 - `npm run e2e`, the `inbox` page, in both themes:
   - the seed writes two cards into the store's `inbox/` (`seedInbox`), one with `workflow:` and `repo:` and one with neither, dated apart;
@@ -1675,8 +1680,10 @@ What was measured:
     dropped behind the page's back, whose 404 and its console line are all its watch sees, with the sentence beside the form verbatim and no
     record written; and, from round 2, a start with the inbox read-only, which stays on the inbox and whose card says it was started as the
     run, with the api's `why` word for word, after the inbox is read again, with no Start and no form. That case was run against the page as
-    it was before the fix, and failed on the missing `why`;
-  - the pictures (`inbox`, `inbox-start`, `inbox-started-as`, `inbox-kept`, `inbox-empty`, `inbox-refused`, each in both themes) were read. They showed the
+    it was before the fix, and failed on the missing `why`; and, from round 3, a card written by hand about another repository that names
+    `dev`, whose start form presets nothing, names that repository, and has no Start until one is picked;
+  - the pictures (`inbox`, `inbox-start`, `inbox-started-as`, `inbox-kept`, `inbox-elsewhere`, `inbox-empty`, `inbox-refused`, each in both
+    themes) were read. They showed the
     box's workflow option cut short, and a rule drawn twice in a card's start form. Both were fixed and photographed again. Then, in a browser
     on a scratch store: a filing refused for a relative repository, and a card filed with `wf inbox add` and started with another workflow,
     which opened its run and left the inbox.
@@ -1686,9 +1693,9 @@ What was measured:
 What it leaves:
 
 - **The run's page does not say a run came from a card.** `fromNote` exists, but `RunDetail` does not carry `from`. `wf decide` says it.
-- **A card's workflow is preset from the api's own listing.** A card about another repository names a workflow of that repository by name.
-  The page looks for it among the api's repository's workflows: it presets that one, or none, with a note to pick. The start runs the folder
-  picked, on the card's `repo:`.
+- **The board lists the api's repository's workflows alone.** A card about another repository that names its workflow by name presets
+  nothing. The page names that repository and offers `wf start`, which finds the workflow there. A workflow picked from the list runs its
+  folder on the card's `repo:`.
 - **A card whose workflow is not listed** (a relative path, a folder elsewhere, one that does not read) presets nothing, and the page says so.
   The board starts only a workflow it lists, as a start from the Workflows page does.
 - **Why a card's removal failed is shown once.** Only the start's answer carries it. The next visit says the card was started, and not why.

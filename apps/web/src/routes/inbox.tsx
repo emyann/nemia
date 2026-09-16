@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { StartRun } from '../components/StartRun';
 import { dropCard, fileCard, inboxQuery, repositoryQuery, workflowNameOf, workflowsQuery, type InboxEntry, type WorkflowListing } from '../lib/api';
-import { newestCardsFirst, presetOf, workflowKey } from '../lib/inbox';
+import { namedElsewhere, newestCardsFirst, presetOf, workflowKey } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
@@ -271,8 +271,11 @@ function CardItem({ entry }: { entry: InboxEntry }) {
 function StartCard({ entry, onKept }: { entry: InboxEntry; onKept: (kept: { id: string; why: string }) => void }) {
   const navigate = useNavigate();
   const workflows = useQuery(workflowsQuery);
+  // The api's repository, whose workflows are listed: a name on a card about another is that one's, and presets none of these.
+  const repository = useQuery(repositoryQuery);
+  const here = repository.data?.repo;
   const [picked, setPicked] = useState<string | null>(null);
-  const preset = workflows.data ? presetOf(entry.workflow, workflows.data) : null;
+  const preset = workflows.data && here !== undefined ? presetOf(entry.workflow, entry.repo, here, workflows.data) : null;
   const key = picked ?? (preset ? workflowKey(preset) : '');
   const workflow = workflows.data?.find((w) => w.error === null && workflowKey(w) === key) ?? null;
   const field = useId();
@@ -283,9 +286,9 @@ function StartCard({ entry, onKept }: { entry: InboxEntry; onKept: (kept: { id: 
         <label htmlFor={field} className="block text-sm font-medium">
           Workflow
         </label>
-        {workflows.error ? (
-          <p className="text-xs text-red-700 dark:text-red-400">Could not list the workflows to start it on: {workflows.error.message}</p>
-        ) : !workflows.data ? (
+        {workflows.error || repository.error ? (
+          <p className="text-xs text-red-700 dark:text-red-400">Could not list the workflows to start it on: {(workflows.error ?? repository.error)!.message}</p>
+        ) : !workflows.data || here === undefined ? (
           <p className="text-xs text-neutral-500">Reading the workflows…</p>
         ) : (
           <select id={field} value={key} onChange={(event) => setPicked(event.target.value)} className={`${FIELD} sm:max-w-xs`}>
@@ -295,9 +298,16 @@ function StartCard({ entry, onKept }: { entry: InboxEntry; onKept: (kept: { id: 
             <WorkflowOptions workflows={workflows.data} />
           </select>
         )}
-        {entry.workflow && workflows.data && !preset && (
+        {entry.workflow && workflows.data && here !== undefined && !preset && (
           <p data-unlisted className="text-xs text-amber-700 dark:text-amber-400">
-            The card names {code(entry.workflow)}, which is not a workflow here that reads: pick the one to run it on.
+            {namedElsewhere(entry.workflow, entry.repo, here) ? (
+              <>
+                The card names {code(entry.workflow)}, a workflow of {code(entry.repo!)}, and the workflows here are {code(here)}&apos;s: pick the one
+                to run it on, or start it with {code('wf start')}, which finds that one.
+              </>
+            ) : (
+              <>The card names {code(entry.workflow)}, which is not a workflow here that reads: pick the one to run it on.</>
+            )}
           </p>
         )}
       </div>

@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dropCard, fileCard, startRun, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
-import { newestCardsFirst, presetOf, workflowKey } from '../src/lib/inbox.ts';
+import { namedElsewhere, newestCardsFirst, presetOf, workflowKey } from '../src/lib/inbox.ts';
 
 const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}): InboxEntry => ({
   name, file: `${name}.md`, title: name, workflow: null, repo: null, startedAs: [], error: null, body: name, filedAt, ...extra,
@@ -34,16 +34,32 @@ const WORKFLOWS = [
   listing('mine', 'yours', '/home/me/.agent-workflows/workflows/mine'),
 ];
 
+/** The api's repository, whose workflows WORKFLOWS lists as the repository's. */
+const HERE = '/code/app';
+
 test("a card's start is preset to the workflow it names, found as a start finds it: a name is the repository's, a path that folder", () => {
-  assert.equal(presetOf('dev', WORKFLOWS), WORKFLOWS[0], "a name is the repository's workflow, though yours has one of that name too");
-  assert.equal(presetOf('/home/me/.agent-workflows/workflows/dev', WORKFLOWS), WORKFLOWS[2], 'an absolute path is that folder, yours included');
-  assert.equal(presetOf('/home/me/.agent-workflows/workflows/mine/', WORKFLOWS), WORKFLOWS[3], 'with a trailing slash too');
+  assert.equal(presetOf('dev', null, HERE, WORKFLOWS), WORKFLOWS[0], "a name is the repository's workflow, though yours has one of that name too");
+  // A card about the api's repository names one of its workflows, however the path is written.
+  for (const repo of [HERE, `${HERE}/`]) assert.equal(presetOf('dev', repo, HERE, WORKFLOWS), WORKFLOWS[0], repo);
+  assert.equal(presetOf('/home/me/.agent-workflows/workflows/dev', null, HERE, WORKFLOWS), WORKFLOWS[2], 'an absolute path is that folder, yours included');
+  assert.equal(presetOf('/home/me/.agent-workflows/workflows/mine/', null, HERE, WORKFLOWS), WORKFLOWS[3], 'with a trailing slash too');
+  // A path names one folder, whatever repository the card is about.
+  assert.equal(presetOf('/code/app/workflows/dev', '/code/other', HERE, WORKFLOWS), WORKFLOWS[0], "an absolute path on a card about another repository is that folder");
   assert.equal(workflowKey(WORKFLOWS[2]!), 'yours:dev');
 });
 
 test('REFUSED: no preset for a card that names no workflow, a workflow nobody here has, one that does not read, a name only yours has, or a relative path', () => {
   for (const workflow of [null, '', 'nope', 'broken', '/code/app/workflows/broken', 'mine', '../workflows/dev', 'workflows/dev', '.', '..', '/elsewhere/dev']) {
-    assert.equal(presetOf(workflow, WORKFLOWS), null, String(workflow));
+    assert.equal(presetOf(workflow, null, HERE, WORKFLOWS), null, String(workflow));
+  }
+});
+
+test("REFUSED: no preset for a name on a card about another repository, though the api's repository has a workflow of that name — a start looks for it in the card's", () => {
+  assert.equal(presetOf('dev', '/code/other', HERE, WORKFLOWS), null);
+  assert.equal(presetOf('dev', '/code/app-two', HERE, WORKFLOWS), null, 'a repository whose path starts with the api\'s is another');
+  assert.equal(namedElsewhere('dev', '/code/other', HERE), true);
+  for (const [workflow, repo] of [['dev', null], ['dev', HERE], ['dev', `${HERE}/`], ['/code/other/workflows/dev', '/code/other'], ['../workflows/dev', '/code/other'], [null, '/code/other']] as const) {
+    assert.equal(namedElsewhere(workflow, repo, HERE), false, `${workflow} on ${repo}`);
   }
 });
 

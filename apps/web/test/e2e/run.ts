@@ -1476,6 +1476,39 @@ const PAGES: PageSpec[] = [
         fs.rmSync(startedRecord, { force: true });
       }
 
+      // A card about another repository that names `dev`, which the api's repository has too, in a page of its own: a start of it from the
+      // command line looks for `dev` in the card's repository, so the form presets none of the api's workflows, says whose `dev` the card
+      // means, and offers no Start until one is picked. The card written by hand, and taken back.
+      const elsewhere = path.join(store!, 'hkb-v2');
+      const elsewhereName = 'a-card-about-another-repo-e2e0';
+      const elsewhereFile = path.join(inbox, `${elsewhereName}.md`);
+      const other = await page.context().newPage();
+      try {
+        fs.writeFileSync(elsewhereFile, `---\nworkflow: ${WORKFLOWS.good.name}\nrepo: ${elsewhere}\n---\nA card about another repository\n`);
+        const { problems } = watch(other);
+        await other.goto(page.url(), { waitUntil: 'networkidle' });
+        const item = cardIn(other, elsewhereName);
+        await item.getByRole('button', { name: 'Start' }).click();
+        const pick = item.getByRole('combobox', { name: 'Workflow' });
+        await expectVisible(pick, `Start opens ${elsewhereName}'s start form`);
+        if ((await pick.inputValue()) !== '') {
+          throw new Refused(`a card about ${elsewhere} that names ${WORKFLOWS.good.name} presets none of the api's workflows — it preset ${JSON.stringify(await pick.inputValue())}`);
+        }
+        await expectVisible(
+          item.locator('[data-unlisted]', { hasText: `The card names ${WORKFLOWS.good.name}, a workflow of ${elsewhere}, and the workflows here are ${checkout}'s` }),
+          'and says whose workflow the card names',
+        );
+        await expectCount(item.locator(`form[aria-label="Start ${elsewhereName}"]`), 0, 'with no Start until one is picked');
+        await settled(other);
+        await other.screenshot({ path: path.join(OUT, `inbox-elsewhere-${await themeOf(other)}.png`), fullPage: true });
+        await other.waitForLoadState('networkidle');
+        const seen = problems();
+        if (seen.length) throw new Refused(`no console error and no failed request on a card about another repository — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await other.close();
+        fs.rmSync(elsewhereFile, { force: true });
+      }
+
       // An empty inbox, in a page of its own: both cards set aside, and put back.
       const aside = path.join(store!, 'inbox-aside');
       const empty = await page.context().newPage();

@@ -8,7 +8,7 @@ import path from 'node:path';
 // agent-workflows locates its store when the module loads, so point it at a scratch directory before app.ts imports it.
 process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-capabilities-'));
 const { app } = await import('../src/app.ts');
-const { HOME_REPO, MEASURED_TOOLS, capabilitiesOf, denyingRule, frontmatterOf, repoOf } = await import('../src/capabilities.ts');
+const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, denyingRule, frontmatterOf, repoOf } = await import('../src/capabilities.ts');
 const { DISALLOW, bashCovers } = await import('../src/reach.ts');
 
 const FIXTURE_SERVER = path.join(import.meta.dirname, 'fixtures', 'mcp-server.ts');
@@ -94,7 +94,7 @@ test('a repository with none of it — or no repository at all — is empty list
   for (const repo of [repoWith({}), gone, repoWith({ '.claude/skills': 'a file', '.claude/agents': 'a file' })]) {
     const { status, body } = await served(repo);
     assert.equal(status, 200, repo);
-    assert.deepEqual(body, { repo, skills: [], agents: [], mcp: [], denied: [], allowed: [], warnings: [], measured: MEASURED_TOOLS, steps: [] }, repo);
+    assert.deepEqual(body, { repo, skills: [], agents: [], mcp: [], denied: [], allowed: [], warnings: [], measured: MEASURED_TOOLS, readOnly: READ_ONLY_COMMANDS, steps: [] }, repo);
   }
 });
 
@@ -590,4 +590,57 @@ test('REFUSED: a deny of a whole MCP server takes back an allow of one of its to
   // The step beside it denies nothing of its own: echo is allowed on both, and only the settings' whole-server deny takes anything back.
   assert.deepEqual(open.allowed.takenBack, [{ rule: 'mcp__other__x', by: settings('mcp__other__*') }]);
   assert.deepEqual(open.mcp[0].tools.find((t: { name: string }) => t.name === 'echo'), { name: 'echo', denied: null, allowed: true });
+});
+
+/** Every read-only command as a step with Bash and no deny of them gets it: the measured ones first, then what the docs name. */
+const readOnlyAll = () => [
+  ...READ_ONLY_COMMANDS.measured.map((command: string) => ({ command, measured: true, denied: null })),
+  ...READ_ONLY_COMMANDS.documented.map((command: string) => ({ command, measured: false, denied: null })),
+];
+
+test("a step with Bash runs Claude Code's read-only commands with no rule, in dontAsk or not — dated, what was measured apart from what is only documented — and a step without Bash, or on Codex, none", async () => {
+  const body = (await served(stepsRepo())).body;
+  assert.deepEqual({ harness: body.readOnly.harness, version: body.readOnly.version, measuredAt: body.readOnly.measuredAt }, { harness: 'Claude Code', version: '2.1.272', measuredAt: '2026-09-15' });
+  const steps = Object.fromEntries(body.steps.map((s: { workflow: string; step: string }) => [`${s.workflow}/${s.step}`, s]));
+  // The settings deny `git push:*`, which is not every `git` command: git's read-only forms still run.
+  assert.deepEqual(steps['dev/review'].readOnly, readOnlyAll());
+  assert.equal(steps['dev/review'].allowed.dontAsk, true);
+  assert.deepEqual(steps['dev/implement'].readOnly, readOnlyAll());
+  assert.equal(steps['codexed/plan'].readOnly, null, 'nothing of a Codex session was measured');
+  const repo = repoWith({
+    'workflows/dev/reader.md': '---\nharness: claude\ntools: Read, Grep\npermissionMode: dontAsk\n---\nRead it.\n',
+    'workflows/dev/denied.md': '---\nharness: claude\npermissionMode: dontAsk\ndisallow: Bash(*)\n---\nRead it.\n',
+  });
+  const { 'dev/reader': reader, 'dev/denied': denied } = await stepsOf(repo);
+  assert.deepEqual(reader.readOnly, [], 'its tools have no Bash');
+  assert.deepEqual(denied.readOnly, [], 'a deny takes Bash whole');
+});
+
+test('REFUSED: a deny that covers a read-only command refuses it — a prefix, a pattern, every git command — and one narrower than the command does not take all of it', async () => {
+  const repo = repoWith({
+    '.claude/settings.json': { permissions: { deny: ['Bash(cat:*)', 'Bash(git push:*)', 'Bash(head -c *)'] } },
+    'workflows/dev/review.md': '---\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\ndisallow: Bash(find *), Bash(git:*), Bash(ls -la)\n---\nReview it.\n',
+  });
+  const { 'dev/review': review } = await stepsOf(repo);
+  const refused = Object.fromEntries(review.readOnly.filter((c: { denied: unknown }) => c.denied).map((c: { command: string; denied: unknown }) => [c.command, c.denied]));
+  assert.deepEqual(refused, {
+    cat: { rule: 'Bash(cat:*)', source: SETTINGS },
+    find: { rule: 'Bash(find *)', source: DISALLOW },
+    git: { rule: 'Bash(git:*)', source: DISALLOW },
+  });
+  // `head -c *`, `git push:*` and `ls -la` each refuse part of a command, which still runs the rest without a rule.
+  for (const command of ['head', 'ls', 'grep']) assert.equal(review.readOnly.find((c: { command: string }) => c.command === command).denied, null, command);
+  assert.equal(review.readOnly.length, readOnlyAll().length, 'a command refused is marked, not dropped');
+});
+
+test("REFUSED: the measured read-only commands are only those this repository's settings allow none of — the review ran them under those settings — and none is both measured and documented", () => {
+  const settings = JSON.parse(fs.readFileSync(path.join(HOME_REPO, '.claude', 'settings.json'), 'utf8')) as { permissions?: { allow?: string[] } };
+  /** The first word of each Bash command the settings allow. */
+  const allowedFirst = new Set((settings.permissions?.allow ?? []).flatMap((rule) => /^Bash\(([^\s:)]+)/.exec(rule)?.[1] ?? []));
+  /** The commands of `names` a rule of the settings allows some form of: a run of one proves nothing of the harness's own leave. */
+  const allowed = (names: readonly string[]) => names.filter((name) => allowedFirst.has(name));
+  assert.deepEqual(allowed(READ_ONLY_COMMANDS.measured), []);
+  // Refused: `cd` and `git`, which the settings allow some of, would read as measured without a rule.
+  assert.deepEqual(allowed([...READ_ONLY_COMMANDS.measured, 'cd', 'git']), ['cd', 'git']);
+  assert.deepEqual(READ_ONLY_COMMANDS.measured.filter((c: string) => (READ_ONLY_COMMANDS.documented as readonly string[]).includes(c)), []);
 });

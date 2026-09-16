@@ -2,7 +2,8 @@ import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { when } from '../components/Facts';
-import { capabilitiesQuery, type Capabilities, type Described, type McpServer, type MeasuredTools, type StepReach } from '../lib/api';
+import { AllowedReach, CHIP, PLAIN, Reach, STRUCK } from '../components/Reach';
+import { capabilitiesQuery, type Capabilities, type Described, type McpServer, type MeasuredTools, type ReadOnlyCommands, type StepReach } from '../lib/api';
 
 export const Route = createFileRoute('/capabilities')({
   loader: ({ context }) => context.queryClient.ensureQueryData(capabilitiesQuery),
@@ -21,7 +22,7 @@ export const Route = createFileRoute('/capabilities')({
 /** What the repository offers a step, section by section, each thing with the file it was read from. */
 function CapabilitiesPage() {
   const { data } = useSuspenseQuery(capabilitiesQuery);
-  const { repo, skills, agents, mcp, denied, warnings, measured, steps } = data;
+  const { repo, skills, agents, mcp, denied, warnings, measured, readOnly, steps } = data;
 
   return (
     <article className="space-y-8">
@@ -61,7 +62,7 @@ function CapabilitiesPage() {
         count={steps.length}
         empty={<>No steps: no workflow under <Path path="workflows/" />, or yours, reads as one.</>}
       >
-        {steps.map((step) => <StepRow key={`${step.from}:${step.workflow}/${step.step}`} step={step} measured={measured} />)}
+        {steps.map((step) => <StepRow key={`${step.from}:${step.workflow}/${step.step}`} step={step} measured={measured} readOnly={readOnly} />)}
       </Section>
     </article>
   );
@@ -108,8 +109,6 @@ function DescribedRow({ item }: { item: Described }) {
     </li>
   );
 }
-
-const CHIP = 'inline-flex items-center rounded px-1.5 py-0.5 font-mono text-[11px] leading-none whitespace-nowrap';
 
 function ServerRow({ server }: { server: McpServer }) {
   const { name, enabled, tools, error, notAsked, checkedAt } = server;
@@ -201,18 +200,14 @@ function DeniedRow({ rule, source, refuses }: { rule: string; source: string; re
 
 const OWN = "the harness's own";
 
-const PLAIN = 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300';
-const STRUCK = 'bg-red-50 text-red-800 line-through decoration-red-500 dark:bg-red-950/60 dark:text-red-300';
-
 /**
  * What one step of a workflow gets: the fence its file declares, then — on Claude Code, whose set was measured — the tools it has (what was only
- * inferred, dashed), the skills it can load, the tools of each server the checkout enables, the deny rules that hold for it, and what the settings
- * allow it. A Codex step is its fence and nothing more: it reads no settings, and what a Codex session is given was not measured.
+ * inferred, dashed), the skills it can load, the tools of each server the checkout enables, the deny rules that hold for it, and what it runs
+ * without asking: Claude Code's read-only commands, and what the settings allow it. A Codex step is its fence and nothing more: it reads no settings, and what a Codex session is given was not measured.
  */
-function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools }) {
+function StepRow({ step, measured, readOnly }: { step: StepReach; measured: MeasuredTools; readOnly: ReadOnlyCommands }) {
   const { fence, tools, skills, mcp, denied, allowed } = step;
   const whyInferred = new Map(measured.inferred.map((t) => [t.name, t.why]));
-  const exceptOf = (rule: string) => allowed.exceptions.find((e) => e.rule === rule)?.except ?? [];
 
   return (
     <li aria-label={`Step ${step.workflow} · ${step.step}`} data-step={`${step.workflow}/${step.step}`} className="space-y-3 px-3 py-3">
@@ -348,66 +343,9 @@ function StepRow({ step, measured }: { step: StepReach; measured: MeasuredTools 
             )}
           </Reach>
 
-          <Reach label={allowed.dontAsk ? 'Bash it may run' : 'Allowed without asking'}>
-            {allowed.dontAsk ? (
-              allowed.why ? (
-                <p data-no-bash className="text-xs text-neutral-500">{allowed.why}</p>
-              ) : (
-                <>
-                  <p className="text-xs text-neutral-500">In dontAsk, a command no rule allows is denied without a prompt. The settings allow it:</p>
-                  {allowed.bash.length ? (
-                    <span className="flex flex-wrap gap-x-3 gap-y-1">
-                      {allowed.bash.map((b) => (
-                        <span key={b.rule} className="inline-flex flex-wrap items-center gap-1">
-                          <code data-bash={b.command} className={`${CHIP} bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300`}>{b.command}</code>
-                          {b.except.length > 0 && <span data-except={b.command} className="text-[11px] text-neutral-500">except {b.except.join(', ')}</span>}
-                        </span>
-                      ))}
-                    </span>
-                  ) : (
-                    <p className="text-xs text-neutral-500">No Bash command at all.</p>
-                  )}
-                </>
-              )
-            ) : allowed.rules.length ? (
-              <span className="flex flex-wrap gap-x-3 gap-y-1">
-                {allowed.rules.map((rule) => (
-                  <span key={rule} className="inline-flex flex-wrap items-center gap-1">
-                    <code data-allowed={rule} className={`${CHIP} ${PLAIN}`}>{rule}</code>
-                    {exceptOf(rule).length > 0 && <span data-except={rule} className="text-[11px] text-neutral-500">except {exceptOf(rule).join(', ')}</span>}
-                  </span>
-                ))}
-              </span>
-            ) : (
-              <p className="text-xs text-neutral-500">Nothing: no allow rule of the settings reaches it, so what asks is its permission mode's to decide.</p>
-            )}
-            {allowed.takenBack.length > 0 && (
-              <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
-                Taken back by a deny, which beats an allow:
-                {allowed.takenBack.map(({ rule, by }) => (
-                  <code key={rule} data-taken-back={rule} title={`Denied by ${by.rule} (${by.source})`} className={`${CHIP} ${STRUCK}`}>{rule}</code>
-                ))}
-              </p>
-            )}
-            {allowed.unused.length > 0 && (
-              <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
-                Of a tool its tools: do not have:
-                {allowed.unused.map((rule) => <code key={rule} data-unused={rule} className={`${CHIP} ${PLAIN} opacity-60`}>{rule}</code>)}
-              </p>
-            )}
-          </Reach>
+          <AllowedReach allowed={allowed} readOnly={step.readOnly} commands={readOnly} />
         </>
       )}
     </li>
-  );
-}
-
-/** One part of what a step gets, under its label. */
-function Reach({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="grid grid-cols-1 gap-x-4 gap-y-1 sm:grid-cols-[8rem_minmax(0,1fr)]">
-      <p className="text-xs font-medium text-neutral-500">{label}</p>
-      <div className="min-w-0 space-y-1">{children}</div>
-    </div>
   );
 }

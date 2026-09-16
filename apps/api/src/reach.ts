@@ -5,7 +5,8 @@
  *
  * What a Claude Code step has is read as the harness gives it, as far as it was measured: its `tools:` exactly, or the harness's own set
  * (`MEASURED_TOOLS`, what was inferred marked so); the Skill tool before any skill; every server of the checkout's `.mcp.json` that the settings
- * enable, whatever its tools; the settings' deny rules and its own `disallow:`; and in `dontAsk`, only what the settings allow of what asks.
+ * enable, whatever its tools; the settings' deny rules and its own `disallow:`; Claude Code's read-only commands, which ask for no rule in any
+ * mode (`READ_ONLY_COMMANDS`); and in `dontAsk`, only what the settings allow of what asks.
  * Rules are matched as Claude Code's permissions docs say it matches them (code.claude.com/docs/en/permissions, read 2026-09-14): deny before
  * allow, whatever either's specificity, so a deny takes back every allow whose calls it matches; in a Bash rule `*` is any text, spaces included,
  * and `:*` at the end is a trailing ` *`, which also matches the bare command; a rule naming a tool whole — `Bash`, or `Bash(*)` — as a deny,
@@ -13,7 +14,7 @@
  * page claims nothing else for it.
  */
 import { HARNESSES } from 'agent-workflows';
-import { capabilitiesOf, denyingRule, MEASURED_TOOLS, SETTINGS, type Capabilities, type DeniedRule } from './capabilities.ts';
+import { capabilitiesOf, denyingRule, MEASURED_TOOLS, READ_ONLY_COMMANDS, SETTINGS, type Capabilities, type DeniedRule } from './capabilities.ts';
 import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from './workflows.ts';
 
 /** The harnesses that are Claude Code, as the engine names them: its `--bg` sessions, and `claude -p` detached. */
@@ -45,6 +46,13 @@ export type AllowedFor = {
   why: string | null;
 };
 
+/**
+ * One of Claude Code's read-only commands as it reaches a step with Bash: whether it was measured running without a rule, or only documented so
+ * (`READ_ONLY_COMMANDS`), and the deny rule that refuses all of it — a Bash rule covering `<command> *` — which beats the harness's own leave as it
+ * beats an allow.
+ */
+export type ReadOnlyCommand = { command: string; measured: boolean; denied: DeniedRule | null };
+
 export type StepReach = {
   workflow: string;
   from: WorkflowSource;
@@ -67,10 +75,15 @@ export type StepReach = {
   /** Every deny rule that holds for it: the settings', then its own. None for a step whose harness reads no settings. */
   denied: DeniedRule[];
   allowed: AllowedFor;
+  /** Claude Code's read-only commands, the measured ones first: none for a step with no Bash, and null for a harness whose were not measured. */
+  readOnly: ReadOnlyCommand[] | null;
 };
 
-/** What the Capabilities page reads: the repository's capabilities, the measured set a step without `tools:` has, and what each step gets. */
-export type CapabilitiesWithSteps = Capabilities & { measured: typeof MEASURED_TOOLS; steps: StepReach[] };
+/**
+ * What the Capabilities page reads: the repository's capabilities, the measured set a step without `tools:` has, the read-only commands Claude
+ * Code runs without a rule, and what each step gets.
+ */
+export type CapabilitiesWithSteps = Capabilities & { measured: typeof MEASURED_TOOLS; readOnly: typeof READ_ONLY_COMMANDS; steps: StepReach[] };
 
 /**
  * A permission rule as Claude Code reads one: the tool, and what its parentheses scope — null for a rule naming the tool whole, as `Bash` and
@@ -165,7 +178,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
   };
   if (!CLAUDE_CODE.has(harness)) {
     return {
-      ...reach, claudeCode: false, tools: null, skills: null, mcp: null, denied: [],
+      ...reach, claudeCode: false, tools: null, skills: null, mcp: null, denied: [], readOnly: null,
       allowed: { rules: [], takenBack: [], unused: [], bash: [], exceptions: [], dontAsk, why: `${harness} reads no ${SETTINGS}, so none of its rules is claimed for this step.` },
     };
   }
@@ -224,6 +237,19 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
       : 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.';
   }
 
+  // What asks for no rule: each read-only command, unless a Bash deny covers all of it. `git`'s read-only forms are not listed, so only a deny of
+  // every `git` command is known to take them.
+  const readOnly: ReadOnlyCommand[] = !names.includes('Bash') ? [] : [
+    ...READ_ONLY_COMMANDS.measured.map((command) => ({ command, measured: true })),
+    ...READ_ONLY_COMMANDS.documented.map((command) => ({ command, measured: false })),
+  ].map(({ command, measured }) => {
+    const by = denied.find((d) => {
+      const r = ruleOf(d.rule);
+      return r?.tool === 'Bash' && r.scope !== null && bashCovers(r.scope, `${command}:*`);
+    });
+    return { command, measured, denied: by ?? null };
+  });
+
   const mcp = capabilities.mcp.filter((server) => server.enabled).map((server) => ({
     server: server.name,
     tools: server.tools?.map((tool): ReachedMcpTool => {
@@ -236,7 +262,7 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
   return {
     ...reach, claudeCode: true,
     tools: { from: spec.tools ? 'declared' : 'measured', names, inferred: spec.tools ? [] : names.filter((name) => inferred.includes(name)), removed },
-    skills, mcp, denied, allowed,
+    skills, mcp, denied, allowed, readOnly,
   };
 }
 
@@ -252,5 +278,5 @@ export async function capabilitiesWithSteps(repo: string): Promise<CapabilitiesW
   } catch (err) {
     capabilities.warnings.push(`${err instanceof Error ? err.message : String(err)} What each step gets is not shown for any workflow.`);
   }
-  return { ...capabilities, measured: MEASURED_TOOLS, steps: reachOf(capabilities, workflows) };
+  return { ...capabilities, measured: MEASURED_TOOLS, readOnly: READ_ONLY_COMMANDS, steps: reachOf(capabilities, workflows) };
 }

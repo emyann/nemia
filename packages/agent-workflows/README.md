@@ -1258,14 +1258,16 @@ and reading it is skipped, where it used to fail the pass for every run on the m
 **Nor does it file into one.** A pass that read a run before `wf cancel` may be cutting a step's worktree
 when the cancel lands, and `npm ci` takes a minute. `wf rm` then sees a cancelled run with nothing in
 flight. So the pass reads the record and the cancellation again before it cuts a worktree and before each
-filing, and files nothing once either says the run is called off or gone. A step a pass filed and died
+filing, and files nothing once either says the run is called off or gone. Nor does it hand a step off or
+collect its files once the record is gone: a `--no-worktree` run's workspace is a person's checkout. A step a pass filed and died
 before writing down is looked for on the engine, as a check, try or round is: `wf rm` counts it in flight,
 and a cancelled run's pass stops it.
 
 **Normal, not errors:** a run the store has no record of (`no such run`, and whatever is left under its
 id is removed and named), a worktree or branch already gone, and a run whose tasks the engine no longer
-knows. An id that is not a name (`..`, a path) is refused before anything is read, since it would name
-a directory that is not the run's.
+knows. An id that is not one `wf start` mints — lowercase letters, digits and dashes — is refused before
+anything is read. `r-xyz.json`, as `ls runs/` gives it, would name another run's record as a run's own
+directory, and `..` or a path a directory that is not the run's; one with a file's suffix is told the id.
 
 **A record from before runs froze their workflow reads its folder on every pass**, so that folder cannot
 be deleted while the record exists. With it gone, `wf ls`, `wf decide` and the tick die with `no workflow

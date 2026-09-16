@@ -1481,7 +1481,8 @@ What was built:
   nobody called off: a cancelled run whose tasks have settled is forgettable. `runWorktrees` takes only what git lists inside
   `worktrees/<id>/`, with the step a hand-off commits under: the last step on the record that works in the directory, or its directory's
   name. `branchFates` takes only `wf/<id>/…` branches. `checkLogsOf` takes `<id>-<step>[-try<n>]-check.stderr` for the record's steps,
-  or, with no record, any under the id that no stored run claims. `idRefusal` takes only a name as an id.
+  or, with no record, any under the id that could be no other stored run's, whose id is longer or shorter. `idRefusal` takes only what
+  `runId` mints: lowercase letters, digits and dashes.
 - **`forget` in runner.ts**, in an order a `wf rm` that dies can finish when run again. It reads the run as `cancel` does, adopting a check,
   try or round a pass filed and never wrote down, and a step too (`unrecordedSteps`), on a cancelled run as well. Then the worktrees: each
   handed off (`handOff`, now answering with the commit it made, or git's words when it could not make one) and removed with
@@ -1497,7 +1498,8 @@ What was built:
   reading it, which used to throw out of `tick` for every run on the machine. `writeRun` is `start`'s alone.
 - **Nor does a pass file into a run called off or forgotten while it worked.** `advance` reads the record and the cancellation again before it
   cuts a worktree, after the cut, and before each try, round and check it files (`mayFile`), and once either says so it files nothing more
-  on that pass. A cancelled run's pass stops a step a pass filed and died before writing down, as it stops what the record names.
+  on that pass. A cancelled run's pass stops a step a pass filed and died before writing down, as it stops what the record names. It hands
+  a step off and collects its files only while the record is there, read at each.
 
 What was decided, and why:
 
@@ -1521,6 +1523,13 @@ cutting its step's worktree, filed the step after `wf rm` had removed the worktr
 refusal tells a person to type, and on a cancelled run nothing judged a ready step. A hand-off git refused was swallowed, and the line passed
 on git's `--force` for the dirty tree. And a worktree on no branch was handed off and removed, its commits with it.
 
+Round 3's review found an id that could name another run's files, and a pass that made a forgotten run's files directory again; both
+were fixed. `idRefusal` took dots, so `wf rm r-xyz.json`, as `ls runs/` gives it, found no record at `runs/r-xyz.json.json` and swept
+`runs/r-xyz.json` as that id's own directory: a live run's record, with nothing asked, exit 0. `.cancelled` and `.asks` did the same to a
+cancellation and a person's asks. Its sibling without a dot: with no record, `wf rm r-xyz-implement` took `r-xyz`'s check logs. And a pass
+that read a `--no-worktree` run before `wf rm` handed its step off and collected its files after: the repository was still there, so
+`runs/<id>/` came back with no record, and a person's edits were committed under the step's name.
+
 **The lesson a record that never froze its workflow taught.** Five runs from 2026-09-13 predate the run freezing its workflow, so every
 pass reads their folder from disk (`stepsOf` falls back to `loadWorkflows(run.workflowDir)`). Measured 2026-09-16: with that folder renamed
 away, `wf ls`, `wf decide` and `wf tick` all died with `no workflow folder`, the tick for every run on the machine. So such a folder cannot
@@ -1530,13 +1539,14 @@ asks and the runs that wait on it. The line ends `its workflow was never frozen,
 
 What was measured:
 
-- `test/run.test.ts` (11 new), pure: a run that is over is forgotten (finished, failed, cancelled and settled, tasks the engine no longer
+- `test/run.test.ts` (12 new), pure: a run that is over is forgotten (finished, failed, cancelled and settled, tasks the engine no longer
   knows); refused in flight, cancelled or not; refused on a step ready, a check, try or round due and roots waiting on runs, each
   forgotten once cancelled; an ask due, one no pass files, one spent, and asks on a cancelled run; a run waiting on it, and children that
   started, were cancelled or wait on another; every reason at once; a record whose folder does not read; `parseWorktrees` and
   `runWorktrees` against the repository, a longer id's directory and the run's own, with `HEAD` and `detached`; `heldWorktree`;
-  `branchFates`; `checkLogsOf`; `forgetLine`'s words, for a detached worktree and a hand-off refused too.
-- `test/store.test.ts` (12 new), over real git and the fake engine: a failed step's run forgotten through the CLI, its file left after the
+  `branchFates`; `checkLogsOf`, sparing a stored run whose id the given one starts with; `idRefusal`, an id with a file's suffix told the id;
+  `forgetLine`'s words, for a detached worktree and a hand-off refused too.
+- `test/store.test.ts` (14 new), over real git and the fake engine: a failed step's run forgotten through the CLI, its file left after the
   last pass committed on its branch and nothing git ignores, a link in `node_modules` not followed, the record and every file under its id
   removed, another run's check log left, the board untouched, and a second `wf rm` saying `no such run`, exit 0. Four refusals in one `wf rm`
   beside a run forgotten, exit 2, then each forgotten once cancelled. A check filed and never written down holding a cancelled run until it
@@ -1548,7 +1558,9 @@ What was measured:
   forgotten; a step filed and never written down on a cancelled run, refused, stopped by the next pass, then forgotten; a pre-commit hook
   refusing the hand-off, in its words (on stderr, on stdout, and silent), the work staged in place, then forgotten once a person committed
   it; a detached worktree with a commit held, the same with uncommitted work at a commit on a branch, forgotten once on a branch that keeps
-  the commit, and a clean detached one at a branch's commit removed.
+  the commit, and a clean detached one at a branch's commit removed. Round 3's: `wf rm <id>.json`, `.cancelled` and `.asks` on a live run,
+  and ids with uppercase, an underscore or a dot, refused with exit 2 and the record, cancellation and ask left; `wf rm <id>-implement`
+  leaving the live run's check log; a pass held across `wf rm` of a `--no-worktree` run, making no `runs/<id>/` and committing no edit.
 - `test/forget-linked.test.ts` (1 new, a file of its own since `WF_ROOT` is read as the package loads): a store under a link, whose
   worktree git lists by its real path, forgotten with its work handed off.
 - Each guard was broken on purpose and the tests rerun: the tick writing a whole record, 1 failing; `done/` made `recursive`, 1; `listRuns`
@@ -1559,10 +1571,11 @@ What was measured:
   compared as written, 1 (the run held, its worktree read as a stray). Round 2's: no re-read after the cut, 1; the re-read ignoring the
   cancellation, 1; no unrecorded step adopted by `wf rm`, 1, or stopped by a cancelled run's pass, 1; a detached worktree removed like any,
   2, or when clean whatever its commit, 2; a hand-off git refused passed over, 1; a silent refusal given no words, 1. A fallback to a hook's
-  stdout failed nothing when broken — git hands a hook's stdout on as its stderr — and was taken out.
+  stdout failed nothing when broken — git hands a hook's stdout on as its stderr — and was taken out. Round 3's: dots taken in an id, 2;
+  check logs sparing only longer ids, 2; a hand-off and collection with no record, 1.
 - On a copy of this machine's `node_modules` (684 MB, 27,488 files) in a throwaway `WF_ROOT`: `wf rm` refused the running run in 2 ms, and
   once its step failed, forgot it in 550 ms, committing the file left in the worktree and leaving git's list with the repository alone.
-- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 430 (429 passed,
+- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 433 (432 passed,
   1 skipped), api 137 and web 174. Typecheck was clean in all four.
 
 What it leaves:

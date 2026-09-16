@@ -1954,7 +1954,8 @@ About one package run and one or two `dev-build` runs; the second if the inspect
 
 **Registered** 2026-09-16, by the operator: the board shows every piece of prose as preformatted text, and a person
 should be able to open a card and read it rendered, with its frontmatter keys laid out — a way to learn what the engine
-does from the thing itself.
+does from the thing itself. **The renderer is chosen by a study, not imposed**: the operator does not want
+`react-markdown` assumed, and asked that the run investigate with web search and web fetch and decide from evidence.
 
 **What exists.** `apps/web` has shiki for code (`components/ai-elements/code-block.tsx`) and no markdown renderer;
 prose is `whitespace-pre` in a dozen components (`Closeout`, `Decide`, `Needs`, `StartRun`, the run page, the Workflows
@@ -1963,12 +1964,30 @@ replies, a step's `body`, a folder's `description` and a card's `body`, all mark
 write it. The package's keys are closed lists with a table of what each count means (`STEP_KEYS`, `COUNTS` in
 `workflow.ts`; `INBOX_KEYS` in `inbox.ts`), and the README explains each key in prose.
 
-**What it needs.**
+**The study, first.** On `workflows/dev-planned-build` (plan → implement ⇄ review, the plan step on `WebFetch` and
+`WebSearch`, read-only; implement checked by build and e2e), and the brief says to wait for approval of the plan, so
+the plan signs off `blocked` with its recommendation in `needs` and the run waits for the operator's word. The study
+compares at least `react-markdown` (with `remark-gfm`), `markdown-it`, `marked` and `micromark`/`mdast` used directly,
+against the board's needs, each with a source fetched and dated:
 
-- **One renderer**, `react-markdown` with `remark-gfm` (tables, task lists), raw HTML left unrendered as it is by
-  default — the text is agents' and folders', not the board's — links opening in a new tab, code blocks through the
-  shiki component already there, and one `Markdown` component with the board's typography in both themes. A second
-  dependency only if it replaces more code than it adds.
+- correctness and GFM (tables, task lists, strikethrough, autolinks, footnotes);
+- safety: raw HTML in an agent's text must not render as HTML, and links must not run script — what each does by
+  default, and what a sanitizer adds;
+- React 19 and this build (Vite, TanStack Router): a component, or a string of HTML to set, and what that costs;
+- code blocks through the shiki component already there;
+- the conversation's streaming turns: rendering a growing string on every event, measured or reasoned;
+- bundle size, maintenance (last release, open issues, maintainers), licence;
+- what the CLI could share: nothing, since `wf decide` stays plain — unless a renderer is small enough to give the
+  CLI headings and lists too, which the study may note and not build.
+
+The recommendation names one renderer and says what it costs against the others; the operator approves or answers
+with another, and implement builds that one.
+
+**What it builds, once approved.**
+
+- **One `Markdown` component** on the chosen renderer, raw HTML left unrendered, links opening in a new tab, code
+  blocks through shiki, the board's typography in both themes. A second dependency only if it replaces more code than
+  it adds.
 - **Where it renders:** a run's brief; a closeout's summary and each reply; a step's body on the Workflows page and
   the step's page; a card's body; the conversation's assistant turns; a blocked step's needs. `wf decide`'s screen
   stays as the CLI prints it.
@@ -1977,10 +1996,10 @@ write it. The package's keys are closed lists with a table of what each count me
   step, from its block on the Workflows page. The one-line meanings come from the package, a small exported table per
   key beside `STEP_KEYS` and `INBOX_KEYS`, so the board and the README say the same thing; the apps run may add that
   table and nothing else in the package.
-- **e2e:** a card with headings, a list, a table and a code block in the seed; the card's page and a step's page in
-  both themes; nothing written.
+- **e2e:** a card with headings, a list, a table, a code block and a line of raw HTML in the seed, the HTML shown as
+  text; the card's page and a step's page in both themes; nothing written.
 
-One `dev-build` run.
+One `dev-planned-build` run: the plan is the study.
 
 ## Engine-side work
 

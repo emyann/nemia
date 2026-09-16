@@ -98,6 +98,24 @@ test("POST /api/inbox files a card as `wf inbox add` does: the idea alone; a rep
   assert.ok(Date.parse(namedEntry.filedAt!) > old.getTime());
 });
 
+test("POST /api/inbox writes an absolute repo as `wf inbox add --repo` does — no trailing slash, no `.` or `..` — so a card's run records the repository as every other run on it does", async () => {
+  clear();
+  for (const given of [`${repo}/`, `${repo}//`, `${repo}/./`, `${path.dirname(repo)}/../${path.basename(path.dirname(repo))}/${path.basename(repo)}`]) {
+    const res = await file({ body: `About ${given}`, workflow: 'dev', repo: given });
+    assert.equal(res.status, 201, `${given}: ${await res.clone().text()}`);
+    const filed = await res.json();
+    // The api's own repository once written as it is, so its workflow is written by name, as for the repository given plainly.
+    assert.deepEqual([filed.repo, filed.workflow], [repo, 'dev'], given);
+    assert.equal(fs.readFileSync(filed.file, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nAbout ${given}\n`, given);
+  }
+
+  // Started, the run names the repository as the api does, so the board lists it with the runs on it.
+  const { name } = await (await file({ body: 'Started from a slash', repo: `${repo}/` })).json();
+  const started = await startCard({ workflow: 'dev', card: name });
+  assert.equal(started.status, 201, await started.clone().text());
+  assert.equal(readRun((await started.json()).id).repo, repo);
+});
+
 test('GET /api/inbox lists an entry that does not read as a card with its refusal and no body, a card started with its run, and reads the folder on each request', async () => {
   clear();
   write(path.join(inbox, 'broken.md'), '---\nafter: some-run\n---\nWait for it.\n');
@@ -297,6 +315,31 @@ test('POST /api/runs with `card` starts the card through the package: the brief 
   assert.equal(bodied.status, 201, await bodied.clone().text());
   const bodiedRun = readRun((await bodied.json()).id);
   assert.deepEqual([bodiedRun.brief, bodiedRun.workflowDir, bodiedRun.from], ['Keep the brief\n\nAs the card says it.', mine, { inbox: plain.name }]);
+});
+
+test("POST /api/runs with `card` whose removal fails still starts: 201 with `removed: false` and the package's why, the record written, the card listed as started — and refused a second start until it is dropped", { skip: process.getuid?.() === 0 ? 'root removes a file from a read-only folder all the same' : false }, async () => {
+  clear();
+  const { card, file: cardFile } = addToInbox({ text: 'Stays in the inbox' });
+  fs.chmodSync(inbox, 0o555);
+  try {
+    const res = await startCard({ workflow: 'dev', card: card.name });
+    assert.equal(res.status, 201, await res.clone().text());
+    const answered = await res.json();
+    assert.deepEqual(Object.keys(answered).sort(), ['card', 'id', 'removed', 'why']);
+    assert.deepEqual([answered.card, answered.removed], [card.name, false]);
+    assert.ok(answered.why.startsWith(`${cardFile} could not be removed — `), answered.why);
+    assert.deepEqual(readRun(answered.id).from, { inbox: card.name });
+    assert.deepEqual(cards(), [`${card.name}.md`], 'the card is still there');
+    assert.deepEqual((await listed()).find((e) => e.name === card.name)?.startedAs, [answered.id]);
+
+    const again = await startCard({ workflow: 'dev', card: card.name });
+    assert.equal(again.status, 409);
+    assert.ok((await again.json()).error.includes(`this card was started as ${answered.id}`));
+  } finally {
+    fs.chmodSync(inbox, 0o755);
+  }
+  assert.equal((await drop(card.name)).status, 200);
+  assert.deepEqual(cards(), []);
 });
 
 /** What `startFromInbox` refuses `name` with, asked as the route asks it. */

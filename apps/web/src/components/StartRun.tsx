@@ -11,7 +11,8 @@ import { standingOf, titleOf } from '../lib/factory';
  *
  * Given a `card`, it starts that inbox card, as `wf start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the card's body,
  * to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted` is told of a
- * start the api took; the Workflows page gives none, and says where the run is itself. `repo` is where the run starts, when the card names a
+ * start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows page gives none,
+ * and says where the run is itself. `repo` is where the run starts, when the card names a
  * repository: what the runs to wait on are listed from.
  */
 export function StartRun({ workflow, card, repo, onStarted }: {
@@ -88,11 +89,6 @@ export function StartRun({ workflow, card, repo, onStarted }: {
           </Link>
           . Nothing is filed until <code className="font-mono text-xs">wf tick</code> or <code className="font-mono text-xs">wf up</code> runs
           {start.variables.after.length > 0 && <>, and {start.variables.after.join(' and ')} {start.variables.after.length > 1 ? 'have' : 'has'} shipped</>}.
-          {start.data.removed === false && (
-            <span data-kept className="block text-amber-700 dark:text-amber-400">
-              The card is still in the inbox — {start.data.why}. It lists as started; Remove drops it.
-            </span>
-          )}
         </p>
       )}
       {start.isError && (

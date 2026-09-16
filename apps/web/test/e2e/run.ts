@@ -1401,6 +1401,57 @@ const PAGES: PageSpec[] = [
         }
       }
 
+      // Started, and its card could not be removed — the inbox read-only — in a page of its own: the run is written and the page stays, the
+      // card says it was started as that run with the api's why, word for word, once the inbox is read again too, and offers Start no more.
+      // Taken back: the inbox writable again, the record removed. Not as root, which removes a file from a read-only folder all the same.
+      if (process.getuid?.() === 0) {
+        console.log('e2e: inbox — a start whose card cannot be removed is not looked at as root, which removes it all the same');
+      } else {
+        const keptRuns = fs.readdirSync(runsDir).sort();
+        const kept = await page.context().newPage();
+        try {
+          const { problems } = watch(kept);
+          await kept.goto(page.url(), { waitUntil: 'networkidle' });
+          const item = cardIn(kept, planned.name);
+          await item.getByRole('button', { name: 'Start' }).click();
+          const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
+          await expectVisible(form.getByRole('button', { name: 'Start' }), `Start opens ${planned.name}'s start form`);
+          // Waited on from before the start, so the read its answer asks for is not missed: nothing else on the page reads the inbox again.
+          const reread = kept.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox', { timeout: WAIT_MS });
+          fs.chmodSync(inbox, 0o555);
+          const [started] = await Promise.all([
+            kept.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
+            form.getByRole('button', { name: 'Start' }).click(),
+          ]);
+          const answer = (await started.json()) as { id?: string; removed?: boolean; why?: string };
+          if (started.status() !== 201 || answer.removed !== false || !answer.why?.startsWith(`${cardFile} could not be removed — `)) {
+            throw new Refused(`the api starts a card it cannot remove, and says so — it answered ${started.status()}: ${JSON.stringify(answer)}`);
+          }
+          // Once the inbox has been read again, which names the run: the form gone, the why still there.
+          const listing = (await (await reread).json()) as Array<{ name: string; startedAs: string[] }>;
+          if (JSON.stringify(listing.find((e) => e.name === planned.name)?.startedAs) !== JSON.stringify([answer.id])) {
+            throw new Refused(`the inbox read again names the run the card was started as — it listed ${JSON.stringify(listing)}`);
+          }
+          await kept.waitForLoadState('networkidle');
+          await expectVisible(item.locator(`[data-started-as] a[href="/runs/${answer.id}"]`), `the card says it was started as ${answer.id}, linked to the run`);
+          const why = await item.locator('[data-started-as] [data-kept]').textContent();
+          if (why !== answer.why) throw new Refused(`the card says why it was not removed, in the api's words — it shows ${JSON.stringify(why)}, and the api said ${JSON.stringify(answer.why)}`);
+          await expectCount(item.getByRole('button', { name: 'Start' }), 0, 'and offers no Start: started again, the idea would run twice');
+          await expectCount(item.locator('[data-start-card]'), 0, 'its start form is gone');
+          if (new URL(kept.url()).pathname !== '/inbox') throw new Refused(`the page stays on the inbox — it went to ${kept.url()}`);
+          if (!fs.existsSync(cardFile)) throw new Refused(`the card is still in the inbox — ${cardFile} is gone`);
+          await settled(kept);
+          await kept.screenshot({ path: path.join(OUT, `inbox-kept-${await themeOf(kept)}.png`), fullPage: true });
+          await kept.waitForLoadState('networkidle');
+          const seen = problems();
+          if (seen.length) throw new Refused(`no console error and no failed request on a start whose card stayed — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+        } finally {
+          await kept.close();
+          fs.chmodSync(inbox, 0o755);
+          for (const file of fs.readdirSync(runsDir)) if (!keptRuns.includes(file)) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
+        }
+      }
+
       // A card a run's record already names — started, its removal failed — in a page of its own: linked to its run, Remove only. Taken back.
       const startedRecord = path.join(runsDir, `${STARTED_AS}.json`);
       const already = await page.context().newPage();

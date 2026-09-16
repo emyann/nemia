@@ -162,15 +162,22 @@ function FileCard() {
  * A card: its first line, its workflow and repository when it names them, and when it was filed; Start, which opens its start form, and Remove.
  * A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a card
  * shows why, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
+ *
+ * A start from this page whose card could not be removed is kept (`kept`): the start form goes, since the card may not start again, and the
+ * card says it was started as that run, with why its removal failed, in the api's words — which only the start's answer carries, so a later
+ * visit says it was started, and not why.
  */
 function CardItem({ entry }: { entry: InboxEntry }) {
   const queryClient = useQueryClient();
   const [starting, setStarting] = useState(false);
+  const [kept, setKept] = useState<{ id: string; why: string } | null>(null);
   const remove = useMutation({
     mutationFn: () => dropCard(entry.name),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
   });
-  const started = entry.startedAs.length > 0;
+  // The run a start just wrote, before the inbox is read again and names it.
+  const startedAs = kept && !entry.startedAs.includes(kept.id) ? [...entry.startedAs, kept.id] : entry.startedAs;
+  const started = startedAs.length > 0;
   const startable = !started && entry.error === null;
 
   return (
@@ -224,7 +231,7 @@ function CardItem({ entry }: { entry: InboxEntry }) {
       {started && (
         <p data-started-as className="text-sm text-amber-700 dark:text-amber-400">
           Started as{' '}
-          {entry.startedAs.map((id, i) => (
+          {startedAs.map((id, i) => (
             <span key={id}>
               {i > 0 && ', '}
               <Link to="/runs/$runId" params={{ runId: id }} className="font-mono underline underline-offset-2">
@@ -233,6 +240,11 @@ function CardItem({ entry }: { entry: InboxEntry }) {
             </span>
           ))}
           , and still here because its removal failed. Remove drops it; to run the idea again, file it again.
+          {kept && (
+            <span data-kept className="mt-1 block font-mono text-xs break-all">
+              {kept.why}
+            </span>
+          )}
         </p>
       )}
       {entry.error !== null && (
@@ -247,16 +259,16 @@ function CardItem({ entry }: { entry: InboxEntry }) {
           <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{remove.error.message}</p>
         </div>
       )}
-      {starting && startable && <StartCard entry={entry} />}
+      {starting && startable && <StartCard entry={entry} onKept={setKept} />}
     </li>
   );
 }
 
 /**
  * A card's start: the workflow, preset from the card and changeable, and `StartRun` with the brief prefilled from its body. A start the api
- * took opens the run's page — unless the card stayed in the inbox, which the form says, with why.
+ * took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and the page stays.
  */
-function StartCard({ entry }: { entry: InboxEntry }) {
+function StartCard({ entry, onKept }: { entry: InboxEntry; onKept: (kept: { id: string; why: string }) => void }) {
   const navigate = useNavigate();
   const workflows = useQuery(workflowsQuery);
   const [picked, setPicked] = useState<string | null>(null);
@@ -295,7 +307,8 @@ function StartCard({ entry }: { entry: InboxEntry }) {
           card={{ name: entry.name, body: entry.body ?? '' }}
           {...(entry.repo ? { repo: entry.repo } : {})}
           onStarted={(started) => {
-            if (started.removed !== false) void navigate({ to: '/runs/$runId', params: { runId: started.id } });
+            if (started.removed === false) onKept({ id: started.id, why: started.why ?? 'the api did not say why' });
+            else void navigate({ to: '/runs/$runId', params: { runId: started.id } });
           }}
         />
       )}

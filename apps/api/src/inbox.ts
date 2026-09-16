@@ -106,11 +106,14 @@ function filingOf(body: unknown, repo: string, home: string): { text: string; wo
   if (about !== undefined && typeof about !== 'string') {
     return { status: 400, error: `\`repo\` is the repository the idea is about, as \`wf inbox add --repo <path>\` takes it: an absolute path, or left out. This request's was ${JSON.stringify(about)}.` };
   }
-  const filing: { text: string; workflow?: string; repo?: string } = { text, ...(about !== undefined ? { repo: about } : {}) };
+  // An absolute path written as `wf inbox add --repo` writes it (`path.resolve`): no trailing slash, no `.` or `..`, so the run a start records
+  // names the repository as every other run on it does, and the board finds them together. A relative one is sent on as it is, for the
+  // package to refuse: the api has no directory it was typed from.
+  const filing: { text: string; workflow?: string; repo?: string } = { text, ...(about !== undefined ? { repo: path.isAbsolute(about) ? path.resolve(about) : about } : {}) };
   if (workflow === undefined) return filing;
   const folder = folderOf(workflow, from as WorkflowSource | undefined, repo, home);
   if ('status' in folder) return folder;
-  const byName = path.dirname(folder.dir) === path.join(repo, 'workflows') && (about === undefined || path.resolve(about) === repo);
+  const byName = path.dirname(folder.dir) === path.join(repo, 'workflows') && (filing.repo === undefined || filing.repo === repo);
   return { ...filing, workflow: byName ? workflow : folder.dir };
 }
 

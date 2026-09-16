@@ -23,7 +23,7 @@ import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workf
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { afterRefusal, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, idRefusal, namesInOrder, parseWorktrees, runWorktrees, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
+import { afterRefusal, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runWorktrees, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -944,18 +944,28 @@ export function startPlan(opts: { dir: string; repo: string; startRun?: typeof s
  * Idempotent: a clean tree commits nothing, so this runs on every pass without accumulating
  * commits. Deliberately not a failure if it cannot — a step's real work is already committed by
  * the step itself in the normal case, and losing a run over a git edge case would be worse.
- * Answers with the commit it made, if it made one: `wf rm` says so, `when` its message says why.
+ * Answers with the commit it made, or with git's words when it could not make one — a hook that refused it, a signature that failed — and
+ * undefined with nothing to commit: the tick reads neither, and `wf rm` says both. `when` goes on the commit's message, saying why.
+ * The repository's hooks and signing are honoured: a hook may be what keeps a secret off a branch.
  */
-function handOff(workspace: string, step: string, when = ''): string | undefined {
+function handOff(workspace: string, step: string, when = ''): { commit: string } | { error: string } | undefined {
+  const quiet = { cwd: workspace, encoding: 'utf8' as const, stdio: ['ignore', 'pipe', 'pipe'] as Array<'ignore' | 'pipe'> };
   try {
-    if (!execFileSync('git', ['status', '--porcelain'], { cwd: workspace, encoding: 'utf8' }).trim()) return undefined;
-    execFileSync('git', ['add', '-A'], { cwd: workspace });
+    if (!execFileSync('git', ['status', '--porcelain'], quiet).trim()) return undefined;
+    execFileSync('git', ['add', '-A'], quiet);
     execFileSync('git', [
       '-c', 'user.email=wf@local', '-c', 'user.name=wf',
       'commit', '-m', `${step}: hand off what was left uncommitted${when}`,
-    ], { cwd: workspace, encoding: 'utf8' });
-    return git(workspace, 'rev-parse', 'HEAD');
-  } catch { return undefined; /* nothing to hand off, or a tree git will not commit */ }
+    ], quiet);
+    return { commit: git(workspace, 'rev-parse', 'HEAD') };
+  } catch (err) { return { error: failedWords(err) }; }
+}
+
+/** What a failed git command said, for a person: the last lines of its stderr — where git hands on a hook's output, stdout's too — or its exit status. */
+function failedWords(err: unknown, lines = 4): string {
+  const { stderr, status } = err as { stderr?: unknown; status?: number | null };
+  const said = String(stderr ?? '').split('\n').map((l) => l.trim()).filter(Boolean);
+  return said.length ? said.slice(-lines).join(' / ') : `it exited ${status ?? 'on a signal'}`;
 }
 
 /**
@@ -1391,11 +1401,17 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   const gone = unlisted.filter((p) => !lstatOf(p));
   const left: Forgot['left'] = [];
   for (const w of worktrees) {
-    if (w.locked !== undefined) { left.push({ path: w.path, locked: w.locked }); continue; }
     // Its directory is gone, or no longer a worktree git can read: pruned below, and a directory still there is found with the strays.
-    if (w.prunable) { if (!lstatOf(w.path)) gone.push(w.path); continue; }
-    const commit = handOff(w.path, w.step, ', before its run was forgotten');
-    if (commit) handedOff.push({ step: w.step, ...(w.branch ? { branch: w.branch } : {}), commit });
+    if (w.prunable && w.locked === undefined) { if (!lstatOf(w.path)) gone.push(w.path); continue; }
+    // Locked, or on no branch with something a removal would leave on none (`heldWorktree`): left as it is. Git is asked of a detached one only.
+    const status = w.detached && w.locked === undefined ? gitSays(w.path, 'status', '--porcelain') : undefined;
+    const onBranch = w.detached && w.head && w.locked === undefined ? Boolean(gitSays(run.repo, 'for-each-ref', '--contains', w.head, '--format=%(refname)', 'refs/heads/')?.trim()) : false;
+    const hold = heldWorktree(w, { clean: status !== undefined && !status.trim(), onBranch });
+    if (hold) { left.push({ path: w.path, ...hold }); continue; }
+    // What it holds uncommitted, on its branch first. A hand-off git refuses leaves the work where it is, and says why.
+    const handed = handOff(w.path, w.step, ', before its run was forgotten');
+    if (handed && 'error' in handed) { left.push({ path: w.path, step: w.step, uncommitted: handed.error }); continue; }
+    if (handed) handedOff.push({ step: w.step, ...(w.branch ? { branch: w.branch } : {}), commit: handed.commit });
     try {
       execFileSync('git', ['worktree', 'remove', w.path], { cwd: run.repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
       removed.push(w.path);

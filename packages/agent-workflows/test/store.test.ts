@@ -3093,32 +3093,48 @@ test("a run whose tasks the engine no longer knows is forgotten; so is a record 
   assert.ok(!under('runs', 'gone-run-3c4d.asks') && !under('runs', 'gone-run-3c4d.cancelled'));
 });
 
-test("REFUSED at shipped defaults: a pass that read a run before `wf cancel` and is still cutting its step's worktree — `npm ci`, a minute — files nothing once the run is called off and forgotten under it: no session on the board, no record, no worktree made again", async (t) => {
-  // A main checkout with a lockfile its worktree does not have: the pass runs `npm ci` there, on an `npm` that waits to be let go.
+/**
+ * A pass held inside `npm ci`, after it has cut its first step's worktree and before it files the step: a main checkout with a lockfile its
+ * worktree does not have, and an `npm` first on PATH that waits to be let go. `release` lets it go, and answers with what the pass did.
+ */
+const heldInNpmCi = async (t: TestContext, b: ReturnType<typeof board>, brief: string) => {
   const repo = aRepo();
   fs.writeFileSync(path.join(repo, 'package-lock.json'), '{}\n');
   const bin = fs.mkdtempSync(path.join(ROOT, 'bin-'));
   const started = path.join(bin, 'started');
-  const release = path.join(bin, 'release');
-  fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\n: > '${started}'\nwhile [ ! -e '${release}' ]; do sleep 0.02; done\n`, { mode: 0o755 });
+  const let_go = path.join(bin, 'release');
+  fs.writeFileSync(path.join(bin, 'npm'), `#!/bin/sh\n: > '${started}'\nwhile [ ! -e '${let_go}' ]; do sleep 0.02; done\n`, { mode: 0o755 });
   const PATH = process.env.PATH;
   process.env.PATH = `${bin}${path.delimiter}${PATH}`;
-  t.after(() => { process.env.PATH = PATH; fs.writeFileSync(release, ''); });
-
-  const b = board();
-  const run = start({ brief: 'called off while it is cut', repo, workflowDir: folder() });
+  t.after(() => { process.env.PATH = PATH; fs.writeFileSync(let_go, ''); });
+  const run = start({ brief, repo, workflowDir: folder() });
   const pass = advance(b.e, readRun(run.id));
   while (!fs.existsSync(started)) await new Promise((r) => setTimeout(r, 10));
   const wt = path.join(ROOT, 'worktrees', run.id, 'implement');
   assert.ok(worktreesOf(repo).includes(wt), 'the pass has cut the worktree, and not filed the step');
+  return { run, repo, wt, release: () => { fs.writeFileSync(let_go, ''); return pass; } };
+};
 
+test("REFUSED at shipped defaults: a pass that read a run before `wf cancel` and is still cutting its step's worktree — `npm ci`, a minute — files nothing once the run is called off and forgotten under it: no session on the board, no record, no worktree made again", async (t) => {
+  const b = board();
+  const { run, release } = await heldInNpmCi(t, b, 'called off while it is cut');
   assert.deepEqual((await cancel(b.e, run.id)).plan, { kind: 'cancel', stop: [] }, 'nothing in flight to stop');
   assert.equal((await forget(b.e, run.id)).kind, 'forgotten');
-  fs.writeFileSync(release, '');
-  await pass;
+  await release();
 
   assert.deepEqual(b.filings, [], 'the step is not filed into a worktree that is gone');
   assert.ok(!under('runs', `${run.id}.json`) && !under('runs', run.id) && !under('worktrees', run.id), 'nothing of the run made again');
+});
+
+test("REFUSED at shipped defaults: a pass still cutting a step's worktree when `wf cancel` lands files no session for it — the worktree it cut stays, and `wf rm` then forgets the run, with nothing in flight", async (t) => {
+  const b = board();
+  const { run, wt, release } = await heldInNpmCi(t, b, 'cancelled while it is cut');
+  await cancel(b.e, run.id);
+  const pass = await release();
+  assert.deepEqual([pass.filed, b.filings, b.stopped], [[], [], []], 'nothing filed, so nothing to stop');
+  assert.equal(readRun(run.id).steps.implement!.taskId, null);
+  const forgot = await forget(b.e, run.id);
+  assert.deepEqual([forgot.kind, forgot.removed], ['forgotten', [wt]]);
 });
 
 test("REFUSED at shipped defaults: a step a pass filed and died before writing down, on a run then cancelled — `wf rm` finds it on the engine, in flight, and says a tick stops it; the next tick does, and once it has settled the run is forgotten", async () => {
@@ -3135,4 +3151,61 @@ test("REFUSED at shipped defaults: a step a pass filed and died before writing d
   assert.deepEqual([b.stopped, pass.filed, b.filings], [[taskId], [], [taskId]], 'stopped, and nothing filed');
   b.settle(taskId, 'stopped');
   assert.equal((await forget(b.e, run.id)).kind, 'forgotten');
+});
+
+test("REFUSED at shipped defaults: a hand-off git will not commit — a pre-commit hook refusing a failed step's code — holds the run in the hook's own words with a safe way on, not git's --force; the work stays, staged. A hook that speaks on stdout alone is heard too, and once a person has committed it, `wf rm` again forgets the run", async () => {
+  const repo = aRepo();
+  const b = board();
+  const p = await aParent(repo, b, { signed: true });
+  fs.writeFileSync(path.join(p.wt, 'flag.ts'), 'export const flag: any = 1;\n');
+  const hook = path.join(repo, '.git', 'hooks', 'pre-commit');
+  fs.writeFileSync(hook, '#!/bin/sh\necho "lint: flag.ts:1 unexpected any" >&2\necho "husky - pre-commit script failed (code 1)" >&2\nexit 1\n', { mode: 0o755 });
+
+  const held = await forget(b.e, p.run.id);
+  assert.equal(forgetLineOf(held), `${p.run.id}  not forgotten: ${p.wt} holds what implement left uncommitted, and the hand-off could not commit it — lint: flag.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${p.wt} commit), then wf rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: wf rm ${p.run.id} again then.`);
+  assert.equal(gitIn(p.wt, 'status', '--porcelain'), 'A  flag.ts', 'the work is where it was, staged');
+  assert.ok(worktreesOf(repo).includes(p.wt) && under('runs', `${p.run.id}.json`));
+
+  // A hook that speaks on stdout alone: git hands it on as its own stderr.
+  fs.writeFileSync(hook, '#!/bin/sh\necho "secret scan: a token in flag.ts"\nexit 1\n', { mode: 0o755 });
+  assert.equal((await forget(b.e, p.run.id)).left[0]!.uncommitted, 'secret scan: a token in flag.ts');
+  // One that says nothing: its exit status.
+  fs.writeFileSync(hook, '#!/bin/sh\nexit 3\n', { mode: 0o755 });
+  assert.equal((await forget(b.e, p.run.id)).left[0]!.uncommitted, 'it exited 1');
+
+  fs.rmSync(hook);
+  gitIn(p.wt, 'commit', '-q', '-m', 'the flag, committed by a person');
+  const forgot = await forget(b.e, p.run.id);
+  assert.deepEqual([forgot.kind, forgot.handedOff], ['forgotten', []]);
+  assert.equal(gitIn(repo, 'log', '-1', '--format=%s', p.branch), 'the flag, committed by a person');
+});
+
+test("REFUSED at shipped defaults: a worktree on no branch — its session stopped with HEAD detached, a commit made there — is held and named with its commit, not removed with the commit on no branch; put on a branch, `wf rm` again forgets the run and the branch keeps the commit. One detached, clean, at a commit on a branch loses nothing, and is removed", async () => {
+  const repo = aRepo();
+  const b = board();
+  const p = await aParent(repo, b, { work: 'first.txt' });
+  gitIn(p.wt, 'checkout', '-q', '--detach');
+  fs.writeFileSync(path.join(p.wt, 'rebased.txt'), 'rebased\n');
+  gitIn(p.wt, 'add', '-A');
+  gitIn(p.wt, 'commit', '-q', '-m', 'made on no branch');
+  const sha = gitIn(p.wt, 'rev-parse', 'HEAD');
+
+  const held = await forget(b.e, p.run.id);
+  assert.equal(forgetLineOf(held), `${p.run.id}  not forgotten: ${p.wt} is on no branch — its HEAD is detached at ${sha.slice(0, 7)}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${p.wt} switch -c <branch>, or finish or abort what left it there), then wf rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: wf rm ${p.run.id} again then.`);
+  assert.ok(worktreesOf(repo).includes(p.wt) && gitIn(p.wt, 'rev-parse', 'HEAD') === sha, 'the worktree, and its commit, where they were');
+
+  // Uncommitted work beside it, at a commit that is on a branch: a hand-off would still commit onto no branch.
+  gitIn(p.wt, 'checkout', '-q', '--detach', p.branch);
+  fs.writeFileSync(path.join(p.wt, 'more.txt'), 'more\n');
+  assert.deepEqual((await forget(b.e, p.run.id)).left.map((l) => l.detached), [gitIn(p.wt, 'rev-parse', 'HEAD')]);
+  fs.rmSync(path.join(p.wt, 'more.txt'));
+  gitIn(p.wt, 'checkout', '-q', sha);
+  gitIn(p.wt, 'switch', '-q', '-c', 'keep-the-rebase');
+  assert.equal((await forget(b.e, p.run.id)).kind, 'forgotten');
+  assert.equal(gitIn(repo, 'rev-parse', 'keep-the-rebase'), sha);
+
+  const q = await aParent(repo, b, { work: 'clean.txt' });
+  gitIn(q.wt, 'checkout', '-q', '--detach');
+  const forgot = await forget(b.e, q.run.id);
+  assert.deepEqual([forgot.kind, forgot.removed, forgot.handedOff], ['forgotten', [q.wt], []]);
 });

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, branchFates, checkLogsOf, forgetLine, forgetRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -2613,11 +2613,11 @@ test("`parseWorktrees` and `runWorktrees`: a run's worktrees are those git lists
   ].join('\n');
   const listed = parseWorktrees(porcelain);
   assert.deepEqual(listed, [
-    { path: '/repo', branch: 'main' },
-    { path: '/wf/worktrees/r-1/implement', branch: 'wf/r-1/implement' },
-    { path: '/wf/worktrees/r-1/cut', branch: 'wf/r-1/cut', locked: 'a person holds it' },
-    { path: '/wf/worktrees/r-1/lost', prunable: true },
-    { path: '/wf/worktrees/r-1-x2/implement', branch: 'wf/r-1-x2/implement' },
+    { path: '/repo', head: 'abc', branch: 'main' },
+    { path: '/wf/worktrees/r-1/implement', head: 'def', branch: 'wf/r-1/implement' },
+    { path: '/wf/worktrees/r-1/cut', head: 'def', branch: 'wf/r-1/cut', locked: 'a person holds it' },
+    { path: '/wf/worktrees/r-1/lost', head: 'def', detached: true, prunable: true },
+    { path: '/wf/worktrees/r-1-x2/implement', head: '123', branch: 'wf/r-1-x2/implement' },
   ]);
   assert.deepEqual(parseWorktrees('worktree /a b\nlocked\n'), [{ path: '/a b', locked: '' }], 'a path with a space, and a lock with no reason');
 
@@ -2635,6 +2635,18 @@ test("`parseWorktrees` and `runWorktrees`: a run's worktrees are those git lists
   assert.deepEqual(runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', [...listed, { path: '/wf/worktrees/r-1' }]).worktrees.map((w) => w.path),
     ['/wf/worktrees/r-1/implement', '/wf/worktrees/r-1/cut', '/wf/worktrees/r-1/lost'], 'never the repository, nor the run\'s directory itself');
   assert.deepEqual(runWorktrees(direct, ['implement'], '/wf/worktrees/r-1', listed.slice(0, 1)), { worktrees: [], unlisted: [] });
+});
+
+test('REFUSED at shipped defaults: `heldWorktree` leaves a locked worktree, and one on no branch — unless nothing is uncommitted in it and its HEAD is on a branch already; one on a branch is removed', () => {
+  const on = { path: '/wf/worktrees/r-1/implement', head: 'abc', branch: 'wf/r-1/implement' };
+  const detached = { path: '/wf/worktrees/r-1/implement', head: 'abc', detached: true as const };
+  assert.equal(heldWorktree(on), null);
+  assert.deepEqual(heldWorktree({ ...on, locked: '' }), { locked: '' });
+  assert.deepEqual(heldWorktree({ ...detached, locked: 'mine' }, { clean: true, onBranch: true }), { locked: 'mine' });
+  assert.deepEqual(heldWorktree(detached), { detached: 'abc' }, 'git not asked: held');
+  assert.deepEqual(heldWorktree(detached, { clean: true, onBranch: false }), { detached: 'abc' }, 'a commit on no branch');
+  assert.deepEqual(heldWorktree(detached, { clean: false, onBranch: true }), { detached: 'abc' }, 'a hand-off would commit onto no branch');
+  assert.equal(heldWorktree(detached, { clean: true, onBranch: true }), null, 'nothing a removal loses');
 });
 
 test("REFUSED at shipped defaults: `branchFates` keeps every branch unless asked; asked, deletes one merged into the base and keeps one that is not unless forced — and never names the base branch, nor a branch of a run whose id starts with this one's", () => {
@@ -2688,7 +2700,14 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
     { path: '/wf/worktrees/r-1/fix', git: "fatal: '/wf/worktrees/r-1/fix' contains modified or untracked files, use --force to delete it" },
     { path: '/wf/worktrees/r-1/stray', unknown: true },
   ] }),
-    "r-1  not forgotten: /wf/worktrees/r-1/implement is locked (a person holds it), and git will not remove it — unlock it if nothing needs it: git -C /repo worktree unlock /wf/worktrees/r-1/implement; git would not remove /wf/worktrees/r-1/fix — fatal: '/wf/worktrees/r-1/fix' contains modified or untracked files, use --force to delete it; /wf/worktrees/r-1/stray is not a worktree git knows, and wf rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted; removed 1 worktree. Its record, files and branches are kept until every worktree is gone: wf rm r-1 again then.");
+    "r-1  not forgotten: /wf/worktrees/r-1/implement is locked (a person holds it), and git will not remove it — unlock it if nothing needs it: git -C /repo worktree unlock /wf/worktrees/r-1/implement; git would not remove /wf/worktrees/r-1/fix — fatal: '/wf/worktrees/r-1/fix' contains modified or untracked files, use --force to delete it; what is uncommitted there is on no branch, so look in it before anything is forced: git -C /wf/worktrees/r-1/fix status; /wf/worktrees/r-1/stray is not a worktree git knows, and wf rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted; removed 1 worktree. Its record, files and branches are kept until every worktree is gone: wf rm r-1 again then.");
+
+  assert.equal(forgetLine({ ...forgotten, kind: 'held', handedOff: [], removed: [], files: [], left: [
+    { path: '/wf/worktrees/r-1/implement', detached: '9d2bd34db7ead0116fa7062827675f3a801e940d' },
+    { path: '/wf/worktrees/r-1/review', step: 'review', uncommitted: 'lint: src/x.ts:1 unexpected any / husky - pre-commit script failed (code 1)' },
+  ] }),
+    'r-1  not forgotten: /wf/worktrees/r-1/implement is on no branch — its HEAD is detached at 9d2bd34, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C /wf/worktrees/r-1/implement switch -c <branch>, or finish or abort what left it there), then wf rm r-1 again; '
+    + '/wf/worktrees/r-1/review holds what review left uncommitted, and the hand-off could not commit it — lint: src/x.ts:1 unexpected any / husky - pre-commit script failed (code 1). That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C /wf/worktrees/r-1/review commit), then wf rm r-1 again. Its record, files and branches are kept until every worktree is gone: wf rm r-1 again then.');
 
   assert.equal(forgetLine({ id: 'r-1', kind: 'refused', refusal: 'implement is running. Forgetting is not cancelling: …', removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] }),
     'r-1  not forgotten: implement is running. Forgetting is not cancelling: …');

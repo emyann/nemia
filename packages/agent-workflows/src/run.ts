@@ -1542,7 +1542,8 @@ const andList = (items: readonly string[]): string =>
 
 /**
  * Why `wf rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every task
- * a pass filed and never wrote down adopted onto it (as `wf cancel` adopts them), the asks in its directory, and the store's other runs.
+ * a pass filed and never wrote down adopted onto it — a check, a try, a round, and a step, on a cancelled run too, since a pass that read it
+ * before the cancel may be filing one — the asks in its directory, and the store's other runs.
  * Every reason is named at once, so a person clears them in one go.
  *
  * Refused:
@@ -1640,10 +1641,13 @@ export function forgetRefusal(
   return held.length ? `${held.join('; ')}. ${fixes.join('. ')}.` : null;
 }
 
-/** A worktree as `git worktree list --porcelain` lists it: where, the branch checked out in it, whether git holds it locked (the reason, or ''), and whether its directory is gone (`prunable`). */
-export type GitWorktree = { path: string; branch?: string; locked?: string; prunable?: boolean };
+/**
+ * A worktree as `git worktree list --porcelain` lists it: where, its HEAD's commit, the branch checked out in it — or `detached`, on none —
+ * whether git holds it locked (the reason, or ''), and whether its directory is gone (`prunable`).
+ */
+export type GitWorktree = { path: string; head?: string; branch?: string; detached?: true; locked?: string; prunable?: boolean };
 
-/** `git worktree list --porcelain`, read. Pure. Each record starts at `worktree <path>`; its `branch`, `locked` and `prunable` lines are kept. */
+/** `git worktree list --porcelain`, read. Pure. Each record starts at `worktree <path>`; its `HEAD`, `branch`, `detached`, `locked` and `prunable` lines are kept. */
 export function parseWorktrees(porcelain: string): GitWorktree[] {
   const listed: GitWorktree[] = [];
   for (const line of porcelain.split('\n')) {
@@ -1652,7 +1656,9 @@ export function parseWorktrees(porcelain: string): GitWorktree[] {
     if (word === 'worktree') listed.push({ path: rest });
     const at = listed.at(-1);
     if (!at || word === 'worktree') continue;
-    if (word === 'branch') at.branch = rest.replace(/^refs\/heads\//, '');
+    if (word === 'HEAD') at.head = rest;
+    else if (word === 'detached') at.detached = true;
+    else if (word === 'branch') at.branch = rest.replace(/^refs\/heads\//, '');
     else if (word === 'locked') at.locked = rest;
     else if (word === 'prunable') at.prunable = true;
   }
@@ -1682,6 +1688,18 @@ export function runWorktrees(
   const unlisted = [...new Set(Object.values(run.steps).map((s) => s.workspace).filter((p): p is string => Boolean(p) && ours(p!)))]
     .filter((p) => !worktrees.some((w) => path.resolve(w.path) === path.resolve(p)));
   return { worktrees, unlisted };
+}
+
+/**
+ * Why `wf rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one on no
+ * branch, what git says of it. Locked: git refuses, and so does `wf rm`. Detached — a rebase, a bisect or a checkout of a commit left its
+ * HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is on a
+ * branch already: a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
+ */
+export function heldWorktree(w: GitWorktree, onNoBranch: { clean: boolean; onBranch: boolean } = { clean: false, onBranch: false }): { locked: string } | { detached: string } | null {
+  if (w.locked !== undefined) return { locked: w.locked };
+  if (w.detached && !(onNoBranch.clean && onNoBranch.onBranch)) return { detached: w.head ?? '' };
+  return null;
 }
 
 /** What `wf rm` does with one of the run's branches, and why: merged into its base, forced, kept by default, or kept unmerged — or git's words, when it would not. */
@@ -1743,10 +1761,11 @@ export type Forgot = {
   /** Worktrees whose directory was already gone. */
   gone: string[];
   /**
-   * What is still there: locked (with git's reason), refused by git (in its words), a directory git does not know as a worktree — or, for a
-   * run with no record, its worktrees' directory, which nothing says whose worktrees are in.
+   * What is still there: locked (with git's reason); on no branch (`detached`, at its HEAD's commit); holding what `step` left uncommitted,
+   * which the hand-off could not commit (`uncommitted`, in git's words); refused by git (in its words); a directory git does not know as a
+   * worktree — or, for a run with no record, its worktrees' directory, which nothing says whose worktrees are in.
    */
-  left: Array<{ path: string; locked?: string; git?: string; unknown?: true; orphaned?: true }>;
+  left: Array<{ path: string; locked?: string; detached?: string; uncommitted?: string; step?: string; git?: string; unknown?: true; orphaned?: true }>;
   branches: BranchFate[];
   /** What was removed besides the worktrees, from `WF_ROOT`: the record first. */
   files: string[];
@@ -1791,8 +1810,12 @@ export function forgetLine(f: Forgot): string {
 function leftWords(f: Forgot): string {
   return f.left.map((l) => (l.locked !== undefined
     ? ` ${l.path} is locked${l.locked ? ` (${l.locked})` : ''}, and git will not remove it — unlock it if nothing needs it: git -C ${f.repo} worktree unlock ${l.path}`
+    : l.detached !== undefined
+      ? ` ${l.path} is on no branch — its HEAD is detached${l.detached ? ` at ${l.detached.slice(0, 7)}` : ''}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${l.path} switch -c <branch>, or finish or abort what left it there), then wf rm ${f.id} again`
+    : l.uncommitted !== undefined
+      ? ` ${l.path} holds what ${l.step} left uncommitted, and the hand-off could not commit it — ${l.uncommitted}. That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${l.path} commit), then wf rm ${f.id} again`
     : l.git !== undefined
-      ? ` git would not remove ${l.path} — ${l.git}`
+      ? ` git would not remove ${l.path} — ${l.git}; what is uncommitted there is on no branch, so look in it before anything is forced: git -C ${l.path} status`
       : l.orphaned
       ? ` ${l.path} is still there, and with no record wf rm cannot say whose worktrees are in it — git worktree list in their repository, and git worktree remove each`
       : ` ${l.path} is not a worktree git knows, and wf rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted`)).join(';');

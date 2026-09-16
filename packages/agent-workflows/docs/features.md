@@ -1915,6 +1915,41 @@ main at `wf start`. The inbox parks cards and starts none.
   from a main missing unmerged results. Either the operator merges daily, or a workflow's last step merges on a green
   trial merge — a change to "a person merges" that this entry does not decide.
 
+## 4. The workflow builder: steps and their edges drawn on the board, written back as the folder
+
+**Registered** 2026-09-16, by the operator: define a step on the board, draw the workflow by dragging arrows between
+blocks, and have the builder amend the folder's files to match. To be written as an inbox card.
+
+**What exists.** The Workflows page draws a folder with React Flow (`apps/web/src/components/WorkflowCanvas.tsx`:
+`SpecNode`, `stepEdges`, `nodesDraggable` off), read-only: no handles, no `onConnect`. The api lists folders from two
+sources, the repository's `workflows/` and the store's (`sourcesOf` in `apps/api/src/workflows.ts`), and writes nothing
+into the checkout; its six writes all go through the package. The package parses a folder (`loadWorkflows`, `STEP_KEYS`
+the closed list of a step's keys, `COUNTS` what each count means, every refusal by name) and has no writer: nothing in
+the packages renders a step back to markdown.
+
+**What it needs.**
+
+- **Package, small.** A pure `renderStep(step)` — frontmatter in `STEP_KEYS` order, then the body — the inverse of the
+  parser, and a round-trip test: load, render, parse again, equal. `writeWorkflow(dir, steps, readme?)` in runner.ts:
+  renders every step, parses the rendered folder in memory before a byte is written, so every parser refusal surfaces
+  first (a key it does not have, `after:` naming no step, a cycle, a loop that is not a back edge), then writes the
+  files, removes a step's file that is no longer in the set, and leaves `output:` schema files and the README as they
+  are. Nothing in `assess`, `advance` or the run model changes: a run still freezes its folder at `wf start`.
+- **Api, small.** `PUT /api/workflows/:name`, the seventh guarded write, the steps in the listing's own shape. Written
+  to the store's folder ("yours") by default; the repository's only with `"from": "repo"`, which is a write into the
+  person's checkout that git will show as changed — the one new kind of write on the board, and a decision to make
+  before it is built. Read back after the write; refusals are the parser's sentences with a 422.
+- **Board.** The Workflows page gains a builder mode: handles on the blocks; dragging from A to B writes `after: A` on
+  B; a second handle for the loop edge (`loop:`, with `rounds:`); an edge deleted takes the key with it; a block added
+  is a step with a name and a body; a step's inspector is a form drawn from `STEP_KEYS` and `COUNTS` (harness, model,
+  effort, permission mode, tools, disallow, deadline, attempts, budget, check, retries, output, loop, rounds) and the
+  body; Save puts the folder and shows a refusal by the step it names; unsaved changes are marked; a new workflow is a
+  name and a first step. An `output:` names a schema file: point at one beside the step, or paste JSON to write one.
+- **e2e.** A builder page on the temporary store: add a step, drag an edge, save, read the folder back through the
+  api, and take the write back before the page ends.
+
+About one package run and one or two `dev-build` runs; the second if the inspector's form is its own piece of work.
+
 ## Engine-side work
 
 Not agent-workflows features, listed so nothing is lost:

@@ -6,7 +6,7 @@
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chromium, type Browser, type Page } from 'playwright';
-import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTheme, expectUncut, expectVisible, Refused, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectTheme, expectUncut, expectVisible, Refused, watch } from './checks.ts';
 
 let browser: Browser;
 before(async () => {
@@ -78,6 +78,20 @@ test('a count that is not the count is refused, naming both', async () => {
   await expectCount(page.locator('.node'), 2, 'a node per step');
   await assert.rejects(expectCount(page.locator('.node'), 3, 'a node per step', 300),
     (err: Error) => err instanceof Refused && err.message === 'a node per step — expected 3, found 2');
+});
+
+test('places out of their order are refused, naming both orders — and so are a place too few, one too many, and nothing at all', async () => {
+  const { page } = await pageWith('<nav><a href="/inbox">Inbox</a><a href="/"> Factory </a><a href="/runs">Runs</a></nav>');
+  const places = page.locator('nav a');
+  await expectTexts(places, ['Inbox', 'Factory', 'Runs'], 'the menu starts with the Inbox');
+  await assert.rejects(expectTexts(places, ['Factory', 'Inbox', 'Runs'], 'the menu starts with the Factory', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the menu starts with the Factory — expected Factory, Inbox, Runs, found Inbox, Factory, Runs');
+  await assert.rejects(expectTexts(places, ['Inbox', 'Factory', 'Runs', 'Workflows'], 'the menu has Workflows', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the menu has Workflows — expected Inbox, Factory, Runs, Workflows, found Inbox, Factory, Runs');
+  await assert.rejects(expectTexts(places, ['Inbox', 'Factory'], 'the menu has two places', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the menu has two places — expected Inbox, Factory, found Inbox, Factory, Runs');
+  await assert.rejects(expectTexts(page.locator('.gone'), ['Inbox'], 'the menu has the Inbox', 300),
+    (err: Error) => err instanceof Refused && err.message === 'the menu has the Inbox — expected Inbox, found nothing');
 });
 
 test('a node hanging off the edge of its canvas is refused, naming it — as the run page was, photographed mid-fit', async () => {

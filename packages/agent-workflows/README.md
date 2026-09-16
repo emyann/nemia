@@ -1213,10 +1213,20 @@ run has had its line.
 outside it: never the repository a `--no-worktree` run worked in, never another run's directory. What a
 worktree holds uncommitted is committed first under its step's name, as the hand-off does, since a failed
 or stopped step's work lives only there. What git ignores (`node_modules`, `.e2e/`) is not work. Then
-`git worktree remove`, never with `--force`, and `git worktree prune`. A locked worktree makes git refuse,
-and `wf rm` does too. It names the worktree and the `git worktree unlock` that frees it. A directory in
-`worktrees/<id>/` that git does not know is left for a person to look in. Either way the run is held: its
-record, files and branches stay, so `wf rm` finds it again and finishes once the worktree is dealt with.
+`git worktree remove`, never with `--force`, and `git worktree prune`. Some worktrees are left as they are,
+each named with what to do:
+
+- **locked**: git refuses, and so does `wf rm`. The line gives the `git worktree unlock` that frees it.
+- **on no branch**: a session stopped in a rebase, a bisect or a checkout of a commit leaves HEAD detached.
+  Removing it would leave its commits, and a hand-off onto it, on no branch. It is held unless it is clean
+  and its HEAD is on a branch already.
+- **a hand-off git would not commit**: a pre-commit hook refused it, or a signature failed. The line gives
+  git's words; commit it there yourself. The repository's hooks are honoured, since one may be what keeps
+  a secret off a branch.
+- **a directory in `worktrees/<id>/` git does not know**, for a person to look in.
+
+Any of these holds the run: its record, files and branches stay, so `wf rm` finds it again and finishes
+once the worktree is dealt with.
 Then the record, and every file under `WF_ROOT` keyed by the run's id (the table below). The engine's
 tasks, journal and sessions are the engine's, and are not touched.
 
@@ -1244,6 +1254,13 @@ the engine and git, and writes the record back. A pass that wrote a new file wou
 `wf rm` had just removed. So the tick opens the record `r+`, which never creates one, and moves an ask
 into `done/` without making the asks directory again. A record removed between the tick listing the store
 and reading it is skipped, where it used to fail the pass for every run on the machine.
+
+**Nor does it file into one.** A pass that read a run before `wf cancel` may be cutting a step's worktree
+when the cancel lands, and `npm ci` takes a minute. `wf rm` then sees a cancelled run with nothing in
+flight. So the pass reads the record and the cancellation again before it cuts a worktree and before each
+filing, and files nothing once either says the run is called off or gone. A step a pass filed and died
+before writing down is looked for on the engine, as a check, try or round is: `wf rm` counts it in flight,
+and a cancelled run's pass stops it.
 
 **Normal, not errors:** a run the store has no record of (`no such run`, and whatever is left under its
 id is removed and named), a worktree or branch already gone, and a run whose tasks the engine no longer

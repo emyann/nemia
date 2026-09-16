@@ -1483,9 +1483,11 @@ What was built:
   name. `branchFates` takes only `wf/<id>/…` branches. `checkLogsOf` takes `<id>-<step>[-try<n>]-check.stderr` for the record's steps,
   or, with no record, any under the id that no stored run claims. `idRefusal` takes only a name as an id.
 - **`forget` in runner.ts**, in an order a `wf rm` that dies can finish when run again. It reads the run as `cancel` does, adopting a check,
-  try or round a pass filed and never wrote down. Then the worktrees: each handed off (`handOff`, now answering with the commit it made)
-  and removed with `git worktree remove`, never `--force`, then `git worktree prune`. A locked worktree, one git still refuses, or a
-  directory in the run's own that git does not know holds the run: nothing else is removed. Then the branches as asked, the record, and
+  try or round a pass filed and never wrote down, and a step too (`unrecordedSteps`), on a cancelled run as well. Then the worktrees: each
+  handed off (`handOff`, now answering with the commit it made, or git's words when it could not make one) and removed with
+  `git worktree remove`, never `--force`, then `git worktree prune`. What holds the run, with nothing else removed: a worktree locked or on
+  no branch (`heldWorktree`, pure: detached, unless clean with its HEAD on a branch), a hand-off git refused, a removal git refused, and a
+  directory in the run's own that git does not know. Then the branches as asked, the record, and
   every file under the id, the record first so a run is never read without its cancellation. The engine's tasks are not touched.
   Paths are compared as git names a worktree, with every link followed (`resolved`). Git lists a worktree by its real path, so a store
   under a link, such as macOS's `/var` in `/private/var`, would otherwise read each worktree as a stray and hold the run for ever.
@@ -1493,6 +1495,9 @@ What was built:
   record `r+`: that never creates a file, and a record unlinked after it is opened takes the write with it. `consumeAsks` makes `done/`
   without `recursive`, so it never makes the asks directory again. `listRuns` skips a record removed between listing the directory and
   reading it, which used to throw out of `tick` for every run on the machine. `writeRun` is `start`'s alone.
+- **Nor does a pass file into a run called off or forgotten while it worked.** `advance` reads the record and the cancellation again before it
+  cuts a worktree, after the cut, and before each try, round and check it files (`mayFile`), and once either says so it files nothing more
+  on that pass. A cancelled run's pass stops a step a pass filed and died before writing down, as it stops what the record names.
 
 What was decided, and why:
 
@@ -1504,8 +1509,17 @@ What was decided, and why:
   nothing says whose worktrees are in a directory with no record, so it is named and left.
 - **The hand-off commits leftovers as the tick does**, including a check's untracked litter. Keeping a failed step's work outweighs a
   commit a person can see on the line and on the branch.
+- **A hand-off git refuses is reported, not bypassed.** Committing with `--no-verify` and signing off would keep the work, but a hook may be
+  what keeps a secret off a branch, and the tick's hand-off honours it too. The work stays in the worktree, staged, and the line says so.
+- **A detached worktree that loses nothing is removed.** Clean, with its HEAD's commit on some branch, it holds only a rebase's or a bisect's
+  state, and its commits are where they were.
 - **Merged means git's `merge-base --is-ancestor` against the run's base branch**, and `git branch -D` only after that answer. `git branch -d`
   judges against whatever is checked out.
+
+Round 2's review found three ways to lose work or strand a session, and each was fixed. A pass that read a run before `wf cancel`, still
+cutting its step's worktree, filed the step after `wf rm` had removed the worktree and the record: `wf cancel` then `wf rm` is what the
+refusal tells a person to type, and on a cancelled run nothing judged a ready step. A hand-off git refused was swallowed, and the line passed
+on git's `--force` for the dirty tree. And a worktree on no branch was handed off and removed, its commits with it.
 
 **The lesson a record that never froze its workflow taught.** Five runs from 2026-09-13 predate the run freezing its workflow, so every
 pass reads their folder from disk (`stepsOf` falls back to `loadWorkflows(run.workflowDir)`). Measured 2026-09-16: with that folder renamed
@@ -1516,19 +1530,25 @@ asks and the runs that wait on it. The line ends `its workflow was never frozen,
 
 What was measured:
 
-- `test/run.test.ts` (10 new), pure: a run that is over is forgotten (finished, failed, cancelled and settled, tasks the engine no longer
+- `test/run.test.ts` (11 new), pure: a run that is over is forgotten (finished, failed, cancelled and settled, tasks the engine no longer
   knows); refused in flight, cancelled or not; refused on a step ready, a check, try or round due and roots waiting on runs, each
   forgotten once cancelled; an ask due, one no pass files, one spent, and asks on a cancelled run; a run waiting on it, and children that
   started, were cancelled or wait on another; every reason at once; a record whose folder does not read; `parseWorktrees` and
-  `runWorktrees` against the repository, a longer id's directory and the run's own; `branchFates`; `checkLogsOf`; `forgetLine`'s words.
-- `test/store.test.ts` (7 new), over real git and the fake engine: a failed step's run forgotten through the CLI, its file left after the
+  `runWorktrees` against the repository, a longer id's directory and the run's own, with `HEAD` and `detached`; `heldWorktree`;
+  `branchFates`; `checkLogsOf`; `forgetLine`'s words, for a detached worktree and a hand-off refused too.
+- `test/store.test.ts` (12 new), over real git and the fake engine: a failed step's run forgotten through the CLI, its file left after the
   last pass committed on its branch and nothing git ignores, a link in `node_modules` not followed, the record and every file under its id
   removed, another run's check log left, the board untouched, and a second `wf rm` saying `no such run`, exit 0. Four refusals in one `wf rm`
   beside a run forgotten, exit 2, then each forgotten once cancelled. A check filed and never written down holding a cancelled run until it
   settles. A locked worktree and a stray directory holding a run, then finished. `--delete-branches` and `--force-unmerged`, a
   `--no-worktree` run's base branch untouched, and the CLI's refusals, `..` among them. A pass held on the engine across a `wf rm`, writing
   nothing back; asks removed as a pass reaches them; a record gone between listing and reading. An unfrozen record whose folder is gone,
-  and a run with no record whose files are left.
+  and a run with no record whose files are left. Round 2's: a pass held inside `npm ci` by an `npm` first on PATH that waits, while
+  `wf cancel` and `wf rm` run, filing nothing and making nothing of the run again; the same with `wf cancel` alone, the worktree then
+  forgotten; a step filed and never written down on a cancelled run, refused, stopped by the next pass, then forgotten; a pre-commit hook
+  refusing the hand-off, in its words (on stderr, on stdout, and silent), the work staged in place, then forgotten once a person committed
+  it; a detached worktree with a commit held, the same with uncommitted work at a commit on a branch, forgotten once on a branch that keeps
+  the commit, and a clean detached one at a branch's commit removed.
 - `test/forget-linked.test.ts` (1 new, a file of its own since `WF_ROOT` is read as the package loads): a store under a link, whose
   worktree git lists by its real path, forgotten with its work handed off.
 - Each guard was broken on purpose and the tests rerun: the tick writing a whole record, 1 failing; `done/` made `recursive`, 1; `listRuns`
@@ -1536,18 +1556,25 @@ What was measured:
   cancelled run's asks held, 2; stranded runs not read, 3; a started child counted, 1; any listed worktree taken, 1; any `wf/<id>…` branch
   taken, 1; an unmerged branch deleted without `--force-unmerged`, 2; check logs by prefix, 1; no hand-off before removal, 1; strays not
   looked for, 1; `--force-unmerged` alone taken, 1; no adoption, 1; any id taken, 3 (and the test root deleted with it); paths
-  compared as written, 1 (the run held, its worktree read as a stray).
+  compared as written, 1 (the run held, its worktree read as a stray). Round 2's: no re-read after the cut, 1; the re-read ignoring the
+  cancellation, 1; no unrecorded step adopted by `wf rm`, 1, or stopped by a cancelled run's pass, 1; a detached worktree removed like any,
+  2, or when clean whatever its commit, 2; a hand-off git refused passed over, 1; a silent refusal given no words, 1. A fallback to a hook's
+  stdout failed nothing when broken — git hands a hook's stdout on as its stderr — and was taken out.
 - On a copy of this machine's `node_modules` (684 MB, 27,488 files) in a throwaway `WF_ROOT`: `wf rm` refused the running run in 2 ms, and
   once its step failed, forgot it in 550 ms, committing the file left in the worktree and leaving git's list with the repository alone.
-- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 424 (423 passed,
+- From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 430 (429 passed,
   1 skipped), api 137 and web 174. Typecheck was clean in all four.
 
 What it leaves:
 
-- **A person's verb in the moment `wf rm` works.** The judgement comes before the worktrees go. A `wf retry` typed on the same run in that
-  half-second, or a `wf cancel` landing while a pass files a step, can file a session into a worktree that is gone. The record is not
-  recreated, so nothing reads that task. Closing it needs a mark of its own that `wf retry`, `wf round` and the tick read, such as
-  `runs/<id>.forgetting`.
+- **A person's word in the moment `wf rm` works.** The judgement comes before the worktrees go. A `wf retry` or `wf round` typed on a run
+  judged over, in the half-second its worktrees take to remove, can have a pass file a try into a worktree that is going, and the pass's
+  write can land before `wf rm` removes the record. Closing it needs a mark of its own that `wf retry`, `wf round` and the tick read, such as
+  `runs/<id>.forgetting`. The cancel-then-`wf rm` case is closed: all a pass does after its last re-read is `e.file`, one journal append.
+- **`npm ci` still running when `wf rm` removes its worktree.** The pass files nothing after it, but an install writing by absolute path may
+  put a `node_modules` back under `worktrees/<id>/`. Not measured with a real `npm`. A `wf rm` of the id then names the directory, and leaves
+  it for a person.
+- **`wf cancel` does not look for a step filed and never written down.** It says nothing was in flight; the next pass stops it.
 - **The engine's board keeps a forgotten run's tasks.** `ae ls` lists them for ever, and the engine has no verb to drop a task.
 - **A hand-off can make a merged branch read unmerged.** What a check left untracked is committed under the step's name as its worktree
   goes. `--delete-branches` then keeps the branch and says so, and the line names the commit.

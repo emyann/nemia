@@ -1845,6 +1845,14 @@ What it leaves:
   `listRuns`.
 - **A directory of worktrees with no record** is named, not removed: nothing says which repository holds them.
 
+## Shipped: two small items from the plan's queue
+
+- **Plan §6 item 28: `unsigned` is the last attempt's word.** `closeoutAsked` already read the last attempt's `reason`, and no test held it
+  to that. Now two do, with a task of `maxAttempts: 2` whose attempt 1 went quiet (`unsigned`) and attempt 2 was `lost`: it reads `failed`,
+  and one lost then quiet reads `unsigned`. The pure one hands `closeoutAsked` a fake view and reads `stepStatus`, `decision` and `listing`
+  off it (`test/run.test.ts`); the store one files the step with `maxAttempts: 2` on the fake board and reads `wf ls`, `wf decide` and the
+  try's brief (`test/store.test.ts`). Reading any attempt's reason instead fails both.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

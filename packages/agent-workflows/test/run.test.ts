@@ -5,6 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { afterRefusal, answerLines, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
 
@@ -615,6 +616,38 @@ test('UNSIGNED, though the engine settles it `failed`: a session that went quiet
   assert.deepEqual(broke.kind === 'awaiting' && [broke.outcome, broke.unsigned, broke.failed], ['failed', [], ['implement']]);
   assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, asked).waitingOnYou, []);
   assert.match(brief(asked), /session ended `failed` before it signed off/);
+});
+
+test("UNSIGNED is the LAST attempt's word: a task of `maxAttempts: 2` whose attempt 1 went quiet `unsigned` and attempt 2 was `lost` reads `failed`, and is not waited on you — the other way round, it reads `unsigned`", async () => {
+  // `closeoutAsked` is runner.ts's, and pure: it reads the views it is handed, and nothing else.
+  const { closeoutAsked } = await import('../src/runner.ts');
+  const at = (n: number) => `2026-09-16T10:0${n}:00.000Z`;
+  /** The engine's view of a task filed with a closeout schema and `maxAttempts: 2`, settled `failed`, one attempt per reason, in order. */
+  const viewed = (...reasons: string[]) => new Map([['t1', {
+    id: 't1', phase: 'failed', sessionId: 's',
+    state: {
+      taskId: 't1', brief: 'filed', cwd: '/wt', maxAttempts: 2, closeoutSchema: CLOSEOUT_SCHEMA, settled: 'failed', stopRequested: false,
+      attempts: reasons.map((reason, i) => ({
+        n: i + 1, startedAt: at(i * 2), spawnedAt: at(i * 2), ended: 'failed', endedAt: at(i * 2 + 1), reason, nativeId: 'native-t1', resumeFrom: null, usage: null, exitCode: null,
+      })),
+    },
+  } as unknown as TaskView]]);
+  const r = run({ implement: 't1', review: null });
+  const failed = phases({ t1: 'failed' });
+  const none = () => undefined;
+
+  const lostLast = closeoutAsked(viewed('unsigned', 'lost'));
+  assert.equal(lostLast('t1'), true, 'asked, and its last attempt ended for another reason');
+  assert.equal(stepStatus(STEPS[0]!, r, failed, none, lostLast), 'failed');
+  const broke = decision(STEPS, r, failed, nothingShipped, none, lostLast);
+  assert.deepEqual(broke.kind === 'awaiting' && [broke.outcome, broke.unsigned, broke.failed], ['failed', [], ['implement']]);
+  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, lostLast).waitingOnYou, []);
+
+  const quietLast = closeoutAsked(viewed('lost', 'unsigned'));
+  assert.equal(quietLast('t1'), 'unsigned');
+  assert.equal(stepStatus(STEPS[0]!, r, failed, none, quietLast), 'unsigned');
+  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, quietLast).waitingOnYou, ['implement']);
+  assert.equal(closeoutAsked(viewed('unsigned', 'unsigned'))('t1'), 'unsigned', 'quiet twice is quiet');
 });
 
 test('a cancelled run files no check, however due', () => {

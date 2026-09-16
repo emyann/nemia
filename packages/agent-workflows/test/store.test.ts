@@ -218,7 +218,7 @@ const gitOut = (cwd: string, ...args: string[]) => execFileSync('git', args, { c
  */
 const board = () => {
   type Filed = { id: string; brief: string; harness?: string; cwd: string; closeoutSchema?: object } & Record<string, unknown>;
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string; usage?: object }>();
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string | string[]; usage?: object }>();
   const filings: string[] = [];
   const stopped: string[] = [];
   const logs = new Map<string, string>();
@@ -231,16 +231,20 @@ const board = () => {
     view: async (id: string) => {
       const t = tasks.get(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
+      const reasons = Array.isArray(t?.reason) ? t.reason : [t?.reason];
       return {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
           brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: said.get(id) ?? [],
           // An attempt given a reason ended `failed` with it, as the engine records a session that went quiet unsigned, or broke. What it
-          // consumed is on it once it has settled, and not before: a `--bg` session writes its cost as its process exits.
-          attempts: !t || t.phase === 'pending' ? [] : [{
-            n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: settled && t.usage ? t.usage : null,
-            ...(t.reason ? { ended: 'failed', reason: t.reason } : {}),
-          }],
+          // consumed is on it once it has settled, and not before: a `--bg` session writes its cost as its process exits. Given several reasons,
+          // one attempt ended with each, in order, and the last carries what the task settled with.
+          attempts: !t || t.phase === 'pending' ? [] : reasons.map((reason, i) => (i < reasons.length - 1
+            ? { n: i + 1, ended: 'failed', reason, nativeId: `native-${id}`, exitCode: null, usage: null }
+            : {
+              n: i + 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: settled && t.usage ? t.usage : null,
+              ...(reason ? { ended: 'failed', reason } : {}),
+            })),
         },
       };
     },
@@ -262,7 +266,7 @@ const board = () => {
       return entry;
     },
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string, usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string | string[], usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
   return { e, tasks, filings, stopped, settle, logs, said, deaf };
 };
 
@@ -1427,6 +1431,36 @@ test('UNSIGNED at shipped defaults, now that the engine settles it `failed`: a s
     assert.deepEqual((await advance(b.e, readRun(b.run.id))).tried, ['implement'], word);
     const brief = b.tasks.get(`${b.run.id}-implement-try2`)!.spec.brief;
     assert.ok(brief.includes(told), `${word}: the try is told ${told}`);
+  }
+});
+
+test("UNSIGNED is read off the LAST attempt: a step of `maxAttempts: 2` whose attempt 1 went quiet and whose nudge was `lost` reads `failed` on `wf ls`, `wf decide` and a try's brief — and one lost, then quiet, reads `unsigned`", async () => {
+  const through = async (reasons: string[]) => {
+    const b = board();
+    const run = started(folder('maxAttempts: 2'));
+    await advance(b.e, readRun(run.id));
+    assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.maxAttempts, 2, 'filed with two attempts');
+    b.settle(`${run.id}-implement`, 'failed', undefined, undefined, reasons);
+    return { ...b, run };
+  };
+  const cases = [
+    { reasons: ['unsigned', 'lost'], asked: true, word: 'failed', outcome: 'failed', onYou: [], told: "The last try's session ended `failed` before it signed off." },
+    { reasons: ['lost', 'unsigned'], asked: 'unsigned', word: 'unsigned', outcome: 'blocked', onYou: ['implement'], told: 'The last try ended without the closeout the run asked for' },
+  ];
+  for (const { reasons, asked, word, outcome, onYou, told } of cases) {
+    const b = await through(reasons);
+    const taskId = `${b.run.id}-implement`;
+    const views = await viewsOf(b.e, readRun(b.run.id));
+    assert.deepEqual(views.get(taskId)!.state.attempts.map((a) => a.reason), reasons, 'two attempts on the view');
+    assert.deepEqual([phaseOfView(views.get(taskId)), closeoutAsked(views)(taskId)], ['failed', asked], word);
+    const l = await list(b.e, readRun(b.run.id));
+    assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], [word, onYou], word);
+    const { decision: d } = await decide(b.e, b.run.id);
+    assert.deepEqual(d.kind === 'awaiting' && { outcome: d.outcome, unsigned: d.unsigned, failed: d.failed },
+      { outcome, unsigned: word === 'unsigned' ? ['implement'] : [], failed: word === 'failed' ? ['implement'] : [] }, word);
+    await retry(b.e, b.run.id, 'implement', { mode: 'nudge' });
+    assert.deepEqual((await advance(b.e, readRun(b.run.id))).tried, ['implement'], word);
+    assert.ok(b.tasks.get(`${taskId}-try2`)!.spec.brief.includes(told), `${word}: the try is told ${told}`);
   }
 });
 

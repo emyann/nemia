@@ -2764,7 +2764,7 @@ test("a claude-detached step's `budget:` goes to the engine as `budgetUsd`; a se
   assert.match(spec.brief, /The last try's session was ended by its harness at this step's budget, before it signed off\./);
 });
 
-test("REFUSED past a budget in a loop at shipped defaults: review's `again: true` files no round while implement is over its budget — `wf round` is refused without `--budget`, and with one files the round, the cap on implement's record", async () => {
+test("REFUSED past a budget in a loop at shipped defaults: review's `again: true` files no round while implement is over its budget — `wf round` is refused without `--budget`, and with one files the round, the cap on implement's record", async (t) => {
   const { main } = await import('../src/cli.ts');
   const run = started(looped('', 'budget: 3\n'));
   const b = board();
@@ -2785,6 +2785,18 @@ test("REFUSED past a budget in a loop at shipped defaults: review's `again: true
 
   const { ask } = await round(b.e, run.id, undefined, 10);
   assert.deepEqual([ask.round, ask.budget], [2, 10]);
+  // Asked, and not filed yet: no step of the loop is held on its budget, and the run waits on nobody — `wf ls`, `wf decide` and the CLI say so.
+  const asked = await list(b.e, readRun(run.id));
+  assert.deepEqual([asked.steps.map((s) => s.status), asked.waitingOnYou], [['verified ✓', 'unverified · done'], []]);
+  assert.deepEqual((await decide(b.e, run.id)).decision, { kind: 'running', waiting: ['review'] });
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  try {
+    await main(['ls', run.id], b.e);
+    await main(['decide', run.id], b.e);
+  } finally { log.mock.restore(); }
+  assert.doesNotMatch(printed.join('\n'), /over budget|waiting on you|OVER BUDGET/i, printed.join('\n'));
+  assert.match(printed.join('\n'), /still running: review\n {2}review: round 2 asked \(wf round --budget 10\) — the next tick files implement\n {2}nothing to decide yet/);
   const pass = await advance(b.e, readRun(run.id));
   assert.deepEqual(pass.looped, ['review']);
   assert.ok(pass.notes.includes('review: round 2 — wf round --budget 10; implement goes again'), pass.notes.join('\n'));

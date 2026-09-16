@@ -115,7 +115,7 @@ export type Run = {
  *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
  *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
  *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
- *                    for one, a step of its loop is
+ *                    for one, a step of its loop is. Never a step of a loop whose round is due: `wf round --budget` raised the cap (`roundSpans`)
  *   budget exhausted its harness ended its session at the step's `budget:` (`claude-detached`: the engine's reason `budget`)
  *   failed (check)   its check did not exit 0
  *   failed, stopped  the engine's own words for the step's task
@@ -186,12 +186,15 @@ export function assess(
   // Nor its checks: a suite nobody will read the verdict of is a suite nobody asked for. Nor a try, nor a round.
   if (run.cancelledAt) return { ready: [], check: [], retry: [], round: [], blocked: [], status: 'cancelled' };
 
-  const status = new Map(steps.map((s) => [s.name, stepStatus(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
+  const standings = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
+  const status = new Map(steps.map((s) => [s.name, standings.get(s.name)!.status]));
   // A step about to be tried again is not final: what waits on it waits, and the run is still going.
   const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
   for (const r of retry) status.set(r.step, 'running');
-  // Nor is a looping step whose loop goes round again: what waits on it waits for the next round's answer.
+  // Nor is a looping step whose loop goes round again: what waits on it waits for the next round's answer. And no step of that loop is held
+  // on its budget on the pass before the round is filed: the round is what a person raised the cap for (`roundSpans`).
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
+  for (const name of roundSpans(steps, round)) if (status.get(name) === 'over budget') status.set(name, standings.get(name)!.own);
   for (const r of round) status.set(r.step, 'running');
   const ready: string[] = [];
   const check: string[] = [];
@@ -1299,6 +1302,18 @@ export function roundsDue(
 }
 
 /**
+ * The steps the rounds due now file again: each looping step's loop (`loopSpan`), the looping step included. Pure. None of them reads `over
+ * budget` on the pass before its round is filed — in `assess`, `wf ls` or `wf decide` — since a round held on a budget is due only once a
+ * person raised the cap above what was spent (`wf round --budget`), and held, the run read as waiting on that person for a tick after they
+ * had answered.
+ */
+export const roundSpans = (steps: readonly Workflow[], rounds: readonly Round[]): Set<string> =>
+  new Set(rounds.flatMap((r) => {
+    const looping = steps.find((s) => s.name === r.step);
+    return looping ? loopSpan(steps, looping) : [];
+  }));
+
+/**
  * The run's steps once a round is filed. Pure.
  *
  * Every step of the loop moves its try behind it, `then: 'round'`, and keeps its workspace and branch. The target's place is taken by the
@@ -2289,7 +2304,9 @@ export function decision(
 
   const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf);
   const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
-  const statusOf = new Map(steps.map((s) => [s.name, standingOf.get(s.name)!.status]));
+  // A step a round due files again is held on no budget (`roundSpans`), as `assess` reads it.
+  const refiled = roundSpans(steps, round);
+  const statusOf = new Map(steps.map((s) => [s.name, refiled.has(s.name) ? standingOf.get(s.name)!.own : standingOf.get(s.name)!.status]));
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
     // whose check is still running is one of them: its agent has finished, its verdict has not.
@@ -2428,6 +2445,8 @@ export function listing(
   // The engine's word says when a harness blocked a session: a person's try of that step is due, and stops the session first.
   const due = run.cancelledAt ? [] : retriesDue(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf);
   const rounds = run.cancelledAt ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
+  // And no step a round due files again reads held on its budget: a person raised the cap for the round (`roundSpans`).
+  const refiled = roundSpans(steps, rounds);
 
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
@@ -2459,7 +2478,8 @@ export function listing(
     // A root of a run waiting on runs names them, where the engine's `pending` would be once it is filed: what waits on a root still says `waiting`.
     if (!taskId) return { name, status: waiting.length && !step.after.length ? waitWord(waiting) : 'waiting', branch };
 
-    const { status, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+    const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
+    const status = refiled.has(name) ? own : stands;
     const onYou = status === 'blocked' || status === 'unsigned' || status === 'failed (check)' || status === 'exhausted' || status === 'over budget' || status === 'budget exhausted';
     if (onYou && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
     // A cap reached says so, with what was spent and the cap in force: `over budget $4.20 of $3`.

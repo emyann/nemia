@@ -225,7 +225,8 @@ loop asks for a round that would file it again.
   round. Each is refused by name without `--budget`, or with one not above what the step has cost. `--budget` on a step that is not over
   its budget is refused, and so is `--budget` on `--recheck`, which files no session: a recheck costs nothing and needs none. The raise
   rides on the ask, and the tick keeps it on the try the ask replaced (`EarlierTry.budget`). It is in force from that try on, and a try
-  that passes the new cap is held again.
+  that passes the new cap is held again. Once a round is asked with a raise above what was spent, no step of its loop reads `over budget`
+  on the passes before the tick files it: `wf ls` shows each step's own word and the round asked, and `wf decide` says still running.
 - **A check that did not finish holds nothing.** Killed at its deadline or stopped, it said nothing of the work, and its way on is the
   check again, which costs nothing: the step reads `failed ✗ check (unfinished)` as it would without a budget, and `wf decide` offers
   `--recheck` first, saying that a new session of it needs `--budget`.

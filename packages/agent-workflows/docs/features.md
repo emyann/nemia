@@ -1852,6 +1852,13 @@ What it leaves:
   and one lost then quiet reads `unsigned`. The pure one hands `closeoutAsked` a fake view and reads `stepStatus`, `decision` and `listing`
   off it (`test/run.test.ts`); the store one files the step with `maxAttempts: 2` on the fake board and reads `wf ls`, `wf decide` and the
   try's brief (`test/store.test.ts`). Reading any attempt's reason instead fails both.
+- **Plan §6 item 31: a round asked past a budget holds nothing on the pass before it is filed.** After `wf round --budget`, `wf ls` and
+  `wf decide` still said the run waited on you for one tick (W7's last review): `assess` marked only the looping step running, so the target
+  held on the round read `over budget`, and the run read failed. Now `roundSpans` names every step of each due round's loop, and `assess`,
+  `listing` and `decision` read each by its own status, never held. Tested pure, with a round asked with a raise, beside a step that failed
+  too, and with no round asked, one without `--budget` and one not above what was spent, which still read held; and on the store, through
+  `wf ls` and `wf decide` between the ask and the tick. Breaking the fix in `assess`, `listing` or `decision`, or taking only the looping
+  step, fails a test each.
 
 ## 1. A run that grows steps from a plan
 

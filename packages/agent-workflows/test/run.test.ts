@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { afterRefusal, answerLines, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { afterRefusal, answerLines, roundSpans, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -2382,6 +2382,44 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
   // A step that did the work and is not asked for again keeps its word, over budget or not: what waits on it is filed.
   assert.equal(stepStatus(BUDGETED_LOOP[0]!, r, ALL_SUCCEEDED, saidIn(1, false), asked, BUDGETED_LOOP, spent), 'verified');
   assert.deepEqual(assess(BUDGETED_LOOP, r, ALL_SUCCEEDED, saidIn(1, false), asked, () => 0, [], [], () => false, spent).ready, ['ship']);
+});
+
+test("a round asked past a budget holds no step of its loop on the pass before it is filed: after `wf round --budget`, nothing reads over budget and the run waits on nobody — with no round asked, or one asked without a raise above what was spent, both still read held", () => {
+  const BUDGETED_LOOP: Workflow[] = [{ ...IMPLEMENT, budget: 3 }, LOOPING_REVIEW, LOOP[2]!];
+  const r = inRound(1);
+  const said = saidIn(1, true);
+  const spent = spends({ i1: 4.25, r1: 0.5 });
+  const seen = (rounds: RoundAsk[]) => {
+    const a = assess(BUDGETED_LOOP, r, ALL_SUCCEEDED, said, asked, () => 0, [], rounds, () => false, spent);
+    const l = listing(BUDGETED_LOOP, r, ALL_SUCCEEDED, said, asked, () => 0, [], rounds, [], [], () => 0, spent);
+    const d = decision(BUDGETED_LOOP, r, ALL_SUCCEEDED, nothingShipped, said, asked, () => 0, [], rounds, () => false, spent);
+    return { a, l, d, words: l.steps.map((s) => s.status) };
+  };
+
+  const raised = seen([{ ...roundAskFor(2), budget: 10 }]);
+  assert.deepEqual(raised.a.round.map((x) => [x.step, x.raise]), [['review', ['implement']]], 'the round is due');
+  assert.deepEqual([raised.a.status, raised.a.ready, raised.a.blocked], ['running', [], []]);
+  assert.deepEqual(roundSpans(BUDGETED_LOOP, raised.a.round), new Set(['implement', 'review']));
+  assert.deepEqual(raised.words, ['verified ✓', 'unverified · done', 'waiting']);
+  assert.ok(!raised.words.some((w) => w.startsWith('over budget')), raised.words.join(' | '));
+  assert.deepEqual(raised.l.waitingOnYou, []);
+  assert.deepEqual([raised.l.steps[1]!.note, raised.l.steps.map((s) => s.cost)], ['round 2 asked (wf round --budget 10) — the next tick files implement', ['$4.25', '$0.50', undefined]]);
+  assert.deepEqual(raised.d, { kind: 'running', waiting: ['review'] });
+  assert.deepEqual([overBudgetLine(BUDGETED_LOOP, r, raised.d, spent), roundLines(BUDGETED_LOOP, r, raised.d, spent)], [undefined, []]);
+  // Beside a step that failed, the run is decided on all the same: the loop whose round is due is not called over budget, nor offered its round again.
+  const BESIDE = [...BUDGETED_LOOP, step('lint')];
+  const beside = { ...r, steps: { ...r.steps, lint: { taskId: 'l1' } } };
+  const lintFailed = (id: string): TaskPhase => (id === 'l1' ? 'failed' : 'succeeded');
+  const d = decision(BESIDE, beside, lintFailed, nothingShipped, said, asked, () => 0, [], [{ ...roundAskFor(2), budget: 10 }], () => false, spent);
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.failed, d.overBudget], ['failed', ['lint'], []]);
+  assert.deepEqual([overBudgetLine(BESIDE, beside, d, spent), roundLines(BESIDE, beside, d, spent)], [undefined, []]);
+
+  for (const [why, rounds] of [['no round asked', []], ['a round asked without --budget', [roundAskFor(2)]], ['a raise not above $4.25', [{ ...roundAskFor(2), budget: 4 }]]] as const) {
+    const held = seen([...rounds]);
+    assert.deepEqual([held.a.round, held.a.status, held.a.blocked], [[], 'failed', ['ship']], why);
+    assert.deepEqual([held.words, held.l.waitingOnYou], [['over budget $4.25 of $3', 'over budget — implement $4.25 of $3', 'waiting'], ['implement', 'review']], why);
+    assert.deepEqual(held.d.kind === 'awaiting' && [held.d.outcome, held.d.overBudget], ['blocked', ['implement', 'review']], why);
+  }
 });
 
 test('at the cap and past a budget: the loop reads rounds exhausted, and its once more asks for `--budget` too — refused on a loop with no step over its budget', () => {

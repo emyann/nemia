@@ -1752,8 +1752,68 @@ What it leaves:
 - A fan-in when the parts are not known in advance: which step merges them, and what it is told.
   Worktrees per concurrent step and merging at fan-in already exist.
 
+## 2. Remote Control on a step, and a supervisor session
+
+**Registered** 2026-09-16, by the operator: not now, but the ability has to exist. The aim is a session supervising the
+whole workload — an orchestrator — that the operator can reach from a phone whenever something waits on a person: a
+merge to accept, an answer to give.
+
+**Measured** (2026-09-16, Claude Code 2.1.273, three throwaway Haiku sessions, each stopped and removed): a `claude --bg`
+session is listed in the web's agents view only when its registration under `~/.claude/sessions/` carries a
+`bridgeSessionId`, and it gets one only when started with `--remote-control`. Without the flag none appears, from a clean
+environment or from the daemon's; with it, one appears at once. The engine's Claude runner passes no such flag, so every
+worker it spawns is invisible there. A worker of the old hkb from 2.1.266 (2026-09-08) carries a bridge id, so Claude Code
+used to bridge background sessions on its own. The docs do not say when that changed; an open Claude Code issue on
+auto-registration with Remote Control fits.
+
+**What it needs.**
+
+- Engine: a field on the task — `remoteControl: true`, say — read by the Claude runner and passed as `--remote-control` on
+  the spawn. A knob on the workload as a field carried on the task, never a default: Remote Control lets the session be
+  driven from claude.ai or a phone, not only seen. Refused on a harness that has no such flag. A live measurement that a
+  spawned worker lands in the agents view.
+- agent-workflows: a step key — `remote:`, say — carried on every filing of the step as `budget:` is. Later, the
+  supervisor: a session of its own, not a step of any run, that watches the store and acts, with Remote Control on. What it
+  is told and what it may do is its own design; nothing here decides it.
+- Board: the run page says a step's session is reachable from the phone when it is.
+
+## 3. The queue: a cap on runs in flight, and cards that start themselves
+
+**Registered** 2026-09-16, by the operator: a Factory canvas filled for a week — cards queued, picked whenever a slot frees.
+
+**What exists.** The engine caps sessions per harness (`AE_MAX_CONCURRENT`, default 3). The workflow layer builds its
+engine with `WF_MAX_CONCURRENT`, default 2 (`src/runner.ts`, `engine`), named in no document until this entry. The count is
+sessions, not runs: both steps of `dev` are on `claude`, so one run's review competes with another run's implement; a
+check has a pool of its own; a session the harness lists `blocked` holds its slot until the step's deadline (`LIVE` in the
+engine's `engine.ts`), and `claude` and `claude-detached` are counted apart though they share one subscription. `--after`
+and `wf plan` give order, and a run that waited is cut from main as it is when filed; a run started plainly is cut from
+main at `wf start`. The inbox parks cards and starts none.
+
+**What it needs.**
+
+- A pure admission gate beside `runReady`: a run with nothing filed is admitted only while runs in flight are below
+  `WF_MAX_RUNS` (0: no cap, today's behaviour), oldest first, serial within a pass, level-triggered. `wf ls` says
+  `waiting for a run slot (2 of 2 in flight)`, the run's timeline counts the wait as queued, and `wf up` prints both
+  ceilings when it starts.
+- Cards that start themselves: an inbox card marked to start on its own (`wf inbox queue <name>`). The tick starts the
+  oldest such card when a run slot frees, through `startFromInbox`, so its base is main at that moment and its brief is
+  frozen then. `--after` stays for cards that depend on one another. The Factory draws queued cards as ghosts.
+- The README names `WF_MAX_CONCURRENT` beside `WF_MAX_RUNS`, what each counts, and that checks are apart.
+- The ceiling that matters over a week is the merge: a child waits on its parent's merge, and every later run is cut
+  from a main missing unmerged results. Either the operator merges daily, or a workflow's last step merges on a green
+  trial merge — a change to "a person merges" that this entry does not decide.
+
 ## Engine-side work
 
-Not agent-workflows features, listed so nothing is lost: waking the tick loop on harness registry
-changes instead of a timer (agent-engine README), and the hkb migration
-([agent-engine/docs/hkb-migration.md](../../agent-engine/docs/hkb-migration.md)).
+Not agent-workflows features, listed so nothing is lost:
+
+- waking the tick loop on harness registry changes instead of a timer (agent-engine README);
+- the hkb migration ([agent-engine/docs/hkb-migration.md](../../agent-engine/docs/hkb-migration.md));
+- a task field for Remote Control (§2 above);
+- a `blocked` session holding a concurrency slot (§3 above): count `working` only toward the ceiling and keep the wider
+  set for what else `LIVE` guards; the README's sentence that a deadline is the only thing that frees such a slot, and the
+  comment in `decide`, change with it; a test that refuses — two blocked sessions at a cap of two, and a third task starts.
+  A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the ceiling exists for:
+  reasoning, not a measurement;
+- pools by subscription: `claude` and `claude-detached` counted as one pool, a harness declaring its pool with its own name
+  as the default. Nothing hits it while the workflows run steps on `claude` only.

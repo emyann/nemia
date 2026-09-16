@@ -17,6 +17,7 @@ wf inbox rm cache-the-views-between-pass-k2q9          # or drop one unstarted
 wf up
 wf ls
 wf cancel r-xyz      # changed your mind: stop the step in flight, file nothing more
+wf rm r-xyz          # it is over: its worktrees, record and files go; its branches stay
 wf decide r-xyz      # what it produced, and the choice it leaves you
 wf retry r-xyz implement --recheck   # its check was killed before it finished: run it again
 wf retry r-xyz plan --message "the second reading"   # it signed off blocked with a question: answer it
@@ -1286,6 +1287,96 @@ cancelled would make `wf ls` lie about work that actually landed. Cancelling twi
 time and re-asks for whatever is *still* in flight, because the engine carries a stop out on its
 next tick: running it again is how a person deals with one that slipped through, not a no-op.
 
+## Forgetting a run: `wf rm`
+
+The store only grows. Every run leaves its record, a directory of its files, sometimes asks and a
+cancellation, a worktree per step with a `node_modules` of its own (one installed by `npm ci` on this
+machine is 1.1 GB), and a branch per step. Removing them by hand leaves git's worktree list stale and a
+record pointing at nothing. `wf rm <runId> [<runId> ...]` forgets runs that are over. Each run is judged
+on its own and gets one line saying what happened. A run not forgotten makes the verb exit 2, once every
+run has had its line.
+
+**What it removes, through git first.** Each worktree git lists inside `worktrees/<id>/`, and nothing
+outside it: never the repository a `--no-worktree` run worked in, never another run's directory. What a
+worktree holds uncommitted is committed first under its step's name, as the hand-off does, since a failed
+or stopped step's work lives only there. What git ignores (`node_modules`, `.e2e/`) is not work. Then
+`git worktree remove`, never with `--force`, and `git worktree prune`. Some worktrees are left as they are,
+each named with what to do:
+
+- **locked**: git refuses, and so does `wf rm`. The line gives the `git worktree unlock` that frees it.
+- **on no branch**: a session stopped in a rebase, a bisect or a checkout of a commit leaves HEAD detached.
+  Removing it would leave its commits, and a hand-off onto it, on no branch. It is held unless it is clean
+  and its HEAD is on a branch already.
+- **a hand-off git would not commit**: a pre-commit hook refused it, or a signature failed. The line gives
+  git's words; commit it there yourself. The repository's hooks are honoured, since one may be what keeps
+  a secret off a branch.
+- **a directory in `worktrees/<id>/` git does not know**, for a person to look in.
+
+Any of these holds the run: its record, files and branches stay, so `wf rm` finds it again and finishes
+once the worktree is dealt with.
+Then the record, and every file under `WF_ROOT` keyed by the run's id (the table below). The engine's
+tasks, journal and sessions are the engine's, and are not touched.
+
+**What it keeps.** Branches, by default, and the line says so: a branch is where the work is.
+`--delete-branches` deletes each one merged into the run's base branch, as git says it. One that is not
+merged is kept, and the line says why, unless `--force-unmerged` is given beside it. Alone,
+`--force-unmerged` is refused. Only `wf/<id>/…` branches are ever named.
+
+**What it refuses**, naming every reason at once and what to do about each:
+
+- **a task in flight**: a step or its check, filed and not settled, including one a pass filed and died
+  before writing down. Forgetting is not cancelling, and `wf rm` never stops anything: `wf cancel` first,
+  then `wf rm` once the tasks have settled. A cancelled run whose tasks have settled is forgettable.
+- **anything a pass would file**: a step ready, a check, a try or a round due, on a run nobody called
+  off. A pass may be filing it at that moment, into a worktree about to go. A run waiting on runs
+  (`--after`) is held the same way, since it files its roots once they ship.
+- **an ask no pass has spent** (`wf retry`, `wf round`), on a run nobody called off. One the next pass
+  files is the case above. One no pass files as the run stands is taken back by deleting its file, which
+  the refusal names.
+- **a run another run waits on and has not started on**, naming the runs it would strand. Forgotten,
+  each would read `waiting on <id> (no such run)` for ever. Let them start, or `wf cancel` them.
+
+**A pass halfway through a run it forgets writes nothing back.** The tick reads a run, spends seconds on
+the engine and git, and writes the record back. A pass that wrote a new file would bring back a record
+`wf rm` had just removed. So the tick opens the record `r+`, which never creates one, and moves an ask
+into `done/` without making the asks directory again. A record removed between the tick listing the store
+and reading it is skipped, where it used to fail the pass for every run on the machine.
+
+**Nor does it file into one.** A pass that read a run before `wf cancel` may be cutting a step's worktree
+when the cancel lands, and `npm ci` takes a minute. `wf rm` then sees a cancelled run with nothing in
+flight. So the pass reads the record and the cancellation again before it cuts a worktree and before each
+filing, and files nothing once either says the run is called off or gone. Nor does it hand a step off or
+collect its files once the record is gone: a `--no-worktree` run's workspace is a person's checkout. A step a pass filed and died
+before writing down is looked for on the engine, as a check, try or round is: `wf rm` counts it in flight,
+and a cancelled run's pass stops it.
+
+**Normal, not errors:** a run the store has no record of (`no such run`, and whatever is left under its
+id is removed and named), a worktree or branch already gone, and a run whose tasks the engine no longer
+knows. An id that is not one `wf start` mints — lowercase letters, digits and dashes — is refused before
+anything is read. `r-xyz.json`, as `ls runs/` gives it, would name another run's record as a run's own
+directory, and `..` or a path a directory that is not the run's; one with a file's suffix is told the id.
+
+**A record from before runs froze their workflow reads its folder on every pass**, so that folder cannot
+be deleted while the record exists. With it gone, `wf ls`, `wf decide` and the tick die with `no workflow
+folder`, the tick for every run on the machine. Forget such runs first, then delete the folder. `wf rm`
+still forgets one whose folder is already gone, since no pass can file anything of it: its tasks in
+flight, its asks and the runs that wait on it are judged as any run's, and its line says the workflow
+never froze.
+
+What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does with it:
+
+| path | what it is | written by | `wf rm` |
+|---|---|---|---|
+| `runs/<id>.json` | the run's record | `wf start`; the tick, while it exists | removed, first of its files |
+| `runs/<id>.cancelled` | when it was called off | `wf cancel` | removed |
+| `runs/<id>.asks/`, `…/done/` | asks for a try or a round, and those spent | `wf retry`, `wf round`; the tick moves them | removed |
+| `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
+| `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
+| `checks/<id>-<step>[-try<n>]-check.stderr` | a check's stderr | the check | removed |
+| `worktrees/<id>/<step>/` | a step's worktree, with its own `node_modules` | the tick (`git worktree add`) | committed, then removed through git |
+| `engine/` | the engine's board: tasks, journal, feed | the engine | not touched |
+| `wf/<id>/<step>`, in the repository | a step's branch | the tick | kept; `--delete-branches` |
+
 ## Choosing the model per step
 
 Verified against the transcripts: `claude --bg --model haiku` really does run Haiku
@@ -1381,11 +1472,11 @@ holding a concurrency slot forever.
 | `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a word the step's harness does not take, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run; find a workflow folder by a path or by its name under `<repo>/workflows/` |
 | `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing and a `repo:` that is not an absolute directory; the card `wf inbox add` writes; a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records; and which path is a card of the inbox |
-| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), and what a step is told, `## From <step>`, `## From run <id>`, `## Try <n>` and `## Round <n> of <N>` included |
+| `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, and what a step is told, `## From <step>`, `## From run <id>`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
-| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine, a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, dropped and started from (`readInbox`, `addToInbox`, `dropFromInbox`, `startFromInbox`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine, a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, dropped and started from (`readInbox`, `addToInbox`, `dropFromInbox`, `startFromInbox`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/cli.ts` | the verbs |
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):

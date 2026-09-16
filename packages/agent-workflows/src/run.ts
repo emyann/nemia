@@ -13,7 +13,7 @@
  */
 import path from 'node:path';
 import { checkContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
-import { depsLines, type Provisioned } from './deps.ts';
+import { depsLines, inside, type Provisioned } from './deps.ts';
 import { budgetWord, dollars, durationWord, sumUsage, usedLines, type Consumed } from './radius.ts';
 
 export { durationWord };
@@ -1518,6 +1518,317 @@ export function cancelPlan(
   const { ready, check, retry, round, status } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, () => false, spendOf);
   if (!ready.length && !check.length && !retry.length && !round.length && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
   return { kind: 'cancel', stop: [] };
+}
+
+// ─── forgetting a run ───────────────────────────────────────────────────────
+
+/**
+ * How `wf rm` treats a run's branches. Kept by default, since a branch is where the work is: `deleteBranches` deletes each one merged into
+ * the run's base branch, and `forceUnmerged`, beside it, each one that is not — and the work on it.
+ */
+export type ForgetHow = { deleteBranches?: boolean; forceUnmerged?: boolean };
+
+/**
+ * Why `wf rm` will not take this as a run's id — or null. Pure, and asked before anything is read. A run's id names files under `WF_ROOT`
+ * with a suffix added — `runs/<id>.json`, `.cancelled`, `.asks` — and directories — `runs/<id>/`, `worktrees/<id>/` — so only what `runId`
+ * mints is taken: lowercase letters, digits and dashes, starting with a letter or a digit. With a dot, `r-xyz.json` — what `ls runs/` gives —
+ * names `runs/r-xyz.json` as a run's directory, which is another run's record, and a run with no record of its own is swept of it with
+ * nothing asked. `..` or a path would name a directory that is not the run's. One that is an id with a file's suffix on it is told the id.
+ */
+export function idRefusal(id: string): string | null {
+  if (/^[a-z0-9][a-z0-9-]*$/.test(id)) return null;
+  const file = /^([a-z0-9][a-z0-9-]*)(\.json|\.cancelled|\.asks)$/.exec(id);
+  if (file) return `${JSON.stringify(id)} is not a run's id: ${file[2]} is on the name of one of its files under runs/, not on the run's. Give the id wf ls prints: wf rm ${file[1]}.`;
+  return `${JSON.stringify(id)} is not a run's id, and wf rm removes what is under WF_ROOT by id — lowercase letters, digits and dashes: give the id wf ls prints, as in wf rm add-a-flag-x1y2.`;
+}
+
+/** An ask as `wf rm` names it: a try (`retry`) or a round (`round`), of which step, and its number — what `askAt` finds its file by. */
+export type AskName = { kind: 'retry' | 'round'; step: string; n: number };
+
+/** `a` and `b`, or `a, b and c`. */
+const andList = (items: readonly string[]): string =>
+  items.length > 1 ? `${items.slice(0, -1).join(', ')} and ${items.at(-1)}` : items[0] ?? '';
+
+/**
+ * Why `wf rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every task
+ * a pass filed and never wrote down adopted onto it — a check, a try, a round, and a step, on a cancelled run too, since a pass that read it
+ * before the cancel may be filing one — the asks in its directory, and the store's other runs.
+ * Every reason is named at once, so a person clears them in one go.
+ *
+ * Refused:
+ * - **a task in flight** — a step or its check, filed and settled neither way (`inFlight`), on a cancelled run too, whose tasks a tick is
+ *   still stopping. Cancelling and forgetting are two decisions, and this never takes the first: a task the engine no longer knows is not
+ *   in flight, so a run whose board was cleared is forgotten.
+ * - **anything a pass would file** (`assess`): a step ready, a check, a try or a round due, on a run nobody called off. A pass may be filing
+ *   it at this moment, into a worktree about to be removed. A run that waits on runs (`gated`) files its roots once they ship, and is held
+ *   the same way.
+ * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
+ *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by deleting its file (`askAt`).
+ * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever.
+ *
+ * A cancelled run whose tasks have settled is forgettable: it files nothing, and its asks are never honoured. `steps` is undefined for a
+ * record from before runs froze their workflow whose folder no longer reads (`stepsOf`): nothing ready can be judged, and nothing needs to
+ * be, since no pass can file anything of it — every pass reads that folder, and dies on it. Its tasks in flight, its asks and the runs
+ * that wait on it are judged as any run's.
+ */
+export function forgetRefusal(
+  steps: readonly Workflow[] | undefined,
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  /** Every other run in the store: whether one waits on this run, and has not started. */
+  others: readonly Run[] = [],
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  asks: readonly RetryAsk[] = [],
+  roundAsks: readonly RoundAsk[] = [],
+  spendOf: SpendOf = () => undefined,
+  /** Where an ask's file is, for the command that takes it back. */
+  askAt: (ask: AskName) => string = (a) => `${run.id}.asks/${a.kind}-${a.step}-${a.n}`,
+): string | null {
+  const held: string[] = [];
+  const fixes: string[] = [];
+  const id = run.id;
+
+  // What the engine still holds: the step's own task and its check, by the words a person reads them by.
+  const live: string[] = [];
+  for (const [name, record] of Object.entries(run.steps)) {
+    for (const [label, taskId] of [[name, record.taskId], [`${name}'s check`, record.check?.taskId]] as const) {
+      const phase = taskId ? phaseOf(taskId) : undefined;
+      if (phase === 'pending' || phase === 'running') live.push(`${label} is ${phase}`);
+    }
+  }
+  if (live.length) held.push(andList(live));
+
+  const due: string[] = [];
+  const unheard: AskName[] = [];
+  let waits = false;
+  if (!run.cancelledAt) {
+    const a = steps ? assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, () => false, spendOf) : undefined;
+    if (a && steps) {
+      waits = gated(run) && a.ready.length > 0;
+      if (waits) {
+        held.push(`it waits on ${andList(run.after!)}, and files ${andList(a.ready)} once ${run.after!.length > 1 ? 'they have' : 'it has'} shipped`);
+      } else if (a.ready.length) due.push(`${andList(a.ready)} ${a.ready.length > 1 ? 'are' : 'is'} ready to be filed`);
+      for (const name of a.check) due.push(`${name}'s check is due`);
+      for (const r of a.retry) {
+        const step = steps.find((s) => s.name === r.step);
+        due.push(`try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : `wf retry ${modeWord(r)}`})`);
+      }
+      for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
+    }
+    if (due.length) held.push(`${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`);
+    // A person's word no pass has spent, and none will file as the step stands: what the pass files is named above.
+    for (const ask of asks) {
+      if (spentAsks(run, [ask]).length || a?.retry.some((r) => r.by === 'ask' && r.step === ask.step && r.try === ask.try)) continue;
+      unheard.push({ kind: 'retry', step: ask.step, n: ask.try });
+    }
+    for (const ask of roundAsks) {
+      if (spentRoundAsks(run, [ask]).length || a?.round.some((r) => r.by === 'ask' && r.step === ask.step && r.round === ask.round)) continue;
+      unheard.push({ kind: 'round', step: ask.step, n: ask.round });
+    }
+    if (unheard.length) {
+      const named = unheard.map((u) => (u.kind === 'retry' ? `try ${u.n} of ${u.step}` : `round ${u.n} of ${u.step}'s loop`));
+      held.push(`${andList(named)} ${unheard.length > 1 ? 'are' : 'is'} asked for, and no pass files ${unheard.length > 1 ? 'them' : 'it'} as the run stands`);
+    }
+  }
+
+  // Said once for what cancelling settles — what is in flight, what a pass would file — and once for the asks nothing files.
+  if (live.length && run.cancelledAt) {
+    fixes.push(`It was cancelled at ${run.cancelledAt}, and a tick stops what is in flight: wf rm ${id} once it has settled (wf ls ${id})`);
+  } else if (live.length || due.length || waits) {
+    fixes.push(`Forgetting is not cancelling: wf cancel ${id} ${live.length ? 'stops what is in flight and ' : ''}files nothing more, then wf rm ${id}${live.length ? ` once what was in flight has settled (wf ls ${id})` : ''}`);
+  }
+  if (unheard.length) fixes.push(`Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then wf rm ${id}: rm ${unheard.map(askAt).join(' ')}`);
+
+  const stranded = others.filter((o) => o.id !== id && o.after?.includes(id) && gated(o)).map((o) => o.id).sort();
+  if (stranded.length) {
+    const one = stranded.length === 1;
+    held.push(`${andList(stranded)} ${one ? 'waits' : 'wait'} on it and ${one ? 'has' : 'have'} not started: forgotten, ${one ? 'it' : 'each'} would read waiting on ${id} (no such run) for ever`);
+    fixes.push(`Let ${one ? 'it' : 'them'} start first, on the pass after wf decide says ${id} has shipped, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `wf cancel ${s}`).join(', ')}`);
+  }
+  return held.length ? `${held.join('; ')}. ${fixes.join('. ')}.` : null;
+}
+
+/**
+ * A worktree as `git worktree list --porcelain` lists it: where, its HEAD's commit, the branch checked out in it — or `detached`, on none —
+ * whether git holds it locked (the reason, or ''), and whether its directory is gone (`prunable`).
+ */
+export type GitWorktree = { path: string; head?: string; branch?: string; detached?: true; locked?: string; prunable?: boolean };
+
+/** `git worktree list --porcelain`, read. Pure. Each record starts at `worktree <path>`; its `HEAD`, `branch`, `detached`, `locked` and `prunable` lines are kept. */
+export function parseWorktrees(porcelain: string): GitWorktree[] {
+  const listed: GitWorktree[] = [];
+  for (const line of porcelain.split('\n')) {
+    const [word, ...more] = line.split(' ');
+    const rest = more.join(' ');
+    if (word === 'worktree') listed.push({ path: rest });
+    const at = listed.at(-1);
+    if (!at || word === 'worktree') continue;
+    if (word === 'HEAD') at.head = rest;
+    else if (word === 'detached') at.detached = true;
+    else if (word === 'branch') at.branch = rest.replace(/^refs\/heads\//, '');
+    else if (word === 'locked') at.locked = rest;
+    else if (word === 'prunable') at.prunable = true;
+  }
+  return listed;
+}
+
+/**
+ * The run's worktrees, and the paths its record names that git does not list. Pure.
+ *
+ * Only what is inside `dir`, the run's own directory (`worktrees/<id>`): never the repository itself, where a `--no-worktree` run worked,
+ * and never another run's, whose id may start with this one's. Git's list decides, so a worktree a pass cut and died before filing is found
+ * too. Each carries the step a hand-off commits what it holds under: the last step, in the order they run, that the record puts in it —
+ * every step after the first in a line of work inherits its directory — or, where the record puts none, its directory's name, which is the
+ * name of the step it was cut for.
+ */
+export function runWorktrees(
+  run: Run,
+  names: readonly string[],
+  dir: string,
+  listed: readonly GitWorktree[],
+): { worktrees: Array<GitWorktree & { step: string }>; unlisted: string[] } {
+  const ours = (p: string) => Boolean(inside(path.resolve(dir), path.resolve(p)));
+  const worktrees = listed.filter((w) => ours(w.path)).map((w) => {
+    const working = names.filter((name) => run.steps[name]?.workspace && path.resolve(run.steps[name]!.workspace!) === path.resolve(w.path));
+    return { ...w, step: working.at(-1) ?? path.basename(w.path) };
+  });
+  const unlisted = [...new Set(Object.values(run.steps).map((s) => s.workspace).filter((p): p is string => Boolean(p) && ours(p!)))]
+    .filter((p) => !worktrees.some((w) => path.resolve(w.path) === path.resolve(p)));
+  return { worktrees, unlisted };
+}
+
+/**
+ * Why `wf rm` leaves a worktree as it is — or null, when git may be asked to remove it. Pure: handed what git lists of it and, for one on no
+ * branch, what git says of it. Locked: git refuses, and so does `wf rm`. Detached — a rebase, a bisect or a checkout of a commit left its
+ * HEAD on no branch, as a session stopped in the middle of one does — unless nothing is uncommitted in it and its HEAD's commit is on a
+ * branch already: a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
+ */
+export function heldWorktree(w: GitWorktree, onNoBranch: { clean: boolean; onBranch: boolean } = { clean: false, onBranch: false }): { locked: string } | { detached: string } | null {
+  if (w.locked !== undefined) return { locked: w.locked };
+  if (w.detached && !(onNoBranch.clean && onNoBranch.onBranch)) return { detached: w.head ?? '' };
+  return null;
+}
+
+/** What `wf rm` does with one of the run's branches, and why: merged into its base, forced, kept by default, or kept unmerged — or git's words, when it would not. */
+export type BranchFate = { branch: string; deleted: boolean; why: 'merged' | 'forced' | 'default' | 'unmerged' | { git: string } };
+
+/**
+ * What becomes of each branch git has under the run's name, `wf/<id>/`. Pure. Only those: never the base branch a `--no-worktree` run
+ * worked on, nor another run's. Kept unless `deleteBranches`; deleted when merged into the run's base branch (`merged`, git's word), or
+ * with `forceUnmerged`; otherwise kept.
+ */
+export function branchFates(run: Pick<Run, 'id'>, listed: readonly string[], merged: (branch: string) => boolean, how: ForgetHow = {}): BranchFate[] {
+  return listed.filter((b) => b.startsWith(`wf/${run.id}/`)).sort().map((branch): BranchFate => {
+    if (!how.deleteBranches) return { branch, deleted: false, why: 'default' };
+    if (merged(branch)) return { branch, deleted: true, why: 'merged' };
+    return how.forceUnmerged ? { branch, deleted: true, why: 'forced' } : { branch, deleted: false, why: 'unmerged' };
+  });
+}
+
+/**
+ * The check logs in `checks/` that are the run's: `<id>-<step>-check.stderr` and `<id>-<step>-try<n>-check.stderr`, for each step the
+ * record names (`checkStderr` in runner.ts). Pure. With no record to name the steps, any `<id>-…-check.stderr` — but none that could be
+ * another stored run's: one whose id starts with this one's, or whose id this one starts with — `r-xyz-implement` is no run, and
+ * `r-xyz-implement-check.stderr` is `r-xyz`'s.
+ */
+export function checkLogsOf(id: string, names: readonly string[] | undefined, listing: readonly string[], otherIds: readonly string[] = []): string[] {
+  const suffix = '-check.stderr';
+  return listing.filter((file) => {
+    if (!file.endsWith(suffix)) return false;
+    if (names) {
+      return names.some((name) => {
+        const prefix = `${id}-${name}`;
+        return file.startsWith(prefix) && /^(-try\d+)?$/.test(file.slice(prefix.length, -suffix.length));
+      });
+    }
+    return file.startsWith(`${id}-`) && !otherIds.some((o) => o !== id && file.startsWith(`${o}-`));
+  }).sort();
+}
+
+/**
+ * What `wf rm` did with one run, for `forgetLine` to say.
+ *
+ *   missing    the store has no record of it: what was left under its id, removed
+ *   refused    `forgetRefusal` said why, and nothing was touched
+ *   held       a worktree git would not remove, or a directory in the run's own that git does not know: what git removed is gone, and the
+ *              record, its files and its branches are kept, so `wf rm` again finishes the job
+ *   forgotten  every worktree gone, the branches as asked, the record and its files removed
+ */
+export type Forgot = {
+  id: string;
+  kind: 'missing' | 'refused' | 'held' | 'forgotten';
+  refusal?: string;
+  /** The run's repository and base branch, and whether it cut worktrees: what the words about its worktrees and branches need. */
+  repo?: string;
+  base?: string;
+  isolate?: boolean;
+  /** Worktrees git removed. */
+  removed: string[];
+  /** What a worktree held uncommitted, committed first under its step's name: on which branch, as which commit. */
+  handedOff: Array<{ step: string; branch?: string; commit: string }>;
+  /** Worktrees whose directory was already gone. */
+  gone: string[];
+  /**
+   * What is still there: locked (with git's reason); on no branch (`detached`, at its HEAD's commit); holding what `step` left uncommitted,
+   * which the hand-off could not commit (`uncommitted`, in git's words); refused by git (in its words); a directory git does not know as a
+   * worktree — or, for a run with no record, its worktrees' directory, which nothing says whose worktrees are in.
+   */
+  left: Array<{ path: string; locked?: string; detached?: string; uncommitted?: string; step?: string; git?: string; unknown?: true; orphaned?: true }>;
+  branches: BranchFate[];
+  /** What was removed besides the worktrees, from `WF_ROOT`: the record first. */
+  files: string[];
+  /** For a record from before runs froze their workflow, when its folder no longer reads: why. */
+  unfrozen?: string;
+};
+
+/** One line for one run `wf rm` was given, saying what happened. Pure. */
+export function forgetLine(f: Forgot): string {
+  const them = (n: number) => (n > 1 ? 'them' : 'it');
+  if (f.kind === 'refused') return `${f.id}  not forgotten: ${f.refusal}`;
+  const files = f.files.length ? `removed ${f.files.join(', ')}` : '';
+  if (f.kind === 'missing') return `${f.id}  no such run — ${files ? `nothing to forget but what was left under its id: ${files}` : 'nothing to forget'}${f.left.length ? `;${leftWords(f)}` : ''}`;
+
+  const worktrees = [
+    f.removed.length ? `removed ${f.removed.length} worktree${f.removed.length > 1 ? 's' : ''}` : '',
+    ...f.handedOff.map((h) => `committed what ${h.step} left uncommitted${h.branch ? ` on ${h.branch}` : ''} as ${h.commit.slice(0, 7)}`),
+    f.gone.length ? `${f.gone.length} worktree${f.gone.length > 1 ? 's were' : ' was'} already gone` : '',
+  ].filter(Boolean);
+  if (f.kind === 'held') {
+    return `${f.id}  not forgotten:${leftWords(f)}${worktrees.length ? `; ${worktrees.join(', ')}` : ''}. Its record, files and branches are kept until every worktree is gone: wf rm ${f.id} again then.`;
+  }
+
+  const base = f.base ?? 'its base branch';
+  const deleted = f.branches.filter((b) => b.deleted);
+  const kept = (why: BranchFate['why']) => f.branches.filter((b) => !b.deleted && b.why === why).map((b) => b.branch);
+  const branches = [
+    deleted.length ? `deleted ${deleted.map((b) => `${b.branch} (${b.why === 'forced' ? `not merged into ${base}, forced` : `merged into ${base}`})`).join(', ')}` : '',
+    kept('default').length ? `kept ${kept('default').join(', ')} — branches are kept unless asked: --delete-branches deletes those merged into ${base}` : '',
+    kept('unmerged').length ? `kept ${kept('unmerged').join(', ')}: not merged into ${base} — --force-unmerged deletes ${them(kept('unmerged').length)}, and the work on ${them(kept('unmerged').length)}` : '',
+    ...f.branches.filter((b) => typeof b.why === 'object').map((b) => `kept ${b.branch}: git would not delete it — ${(b.why as { git: string }).git}`),
+  ].filter(Boolean);
+  return [
+    `${f.id}  forgotten: ${worktrees.length ? worktrees.join(', ') : f.isolate === false ? `no worktrees, it worked in ${f.repo} itself` : 'no worktrees'}`,
+    files,
+    branches.length ? branches.join('; ') : f.isolate === false ? 'no branch of its own' : 'no branches left',
+    f.unfrozen ? `its workflow was never frozen, and ${f.unfrozen}` : '',
+  ].filter(Boolean).join('; ');
+}
+
+/** What is still there after `wf rm`, each with what to do about it. */
+function leftWords(f: Forgot): string {
+  return f.left.map((l) => (l.locked !== undefined
+    ? ` ${l.path} is locked${l.locked ? ` (${l.locked})` : ''}, and git will not remove it — unlock it if nothing needs it: git -C ${f.repo} worktree unlock ${l.path}`
+    : l.detached !== undefined
+      ? ` ${l.path} is on no branch — its HEAD is detached${l.detached ? ` at ${l.detached.slice(0, 7)}` : ''}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${l.path} switch -c <branch>, or finish or abort what left it there), then wf rm ${f.id} again`
+    : l.uncommitted !== undefined
+      ? ` ${l.path} holds what ${l.step} left uncommitted, and the hand-off could not commit it — ${l.uncommitted}. That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged: git -C ${l.path} commit), then wf rm ${f.id} again`
+    : l.git !== undefined
+      ? ` git would not remove ${l.path} — ${l.git}; what is uncommitted there is on no branch, so look in it before anything is forced: git -C ${l.path} status`
+      : l.orphaned
+      ? ` ${l.path} is still there, and with no record wf rm cannot say whose worktrees are in it — git worktree list in their repository, and git worktree remove each`
+      : ` ${l.path} is not a worktree git knows, and wf rm removes worktrees only through git — look in it, and remove it yourself if nothing there is wanted`)).join(';');
 }
 
 // ─── the closeout ───────────────────────────────────────────────────────────

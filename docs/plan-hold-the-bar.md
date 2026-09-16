@@ -981,7 +981,8 @@ Everything left, in one list, as of 2026-09-14 — D1, Q1, Q2, P1, W4, P2, P3, B
 `five-small-items-on-the-boar-zle1` from `./workflows/dev-build`, and E7 (engine, items 16–18 in one) as
 `three-items-in-agent-engine-bt5p` from `./workflows/dev`, side by side. E7 done, `9709867`; W6 done, `aa95f4a`; B9 done, `26ebf0e`; E8 done, `1944644`; W7 done, `60e5606` (three rounds; restarted twice on E8's measurements and once when the
 background daemon was down). B10 done, `b19596a`. **Item 29 is done.** `wf rm` (features.md item 1) ran 2026-09-16 as
-`forget-a-run-that-is-over-wf-auru` from `./workflows/dev`: three rounds, $42.15, at its decision, not yet merged. Run from its
+`forget-a-run-that-is-over-wf-auru` from `./workflows/dev`: three rounds, $42.15. **Merged, `9d9c87f`** (conflicts with the inbox merge
+resolved by keeping both sides; its review's two doc nits fixed on main after). Run from its
 worktree the same day, it forgot the five `hold-the-bar` runs of 2026-09-13 (branches kept), and
 `~/.agent-workflows/workflows/hold-the-bar` was deleted after — their records predated the run freezing its workflow and read
 the folder on every pass; with it renamed away, `wf ls`, `wf decide` and `wf tick` had died for every run. Deleting the folder
@@ -991,8 +992,9 @@ The other two home-store folders, `hold-the-bar-checked` and `-build`, were remo
 froze the workflow. Also in flight 2026-09-16, the inbox (operator: a place on the board to park an idea and later
 start a workflow on it; decided: the home store, a `repo:` key on the card for a board that will serve several repositories,
 the card removed once started, a page of its own for now): `an-inbox-cards-parked-before-ri7j` from `./workflows/dev` — the
-package half, `$WF_ROOT/inbox/`, `wf inbox`, `wf start` on an inbox card — and `the-inbox-on-the-board-a-pag-ryny` from
-`./workflows/dev-build` `--after` it, the api's routes and the page. Left: items 20 (settings), 27, 28, 30, 31 (all small).
+package half, `$WF_ROOT/inbox/`, `wf inbox`, `wf start` on an inbox card — two rounds, $22.97, **merged, `aef14f0`**; and
+`the-inbox-on-the-board-a-pag-ryny` from `./workflows/dev-build` `--after` it, the api's routes and the page, filed 22:12Z the same
+day, in flight. Left: items 20 (settings), 27, 28, 30, 31 (all small).
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**

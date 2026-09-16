@@ -4,7 +4,7 @@ import { StatusChip } from '../components/StatusChip';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { spentTitle } from '../lib/cost';
-import { titleOf, waitsOnYou } from '../lib/factory';
+import { inFlight, inFlightFirst, titleOf, waitsOnYou } from '../lib/factory';
 
 export const Route = createFileRoute('/runs/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),
@@ -30,8 +30,9 @@ function Runs() {
   }
 
   return (
+    // The runs still going on top, then the rest, each newest first (`inFlightFirst`): the api lists them by id.
     <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
-      {runs.map((run) => (
+      {inFlightFirst(runs).map((run) => (
         <RunRow key={run.id} run={run} />
       ))}
     </ul>
@@ -43,7 +44,7 @@ function RunRow({ run }: { run: RunSummary }) {
 
   return (
     // The run's link, and beside it when it started and the workflow's link: side by side, since a link inside a link is not HTML.
-    <li className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900">
+    <li data-in-flight={inFlight(run)} className="-mx-2 flex items-start gap-4 rounded px-2 py-3 hover:bg-neutral-100 dark:hover:bg-neutral-900">
       <Link to="/runs/$runId" params={{ runId: run.id }} className="block min-w-0 flex-1">
         <p className="truncate font-medium">{title}</p>
         <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">

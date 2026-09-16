@@ -1487,6 +1487,8 @@ What was built:
   and removed with `git worktree remove`, never `--force`, then `git worktree prune`. A locked worktree, one git still refuses, or a
   directory in the run's own that git does not know holds the run: nothing else is removed. Then the branches as asked, the record, and
   every file under the id, the record first so a run is never read without its cancellation. The engine's tasks are not touched.
+  Paths are compared as git names a worktree, with every link followed (`resolved`). Git lists a worktree by its real path, so a store
+  under a link, such as macOS's `/var` in `/private/var`, would otherwise read each worktree as a stray and hold the run for ever.
 - **A pass that finishes after the removal does not recreate the record.** `advance` writes back through `rewriteRun`, which opens the
   record `r+`: that never creates a file, and a record unlinked after it is opened takes the write with it. `consumeAsks` makes `done/`
   without `recursive`, so it never makes the asks directory again. `listRuns` skips a record removed between listing the directory and
@@ -1527,11 +1529,14 @@ What was measured:
   `--no-worktree` run's base branch untouched, and the CLI's refusals, `..` among them. A pass held on the engine across a `wf rm`, writing
   nothing back; asks removed as a pass reaches them; a record gone between listing and reading. An unfrozen record whose folder is gone,
   and a run with no record whose files are left.
+- `test/forget-linked.test.ts` (1 new, a file of its own since `WF_ROOT` is read as the package loads): a store under a link, whose
+  worktree git lists by its real path, forgotten with its work handed off.
 - Each guard was broken on purpose and the tests rerun: the tick writing a whole record, 1 failing; `done/` made `recursive`, 1; `listRuns`
   throwing on a vanished record, 1; nothing in flight read, 3; nothing due read, 3; a waiting run not held, 1; unspent asks not held, 2; a
   cancelled run's asks held, 2; stranded runs not read, 3; a started child counted, 1; any listed worktree taken, 1; any `wf/<id>…` branch
   taken, 1; an unmerged branch deleted without `--force-unmerged`, 2; check logs by prefix, 1; no hand-off before removal, 1; strays not
-  looked for, 1; `--force-unmerged` alone taken, 1; no adoption, 1; any id taken, 3 (and the test root deleted with it).
+  looked for, 1; `--force-unmerged` alone taken, 1; no adoption, 1; any id taken, 3 (and the test root deleted with it); paths
+  compared as written, 1 (the run held, its worktree read as a stray).
 - On a copy of this machine's `node_modules` (684 MB, 27,488 files) in a throwaway `WF_ROOT`: `wf rm` refused the running run in 2 ms, and
   once its step failed, forgot it in 550 ms, committing the file left in the worktree and leaving git's list with the repository alone.
 - From the root, `npm test && npm run typecheck` exited 0: agent-engine 307 (299 passed, 8 skipped), agent-workflows 423 (422 passed,

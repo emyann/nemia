@@ -1331,8 +1331,10 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   const refusal = forgetRefusal(steps, run, phaseOf, others, reader, asked, verdictOf, asks, rounds, spendOf, askAt);
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing };
 
-  // 1. The worktrees, through git.
-  const { worktrees, unlisted } = runWorktrees(run, namesInOrder(run, steps ?? []), dir, parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? ''));
+  // 1. The worktrees, through git — which lists each by its real path, so the run's directory and the record's are read the same way.
+  const within = resolved(dir);
+  const recorded = { ...run, steps: Object.fromEntries(Object.entries(run.steps).map(([name, st]) => [name, st.workspace ? { ...st, workspace: resolved(st.workspace) } : st])) };
+  const { worktrees, unlisted } = runWorktrees(recorded, namesInOrder(run, steps ?? []), within, parseWorktrees(gitSays(run.repo, 'worktree', 'list', '--porcelain') ?? ''));
   const removed: string[] = [];
   const handedOff: Forgot['handedOff'] = [];
   const gone = unlisted.filter((p) => !lstatOf(p));
@@ -1352,7 +1354,7 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   }
   if (worktrees.length) gitSays(run.repo, 'worktree', 'prune');
   let strays: string[] = [];
-  try { strays = fs.readdirSync(dir).map((name) => path.join(dir, name)); } catch { /* none cut, or already removed */ }
+  try { strays = fs.readdirSync(within).map((name) => path.join(within, name)); } catch { /* none cut, or already removed */ }
   for (const at of strays) if (!left.some((l) => l.path === at)) left.push({ path: at, unknown: true });
   if (left.length) return { ...said, kind: 'held', removed, handedOff, gone, left, branches: [], files: [] };
 
@@ -1377,6 +1379,19 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
 
   // 3. The record, then what is keyed by its id.
   return { ...said, kind: 'forgotten', removed, handedOff, gone, left, branches, files: removeKeyed(id, Object.keys(run.steps)) };
+}
+
+/**
+ * A path as git names a worktree: every link on the way followed, as far as the path exists, and the rest as written. A store under a
+ * link — a home directory on another disk, or macOS's `/var` in `/private/var` — would otherwise hold no worktree git lists.
+ */
+function resolved(p: string): string {
+  try {
+    return fs.realpathSync(p);
+  } catch {
+    const parent = path.dirname(p);
+    return parent === p ? p : path.join(resolved(parent), path.basename(p));
+  }
 }
 
 /** What git said when it refused, in one line: the first of its stderr, or of the error. */

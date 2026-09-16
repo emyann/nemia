@@ -470,7 +470,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         }
       }
       if (notForgotten.length) {
-        throw Object.assign(new Error(`wf rm: ${notForgotten.join(', ')} not forgotten — its line above says why, and what to do.`), { exitCode: failed ? 1 : 2 });
+        throw Object.assign(new Error(`wf rm: ${notForgotten.join(', ')} not forgotten — ${notForgotten.length > 1 ? 'each' : 'its'} line above says why, and what to do.`), { exitCode: failed ? 1 : 2 });
       }
       return;
     }

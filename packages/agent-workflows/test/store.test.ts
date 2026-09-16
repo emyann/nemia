@@ -2907,7 +2907,7 @@ test('REFUSED at shipped defaults: `wf rm` on a run with a step in flight, one w
 
   const { printed, error } = await rmTyped(t, b.e, running.id, ready.id, asked.id, parent.run.id, over.run.id);
   assert.equal(error?.exitCode, 2);
-  assert.equal(error?.message, `wf rm: ${running.id}, ${ready.id}, ${asked.id}, ${parent.run.id} not forgotten — its line above says why, and what to do.`);
+  assert.equal(error?.message, `wf rm: ${running.id}, ${ready.id}, ${asked.id}, ${parent.run.id} not forgotten — each line above says why, and what to do.`);
   assert.deepEqual(printed.slice(0, 4), [
     `${running.id}  not forgotten: implement is pending. Forgetting is not cancelling: wf cancel ${running.id} stops what is in flight and files nothing more, then wf rm ${running.id} once what was in flight has settled (wf ls ${running.id}).`,
     `${ready.id}  not forgotten: review is ready to be filed, and a pass may be filing it now. Forgetting is not cancelling: wf cancel ${ready.id} files nothing more, then wf rm ${ready.id}.`,
@@ -2958,7 +2958,7 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
   markCancelled(locked.run.id);
 
   const held = await rmTyped(t, b.e, locked.run.id);
-  assert.equal(held.error?.exitCode, 2);
+  assert.deepEqual([held.error?.exitCode, held.error?.message], [2, `wf rm: ${locked.run.id} not forgotten — its line above says why, and what to do.`]);
   assert.deepEqual(held.printed, [
     `${locked.run.id}  not forgotten: ${locked.wt} is locked (a person holds it), and git will not remove it — unlock it if nothing needs it: git -C ${repo} worktree unlock ${locked.wt}. Its record, files and branches are kept until every worktree is gone: wf rm ${locked.run.id} again then.`,
   ]);

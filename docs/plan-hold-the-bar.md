@@ -1019,7 +1019,8 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   `500e7a2`**; B12 `the-queue-on-the-board-queue-ppu1`
   (apps: queued cards as Factory ghosts, Queue from the Inbox page, the ceilings on the board; `dev-build`);
 - **after E10 and W9:** W10 `two-small-items-in-agent-wor-5l9e` (agent-workflows: `priority: 1` on every filing after a run's first,
-  `remote:` on a step; `dev`); **after W9:** B13 `the-gate-on-the-board-approv-4t7s` (apps: Approve and Send back on the run page, the
+  `remote:` on a step; `dev`) — one round, $11.20, **merged, `925aff3`** (its first try lost its connection when the laptop slept;
+  a continued try with a note finished it); **after W9:** B13 `the-gate-on-the-board-approv-4t7s` (apps: Approve and Send back on the run page, the
   card's need; `dev-build`); **after W10:** W11 `the-workflow-builder-s-packa-x2ha` (agent-workflows: `renderStep`, `writeWorkflow`;
   `dev`); **after W11 and B13:** B14 `the-workflow-builder-on-the-4ifo` (apps: the builder on the Workflows page, writing the store's
   folder only; `dev-build`); **after B14:** B15 `the-web-app-s-components-on-3xq9` (apps: React Aria as the base, §7, the plan waiting

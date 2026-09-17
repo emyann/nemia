@@ -37,6 +37,28 @@ it on a step drawn there (`UNSET` in `apps/web/src/lib/builder.ts`). It does not
 the spec it was given, so a `dev` folder saved from the board keeps `workspace: main`. The board run adds the
 key to the mirror; until then the gap is *cannot edit*, not *drops*.
 
+## What the review's third round changed
+
+Three, all of them held:
+
+- **The gate holds on the work, and work said again un-holds it.** A looping step that asks for another round
+  has signed off, so the record alone read it as handed on: in the very pass that filed the round, `wf ls`
+  offered `to decide: Ship it …`, and an approval taken in that window named a try nothing spends — the next
+  round's work would have merged with nobody having read the review that asked for it. Reachable in every
+  shipped `dev*` folder. `waitsAtGate` and `approvalRefusal` now share `notHandedOn`, which counts a round
+  wanted as work not handed on; a person's send-back does the same between the ask and the pass that files it
+  (`unheld`).
+- **One behaviour a person may notice: `wf start --workflows dev --no-worktree` is now refused.** Such a run
+  works on the base branch itself, so it has no result branch for `ship` to merge — the step would be told the
+  work is on the branch it is standing on, merge a branch into itself, and pay for `npm test && npm run
+  typecheck` to find nothing to commit. The refusal says which two things to choose between, at `wf start`,
+  before anything is spent. `wf plan` already refuses the same flag for the same reason.
+- **A gate set at start on a step written as work** (`wf start --gate review`) is an ending too — a person's
+  word ends the run — but nothing merges its branch. Approving now accepts what that step did rather than
+  offering its own instructions as what happens next, and the `git merge` / `git branch -D` commands print
+  wherever no step of the workflow merges, so the branch holding all the work is never left with no command on
+  the screen.
+
 ## For CLAUDE.md, if the merger agrees
 
 A trap worth the file, which cost a round here: **a key added to `STEP_KEYS` has three obligations outside the

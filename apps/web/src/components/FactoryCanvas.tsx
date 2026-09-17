@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { useQueries } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import {
   applyNodeChanges,
@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { runQuery, type RunDetail, type RunSummary } from '@/lib/api';
+import { ceilingsQuery, inboxQuery, runQuery, type RunDetail, type RunSummary } from '@/lib/api';
 import { forgetFactoryLayout, forgetFactoryOpen, readFactoryLayout, readFactoryOpen, saveFactoryLayout, saveFactoryOpen } from '@/lib/canvas';
 import {
   CARD_WIDTH,
@@ -38,9 +38,11 @@ import {
   waitsOnYou,
   type Span,
 } from '@/lib/factory';
+import { capLine, queueOf } from '@/lib/inbox';
 import { extentOf, layout, stepsOf, type Point } from '@/lib/layout';
 import { stepState } from '@/lib/status';
 import { CanvasLegend } from './CanvasLegend';
+import { QueueLane } from './QueueLane';
 import { RunNode, type RunFlowNode } from './RunNode';
 import { StateEdge } from './StateEdge';
 import { StepInspector } from './StepInspector';
@@ -103,6 +105,10 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  * are the card's children in React Flow, placed relative to it, so they move with it when it is
  * dragged. A click on a step opens its inspector beside the floor. Which runs are open is kept in this
  * browser with the layout.
+ *
+ * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says the
+ * runs in flight against the cap the daemon runs with (`CapLine`). Both are read again every 5 s, as the runs are: the daemon starts a card
+ * when a run slot frees, and nothing on the board asks it to.
  */
 export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
   return (
@@ -407,6 +413,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // Said beside the counts: a run stopped at a step that needs a person is finished, so off the floor by default — and so is one
   // waiting on a run that never ships without a person.
   const waiting = runs.filter(waitsOnYou).length;
+  const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
+  const queued = queue.data ? queueOf(queue.data) : [];
   const cells = placed.reduce((sum, node) => {
     const { columns, rows } = spans.get(node.id) ?? ONE_CELL;
     return sum + columns * rows;
@@ -421,88 +429,122 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     // The height left under the root's `h-12` header, so the floor fills the screen and no more.
     <div className="flex h-[calc(100svh-3rem)] min-h-96 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
-        <p className="text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">{flying.size}</span> in flight
-          {finished > 0 && ` · ${finished} finished`}
-          {waiting > 0 && ` · ${waiting} waiting on you`}
-        </p>
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <p className="text-sm text-muted-foreground">
+            <span className="font-medium text-foreground">{flying.size}</span> in flight
+            {finished > 0 && ` · ${finished} finished`}
+            {waiting > 0 && ` · ${waiting} waiting on you`}
+          </p>
+          <CapLine queued={queued.length} queueError={queue.error} />
+        </div>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <Switch checked={showFinished} onCheckedChange={toggleFinished} />
           Show finished
         </label>
       </div>
 
-      {shown.length ? (
-        <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-          <div ref={frame} className="min-h-0 min-w-0 flex-1">
-            <ReactFlow
-              nodes={nodes}
-              edges={edges}
-              nodeTypes={nodeTypes}
-              edgeTypes={edgeTypes}
-              onNodesChange={onNodesChange}
-              onNodeClick={(event, node) => {
-                // The title's link and the chevron do what they do, and no more.
-                if (node.type === 'run' && (event.target as Element).closest('a, button')) return;
-                activate(node);
-              }}
-              onPaneClick={close}
-              onKeyDown={(event) => {
-                if (event.key !== 'Enter') return;
-                // On a card or a step itself: Enter on the title's link or the chevron is theirs.
-                const target = event.target as HTMLElement;
-                if (!target.classList.contains('react-flow__node')) return;
-                const node = nodes.find((candidate) => candidate.id === target.dataset.id);
-                if (node) activate(node);
-              }}
-              nodesConnectable={false}
-              elementsSelectable={false}
-              edgesFocusable={false}
-              deleteKeyCode={null}
-              selectionKeyCode={null}
-              multiSelectionKeyCode={null}
-              colorMode="system"
-              // Null, so arrowheads take `--xy-edge-stroke` like their edges instead of one grey for both themes.
-              defaultMarkerColor={null}
-              minZoom={0.2}
-              fitView
-              fitViewOptions={FIT}
-            >
-              <Panel position="top-left" className="hidden text-[11px] text-muted-foreground sm:block">
-                Click a run for its steps · drag to arrange · kept in this browser
-              </Panel>
-              <Panel position="top-right" className="flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={resetLayout}>
-                  Reset layout
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={collapseAll} disabled={!open.length}>
-                  Collapse all
-                </Button>
-                <Button type="button" variant="outline" size="sm" onClick={() => setFits((n) => n + 1)}>
-                  Fit view
-                </Button>
-              </Panel>
-              <Background variant={BackgroundVariant.Dots} gap={16} />
-              <Controls showInteractive={false} showFitView={false} />
-              {/* Wrapped short of the minimap, when there is one. */}
-              <CanvasLegend cards className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />
-              {cells > HANDFUL && <MiniMap<FloorNode> pannable zoomable style={{ width: 128, height: 88 }} nodeColor={minimapFill} />}
-            </ReactFlow>
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        {queued.length > 0 && <QueueLane cards={queued} />}
+        {shown.length ? (
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
+            <div ref={frame} className="min-h-0 min-w-0 flex-1">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                nodeTypes={nodeTypes}
+                edgeTypes={edgeTypes}
+                onNodesChange={onNodesChange}
+                onNodeClick={(event, node) => {
+                  // The title's link and the chevron do what they do, and no more.
+                  if (node.type === 'run' && (event.target as Element).closest('a, button')) return;
+                  activate(node);
+                }}
+                onPaneClick={close}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return;
+                  // On a card or a step itself: Enter on the title's link or the chevron is theirs.
+                  const target = event.target as HTMLElement;
+                  if (!target.classList.contains('react-flow__node')) return;
+                  const node = nodes.find((candidate) => candidate.id === target.dataset.id);
+                  if (node) activate(node);
+                }}
+                nodesConnectable={false}
+                elementsSelectable={false}
+                edgesFocusable={false}
+                deleteKeyCode={null}
+                selectionKeyCode={null}
+                multiSelectionKeyCode={null}
+                colorMode="system"
+                // Null, so arrowheads take `--xy-edge-stroke` like their edges instead of one grey for both themes.
+                defaultMarkerColor={null}
+                minZoom={0.2}
+                fitView
+                fitViewOptions={FIT}
+              >
+                <Panel position="top-left" className="hidden text-[11px] text-muted-foreground sm:block">
+                  Click a run for its steps · drag to arrange · kept in this browser
+                </Panel>
+                <Panel position="top-right" className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={resetLayout}>
+                    Reset layout
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={collapseAll} disabled={!open.length}>
+                    Collapse all
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setFits((n) => n + 1)}>
+                    Fit view
+                  </Button>
+                </Panel>
+                <Background variant={BackgroundVariant.Dots} gap={16} />
+                <Controls showInteractive={false} showFitView={false} />
+                {/* Wrapped short of the minimap, when there is one. */}
+                <CanvasLegend cards className={cells > HANDFUL ? 'mr-40 ml-12' : 'mr-4 ml-12'} />
+                {cells > HANDFUL && <MiniMap<FloorNode> pannable zoomable style={{ width: 128, height: 88 }} nodeColor={minimapFill} />}
+              </ReactFlow>
+            </div>
+            {inspectedRun && inspected && (
+              <StepInspector
+                run={inspectedRun}
+                step={inspected}
+                runTitle={titleOf(inspectedRun)}
+                onClose={close}
+                className="h-80 shrink-0 rounded-none border-0 border-t md:h-auto md:border-t-0 md:border-l"
+              />
+            )}
           </div>
-          {inspectedRun && inspected && (
-            <StepInspector
-              run={inspectedRun}
-              step={inspected}
-              runTitle={titleOf(inspectedRun)}
-              onClose={close}
-              className="h-80 shrink-0 rounded-none border-0 border-t md:h-auto md:border-t-0 md:border-l"
-            />
-          )}
-        </div>
-      ) : (
-        <Empty anyRuns={runs.length > 0} />
-      )}
+        ) : (
+          <Empty anyRuns={runs.length > 0} />
+        )}
+      </div>
     </div>
+  );
+}
+
+/**
+ * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 runs in flight · 3 queued`, or `no cap`. Its count is the
+ * cap's — a run with a task filed and not settled, or started with something due — which a run waiting on runs, on the floor, is not; the
+ * difference is said on hover. Nothing until the cap is read; why, when it cannot be.
+ */
+function CapLine({ queued, queueError }: { queued: number; queueError: Error | null }) {
+  const { data, error } = useQuery(ceilingsQuery);
+  if (error || queueError) {
+    return (
+      <p data-cap-error className="max-w-md truncate text-xs text-red-600 dark:text-red-400" title={(error ?? queueError)!.message}>
+        {error ? 'The cap on runs in flight' : 'The queue'} could not be read: {(error ?? queueError)!.message}
+      </p>
+    );
+  }
+  if (!data) return null;
+  const by = data.last
+    ? `as the daemon's last pass ran with it (WF_MAX_RUNS=${data.last.runs}, WF_MAX_CONCURRENT=${data.last.sessions})`
+    : "as the api's environment sets it: no pass of the daemon has written its own";
+  const title = data.cap > 0
+    ? `Runs in flight against the cap, ${by}. A run counts while a task of it is filed and not settled, or, once started, while it has something due; a run waiting on runs counts once it starts. ${data.held.length ? `Held for a slot: ${data.held.map((h) => h.run).join(', ')}.` : ''}`
+    : `No cap on runs in flight, ${by}: every run is filed as soon as it is ready.`;
+  return (
+    <p data-cap={data.cap} title={title.trim()} className="text-sm text-muted-foreground">
+      {capLine(data, queued)}
+    </p>
   );
 }
 

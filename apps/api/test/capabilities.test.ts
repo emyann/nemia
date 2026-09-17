@@ -680,8 +680,8 @@ test("REFUSED: an ask rule that covers a read-only command makes it ask — deni
 
 test('REFUSED: an ask rule takes back every allow it matches the whole of, as a deny does, and a narrower one is an exception — the allow asks there, and in dontAsk runs no more — while a deny comes first', async () => {
   const repo = askingRepo({
-    ask: ['Bash(git:*)', 'Bash(npx turbo run test build)', 'Bash(npm test)'],
-    deny: ['Bash(npm test)'],
+    ask: ['Bash(git:*)', 'Bash(npx turbo run test build)', 'Bash(npm test)', 'Bash(npx turbo run test e2e)', 'Bash(npx turbo run test lint --fix)'],
+    deny: ['Bash(npm test)', 'Bash(npx turbo run test e2e)', 'Bash(npx turbo run test lint:*)'],
     allow: ['Bash(git diff:*)', 'Bash(npx turbo run test:*)', 'Bash(npm test)', 'Bash(node --version)'],
   });
   const { 'dev/review': review, 'dev/implement': implement } = await stepsOf(repo);
@@ -689,8 +689,10 @@ test('REFUSED: an ask rule takes back every allow it matches the whole of, as a 
     assert.deepEqual(step.allowed.takenBack, [{ rule: 'Bash(npm test)', by: { rule: 'Bash(npm test)', source: SETTINGS } }], 'the deny, not the ask rule');
     assert.deepEqual(step.allowed.asked, [{ rule: 'Bash(git diff:*)', by: { rule: 'Bash(git:*)', source: SETTINGS } }]);
     assert.deepEqual(step.allowed.rules, ['Bash(npx turbo run test:*)', 'Bash(node --version)']);
-    assert.deepEqual(step.allowed.bash, [bashRule('Bash(npx turbo run test:*)', [], ['Bash(npx turbo run test build)']), bashRule('Bash(node --version)')]);
-    assert.deepEqual(step.allowed.exceptions, [{ rule: 'Bash(npx turbo run test:*)', except: [], asks: ['Bash(npx turbo run test build)'] }]);
+    // A narrower ask rule a deny covers — the same words, or a wider deny — never asks: the deny comes first, and it is said as the deny alone.
+    const except = ['Bash(npx turbo run test e2e)', 'Bash(npx turbo run test lint:*)'];
+    assert.deepEqual(step.allowed.bash, [bashRule('Bash(npx turbo run test:*)', except, ['Bash(npx turbo run test build)']), bashRule('Bash(node --version)')]);
+    assert.deepEqual(step.allowed.exceptions, [{ rule: 'Bash(npx turbo run test:*)', except, asks: ['Bash(npx turbo run test build)'] }]);
   }
   assert.ok(!review.allowed.bash.some((b: { command: string }) => b.command === 'git diff:*'), 'a dontAsk step is not shown running what asks');
 });
@@ -710,7 +712,8 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
     { name: 'wipe', denied: { rule: 'mcp__fixture__wipe', source: SETTINGS }, asks: null, allowed: false },
   ]);
   assert.deepEqual(review.allowed.rules, ['mcp__fixture']);
-  assert.deepEqual(review.allowed.exceptions, [{ rule: 'mcp__fixture', except: ['mcp__fixture__wipe'], asks: ['mcp__fixture__echo', 'mcp__fixture__wipe'] }]);
+  // wipe is denied, which comes first: it never asks, so only echo is an ask beside the allow.
+  assert.deepEqual(review.allowed.exceptions, [{ rule: 'mcp__fixture', except: ['mcp__fixture__wipe'], asks: ['mcp__fixture__echo'] }]);
   // An ask rule of the whole server takes the allow back.
   const whole = repoWith({
     '.claude/settings.json': { enabledMcpjsonServers: ['fixture'], permissions: { allow: ['mcp__fixture__echo'], ask: ['mcp__fixture'] } },

@@ -240,15 +240,17 @@ function stepReach(capabilities: Pick<Capabilities, 'skills' | 'mcp' | 'denied' 
     else if (tool !== undefined && !has(tool)) allowed.unused.push(rule);
     else allowed.rules.push(rule);
   }
+  // The narrower ask rules that still make part of an allow ask — less any a deny covers, since the deny comes first and that part never asks.
+  const narrowerAsks = (rule: string) => narrowerDenies(rule, asked).filter((ask) => !takenBackBy(ask, denied));
   allowed.exceptions = allowed.rules
-    .map((rule) => ({ rule, except: narrowerDenies(rule, denied), asks: narrowerDenies(rule, asked) }))
+    .map((rule) => ({ rule, except: narrowerDenies(rule, denied), asks: narrowerAsks(rule) }))
     .filter((e) => e.except.length > 0 || e.asks.length > 0);
   const bashTaken = removed.find((r) => r.name === 'Bash');
   if (names.includes('Bash')) {
     allowed.bash = allowed.rules.flatMap((rule) => {
       const r = ruleOf(rule);
       if (r?.tool !== 'Bash') return [];
-      return [{ rule, command: r.scope ?? '*', except: narrowerDenies(rule, denied), asks: narrowerDenies(rule, asked) }];
+      return [{ rule, command: r.scope ?? '*', except: narrowerDenies(rule, denied), asks: narrowerAsks(rule) }];
     });
   } else {
     allowed.why = bashTaken

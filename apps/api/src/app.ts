@@ -1345,12 +1345,12 @@ const AT_GATE = /^awaiting approval:\s{2}(wf approve \S+ \S+)(?: \[--message "<w
  * each step waiting at its gate on you (`gates`, `gateLines`' lines), then ship it and drop it for the branches, or read it for a run
  * worked on its base branch — which has nothing to merge, nor a branch to delete.
  *
- * `merges` is whether a step of the workflow acts on the base branch itself (`workspace: main`): ship it and drop it are for the folder
+ * `endingMerges` is whether a step of the workflow acts on the base branch itself (`workspace: main`): ship it and drop it are for the folder
  * that says nothing about what happens when the work is done, and a folder that says it in prose does not also tell a person to type
  * `git merge` — its ending step is what merges, and a run parked at that step's gate is one approval away from doing it. As `wf decide`
  * decides it (cli.ts, `!merges(steps)`).
  */
-function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Readonly<Record<string, string>> = {}, merges = false): DecideCommand[] {
+function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Readonly<Record<string, string>> = {}, endingMerges = false): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
   const once = [
     ...offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said })),
@@ -1365,7 +1365,7 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Rea
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
     return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
   }
-  const first = merges ? undefined : d.branches[0];
+  const first = endingMerges ? undefined : d.branches[0];
   return [
     ...once,
     ...(first

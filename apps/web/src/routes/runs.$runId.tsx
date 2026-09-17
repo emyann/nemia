@@ -6,7 +6,7 @@ import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
 import { Check, code, Facts, specRows, spentRows, Told, when } from '../components/Facts';
-import { ActsOn, Approved, actsOnly, Gate, gateWord } from '../components/Gate';
+import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
@@ -122,9 +122,10 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
   const { spec, closeout, gate } = step;
   // Waiting at its gate on you, as `wf ls` asks it (`approve`): on a run nobody called off, and not sent back already.
   const atGate = gateOffered(step, runCancelled);
-  // An ending step's gate, which holds before the step is filed (`actsOnly`): it has no closeout of its own, and what a person approves is
+  // An ending step's gate, which holds before the step is filed (`endsTheRun`): it has no closeout of its own, and what a person approves is
   // the work it would act on — the branch's standing and diff stat, and each work step's closeout with its files (`ActsOn`).
-  const acts = atGate && actsOnly(step);
+  const ends = endsTheRun(step);
+  const acts = atGate && ends;
   // The steps a send-back names, as the package names them (`sendBackTo`): the step itself once it has run, or the steps it waits on.
   const back = acts ? run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from) : [step.name];
   const handedOn = closeout && (
@@ -162,8 +163,8 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
         rows={[
           ['branch', code(step.branch)],
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
-          // Its gate, where it has one: a person's word files what follows it.
-          ...(gate ? ([['gate', gateWord(gate)]] satisfies Array<[string, string]>) : []),
+          // Its gate, where it has one: a person's word files what follows it — or, for the step that ends the run, the step itself.
+          ...(gate ? ([['gate', gateWord(gate, ends)]] satisfies Array<[string, string]>) : []),
           // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0.
           ['used', step.used?.used],
           ['cost', step.used?.cost],

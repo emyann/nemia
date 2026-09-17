@@ -1317,6 +1317,15 @@ const PAGES: PageSpec[] = [
       );
       const approve = gate.getByRole('button', { name: 'Approve', exact: true });
       if (!(await approve.isEnabled())) throw new Refused('Approve is enabled with no words: an approval needs none');
+      // The words go to the step itself, as its own brief is handed them (`## Approved`): nothing follows an ending to be handed anything.
+      const words = gate.getByRole('textbox', { name: `Words to approve ${ending} with, if any` });
+      const placeholder = await words.getAttribute('placeholder');
+      if (placeholder !== 'Your words (optional): the step is handed them as the terms it acts on, under “Approved”.') {
+        throw new Refused(`the approval's box says the words are the terms the step acts on — it says ${JSON.stringify(placeholder)}`);
+      }
+      // Its facts: it runs in the repository's own checkout, and its gate awaits your word.
+      await expectVisible(section.locator('dd', { hasText: /^main$/ }), `${ending}'s facts say it runs in the repository's own checkout (workspace main)`);
+      await expectVisible(section.locator('dd', { hasText: /^awaiting approval$/ }), 'and that its gate awaits approval');
       // The send-back goes to the work, which is what the objection is about: `wf retry` of the step at this gate is refused.
       const sendBack = gate.getByRole('form', { name: `Send ${back} back` });
       await expectVisible(sendBack, `the send-back names ${back}, the step the package sends it to`);
@@ -1346,6 +1355,11 @@ const PAGES: PageSpec[] = [
       await expectVisible(page.locator(`article > section#step-${back} [data-note]`, { hasText: note }), `${back}'s section says what wf ls says of the try asked`);
       await expectCount(page.locator('section[aria-label="To decide"]'), 0, 'and there is nothing to decide while the work is asked for again');
       await expectCount(gate, 0, 'and the gate holds nothing: it holds on the work, and the work was sent back');
+      // And its facts say where that gate holds — never that it holds once a step whose approval is what files it has signed off.
+      await expectVisible(
+        section.locator('dd', { hasText: /^holds once the work has handed on, and your approval files it$/ }),
+        `${ending}'s facts say its gate holds once the work has handed on`,
+      );
       await settled(page);
       await page.screenshot({ path: path.join(OUT, `decide-sent-back-${await themeOf(page)}.png`), fullPage: true });
 

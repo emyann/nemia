@@ -20,8 +20,10 @@ import { when } from './Facts';
  * `back` are the steps a send-back names, as the package names them (`sendBackTo`): the gated step itself, which is the default and §6's
  * gate; or, at an ending step's gate — held before the step is filed — the steps it waits on, whose work the objection is about, since the
  * ending has done nothing to object to. `wf retry` of the step at such a gate is refused, so the button asks for a try of the work instead,
- * and where the ending waits on several steps a person picks which. `acts` says the gate is an ending's: approving runs it rather than
- * letting what follows be filed.
+ * and where the ending waits on several steps a person picks which. Empty for an ending that waits on nothing — a workflow of one step in
+ * the checkout — and then there is no send-back at all, as `wf ls`'s own gate note prints none (`gateNote`): approving it is the only word
+ * there is to say. `acts` says the gate is an ending's: approving runs it rather than letting what follows be filed, and the words given
+ * with the approval are the terms it acts on (`approvedSection`), not something handed to steps after it.
  */
 export function Gate({ runId, step, back = [step], acts = false }: { runId: string; step: string; back?: readonly string[]; acts?: boolean }) {
   const [words, setWords] = useState('');
@@ -35,12 +37,16 @@ export function Gate({ runId, step, back = [step], acts = false }: { runId: stri
   // What the send-back's words name: the one step it goes to, or the work where there are several and a person picks one.
   const backName = back.length === 1 ? back[0]! : 'the work';
 
-  if (approval.isSuccess || sendBack.isSuccess) {
+  // What the gate says the moment either word is taken (`takenOf`), until the run is read again and the step says it itself.
+  const taken = approval.isSuccess
+    ? takenOf({ approved: approval.data.try }, step, acts)
+    : sendBack.isSuccess ? takenOf({ asked: sendBack.data, step: to }, step, acts) : null;
+  if (taken) {
     return (
       <section aria-label={`The gate of ${step}`} data-gate="taken" className="rounded border border-neutral-200 px-3 py-2 text-sm dark:border-neutral-800">
-        <strong>{step}</strong>{' '}
+        <strong>{taken.named}</strong>{' '}
         <span data-note className="font-mono text-xs text-neutral-600 dark:text-neutral-400">
-          {approval.isSuccess ? `approved try ${approval.data.try} — the next tick files what waits on it` : sendBack.isSuccess ? askedSaid(sendBack.data) : null}
+          {taken.said}
         </span>
       </section>
     );
@@ -55,7 +61,7 @@ export function Gate({ runId, step, back = [step], acts = false }: { runId: stri
       <p className="break-words">
         <strong>{step}</strong> waits at its gate:{' '}
         {acts
-          ? `nothing of it runs until you approve it — your approval is what files it — or you send ${backName} back.`
+          ? `nothing of it runs until you approve it — your approval is what files it${back.length ? ` — or you send ${backName} back` : ''}.`
           : 'nothing after it is filed until you approve what it handed on, or send it back.'}
       </p>
 
@@ -76,7 +82,9 @@ export function Gate({ runId, step, back = [step], acts = false }: { runId: stri
           value={words}
           onChange={(event) => setWords(event.target.value)}
           rows={2}
-          placeholder="Your words (optional): every step after the gate is handed them, under “Approved”."
+          placeholder={acts
+            ? 'Your words (optional): the step is handed them as the terms it acts on, under “Approved”.'
+            : 'Your words (optional): every step after the gate is handed them, under “Approved”.'}
           className={TEXTAREA}
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -90,66 +98,90 @@ export function Gate({ runId, step, back = [step], acts = false }: { runId: stri
         {approval.isError && <Refusal error={approval.error} not="Not approved" />}
       </form>
 
-      <form
-        aria-label={`Send ${backName} back`}
-        className="space-y-2 border-t border-amber-200 pt-3 dark:border-amber-900"
-        onSubmit={(event) => {
-          event.preventDefault();
-          // An objection goes as it was typed, as `--message` takes it: the package refuses a send-back with none. To the step the
-          // package sends it to, which at an ending's gate is the work and not the step at the gate.
-          sendBack.mutate({ mode, message: objection, step: to });
-        }}
-      >
-        <label htmlFor={`${field}-objection`} className="sr-only">
-          {`What to change, sent back to ${backName}`}
-        </label>
-        <textarea
-          id={`${field}-objection`}
-          value={objection}
-          onChange={(event) => setObjection(event.target.value)}
-          rows={2}
-          placeholder="What to change: its next try is told it, under “Your answer”, and waits at its gate again."
-          className={TEXTAREA}
-        />
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button type="submit" disabled={busy || !objection.trim()} className={cn(BUTTON, 'bg-white text-neutral-900 ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900')}>
-            {sendBack.isPending ? 'Sending back…' : 'Send back'}
-          </button>
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-            <legend className="sr-only">How to send {backName} back</legend>
-            {(['nudge', 'fresh'] as const).map((m) => (
-              <label key={m} className="flex cursor-pointer items-center gap-1.5">
-                <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
-                {MODES[m]} <code className="text-neutral-500">--{m}</code>
-              </label>
-            ))}
-          </fieldset>
-        </div>
-        {/* Which step the objection goes to, where the ending waits on more than one: one of them is enough to hold its gate again. */}
-        {back.length > 1 && (
-          <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-            <legend className="sr-only">Which step to send back</legend>
-            {back.map((name) => (
-              <label key={name} className="flex cursor-pointer items-center gap-1.5">
-                <input type="radio" name={`${field}-to`} value={name} checked={to === name} onChange={() => setTo(name)} />
-                {name}
-              </label>
-            ))}
-          </fieldset>
-        )}
-        {sendBack.isError && <Refusal error={sendBack.error} />}
-      </form>
+      {/* No send-back where there is no work to send back: an ending that waits on nothing has nothing of its own to object to, and a try
+          of the unfiled step is refused by the package. `wf ls`'s gate note prints the approval alone for it (`gateNote`). */}
+      {back.length > 0 && (
+        <form
+          aria-label={`Send ${backName} back`}
+          className="space-y-2 border-t border-amber-200 pt-3 dark:border-amber-900"
+          onSubmit={(event) => {
+            event.preventDefault();
+            // An objection goes as it was typed, as `--message` takes it: the package refuses a send-back with none. To the step the
+            // package sends it to, which at an ending's gate is the work and not the step at the gate.
+            sendBack.mutate({ mode, message: objection, step: to });
+          }}
+        >
+          <label htmlFor={`${field}-objection`} className="sr-only">
+            {`What to change, sent back to ${backName}`}
+          </label>
+          <textarea
+            id={`${field}-objection`}
+            value={objection}
+            onChange={(event) => setObjection(event.target.value)}
+            rows={2}
+            placeholder="What to change: its next try is told it, under “Your answer”, and waits at its gate again."
+            className={TEXTAREA}
+          />
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <button type="submit" disabled={busy || !objection.trim()} className={cn(BUTTON, 'bg-white text-neutral-900 ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900')}>
+              {sendBack.isPending ? 'Sending back…' : 'Send back'}
+            </button>
+            <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              <legend className="sr-only">How to send {backName} back</legend>
+              {(['nudge', 'fresh'] as const).map((m) => (
+                <label key={m} className="flex cursor-pointer items-center gap-1.5">
+                  <input type="radio" name={`${field}-mode`} value={m} checked={mode === m} onChange={() => setMode(m)} />
+                  {MODES[m]} <code className="text-neutral-500">--{m}</code>
+                </label>
+              ))}
+            </fieldset>
+          </div>
+          {/* Which step the objection goes to, where the ending waits on more than one: one of them is enough to hold its gate again. */}
+          {back.length > 1 && (
+            <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
+              <legend className="sr-only">Which step to send back</legend>
+              {back.map((name) => (
+                <label key={name} className="flex cursor-pointer items-center gap-1.5">
+                  <input type="radio" name={`${field}-to`} value={name} checked={to === name} onChange={() => setTo(name)} />
+                  {name}
+                </label>
+              ))}
+            </fieldset>
+          )}
+          {sendBack.isError && <Refusal error={sendBack.error} />}
+        </form>
+      )}
     </section>
   );
 }
 
 /**
- * Whether a step's gate holds before the step is filed, which is an ending step's gate (`approvedFirst`, `waitsAtGate` in agent-workflows):
- * it waits at its gate and has never run. A gate on a step that works, §6's, holds the handoff after the step has signed off, so that step
- * has a task and a closeout to read; an ending step acts where nothing can be taken back, so its approval is what runs it, and there is no
- * closeout of its own — what a person approves is the work it would act on.
+ * What a gate says the moment a person's word is taken, until the run is read again and the step's own note says it: the step the word was
+ * about, and what the next tick does with it.
+ *
+ * An approval is about the gated step, and what follows it is filed — except at an ending step's gate (`acts`), where nothing follows and
+ * the approval files that step itself. A send-back is about the step whose try was asked for, which at such a gate is the work and not the
+ * step at the gate (`sendBackTo` in agent-workflows): naming the ending there would say a try was filed for a step that has not run.
  */
-export const actsOnly = (step: Pick<RunDetail['steps'][number], 'taskId' | 'gate'>): boolean => Boolean(step.gate?.awaiting) && step.taskId === null;
+export const takenOf = (
+  taken: { approved: number } | { asked: { try: number; stopFirst: boolean }; step: string },
+  step: string,
+  acts: boolean,
+): { named: string; said: string } =>
+  ('approved' in taken
+    ? { named: step, said: `approved try ${taken.approved} — the next tick files ${acts ? 'it' : 'what waits on it'}` }
+    : { named: taken.step, said: askedSaid(taken.asked) });
+
+/**
+ * Whether the step ends the run in the repository's own checkout, off the workflow the run froze (`workspace: main`, `approvedFirst` in
+ * agent-workflows): its gate holds before it is filed, and a person's approval is what files it.
+ *
+ * A gate on a step that works, §6's, holds the handoff after the step has signed off, so that step has a task and a closeout to read; an
+ * ending step acts where nothing can be taken back, and has no closeout of its own — what a person approves is the work it would act on.
+ * The two read the same off a step's record at its gate (unfiled, awaiting approval), so the key is what tells them apart; a detail from an
+ * api that does not carry it reads as any other step, and its gate is drawn as §6's.
+ */
+export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): boolean => step.spec?.workspace === 'main';
 
 /**
  * What an ending step would act on, beside its gate: the run's result, for the person deciding whether to let it run.
@@ -206,9 +238,16 @@ export function ActsOn({ run, step }: { run: RunDetail; step: RunDetail['steps']
   );
 }
 
-/** A gated step's gate as a word, for its facts: approved, awaiting approval, or where it holds once the step has signed off. */
-export const gateWord = (gate: StepGate): string =>
-  gate.approval ? `approved, try ${gate.approval.try}` : gate.awaiting ? 'awaiting approval' : 'holds once it has signed off';
+/**
+ * A gated step's gate as a word, for its facts: approved, awaiting approval, or where it holds — once the step has signed off, and for a
+ * step that ends the run in the checkout (`ends`, `endsTheRun`) once the work it acts on has, since such a step never signs off before its
+ * gate and its approval is what files it. The package's own refusal says it the same way (`approvalRefusal` in agent-workflows).
+ */
+export const gateWord = (gate: StepGate, ends = false): string =>
+  (gate.approval ? `approved, try ${gate.approval.try}`
+    : gate.awaiting ? 'awaiting approval'
+    : ends ? 'holds once the work has handed on, and your approval files it'
+    : 'holds once it has signed off');
 
 /**
  * A gated step's approval, under the step: the try approved, when, and the words given with it, as the person wrote them — what every step

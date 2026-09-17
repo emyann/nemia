@@ -118,6 +118,11 @@ export type StepSpec = {
   model: string | null;
   effort: string | null;
   after: string[];
+  /**
+   * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's: the step that ends the run, whose
+   * gate holds before it is filed and whose approval is what files it (`endsTheRun`). Null for every other step.
+   */
+  workspace: string | null;
   resume: string | null;
   permissionMode: string | null;
   /** Null for the harness's own set, empty for none. */

@@ -1223,7 +1223,9 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
     new Map(html.split('<span class="flex items-center gap-1">').slice(1).map((item) => [/([a-z ]+)<\/span>(?:<\/div>)?$/.exec(item)?.[1], item]));
   assert.deepEqual([...itemsOf(legendOf(false)).keys()], ['to come', 'running', 'done', 'loops back', 'human gate']);
   const items = itemsOf(legendOf(true));
-  assert.deepEqual([...items.keys()], ['to come', 'running', 'done', 'loops back', 'waits on a run', 'human gate']);
+  // And the ring round a card whose result nobody has decided, which only the Factory draws.
+  assert.deepEqual([...items.keys()], ['to come', 'running', 'done', 'loops back', 'waits on a run', 'human gate', 'to decide']);
+  assert.match(items.get('to decide')!, /ring-1 ring-emerald-500/);
   const cards = items.get('waits on a run')!;
   assert.match(cards, /data-sample="cards"/);
   assert.equal((cards.match(/<rect /g) ?? []).length, 2, 'a card at each end');

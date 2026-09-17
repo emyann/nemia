@@ -36,7 +36,20 @@ export type RunSummary = {
   waitingOnYou: string[];
   /** `waitingOnYou` as `wf ls` names it after `→ waiting on you:`, one entry a step: its name, or for a step at its gate, `approve plan`. */
   onYou: string[];
+  /** What a person has to decide about the run's result (`RunToDecide`); null while there is nothing — which is every run still going. */
+  toDecide: RunToDecide | null;
 };
+
+/**
+ * Mirrors `RunToDecide` in apps/api/src/app.ts: what a person has to decide about a run's result, the fifth reason a run waits on one —
+ * `approve`, the gate on its last step, with `step` and `says`, what that step would do in the folder's own words (null for a gated step
+ * that has signed off, whose closeout is what to read); or `git`, result branches ahead of the base that nothing in the workflow merges.
+ *
+ * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it. The board runs neither.
+ */
+export type RunToDecide =
+  | { kind: 'approve'; step: string; says: string | null; said: string; command: string }
+  | { kind: 'git'; branches: string[]; said: string; command: string };
 
 /**
  * Mirrors `Spent` in apps/api/src/app.ts: what sessions cost, as the package adds it up — the dollars of the attempts that ended with a cost on
@@ -219,6 +232,8 @@ export type RunDetail = {
   waitingOnYou: string[];
   /** As on `RunSummary`. */
   onYou: string[];
+  /** As on `RunSummary` (`RunToDecide`). */
+  toDecide: RunToDecide | null;
   /** The steps the run is gated at, in the order they run: those its workflow gates, and those it was started with. */
   gates: string[];
   warning: string | null;
@@ -345,8 +360,18 @@ export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 /** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints and runs none of. */
 export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back'; command: string; said: string | null };
 
+/**
+ * Mirrors `Standing` in apps/api/src/app.ts: where one result branch stands against the base branch as git says it now — on it, ahead of it
+ * by N commits, or gone — with the fact in the package's words and how much it changed, as `wf decide` prints beside the branch (git's
+ * `--shortstat`); `stat` is null where git said nothing of it.
+ */
+export type Standing = ({ branch: string; where: 'on' } | { branch: string; where: 'ahead'; commits: number } | { branch: string; where: 'gone' })
+  & { said: string; stat: string | null };
+
 /** Mirrors `Decidable` in apps/api/src/app.ts. */
 export type Decidable = {
+  /** Where each result branch stands, and how much it changed: the facts under the run's result, as `wf decide` prints them. */
+  standings: Standing[];
   touched: Touched[];
   lesson: Lesson;
   sensitive: SensitiveDiff[];

@@ -41,6 +41,7 @@ import {
   spanOf,
   stepId,
   titleOf,
+  toDecideOf,
   toggleOpen,
   waitsOnYou,
   type Span,
@@ -68,17 +69,20 @@ const FIT = { padding: 0.15, maxZoom: 1 };
 const HANDFUL = 5;
 
 /**
- * The minimap in the cards' terms — waiting on you, still going, or finished — and a step in its chip's colour.
- * Waiting on you before finished: a run stopped at a step that needs a person is over, and still wants finding.
+ * The minimap in the cards' terms — to decide, waiting on you, still going, or finished — and a step in its chip's colour.
+ * To decide first, then waiting on you, then finished: a run whose result nobody has decided, and one stopped at a step that needs a
+ * person, are both over, and both still want finding.
  */
 const minimapFill = (node: FloorNode) =>
   node.type === 'step'
     ? stepMinimapFill[stepState(node.data.step.status, node.data.runCancelled)]
-    : waitsOnYou(node.data.run)
-      ? 'var(--color-amber-500)'
-      : node.data.finished
-        ? 'var(--color-neutral-400)'
-        : 'var(--color-sky-500)';
+    : toDecideOf(node.data.run)
+      ? 'var(--color-emerald-500)'
+      : waitsOnYou(node.data.run)
+        ? 'var(--color-amber-500)'
+        : node.data.finished
+          ? 'var(--color-neutral-400)'
+          : 'var(--color-sky-500)';
 
 /**
  * Where an open run's steps go beside its card before a person drags any, from their names and the `after` edges of its graph alone —
@@ -486,6 +490,9 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   // Said beside the counts: a run stopped at a step that needs a person is finished, so off the floor by default — and so is one
   // waiting on a run that never ships without a person.
   const waiting = runs.filter(waitsOnYou).length;
+  // And the runs nobody has decided, which are finished too and stay on the floor: counted as `wf ls` says them, before who else
+  // the run waits on. A run at its ending's gate is in both counts — the decision is what it waits on you for.
+  const toDecide = runs.filter((run) => toDecideOf(run) !== null).length;
   const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queue.data) : [];
   // The lane beside the floor comes or goes with the first card queued or the last one started: the floor is fitted again to its new width.
@@ -514,6 +521,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
           <p className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{flying.size}</span> in flight
             {finished > 0 && ` · ${finished} finished`}
+            {toDecide > 0 && <span className="text-emerald-700 dark:text-emerald-400"> · {toDecide} to decide</span>}
             {waiting > 0 && ` · ${waiting} waiting on you`}
           </p>
           <CapLine queued={queued.length} queueError={queue.error} />

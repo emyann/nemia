@@ -63,6 +63,16 @@ test("a step at its gate needs its approval, in `wf ls`'s words, while it waits 
   assert.equal(needOf(plan, false, false), null, 'not waiting on you: nothing to approve');
   assert.equal(needOf({ ...plan, approve: null }, true, false), null, 'no need the api does not carry');
   assert.deepEqual(needsOf(run(steps, ['plan'], '2026-09-16T22:00:00.000Z')), [], 'nothing on a run called off');
+  // An ending step at its gate is the run's to-decide line, which names it and the command: not asked for twice, as `wf ls` prints it.
+  const ship = step('ship', 'awaiting approval', { approve: 'approve ship' });
+  const ending = { ...run([step('implement', 'unverified · done'), ship], ['ship']), toDecide: { kind: 'approve', step: 'ship', says: 'Merge it.', said: 'Merge it. — wf approve r ship', command: 'wf approve r ship' } as const };
+  assert.deepEqual(needsOf(ending), [], 'the to-decide line says it');
+  // Another step's own gate, mid-workflow, is still asked for beside it.
+  const both = { ...ending, steps: [...ending.steps, plan], waitingOnYou: ['ship', 'plan'] };
+  assert.deepEqual(needsOf(both), [{ step: 'plan', kind: 'approve', said: 'approve plan' }]);
+  // And a branch nobody merged names no step, so nothing is left out.
+  const ahead = { ...run(steps, ['plan']), toDecide: { kind: 'git', branches: ['wf/r/implement'], said: 'wf/r/implement is ahead of main, and nothing has merged it — wf decide r', command: 'wf decide r' } as const };
+  assert.deepEqual(needsOf(ahead), [{ step: 'plan', kind: 'approve', said: 'approve plan' }]);
   // A gate's step is answered where its closeout is, not among the answers.
   assert.deepEqual(offersOf(run(steps, ['plan', 'theme'])), [{ step: 'theme', kind: 'try-again', recheck: true, unfinished: false }]);
   // Sent back: its try asked, which the Decide section says, as for any try asked.

@@ -29,6 +29,7 @@ import {
   standingOf,
   stepId,
   titleOf,
+  toDecideOf,
   toggleOpen,
   waitsOnYou,
   type Span,
@@ -513,6 +514,43 @@ test('the floor is every run in flight, and each finished run one of them waits 
     run([], { id: 'k', moving: true, after: ['p'], createdAt: at(2) }),
   ];
   assert.deepEqual(floorRuns(chain, false).map((r) => r.id), ['p', 'k']);
+});
+
+/** What a person has to decide, as the api words it (`RunToDecide`): an ending step's gate, or a branch nobody merged. */
+const approve = (id: string, step: string): RunSummary['toDecide'] =>
+  ({ kind: 'approve', step, says: 'Merge it onto the base branch.', said: `Merge it onto the base branch. — wf approve ${id} ${step}`, command: `wf approve ${id} ${step}` });
+const merge = (id: string, branch: string): RunSummary['toDecide'] =>
+  ({ kind: 'git', branches: [branch], said: `${branch} is ahead of main, and nothing has merged it — wf decide ${id}`, command: `wf decide ${id}` });
+
+test('a run nobody has decided stays on the floor, whatever Show finished says, until it is decided', () => {
+  const runs = [
+    // Finished at its ending's gate: nothing of it moves, and its result is a person's word away.
+    run(['unverified · done', 'awaiting approval'], { id: 'ends', status: 'failed', waitingOnYou: ['ship'], onYou: ['approve ship'], toDecide: approve('ends', 'ship'), createdAt: at(0) }),
+    // Finished and succeeded, with a branch nobody merged: nothing waits on you, and the run is still to be decided.
+    run(['unverified · done'], { id: 'ahead', status: 'succeeded', toDecide: merge('ahead', 'wf/ahead/implement'), createdAt: at(1) }),
+    // Finished and decided: its ending merged it, so the card is off the floor with the rest.
+    run(['unverified · done', 'unverified · done'], { id: 'shipped', status: 'succeeded', createdAt: at(2) }),
+  ];
+  assert.deepEqual(floorRuns(runs, false).map((r) => r.id), ['ends', 'ahead']);
+  assert.deepEqual(floorRuns(runs, true).map((r) => r.id), ['ends', 'ahead', 'shipped']);
+  // And a list from an api that carries no `toDecide` at all reads as one with nothing to decide, rather than taking the floor down.
+  const old = [{ ...runs[1]!, toDecide: undefined as unknown as RunSummary['toDecide'] }];
+  assert.deepEqual(floorRuns(old, false).map((r) => r.id), []);
+  assert.equal(toDecideOf(old[0]!), null);
+});
+
+test("the ending step's own gate is not asked for twice: the to-decide line says it, and `waiting on you` leaves it out", () => {
+  const ends = run(['unverified · done', 'awaiting approval'], {
+    id: 'ends', status: 'failed', waitingOnYou: ['ship'], onYou: ['approve ship'], toDecide: approve('ends', 'ship'),
+  });
+  assert.equal(waitsOnYou(ends), true, 'the step still waits at its gate');
+  assert.deepEqual(onYouOf(ends), [], 'and nothing is left to name: the decision is the whole of it');
+  // Another step waiting on you is still named, beside the ending's own line.
+  const both = { ...ends, waitingOnYou: ['tokens', 'ship'], onYou: ['tokens', 'approve ship'] };
+  assert.deepEqual(onYouOf(both), ['tokens']);
+  // A branch nobody merged asks for no step, so nothing is filtered.
+  const ahead = run(['unverified · done'], { id: 'ahead', status: 'succeeded', waitingOnYou: ['implement'], onYou: ['implement'], toDecide: merge('ahead', 'wf/ahead/implement') });
+  assert.deepEqual(onYouOf(ahead), ['implement']);
 });
 
 test('the Runs page lists the runs in flight first, then the rest, each newest first', () => {

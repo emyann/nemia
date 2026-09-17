@@ -32,6 +32,8 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
       <Item sample={<Sample state="to-come" loop />}>loops back</Item>
       {cards && <Item sample={<CardsSample />}>waits on a run</Item>}
       <Item sample={<span className="size-2.5 rounded-sm border-2 border-amber-500" />}>human gate</Item>
+      {/* The ring round a card whose result nobody has decided: it stays on the floor, finished, until a person decides it. */}
+      {cards && <Item sample={<span className="size-2.5 rounded-sm ring-1 ring-emerald-500" />}>to decide</Item>}
     </Panel>
   );
 }

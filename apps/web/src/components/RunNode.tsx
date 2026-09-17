@@ -9,7 +9,7 @@ import { needLine, needsOf } from '@/lib/asks';
 import { duration } from '@/lib/canvas';
 import { spentTitle } from '@/lib/cost';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
-import { repoName, titleOf, waitsOnYou } from '@/lib/factory';
+import { repoName, titleOf, toDecideOf, waitsOnYou } from '@/lib/factory';
 import { useNow } from '@/lib/useNow';
 import { StatusChip } from './StatusChip';
 
@@ -41,10 +41,13 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
   const cancelled = run.cancelledAt !== null;
   const title = titleOf(run);
   const needs = needsOf(run);
+  const decide = toDecideOf(run);
   const since = duration(now - Date.parse(run.createdAt));
 
   return (
-    <Card size="sm" className={`w-72 shadow-sm transition-opacity ${finished ? 'opacity-50 hover:opacity-80' : ''}`}>
+    // Marked while nobody has decided its result, and not dimmed as a finished card is: nothing of it moves, so it is finished, and it is
+    // on the floor because it is the one card there that is waiting for a person rather than for a machine.
+    <Card size="sm" className={`w-72 shadow-sm transition-opacity ${decide ? 'ring-1 ring-emerald-500/60' : finished ? 'opacity-50 hover:opacity-80' : ''}`}>
       <div className="min-w-0 px-3">
         <div className="flex items-center gap-1">
           {/* Not preloaded on hover: only an open run reads its detail. */}
@@ -119,6 +122,18 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
         </ul>
       )}
 
+      {/* What a person has to decide about the result, in `wf ls`'s own words (`toDecideWords`): the ending step's gate, with the command
+          that approves it, or a branch nobody has merged. Two lines, whole on hover; the step's own `approve <step>` is not said twice. */}
+      {decide && (
+        <p
+          data-to-decide={decide.kind}
+          title={decide.said}
+          className="line-clamp-2 px-3 text-[11px] break-words text-emerald-800 dark:text-emerald-300"
+        >
+          to decide: {decide.said}
+        </p>
+      )}
+
       {/* For triage among the runs waiting on you: how far the work reaches, read once the card is opened. */}
       {open && run.waitingOnYou.length > 0 && <TouchedLine run={run} />}
 
@@ -141,6 +156,9 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
           )}
         </span>
         <span className="flex gap-1">
+          {decide && (
+            <Badge className="bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">to decide</Badge>
+          )}
           {waitsOnYou(run) && (
             <Badge className="bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300">waiting on you</Badge>
           )}

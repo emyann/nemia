@@ -9,6 +9,25 @@ Four commits, one per item, all in `packages/agent-engine`. `npm test && npm run
 | `4574368` | issue 24: a session held busy by its own background shell is read as quiet once its closeout is the last word |
 | `4d2ee7a` | the equal-times admission test now runs over a store that lists in reverse, and fails without the id tiebreak |
 | `08e3f51` | `poolsOf` maps the `claude-bg` runner into the `claude` pool under any harness name — a test that fails without the branch |
+| `2073041` | round 2, both of review's findings: the busy read is kept while its transcript stays cold, and `quietMs`'s contract says a sighting can be busy and quiet at once |
+
+## Round 2: what review found, and what changed
+
+Both findings were right about the code, and both are fixed.
+
+**The read cost.** `keptRead` pinned a read only for a session the registry lists FINAL, so the read the busy branch
+makes over a cold transcript ran on every pass — and a tool call longer than ninety seconds (`npm ci`, a build, this
+repository's suite) is exactly that case, for its whole length. `keptRead` now takes that decision from its caller, and
+the busy branch keeps both its reads. It is safe for the reason the branch exists: it is reached only while nothing has
+been written, which is the condition under which reading again would answer the same, and the pin drops the moment the
+mtime passes it. Measured on the largest transcript on this machine (39.5 MB): a read and its scan 174–282 ms, the mtime
+that gates it 17–60 ms. `test/completion.test.ts` holds it — three passes over a cold transcript, one read; written
+since, read again — and fails without the change.
+
+**The stale contract.** `Sighting.quietMs` defined itself as "working, not busy, nothing written", which is the one
+combination the new rule turns on. Its doc now says a sighting can be busy and quiet at once, that `busy` is a separate
+fact about the process, and why quiet rather than the statement is what ends such an attempt (`closedOut` still refuses
+to act on a busy session's statement, deliberately). `QUIESCENT_AFTER_MS`'s doc says which rule each floor is under.
 
 ## What is worth knowing before this ships
 

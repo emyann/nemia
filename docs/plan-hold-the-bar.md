@@ -999,14 +999,16 @@ The daemon runs with `WF_MAX_CONCURRENT=4` since 2026-09-16 23:20Z (was the defa
 the queue are registered as features.md §2 and §3. In flight 2026-09-16 23:30Z, three lanes at once on the new ceiling, one per
 package: E9 `three-small-items-in-agent-e-fiqe` (engine: item 27, a blocked session no longer holding a slot, pools by
 subscription) from `./workflows/dev` — one round, $11.65, **merged, `912d537`**; item 27 done; W8 `four-items-in-agent-workflow-w4eb` (agent-workflows: items 28 and 31, the run cap
-`WF_MAX_RUNS`, `wf inbox queue` with the tick starting cards — features.md §3 without the board) from `./workflows/dev`; B11
+`WF_MAX_RUNS`, `wf inbox queue` with the tick starting cards — features.md §3 without the board) from `./workflows/dev` — two
+rounds, $49.68, **merged, `00d4c06`**; items 28 and 31 done; the ceiling reworded as pools after (`72b7454`); the daemon runs with
+`WF_MAX_CONCURRENT=4 WF_MAX_RUNS=4` since 2026-09-17 00:47Z; B11
 `three-small-items-on-the-boa-bmq6` (apps: item 30, the run page naming a run's inbox card, the inbox reloading after a refusal)
 from `./workflows/dev-build` — one round, $21.16, **merged, `452a772`**; item 30 done; its review left two findings, filed 2026-09-17
 00:20Z as `two-findings-the-apps-lane-s-1qur` (`dev-build`). The operator's first two inbox cards, started from the board, both
 merged the same night: the Inbox first in the menu (`make-the-inbox-be-the-first-7vms`, $2.40, `a622309`) and the Runs page in
 two groups (`the-runs-page-should-sort-th-zdoe`, $6.05, `6886203`). The markdown study (features.md §5) is filed as
 `markdown-rendered-on-the-boa-699m` on the new `./workflows/dev-planned-build`, its plan waiting for approval. The Factory's
-ghosts for queued cards wait for W8, in its second round. Left: items 20 (settings), 27, 28, 30, 31 (all small).
+ghosts for queued cards wait for W8, in its second round. Left: item 20 (settings, by hand). Items 27, 28, 30 and 31 are done.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 
 **Packages (§4), not started**

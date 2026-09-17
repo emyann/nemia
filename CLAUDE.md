@@ -45,6 +45,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).
+- **Something beside the Factory's floor that mounts after its first render narrows a floor already fitted.** The e2e still passes, and
+  the picture shows the last card cut at the right. Load what it draws in the route's loader (`prefetchQuery`, which never throws), and fit
+  again when it comes or goes (the queue's lane, learned by the run that drew queued cards on the Factory).
 - **The engine's task view carries no filing time; its feed does.** A slot wait is filed → first attempt, so the timeline
   reads filings off `e.feed` (`readFilings`). A store written by hand — the e2e's seed — writes `engine/feed.jsonl` too
   (`seedFeed`), or every queue time reads `not known` (learned by the run that added the timeline).

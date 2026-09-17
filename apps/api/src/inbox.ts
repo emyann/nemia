@@ -141,8 +141,8 @@ function queueBodyRefusal(route: string, text: string): Refusal | null {
 
 /**
  * The status of a queue — or its taking back — that `queueInInbox` refused, in its words (`exitCode` 2), by what is on disk once refused: 404
- * for a card not there; 422 for a card that does not read, or, queued, one that names no workflow; 409 for one a run's record already names, or
- * already queued — a card whose state is not the one the request was made against.
+ * for a card not there; 422 for a card that does not read, or a card to queue that names no workflow; 409 for a card to queue that a run's
+ * record already names, or that is queued already — a card whose state is not the one the request was made against.
  */
 function queueRefusalStatus(name: string): 404 | 409 | 422 {
   if (!fs.existsSync(path.join(inboxDir(), `${name}.md`))) return 404;

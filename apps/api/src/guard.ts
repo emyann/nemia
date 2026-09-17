@@ -1,9 +1,10 @@
 /**
  * The guard on the board's writes: a request refused before its body is read, whatever it asks for.
  *
- * Six writes pass it: a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the card; an ask
+ * Seven writes pass it: a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the card; an ask
  * for another try (`POST /api/runs/:id/steps/:step/retry`, app.ts) or another round (`POST /api/runs/:id/round`, app.ts), each of which writes a
- * person's ask file; words for a step's running session (`POST /api/runs/:id/steps/:step/say`, app.ts), which the engine hands the session and
+ * person's ask file; an approval of a step waiting at its gate (`POST /api/runs/:id/steps/:step/approve`, app.ts), which writes a person's
+ * approval file; words for a step's running session (`POST /api/runs/:id/steps/:step/say`, app.ts), which the engine hands the session and
  * journals; and a card filed in the inbox (`POST /api/inbox`, inbox.ts) or dropped from it (`DELETE /api/inbox/:name`, inbox.ts), each of which
  * writes the store's inbox. Each is what an agent acts on in the repository — once a tick files it, or at once, or once a person starts the card
  * — or a person's idea gone, so a page on another site must not be able to make any of them; and a `fetch` with a body, from any page, reaches

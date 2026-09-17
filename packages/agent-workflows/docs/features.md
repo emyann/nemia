@@ -2058,13 +2058,13 @@ Not agent-workflows features, listed so nothing is lost:
 - waking the tick loop on harness registry changes instead of a timer (agent-engine README);
 - the hkb migration ([agent-engine/docs/hkb-migration.md](../../agent-engine/docs/hkb-migration.md));
 - a task field for Remote Control (§2 above);
-- a `blocked` session holding a concurrency slot (§3 above): count `working` only toward the ceiling and keep the wider
+- ~~a `blocked` session holding a concurrency slot~~ *done, engine `912d537`*: count `working` only toward the ceiling and keep the wider
   set for what else `LIVE` guards; the README's sentence that a deadline is the only thing that frees such a slot, and the
   comment in `decide`, change with it; a test that refuses — two blocked sessions at a cap of two, and a third task starts.
   A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the ceiling exists for:
   reasoning, not a measurement;
-- pools by subscription: `claude` and `claude-detached` counted as one pool, a harness declaring its pool with its own name
-  as the default. Nothing hits it while the workflows run steps on `claude` only;
+- ~~pools by subscription~~ *done, engine `912d537`*: `claude` and `claude-detached` counted as one pool, a harness declaring its
+  pool with its own name as the default. The workflow layer's README and `wf --help` still say "sessions per harness";
 - **admission in filing order, and a task's priority.** The tick walks tasks in `journal.list`'s order, which is the ids
   sorted (`readdirSync(...).sort()`), and admits each pending one while `used < max`: so which of two pending tasks gets a
   slot is decided by the alphabet of their run ids, and a run never keeps its slot across its own steps — its next step is

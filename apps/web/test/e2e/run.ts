@@ -47,11 +47,16 @@ async function sidebar(page: Page): Promise<void> {
   await expectTexts(menu.locator('[data-sidebar="content"] [data-sidebar="menu-button"]'), PLACES, 'the sidebar lists its places in order, the Inbox first');
 }
 
-/** Finished runs on the Factory's floor too. Off by default, on every visit. */
+/**
+ * Finished runs on the Factory's floor too. Off by default, on every visit. Pressed where a person presses it, on its track: React Aria's
+ * switch is a label drawn round an input hidden to the eye, so a click aimed at the input lands on the label, and Playwright waits for ever.
+ */
 async function showFinished(page: Page): Promise<void> {
   const toggle = page.getByRole('switch', { name: 'Show finished' });
   await expectVisible(toggle, 'the Factory has a Show finished switch');
-  await toggle.click();
+  await expectCount(page.getByRole('switch', { name: 'Show finished', checked: false }), 1, 'Show finished is off as the Factory opens');
+  await page.locator('label', { has: toggle }).click();
+  await expectCount(page.getByRole('switch', { name: 'Show finished', checked: true }), 1, 'pressed, Show finished is on');
 }
 
 /** The fake run on the Factory: its card, its step nodes, and both together. */

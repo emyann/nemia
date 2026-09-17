@@ -586,6 +586,11 @@ function checkOf(step: string, check: string | undefined): string | undefined {
 function outputOf(step: string, file: string | undefined, read: ((file: string) => string | undefined) | undefined): StepOutput | undefined {
   if (file === undefined) return undefined;
   const named = `${step}: \`output: ${file}\``;
+  // Refused before it is read: a folder is what a run freezes and the builder writes back, and a schema outside it is part of the step
+  // that neither carries. Read through the api, a file outside it would also answer a refusal with the start of whatever it holds.
+  if (path.isAbsolute(file) || path.normalize(file).split(/[\\/]/)[0] === '..') {
+    refuse(`${named} names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside ${step}.md and name it from there — \`output: ${step}.schema.json\` — or delete the line, and the step declares no output.`);
+  }
   if (!read) refuse(`${named} names a file beside the step, and this step was read without its folder. Load it with \`loadWorkflows(<folder>)\`, which reads the file.`);
   const text = read(file);
   if (text === undefined) {

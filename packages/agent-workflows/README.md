@@ -322,7 +322,8 @@ Review the change in this workspace as a second engineer would, and look at it a
   Its properties are merged into the closeout schema the step is filed with. The merged schema stays
   strict: every property required and no others allowed, because Codex enforces strict output
   schemas. At load, the run refuses a schema whose objects are not strict or that uses `$ref`, a schema that names
-  `outcome`, `summary`, `artifacts` or `needs`, and a file that is not there. Each refusal names the fix.
+  `outcome`, `summary`, `artifacts` or `needs`, a file that is not there, and a file outside the folder — absolute, or up
+  and out with `..` — before it is read. Each refusal names the fix.
 - **`input: <step>`** hands this step the producer's declared fields, under `## From <step>` in its
   brief, as JSON labelled as data. It gets those fields only, never the producer's summary, needs or
   artifacts. The producer must be a step this one waits on, directly or through `resume`, and must

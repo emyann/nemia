@@ -612,6 +612,24 @@ test('an `output:` file that is not there is refused at load, with the fix', () 
   assert.throws(() => parseWorkflow('review', '---\noutput: review.schema.json\n---\nreview it\n'), /review: `output: review\.schema\.json` names a file beside the step, and this step was read without its folder/);
 });
 
+test('REFUSED at load: an `output:` naming a file outside the workflow folder — up and out, or absolute — though the file is there and strict', () => {
+  const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wf-outside-')), 'review.schema.json');
+  fs.writeFileSync(outside, JSON.stringify(FINDINGS));
+  const naming = (file: string) => ({ 'review.md': `---\nafter: implement\noutput: ${file}\n---\nreview it\n` });
+  const fix = 'names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside review.md and name it from there — `output: review.schema.json` — or delete the line, and the step declares no output.';
+
+  const up = path.relative(outputFolder(), outside);
+  assert.match(up, /^\.\.\//, 'a path that climbs out of the folder');
+  assert.equal(refusal(naming(up)), `review: \`output: ${up}\` ${fix}`);
+  assert.equal(refusal(naming(outside)), `review: \`output: ${outside}\` ${fix}`);
+  assert.equal(refusal(naming('schemas/../../review.schema.json')), `review: \`output: schemas/../../review.schema.json\` ${fix}`, 'out, however it is spelled');
+  // Read without its folder, it is refused all the same: where the file is, not whether it can be read.
+  assert.throws(() => parseWorkflow('review', naming(outside)['review.md']), (e: Error) => e.message === `review: \`output: ${outside}\` ${fix}`);
+
+  // The same file, and a path that only passes through a folder, inside, loads.
+  assert.deepEqual(loadWorkflows(outputFolder({ ...naming('schemas/../review.schema.json') })).find((s) => s.name === 'review')!.output?.schema, FINDINGS);
+});
+
 test('an output schema that is not strict is refused, and says where', () => {
   const items = FINDINGS.properties.findings.items;
   const withItems = (changed: object) => ({ ...FINDINGS, properties: { findings: { type: 'array', items: { ...items, ...changed } } } });

@@ -1037,6 +1037,15 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   supervisor's folder and a step that never ends; the operator starts its first run); after W12 and B16 — B17
   `a-finished-run-is-a-decision-vjcj` (§8's board half); after W13 — W14 `four-leftovers-in-agent-work-3uyy` (the queue's and
   the builder's package leftovers). Each finish is a merge question to the operator.
+  The first three are merged (2026-09-17 evening): E11, two rounds, $30.48, **merged, `7e9c7dc`** — issues 24 and 25 closed in code,
+  no live session yet read quiet that way; W12, three rounds, $84.14, **merged, `a3e3315`** — runs filed on the `dev*` folders from
+  here end at `ship`'s gate, and `wf start --no-worktree` on them is refused; B16, two rounds, $58.13, **merged, `96c719b`**. Each
+  run's line for `CLAUDE.md` went in with its merge. W12's last review left seven findings with its rounds spent; the six in the
+  package are filed as W15 `six-findings-the-last-review-6no7` (`dev`, so the first run to end at `ship`'s gate) — the two that
+  matter: nothing keeps two runs' ending steps out of one checkout at once, and the ending's brief still carries the artifacts
+  contract's "leave it in this workspace". **Until W15 lands, approve one `ship` at a time.** The seventh is the board's:
+  `commandsOf` (`apps/api/src/app.ts`) offers `git merge` for a run whose ending merges — for the board run after B17. Seen on
+  B16's pictures and not from it: at 1280px the Factory's hint text runs under *Reset layout*.
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
 `each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
 the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,

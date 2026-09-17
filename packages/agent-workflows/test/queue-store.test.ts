@@ -633,6 +633,41 @@ test("a queued card whose `repo:` is no git repository leaves the daemon's own s
   assert.match(queueLine(pass.queue), /^no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ fatal: not a git repository/);
 });
 
+test("a `wf up` at a cap of 1 names the card its queue is stuck on once a slot frees, though its first pass read no queue at all: a daemon says what it has not said, not what the store has not written", async (t) => {
+  emptyStore('1');
+  const b = board();
+  // A card whose start fails without a refusal, tried and written down by a pass of its own — the daemon that is gone.
+  const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
+  fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
+  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
+  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
+  const before = await tick(b.e);
+  assert.ok(before.queue && 'failed' in before.queue && !before.queue.again, JSON.stringify(before.queue));
+
+  // A run to hold the one slot, so the daemon's first pass files it and reads no queue at all — and finishes before the second pass,
+  // which tries the card and fails as the pass above did: `again`, and never said by this daemon.
+  const busy = started('holds the slot', at(1));
+  let passes = 0;
+  const stop = new Error('the test stops the daemon');
+  const inner = b.e.tick.bind(b.e);
+  (b.e as { tick: () => Promise<void> }).tick = async () => {
+    if (++passes > 2) throw stop;
+    if (passes === 2) b.settle(`${busy.id}-implement`, 'succeeded', SIGNED);
+    await inner();
+  };
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  try {
+    await assert.rejects(main(['up', '1'], b.e), (err) => err === stop);
+  } finally { log.mock.restore(); }
+
+  const named = printed.filter((l) => l.includes('no-git-a1b2'));
+  assert.equal(named.length, 1, printed.join('\n'));
+  assert.match(named[0]!, /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository/);
+  const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
+  assert.ok(filed >= 0 && filed < printed.indexOf(named[0]!), `the pass that held the slot came first: ${printed.join('\n')}`);
+});
+
 test("REFUSED at shipped defaults, on the repository it was tried on: a queued card that names no repository, refused on the daemon's — no such workflow there — is passed over by every pass there, and started by a pass in a repository that has its workflow", async (t) => {
   emptyStore(undefined);
   const b = board();

@@ -259,8 +259,9 @@ export type QueueStarted =
   | { card: string; failed: string; again: boolean; on?: string };
 
 /**
- * A pass's start of a queued card, as `wf up` and `wf tick` log it: `started <card> as <runId>`, or why it was not started, and what then. `wf up`
- * says a failure `again` no more.
+ * A pass's start of a queued card, as `wf up` and `wf tick` log it: `started <card> as <runId>`, or why it was not started, and what then. A
+ * failure is said once by the daemon that says it — `wf up` keeps the last one it printed, rather than reading `again`, which is a fact about
+ * the store and not about this terminal.
  */
 export function queueLine(q: QueueStarted): string {
   if ('refused' in q) {

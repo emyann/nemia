@@ -4,7 +4,7 @@
  */
 import type { RunSummary } from './api';
 import type { EdgeState } from './canvas.ts';
-import { COLUMN_WIDTH, layers, NODE_WIDTH, type Point } from './layout.ts';
+import { COLUMN_WIDTH, layers, NODE_WIDTH, ROW_HEIGHT, type Point, type StepEdges } from './layout.ts';
 
 /**
  * Whether a run is in flight, and so on the Factory by default: `assess` has it `running`, or it still moves
@@ -114,17 +114,21 @@ export type Span = { columns: number; rows: number };
 export const ONE_CELL: Span = { columns: 1, rows: 1 };
 
 /**
- * The cells an open run takes: its card's, as many more to the right as its graph is wide, and as many
- * rows as its graph is tall. From the layout's extent (`extentOf`), which reads names and `after` only,
- * so a refetch that moves a status moves no card.
+ * The cells an open run takes: its card's, as many more to the right as its steps reach, and as many rows down. From
+ * where each step is beside the card (`arranged`: the layering's places, moved where a person dragged them), which reads
+ * names, `after` and the person's moves only, so a refetch that moves a status moves no card.
  *
- * The graph starts a column's arrow right of the card (`graphAt`), so it ends the card's width plus the
- * layout's width from the card's corner; with a cell's gap after it, that is one cell plus the layout.
+ * Across, to a gap's width past the rightmost step's right edge — the layering puts a step a column's arrow right of the
+ * card, so a graph a column wide takes the card's cell and one more; down, to a row's height under the lowest step's top.
+ * Never less than the card's own cell. A step dragged left of the card, or above it, is outside these cells: what the run
+ * claims lies right of its card and below its top, and a card a person left under such a step is theirs to move.
  */
-export function spanOf({ width, height }: { width: number; height: number }): Span {
+export function spanOf(at: ReadonlyMap<string, Point>): Span {
+  const xs = [...at.values()].map((p) => p.x);
+  const ys = [...at.values()].map((p) => p.y);
   return {
-    columns: 1 + Math.ceil(width / CELL_WIDTH),
-    rows: Math.max(1, Math.ceil((GRAPH_TOP + height) / CELL_HEIGHT)),
+    columns: Math.max(1, Math.ceil((Math.max(...xs) + NODE_WIDTH + (CELL_WIDTH - CARD_WIDTH)) / CELL_WIDTH)),
+    rows: Math.max(1, Math.ceil((Math.max(...ys) + ROW_HEIGHT) / CELL_HEIGHT)),
   };
 }
 
@@ -139,6 +143,63 @@ export function graphAt(at: ReadonlyMap<string, Point>): Map<string, Point> {
     [...at].map(([name, p]) => [name, { x: CARD_WIDTH + COLUMN_WIDTH - NODE_WIDTH + p.x - left, y: GRAPH_TOP + p.y - top }]),
   );
 }
+
+/** A step's node on the floor, named by its run too: two runs may each have an `implement`. */
+export const stepId = (runId: string, step: string): string => `${runId}/${step}`;
+
+/** The run a node on the floor is of: a card's own id, or the run a step's node is named by — a run id has no slash (`wf start` refuses one), so the last is the step's. */
+export const runOfNode = (id: string): string => (id.includes('/') ? id.slice(0, id.lastIndexOf('/')) : id);
+
+/**
+ * Where each step of an open run is beside its card: where the layering puts it (`graphAt`), moved by as far as a person
+ * dragged it. `dragged` is how far each step on the floor was moved, by its node's id (`stepId`); a step not in it is where
+ * the layering put it.
+ */
+export function arranged(runId: string, at: ReadonlyMap<string, Point>, dragged: ReadonlyMap<string, Point>): Map<string, Point> {
+  return new Map(
+    [...at].map(([name, p]) => {
+      const by = dragged.get(stepId(runId, name));
+      return [name, by ? { x: p.x + by.x, y: p.y + by.y } : p];
+    }),
+  );
+}
+
+/**
+ * The steps that move with `name` when a person drags it on the Factory: every step that waits on it, directly or through
+ * others — the graph to its right — in the run's order, and not `name` itself. The steps it waits on, to its left, stay where
+ * they are. Ends on any input: a step is taken once, so a cycle, which only a record edited by hand could have, is walked once.
+ */
+export function followersOf(steps: readonly StepEdges[], name: string): string[] {
+  const found = new Set([name]);
+  for (const one of found) for (const step of steps) if (step.after.includes(one)) found.add(step.name);
+  return [...new Set(steps.map((step) => step.name))].filter((step) => step !== name && found.has(step));
+}
+
+/**
+ * The cards that move with `id` when a person drags its card on the Factory, as a step's followers move with it: every card on
+ * the floor that waits on it, directly or through others on the floor — the cards to its right, down the `after` edges the floor
+ * draws (`runEdges`) — oldest first, and not `id` itself. The cards it waits on stay where they are. A run in an `after` that is
+ * off the floor draws no edge, and nothing follows through it. Each card's steps go with it, as its children.
+ */
+export const followingCards = (runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after'>>, id: string): string[] =>
+  followersOf(runs.map((run) => ({ name: run.id, after: run.after })), id);
+
+/**
+ * How far each step was dragged, after `moving` are dragged `by` further: each of them moved by as much from where it was —
+ * from where the layering put it, for one not dragged before — and every other step as it was.
+ */
+export function draggedBy(dragged: ReadonlyMap<string, Point>, moving: readonly string[], by: Point): Map<string, Point> {
+  const next = new Map(dragged);
+  for (const id of moving) {
+    const was = dragged.get(id) ?? { x: 0, y: 0 };
+    next.set(id, { x: was.x + by.x, y: was.y + by.y });
+  }
+  return next;
+}
+
+/** Of the steps a person dragged, those of runs the store still lists — open or not, as `keepLayout` keeps a card off the floor — and nothing for a run it has lost. */
+export const keepDragged = (dragged: ReadonlyMap<string, Point>, known: ReadonlySet<string>): Map<string, Point> =>
+  new Map([...dragged].filter(([id]) => known.has(runOfNode(id))));
 
 /** The Factory's open runs after a click on one: closed if it was open, else open, and opened last. */
 export const toggleOpen = (open: readonly string[], id: string): string[] =>

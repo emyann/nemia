@@ -145,6 +145,23 @@ test('a step left behind when its card moves is refused, naming it — and so is
     (err: Error) => err instanceof Refused && err.message === 'the steps move with the card — run did not move');
 });
 
+test('a step that moves when it should stay put is refused, naming it — and so is nothing to stay put', async () => {
+  const { page } = await pageWith(`<div class="step" data-id="run/implement" style="position:absolute;left:150px;top:0;width:100px;height:50px"></div>
+    <div class="step" data-id="run/review" style="position:absolute;left:300px;top:0;width:100px;height:50px"></div>
+    <div class="lane" data-id="run/tokens" style="position:absolute;left:150px;top:100px;width:100px;height:50px"></div>
+    <div class="lane" data-id="run/theme" style="position:absolute;left:300px;top:100px;width:100px;height:50px"></div>`);
+  const down = (selector: string) => () =>
+    page.evaluate((s) => {
+      document.querySelectorAll<HTMLElement>(s).forEach((el) => (el.style.top = `${parseFloat(el.style.top) + 40}px`));
+    }, selector);
+  const [review, implement] = [page.locator('[data-id="run/review"]'), page.locator('[data-id="run/implement"]')];
+  await expectMovedWith(review, implement, down('.step'), 'review moves with implement, and the other lane stays', page.locator('.lane'));
+  await assert.rejects(expectMovedWith(review, implement, down('.step, [data-id="run/theme"]'), 'review moves with implement, and the other lane stays', page.locator('.lane')),
+    (err: Error) => err instanceof Refused && err.message === 'review moves with implement, and the other lane stays — run/theme moved too');
+  await assert.rejects(expectMovedWith(review, implement, down('.step'), 'review moves with implement, and the other lane stays', page.locator('.gone')),
+    (err: Error) => err instanceof Refused && err.message === 'review moves with implement, and the other lane stays — nothing to stay put: 0 found');
+});
+
 test("an edge back that runs beside its steps, or over them, is refused, naming both — and so is a comparison with nothing on one side", async () => {
   const { page } = await pageWith(`<div style="position:relative">
     <div class="step" data-id="implement" style="position:absolute;left:0;top:100px;width:100px;height:60px"></div>

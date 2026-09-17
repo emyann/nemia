@@ -1149,7 +1149,7 @@ dropped. **Nothing in the packages knows what shipping means.**
   ran. The prose of a `ship.md` is not a constraint, so the machinery holds the second: while a `workspace:
   main` task of any run on the same repository is in flight, **nothing of another is filed** — not a first
   session, and not the try a person asks for after one ended blocked, which works in that same directory. It
-  reads `waiting for the checkout (<run>'s ship has it)` on `wf ls`, on its own line or beside the try it is
+  reads `waiting on the checkout (<run>'s ship has it)` on `wf ls`, on its own line or beside the try it is
   waiting to take, and `wf decide` says which run's step has it. With nothing in the
   checkout, the oldest approval takes it. Level-triggered: the claims are read from the world on the pass that
   asks, including what that pass has already filed, so the order a pass reads the runs in decides nothing, and

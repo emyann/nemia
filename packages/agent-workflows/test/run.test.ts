@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, branchWord, endingSteps, firstLine, merges, resultSteps, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -3407,6 +3407,30 @@ test("an ending step's brief carries one way of handing a file over, not two: th
   assert.ok(work.includes('\n## Files for the steps after you\n'), work);
   assert.ok(work.includes('- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root'), work);
   assert.doesNotMatch(work, /## Files for the person who decides/);
+});
+
+test("the repository's own checkout goes to one run's ending step: a step in it keeps it, the oldest word takes a free one, and the words say which run has it", () => {
+  const claim = (id: string, over: Partial<MainClaim> = {}): MainClaim => ({ id, repo: '/repo', step: 'ship', holds: false, at: '2026-09-17T11:00:00.000Z', ...over });
+
+  // With nothing in it, the oldest word takes it — whatever order the claims come in, and whichever run was made first.
+  const free = heldCheckouts([claim('r-3', { at: '2026-09-17T12:00:00.000Z' }), claim('r-1'), claim('r-2', { at: '2026-09-17T10:00:00.000Z' })]);
+  assert.deepEqual([...free], [['r-1', { run: 'r-2', step: 'ship' }], ['r-3', { run: 'r-2', step: 'ship' }]]);
+  // The same words on two runs: the id breaks the tie, so a pass cannot hand the checkout to a different one each time it asks.
+  assert.deepEqual([...heldCheckouts([claim('r-b'), claim('r-a')])], [['r-b', { run: 'r-a', step: 'ship' }]]);
+  // A step already in it keeps it, whatever was said and whenever: nothing is taken from under a session that is merging.
+  const busy = heldCheckouts([claim('r-1', { at: '2026-09-17T09:00:00.000Z' }), claim('r-9', { holds: true, at: undefined }), claim('r-2')]);
+  assert.deepEqual([...busy], [['r-1', { run: 'r-9', step: 'ship' }], ['r-2', { run: 'r-9', step: 'ship' }]]);
+  // One repository at a time: two runs of two checkouts hold nothing of each other's.
+  assert.deepEqual([...heldCheckouts([claim('r-1'), claim('r-2', { repo: '/other' })])], []);
+  // And a run that has nobody's word waits for nothing: it is not filed for other reasons, and says them.
+  assert.deepEqual([...heldCheckouts([claim('r-1', { at: undefined }), claim('r-2', { at: undefined })])], []);
+
+  assert.equal(checkoutWord({ run: 'r-2', step: 'ship' }), "waiting on the checkout (r-2's ship has it)");
+  // `waiting on …` and not `waiting for …`: the board reads the words, and takes `waiting`, `waiting on …` and `pending` for a step with
+  // nothing filed and anything else for a session at work (`stepState`, apps/web/src/lib/status.ts).
+  assert.match(checkoutWord({ run: 'r-2', step: 'ship' }), /^waiting on /);
+  assert.equal(checkoutLine('ship', { run: 'r-2', step: 'ship' }),
+    "ship: waiting on the checkout (r-2's ship has it) — it works in the repository's own checkout, and two endings never do at once; the next tick files ship once r-2's ship has settled");
 });
 
 test('`branchWord`: where a result branch stands against the base branch, for a person', () => {

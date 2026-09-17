@@ -8,7 +8,7 @@ step of its workflow*), one commit each. Everything is in `packages/agent-workfl
    staged merge. Now, while a `workspace: main` task of any run on the same repository is unsettled, another is
    not filed: `heldCheckouts` (pure) over claims `checkoutHold` reads from the store and the engine on the pass
    that asks — including what that pass has already filed — with the oldest approval taking a free checkout.
-   `assess` drops it from `ready`, `listing` says `waiting for the checkout (<run>'s ship has it)`, `decision`
+   `assess` drops it from `ready`, `listing` says `waiting on the checkout (<run>'s ship has it)`, `decision`
    names it as what the run is still running for, and `wf decide` prints the line. Two store tests in
    `ship.test.ts`, the second run's approval written *older* than the first's so the order is the rule's and
    not the fixture's.

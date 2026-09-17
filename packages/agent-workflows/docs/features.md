@@ -2804,8 +2804,11 @@ What was built, four commits:
   merge, and the loser's `git merge --abort` throws away the winner's staged merge while its check runs; ship.md's prose was the only thing
   in the way. Now, while a `workspace: main` task of any run on the same repository is in flight, nothing of another is filed — not a first
   session, and not a try of one that ended blocked, which works in that same directory: it reads as waiting,
-  `wf ls` says `waiting for the checkout (<run>'s ship has it)` on its line and `wf decide` names the step in it (`checkoutWord`,
-  `checkoutLine`). Oldest approval first, then by id. Level-triggered: the claims are read from the store and the engine on the pass that
+  `wf ls` says `waiting on the checkout (<run>'s ship has it)` on its line and `wf decide` names the step in it (`checkoutWord`,
+  `checkoutLine`). The word is `waiting on the checkout (…)`, not `waiting for …`: the board takes `waiting`, `waiting on …` and `pending`
+  for a step with nothing filed and anything else for a session at work (`stepState`, `apps/web/src/lib/status.ts`), so `waiting for …`
+  would have drawn a step with no session as one that is running. `slotWord` (`waiting for a run slot (…)`) reads as working there for the
+  same reason, and is the board's to fix. Oldest approval first, then by id. Level-triggered: the claims are read from the store and the engine on the pass that
   asks — including what that pass has already filed — so the order a pass takes the runs in decides nothing, and a restart changes nothing.
   `assess`, `listing` and `decision` take the hold as they take a run slot. A step holds the checkout while the engine holds its task in
   flight, as `inFlight` counts one: a task the engine has lost holds nothing, since a run nobody can stop must not hold every other run's
@@ -2865,7 +2868,7 @@ What was measured:
   itself, which used to return before the decision was printed; `run.test.ts` holds `wf rm`'s words at both kinds of gate.
 - From its fourth, six findings, one commit each: `ship.test.ts` holds two runs of one repository, each at its ending's gate and each
   approved — the second's approval written older, since a fixture that already has the order proves nothing — to one ending in the checkout,
-  whatever order the pass takes them in, with the other reading `waiting for the checkout (<run>'s ship has it)` on `wf ls`, named on `wf
+  whatever order the pass takes them in, with the other reading `waiting on the checkout (<run>'s ship has it)` on `wf ls`, named on `wf
   decide`'s screen, and filed on the first pass after that step settles; and refuses, on `err.message`, a send-back with no words, a try of
   the ending itself, and `wf round` at the ending's gate, each naming the gate and the commands that are honoured. `run.test.ts` pins those
   three sentences where it had an alternation that passed whatever they said, holds the brief of both kinds of step to its own artifacts

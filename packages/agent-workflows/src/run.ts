@@ -526,8 +526,16 @@ export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[])
     ? asks.find((a) => a.step === step.name && a.try === tryOf(run, step.name) + 1)?.at
     : approvalOf(run, step.name)?.at);
 
-/** A run whose ending step waits for the repository's own checkout, as `wf ls` says it on that step's line: `waiting for the checkout (r-1's ship has it)`. Pure. */
-export const checkoutWord = (hold: CheckoutHold): string => `waiting for the checkout (${hold.run}'s ${hold.step} has it)`;
+/**
+ * A run whose ending step waits for the repository's own checkout, as `wf ls` says it on that step's line: `waiting on the checkout
+ * (r-1's ship has it)`. Pure.
+ *
+ * `waiting on …`, and not `waiting for …`, because the board reads the words: `stepState` (`apps/web/src/lib/status.ts`) takes `waiting`,
+ * `waiting on …` and `pending` as a step not filed and anything else as one still working, so a step with no session of its own would be
+ * drawn as one whose session is running. The same is true of `slotWord`, which says `waiting for a run slot` and is drawn as working;
+ * that one is the board's to fix, this one was a word away.
+ */
+export const checkoutWord = (hold: CheckoutHold): string => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
 
 /**
  * What `wf decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees this

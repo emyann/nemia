@@ -211,14 +211,14 @@ test("two runs' ending steps never work in one checkout at once: the oldest appr
   assert.deepEqual((await advance(e, readRun(first.id))).filed, []);
   // And both screens say which run's step has it.
   const listed = await list(e, readRun(first.id));
-  assert.equal(listed.steps.find((s) => s.name === 'ship')!.status, `waiting for the checkout (${second.id}'s ship has it)`);
+  assert.equal(listed.steps.find((s) => s.name === 'ship')!.status, `waiting on the checkout (${second.id}'s ship has it)`);
   const { decision, checkout } = await decide(e, first.id);
   assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
   assert.deepEqual(checkout, { run: second.id, step: 'ship' });
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
   try { await main(['decide', first.id], e); } finally { log.mock.restore(); }
-  assert.ok(printed.includes(`  ship: waiting for the checkout (${second.id}'s ship has it) — it works in the repository's own checkout, `
+  assert.ok(printed.includes(`  ship: waiting on the checkout (${second.id}'s ship has it) — it works in the repository's own checkout, `
     + `and two endings never do at once; the next tick files ship once ${second.id}'s ship has settled`), printed.join('\n'));
 });
 
@@ -253,7 +253,7 @@ test("a try of an ending step waits for the checkout as its first filing does: a
   assert.equal(git(repo, 'rev-parse', 'HEAD'), first.base, 'nothing merged while two endings wanted the same directory');
   const listed = await list(e, readRun(second.id));
   assert.deepEqual([listed.steps[1]!.status, listed.steps[1]!.note],
-    ['succeeded · BLOCKED', `try 2 asked (--nudge) — waiting for the checkout (${first.id}'s ship has it)`]);
+    ['succeeded · BLOCKED', `try 2 asked (--nudge) — waiting on the checkout (${first.id}'s ship has it)`]);
 
   // Once the step in the checkout settles, the try is filed there, as any try of it would be.
   settle(`${first.id}-ship`, 'succeeded', SIGNED);
@@ -271,7 +271,7 @@ test("a cancelled run holds the checkout while its ending's session is still in 
   const { plan } = await cancel(e, second.id);
   assert.deepEqual(plan.kind === 'cancel' ? plan.stop.map((x) => x.name) : [], ['ship']);
   assert.deepEqual((await advance(e, readRun(first.id))).filed, [], 'so the other run files nothing into it');
-  assert.equal((await list(e, readRun(first.id))).steps.find((s) => s.name === 'ship')!.status, `waiting for the checkout (${second.id}'s ship has it)`);
+  assert.equal((await list(e, readRun(first.id))).steps.find((s) => s.name === 'ship')!.status, `waiting on the checkout (${second.id}'s ship has it)`);
 
   // Settled `stopped`, a tick or two later: the checkout is free, and the next pass takes it.
   settle(`${second.id}-ship`, 'stopped');

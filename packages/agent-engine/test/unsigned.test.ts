@@ -120,7 +120,8 @@ test('a task that asked for a closeout, whose session goes quiet without one, do
     v = await engine.view(id);
     const second = v.state.attempts[1];
     assert.equal(second?.resumeFrom, row!.sessionId, 'the next attempt continues that session');
-    assert.match(second?.nudge ?? '', /stopped without giving your closing statement/, 'with a nudge, on the record');
+    assert.match(second?.nudge ?? '', /^You ended without calling StructuredOutput, and this task asks for a closing statement\./, 'with a nudge naming the tool, on the record');
+    assert.match(second?.nudge ?? '', /Change nothing: the work you did stands/, 'and saying the work stands');
     const spawn = claude.spawns().at(-1)!;
     assert.equal(spawn[spawn.indexOf('--resume') + 1], row!.sessionId);
     assert.equal(spawn.at(-1), second?.nudge, 'the nudge is what the session is told, not the brief again');

@@ -73,8 +73,17 @@ export type Sighting = {
    */
   closeout?: { payload: unknown; at: number };
   /**
-   * How long the session has been quiet — working, not busy, nothing written — present once that is long enough that
-   * its runner holds it has stopped rather than paused between steps it drives itself (Claude Code: ninety seconds).
+   * How long the session has been quiet — nothing written — present once that is long enough that its runner holds it
+   * has stopped rather than paused between steps it drives itself (Claude Code: ninety seconds).
+   *
+   * **A sighting can be `busy` and quiet at once**, and that combination is the whole of issue 24: a session whose
+   * process is doing something other than the work — a background shell it left running — while the last word in its
+   * conversation is its own closing statement. Whether a runner can tell those apart is its harness's business; this
+   * field is the answer, and `busy` is a separate fact about the process. So a reader of a sighting, and a runner
+   * written against this type, must not take quiet to mean not busy. (`closedOut` in `engine.ts` does refuse to act on
+   * a statement from a busy session — a verdict it may yet revise — which is why quiet, not the statement, is what
+   * ends such an attempt.)
+   *
    * A fact about the session, not a verdict on the work: a quiet session is the end of a task that asked for nothing,
    * and an unsigned attempt of one that asked for a closing statement and was told none. Only the journal knows which,
    * so `decide` reads this, and no runner turns it into `done`.
@@ -129,8 +138,18 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
 /**
  * What a session that stopped without its closing statement is told when it is continued: not the brief, which it has,
  * but why it is back. Shape-free, since what a statement says is the task's vocabulary, not the engine's.
+ *
+ * It NAMES THE TOOL and says the work stands. Measured twice (issue 25): two implement steps finished their work — every
+ * commit in, the check green — and ended their turn with a prose summary instead of calling `StructuredOutput`. The old
+ * nudge, which asked for "your closing statement" and named nothing, got neither to sign off; a person's `wf retry
+ * --message` saying "you ended in prose instead of calling the StructuredOutput tool; change nothing; sign off now" got
+ * each within thirty seconds. So this says that, and the unfinished case keeps its sentence at the end.
+ *
+ * The tool's name is Claude Code's, which is the only harness a nudge can reach: `unsigned` needs quiet, and only the
+ * `claude --bg` runner reports it. A harness with another word for its closing statement would need its own nudge, and
+ * that would be a value on the task rather than a branch in here.
  */
-const NUDGE = 'You stopped without giving your closing statement, and this task asks for one. If the work is done, give it now. If it is not, finish the work, then give it. If you cannot finish, give it anyway, saying what stops you.';
+const NUDGE = 'You ended without calling StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you cannot finish it, call it anyway, saying what stops you.';
 
 /**
  * Why an attempt ended, in the only four categories the engine can tell apart.

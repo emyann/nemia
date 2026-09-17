@@ -101,6 +101,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's
   admission gate, worktree base and lease each were).
+- **A rule about order or names is not proven by a fixture that already has it.** The equal-times admission test read
+  a journal whose `list` sorts, and a sort is stable, so it passed with the id tiebreak deleted; the pool test
+  configured the `claude-bg` runner as `claude`, whose pool is `claude`, so it passed with `poolsOf`'s mapping
+  deleted. Give the fixture the opposite order, or another name, and check the test fails without the rule
+  (learned by the run that closed engine issues 24 and 25).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

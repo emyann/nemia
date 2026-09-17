@@ -101,6 +101,103 @@ test('a cold transcript is NOT silence while the session is busy', async () => {
   } finally { restore(); }
 });
 
+// ─── busy, and held by something that is not the work ───────────────────────
+// A step signed off with StructuredOutput and left a `run_in_background` loop running. Its registration read
+// `status: shell`, the registry listed it busy, and seventy-seven minutes later nothing had read its closeout:
+// `busy` alone kept every other rule from firing (issue 24). Its own closeout as the last word in the
+// conversation, and the floor, are what tell that session from one in a long turn.
+
+const STARTED = 1_789_000_000_000;
+const busyRow = JSON.stringify([{ name: 'ae/t-1/1', sessionId: 's-1', state: 'working', status: 'busy', kind: 'background', startedAt: STARTED }]);
+/** A busy session observed `after` its start, whose transcript was last written `written` and holds `said`. */
+const heldSession = async (after: number, written: number, said: { payload: unknown; at: number; lastWord?: boolean } | undefined) => {
+  const restore = withFakeClaude(busyRow);
+  let asked = 0;
+  try {
+    const ops = claudeOps({
+      now: () => STARTED + after, transcriptTime: async () => written,
+      closeoutFrom: async () => { asked++; return said; },
+      usageFrom: async () => ({ turns: 4 }),
+    });
+    return { seen: (await Effect.runPromise(ops.observe)).get('ae/t-1/1'), asked };
+  } finally { restore(); }
+};
+
+test('a busy session whose own closeout is the last word, and whose transcript has been cold for the window, is QUIET: the work is over, whatever its process is still doing', async () => {
+  const said = { payload: { outcome: 'done' }, at: STARTED + 10, lastWord: true };
+  const { seen } = await heldSession(10 + QUIESCENT_AFTER_MS, STARTED + 10, said);
+  assert.equal(seen?.quietMs, QUIESCENT_AFTER_MS, 'quiet since its closeout');
+  assert.deepEqual(seen?.closeout, { payload: { outcome: 'done' }, at: STARTED + 10 }, 'with the statement, for the engine to judge');
+  assert.equal(seen?.state, 'working', 'reported, not concluded');
+  assert.equal(seen?.busy, true, 'and still busy: that is a fact about its process, not about the work');
+  assert.deepEqual(seen?.usage, { turns: 4 }, 'over, so what it consumed is final too');
+});
+
+test('a busy session whose transcript is still advancing is left alone, and is not even read for a statement', async () => {
+  const said = { payload: { outcome: 'done' }, at: STARTED + 10, lastWord: true };
+  const { seen, asked } = await heldSession(QUIESCENT_AFTER_MS, STARTED + 1, said);
+  assert.equal(seen?.quietMs, undefined, 'one millisecond short of the floor: it is working');
+  assert.equal(seen?.closeout, undefined);
+  assert.equal(asked, 0, 'a busy session that just wrote costs its mtime and nothing more');
+});
+
+test('a busy session that has spoken since its closeout is still working — the statement is not its last word', async () => {
+  const { seen, asked } = await heldSession(10 * QUIESCENT_AFTER_MS, STARTED + 10, { payload: { outcome: 'done' }, at: STARTED + 10, lastWord: false });
+  assert.equal(seen?.quietMs, undefined);
+  assert.equal(seen?.closeout, undefined, 'nothing it has said is final while its process works');
+  assert.equal(asked, 1, 'read once the floor was reached, and read for nothing else');
+});
+
+test('a busy session with no statement at all is left to the deadline, as it always was', async () => {
+  const { seen } = await heldSession(10 * QUIESCENT_AFTER_MS, STARTED + 10, undefined);
+  assert.equal(seen?.quietMs, undefined);
+});
+
+test("a busy session carrying only the closeout of the session it continues is not quiet: it has said nothing of its own", async () => {
+  // `--resume` keeps the parent's whole conversation, its closing turn last, and a continuation's first turn
+  // can run past the floor without writing. Reading that as quiet would end an attempt that has just begun.
+  const { seen } = await heldSession(10 * QUIESCENT_AFTER_MS, STARTED - 3_600_000, { payload: { outcome: 'done' }, at: STARTED - 3_600_000, lastWord: true });
+  assert.equal(seen?.quietMs, undefined);
+  assert.equal(seen?.closeout, undefined);
+});
+
+test('a busy session over a cold transcript is read ONCE, and again only once the transcript grows — not on every pass of a long tool call', async () => {
+  // The read this branch makes is a full read of a transcript that runs to tens of megabytes (measured: 174–282 ms
+  // on a 39.5 MB one, against 17–60 ms for the mtime that gates it), and a tool call that runs for minutes reaches
+  // it on every pass. It is safe to keep precisely because the branch is reached only while nothing has written.
+  const restore = withFakeClaude(busyRow);
+  try {
+    let asked = 0;
+    let written = STARTED;
+    let t = STARTED + QUIESCENT_AFTER_MS;
+    const ops = claudeOps({
+      now: () => t, transcriptTime: async () => written,
+      closeoutFrom: async () => { asked++; return undefined; },
+    });
+    await Effect.runPromise(ops.observe);
+    await Effect.runPromise(ops.observe);
+    await Effect.runPromise(ops.observe);
+    assert.equal(asked, 1, 'three passes over a transcript nothing has written: one read');
+
+    // It wrote again — a tool result — and went quiet for another window. What it says now may differ.
+    written = t;
+    t += QUIESCENT_AFTER_MS;
+    await Effect.runPromise(ops.observe);
+    assert.equal(asked, 2, 'written since the read: read again');
+  } finally { restore(); }
+});
+
+test('a busy session the registry gives no start is left alone: its conversation could not be told from the one it continues', async () => {
+  const restore = withFakeClaude(row('working', 'busy'));
+  try {
+    const ops = claudeOps({
+      now: () => 10 * QUIESCENT_AFTER_MS, transcriptTime: async () => 0,
+      closeoutFrom: async () => ({ payload: { outcome: 'done' }, at: 1, lastWord: true }),
+    });
+    assert.equal((await Effect.runPromise(ops.observe)).get('ae/t-1/1')?.quietMs, undefined);
+  } finally { restore(); }
+});
+
 test('the verdict does not depend on WHO is asking, or for how long', async () => {
   // Two independent runners are what two `wf tick` processes are. An earlier version kept the
   // clock in a closure, so a driver that ticked once per process could never reach a verdict:
@@ -167,8 +264,36 @@ test('the LAST StructuredOutput call is the statement, stamped with when it was 
     structured('2026-09-12T09:30:00.000Z', { outcome: 'blocked' }),
     '{half a line mentioning StructuredOutput',
   ].join('\n');
-  assert.deepEqual(lastStructuredOutput(jsonl), { payload: { outcome: 'blocked' }, at: Date.parse('2026-09-12T09:30:00.000Z') });
+  assert.deepEqual(lastStructuredOutput(jsonl), { payload: { outcome: 'blocked' }, at: Date.parse('2026-09-12T09:30:00.000Z'), lastWord: false });
   assert.equal(lastStructuredOutput(entry({ type: 'user', message: { content: 'say StructuredOutput' } })), undefined);
+});
+
+// A closing turn as Claude Code writes it, measured on the transcript issue 24 was written from: the call, an
+// `attachment` line carrying the same payload, the call's result, and a `system` line with the turn's duration.
+const closingTurn = (timestamp: string, id: string, input: object) => [
+  entry({ type: 'assistant', timestamp, message: { content: [{ type: 'tool_use', id, name: 'StructuredOutput', input }] } }),
+  entry({ parentUuid: 'u1', attachment: { type: 'structured_output', data: input } }),
+  entry({ type: 'user', timestamp, message: { content: [{ tool_use_id: id, type: 'tool_result', content: 'Structured output provided successfully' }] } }),
+  entry({ type: 'system', subtype: 'turn_duration', timestamp, durationMs: 11_545 }),
+];
+
+test('a statement is the LAST WORD when the conversation ends with its result — bookkeeping after it does not count, and anything said after it does', () => {
+  const at = '2026-09-17T02:53:00.160Z';
+  const closed = closingTurn(at, 'toolu_1', { outcome: 'done' }).join('\n');
+  assert.deepEqual(lastStructuredOutput(closed), { payload: { outcome: 'done' }, at: Date.parse(at), lastWord: true });
+  assert.equal(lastStructuredOutput(`${closed}\n`)?.lastWord, true, 'a trailing newline is not a line');
+
+  const woken = [closed, entry({ type: 'user', timestamp: '2026-09-17T04:03:15.727Z', message: { content: 'carry on' } })].join('\n');
+  assert.equal(lastStructuredOutput(woken)?.lastWord, false, 'it was woken and spoken to: not the last word any more');
+
+  const other = [closed, entry({ type: 'user', timestamp: at, message: { content: [{ tool_use_id: 'toolu_other', type: 'tool_result', content: 'ok' }] } })].join('\n');
+  assert.equal(lastStructuredOutput(other)?.lastWord, false, "another call's result is not this statement's");
+
+  const unfinished = [closed, '{half a line still being writ'].join('\n');
+  assert.equal(lastStructuredOutput(unfinished)?.lastWord, true, 'a line still being written is passed over, as the reader passes over any');
+
+  const noResult = closingTurn(at, 'toolu_1', { outcome: 'done' }).slice(0, 2).join('\n');
+  assert.equal(lastStructuredOutput(noResult)?.lastWord, false, 'the call alone is not the result: the turn has not closed');
 });
 
 test('an idle session reports what it said; a busy one is not even asked', async () => {

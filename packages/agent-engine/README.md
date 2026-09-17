@@ -540,9 +540,38 @@ So `claudeOps` answers the half of the question that is its harness's vocabulary
 done   ⟸  state = done
 quiet  ⟸  state = working AND not busy AND nothing written for 90 seconds,
           counted from its last write or its own start, whichever is later
+quiet  ⟸  state = working AND busy AND the last word in its conversation is its OWN
+          closeout's tool result, with nothing written since for those 90 seconds
 ```
 
 and reports quiet as a fact, `quietMs`, with the state left `working`. What quiet means is `decide`'s (below).
+
+**The second quiet rule is for a session held by something that is not the work.** A step signed off with
+`StructuredOutput`, every commit in, and left a `run_in_background` loop running; its registration read `status: shell`,
+the registry listed it busy, and seventy-seven minutes later nothing had read its closeout — no end, no check, no
+review — until a person killed the shell by hand (issue 24, measured 2026-09-17; its journal shows the gap, and its
+transcript not one line in it). `busy` is what held it: it stops the runner reading a statement at all, and stops the
+engine acting on one. So `busy` no longer answers the question by itself. When a busy session's transcript has been
+cold for the floor, the runner reads it: if the conversation ends with the result of that session's own
+`StructuredOutput` call, the work is over, whatever its process is still doing, and the attempt ends on the statement.
+Three things have to hold, and each has a test that makes it refuse — the floor (a session mid-turn writes something),
+the last word (a session that spoke after its closeout is still going), and *its own* (a resumed session inherits its
+parent's closing turn, and has said nothing of its own until it writes). Everything else about a busy session is
+unchanged: with no statement it is left to the deadline exactly as before.
+
+**What that read costs, and why it is kept.** A busy session costs its transcript's mtime and nothing else until that
+has been cold for ninety seconds — which every tool call longer than ninety seconds is, `npm ci` and this repository's
+own suite included. The read that follows is then kept for as long as the transcript stays as it found it, by the same
+mtime machinery a finished session's read uses, so a long call costs one read rather than one per pass: measured on a
+39.5 MB transcript, a read is 174–282 ms against 17–60 ms for the mtime. Keeping it changes no answer, because the
+branch is only reached while nothing has been written — which is exactly the condition under which reading again would
+say the same thing.
+
+**What the registry's words are.** `status` is one of `busy`, `shell`, `idle` and `waiting` (2.1.274's own list), and
+Claude Code's view renders `busy` and `shell` alike as working. The engine reads only `busy` as busy: `shell` is not a
+turn, so the first quiet rule already ends such a session. The reading rests on a registry field and a transcript's
+shape, which is [issue 13's caveat](docs/open-issues.md) — a release that renames either makes the rule silent, and
+`AE_LIVE=1` is what would notice. A background loop with a bound is the courtesy that keeps it from mattering.
 
 **The clock is the transcript's, not the observer's.** A session that speaks pushes its own
 deadline out, which is what keeps a pause between self-driven steps from being mistaken for an
@@ -583,11 +612,19 @@ reports how long a session has been quiet, and `decide` says what that means:
 
 `unsigned` is continued under `interrupted` and `always`, as `lost` is: the work in the transcript is real, and nobody
 has judged it, the session included. Its session is stopped first if it still runs — quiet is not gone — and the next
-attempt `--resume`s it, told why it is back instead of the brief it already has: *"You stopped without giving your
-closing statement, and this task asks for one. If the work is done, give it now. If it is not, finish the work, then
-give it. If you cannot finish, give it anyway, saying what stops you."* The nudge is journalled on the attempt's
+attempt `--resume`s it, told why it is back instead of the brief it already has: *"You ended without calling
+StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is
+being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then
+call it; if you cannot finish it, call it anyway, saying what stops you."* The nudge is journalled on the attempt's
 `starting` entry, and read as `state.attempts[n].nudge`. Out of attempts, the task settles `failed` with the note
 `N attempt(s), none succeeded: the last went quiet without the closing statement it was asked for`.
+
+**The nudge names the tool, and its words are pinned by a test.** It asked for "your closing statement" and named
+nothing until 2026-09-17, and twice that did not get a finished step to sign off: each had done all its work and ended
+its turn with a prose summary, and each signed off within thirty seconds of a person's `wf retry --message` naming
+`StructuredOutput` and saying to change nothing (issue 25). The tool's name is Claude Code's, and that is the only
+harness a nudge reaches — `unsigned` needs quiet, which only the `claude --bg` runner reports. Whether the wording
+alone closes the next such session is not measured.
 
 Quiet is counted from the later of the transcript's last write and the session's own start in `claude agents`: a
 continuation `--resume`s a transcript that may have been cold for an hour, and measured by the transcript alone it
@@ -1042,6 +1079,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/engine.test.ts` | the crash cases, the ceiling, what it counts and which waiting task a free slot goes to, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
 | `test/unsigned.test.ts` | a session gone quiet without the closing statement its task asked for: unsigned, continued with a nudge, then failed saying why; quiet with none asked for still succeeds — a fake `claude` that keeps a registry, at shipped defaults |
+| `test/shell.test.ts` | a session held busy by a background shell it left running: its own closeout as the last word in a cold transcript ends the attempt, an advancing one or no statement does not — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |

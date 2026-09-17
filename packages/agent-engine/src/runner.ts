@@ -169,8 +169,10 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
 }
 
 /**
- * How long `working` + not busy + nothing written must hold before this harness reports a session quiet —
- * stopped, rather than paused (`Sighting.quietMs`). What quiet means for the attempt is `decide`'s.
+ * How long a `working` session must write nothing before this harness reports it quiet — stopped, rather than
+ * paused (`Sighting.quietMs`). The floor under both quiet rules: on its own for a session the registry lists
+ * idle, and beside its own closeout being the last word in the conversation for one the registry lists busy
+ * (issue 24). What quiet means for the attempt is `decide`'s.
  *
  * 90 seconds. Long enough that a pause between self-driven steps resumes first — the docs are
  * explicit that `working` also covers "between steps of work it drives on its own" — and short
@@ -204,29 +206,63 @@ const transcriptFile = (sessionId: string): string | undefined => {
 };
 
 /**
- * The LAST StructuredOutput call in a transcript, and when it was made.
+ * The LAST StructuredOutput call in a transcript, when it was made, and whether the conversation ends
+ * with its result — `lastWord`: the session gave its closeout and has said nothing since.
  *
  * Read from the raw JSONL rather than through `getSessionMessages`, because the SDK's messages
  * carry no timestamp, and the timestamp is the only thing that tells this session's statement from
  * one it inherited: a resumed transcript holds its parent's whole conversation, parent's calls
  * included, under the child's own session id.
+ *
+ * `lastWord` is what tells a session held by something other than the work from one still doing it
+ * (issue 24), so it is read here, off the same file, rather than by a second pass over it.
  */
-export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: number } | undefined => {
-  let found: { payload: unknown; at: number } | undefined;
-  for (const line of jsonl.split('\n')) {
+export const lastStructuredOutput = (jsonl: string): { payload: unknown; at: number; lastWord: boolean } | undefined => {
+  const lines = jsonl.split('\n');
+  let found: { payload: unknown; at: number; id?: string } | undefined;
+  for (const line of lines) {
     // Most lines are not it, and the tool's own definition mentions the name too.
     if (!line.includes('StructuredOutput')) continue;
     let entry: { type?: string; timestamp?: string; message?: { content?: unknown } };
     try { entry = JSON.parse(line); } catch { continue; }
     const content = entry.message?.content;
     if (entry.type !== 'assistant' || !Array.isArray(content)) continue;
-    for (const block of content as Array<{ type?: string; name?: string; input?: unknown }>) {
+    for (const block of content as Array<{ type?: string; id?: unknown; name?: string; input?: unknown }>) {
       if (block?.type !== 'tool_use' || block.name !== 'StructuredOutput') continue;
       const at = Date.parse(entry.timestamp ?? '');
-      if (Number.isFinite(at)) found = { payload: block.input, at };
+      if (Number.isFinite(at)) found = { payload: block.input, at, ...(typeof block.id === 'string' ? { id: block.id } : {}) };
     }
   }
-  return found;
+  if (!found) return undefined;
+  return { payload: found.payload, at: found.at, lastWord: found.id !== undefined && endsWithResultOf(lines, found.id) };
+};
+
+/**
+ * Whether a conversation ends with the result of the call `id`: the last `user` or `assistant` line is a
+ * `tool_result` naming it.
+ *
+ * Only those two line types are the conversation. Claude Code writes bookkeeping around the closing turn —
+ * the structured output's own `attachment` line, then a `system` line carrying the turn's duration — and a
+ * check that took the very last line would therefore never fire on a real session. Measured on the
+ * transcript issue 24 was written from: `assistant`(tool_use) · `attachment` · `user`(tool_result) ·
+ * `system`, and nothing else for seventy minutes.
+ *
+ * Backwards, because only the end matters and a transcript runs to tens of megabytes.
+ */
+const endsWithResultOf = (lines: readonly string[], id: string): boolean => {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    const line = lines[i]!;
+    if (!line.trim() || !line.includes('"type"')) continue;
+    let entry: { type?: string; message?: { content?: unknown } };
+    try { entry = JSON.parse(line); } catch { continue; } // a line still being written, or one that is not JSON
+    if (entry?.type !== 'user' && entry?.type !== 'assistant') continue;
+    const content = entry.message?.content;
+    return Array.isArray(content) && content.some((b) => {
+      const block = b as { type?: unknown; tool_use_id?: unknown } | null;
+      return block?.type === 'tool_result' && block.tool_use_id === id;
+    });
+  }
+  return false;
 };
 
 /** A Claude Code session's transcript file, for the other runner that reads one: `claude -p`'s. */
@@ -816,13 +852,21 @@ export const claudeMcpArgs = (configs: ReadonlyArray<string | undefined>): strin
   return [...(named.length ? ['--mcp-config', ...named] : []), '--strict-mcp-config', '--no-chrome'];
 };
 
+/**
+ * A session's closing statement as this runner reads it: what it said, when it said it, and whether its conversation
+ * ends with the statement's own result (`lastWord`). The first two go to the engine, which decides whose statement it
+ * is; the third never leaves the runner — it is how a session held by something that is not the work is told from one
+ * still doing it (issue 24).
+ */
+type Statement = { payload: unknown; at: number; lastWord?: boolean };
+
 export type ClaudeOptions = {
   quiescentAfterMs?: number;
   now?: () => number;
   /** When the session's transcript was last written. Injectable so tests need no harness. */
   transcriptTime?: (sessionId: string) => Promise<number | undefined>;
-  /** The session's closing statement and when it was made. Injectable for the same reason. */
-  closeoutFrom?: (sessionId: string) => Promise<{ payload: unknown; at: number } | undefined>;
+  /** The session's closing statement, as above. Injectable for the same reason. */
+  closeoutFrom?: (sessionId: string) => Promise<Statement | undefined>;
   /** What the session consumed since `since`, its own start. Injectable for the same reason. */
   usageFrom?: (sessionId: string, since: number) => Promise<Usage | undefined>;
   /** Where the runner writes what it hands the CLI by path — a task's MCP config. Default `~/.agent-engine`. */
@@ -853,6 +897,9 @@ export type ClaudeOptions = {
  *     done   ⟸  state = done
  *     quiet  ⟸  state = working AND not busy AND nothing written for QUIESCENT_AFTER_MS, counted from its
  *               last write or its own start, whichever is later: `quietMs`, with `working` left as it is
+ *     quiet  ⟸  state = working AND busy AND the last word in its conversation is its OWN closeout's tool
+ *               result, nothing written since for QUIESCENT_AFTER_MS — its process is held by something that
+ *               is not the work: a background shell the session left running (issue 24)
  *
  * Telling a quiet session from one between steps lives HERE, in the runner, and not in `decide`: `working`
  * and `idle` are this harness's vocabulary; the engine's is `working | blocked | done | failed | stopped`,
@@ -887,6 +934,13 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * and only while the transcript has not been written since. A working session is read on every
    * idle pass instead, because that is when it may just have spoken. Losing this only re-reads.
    *
+   * `keep` says which reads are worth keeping, and the caller decides: an attempt whose session the registry
+   * lists FINAL, and a busy session read over a transcript cold for the quiescence floor (issue 24), which is
+   * reached only while nothing has been written and so answers the same until something is. Without that
+   * second one, a session in any tool call longer than ninety seconds — `npm ci`, a build, this repository's
+   * own suite — was read in full on every pass of `wf up`, for the length of the call: measured on a 39.5 MB
+   * transcript, 174–282 ms a read against 17–60 ms for the mtime that gates it (found in review).
+   *
    * Both conditions are what reading again would find, so no driver answers differently for having
    * seen the session before. Kept by session id, for good, it failed twice on one step
    * (`let-a-step-say-which-tools-i-v27t-implement`, 2026-09-13). The registry listed the session
@@ -896,14 +950,14 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
    * the byte. An attempt is the row's name, its session, and the start `claude agents` gave it.
    */
   type Kept<T> = { value: T; readAt: number };
-  const keptStatements = new Map<string, Kept<{ payload: unknown; at: number } | undefined>>();
+  const keptStatements = new Map<string, Kept<Statement | undefined>>();
   const keptUsage = new Map<string, Kept<Usage | undefined>>();
   const attemptOf = (name: string, s: Sighting, startedAt: number | undefined) => JSON.stringify([name, s.sessionId, startedAt ?? null]);
   const keptRead = async <T>(
-    kept: Map<string, Kept<T>>, attempt: string, s: Sighting,
+    kept: Map<string, Kept<T>>, attempt: string, keep: boolean,
     writtenAt: () => Promise<number | undefined>, read: () => Promise<T>,
   ): Promise<T> => {
-    if (!FINAL.has(s.state)) return read();
+    if (!keep) return read();
     const pin = kept.get(attempt);
     if (pin) {
       const written = await writtenAt();
@@ -914,14 +968,14 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
     kept.set(attempt, { value, readAt });
     return value;
   };
-  const statementOf = (attempt: string, s: Sighting, writtenAt: () => Promise<number | undefined>) =>
-    keptRead(keptStatements, attempt, s, writtenAt, () => closeoutFrom(s.sessionId));
+  const statementOf = (attempt: string, s: Sighting, writtenAt: () => Promise<number | undefined>, keep = FINAL.has(s.state)) =>
+    keptRead(keptStatements, attempt, keep, writtenAt, () => closeoutFrom(s.sessionId));
   /**
    * No start in the registry, no usage — without one, a resumed session's inherited conversation
    * cannot be told from its own, and a wrong count is worse than none.
    */
-  const usageOf = async (attempt: string, s: Sighting, since: number | undefined, writtenAt: () => Promise<number | undefined>) =>
-    since === undefined ? undefined : keptRead(keptUsage, attempt, s, writtenAt, () => usageFrom(s.sessionId, since));
+  const usageOf = async (attempt: string, s: Sighting, since: number | undefined, writtenAt: () => Promise<number | undefined>, keep = FINAL.has(s.state)) =>
+    since === undefined ? undefined : keptRead(keptUsage, attempt, keep, writtenAt, () => usageFrom(s.sessionId, since));
 
   /**
    * Each of our sessions' state as `claude agents` itself last listed it: what `release` stops on, whatever
@@ -1025,7 +1079,9 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         return m;
       }),
       // Second pass: apply this harness's own definition of finished to whatever is still
-      // `working`. Only quiescent candidates cost a transcript read, so a busy fleet pays nothing.
+      // `working`. Only quiescent candidates cost a transcript READ — a session whose process is busy costs
+      // its transcript's mtime and nothing more until that has been cold for the floor, and one read then,
+      // kept for as long as it stays cold.
       //
       // The clock is the TRANSCRIPT'S, not ours. An earlier version remembered when each session
       // was first seen idle, which made the verdict depend on the observer surviving long enough
@@ -1041,38 +1097,62 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
         return Effect.forEach(
           [...m],
           ([name, { sighting, startedAt }]) =>
-            // Busy right now: nothing it has said is final and nothing about it is quiet. A long tool
-            // call writes nothing for minutes, and `busy` is what keeps that from reading as silence.
-            sighting.busy
-              ? Effect.succeed([name, sighting] as const)
-              : Effect.promise(async () => {
-                  const attempt = attemptOf(name, sighting, startedAt);
-                  // When the transcript was last written: asked once a pass at most, and only if needed.
-                  let written: Promise<number | undefined> | undefined;
-                  const writtenAt = () => (written ??= transcriptTime(sighting.sessionId));
-                  // What the workload SAID, if it said anything — reported with when it was said.
-                  // Whether it belongs to this attempt is the engine's call, not ours: a resumed
-                  // session carries its parent's statements too, and only the journal knows when
-                  // the attempt began.
-                  const said = await statementOf(attempt, sighting, writtenAt);
-                  // And what it has consumed since its own start — reported as measured, or not at all.
-                  const used = await usageOf(attempt, sighting, startedAt, writtenAt);
-                  const reported: Sighting = { ...sighting, ...(said ? { closeout: said } : {}), ...(used ? { usage: used } : {}) };
-                  if (reported.state !== 'working') return [name, reported] as const;
-                  // The floor underneath, statement or not: how long it has been quiet, once that is long
-                  // enough to be stopped rather than paused — reported, not concluded (`decide` says what it
-                  // means). Kept even when there IS a statement, because an inherited one is discarded
-                  // upstream. No transcript, no measure: the deadline is for sessions nobody reads.
-                  //
-                  // From its last write or its own start, whichever is later: a session resumed over a
-                  // transcript cold for an hour has been quiet only since it began, and measured by the
-                  // transcript alone it would end the moment the registry listed it idle.
-                  const lastWrite = await writtenAt();
-                  const quietFor = lastWrite === undefined ? undefined : now() - Math.max(lastWrite, startedAt ?? lastWrite);
-                  return quietFor !== undefined && quietFor >= quiescentAfterMs
-                    ? [name, { ...reported, quietMs: quietFor }] as const
-                    : [name, reported] as const;
-                }),
+            Effect.promise(async () => {
+              const attempt = attemptOf(name, sighting, startedAt);
+              // When the transcript was last written: asked once a pass at most, and only if needed.
+              let written: Promise<number | undefined> | undefined;
+              const writtenAt = () => (written ??= transcriptTime(sighting.sessionId));
+              /**
+               * How long it has been quiet: from its last write or its own start, whichever is later — a
+               * session resumed over a transcript cold for an hour has been quiet only since it began, and
+               * measured by the transcript alone it would end the moment the registry listed it idle. No
+               * transcript, no measure: the deadline is for sessions nobody reads.
+               */
+              const quietFor = async () => {
+                const lastWrite = await writtenAt();
+                return lastWrite === undefined ? undefined : now() - Math.max(lastWrite, startedAt ?? lastWrite);
+              };
+              // Busy right now: nothing it has said is final and nothing about it is quiet. A long tool
+              // call writes nothing for minutes, and `busy` is what keeps that from reading as silence.
+              //
+              // Unless the last word in its conversation is its own closeout and nothing has followed it for
+              // the floor. Then the work is over and something else is holding the process: a background shell
+              // the session left running held one for seventy-seven minutes, its closeout unread, and only a
+              // person ending the shell let it go (issue 24). Both halves are needed — a session in a long turn
+              // has said nothing since its last tool call, and one whose closeout is its parent's has said
+              // nothing of its own at all.
+              //
+              // Both reads here are KEPT while the transcript stays as they found it (`keep`), because this branch
+              // is reached only over a transcript nothing has written for the floor: a tool call that runs for
+              // minutes would otherwise be a full read of a multi-megabyte file on every pass, always answering the
+              // same (found in review).
+              if (sighting.busy) {
+                const quiet = sighting.state === 'working' ? await quietFor() : undefined;
+                if (quiet === undefined || quiet < quiescentAfterMs || startedAt === undefined) return [name, sighting] as const;
+                const said = await statementOf(attempt, sighting, writtenAt, true);
+                if (!said?.lastWord || said.at < startedAt) return [name, sighting] as const;
+                // Over, so what it consumed is final too — read here as it is for any session that has stopped.
+                const used = await usageOf(attempt, sighting, startedAt, writtenAt, true);
+                return [name, { ...sighting, closeout: { payload: said.payload, at: said.at }, ...(used ? { usage: used } : {}), quietMs: quiet }] as const;
+              }
+              // What the workload SAID, if it said anything — reported with when it was said.
+              // Whether it belongs to this attempt is the engine's call, not ours: a resumed
+              // session carries its parent's statements too, and only the journal knows when
+              // the attempt began.
+              const said = await statementOf(attempt, sighting, writtenAt);
+              // And what it has consumed since its own start — reported as measured, or not at all.
+              const used = await usageOf(attempt, sighting, startedAt, writtenAt);
+              const reported: Sighting = { ...sighting, ...(said ? { closeout: { payload: said.payload, at: said.at } } : {}), ...(used ? { usage: used } : {}) };
+              if (reported.state !== 'working') return [name, reported] as const;
+              // The floor underneath, statement or not: how long it has been quiet, once that is long
+              // enough to be stopped rather than paused — reported, not concluded (`decide` says what it
+              // means). Kept even when there IS a statement, because an inherited one is discarded
+              // upstream.
+              const quiet = await quietFor();
+              return quiet !== undefined && quiet >= quiescentAfterMs
+                ? [name, { ...reported, quietMs: quiet }] as const
+                : [name, reported] as const;
+            }),
           { concurrency: 'unbounded' },
         ).pipe(Effect.map((entries) => new Map(entries)));
       }),

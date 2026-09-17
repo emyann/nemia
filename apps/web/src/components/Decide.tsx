@@ -6,6 +6,7 @@ import { answersOf, askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
 import { Facts } from './Facts';
+import { Markdown } from './Markdown';
 
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what `wf decide` shows a
@@ -119,11 +120,24 @@ export function Offers({ runId, offers }: { runId: string; offers: readonly Answ
   );
 }
 
-/** What a step needs, as its row says it after its name. */
+/** A question a step asks, as its agent wrote it, in a box that scrolls once it is long: under `asks:`, which `wf decide` puts before it. */
+function Asks({ step, needs, ...data }: { step?: string; needs: string; 'data-asks'?: boolean; 'data-said'?: boolean }) {
+  return (
+    <div {...data} className="space-y-1">
+      <p>
+        {step && <strong>{step}</strong>}
+        {step && ' '}asks:
+      </p>{' '}
+      <Markdown className="max-h-72 overflow-y-auto pr-1">{needs}</Markdown>
+    </div>
+  );
+}
+
+/** What a step needs, as its row says it after its name, when it is not a question: a question is drawn as the markdown it is (`Asks`). */
 function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string {
   switch (offer.kind) {
     case 'answer':
-      return offer.needs ? `asks: ${offer.needs}` : 'signed off blocked, and said nothing of what it needs';
+      return 'signed off blocked, and said nothing of what it needs';
     case 'try-again':
       return !offer.recheck ? 'ended without the closeout it was asked for' : offer.unfinished ? 'has a check that did not finish: no verdict on the work' : 'was refused by its check';
   }
@@ -162,9 +176,13 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
   const modes: RetryMode[] = offer.kind === 'try-again' && offer.recheck ? ['nudge', 'fresh', 'recheck'] : ['nudge', 'fresh'];
   return (
     <li data-offer={offer.kind} data-step={offer.step} className="space-y-2 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30">
-      <p className="line-clamp-4 whitespace-pre-wrap break-words" title={offerSaid(offer)}>
-        <strong>{offer.step}</strong> {offerSaid(offer)}
-      </p>
+      {offer.kind === 'answer' && offer.needs ? (
+        <Asks data-said step={offer.step} needs={offer.needs} />
+      ) : (
+        <p data-said className="break-words">
+          <strong>{offer.step}</strong> {offerSaid(offer)}
+        </p>
+      )}
       <form
         aria-label={offer.kind === 'answer' ? `Answer ${offer.step}` : `Try ${offer.step} again`}
         className="space-y-2"
@@ -264,11 +282,14 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
       <p className="break-words">
         <strong>{offer.step}</strong> <span className="font-mono text-xs">{offer.status}</span>
       </p>
-      {asks && (
-        <p data-asks className="line-clamp-4 whitespace-pre-wrap break-words" title={offer.needs ?? undefined}>
-          {offer.needs ? `asks: ${offer.needs}` : 'signed off blocked, and said nothing of what it needs'}
-        </p>
-      )}
+      {asks &&
+        (offer.needs ? (
+          <Asks data-asks needs={offer.needs} />
+        ) : (
+          <p data-asks className="break-words">
+            signed off blocked, and said nothing of what it needs
+          </p>
+        ))}
       <p className="text-xs break-words text-neutral-600 dark:text-neutral-400">
         The run spends nothing more on it until its cap is raised above <span className="font-mono">{offer.said}</span>
         {offer.by === 'round' ? ", with its loop's next round" : ''}, as <code>{command}</code> raises it.

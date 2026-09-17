@@ -50,6 +50,13 @@ export const INBOX_KEYS = ['workflow', 'repo', 'queued'] as const;
 /** An ISO time as `new Date().toISOString()` writes it, to the second or the millisecond, in UTC: what `queued:` takes, so the order is stable. */
 const isInstant = (value: string): boolean => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(value) && !Number.isNaN(Date.parse(value));
 
+/** What each of an inbox card's keys means, in one line, in `INBOX_KEYS`' order: what the board shows beside a card's value. */
+export const INBOX_KEY_MEANINGS: Readonly<Record<(typeof INBOX_KEYS)[number], string>> = {
+  workflow: "what runs the card when it is started: a workflow's name under the repository's `workflows/`, or a path to a workflow folder; else the start names one",
+  repo: 'the absolute path of the repository the idea is about: the repository the start is made in when unset',
+  queued: 'the time `wf inbox queue` marked the card to start on its own: the tick starts it when a run slot frees, oldest first; unset, a person starts it',
+};
+
 function refuse(why: string): never {
   throw new WorkflowError(why);
 }

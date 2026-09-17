@@ -1,8 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
-import { Artifacts } from '../components/Closeout';
+import { Artifacts, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
+import { Markdown } from '../components/Markdown';
 import { NeedsBanner } from '../components/Needs';
 import { Check, code, Facts, specRows, spentRows, Told, when } from '../components/Facts';
 import { RunCanvas } from '../components/RunCanvas';
@@ -84,7 +85,7 @@ function Run({ run }: { run: RunDetail }) {
       </section>
 
       <section className="space-y-4">
-        <div className="whitespace-pre-wrap leading-relaxed">{run.brief}</div>
+        <Markdown>{run.brief}</Markdown>
         {/* Under the brief, as `wf decide` puts it under the run's line: the inbox card it was started from. */}
         {run.fromNote && (
           <p data-from={run.from?.inbox} className="text-sm text-neutral-500">
@@ -129,7 +130,7 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
 
       {step.check && <Check check={step.check} />}
 
-      {step.body && <div className="whitespace-pre-wrap text-sm leading-relaxed">{step.body}</div>}
+      {step.body && <Markdown className="text-sm">{step.body}</Markdown>}
 
       {step.told && <Told told={step.told} filed={step.taskId !== null} />}
 
@@ -147,12 +148,8 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
 
       {closeout && (
         <div className="space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
-          <p className="whitespace-pre-wrap">{closeout.summary}</p>
-          {closeout.needs && (
-            <p className="whitespace-pre-wrap text-amber-700 dark:text-amber-400">
-              <span className="font-medium">Needs:</span> {closeout.needs}
-            </p>
-          )}
+          <Markdown>{closeout.summary}</Markdown>
+          {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
           {closeout.artifacts.length > 0 && (
             <div aria-label="Artifacts" className="text-xs text-neutral-500">
               Artifacts:

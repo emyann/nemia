@@ -24,8 +24,9 @@ const { listWorkflows } = await import('../src/workflows.ts');
 const { HOME_REPO } = await import('../src/capabilities.ts');
 const { parentRecord, readRun } = await import('agent-workflows');
 const { afterRefusal } = await import('agent-workflows/run');
-const { isReadme, loadWorkflows } = await import('agent-workflows/workflow');
+const { isReadme, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-workflows/workflow');
 type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
+type WorkflowStepPage = import('../src/workflows.ts').WorkflowStepPage;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -109,6 +110,69 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       error: null,
     },
   ]);
+});
+
+/** A step's page, as the board asks for it. */
+const stepPage = (from: string, name: string, step: string) => app.request(`/api/workflows/${from}/${name}/${step}`);
+
+/** Every key a step may set, in the package's order, with the values `set` gives and the package's line of meaning. */
+const rows = (set: Record<string, string>) => STEP_KEYS.map((key) => ({ key, value: set[key] ?? null, meaning: STEP_KEY_MEANINGS[key] }));
+
+/** A folder as it is: each file's name and text, to show a read wrote nothing. */
+const filesOf = (dir: string): Array<[string, string]> => fs.readdirSync(dir).sort().map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
+
+test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and step, its body, its file as written, and every key a step may set with its value as the loader read it and what it means", async () => {
+  const before = [filesOf(good), filesOf(mine)];
+
+  const res = await stepPage('repo', 'good', 'review');
+  assert.equal(res.status, 200, await res.clone().text());
+  const review: WorkflowStepPage = await res.json();
+  assert.deepEqual({ ...review, keys: undefined }, {
+    workflow: 'good', from: 'repo', dir: good, step: 'review', body: 'Review it.',
+    source: fs.readFileSync(path.join(good, 'review.md'), 'utf8'), keys: undefined,
+  });
+  assert.deepEqual(review.keys, rows({ after: 'implement', harness: 'claude', permissionMode: 'dontAsk', tools: 'Read, Grep', output: 'review.json', loop: 'implement', rounds: '2' }));
+  assert.deepEqual(review.keys.map((k) => k.key), [...STEP_KEYS], "in the package's order, set or not");
+
+  // Yours, and a step that sets counts: each in digits.
+  const plan: WorkflowStepPage = await (await stepPage('yours', 'mine', 'plan')).json();
+  assert.deepEqual([plan.from, plan.dir, plan.body, plan.source], ['yours', mine, 'Write PLAN.md.', '---\nharness: codex\ncheck: test -f PLAN.md\nretries: 1\n---\nWrite PLAN.md.\n']);
+  assert.deepEqual(plan.keys, rows({ harness: 'codex', check: 'test -f PLAN.md', retries: '1' }));
+
+  // A step that sets nothing: every key, none set.
+  write(path.join(mine, 'notes.md'), 'Take notes.\n');
+  const notes: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
+  assert.deepEqual([notes.body, notes.keys], ['Take notes.', rows({})]);
+  fs.rmSync(path.join(mine, 'notes.md'));
+
+  assert.deepEqual([filesOf(good), filesOf(mine)], before, 'read, and nothing written');
+});
+
+test("REFUSED at shipped defaults: a step's page from somewhere that is not repo or yours (400), for a workflow there is not (404, in a start's words), a folder the loader refuses (422, in its words), and a step the folder does not have (404, naming its steps) — nothing read outside the folder", async () => {
+  const from = await stepPage('elsewhere', 'good', 'review');
+  assert.equal(from.status, 400);
+  assert.match((await from.json()).error, /`repo` or `yours`.*This request's was 'elsewhere'\./);
+
+  const unknown = await stepPage('repo', 'nope', 'review');
+  assert.equal(unknown.status, 404);
+  const { error } = await unknown.json();
+  assert.ok(error.startsWith("No workflow 'nope' in "), error);
+  // Found among the folders a source has, never joined onto a path; and yours is not the repository's.
+  for (const [where, name] of [['repo', '..%2Fworkflows%2Fgood'], ['repo', 'mine'], ['yours', 'good'], ['repo', '.draft'], ['yours', '.git']]) {
+    assert.equal((await stepPage(where!, name!, 'implement')).status, 404, `${where} ${name}`);
+  }
+
+  const broken = await stepPage('repo', 'broken', 'implement');
+  assert.equal(broken.status, 422);
+  assert.equal((await broken.json()).error, loaderRefusal(path.join(repo, 'workflows', 'broken')));
+
+  for (const step of ['nope', 'README', 'review.md', '..%2F..%2Fbroken%2Freview', '..%2Freview.json']) {
+    const res = await stepPage('repo', 'good', step);
+    assert.equal(res.status, 404, step);
+    const said = (await res.json()).error as string;
+    assert.ok(said.startsWith(`No step '${decodeURIComponent(step)}' in workflow good (${good}). Its steps are: implement, review.`), said);
+    assert.ok(!said.includes('afer') && !said.includes('"again"'), `${step}: nothing of another file`);
+  }
 });
 
 test('POST /api/runs starts a run of the workflow it names as `wf start` does: the record is written, and nothing is filed', async () => {

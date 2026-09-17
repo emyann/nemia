@@ -7,6 +7,14 @@ import type { InboxEntry, WorkflowListing } from './api';
 export const newestCardsFirst = (entries: readonly InboxEntry[]): InboxEntry[] =>
   [...entries].sort((a, b) => (b.filedAt ?? '').localeCompare(a.filedAt ?? '') || a.name.localeCompare(b.name));
 
+/**
+ * Whether an entry of the inbox has a page, `/inbox/<name>`: whether its name is one the api takes (the package's `inboxNameRefusal`). Every
+ * card's and every stray file's is, but a folder's, which the listing names `sub/`, and a file's with a backslash in it: the api would refuse
+ * the name the page asks for, and a link would open a refusal of what the Inbox page has just listed.
+ */
+export const hasPage = (entry: Pick<InboxEntry, 'name'>): boolean =>
+  entry.name.trim() !== '' && !/[\\/\0]/.test(entry.name) && !entry.name.startsWith('.');
+
 /** A start or a drop of a card the api refused: the card as the page listed it, what was asked, and the api's words. */
 export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove'; message: string };
 

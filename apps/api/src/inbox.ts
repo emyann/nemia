@@ -5,16 +5,18 @@
  * `<name>.md`, read from disk on each request, as the workflows are, so a card a person has just filed or dropped at the command line lists
  * as it is now. Starting a card is a start, so it is `POST /api/runs` with `card` (workflows.ts), through `startFromInbox`.
  *
+ * A card's page reads one card: as the inbox lists it, as its file is written, and its keys (`GET /api/inbox/:name`).
+ *
  * Every refusal is the package's sentence with the api's status, but for the body's shape, which is the api's own (400). Filing and dropping
  * are writes a page on another site must not make, so each passes the guard (guard.ts) before its body is read.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
-import { addToInbox, dropFromInbox, HOME, inboxDir, inboxNameRefusal, noCardLine, parseInboxCard, readInbox, type InboxListing } from 'agent-workflows';
+import { addToInbox, dropFromInbox, HOME, INBOX_KEY_MEANINGS, INBOX_KEYS, inboxDir, inboxNameRefusal, noCardLine, parseInboxCard, readInbox, type InboxListing } from 'agent-workflows';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { folderOf, type WorkflowSource } from './workflows.ts';
+import { folderOf, type KeyRow, type WorkflowSource } from './workflows.ts';
 
 /**
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
@@ -25,6 +27,12 @@ import { folderOf, type WorkflowSource } from './workflows.ts';
  * first: a card carries no time of its own. Null for an entry gone between the listing and the read.
  */
 export type InboxEntry = InboxListing & { body: string | null; filedAt: string | null };
+
+/**
+ * What a card's page shows: the card as the inbox lists it (`InboxEntry`), its file as written — frontmatter and all — and each key an inbox
+ * card may set, a row each, with its value and what it means. No keys for an entry that does not read as a card: its `error` says why.
+ */
+export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
 /** What `POST /api/inbox` answers: the card written, as `wf inbox add` prints it. */
 export type InboxFiled = { name: string; file: string; workflow: string | null; repo: string | null; body: string };
@@ -117,6 +125,12 @@ function filingOf(body: unknown, repo: string, home: string): { text: string; wo
   return { ...filing, workflow: byName ? workflow : folder.dir };
 }
 
+/**
+ * The cards a sentence about a card not there names, as the package's does (`wf inbox rm`, a start): every `.md` file, read as a card or
+ * not — never a stray file or a folder, which no name reaches as a card.
+ */
+const cardsIn = (entries: readonly InboxEntry[]): string[] => entries.filter((e) => e.file.endsWith('.md')).map((e) => e.name);
+
 export const inbox = new Hono()
   // The cards, and every entry of the folder that does not read as one, with why: never hidden, as a workflow that does not load is not.
   .get('/api/inbox', (c) => {
@@ -126,6 +140,34 @@ export const inbox = new Hono()
       // A run's record that does not parse: the listing reads them all, for the runs a card was started as.
       return c.json({ error: messageOf(err) }, 500);
     }
+  })
+  // One card, for its page. A name that would leave the inbox, or a hidden one, is refused in the package's words before anything is read; a
+  // card is found among the entries the inbox lists, never by a path joined from what was sent.
+  .get('/api/inbox/:name', (c) => {
+    const name = c.req.param('name');
+    const wrong = inboxNameRefusal(name);
+    if (wrong) return c.json({ error: wrong }, 400);
+    let entries: InboxEntry[];
+    try {
+      entries = listInbox();
+    } catch (err) {
+      return c.json({ error: messageOf(err) }, 500);
+    }
+    // A card before a stray file of the same name: `notes.md` and `notes` both list as `notes`.
+    const entry = entries.find((e) => e.name === name && e.file.endsWith('.md')) ?? entries.find((e) => e.name === name);
+    if (!entry) return c.json({ error: noCardLine(name, cardsIn(entries)) }, 404);
+    let source: string;
+    try {
+      source = fs.readFileSync(path.join(inboxDir(), entry.file), 'utf8');
+    } catch {
+      // Dropped since the listing read it: not among the cards the sentence names.
+      return c.json({ error: noCardLine(name, cardsIn(entries.filter((e) => e !== entry))) }, 404);
+    }
+    // A card's keys as the listing reads them: `queued` is when it was queued (the listing carries its place too), null when unset.
+    const keys = entry.error === null
+      ? INBOX_KEYS.map((key) => ({ key, value: key === 'queued' ? entry.queued?.at ?? null : entry[key] ?? null, meaning: INBOX_KEY_MEANINGS[key] }))
+      : null;
+    return c.json({ ...entry, source, keys } satisfies InboxCardPage);
   })
   // `wf inbox add "<idea>" --workflow <name> --repo <path>`: a card filed, under the slug of its first line.
   .post('/api/inbox', async (c) => {

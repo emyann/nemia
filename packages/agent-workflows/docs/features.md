@@ -19,8 +19,9 @@ in the order they run, `wf start --input`, artifacts collected from the workspac
 file (§6 items 6–9, 24, 25) — and a step gone quiet without its closeout reading `unsigned` again after the engine began
 settling it `failed` — and a step's `budget:`, with what a step and a run cost on `wf ls` and `wf decide` (plan §6 item 29, its
 workflow half), forgetting a run that is over (`wf rm`) — and an inbox of cards parked before they are started (`wf inbox`,
-and its page on the board) — and two small items from the plan's queue (§6 items 28 and 31), a cap on runs in flight (`WF_MAX_RUNS`) and
-cards that start themselves (`wf inbox queue`) — have shipped.
+and its page on the board) — two small items from the plan's queue (§6 items 28 and 31), a cap on runs in flight (`WF_MAX_RUNS`) and
+cards that start themselves (`wf inbox queue`) — and markdown rendered on the board, with a page for a card and for a step that
+explains their keys — have shipped.
 
 ## Shipped: the check
 
@@ -2022,6 +2023,132 @@ What it leaves:
   `WF_MAX_CONCURRENT`.
 - **The ceiling that matters over a week is still the merge.** A child waits on its parent's merge, and every later run is cut from a main
   missing unmerged results: the operator merges daily, or a workflow's last step merges on a green trial merge. Not decided here.
+## Shipped: markdown on the board, and a card's page with its keys explained
+
+The board showed every piece of prose as preformatted text: a run's brief, a step's body, a closeout's summary and needs, each reply, a
+question on the Decide section. Agents, folders and cards write all of it in markdown. A card was its first line on the Inbox page and a
+step its spec on a node, and nothing on the board said what a key does. Only the conversation rendered markdown, through streamdown 2.6.0,
+which rendered raw HTML through a sanitizer and drew code blocks unhighlighted without `@streamdown/code`. Read first: CLAUDE.md's apps/web
+lines, `components/Markdown.tsx`, and `KeyTable` and `AsWritten` in `components/FilePage.tsx`.
+
+**The study, and the renderer chosen.** The plan step compared the candidates on `WebSearch` and `WebFetch`, signed off `blocked` with its
+recommendation, and the operator approved it: **react-markdown 10.1.0 with remark-gfm 4.0.1.** It is the only candidate that is safe as it
+ships *and* hands the board React elements, so a fenced block goes to the shiki `CodeBlock` already there as a component, with no HTML
+string set anywhere.
+
+| | react-markdown + remark-gfm | marked | markdown-it | micromark and mdast by hand | streamdown (what was there) |
+|:--|:--|:--|:--|:--|:--|
+| Output | React elements | an HTML string | an HTML string | hast, to React through `hast-util-to-jsx-runtime` | React elements |
+| Raw HTML, as shipped | turned into text | rendered: "Marked does not sanitize the output HTML", DOMPurify recommended | escaped (`html: false`) | as the glue decides | rendered, through `rehype-sanitize` and `rehype-harden` |
+| Links, as shipped | `defaultUrlTransform` empties any protocol but http(s), irc(s), mailto, xmpp | as written | `validateLink` refuses `javascript:`, `vbscript:`, `file:`, most `data:` | as the glue decides | a link modal |
+| Code through `CodeBlock` | `components.pre` | a string, or a renderer that returns one | `highlight` is synchronous and returns a string | a component, glue owned here | its own block, plain without a plugin |
+| GFM | all five with remark-gfm | built in, footnotes by extension | tables and strikethrough; autolinks with `linkify`, off as shipped; task lists and footnotes are plugins | micromark-extension-gfm | remark-gfm |
+| Size, gzipped (bundlephobia) | 34,090 + 9,811 B | 13,250 B, + 10,739 for DOMPurify | 40,507 B | 14,568 + 7,136 + 14,971 + 5,340 + 9,977 B | 147,624 B |
+| Last release | 10.1.0, 2025-03-07 | 18.0.13, 2026-09-12 | 15.0.2 | micromark 4.0.2, 2025-02-27 | 2.6.0, 2026-08-24 |
+| Licence | MIT | MIT | MIT | MIT | Apache-2.0 |
+
+What it cost against the others: about 44 kB gzipped where marked with DOMPurify is about 24 kB; two dependencies added for the one removed;
+and a last release eighteen months old, where marked and streamdown released this month. Why not the others: marked renders raw HTML and
+needs a sanitizer over a string; markdown-it is safe as it ships but gives a string, and its synchronous `highlight` cannot wait for shiki's
+lazy grammars; micromark and mdast by hand is react-markdown's own pipeline with its glue owned here; keeping streamdown meant overriding
+four of its defaults (raw HTML, the link modal, plain code, a streaming mode the board never uses) on 147.6 kB. The GFM claims are the
+projects' own: nothing here ran the GFM spec against a renderer. Sources, fetched 2026-09-16 by the plan step unless marked: github.com/remarkjs/react-markdown,
+raw.githubusercontent.com/remarkjs/react-markdown/main/lib/index.js (its `safeProtocol` and the raw-to-text transform, read again in
+`node_modules/react-markdown/lib/index.js` by implement), its `changelog.md`, registry.npmjs.org/react-markdown/latest,
+api.github.com/repos/remarkjs/react-markdown and its `releases/latest`; github.com/remarkjs/remark-gfm; github.com/micromark/micromark
+and its `releases/latest`; cdn.jsdelivr.net/npm/markdown-it@15.0.2/dist/markdown-it.d.mts (the `html`, `highlight` and `validateLink`
+lines fetched again by implement), cdn.jsdelivr.net/npm/markdown-it@15/README.md, registry.npmjs.org/markdown-it/latest;
+marked.js.org (its sanitizing sentence fetched again by implement), marked.js.org/using_advanced,
+api.github.com/repos/markedjs/marked/releases/latest; streamdown.ai/docs/security, /docs/configuration, /docs/code-blocks,
+/docs/plugins/code, raw.githubusercontent.com/vercel/streamdown/main/packages/streamdown/package.json and its releases;
+bundlephobia.com/api/size for each package (dompurify 3.4.15).
+
+What was built:
+
+- **One `Markdown` component** (`components/Markdown.tsx`) on react-markdown with remark-gfm. Raw HTML stays text and a link's address
+  passes react-markdown's own check, both as it ships; nothing adds `rehype-raw` or a `urlTransform`. A link opens in a new tab with
+  `rel="noreferrer noopener"`; one whose address was emptied is its words, and a footnote link stays in the tab. A fenced block is the
+  shiki `CodeBlock`, its fence mapped to the six grammars it loads by `languageOf` (`lib/markdown.ts`, pure), anything else shown as text.
+  Two rules the request did not name: an image is a link to it, never fetched, since an agent's text can name any address; and headings
+  go two levels down (`#` is an h3), so a text never stands level with the page's h1 and h2, which the e2e's section locators read. Each
+  text's footnotes get a prefix of their own, the label's id included (`labelFootnotes`), so two closeouts on one page link each to its
+  own. Tailwind classes per element for both themes, sizes in `em`, so a text takes the size of the box it is in. Memoized on the text.
+- **Where it renders:** a run's brief, each step's body and its closeout's summary and needs on the run page; the Output tab's summary,
+  needs, and each reply's finding and why; a question on the Decide section's answer and raise rows, under `asks:`, in a box that scrolls
+  where it was clamped to four lines; the conversation's said turns, thoughts and closeout; a workflow's description on the Workflows
+  page; a card's body and a step's body on their pages; and each key's meaning. A reply reads finding, then `→ answer · why` beneath it,
+  where it was `finding → answer (why)` on one line: the finding and why may be more than a line.
+- **What stays plain:** the run page's banner and the Factory's cards and nodes, one-line clamps by the operator's decision on the plan;
+  `wf decide`'s screen; a person's own words (`Told`, `your answer`); declared output values; refusals.
+- **Streamdown is gone.** `ai-elements/response.tsx` is deleted, `reasoning.tsx` renders `Markdown`, and `styles.css` loses its `@source`.
+- **A card's page, `/inbox/<name>`**, from the card's title on the Inbox page: the body rendered, then a row per key an inbox card may
+  set — its value or `not set`, and one line of what it means — and **Source**, a toggle to the file as written, frontmatter included. A file in
+  the inbox that is not a card has a page too, its refusal and its text; a folder, whose name `sub/` the api refuses, has none (`hasPage`).
+  **A step's page, `/workflows/<repo|yours>/<workflow>/<step>`**, the
+  address the operator gave in approving the plan, from its block on the Workflows canvas and from a line of step links under each graph:
+  the same, for every key a step may set, its value as the loader reads it, which the page says (`after` names the step `resume:` names; a
+  loop that sets no `rounds` runs 3). Neither page writes. The menu lights the Inbox and Workflows on them.
+- **The package's lines of meaning**, the one thing added to the package: `STEP_KEY_MEANINGS` beside `STEP_KEYS` in `workflow.ts`, a
+  count's line being `COUNTS`' own (so `COUNTS` moved up beside the keys), and `INBOX_KEY_MEANINGS` beside `INBOX_KEYS` in `inbox.ts`,
+  re-exported from runner.ts. A key without a line does not typecheck.
+- **The api**, a route per page, each finding what it reads among what the package lists and never by a path joined from the request.
+  `GET /api/inbox/:name`: the card as the inbox lists it, `source`, and `keys` (null for an entry that does not read); a name that is not a
+  card's is 400 in `inboxNameRefusal`'s words, a card not there 404 in `noCardLine`'s, naming the `.md` files as `wf inbox rm` does; a card is found before a
+  stray file of its name. `GET /api/workflows/:from/:name/:step`, the page's own address: the step's body, `source`, and `keys`
+  (`keyRows`); a `from` other than `repo` or `yours` is 400, a workflow `folderOf` does not find its 404, a folder the loader refuses 422
+  in its words, and a step it did not load 404, naming the steps.
+- **From review, round 2**, three findings, each fixed:
+  - The step's page was first built under `steps/`, as a run's step is, against the operator's answer, which named
+    `/workflows/<repo|yours>/<workflow>/<step>`. It moved there, its api route with it.
+  - A folder in the inbox linked to a page that refused its name, `sub/`. Only an entry whose name the api takes is linked now.
+  - A card's page refused for a name not there named every entry, a stray file and a folder among them. It names the cards, as the
+    package does.
+
+What was measured:
+
+- From the root, `npx turbo run test --force`: agent-engine 313 (305 passed, 8 skipped), agent-workflows 458 (457 passed, 1 skipped), api 161
+  and web 201, from 313, 455, 156 and 189. `npm run typecheck` clean in all four.
+- New tests. agent-workflows: each table's keys in order with one line each, the count lines as `countOf` refuses in, and the check
+  refusing a key missing, out of order, extra, empty or on two lines. web: `languageOf`, `fencedCode` and `labelFootnotes`; `Markdown`
+  rendered to markup for GFM, links, fences, and two texts' footnotes on one page; raw HTML inline and as a block (`<b>`, `<img onerror>`,
+  `<script>`, `<div onclick>`, `<a>`) shown as text, `javascript:`, `vbscript:` and `data:` links refused, and an image never an `<img>`;
+  the menu lighting a card's and a step's page, and not `/inboxes`; `hasPage` refusing a folder, a backslash, a hidden name and
+  none. api: both routes' answers, a card with keys, with none and one that
+  does not read; a step setting seven keys, one setting counts and one setting none; and every refusal above, `..%2F` in a name and a
+  step, `README` and `review.md` as a step; a 404 in an inbox holding a
+  stray file and a folder, held to DELETE's sentence for the same name; `notes.md` beside a stray `notes`.
+- Each guard broken on purpose and the tests rerun: `rehype-raw` added, the raw HTML test failing; `urlTransform` passing every address,
+  the link test; no image rule and no `target`, two; no footnote label prefix, one; the api's name refusal skipped, a missing card answered
+  200, any `from` taken, a step found by a path joined from the request, a loader refusal answered 500, the 404 naming every entry, no card found before a stray file, and `hasPage` taking a slash, one
+  each; a meaning deleted and one
+  on two lines, the package's tests. In the e2e, `urlTransform` passing every address failed the card page: "no link on the page runs
+  script — expected 0, found 1"; every inbox entry linked failed the inbox page: "has no page … expected 0, found 1".
+- `npm run e2e`: a third seeded card in markdown (a heading, a list, a table, a bash block, a line of raw HTML, a link and a `javascript:`
+  one) and review.md with a heading and a list. The card page and the step page, in both themes: each renders; the raw HTML is text with
+  no `b`, `img` or `script` made of it; no link runs script; the link opens in a new tab; a row per key in the api's order with the api's
+  value and meaning; Source equal to the file on disk, and back; the inbox and the checkout's `workflows/dev` unchanged. The Workflows page:
+  the step links, and a link and a block each opening the step's page. The Inbox page with a stray file and a folder in it: the folder
+  unlinked, and the file's link opening its refusal and Source. The PNGs were read. From them, markdown tables were narrowed to
+  their content, the key table's value column narrowed, inline code kept whole across a line break, and card titles underlined.
+- `vite build`: the lazy Conversation chunk went from 529.8 kB (160.8 kB gzipped) to 41.7 kB (12.8 kB), and a shared `Markdown` chunk of
+  160.1 kB (48.2 kB) is loaded by the run page, the Workflows page, both new pages and the conversation. The run page's own chunk is
+  35.4 kB (10.0 kB), as before.
+
+What it leaves:
+
+- **Text never meant as markdown now renders.** A brief or closeout typed before this with `**/*.ts`, `__init__`, a line opening with `#`,
+  or an indented line (a code block) reads differently. The run page has no Source toggle for a brief; the record keeps the text.
+- **The run page loads the markdown chunk on first visit**, 48 kB gzipped it did not load before. Lazy-loading `Markdown` would flash
+  plain text on every run page; not done, not measured on a slow link.
+- **The banner and the Factory still clamp a question to its lines**, as plain text: a question that is a list reads flat there.
+- **Streaming is reasoned, not measured.** A said turn is one event's whole text, and the component is memoized on it; nobody has timed a
+  long conversation.
+- **react-markdown's last release is 2025-03-07.** A React or Vite change could wait on it; its pipeline packages built here through
+  streamdown before, which lowers that and does not remove it.
+- **A step's page shows the loader's values**, which can read as disagreeing with Source. The page says why.
+- **Keyboard.** A block on the Workflows canvas is not focusable (`nodesFocusable` is off); the step links under the graph are the way by
+  keyboard.
+- **Neither page starts, drops or edits anything.** Starting a card is the Inbox page's; editing a step is §4's builder.
 
 ## 1. A run that grows steps from a plan
 
@@ -2110,54 +2237,8 @@ About one package run and one or two `dev-build` runs; the second if the inspect
 
 ## 5. Markdown rendered on the board, and a card's page with its keys explained
 
-**Registered** 2026-09-16, by the operator: the board shows every piece of prose as preformatted text, and a person
-should be able to open a card and read it rendered, with its frontmatter keys laid out — a way to learn what the engine
-does from the thing itself. **The renderer is chosen by a study, not imposed**: the operator does not want
-`react-markdown` assumed, and asked that the run investigate with web search and web fetch and decide from evidence.
-
-**What exists.** `apps/web` has shiki for code (`components/ai-elements/code-block.tsx`) and no markdown renderer;
-prose is `whitespace-pre` in a dozen components (`Closeout`, `Decide`, `Needs`, `StartRun`, the run page, the Workflows
-page, the inbox page, the conversation's `Turns`). The api hands the page a run's `brief`, a closeout's `summary` and
-replies, a step's `body`, a folder's `description` and a card's `body`, all markdown as the agents and the folders
-write it. The package's keys are closed lists with a table of what each count means (`STEP_KEYS`, `COUNTS` in
-`workflow.ts`; `INBOX_KEYS` in `inbox.ts`), and the README explains each key in prose.
-
-**The study, first.** On `workflows/dev-planned-build` (plan → implement ⇄ review, the plan step on `WebFetch` and
-`WebSearch`, read-only; implement checked by build and e2e), and the brief says to wait for approval of the plan, so
-the plan signs off `blocked` with its recommendation in `needs` and the run waits for the operator's word. The study
-compares at least `react-markdown` (with `remark-gfm`), `markdown-it`, `marked` and `micromark`/`mdast` used directly,
-against the board's needs, each with a source fetched and dated:
-
-- correctness and GFM (tables, task lists, strikethrough, autolinks, footnotes);
-- safety: raw HTML in an agent's text must not render as HTML, and links must not run script — what each does by
-  default, and what a sanitizer adds;
-- React 19 and this build (Vite, TanStack Router): a component, or a string of HTML to set, and what that costs;
-- code blocks through the shiki component already there;
-- the conversation's streaming turns: rendering a growing string on every event, measured or reasoned;
-- bundle size, maintenance (last release, open issues, maintainers), licence;
-- what the CLI could share: nothing, since `wf decide` stays plain — unless a renderer is small enough to give the
-  CLI headings and lists too, which the study may note and not build.
-
-The recommendation names one renderer and says what it costs against the others; the operator approves or answers
-with another, and implement builds that one.
-
-**What it builds, once approved.**
-
-- **One `Markdown` component** on the chosen renderer, raw HTML left unrendered, links opening in a new tab, code
-  blocks through shiki, the board's typography in both themes. A second dependency only if it replaces more code than
-  it adds.
-- **Where it renders:** a run's brief; a closeout's summary and each reply; a step's body on the Workflows page and
-  the step's page; a card's body; the conversation's assistant turns; a blocked step's needs. `wf decide`'s screen
-  stays as the CLI prints it.
-- **A card's page**, `/inbox/<name>`: the body rendered, then its keys as a table — each key, its value, and one line of
-  what it means — and a source toggle showing the file as written, frontmatter included. The same page for a workflow's
-  step, from its block on the Workflows page. The one-line meanings come from the package, a small exported table per
-  key beside `STEP_KEYS` and `INBOX_KEYS`, so the board and the README say the same thing; the apps run may add that
-  table and nothing else in the package.
-- **e2e:** a card with headings, a list, a table, a code block and a line of raw HTML in the seed, the HTML shown as
-  text; the card's page and a step's page in both themes; nothing written.
-
-One `dev-planned-build` run: the plan is the study.
+Shipped 2026-09-17 as *Shipped: markdown on the board, and a card's page with its keys explained*, above, with the study's conclusion
+and its sources. The number kept so §6 and §7 keep theirs.
 
 ## 6. A gate: a step's handoff that waits for a person
 
@@ -2195,8 +2276,8 @@ that fills when someone answers, and a step whose body nobody writes. The handof
   implementer and by the reviewer after.
 - **`wf decide`** prints the gate under the step (`approved 23:10Z — "ship the second reading"`), and a run cancelled
   while gated is cancelled as any run is. `wf rm` refuses a run at a gate: something is due to be asked for.
-- **Board.** The Factory's card says `approve plan`; the run page shows the gated step's closeout — rendered, once §5
-  lands — with Approve (a box for the words) and Send back (the answer box that exists); `POST …/approve`, the seventh
+- **Board.** The Factory's card says `approve plan`; the run page shows the gated step's closeout, rendered as markdown,
+  with Approve (a box for the words) and Send back (the answer box that exists); `POST …/approve`, the seventh
   guarded write. From a phone once Remote Control (§2) lands.
 - **`dev-planned` and `dev-planned-build`** put `gate: true` on `plan`? No: a folder decides for every run of it, and a
   plan that reads one way should start implement at once. Keep the folders as they are and let the card or the start

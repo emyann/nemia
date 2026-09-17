@@ -1,9 +1,9 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { StartRun } from '../components/StartRun';
 import { dropCard, fileCard, inboxQuery, repositoryQuery, workflowNameOf, workflowsQuery, type InboxEntry, type WorkflowListing } from '../lib/api';
-import { cardLines, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../lib/inbox';
+import { cardLines, hasPage, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
@@ -172,7 +172,8 @@ function FileCard() {
 }
 
 /**
- * A card: its first line, its workflow and repository when it names them, and when it was filed; Start, which opens its start form, and Remove.
+ * A card: its first line, linked to its page, its workflow and repository when it names them, and when it was filed; Start, which opens its
+ * start form, and Remove.
  * A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a card
  * shows why, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
  *
@@ -211,12 +212,16 @@ function CardItem({ entry, refusal, onRefused }: {
     >
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
+          {/* Its title opens its page: the body rendered and its keys explained — for a file that does not read too, with the file as written. A
+              folder, or a name the api refuses, has no page (`hasPage`), and is its name alone. */}
           {entry.error === null ? (
             <p data-title className="font-medium break-words">
-              {entry.title}
+              <PageLink entry={entry}>{entry.title}</PageLink>
             </p>
           ) : (
-            <p className="font-mono text-sm break-all">{entry.file}</p>
+            <p className="font-mono text-sm break-all">
+              <PageLink entry={entry}>{entry.file}</PageLink>
+            </p>
           )}
           <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
             <span className="font-mono">{entry.name}</span>
@@ -281,6 +286,16 @@ function CardItem({ entry, refusal, onRefused }: {
       )}
       {refusal && <Refused refusal={refusal} />}
     </li>
+  );
+}
+
+/** An entry's words, linked to its page where it has one (`hasPage`). */
+function PageLink({ entry, children }: { entry: InboxEntry; children: ReactNode }) {
+  if (!hasPage(entry)) return <>{children}</>;
+  return (
+    <Link to="/inbox/$name" params={{ name: entry.name }} className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600">
+      {children}
+    </Link>
   );
 }
 

@@ -457,6 +457,90 @@ test('in a live fold with nothing said after it, every call still waiting is run
   assert.deepEqual(states(true, false), ['no-result', 'no-result']);
 });
 
+const { Markdown } = await import('../src/components/Markdown.tsx');
+
+/** A text, as the board renders it. */
+const md = (text: string): string => renderToStaticMarkup(createElement(Markdown, { children: text }));
+
+test("markdown is drawn as GFM: headings two levels down, lists, a table, a task list, strikethrough, an autolink and a footnote", () => {
+  const html = md(
+    [
+      '# Title', '## What it needs', '###### Deepest', '',
+      '- one', '- two', '', '1. first', '2. second', '',
+      '| file | lines |', '|:--|--:|', '| a.ts | 12 |', '',
+      '- [x] done', '- [ ] to do', '',
+      '~~gone~~ and www.example.com', '',
+      'A claim[^1].', '', '[^1]: Its source.',
+    ].join('\n'),
+  );
+  assert.match(html, /^<div data-markdown="true"/);
+  assert.match(html, /<h3[^>]*>Title<\/h3>/, '`#` is an h3: the page has its own h1 and h2');
+  assert.match(html, /<h4[^>]*>What it needs<\/h4>/);
+  assert.match(html, /<h6[^>]*>Deepest<\/h6>/, 'and nothing goes past h6');
+  assert.doesNotMatch(html, /<h[12][\s>]/);
+  assert.match(html, /<ul[^>]*>\s*<li[^>]*>one<\/li>\s*<li[^>]*>two<\/li>\s*<\/ul>/);
+  assert.match(html, /<ol[^>]*>\s*<li[^>]*>first<\/li>/);
+  assert.match(html, /<div class="[^"]*overflow-x-auto[^"]*"><table[^>]*><thead><tr><th[^>]*style="text-align:left"[^>]*>file<\/th><th[^>]*style="text-align:right"[^>]*>lines<\/th>/, 'a table, in a box that scrolls sideways');
+  assert.match(html, /<td[^>]*>a\.ts<\/td><td[^>]*>12<\/td>/);
+  assert.match(html, /<input type="checkbox" disabled=""[^>]*checked=""\/> done/, 'a task done, its box not to be ticked from the board');
+  assert.match(html, /<input type="checkbox" disabled=""[^>]*\/> to do/);
+  assert.match(html, /<del>gone<\/del>/);
+  assert.match(html, /<a href="http:\/\/www\.example\.com" target="_blank"/);
+  assert.match(html, /<section data-footnotes="true"/);
+  assert.match(html, /Its source\./);
+});
+
+test('a link opens in a new tab and gives the page it opens nothing of this one; a footnote link stays in the tab', () => {
+  const html = md('See [the docs](https://example.com/docs) and a note[^n].\n\n[^n]: Here.');
+  assert.match(html, /<a href="https:\/\/example\.com\/docs" target="_blank" rel="noreferrer noopener"[^>]*>the docs<\/a>/);
+  const internal = [...html.matchAll(/<a href="#[^"]*"[^>]*>/g)].map((m) => m[0]);
+  assert.equal(internal.length, 2, 'the reference and the way back');
+  for (const a of internal) assert.doesNotMatch(a, /target=/, a);
+});
+
+test('REFUSED: raw HTML in a text is shown as the text it is — no element is made of it, inline or as a block', () => {
+  const html = md('Before <b>bold</b> <img src=x onerror="alert(1)"> after.\n\n<script>alert(1)</script>\n\n<div onclick="alert(1)">a block</div>\n\n<a href="https://example.com">a tag</a>');
+  assert.match(html, /&lt;b&gt;bold&lt;\/b&gt;/);
+  assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt;/);
+  assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
+  assert.match(html, /&lt;div onclick=&quot;alert\(1\)&quot;&gt;a block&lt;\/div&gt;/);
+  for (const element of ['b', 'img', 'script', 'div onclick', 'a href="https://example.com">a tag']) {
+    assert.ok(!html.includes(`<${element}`), `no <${element}> element`);
+  }
+});
+
+test('REFUSED: a link whose address could run script is its words and no link; an image is a link to it, never fetched', () => {
+  for (const address of ['javascript:alert(1)', 'JavaScript:alert(1)', 'vbscript:msgbox(1)', 'data:text/html,<script>alert(1)</script>']) {
+    const html = md(`[click me](${address}) and <${address}>`);
+    assert.match(html, /click me/, address);
+    assert.doesNotMatch(html, /href="[^"]*(script|data):/i, address);
+    assert.doesNotMatch(html, /<a[^>]*>click me<\/a>/, `${address}: its words, not a link`);
+  }
+  const image = md('![the diagram](https://example.com/d.png) and ![](javascript:alert(1))');
+  assert.doesNotMatch(image, /<img/);
+  assert.match(image, /<a href="https:\/\/example\.com\/d\.png" target="_blank" rel="noreferrer noopener" data-image="true"[^>]*>image: the diagram<\/a>/);
+  assert.match(image, /<span data-image="true">image<\/span>/, 'an image whose address was emptied is a word');
+});
+
+test("a fenced block is the board's code block in its fence's language; one it has no grammar for is text; inline code is inline", () => {
+  const html = md('Run `npm test`:\n\n```bash\nnpm test\nnpm run e2e\n```\n\n```python\nprint(1)\n```\n\n```\nplain\n```');
+  assert.match(html, /data-language="bash"[^>]*>.*<code>npm test\nnpm run e2e<\/code>/s, 'the code, less the newline the block ends with');
+  assert.match(html, /data-language="text"[^>]*>.*<code>print\(1\)<\/code>/s);
+  assert.equal([...html.matchAll(/data-language=/g)].length, 3);
+  assert.match(html, /Run <code class="[^"]*font-mono[^"]*">npm test<\/code>:/);
+});
+
+test("two texts with footnotes on one page name theirs apart — no id twice, each reference to its own note", () => {
+  const html = renderToStaticMarkup(
+    createElement('div', null, createElement(Markdown, { children: 'One[^1].\n\n[^1]: First.' }), createElement(Markdown, { children: 'Two[^1].\n\n[^1]: Second.' })),
+  );
+  const ids = [...html.matchAll(/ id="([^"]+)"/g)].map((m) => m[1]!);
+  assert.equal(ids.length, 6, 'a reference, a label and a note, in each');
+  assert.equal(new Set(ids).size, ids.length, `no id twice: ${ids.join(', ')}`);
+  for (const [, href] of html.matchAll(/href="#([^"]+)"/g)) assert.ok(ids.includes(href!), `#${href} names an element on the page`);
+  for (const [, label] of html.matchAll(/aria-describedby="([^"]+)"/g)) assert.ok(ids.includes(label!), `${label} names an element on the page`);
+});
+
 type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
 
 /** A step of a workflow no run has started, as the Workflows page draws it: in the step node's spec mode. */
@@ -749,18 +833,21 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
   assert.match(once, />attempts<\/dt>/);
 });
 
-test("the Output tab shows the selected try's closeout — its declared output, and its replies as `finding → answer (why)` — and every other try's folded beneath it", () => {
+test("the Output tab shows the selected try's closeout — its declared output, and its replies as `finding → answer · why`, each text markdown — and every other try's folded beneath it", () => {
   const replies = [
-    { finding: 'src/cache.ts:12 — the cache never expires', answer: 'fixed', why: 'Entries expire after the TTL now.' },
+    { finding: '`src/cache.ts:12` — the cache never expires', answer: 'fixed', why: 'Entries expire after the **TTL** now.' },
     { finding: 'src/cache.ts:40 — a miss is counted twice', answer: "won't fix", why: 'Once per layer, on purpose.' },
   ];
   const tries = threeTries.map((t) => (t.current ? { ...t, closeout: closeoutSaying('Answered the review.', { replies, output: { again: false, risk: 'low' }, missing: ['notes'] }) } : t));
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
   assert.deepEqual(textsOf(/<p data-shown-try="3"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['round 2 · try 3 (round) · current']);
   assert.deepEqual([...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]!).join(' ')), [
-    'src/cache.ts:12 — the cache never expires → fixed (Entries expire after the TTL now.)',
-    "src/cache.ts:40 — a miss is counted twice → won't fix (Once per layer, on purpose.)",
+    'src/cache.ts:12 — the cache never expires → fixed · Entries expire after the TTL now.',
+    "src/cache.ts:40 — a miss is counted twice → won't fix · Once per layer, on purpose.",
   ]);
+  // The finding and why as markdown, the answer as the word it is.
+  assert.match(html, /<li data-answer="fixed"[^>]*><div data-markdown="true"[^>]*><p[^>]*><code[^>]*>src\/cache\.ts:12<\/code> — the cache never expires<\/p><\/div>/);
+  assert.match(html, /<span class="font-medium[^"]*">fixed<\/span><\/span> <span aria-hidden="true">·<\/span> <div data-markdown="true"[^>]*><p[^>]*>Entries expire after the <strong>TTL<\/strong> now\.<\/p>/);
   const declared = /<section aria-label="Declared output"[\s\S]*?<\/section>/.exec(html)![0];
   assert.deepEqual([...declared.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textsOf(m[2]!).join(' ')]), [['again', 'false'], ['risk', 'low']]);
   assert.match(declared, />declared and not given: notes</);
@@ -906,7 +993,8 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.deepEqual([...rows].map(([name, { kind }]) => [name, kind]), [
     ['implement', 'answer'], ['theme', 'try-again'], ['lint', 'try-again'], ['docs', 'try-again'], ['plan', 'asked'],
   ]);
-  const said = (name: string) => textsOf(/<p [^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!.html)![1]!).join(' ');
+  // What the row says a step needs: a question as its markdown, under `asks:`, and any other need as a sentence.
+  const said = (name: string) => textsOf(/<(p|div) data-said="true"[^>]*>([\s\S]*?)<\/\1>/.exec(rows.get(name)!.html)![2]!).join(' ');
   const buttons = (name: string) => [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
   // A server render writes `checked` before `value`.
   const radios = (name: string) => [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
@@ -951,7 +1039,7 @@ test('the Decide section puts the answers first, before what there is to decide,
   assert.ok(html.indexOf('aria-label="Answer"') < html.indexOf('data-lesson'), html);
   const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
   assert.deepEqual([...commands.matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])), [true]);
-  assert.match(html, />implement<\/strong> asks: Which database\?</);
+  assert.match(html, />implement<\/strong> asks:<\/p> <div data-markdown="true"[^>]*><p[^>]*>Which database\?<\/p><\/div>/);
 });
 
 test('the tries say `your answer` beside a try a person answered, and above its closeout in the Output tab, selected or folded', () => {
@@ -1250,7 +1338,8 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
 
   // Signed off blocked past its budget: its question, and the answer with the raise — the button waits for the answer, as an answer row's does.
   const palette = textsOf(rows.get('palette')!.html);
-  assert.ok(palette.includes('asks: Warm colours, or cool ones?'), palette.join(' | '));
+  assert.ok(palette.join(' ').includes('asks: Warm colours, or cool ones?'), palette.join(' | '));
+  assert.match(rows.get('palette')!.html, /<div data-asks="true"[^>]*><p>asks:<\/p> <div data-markdown="true" class="[^"]*max-h-72 overflow-y-auto[^"]*"><p[^>]*>Warm colours, or cool ones\?<\/p>/, 'the question as markdown, in a box that scrolls');
   assert.ok(palette.includes('wf retry r-1 palette --budget <amount> --message "<answer>"'), palette.join(' | '));
   assert.equal(box('palette'), '2');
   assert.deepEqual(said('palette'), ['Your answer to palette', false]);

@@ -2,6 +2,7 @@ import type { StepArtifact, StepAttempts, StepCloseout, StepTry } from '../lib/a
 import { duration } from '../lib/canvas';
 import { cn } from '../lib/utils';
 import { code, Facts } from './Facts';
+import { Markdown } from './Markdown';
 
 /**
  * A try as the Rounds rows and the Output tab name it: its round, its number, and in brackets how it was reached — what replaced
@@ -140,12 +141,8 @@ export function CloseoutView({ closeout }: { closeout: StepCloseout }) {
         <span className="text-neutral-500">outcome </span>
         <span className={closeout.outcome === 'blocked' ? 'font-semibold text-amber-700 dark:text-amber-400' : 'font-medium'}>{closeout.outcome}</span>
       </p>
-      <p className="whitespace-pre-wrap">{closeout.summary}</p>
-      {closeout.needs && (
-        <p className="whitespace-pre-wrap text-amber-700 dark:text-amber-400">
-          <span className="font-medium">Needs:</span> {closeout.needs}
-        </p>
-      )}
+      <Markdown>{closeout.summary}</Markdown>
+      {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
       {(declared.length > 0 || closeout.missing.length > 0) && (
         <section aria-label="Declared output" className="space-y-1">
           <h4 className="text-neutral-500">declared output</h4>
@@ -161,9 +158,20 @@ export function CloseoutView({ closeout }: { closeout: StepCloseout }) {
           {closeout.replies.length ? (
             <ul className="space-y-1 text-xs">
               {closeout.replies.map((reply, i) => (
-                <li key={i} data-answer={reply.answer} className="whitespace-pre-wrap break-words">
-                  {reply.finding} → <span className="font-medium">{reply.answer}</span>
-                  {reply.why && <span className="text-neutral-500"> ({reply.why})</span>}
+                // The finding, then its answer and why beneath it: each of the agent's texts is markdown, and may be more than a line.
+                <li key={i} data-answer={reply.answer} className="space-y-0.5">
+                  <Markdown>{reply.finding}</Markdown>{' '}
+                  <div className="flex gap-1.5 text-neutral-500">
+                    <span className="shrink-0">
+                      →{' '}<span className="font-medium text-neutral-900 dark:text-neutral-100">{reply.answer}</span>
+                    </span>
+                    {reply.why && (
+                      <>
+                        {' '}<span aria-hidden>·</span>{' '}
+                        <Markdown>{reply.why}</Markdown>
+                      </>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -176,6 +184,16 @@ export function CloseoutView({ closeout }: { closeout: StepCloseout }) {
         <p className="text-neutral-500">artifacts</p>
         <Artifacts artifacts={closeout.artifacts} />
       </div>
+    </div>
+  );
+}
+
+/** What a step that signed off blocked needs, under its word, as its agent wrote it. */
+export function ClosedNeeds({ needs }: { needs: string }) {
+  return (
+    <div data-needs className="text-amber-700 dark:text-amber-400">
+      <p className="font-medium">Needs:</p>{' '}
+      <Markdown>{needs}</Markdown>
     </div>
   );
 }

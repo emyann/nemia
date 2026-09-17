@@ -216,9 +216,9 @@ export const LOOPING = {
     { implement: 'Implemented it.', review: 'Three findings.' },
     { implement: 'Answered the first review.', review: 'Two findings are still open.' },
   ],
-  /** What implement answered in round 2, and how the Output tab says it: `finding → answer (why)`. */
+  /** What implement answered in round 2, and how the Output tab says it: `finding → answer · why`. */
   replies: [{ finding: 'apps/web/src/lib/status.ts — an unknown word reads as working', answer: 'fixed', why: 'It reads as unknown now.' }],
-  replied: 'apps/web/src/lib/status.ts — an unknown word reads as working → fixed (It reads as unknown now.)',
+  replied: 'apps/web/src/lib/status.ts — an unknown word reads as working → fixed · It reads as unknown now.',
 } as const;
 
 /**
@@ -466,6 +466,14 @@ export const WORKFLOWS = {
     /** What implement disallows, which the Capabilities page takes from the set it has. */
     disallow: 'SendMessage',
     loop: 'implement · 3 rounds',
+    /** What review's agent is told, in markdown: a heading and a list, which its page renders. */
+    review: {
+      body: 'Review the change.\n\n## How to review\n\n- Read the diff against the brief.\n- Run the check yourself.',
+      heading: 'How to review',
+      items: ['Read the diff against the brief.', 'Run the check yourself.'],
+      /** Each key review sets, as the loader reads it: what its page's key table says. */
+      keys: { after: 'implement', harness: 'claude', model: 'opus', effort: 'high', permissionMode: 'dontAsk', tools: 'Read, Grep, Glob, Bash', output: 'review.schema.json', loop: 'implement', rounds: '3' },
+    },
   },
   broken: { name: 'broken', error: 'review: `afer` is not a key a step has.' },
   yours: { name: 'mine', steps: ['plan'] },
@@ -477,7 +485,7 @@ export function seedWorkflows(repo: string, root: string): void {
   const dev = path.join(repo, 'workflows', good.name);
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
   write(path.join(dev, 'implement.md'), `---\nharness: claude\nmodel: opus\ncheck: ${good.check}\ndisallow: ${good.disallow}\n---\nImplement what was asked.\n`);
-  write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nReview the change.\n`);
+  write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`);
   write(path.join(dev, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }, null, 2));
   const bad = path.join(repo, 'workflows', broken.name);
   write(path.join(bad, 'README.md'), `# ${broken.name}\n\nA reviewer whose after is misspelt.\n`);
@@ -487,9 +495,11 @@ export function seedWorkflows(repo: string, root: string): void {
 }
 
 /**
- * The inbox the Inbox page lists: two cards in the store's `inbox/`, as `wf inbox add` writes them. `planned` names the checkout's `dev` and
+ * The inbox the Inbox page lists: three cards in the store's `inbox/`, as `wf inbox add` writes them. `planned` names the checkout's `dev` and
  * the checkout as the repository it is about, and was filed an hour ago; `bare` names neither, and was filed ten minutes ago, so it is listed
- * first. Each body has a second paragraph, which the list does not show and a start's brief is prefilled with.
+ * first; `rich`, between them, names `dev` and is written in markdown — a heading, a list, a table, a code block, a line of raw HTML and two
+ * links, one of them `javascript:` — for its page. Each body has a second paragraph, which the list does not show and a start's brief is
+ * prefilled with.
  */
 export const CARDS = {
   planned: {
@@ -505,14 +515,50 @@ export const CARDS = {
     body: 'Show what a step cost on the board\n\nBeside its status, in dollars.',
     filedMinutesAgo: 10,
   },
+  rich: {
+    name: 'render-the-board-s-markdown-r3nd',
+    title: "Render the board's markdown",
+    body: [
+      "Render the board's markdown",
+      '',
+      '## What it needs',
+      '',
+      '- Headings, lists and tables drawn as such',
+      "- Code in the board's code block",
+      '',
+      '| page | renders |',
+      '|:--|:--|',
+      '| inbox card | its body |',
+      '| workflow step | what its agent is told |',
+      '',
+      '```bash',
+      'npm run e2e',
+      '```',
+      '',
+      '<b>raw HTML stays text</b> <img src="/raw.png" onerror="alert(1)">',
+      '',
+      'See [the GFM spec](https://github.github.com/gfm/) and [not a link](javascript:alert(1)).',
+    ].join('\n'),
+    workflow: 'dev',
+    heading: 'What it needs',
+    items: ['Headings, lists and tables drawn as such', "Code in the board's code block"],
+    cells: ['inbox card', 'its body', 'workflow step', 'what its agent is told'],
+    code: 'npm run e2e',
+    /** A line of raw HTML, which the page shows as the text it is. */
+    html: '<b>raw HTML stays text</b> <img src="/raw.png" onerror="alert(1)">',
+    link: { text: 'the GFM spec', href: 'https://github.github.com/gfm/' },
+    unsafe: 'not a link',
+    filedMinutesAgo: 30,
+  },
 } as const;
 
 /** Write CARDS into the store at `root`, `planned` about the checkout at `repo`, each file dated when it was filed. */
 export function seedInbox(root: string, repo: string, now = Date.now()): void {
-  const { planned, bare } = CARDS;
+  const { planned, bare, rich } = CARDS;
   const cards = [
     { card: planned, text: `---\nworkflow: ${planned.workflow}\nrepo: ${repo}\n---\n${planned.body}\n` },
     { card: bare, text: `${bare.body}\n` },
+    { card: rich, text: `---\nworkflow: ${rich.workflow}\n---\n${rich.body}\n` },
   ];
   for (const { card, text } of cards) {
     const file = path.join(root, 'inbox', `${card.name}.md`);

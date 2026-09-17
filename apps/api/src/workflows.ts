@@ -10,12 +10,15 @@
  * `wf up` files the first step, as it does for a run started at the command line. A start that names an inbox card (`card`) is the
  * package's `startFromInbox()` instead, `wf start <inbox>/<name>.md`'s own: the same record, with `from` on it, and the card removed.
  * Nothing else here writes; the inbox's own writes are inbox.ts's.
+ *
+ * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
+ * the page itself has on the board..
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { loadWorkflows, workflowDescription, type Workflow } from 'agent-workflows/workflow';
+import { loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -61,6 +64,30 @@ export type WorkflowListing = {
   graph: RunGraph;
   error: string | null;
 };
+
+/**
+ * One key of a file, as a card's or a step's page lays them out: the key, its value as the package read it — null where the file does not
+ * set it — and one line of what it means, the package's (`STEP_KEY_MEANINGS`, `INBOX_KEY_MEANINGS`).
+ */
+export type KeyRow = { key: string; value: string | null; meaning: string };
+
+/**
+ * What a step's page shows: which workflow and step, its body, the file as written — frontmatter and all — and every key a step may set, in
+ * the package's order, with its value as the loader read it. Read so, `after` names the step `resume:` implies too, and a loop's `rounds` is
+ * the default where the file sets none: the file as written says which.
+ */
+export type WorkflowStepPage = { workflow: string; from: WorkflowSource; dir: string; step: string; body: string; source: string; keys: KeyRow[] };
+
+/** A step's value for `key`, as a row says it: a list joined, a count in digits, `output:` as the file it names, and null for none. */
+function keyValue(step: Workflow, key: StepKey): string | null {
+  const value = key === 'output' ? step.output?.file : step[key];
+  if (value === undefined) return null;
+  if (Array.isArray(value)) return value.length ? value.join(', ') : null;
+  return String(value);
+}
+
+/** Every key a step may set, a row each, in `STEP_KEYS`' order: set or not, so a person reads what the step could say as well as what it does. */
+export const keyRows = (step: Workflow): KeyRow[] => STEP_KEYS.map((key) => ({ key, value: keyValue(step, key), meaning: STEP_KEY_MEANINGS[key] }));
 
 /** Where workflows are read from, in the order they are listed: the repository's, then yours. */
 export const sourcesOf = (repo: string, home: string = HOME): Array<{ from: WorkflowSource; dir: string }> => [
@@ -230,6 +257,33 @@ export const workflows = new Hono()
   .get('/api/workflows', (c) => {
     try {
       return c.json(listWorkflows(repoOf()));
+    } catch (err) {
+      return c.json({ error: messageOf(err) }, 500);
+    }
+  })
+  // One step of one folder, for its page: found among the folders the sources have and the steps the loader read, never joined from what
+  // was sent — so no name in the path reaches a file outside the folder — or why not, in the words a start would use.
+  .get('/api/workflows/:from/:name/:step', (c) => {
+    const { from, name, step } = c.req.param();
+    if (from !== 'repo' && from !== 'yours') {
+      return c.json({ error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${step}, say. This request's was '${from}'.` }, 400);
+    }
+    try {
+      const folder = folderOf(name, from, repoOf(), HOME);
+      if ('status' in folder) return c.json({ error: folder.error }, folder.status);
+      let steps: Workflow[];
+      try {
+        steps = loadWorkflows(folder.dir);
+      } catch (err) {
+        // The loader's refusal, word for word: the folder is listed with it, and has no step to show.
+        return c.json({ error: messageOf(err) }, 422);
+      }
+      const found = steps.find((s) => s.name === step);
+      if (!found) {
+        return c.json({ error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` }, 404);
+      }
+      const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
+      return c.json({ workflow: name, from, dir: folder.dir, step: found.name, body: found.body, source, keys: keyRows(found) } satisfies WorkflowStepPage);
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);
     }

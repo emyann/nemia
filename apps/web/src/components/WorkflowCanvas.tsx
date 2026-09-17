@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useNavigate } from '@tanstack/react-router';
 import { Background, BackgroundVariant, Position, ReactFlow } from '@xyflow/react';
 import type { RunDetail, WorkflowListing } from '../lib/api';
 import { extentOf, layout, stepsOf } from '../lib/layout';
@@ -42,10 +43,11 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
  * per `after` and the edge back a `loop:` makes, as the api's `graph` has them — laid out as a run's page lays a run out.
  *
  * Fitted to its frame and not arranged by hand: it is a card on a page of cards, so the wheel scrolls the page past it
- * rather than zooming, and nothing about it is kept.
+ * rather than zooming, and nothing about it is kept. A block clicked opens its step's page.
  */
 export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
   const { steps, graph } = workflow;
+  const navigate = useNavigate();
   const drawn = useMemo(() => {
     let at;
     try {
@@ -62,6 +64,7 @@ export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
       data: { name: step.name, index, spec: step.spec },
       draggable: false,
       selectable: false,
+      className: 'cursor-pointer',
     }));
     const loops = graph.edges.some((e) => e.kind === 'loop');
     return { nodes, edges: stepEdges(unstartedRun(workflow)), height: extentOf(at).height + (loops ? LOOP_ROOM : 0) };
@@ -95,6 +98,9 @@ export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
         zoomOnDoubleClick={false}
         preventScrolling={false}
         deleteKeyCode={null}
+        onNodeClick={(_, node) =>
+          void navigate({ to: '/workflows/$from/$workflow/$step', params: { from: workflow.from, workflow: workflow.name, step: node.id } })
+        }
         colorMode="system"
         // Null, so arrowheads take `--xy-edge-stroke` like their edges instead of one grey for both themes.
         defaultMarkerColor={null}

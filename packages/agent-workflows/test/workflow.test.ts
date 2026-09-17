@@ -7,7 +7,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
-import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEYS, type StepKey } from '../src/workflow.ts';
+import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -321,6 +321,32 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual(w.output, { file: 'review.schema.json', schema: LOOPING });
   assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
   assert.deepEqual([w.effort, w.tools, w.disallow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage']]);
+});
+
+/** A table of one line of meaning per key, as the board lays a file's keys out: why `meanings` is not one, or null. */
+function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<string, string>>): string | null {
+  if (JSON.stringify(Object.keys(meanings)) !== JSON.stringify(keys)) return `keys ${Object.keys(meanings).join(', ')} are not ${keys.join(', ')}, in that order`;
+  const bad = Object.entries(meanings).find(([, line]) => typeof line !== 'string' || !line.trim() || /[\r\n]/.test(line));
+  return bad ? `${bad[0]}'s meaning is not one line: ${JSON.stringify(bad[1])}` : null;
+}
+
+test("every key a step has has one line of meaning, in the keys' order — a count's in its refusal's words", () => {
+  assert.equal(meaningsRefusal(STEP_KEYS, STEP_KEY_MEANINGS), null);
+  // The counts' lines are the words `countOf` refuses a value with.
+  assert.equal(STEP_KEY_MEANINGS.deadlineSeconds, 'the seconds the engine lets the step run before stopping it');
+  assert.equal(STEP_KEY_MEANINGS.maxAttempts, 'how many attempts the engine may make at the step');
+  assert.equal(STEP_KEY_MEANINGS.retries, 'how many times the run re-files the step after its check refuses it');
+  assert.equal(STEP_KEY_MEANINGS.rounds, 'how many rounds `loop:` may run, the first included');
+  assert.throws(() => fm('review', 'retries: -1'), (e: Error) => e.message.includes(`\`retries\` is ${STEP_KEY_MEANINGS.retries}:`));
+});
+
+test('REFUSED: a table of meanings with a key missing, one out of order, an extra one, an empty line or one on two lines', () => {
+  const { after, resume, ...rest } = STEP_KEY_MEANINGS;
+  assert.match(String(meaningsRefusal(STEP_KEYS, { resume, ...rest })), /are not after, resume/, 'after missing');
+  assert.match(String(meaningsRefusal(STEP_KEYS, { resume, after, ...rest })), /in that order/, 'out of order');
+  assert.match(String(meaningsRefusal(STEP_KEYS, { ...STEP_KEY_MEANINGS, colour: 'red' })), /are not/, 'a key the step does not have');
+  assert.match(String(meaningsRefusal(STEP_KEYS, { ...STEP_KEY_MEANINGS, model: ' ' })), /^model's meaning is not one line/);
+  assert.match(String(meaningsRefusal(STEP_KEYS, { ...STEP_KEY_MEANINGS, model: 'the model\nand more' })), /^model's meaning is not one line/);
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {

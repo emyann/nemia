@@ -576,6 +576,25 @@ export const workflowsQuery = queryOptions({
   queryFn: () => get<WorkflowListing[]>('/api/workflows'),
 });
 
+/**
+ * Mirrors `KeyRow` in apps/api/src/workflows.ts: one key of a card or a step, as its page lays them out — the key, its value as the package
+ * read it, null where the file does not set it, and the package's one line of what it means.
+ */
+export type KeyRow = { key: string; value: string | null; meaning: string };
+
+/**
+ * Mirrors `WorkflowStepPage` in apps/api/src/workflows.ts: one step of a workflow — its body, its file as written, and every key a step may set,
+ * in the package's order, with its value as the loader read it.
+ */
+export type WorkflowStepPage = { workflow: string; from: WorkflowListing['from']; dir: string; step: string; body: string; source: string; keys: KeyRow[] };
+
+/** A step of a workflow, for its page. Read again on each visit, as the Workflows page is: a person edits the folder. */
+export const stepQuery = (from: string, workflow: string, step: string) =>
+  queryOptions({
+    queryKey: ['workflows', from, workflow, step],
+    queryFn: () => get<WorkflowStepPage>(`/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}`),
+  });
+
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
 export const workflowNameOf = (workflowDir: string): string => workflowDir.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || workflowDir;
 
@@ -638,6 +657,19 @@ export const inboxQuery = queryOptions({
   queryKey: ['inbox'],
   queryFn: () => get<InboxEntry[]>('/api/inbox'),
 });
+
+/**
+ * Mirrors `InboxCardPage` in apps/api/src/inbox.ts: a card as the inbox lists it, its file as written, frontmatter included, and each key a card
+ * may set, a row each — none for an entry that does not read as a card.
+ */
+export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
+
+/** A card, for its page. Read again on each visit, as the inbox is. */
+export const cardQuery = (name: string) =>
+  queryOptions({
+    queryKey: ['inbox', name],
+    queryFn: () => get<InboxCardPage>(`/api/inbox/${encodeURIComponent(name)}`),
+  });
 
 /**
  * File an idea as a card, as `wf inbox add "<idea>" --workflow <name> --repo <path>` does. Resolves with the card's name; rejects with the api's

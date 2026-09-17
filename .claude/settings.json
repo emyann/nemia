@@ -26,7 +26,8 @@
       "Bash(git branch --list:*)",
       "Bash(cd:*)",
       "WebSearch",
-      "WebFetch"
+      "WebFetch",
+      "Bash(npx shadcn@latest:*)"
     ]
   }
 }

@@ -334,6 +334,25 @@ export const HARNESSES = {
 } as const;
 
 /**
+ * Why the engine refuses `remoteControl: true` on a harness that runs a prompt and exits, in its words (agent-engine's `file()`), which
+ * `test/store.test.ts` holds this copy to by asking the engine. A copy, because `start` is synchronous and the engine's door is not; and
+ * asked only at filing, the refusal would come after the run was written, on its first pass.
+ */
+const NOT_BRIDGED = 'has no such flag: it runs a prompt and exits, and only a Claude Code background session (`claude --bg --remote-control`) is bridged';
+
+/**
+ * The first step that says `remote: true` on a harness the engine refuses `remoteControl` for — every one of `HARNESSES` but Claude Code's
+ * background sessions, as the engine's own door judges — refused by name in the engine's words (`NOT_BRIDGED`), or undefined. A step without
+ * a `harness:` runs on `claude`, the engine's first.
+ */
+function remoteRefusal(steps: readonly Workflow[]): string | undefined {
+  const bridged = Object.entries(HARNESSES).filter(([, h]) => h === 'claude-bg').map(([name]) => name);
+  const step = steps.find((s) => s.remote && !bridged.includes(s.harness ?? 'claude'));
+  if (!step) return undefined;
+  return `${step.name}: \`remote: true\` asks for a session bridged to claude.ai, and the \`${step.harness}\` harness ${NOT_BRIDGED}. Run the step on ${bridged.join(' or ')} — delete \`harness: ${step.harness}\` — or delete \`remote: true\`.`;
+}
+
+/**
  * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, 2 unless set) is the engine's: sessions
  * per harness at once, counted apart for each — a check on the `check` harness is in a pool of its own, and a `dev` run's review competes with
  * another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `runCapOf`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
@@ -903,6 +922,9 @@ function stepsToStart(workflowDir: string, isolate: boolean): Workflow[] {
       `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
     ), { exitCode: 2 });
   }
+  // Refused here, before anything is written, and not by the engine when the step is filed: by then the run is on the record.
+  const unbridged = remoteRefusal(steps);
+  if (unbridged) throw Object.assign(new Error(unbridged), { exitCode: 2 });
   return steps;
 }
 
@@ -1527,6 +1549,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
         tools: step.tools,
         disallowedTools: step.disallow,
+        // And the bridge to claude.ai, as the step asked for it: a try is a session of the step.
+        remoteControl: step.remote,
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
         // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
@@ -1574,6 +1598,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         permissionMode: target.permissionMode,
         tools: target.tools,
         disallowedTools: target.disallow,
+        remoteControl: target.remote,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
         budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
@@ -1672,6 +1697,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       tools: step.tools,
       // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
       disallowedTools: step.disallow,
+      // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
+      remoteControl: step.remote,
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       // What is left of the cap for this session, where its harness keeps one: `claude-detached`. A step on a later round has spent some of it.

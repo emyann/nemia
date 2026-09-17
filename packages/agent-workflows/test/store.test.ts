@@ -25,7 +25,7 @@ fs.writeFileSync(path.join(WORKFLOW, 'review.md'), '---\nafter: implement\n---\n
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, forget, forgetLine: forgetLineOf, list, listRuns, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan, stepsOf } = await import('../src/runner.ts');
+const { HARNESSES, advance, artifactFiles, artifactsDir, cancel, closeoutAsked, decide, exitVerdicts, forget, forgetLine: forgetLineOf, list, listRuns, markCancelled, missingArtifacts, parentOf, phaseOfView, readAnswers, readAsks, readRun, retry, round, say, start, startPlan, stepsOf } = await import('../src/runner.ts');
 
 const aRun = (id: string, steps: Run['steps']): Run => ({
   id, repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main',
@@ -1426,6 +1426,98 @@ test("REFUSED without the momentum: at a ceiling of one, the engine's own admiss
   };
   assert.deepEqual(await admitted(false), [nameFor(`${a.id}-review`, 1)], "the run in flight's next step, filed later");
   assert.deepEqual(await admitted(true), [nameFor(`${b.id}-implement`, 1)], 'without it, the newer run, filed first');
+});
+
+// ─── a step reachable from a phone: `remote:` ───────────────────────────────
+
+test('a step with `remote: true` reaches `e.file` with `remoteControl: true` — on its first filing, a try `retries:` files, and a try `wf retry` asks for — and its check, and a step without the line, with none', async () => {
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nremote: true', 'failed', 1);
+  assert.equal(tasks.get(`${run.id}-implement`)!.spec.remoteControl, true, 'the first filing');
+
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
+  assert.deepEqual([nudged.remoteControl, nudged.resumeFrom], [true, `native-${run.id}-implement`], 'the try `retries:` files, continuing the session');
+
+  settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).checked, ['implement']);
+  settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
+  await retry(e, run.id, 'implement', { mode: 'fresh' });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['implement']);
+  assert.equal(tasks.get(`${run.id}-implement-try3`)!.spec.remoteControl, true, 'a new session, bridged the same');
+
+  // The check is the run's own, on a harness the engine refuses a bridge for; and review never said the word.
+  assert.deepEqual([tasks.get(`${run.id}-implement-check`)!.spec.harness, tasks.get(`${run.id}-implement-check`)!.spec.remoteControl], ['check', undefined]);
+  settle(`${run.id}-implement-try3`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-try3-check`, 'succeeded', undefined, 0);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
+  assert.equal(tasks.get(`${run.id}-review`)!.spec.remoteControl, undefined, 'never a default');
+});
+
+test('a round files its target bridged as the target says, and the looping step — a new session each round — as it says', async () => {
+  const run = started(looped('remote: true\n'));
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.remoteControl, undefined);
+  await toReview(b, run.id, 1, true);
+  assert.equal(b.tasks.get(`${run.id}-review`)!.spec.remoteControl, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  assert.equal(b.tasks.get(`${run.id}-implement-try2`)!.spec.remoteControl, undefined, 'the round, continuing implement');
+  await toReview(b, run.id, 2, false);
+  assert.equal(b.tasks.get(`${run.id}-review-try2`)!.spec.remoteControl, true, "round 2's review");
+
+  const other = started(looped('', 'remote: true\n'));
+  const c = board();
+  await advance(c.e, readRun(other.id));
+  await toReview(c, other.id, 1, true);
+  assert.deepEqual((await advance(c.e, readRun(other.id))).looped, ['review']);
+  assert.deepEqual([c.tasks.get(`${other.id}-implement-try2`)!.spec.remoteControl, c.tasks.get(`${other.id}-review`)!.spec.remoteControl], [true, undefined]);
+});
+
+test("REFUSED at `wf start`, in the engine's words, with nothing written: `remote: true` on every harness the engine refuses `remoteControl` for — codex and claude-detached — and taken on claude, and `remote: false` on any", async () => {
+  const engine = createEngine({ root: fs.mkdtempSync(path.join(ROOT, 'engine-')), journal: memoryJournal(), harnesses: HARNESSES });
+  /** What the engine's own door says to `remoteControl: true` on `harness`: its reason, or undefined when it files the task. */
+  const engineSays = async (harness: string): Promise<string | undefined> => {
+    try {
+      await engine.file({ brief: 'b', cwd: '/w', harness, remoteControl: true });
+      return undefined;
+    } catch (err) {
+      const reason = new RegExp(`^file: \`remoteControl: true\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness (.*?)\\. File the task on \`claude\``).exec((err as Error).message)?.[1];
+      assert.ok(reason, (err as Error).message);
+      return reason;
+    }
+  };
+  const runs = () => fs.readdirSync(path.join(ROOT, 'runs')).sort();
+  const withRemote = (harness: string, word = 'true') => folder(`harness: ${harness}\nremote: ${word}`);
+
+  for (const harness of ['codex', 'claude-detached']) {
+    const reason = await engineSays(harness);
+    assert.ok(reason, `the engine refuses it on ${harness}`);
+    const dir = withRemote(harness);
+    const repo = aRepo();
+    const before = runs();
+    assert.throws(() => start({ brief: 'add a flag', repo, workflowDir: dir, isolate: false }), (err: Error & { exitCode?: number }) => err.exitCode === 2
+      && err.message === `implement: \`remote: true\` asks for a session bridged to claude.ai, and the \`${harness}\` harness ${reason}. Run the step on claude — delete \`harness: ${harness}\` — or delete \`remote: true\`.`, harness);
+    assert.deepEqual(runs(), before, `nothing written for ${harness}`);
+    assert.equal(gitOut(repo, 'branch', '--list').split('\n').length, 1, 'and no branch cut');
+    // And a plan whose card names such a workflow is refused before its first run is started.
+    const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
+    fs.writeFileSync(path.join(plan, 'card.md'), `---\nworkflow: ${dir}\n---\nadd a flag\n`);
+    assert.throws(() => startPlan({ dir: plan, repo }), (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.includes(`\`remote: true\` asks for a session bridged to claude.ai, and the \`${harness}\` harness ${reason}.`));
+    assert.deepEqual(runs(), before, `nothing written for a plan on ${harness}`);
+
+    // `remote: false` asks for nothing, and the engine files it on any harness: so does start.
+    assert.ok(started(withRemote(harness, 'false')).id);
+  }
+
+  // On claude the engine files it, and so does start — named, or by default.
+  assert.equal(await engineSays('claude'), undefined);
+  for (const dir of [withRemote('claude'), folder('remote: true')]) {
+    const run = started(dir);
+    const b = board();
+    await advance(b.e, readRun(run.id));
+    assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.remoteControl, true);
+  }
 });
 
 // ─── what a consumer reads without a log: `phaseOfView`, `closeoutAsked`, `exitVerdicts` ───

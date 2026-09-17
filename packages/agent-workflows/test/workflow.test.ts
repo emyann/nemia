@@ -309,7 +309,7 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 test('every key a step has is read — none is accepted and then dropped', () => {
   const values: Record<StepKey, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
-    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
+    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -321,6 +321,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual(w.output, { file: 'review.schema.json', schema: LOOPING });
   assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
   assert.equal(w.gate, true);
+  assert.equal(w.remote, true);
   assert.deepEqual([w.effort, w.tools, w.disallow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage']]);
 });
 
@@ -351,7 +352,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, disallow, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -763,6 +764,20 @@ test("`gate: true` gates a step — its closeout waits for a person — and a st
   }
   refused('gate:', /^plan: `gate` has no value\. Delete the line rather than leaving it blank/);
   refused('gate: true\ngate: true', /^plan: `gate` is set twice/);
+});
+
+test("`remote: true` bridges a step's sessions to claude.ai, `remote: false` does not, and a step without the line has neither; REFUSED at load: a word that is not `true` or `false`, no value, and the line twice", () => {
+  assert.equal(fm('implement', 'remote: true').remote, true);
+  assert.equal(fm('implement', 'remote: false').remote, false, 'the author said no, and it is kept');
+  assert.equal(fm('implement', 'check: npm test').remote, undefined, 'never a default');
+  // Which harness bridges a session is the engine's to say, at `wf start`: the parser reads the word on any.
+  assert.equal(fm('review', 'harness: codex\nremote: true').remote, true);
+  const refused = (lines: string, pattern: RegExp) => assert.throws(() => fm('implement', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
+  for (const word of ['yes', 'no', 'on', 'True', '1', 'claude']) {
+    refused(`remote: ${word}`, new RegExp(`^implement: \`remote: ${word}\` is not \`true\` or \`false\`\. \`remote: true\` bridges every session of the step to claude\.ai, where anyone signed in to the account can drive it from a browser or a phone; \`remote: false\`, or no line, does not\. Write one of the two, or delete the line\.$`));
+  }
+  refused('remote:', /^implement: `remote` has no value\. Delete the line rather than leaving it blank/);
+  refused('remote: true\nremote: false', /^implement: `remote` is set twice/);
 });
 
 test('REFUSED at load: `rounds:` on a step with no `loop:`, and rounds that are not a count above zero', () => {

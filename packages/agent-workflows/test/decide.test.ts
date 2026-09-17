@@ -53,14 +53,14 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
  * settled; the feed has each filing.
  */
 const board = () => {
-  type Filed = { id: string; closeoutSchema?: object; priority?: number };
+  type Filed = { id: string; closeoutSchema?: object; priority?: number; remoteControl?: boolean };
   const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; filedAt: number }>();
   const T0 = Date.parse('2026-09-13T00:00:00Z');
   const iso = (ms: number) => new Date(ms).toISOString();
   const logs = new Map<string, string>();
   /** How many times each task was viewed: every view is a harness observe. */
   const viewed = new Map<string, number>();
-  /** Whether a view's record carries the fields the task was filed with that no screen reads — `priority` — as the engine's does. */
+  /** Whether a view's record carries the fields the task was filed with that no screen reads — `priority`, `remoteControl` — as the engine's does. */
   const carries = { on: true };
   const e = {
     view: async (id: string) => {
@@ -71,7 +71,7 @@ const board = () => {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
           brief: t ? 'filed' : '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false,
-          ...(t && carries.on ? { priority: t.spec.priority } : {}),
+          ...(t && carries.on ? { priority: t.spec.priority, remoteControl: t.spec.remoteControl } : {}),
           attempts: !t || t.phase === 'pending' ? [] : [{
             n: 1, startedAt: iso(t.filedAt + 5_000), spawnedAt: iso(t.filedAt + 12_000),
             endedAt: settled ? iso(t.filedAt + 300_000) : null, reason: settled ? 'harness' : null,
@@ -93,10 +93,10 @@ const board = () => {
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const USAGE = { turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000 };
 
-/** `implement`, checked by `npm test`, then `review`, with no check. */
-const folder = () => {
+/** `implement`, checked by `npm test` and with whatever other keys it is given, each ending with a newline, then `review`, with no check. */
+const folder = (implementKeys = '') => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.md'), `---\ncheck: npm test\n${implementKeys}---\nimplement it\n`);
   fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\n---\nreview it\n');
   return dir;
 };
@@ -105,9 +105,9 @@ const folder = () => {
  * A run waiting on you: implement verified, with usage; review unverified, with none. Its branch weakened
  * a test, added to a source file, wrote a lesson in CLAUDE.md and added a binary file.
  */
-const awaiting = async () => {
+const awaiting = async (implementKeys = '') => {
   const repo = aRepo();
-  const run = start({ brief: 'add sub', repo, workflowDir: folder(), isolate: false });
+  const run = start({ brief: 'add sub', repo, workflowDir: folder(implementKeys), isolate: false });
   const branch = `wf/${run.id}`;
   branchOff(repo, branch, () => {
     fs.appendFileSync(path.join(repo, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
@@ -201,14 +201,15 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   assert.ok(git(repo, 'branch', '--list', branch).trim(), 'the branch is still there');
 });
 
-test("`wf decide` and `wf ls` say nothing of a run's momentum: the same screens, line for line, whether the engine's record carries the `priority` the run's later filings were made with or not", async (t) => {
-  const { run, e, carries, filed } = await awaiting();
-  assert.deepEqual([`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`].map((id) => filed(id)?.priority), [undefined, 1, 1], 'filed with it');
+test("`wf decide` and `wf ls` say nothing of a run's momentum or a step's Remote Control: the same screens, line for line, whether the engine's record carries the `priority` and `remoteControl` the run's filings were made with or not", async (t) => {
+  const { run, e, carries, filed } = await awaiting('remote: true\n');
+  const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
+  assert.deepEqual(ids.map((id) => [filed(id)?.priority, filed(id)?.remoteControl]), [[undefined, true], [1, undefined], [1, undefined]], 'filed with them');
   const screens = async () => ({ decide: await screen(t, e, run.id), ls: await listed(t, e, run.id) });
   const carried = await screens();
   carries.on = false;
   assert.deepEqual(await screens(), carried);
-  assert.ok(!Object.values(carried).flat().some((l) => /priority|momentum/i.test(l)), [...carried.decide, ...carried.ls].join('\n'));
+  assert.ok(!Object.values(carried).flat().some((l) => /priority|momentum|remote|bridge/i.test(l)), [...carried.decide, ...carried.ls].join('\n'));
 });
 
 test('--sensitive with a glob that matches nothing prints the heading, and none', async (t) => {

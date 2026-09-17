@@ -99,7 +99,7 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `effort`,
-`permissionMode`, `tools`, `disallow`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`, `gate`, `output`, `loop`,
+`permissionMode`, `tools`, `disallow`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`, `gate`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
 
@@ -189,6 +189,27 @@ are copies of agent-engine's `CLAUDE_PERMISSION_MODES`, `CLAUDE_EFFORTS`, `CODEX
 word only when the step is filed, after the run exists. `test/vocabulary.test.ts` imports the engine's
 lists and fails the moment a copy differs. The first copies had drifted: the engine took `manual` and
 codex's `bypassPermissions`, and the parser refused both. To change a word, change the engine, then the copy.
+
+### Who may drive a step's session: `remote:`
+
+```md
+---
+remote: true     # every session of this step is bridged to claude.ai, and can be driven from a phone
+---
+Implement what was asked, in this repository.
+```
+
+`remote: true` is carried on every filing of the step — the first, each try and each round — as the engine's `remoteControl: true`, so
+Claude Code's `--bg` session is started with `--remote-control` and listed in the web's agents view (agent-engine's README, *Reachable
+from a phone*). There anyone signed in to the account can **drive** it — type into it, answer its prompts, stop it — from a browser or a
+phone, and not only watch it. So it is a deliberate setting, never a default: a step without the line, or with `remote: false`, is not
+bridged, and a step's check never is.
+
+Refused at load: any word but `true` or `false` — `remote: yes` is refused by name — an empty value, and the line twice. Refused at
+`wf start`, with nothing written, on a harness the engine refuses `remoteControl` for, in the engine's words: `codex` and
+`claude-detached` run a prompt and exit, and only a Claude Code background session, `claude`, is bridged. The words are a copy, since
+`start` cannot wait on the engine's door; `test/store.test.ts` asks the engine and fails the moment they differ. `wf ls` and `wf decide`
+say nothing of it yet.
 
 ### What a step may spend: `budget:`
 

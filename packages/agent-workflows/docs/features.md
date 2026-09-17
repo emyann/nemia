@@ -2859,6 +2859,42 @@ not offer is named, not worked around. The lockfile committed with the dependenc
 
 One `dev-planned-build` run, the plan waiting for approval; likely the largest apps change so far.
 
+## 8. A finished run is a decision waiting on a person, and shipping is a task
+
+**Registered** 2026-09-17, by the operator: a card started from the Inbox finished its run and, with nothing asking for a
+merge, it seemed to vanish — off the Factory (which shows runs in flight), a row in the Runs list among the finished, its
+result branch waiting for `wf decide` that nobody was told to run. "Since we don't have a guard at the end of this
+workflow that asks me to merge, it is just like it vanished."
+
+**What exists.** The run boundary is the gate (plan §5): a finished run's result is a branch, `wf decide` says ship it or
+drop it, and a person merges after a trial merge runs the suite. The board says `finished` and links `wf decide`; its
+"waiting on you" covers blocked, unsigned, over budget and at a gate — not a result nobody has decided. The Runs page
+groups in flight and finished; the Factory hides the finished by default. Nothing counts results to decide, and nothing
+on the board can merge.
+
+**What it needs.**
+
+- **The vocabulary:** a run at its result whose branch is not on the base and not deleted is *to decide* — a fifth reason a
+  run waits on a person, in `wf ls` (`→ to decide: ship it or drop it — wf decide <run>`), `listing`, and the api's `onYou`.
+  Shipped (the branch on the base), dropped (the branch gone) or forgotten (`wf rm`) ends it. Level-triggered: read off git
+  each pass, as `runReady` reads a parent.
+- **The board:** the Factory's header counts them (`2 to decide`) and keeps a to-decide card on the floor, marked, until it
+  is decided; the Runs page groups *To decide* between *In flight* and *Finished*; the run page's banner says it.
+- **Shipping as a task.** `wf ship <run>` files the trial merge as an engine task on the `check` harness — `git merge
+  --no-ff --no-commit <branch> && npm test && npm run typecheck [&& npm run build && npm run e2e] && git commit`, or
+  `git merge --abort` on any failure — so it outlives a tick, is stopped by `wf cancel`, has a deadline, and its exit
+  code is the verdict: `shipping`, then `shipped` or `ship failed (exit 1)` with the log. The command is the workflow's to
+  declare (`ship:` on the folder's README or a step key on the last step, default the check of its last checked step), never
+  a checkout's. The board offers Ship and Drop on a to-decide run — the seventh and eighth guarded writes after the builder's
+  — which is what a phone needs once Remote Control (§2) lands. `wf decide` keeps its commands for the person who wants
+  them by hand.
+- **The watch:** whoever supervises (§2's supervisor, or the operator's session) reads *to decide* off `wf ls`, not off the
+  ids it filed: a card the operator starts from the board is theirs to be asked about too.
+
+One agent-workflows run (the vocabulary, `wf ship`, the ship task, tests that refuse: a ship of a run not at its result, of
+one whose branch is gone, of one already shipped; a failed trial merge aborted with the tree clean), then one apps run
+(the counts, the group, Ship and Drop on the run page, e2e with a to-decide run in the seed).
+
 ## Engine-side work
 
 Not agent-workflows features, listed so nothing is lost:

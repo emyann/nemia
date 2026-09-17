@@ -445,9 +445,11 @@ function SidebarGroupContent({
   )
 }
 
-function SidebarMenu({ className, ...props }: React.ComponentProps<"div">) {
+// Local edit: the registry's aria-nova draws the menu as a `div` of `div`s, where radix-nova drew a list, and its own `SidebarMenuSub`
+// still does. A list, so a screen reader says how many places the menu has. Nothing of React Aria is involved.
+function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   return (
-    <div
+    <ul
       data-slot="sidebar-menu"
       data-sidebar="menu"
       className={cn("flex w-full min-w-0 flex-col gap-0", className)}
@@ -456,9 +458,9 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function SidebarMenuItem({ className, ...props }: React.ComponentProps<"div">) {
+function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
-    <div
+    <li
       data-slot="sidebar-menu-item"
       data-sidebar="menu-item"
       className={cn("group/menu-item relative", className)}

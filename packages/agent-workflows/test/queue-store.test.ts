@@ -509,3 +509,32 @@ test('REFUSED at shipped defaults: a queued card whose start the package refuses
   assert.deepEqual(retried.queue, { card: 'gone-a1b2', run: back!.id, removed: true });
   assert.deepEqual(fs.readdirSync(path.join(ROOT, 'queue')), [], 'its refusal removed once the card no longer read as refused');
 });
+
+test("REFUSED at shipped defaults: a queued card whose `repo:` folder was deleted keeps its place, is tried, and its start refused by name on `wf tick` and in `wf inbox`, the card left as it is — the card behind it starts on the next pass, and `--off` takes it back", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const repo = aRepoWith('dev');
+  const doomed = aRepoWith('dev');
+  const gone = aCard('gone-a1b2', { workflow: 'dev', repo: doomed, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository is gone');
+  aCard('behind-c3d4', { workflow: 'dev', repo, queued: '2026-09-16T09:05:00.000Z' }, 'Behind it');
+  fs.rmSync(doomed, { recursive: true, force: true });
+  const text = fs.readFileSync(gone, 'utf8');
+
+  const why = `gone-a1b2.md: \`repo: ${doomed}\` names no directory. Correct it to the repository the idea is about, or delete the line, and the card is started on the repository its start names.`;
+  assert.deepEqual(await printedBy(t, b.e, 'tick'), [
+    `gone-a1b2 not started: ${why} — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (wf inbox queue gone-a1b2 --off, then wf inbox queue gone-a1b2)`,
+  ]);
+  assert.deepEqual([fs.readFileSync(gone, 'utf8'), listRuns()], [text, []], 'the card as it was, and no run');
+  const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('gone-a1b2'))!;
+  assert.match(listed, new RegExp(`^gone-a1b2 +${why.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}  queued 1 of 2 — not started at \\S+ Edit the card, or take it back and queue it again, and the tick tries it again$`));
+
+  const next = await tick(b.e);
+  const [behind] = fromCard('behind-c3d4');
+  assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind!.id, removed: true });
+
+  // Taken back though its repository is gone, and listed with why, out of the queue.
+  assert.deepEqual(await printedBy(t, b.e, 'inbox', 'queue', 'gone-a1b2', '--off'), [`gone-a1b2  taken back: it no longer starts on its own — start it with wf start ${gone}`]);
+  assert.equal(fs.readFileSync(gone, 'utf8'), `---\nworkflow: dev\nrepo: ${doomed}\n---\nIts repository is gone\n`);
+  assert.equal(readInbox().find((l) => l.name === 'gone-a1b2')!.queued, undefined);
+  await assert.rejects(main(['inbox', 'queue', 'gone-a1b2'], b.e), refusedWith(/^gone-a1b2\.md: `repo: .*` names no directory\./), 'and queued again only once it reads');
+});

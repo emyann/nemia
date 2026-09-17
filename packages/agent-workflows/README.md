@@ -1322,7 +1322,9 @@ up — every 4000ms, ^C to stop
   `startFromInbox` refuses: `wf up`'s line names it, `wf inbox` says `not started at <time>: <why>` beside the card's place,
   and the card is left as it is. The tick keeps the refusal in `$WF_ROOT/queue/<name>.json` with the card's text, and passes
   over the card while its text is the same: one try, no hot loop, and the card behind it has its turn. Edit the card, or take
-  it back and queue it again, and the next pass tries it again.
+  it back and queue it again, and the next pass tries it again. A card whose `repo:` folder was deleted after it was queued no
+  longer reads as a card, and keeps its place all the same: `wf inbox` lists why beside `queued 1 of 2`, the tick tries it and
+  names the refusal, and `--off` takes it back.
 - **Refused by name**, exit 2, before anything is written: a name with no card, naming the cards there are; a card with no
   `workflow:` and no `--workflow` — `--workflow <w>` writes both; a card already queued, with its place, and `--off` to take it
   back first; a card a run was started from; and `--off` beside `--workflow`. `--off` on a card not queued says so, exit 0.

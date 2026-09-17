@@ -1968,6 +1968,13 @@ Round 2's review found three things, each fixed:
   and `runSlots` reads the cap there, falling back to the shell's own only before any pass has written it. Tested in
   `test/queue-store.test.ts` through `wf ls` and `wf decide`, run with no `WF_MAX_RUNS`, with `5`, `1` and `two`; with the file removed, the
   shell's own; and a pass with no cap writing `0`, which a shell setting `1` reads. Reading the shell again, and a pass not writing, fail it.
+- **A queued card whose `repo:` folder was deleted left the queue with nothing said.** `parseInboxCard` refuses a `repo:` that names no
+  directory, so the listing had no `queued` for it, and no pass tried it: `wf up` said nothing, though the brief names the repository gone as
+  a refusal said there. `inboxListing` now reads such a card's `queued:` without the directory check, so it keeps its place beside why it
+  does not read; the tick tries it, `startFromInbox` refuses it by name, and the refusal is written down as any. `--off` takes it back without
+  the check. Tested pure in `test/inbox.test.ts` — a card with another fault is in no queue — and in `test/queue-store.test.ts`, deleting a
+  queued card's repository: named on `wf tick` and in `wf inbox`, the card behind it started on the next pass, and taken back. Leaving it out
+  of the queue fails two; `--off` with the check, one.
 
 What it leaves:
 

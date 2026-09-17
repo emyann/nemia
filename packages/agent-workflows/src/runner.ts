@@ -1080,18 +1080,20 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
     throw new WorkflowError(`${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`);
   }
-  const card = parseInboxCard(`${name}.md`, text, isDirectory);
+  // Taken back whatever its `repo:` names: a card whose repository is gone leaves the queue as any card does, and is listed with why.
+  const exists = how.off ? () => true : isDirectory;
+  const card = parseInboxCard(`${name}.md`, text, exists);
   if (how.off && card.queued === undefined) return { card, file, was: 'not queued' };
   if (!how.off) {
     const listing = readInbox();
     const why = queueRefusal(card, file, listing.find((l) => l.name === name)?.startedAs ?? [], listing.find((l) => l.name === name)?.queued?.place ?? null, how.workflow);
     if (why) throw new WorkflowError(why);
   }
-  const written = queuedText(card, how.off ? null : new Date().toISOString(), isDirectory, how.workflow);
+  const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
   const hidden = path.join(inboxDir(), `.${name}.md.${process.pid}`);
   fs.writeFileSync(hidden, written);
   fs.renameSync(hidden, file);
-  const now = parseInboxCard(`${name}.md`, written, isDirectory);
+  const now = parseInboxCard(`${name}.md`, written, exists);
   if (how.off) return { card: now, file, was: 'taken back' };
   const order = queueOrder(readInbox());
   const place = order.findIndex((l) => l.name === name) + 1;

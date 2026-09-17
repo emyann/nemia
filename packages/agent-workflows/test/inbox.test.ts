@@ -266,3 +266,26 @@ test("`queueLine`: what `wf up` logs of the queue — `started <card> as <runId>
   assert.equal(queueLine({ card: 'cache-the-views-k2q9', refused: 'cache-the-views-k2q9.md: `workflow: nope` — no workflow folder.' }),
     'cache-the-views-k2q9 not started: cache-the-views-k2q9.md: `workflow: nope` — no workflow folder. — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (wf inbox queue cache-the-views-k2q9 --off, then wf inbox queue cache-the-views-k2q9)');
 });
+
+test("a queued card whose `repo:` names no directory any more keeps its place in the queue, beside why it does not read — so the tick tries it and the start refuses it by name — while a card that does not read for another reason is in no queue", () => {
+  const gone = '---\nworkflow: dev\nrepo: /home/me/code/gone\nqueued: 2026-09-16T09:00:00.000Z\n---\nIts repository is gone\n';
+  const files = [
+    { file: 'gone-a1b2.md', text: gone },
+    { file: 'behind-c3d4.md', text: '---\nworkflow: dev\nrepo: /home/me/code/app\nqueued: 2026-09-16T09:05:00.000Z\n---\nBehind it\n' },
+    { file: 'broken-e5f6.md', text: '---\nworkflow: dev\nharness: codex\nqueued: 2026-09-16T08:00:00.000Z\n---\nA key it does not have\n' },
+  ];
+  const why = 'gone-a1b2.md: `repo: /home/me/code/gone` names no directory. Correct it to the repository the idea is about, or delete the line, and the card is started on the repository its start names.';
+  const listing = inboxListing(files, [], isDirectory);
+  assert.deepEqual(listing.map((l) => [l.name, l.error?.slice(0, 40) ?? null, l.queued]), [
+    ['behind-c3d4', null, { at: '2026-09-16T09:05:00.000Z', place: 2 }],
+    ['broken-e5f6', 'broken-e5f6.md: `harness` is not a key a', undefined],
+    ['gone-a1b2', why.slice(0, 40), { at: '2026-09-16T09:00:00.000Z', place: 1 }],
+  ]);
+  assert.equal(nextQueued(listing)?.name, 'gone-a1b2', 'the tick tries it, and the start says why');
+
+  // Once refused as it stands, passed over, and `wf inbox` says so beside why it does not read — without saying that twice.
+  const refused = inboxListing(files, [], isDirectory, new Map([['gone-a1b2', { at: '2026-09-16T10:00:00.000Z', text: gone, why }]]));
+  assert.equal(nextQueued(refused)?.name, 'behind-c3d4');
+  assert.equal(inboxLines(refused).at(-1),
+    `gone-a1b2    ${why}  queued 1 of 2 — not started at 2026-09-16T10:00:00.000Z Edit the card, or take it back and queue it again, and the tick tries it again`);
+});

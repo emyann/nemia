@@ -183,7 +183,16 @@ export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run
           ...(refusal && refusal.text === text ? { refused: { at: refusal.at, why: refusal.why } } : {}),
         };
       } catch (err) {
-        return { name, file, title: null, workflow: null, repo: null, startedAs, error: (err as Error).message };
+        // A queued card whose `repo:` is gone reads as a card but for that, and keeps its place in the queue: the tick tries it, and the start
+        // refuses it by name, as it refuses a workflow gone — never a card that leaves the queue with nothing said.
+        let queued: string | undefined;
+        try { queued = parseInboxCard(file, text, () => true).queued; } catch { /* not a card for another reason: not in the queue */ }
+        const refusal = queued !== undefined ? refusals.get(name) : undefined;
+        return {
+          name, file, title: null, workflow: null, repo: null, startedAs, error: (err as Error).message,
+          ...(queued !== undefined ? { queued: { at: queued, place: null } } : {}),
+          ...(refusal && refusal.text === text ? { refused: { at: refusal.at, why: refusal.why } } : {}),
+        };
       }
     });
   queueOrder(listed).forEach((l, i) => { l.queued!.place = i + 1; });
@@ -225,10 +234,12 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
-    if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${started}`;
-    // Its place in the queue, and, when the tick's start of it was refused as it stands, why: it waits for a person, not for a slot.
+    // Its place in the queue, and, when the tick's start of it was refused as it stands, why: it waits for a person, not for a slot. A card
+    // that does not read says why beside its name already, and is not told it twice.
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
-    const refused = l.refused ? ` — not started at ${l.refused.at}: ${l.refused.why} Edit the card, or take it back and queue it again, and the tick tries it again` : '';
+    const why = l.refused && l.refused.why !== l.error ? `: ${l.refused.why}` : '';
+    const refused = l.refused ? ` — not started at ${l.refused.at}${why} Edit the card, or take it back and queue it again, and the tick tries it again` : '';
+    if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${refused}${started}`;
     return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${queued}${refused}${started}`;
   });
 }

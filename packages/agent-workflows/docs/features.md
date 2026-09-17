@@ -2818,6 +2818,10 @@ What was built, four commits:
   honoured: `wf approve <run> ship` and `wf retry <run> review --message "<objection>"`. The test that pinned it used an alternation,
   `/^review is awaiting approval|--message/`, which passed whatever the sentence said; the sentence is pinned now, and refused again at the
   store on `err.message`. Found by the review, round 4.
+- **`decision` and `gateLines` take the same `unheld` adjustment `assess` and `listing` take.** Between `wf retry <run> <the work>
+  --message` and the pass that files it, `wf decide`'s `gates` offered `wf approve <run> ship` — the very approval `approvalRefusal` was
+  refusing in that moment, while `wf ls` showed ship waiting. `decision`'s `statusOf` and `gateLines` now read an un-held ending as the
+  waiting step it is, `gateLines` taking the asks as `listing` does, so one vocabulary reads the window one way. Found by the review, round 4.
 - **`--no-worktree` is refused on a folder whose last step merges** (`stepsToStart`), before a run is written: such a run works on the base
   branch itself, so there is no result branch for the ending to merge — it would be told the work is on the branch it is standing on, merge
   a branch into itself, and pay for the folder's whole check to find nothing to commit. Found by the review, round 3.

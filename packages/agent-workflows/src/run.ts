@@ -2921,7 +2921,11 @@ export function decision(
   const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   // A step a round due files again is held on no budget (`roundSpans`), as `assess` reads it.
   const refiled = roundSpans(steps, round);
-  const statusOf = new Map(steps.map((s) => [s.name, refiled.has(s.name) ? standingOf.get(s.name)!.own : standingOf.get(s.name)!.status]));
+  // Nor does an ending hold its gate while the work it would act on is filed again (`unheld`), as `assess` and `listing` read it: one
+  // vocabulary, so this screen cannot offer an approval `wf approve` refuses while `wf ls` calls the same step waiting.
+  const waitingAgain = unheld(steps, run, retry, round);
+  const statusOf = new Map<string, StepStatus>(steps.map((s) => [s.name,
+    waitingAgain.has(s.name) ? 'waiting' : refiled.has(s.name) ? standingOf.get(s.name)!.own : standingOf.get(s.name)!.status]));
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
     // whose check is still running is one of them: its agent has finished, its verdict has not.
@@ -2932,7 +2936,7 @@ export function decision(
     // An ending step waiting for the repository's own checkout is waited on too: its approval is given, and what holds it is another run's
     // step in that directory (`heldCheckouts`). Never one whose own work is being said again, which is what it waits for first (`unheld`).
     const waitsForCheckout = checkout
-      ? steps.filter((s) => s.workspace === 'main' && !run.steps[s.name]?.taskId && !unheld(steps, run, retry, round).has(s.name)).map((s) => s.name)
+      ? steps.filter((s) => s.workspace === 'main' && !run.steps[s.name]?.taskId && !waitingAgain.has(s.name)).map((s) => s.name)
       : [];
     // A step the next tick tries again is waited on too: nothing is decided about it yet. So is a loop going round again. A step whose
     // blocked session the tick stops first is both live and due, and named once.
@@ -3669,10 +3673,19 @@ export function gateLines(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   spendOf: SpendOf = () => undefined,
+  /** What people asked for with `wf retry`, and the run has not consumed yet: what un-holds an ending's gate (`unheld`). */
+  asks: readonly RetryAsk[] = [],
+  /** What people asked for with `wf round`, and the run has not consumed yet: the same. */
+  roundAsks: readonly RoundAsk[] = [],
 ): Record<string, string> {
   const lines: Record<string, string> = {};
+  // An ending whose work this pass files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it: between a person's
+  // send-back and the pass that honours it, this offered the approval that `wf approve` was refusing at the same moment.
+  const waitingAgain = unheld(steps, run,
+    retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, () => false, spendOf),
+    roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf));
   for (const step of steps) {
-    if (!hasGate(step, run)) continue;
+    if (!hasGate(step, run) || waitingAgain.has(step.name)) continue;
     const given = approvalOf(run, step.name);
     if (given) {
       lines[step.name] = `approved ${given.at.slice(11, 16)}Z${given.message !== undefined ? ` — "${given.message}"` : ''}`;

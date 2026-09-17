@@ -2918,7 +2918,7 @@ export async function decide(e: Engine, id: string): Promise<{
     runCost: runCostLines(run, spendOf),
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
-    gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf),
+    gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
     waiting: waitsOf(run, await parentsOf(e, run)),
     said,
     timeline: timeline(run, everyTry, filed, steps),

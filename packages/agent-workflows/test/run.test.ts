@@ -3478,9 +3478,22 @@ test("REFUSED while a send-back is being filed: an ending held at its gate reads
   assert.deepEqual(unheld(ENDS, atEnd(), a.retry, a.round), new Set(['ship']));
   const l = listing(ENDS, atEnd(), (id: string) => (id === 't1' || id === 't2' ? 'succeeded' : 'unknown'), signedDone, asked, () => undefined, [ask]);
   assert.deepEqual([l.steps[2]!.status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
-  // The ask taken back, the gate holds again: nothing was stored either way.
+
+  // All three read the window the same way, and `wf approve` refuses in it: `wf decide` names the work as what the run waits on and says
+  // nothing of the ending's gate, where it used to print the approval that was being refused at that same moment.
+  const d = decision(ENDS, atEnd(), DONE, () => false, signedDone, asked, () => undefined, [ask]);
+  assert.deepEqual([d.kind, d.kind === 'running' ? d.waiting : []], ['running', ['review']]);
+  assert.deepEqual(gateLines(ENDS, atEnd(), DONE, signedDone, asked, () => undefined, () => undefined, [ask]), {});
+  assert.match(String(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [ask])),
+    /^try 2 of review is asked for \(--nudge, at 2026-09-17T09:00:00\.000Z\), and ship acts on what it changes/);
+
+  // The ask taken back, the gate holds again: nothing was stored either way — and all three say so again.
   assert.deepEqual(assess(ENDS, atEnd(), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, AHEAD).toDecide?.kind, 'approve');
   assert.deepEqual(unheld(ENDS, atEnd(), [], []), new Set());
+  assert.deepEqual(gateLines(ENDS, atEnd(), DONE, signedDone, asked), {
+    ship: 'awaiting approval:  wf approve r-1 ship [--message "<words>"]  — or send it back:  wf retry r-1 review --message "<objection>"',
+  });
+  assert.equal(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked), null);
 });
 
 test("a gate on the last step of a folder that merges nothing: approving accepts what it did, so `says` is its closeout's, not its prose — and the branch is still a person's once approved", () => {

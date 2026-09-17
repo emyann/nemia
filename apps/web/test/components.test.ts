@@ -1283,17 +1283,22 @@ const READ_ONLY: ReadOnlyCommands = {
 };
 /** What a Claude Code step allowed `npm test` gets, in `dontAsk` or not. */
 const allowedTo = (dontAsk: boolean): StepReach['allowed'] => ({
-  rules: ['Bash(npm test)'], takenBack: [], unused: [], bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [] }], exceptions: [], dontAsk, why: null,
+  rules: ['Bash(npm test)'], takenBack: [], asked: [], unused: [], bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] }], exceptions: [], dontAsk, why: null,
 });
-const readOnlyReach = (denied: Record<string, string> = {}): NonNullable<StepReach['readOnly']> => [
+/** The read-only commands as the api gives them to a step: `denied` by a deny rule, and `asks` by an ask rule — which, `dontAsk`, the api gives as the rule that denies it too. */
+const readOnlyReach = (denied: Record<string, string> = {}, asks: Record<string, string> = {}, dontAsk = false): NonNullable<StepReach['readOnly']> => [
   ...READ_ONLY.measured.map((command) => ({ command, measured: true })),
   ...READ_ONLY.documented.map((command) => ({ command, measured: false })),
-].map((c) => ({ ...c, denied: denied[c.command] ? { rule: denied[c.command]!, source: '.claude/settings.json' } : null }));
+].map((c) => {
+  const rule = (of: Record<string, string>) => (of[c.command] ? { rule: of[c.command]!, source: '.claude/settings.json' } : null);
+  return { ...c, denied: rule(denied) ?? (dontAsk ? rule(asks) : null), asks: rule(asks) };
+});
 const allowedMarkup = (allowed: StepReach['allowed'], readOnly: StepReach['readOnly']) =>
   renderToStaticMarkup(createElement(AllowedReach, { allowed, readOnly, commands: READ_ONLY }));
-/** Each read-only command drawn, as `command[:documented][:denied rule]`. */
+/** Each read-only command drawn, as `command[:documented][:denied rule][:asks rule]`. */
 const readOnlyChips = (html: string) =>
-  [...html.matchAll(/<code data-read-only="([^"]+)"( data-documented="true")?(?: data-denied="([^"]+)")?/g)].map(([, c, documented, denied]) => [c, documented ? ':documented' : '', denied ? `:${unescaped(denied)}` : ''].join(''));
+  [...html.matchAll(/<code data-read-only="([^"]+)"( data-documented="true")?(?: data-denied="([^"]+)")?(?: data-asks="([^"]+)")?/g)].map(([, c, documented, denied, asks]) =>
+    [c, documented ? ':documented' : '', denied ? `:${unescaped(denied)}` : '', asks ? `:asks ${unescaped(asks)}` : ''].join(''));
 
 test("in dontAsk, a step with Bash is not told that every command no rule allows is denied: Claude Code's read-only commands ask for none, measured apart from documented, dated — then what the settings allow of what asks", () => {
   const html = allowedMarkup(allowedTo(true), readOnlyReach());
@@ -1319,6 +1324,58 @@ test('REFUSED: a read-only command a deny covers is drawn struck, with the deny 
   assert.deepEqual(readOnlyChips(shut), []);
   assert.deepEqual(textsOf(shut), ['Bash it may run', why]);
   assert.deepEqual(readOnlyChips(allowedMarkup({ ...allowedTo(false), why }, null)), []);
+});
+
+test('REFUSED: a read-only command an ask rule covers is drawn asking, with the rule said beside it — struck in dontAsk, which denies what asks — and with no ask rule, nothing of it is drawn', () => {
+  // The finding: `ask: ["Bash(cat:*)"]` on a dontAsk step drew cat solid under "do not ask", and its cat is denied.
+  const html = allowedMarkup(allowedTo(true), readOnlyReach({}, { cat: 'Bash(cat:*)' }, true));
+  assert.deepEqual(readOnlyChips(html), ['cat:Bash(cat:*):asks Bash(cat:*)', 'grep', 'find:documented', 'git:documented']);
+  assert.match(html, /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave, and dontAsk denies what asks" class="[^"]*line-through/);
+  assert.ok(textsOf(html).includes('cat asks, by Bash(cat:*) (.claude/settings.json), which dontAsk denies.'), textsOf(html).join(' | '));
+
+  // Outside dontAsk it asks: not struck, and not drawn as running.
+  const asking = allowedMarkup(allowedTo(false), readOnlyReach({ find: 'Bash(find:*)' }, { cat: 'Bash(cat:*)', git: 'Bash(git:*)' }));
+  assert.deepEqual(readOnlyChips(asking), ['cat:asks Bash(cat:*)', 'grep', 'find:documented:Bash(find:*)', 'git:documented:asks Bash(git:*)']);
+  assert.match(asking, /<code data-read-only="cat" data-asks="Bash\(cat:\*\)" title="Asks by Bash\(cat:\*\) \(.claude\/settings.json\), which beats the harness&#x27;s own leave" class="[^"]*bg-amber-50/);
+  assert.doesNotMatch(asking.match(/<code data-read-only="cat"[^>]*>/)![0], /line-through|emerald/);
+  assert.ok(
+    textsOf(asking).includes("cat asks, by Bash(cat:*) (.claude/settings.json); find is denied, by Bash(find:*) (.claude/settings.json); read-only git asks, by Bash(git:*) (.claude/settings.json)."),
+    textsOf(asking).join(' | '),
+  );
+
+  // No ask rule: no command marked asking, and no sentence of what is taken.
+  for (const dontAsk of [true, false]) {
+    const plain = allowedMarkup(allowedTo(dontAsk), readOnlyReach());
+    assert.doesNotMatch(plain, /data-asks|data-read-only-taken/);
+  }
+});
+
+test('REFUSED: an allow an ask rule takes back is drawn apart, with the rule — struck in dontAsk — and a narrower ask rule is said beside the allow it falls in', () => {
+  const settings = (rule: string) => ({ rule, source: '.claude/settings.json' });
+  const allowed = (dontAsk: boolean): StepReach['allowed'] => ({
+    ...allowedTo(dontAsk),
+    rules: ['Bash(npm test)', 'Bash(npx turbo run test:*)'],
+    asked: [{ rule: 'Bash(git diff:*)', by: settings('Bash(git:*)') }],
+    bash: [
+      { rule: 'Bash(npm test)', command: 'npm test', except: [], asks: [] },
+      { rule: 'Bash(npx turbo run test:*)', command: 'npx turbo run test:*', except: ['Bash(npx turbo run test e2e)'], asks: ['Bash(npx turbo run test build)'] },
+    ],
+    exceptions: [{ rule: 'Bash(npx turbo run test:*)', except: ['Bash(npx turbo run test e2e)'], asks: ['Bash(npx turbo run test build)'] }],
+  });
+  const shut = allowedMarkup(allowed(true), readOnlyReach());
+  assert.ok(textsOf(shut).includes('Taken back by an ask rule, which beats an allow, and dontAsk denies what asks:'), textsOf(shut).join(' | '));
+  assert.match(shut, /<code data-asked="Bash\(git diff:\*\)" title="Asks by Bash\(git:\*\) \(.claude\/settings.json\)" class="[^"]*line-through/);
+  assert.doesNotMatch(shut, /data-bash="git diff/, 'not drawn among what it may run');
+  assert.match(shut, /data-asks="npx turbo run test:\*"[^>]*>and asks for Bash\(npx turbo run test build\), which dontAsk denies</);
+  assert.doesNotMatch(shut, /data-asks="npm test"/);
+
+  const open = allowedMarkup(allowed(false), readOnlyReach());
+  assert.ok(textsOf(open).includes('Taken back by an ask rule, which beats an allow: these ask.'), textsOf(open).join(' | '));
+  assert.match(open, /<code data-asked="Bash\(git diff:\*\)"[^>]*class="[^"]*bg-amber-50/);
+  assert.match(open, /data-except="Bash\(npx turbo run test:\*\)"[^>]*>except Bash\(npx turbo run test e2e\)</);
+  assert.match(open, /data-asks="Bash\(npx turbo run test:\*\)"[^>]*>and asks for Bash\(npx turbo run test build\)</);
+  assert.doesNotMatch(open, /dontAsk denies/);
+  assert.doesNotMatch(allowedMarkup(allowedTo(true), readOnlyReach()), /Taken back by an ask rule/);
 });
 
 test("outside dontAsk the settings' allow rules are listed, and the read-only commands after them, in every mode", () => {

@@ -49,6 +49,11 @@ export type Capabilities = {
   mcp: McpServer[];
   denied: DeniedRule[];
   /**
+   * `permissions.ask` in `.claude/settings.json`, in its order: what asks whatever an allow rule or the harness's own leave says — Claude Code
+   * reads them after the deny rules and before the allow rules. In `dontAsk`, where nothing asks, what they match is denied.
+   */
+  asked: DeniedRule[];
+  /**
    * `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking, beside what asks for no rule — Claude Code's
    * read-only commands (`READ_ONLY_COMMANDS`) among it. In `dontAsk`, all it runs of what asks.
    */
@@ -77,6 +82,7 @@ export async function capabilitiesOf(
   const warnings: string[] = [];
   const settings = jsonAt(repo, SETTINGS, warnings, 'nothing is read as denied or enabled from it');
   const deny = stringsAt(settings, ['permissions', 'deny'], warnings);
+  const ask = stringsAt(settings, ['permissions', 'ask'], warnings);
   const allow = stringsAt(settings, ['permissions', 'allow'], warnings);
   const enabled = enabledBy(settings, warnings);
   const declared = declaredServers(jsonAt(repo, MCP_JSON, warnings, 'no MCP server is listed from it'), warnings);
@@ -115,6 +121,7 @@ export async function capabilitiesOf(
     agents: agentsOf(repo, warnings),
     mcp,
     denied: deny.map((rule) => ({ rule, source: SETTINGS })),
+    asked: ask.map((rule) => ({ rule, source: SETTINGS })),
     allowed: allow.map((rule) => ({ rule, source: SETTINGS })),
     warnings,
   };
@@ -157,7 +164,7 @@ export const MEASURED_TOOLS = {
 
 /**
  * The Bash commands Claude Code runs without a prompt in every mode, `dontAsk` among them, with no rule allowing them — unless a deny names
- * them. Data with its date and version, as `MEASURED_TOOLS` is: nothing here asks the harness again, and the page never says it is current.
+ * them, or an ask rule does, which makes one ask, and in `dontAsk` denied. Data with its date and version, as `MEASURED_TOOLS` is: nothing here asks the harness again, and the page never says it is current.
  *
  * `measured` ran in B9's last review (docs/plan-hold-the-bar.md §6 item 30): its session, `c342ce08`, in `dontAsk` under this repository's
  * settings, which allow none of them, ran `cat`, `ls` and `grep` alone and `head` and `tail` in a pipe, while `node -e` was denied. The api's

@@ -8,7 +8,7 @@ import path from 'node:path';
 // agent-workflows locates its store when the module loads, so point it at a scratch directory before app.ts imports it.
 process.env.WF_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-capabilities-'));
 const { app } = await import('../src/app.ts');
-const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, denyingRule, frontmatterOf, repoOf } = await import('../src/capabilities.ts');
+const { HOME_REPO, MEASURED_TOOLS, READ_ONLY_COMMANDS, capabilitiesOf, dated, denyingRule, frontmatterOf, readOnlyCommands, repoOf } = await import('../src/capabilities.ts');
 const { DISALLOW, bashCovers } = await import('../src/reach.ts');
 
 const FIXTURE_SERVER = path.join(import.meta.dirname, 'fixtures', 'mcp-server.ts');
@@ -722,14 +722,50 @@ test("REFUSED: an ask rule over a server's tool makes it ask — not allowed, th
   assert.deepEqual(asked.mcp[0].tools.map((t: { name: string; allowed: boolean }) => [t.name, t.allowed]), [['echo', false], ['wipe', false]]);
 });
 
-test("REFUSED: the measured read-only commands are only those this repository's settings allow none of — the review ran them under those settings — and none is both measured and documented", () => {
-  const settings = JSON.parse(fs.readFileSync(path.join(HOME_REPO, '.claude', 'settings.json'), 'utf8')) as { permissions?: { allow?: string[] } };
-  /** The first word of each Bash command the settings allow. */
-  const allowedFirst = new Set((settings.permissions?.allow ?? []).flatMap((rule) => /^Bash\(([^\s:)]+)/.exec(rule)?.[1] ?? []));
-  /** The commands of `names` a rule of the settings allows some form of: a run of one proves nothing of the harness's own leave. */
-  const allowed = (names: readonly string[]) => names.filter((name) => allowedFirst.has(name));
-  assert.deepEqual(allowed(READ_ONLY_COMMANDS.measured), []);
-  // Refused: `cd` and `git`, which the settings allow some of, would read as measured without a rule.
-  assert.deepEqual(allowed([...READ_ONLY_COMMANDS.measured, 'cd', 'git']), ['cd', 'git']);
-  assert.deepEqual(READ_ONLY_COMMANDS.measured.filter((c: string) => (READ_ONLY_COMMANDS.documented as readonly string[]).includes(c)), []);
+test("the read-only commands are data of the day they were measured: the list's shape and its date pinned, and settings that allow some of them change nothing of it", async () => {
+  assert.deepEqual(Object.keys(READ_ONLY_COMMANDS), ['harness', 'version', 'measuredAt', 'source', 'measured', 'documented', 'docs']);
+  assert.deepEqual(
+    { harness: READ_ONLY_COMMANDS.harness, version: READ_ONLY_COMMANDS.version, measuredAt: READ_ONLY_COMMANDS.measuredAt },
+    { harness: 'Claude Code', version: '2.1.272', measuredAt: '2026-09-15' },
+  );
+  assert.deepEqual(READ_ONLY_COMMANDS.measured, ['cat', 'grep', 'head', 'ls', 'tail']);
+  assert.equal(readOnlyCommands('READ_ONLY_COMMANDS', READ_ONLY_COMMANDS), READ_ONLY_COMMANDS, 'the shipped list passes its own guard');
+  assert.equal(dated('MEASURED_TOOLS', MEASURED_TOOLS), MEASURED_TOOLS);
+
+  // Settings that allow `ls` and `cat` — a harmless change, which the old test failed as a wrong measurement. The measurement was taken under
+  // that day's settings, and stays what it was: served as it is, each command still measured, and the allows listed as allows.
+  const repo = askingRepo({ allow: ['Bash(ls:*)', 'Bash(cat:*)'] });
+  const { body } = await served(repo);
+  assert.deepEqual(body.readOnly, READ_ONLY_COMMANDS);
+  const review = body.steps.find((s: { step: string }) => s.step === 'review');
+  assert.deepEqual(review.readOnly, readOnlyAll());
+  assert.deepEqual(review.allowed.bash, [bashRule('Bash(ls:*)'), bashRule('Bash(cat:*)')]);
+});
+
+test('REFUSED: a measurement without a date, or a version, is refused by name with the fix — and a day not on the calendar, a list naming a command twice, or docs with no day read', () => {
+  /** The shipped list, with `key` set to `value` — or left out, for undefined. */
+  const edited = (of: object, key: string, value?: unknown): any => {
+    const copy: Record<string, unknown> = { ...of };
+    if (value === undefined) delete copy[key];
+    else copy[key] = value;
+    return copy;
+  };
+  const refuses = (run: () => unknown, pattern: RegExp) =>
+    assert.throws(run, (err: Error & { exitCode?: number }) => pattern.test(err.message) && err.exitCode === 2 && /give it the day it was taken|Fix the list/.test(err.message));
+  const R = READ_ONLY_COMMANDS;
+  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'measuredAt')), /^READ_ONLY_COMMANDS has no `measuredAt` day written as 2026-09-15 \(null\)\./);
+  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'version')), /^READ_ONLY_COMMANDS has no `version` numbered as 2\.1\.272 \(null\)\./);
+  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(edited(R, 'version', ''), 'measuredAt')), /^READ_ONLY_COMMANDS has no `version` .*, no `measuredAt` day/);
+  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'version', 'latest')), /no `version` numbered as 2\.1\.272 \("latest"\)/);
+  for (const day of ['2026-02-30', '2026-13-01', 'September 15', '2026-9-15', 'today']) {
+    refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'measuredAt', day)), /no `measuredAt` day written as 2026-09-15/);
+  }
+  refuses(() => dated('MEASURED_TOOLS', edited(MEASURED_TOOLS, 'measuredAt')), /^MEASURED_TOOLS has no `measuredAt` day/);
+  refuses(() => dated('MEASURED_TOOLS', edited(MEASURED_TOOLS, 'version')), /^MEASURED_TOOLS has no `version`/);
+  refuses(() => dated('MEASURED_TOOLS', edited(MEASURED_TOOLS, 'source', ' ')), /^MEASURED_TOOLS has no `source`/);
+  // Past the date and the version, the lists themselves.
+  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'documented', [...R.documented, 'cat'])), /^READ_ONLY_COMMANDS has cat listed twice\./);
+  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'measured', [])), /no `measured` list of commands/);
+  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'measured', ['cat -n'])), /no `measured` list of commands/);
+  refuses(() => readOnlyCommands('READ_ONLY_COMMANDS', edited(R, 'docs', 'code.claude.com/docs/en/permissions')), /no `docs` ending in the day they were read/);
 });

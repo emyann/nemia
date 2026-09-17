@@ -1307,7 +1307,12 @@ test("in dontAsk, a step with Bash is not told that every command no rule allows
   assert.doesNotMatch(html, /a command no rule allows is denied/, 'the sentence B9 left, which a read-only command makes false');
   assert.ok(texts.includes("In dontAsk, a command that asks is denied without a prompt unless a rule allows it. Claude Code's read-only commands do not ask:"), texts.join(' | '));
   assert.deepEqual(readOnlyChips(html), ['cat', 'grep', 'find:documented', 'git:documented']);
-  assert.match(html, /data-read-only-measured="2026-09-15"[^>]*>The solid ones ran with no rule allowing them on 2026-09-15 with 2\.1\.272 \(B9&#x27;s last review\)\. The dashed ones are named by its docs/);
+  // The measurement is of its day: the words say so, and claim nothing of the settings or the harness today.
+  assert.ok(
+    textsOf(html).some((t) => t.startsWith("The solid ones were measured on 2026-09-15 with 2.1.272 (B9's last review): that day, under that day's settings, they ran with no rule allowing them. The dashed ones are named by its docs")),
+    textsOf(html).join(' | '),
+  );
+  assert.match(html, /<code data-read-only="cat" title="Measured on 2026-09-15, Claude Code 2\.1\.272: it ran with no rule allowing it, under that day&#x27;s settings"/);
   assert.ok(texts.includes('Of the commands that ask, the settings allow it:'), texts.join(' | '));
   assert.match(html, /<code data-bash="npm test"/);
   assert.doesNotMatch(html, /No Bash command at all/, 'a step whose settings allow no command still runs the read-only ones');

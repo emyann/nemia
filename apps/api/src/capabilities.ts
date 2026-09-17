@@ -127,6 +127,53 @@ export async function capabilitiesOf(
   };
 }
 
+/** What a measurement carries so that it is never read as current: the harness it was taken on, that harness's version, the day, and where it is recorded. */
+export type Dated = { harness: string; version: string; measuredAt: string; source: string };
+
+/**
+ * `measurement`, refused unless it says what it was taken on and when: a harness named, a version numbered as Claude Code numbers its own
+ * (`2.1.272`), a day that is on the calendar (`2026-09-15`), and where it is recorded. A list without them reads as a claim about today, which
+ * nothing here can check: the page says which day and which version, and those are all that hold it to what was measured.
+ */
+export function dated<T extends Dated>(name: string, measurement: T): T {
+  const { harness, version, measuredAt, source } = measurement as Partial<Dated>;
+  const said = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
+  const at = said(measuredAt) && /^\d{4}-\d{2}-\d{2}$/.test(measuredAt) ? new Date(`${measuredAt}T00:00:00Z`) : null;
+  // A day the calendar has: `2026-02-30` parses to no time, or to another day.
+  const day = at !== null && !Number.isNaN(at.getTime()) && at.toISOString().startsWith(measuredAt as string);
+  const wrong = [
+    ...(said(harness) ? [] : ['no `harness`']),
+    ...(said(version) && /^\d+\.\d+\.\d+$/.test(version) ? [] : [`no \`version\` numbered as 2.1.272 (${JSON.stringify(version ?? null)})`]),
+    ...(day ? [] : [`no \`measuredAt\` day written as 2026-09-15 (${JSON.stringify(measuredAt ?? null)})`]),
+    ...(said(source) ? [] : ['no `source`']),
+  ];
+  if (wrong.length === 0) return measurement;
+  throw Object.assign(
+    new Error(`${name} has ${wrong.join(', ')}. A measurement is data of one day and one version: give it the day it was taken, the version it was taken on, and where that is recorded.`),
+    { exitCode: 2 },
+  );
+}
+
+/**
+ * The read-only commands as `dated` holds a measurement, and more: `measured` and `documented` each a list of commands, one word each, with none
+ * listed twice and none both measured and documented, and `docs` saying when the docs were read.
+ */
+export function readOnlyCommands<T extends Dated & { measured: readonly string[]; documented: readonly string[]; docs: string }>(name: string, commands: T): T {
+  dated(name, commands);
+  const listed = (value: unknown): value is readonly string[] => Array.isArray(value) && value.every((c) => typeof c === 'string' && /^[a-z][\w-]*$/.test(c));
+  const { measured, documented, docs } = commands as Partial<T>;
+  const all = [...(listed(measured) ? measured : []), ...(listed(documented) ? documented : [])];
+  const twice = [...new Set(all.filter((c, i) => all.indexOf(c) !== i))];
+  const wrong = [
+    ...(listed(measured) && measured.length > 0 ? [] : ['no `measured` list of commands, one word each']),
+    ...(listed(documented) ? [] : ['no `documented` list of commands, one word each']),
+    ...(twice.length === 0 ? [] : [`${twice.join(', ')} listed twice`]),
+    ...(typeof docs === 'string' && /read \d{4}-\d{2}-\d{2}$/.test(docs) ? [] : ['no `docs` ending in the day they were read ("read 2026-09-16")']),
+  ];
+  if (wrong.length === 0) return commands;
+  throw Object.assign(new Error(`${name} has ${wrong.join(', ')}. Fix the list where it is declared.`), { exitCode: 2 });
+}
+
 /** Why a tool the fenced reviewer had is taken to be in the unfenced set: `tools:` narrows the harness's own set, and adds nothing to it. */
 const ON_THE_FENCED = "Not named by the unfenced measurement. The fenced reviewer had it the same day, and `tools:` only narrows the harness's own set.";
 /** Why Edit and Write are taken to be in it: nothing measured names them. */
@@ -144,7 +191,7 @@ const EDITS_WITH = 'Not named by any measurement. Every implement step of this r
  * MCP tools are in neither: the checkout's servers reach a step whatever its `tools:` (packages/agent-workflows/docs/features.md, measured),
  * and each lists its own.
  */
-export const MEASURED_TOOLS = {
+export const MEASURED_TOOLS = dated('MEASURED_TOOLS', {
   harness: 'Claude Code',
   version: '2.1.270',
   measuredAt: '2026-09-14',
@@ -160,18 +207,20 @@ export const MEASURED_TOOLS = {
     { name: 'Write', why: EDITS_WITH },
   ],
   lacks: ['Artifact', 'AskUserQuestion'],
-} as const;
+} as const);
 
 /**
  * The Bash commands Claude Code runs without a prompt in every mode, `dontAsk` among them, with no rule allowing them — unless a deny names
  * them, or an ask rule does, which makes one ask, and in `dontAsk` denied. Data with its date and version, as `MEASURED_TOOLS` is: nothing here asks the harness again, and the page never says it is current.
  *
  * `measured` ran in B9's last review (docs/plan-hold-the-bar.md §6 item 30): its session, `c342ce08`, in `dontAsk` under this repository's
- * settings, which allow none of them, ran `cat`, `ls` and `grep` alone and `head` and `tail` in a pipe, while `node -e` was denied. The api's
- * test refuses a measured command those settings allow. `documented` are the rest of what Claude Code's docs name, which say the set includes
- * them, not that it is all of it; `git` is its read-only forms, which they do not list.
+ * settings of that day, 2026-09-15, which allowed none of them, ran `cat`, `ls` and `grep` alone and `head` and `tail` in a pipe, while
+ * `node -e` was denied. That is what was measured, and it stays so whatever the settings allow since: a rule allowing `ls` today proves nothing
+ * of that day's run, and takes nothing from it. So nothing checks the list against the settings; `readOnlyCommands` holds its shape and its
+ * date, and the page says the day. `documented` are the rest of what Claude Code's docs name, which say the set includes them, not that it is
+ * all of it; `git` is its read-only forms, which they do not list.
  */
-export const READ_ONLY_COMMANDS = {
+export const READ_ONLY_COMMANDS = readOnlyCommands('READ_ONLY_COMMANDS', {
   harness: 'Claude Code',
   version: '2.1.272',
   measuredAt: '2026-09-15',
@@ -179,7 +228,7 @@ export const READ_ONLY_COMMANDS = {
   measured: ['cat', 'grep', 'head', 'ls', 'tail'],
   documented: ['cd', 'diff', 'du', 'echo', 'find', 'git', 'pwd', 'stat', 'wc', 'which'],
   docs: 'code.claude.com/docs/en/permissions, "Read-only commands", read 2026-09-16',
-} as const;
+} as const);
 
 /**
  * The rule in `deny` that refuses the tool `mcp__<server>__<tool>`, if one does: one naming the tool, the whole

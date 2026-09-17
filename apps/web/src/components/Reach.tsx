@@ -127,7 +127,7 @@ const named = (command: string) => (command === 'git' ? 'read-only git' : comman
 /**
  * Claude Code's read-only commands as they reach a step: solid where they were measured running without a rule, dashed where only its docs say
  * so, amber where an ask rule makes one ask, struck where a deny refuses the whole command or, in dontAsk, an ask rule does — each of those said
- * with its rule — then when, on which version and from where that was learned, never claimed current.
+ * with its rule — then the day and the version it was measured on, and where that is recorded: a measurement of that day, never claimed current.
  */
 function ReadOnly({ readOnly, commands, dontAsk }: { readOnly: NonNullable<StepReach['readOnly']>; commands: ReadOnlyCommands; dontAsk: boolean }) {
   const taken = readOnly.filter((c) => c.denied || c.asks);
@@ -147,7 +147,7 @@ function ReadOnly({ readOnly, commands, dontAsk }: { readOnly: NonNullable<StepR
                 : denied
                   ? `Denied by ${denied.rule} (${denied.source}), which beats the harness's own leave`
                   : measured
-                    ? `Ran with no rule allowing it on ${commands.measuredAt}, ${commands.harness} ${commands.version}`
+                    ? `Measured on ${commands.measuredAt}, ${commands.harness} ${commands.version}: it ran with no rule allowing it, under that day's settings`
                     : `Named by ${commands.harness}'s docs, not measured`
             }
             className={`${CHIP} ${denied ? STRUCK : asks ? ASKS : measured ? RUNS : DOCUMENTED}`}
@@ -166,8 +166,9 @@ function ReadOnly({ readOnly, commands, dontAsk }: { readOnly: NonNullable<StepR
         </p>
       )}
       <p data-read-only-measured={commands.measuredAt} className="text-xs text-neutral-500">
-        The solid ones ran with no rule allowing them on {commands.measuredAt} with {commands.version} ({commands.source}). The dashed ones are named
-        by its docs ({commands.docs}), which say the set includes them, not that it is all of it; git is its read-only forms. A deny covering one
+        The solid ones were measured on {commands.measuredAt} with {commands.version} ({commands.source}): that day, under that day&apos;s settings, they
+        ran with no rule allowing them. The dashed ones are named by its docs ({commands.docs}), which say the set includes them, not that it is all
+        of it; git is its read-only forms. A deny covering one
         still refuses it, and an ask rule covering one makes it ask{dontAsk ? ', which dontAsk denies' : ''}. Not asked again: a later version may run others.
       </p>
     </>

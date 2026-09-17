@@ -1777,7 +1777,10 @@ const PAGES: PageSpec[] = [
         'review says why cat is struck, beside the commands',
       );
       await expectVisible(review.locator(`[data-ask-rule="${ask}"]`), `review lists the ask rule that holds for it (${ask})`);
-      await expectVisible(review.locator('[data-read-only-measured="2026-09-15"]', { hasText: '2.1.272' }), 'with the date and version the read-only commands were measured on');
+      await expectVisible(
+        review.locator('[data-read-only-measured="2026-09-15"]', { hasText: /were measured on 2026-09-15 with 2\.1\.272 \(.+\): that day, under that day's settings/ }),
+        'with the day and version the read-only commands were measured on, as a measurement of that day',
+      );
       await expectVisible(review.locator('[data-mcp-tool="echo"][data-not-allowed]'), "review's server tool no rule allows is marked: dontAsk denies it without a prompt");
       await expectVisible(review.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`), `review's server tool the settings deny is marked denied (${server.denied})`);
       const implement = steps.locator(`li[data-step="${good.name}/implement"]`);

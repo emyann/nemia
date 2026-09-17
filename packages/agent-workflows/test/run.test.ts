@@ -3333,6 +3333,19 @@ test("a send-back at an ending step's gate goes to the work: the step before it 
   assert.equal(retryable(review, atEnd(), DONE, signedDone, asked, ungated).sendsBack, undefined);
 });
 
+test("REFUSED: a try of the ending step itself, which has not run — it names the approval that files it and the send-back to the work, not \"there is nothing to try again\"", () => {
+  assert.equal(retryable(SHIP, atEnd(), DONE, signedDone, asked, ENDS).modes.length, 0, 'there is no try of a step nothing of which has run');
+  assert.equal(retryRefusal(ENDS, atEnd(), 'ship', { mode: 'nudge' }, DONE, signedDone, asked),
+    "ship is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. "
+    + 'Approve it: wf approve r-1 ship — or send the work back: wf retry r-1 review --message "<objection>".');
+  // With words, and with --fresh, the same: what is missing is not the objection, it is a try to replace.
+  assert.equal(retryRefusal(ENDS, atEnd(), 'ship', { mode: 'fresh', message: 'merge it the other way round' }, DONE, signedDone, asked)?.startsWith('ship is at its gate, and nothing of it has run'), true);
+  // Once it has been approved and filed, it is a step like any other: its own status says what there is to say.
+  const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
+  assert.equal(retryRefusal(ENDS, ran, 'ship', { mode: 'nudge' }, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'running' }), signedDone, asked),
+    `ship is still running, so there is nothing to try again until it ends. Wait for it: wf ls r-1 (or stop the run: wf cancel r-1).`);
+});
+
 test("`wf ls` at an ending step's gate: the step reads `awaiting approval` unfiled, with the approval and the send-back to the work beside it, and the run's line says what is to be decided", () => {
   const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
   const l = listing(ENDS, atEnd(), shownAs({ t1: 'succeeded', t2: 'succeeded' }), signedDone, asked);

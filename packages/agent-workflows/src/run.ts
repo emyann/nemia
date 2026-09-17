@@ -1522,6 +1522,13 @@ export function retryRefusal(
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
   }
   if (!modes.length) {
+    // An ending step waiting at its gate with nothing of it filed (`approvedFirst`): there is no try of it to replace, and the two things
+    // there are to say to it are the approval that files it and an objection to the work it would act on (`sendBackTo`).
+    if (status === 'awaiting approval' && !run.steps[name]!.taskId) {
+      const back = sendBackTo(step, run).map((s) => `wf retry ${run.id} ${s} --message "<objection>"`).join(' or ');
+      return `${name} is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. `
+        + `Approve it: wf approve ${run.id} ${name}${back ? ` — or send the work back: ${back}` : ''}.`;
+    }
     const why: Partial<Record<StepStatus, string>> = {
       waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: wf ls ${run.id}.`,
       running: `${name} is still running, so there is nothing to try again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`,

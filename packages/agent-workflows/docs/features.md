@@ -2822,6 +2822,10 @@ What was built, four commits:
   --message` and the pass that files it, `wf decide`'s `gates` offered `wf approve <run> ship` — the very approval `approvalRefusal` was
   refusing in that moment, while `wf ls` showed ship waiting. `decision`'s `statusOf` and `gateLines` now read an un-held ending as the
   waiting step it is, `gateLines` taking the asks as `listing` does, so one vocabulary reads the window one way. Found by the review, round 4.
+- **`wf retry <run> ship` at the ending's gate says what there is to say** (`retryRefusal`). The step `wf ls` names as awaiting approval
+  answered `ship is awaiting approval, and there is nothing to try again` — the end of the road, in the one place a person who typed the
+  step's own name would look. It now says nothing of it has run, so there is no try of it to replace, and names the two things there are:
+  `wf approve <run> ship`, and the send-back `sendBackTo` computes. Found by the review, round 4.
 - **`--no-worktree` is refused on a folder whose last step merges** (`stepsToStart`), before a run is written: such a run works on the base
   branch itself, so there is no result branch for the ending to merge — it would be told the work is on the branch it is standing on, merge
   a branch into itself, and pay for the folder's whole check to find nothing to commit. Found by the review, round 3.

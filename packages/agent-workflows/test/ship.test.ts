@@ -274,6 +274,17 @@ test("REFUSED at the ending's gate, at shipped defaults: a send-back with no wor
   assert.equal((await approve(other.e, other.id, 'ship')).approval.step, 'ship');
 });
 
+test("REFUSED at shipped defaults: a try of the ending step itself, which has not run, names the approval that files it and the send-back to the work", async () => {
+  const { id, e } = await atTheGate();
+  await assert.rejects(retry(e, id, 'ship', { mode: 'nudge' }), (err: Error & { exitCode?: number }) => {
+    assert.equal(err.exitCode, 2);
+    assert.equal(err.message, "ship is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. "
+      + `Approve it: wf approve ${id} ship — or send the work back: wf retry ${id} implement --message "<objection>".`);
+    return true;
+  });
+  assert.equal(readRun(id).steps.ship!.taskId, null, 'and nothing was written');
+});
+
 test("a check that refuses leaves the checkout clean: the abort the ending's prose names takes the trial merge back, and the run says what happened", async () => {
   const { repo, id, branch, e, settle, base } = await atTheGate();
   await approve(e, id, 'ship');

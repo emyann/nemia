@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
-import type { Engine, TaskView } from 'agent-engine';
+import { createEngine, nameFor, type Engine, type PromiseJournal, type PromiseRunner, type Sighting, type TaskView } from 'agent-engine';
 import type { RetryHow, Run, TaskPhase } from '../src/run.ts';
 import { readCheckBrief, verdictWord } from '../src/check.ts';
 
@@ -1333,6 +1333,99 @@ test("a round files its target with the target's tools, deny list and effort, an
   await toReview(b, run.id, 2, false);
   const review2 = b.tasks.get(`${run.id}-review-try2`)!.spec;
   assert.deepEqual([review2.tools, review2.disallowedTools, review2.effort, review2.resumeFrom], [REVIEWS, ['Bash(npm run build)'], 'max', undefined], "round 2's review");
+});
+
+// ─── a run in flight keeps its momentum: `priority` ─────────────────────────
+
+/** The `priority` each task of a run was filed with, by the name the run gives it: `implement`, `implement-check`, `review-try2`. */
+const prioritiesOf = (b: ReturnType<typeof board>, id: string) =>
+  Object.fromEntries([...b.tasks].filter(([task]) => task.startsWith(`${id}-`)).map(([task, t]) => [task.slice(id.length + 1), t.spec.priority]));
+
+test('a run in flight keeps its momentum: its first step is filed with no `priority`, and everything after it — its check, a step after another, a round, a try `retries:` files and one `wf retry` asks for — with `priority: 1`', async () => {
+  // implement → its check → review, looping back: round 2's implement, continued, its check, and a new session of review.
+  const run = started(looped());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  await toReview(b, run.id, 1, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, ['review']);
+  await toReview(b, run.id, 2, false);
+  assert.deepEqual(prioritiesOf(b, run.id), {
+    implement: undefined, 'implement-check': 1, review: 1, 'implement-try2': 1, 'implement-try2-check': 1, 'review-try2': 1,
+  });
+
+  // A try `retries:` files, its check, and a try `wf retry` asks for.
+  const tried = await throughCheck('check: npm test\nretries: 1', 'failed', 1);
+  assert.deepEqual((await advance(tried.e, readRun(tried.run.id))).tried, ['implement']);
+  tried.settle(`${tried.run.id}-implement-try2`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(tried.e, readRun(tried.run.id))).checked, ['implement']);
+  tried.settle(`${tried.run.id}-implement-try2-check`, 'failed', undefined, 1);
+  await retry(tried.e, tried.run.id, 'implement', { mode: 'fresh' });
+  assert.deepEqual((await advance(tried.e, readRun(tried.run.id))).tried, ['implement']);
+  assert.deepEqual(prioritiesOf(tried, tried.run.id), {
+    implement: undefined, 'implement-check': 1, 'implement-try2': 1, 'implement-try2-check': 1, 'implement-try3': 1,
+  });
+});
+
+test('a run\'s first steps are every step that waits on nothing: two roots filed with no `priority`, and the step that joins them with `priority: 1`', async () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'left.md'), 'the left half\n');
+  fs.writeFileSync(path.join(dir, 'right.md'), 'the right half\n');
+  fs.writeFileSync(path.join(dir, 'join.md'), '---\nafter: left, right\n---\njoin them\n');
+  const run = start({ brief: 'two halves', repo: aRepo(), workflowDir: dir });
+  const b = board();
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed.sort(), ['left', 'right']);
+  b.settle(`${run.id}-left`, 'succeeded', SIGNED);
+  b.settle(`${run.id}-right`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['join']);
+  assert.deepEqual(prioritiesOf(b, run.id), { left: undefined, right: undefined, join: 1 });
+});
+
+/** The engine's store, in memory, as its own tests keep one. */
+const memoryJournal = (): PromiseJournal => {
+  const tasks = new Map<string, Parameters<PromiseJournal['append']>[1][]>();
+  const feed: Awaited<ReturnType<PromiseJournal['feed']>>['entries'] = [];
+  return {
+    async append(taskId, event) { tasks.set(taskId, [...(tasks.get(taskId) ?? []), event]); feed.push({ taskId, event }); },
+    async read(taskId) { return [...(tasks.get(taskId) ?? [])]; },
+    async list() { return [...tasks.keys()].sort(); },
+    async feed(after) { return { entries: feed.slice(after as number | undefined), cursor: feed.length }; },
+  };
+};
+
+/** A harness that starts whatever it is asked to, and remembers the order: every session at work. */
+const startsInOrder = (sessions: Map<string, Sighting>): PromiseRunner => ({
+  async spawn(r) { sessions.set(r.name, { sessionId: `s-${sessions.size + 1}`, state: 'working' }); },
+  async observe() { return new Map(sessions); },
+  async stop() {},
+  async logs() { return ''; },
+});
+
+test("REFUSED without the momentum: at a ceiling of one, the engine's own admission gives the slot to a run's next step before a newer run's first step filed ahead of it — and, filed with no `priority`, to the newer run", async () => {
+  // Run a's implement has ended; run b starts, and files its implement; then a's review is filed — after it, a pass later.
+  const a = started(folder());
+  const b = started(folder());
+  const filedBy = board();
+  await advance(filedBy.e, readRun(a.id));
+  await advance(filedBy.e, readRun(b.id));
+  filedBy.settle(`${a.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(filedBy.e, readRun(a.id))).filed, ['review']);
+  const newer = filedBy.tasks.get(`${b.id}-implement`)!.spec;
+  const next = filedBy.tasks.get(`${a.id}-review`)!.spec;
+  assert.deepEqual([newer.priority, next.priority], [undefined, 1]);
+
+  /** The two filings, handed to an engine with one slot in the order the run filed them, and the session its first pass starts. */
+  const admitted = async (strip: boolean) => {
+    const sessions = new Map<string, Sighting>();
+    const e = createEngine({ journal: memoryJournal(), harnesses: { claude: startsInOrder(sessions) }, defaultHarness: 'claude', maxConcurrent: 1 });
+    const as = (spec: typeof next) => ({ ...spec, harness: 'claude', ...(strip ? { priority: undefined } : {}) }) as Parameters<Engine['file']>[0];
+    await e.file(as(newer));
+    await new Promise((r) => setTimeout(r, 5));
+    await e.file(as(next));
+    await e.tick();
+    return [...sessions.keys()];
+  };
+  assert.deepEqual(await admitted(false), [nameFor(`${a.id}-review`, 1)], "the run in flight's next step, filed later");
+  assert.deepEqual(await admitted(true), [nameFor(`${b.id}-implement`, 1)], 'without it, the newer run, filed first');
 });
 
 // ─── what a consumer reads without a log: `phaseOfView`, `closeoutAsked`, `exitVerdicts` ───

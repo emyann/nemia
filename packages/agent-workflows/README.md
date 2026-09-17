@@ -1358,6 +1358,9 @@ up — every 4000ms, ^C to stop
   `check` harness, a pool of its own, so a suite never waits behind a session (engine `912d537`). Both steps of `dev` are on `claude`, so one run's
   review competes with another run's implement for the same slots. A task filed past the ceiling waits for a slot, `pending`; the timeline
   counts that wait as queued. A session its harness lists `blocked` holds no slot: it makes no API calls, so the engine counts only `working` sessions (engine `912d537`).
+- **A run in flight keeps its momentum.** Every filing after a run's first steps — a step after another, a try, a round, a check — carries
+  the engine's `priority: 1`, and a run's first steps none, so a run's next step waiting for a slot goes before a newer run's first step
+  (`MOMENTUM`, `priorityOf`); nothing running is stopped for it, and `WF_MAX_RUNS` and the queue are unchanged.
 - **`WF_MAX_RUNS`, unset or 0 for no cap, counts runs in flight.** A run is in flight while a task of it — a step's or a check's — is filed
   and not settled, or while it has started and the tick files something of it on the pass: a run between two steps is still in flight. One
   that waits on a person, or has finished, is not; one called off is, until the engine has stopped what it had in flight. A run with nothing

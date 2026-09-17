@@ -1056,6 +1056,9 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   `ship`). Open as design, not filed: ship.md calls a conflict "the work's job", and a run with its rounds spent has no step to
   give it to. One flake seen under load during a trial merge, gone on the rerun: `agent-engine/test/say.test.ts` and
   `apps/api/test/transcript.test.ts` each failed as a file at about 10.8s.
+  W14, two rounds, $22.21, **merged, `242f9b1`**, its one finding (a GNU-only `cp` flag named in a refusal) fixed at the merge;
+  W16 started on it. B17 is in its third round after an unsigned second (nudged by hand at $115). **All six of the graph are
+  in but B17.**
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
 `each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
 the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,

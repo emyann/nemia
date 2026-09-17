@@ -10,7 +10,7 @@ import { Effect, Layer } from 'effect';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
 import { file, GRACE_MS, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
-import { decide, fold, nameFor, type Observed, type Sighting } from '../src/domain.ts';
+import { decide, fold, nameFor, type Event, type Observed, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 
 /** One board: a journal and a fake harness whose session states a test moves by hand. */
@@ -330,7 +330,7 @@ test('a deadline ends a blocked session, which would otherwise wait on a person 
 // calls, so it costs nothing against the rate limit the ceiling exists for. Reasoning, not a
 // measurement. Counted afresh on every pass, from what the harness says now.
 
-/** A board of tasks `ids`, filed in that order; admission runs in sorted id order. */
+/** A board of tasks `ids`, filed in that order; admission runs in filing order. */
 const filed = async (ids: string[]) => {
   const b = board();
   for (const id of ids) await b.run(file({ ...spec, id, brief: id }));
@@ -384,6 +384,77 @@ test('a blocked session that works again counts again on the next pass — level
   b.set('a', 'blocked');
   await b.run(tick(2));
   assert.ok(b.sessions.has(nameFor('d', 1)), 'and its slot is free again');
+});
+
+// ─── which task a free slot goes to ─────────────────────────────────────────
+// The oldest filing, and the ids' order only between two filed at the same instant. It was the ids'
+// order alone, so which of two waiting tasks started was the alphabet of their names.
+
+/** File `id` as of `at`: the entry `file` writes, with the time chosen by the test. */
+const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
+  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', maxAttempts: 1, ...fields })));
+
+/** Tick at a ceiling of one until every task has run, ending each session once it is seen: the order they started in. */
+const admitted = async (b: ReturnType<typeof board>, count: number) => {
+  const order: string[] = [];
+  for (let i = 0; i < count; i++) {
+    await b.run(tick(1));
+    const started = [...b.sessions].filter(([, s]) => s.state === 'working').map(([name]) => name);
+    assert.equal(started.length, 1, `one at a time: ${started.join(', ')}`);
+    order.push(started[0]!.split('/')[1]!);
+    b.sessions.set(started[0]!, { ...b.sessions.get(started[0]!)!, state: 'done' });
+  }
+  return order;
+};
+
+test('a free slot goes to the task filed first, not the one first in the alphabet', async () => {
+  const b = board();
+  await fileAt(b, 'z-filed-first', '2026-09-16T23:53:07.000Z');
+  await fileAt(b, 'a-filed-last', '2026-09-16T23:54:44.000Z');
+  await b.run(tick(1));
+  assert.deepEqual([...b.sessions.keys()], [nameFor('z-filed-first', 1)], 'the earlier filing is admitted');
+  assert.equal(await b.run(phaseOf('a-filed-last', b)), 'pending', 'and the later one waits, whatever its name');
+});
+
+test('tasks are admitted oldest filing first, pass after pass — a time with or without its milliseconds is the same clock', async () => {
+  const b = board();
+  await fileAt(b, 'c', '2026-09-16T10:00:01Z');
+  await fileAt(b, 'a', '2026-09-16T10:00:02.000Z');
+  await fileAt(b, 'b', '2026-09-16T10:00:00.500Z');
+  assert.deepEqual(await admitted(b, 3), ['b', 'c', 'a']);
+});
+
+test('two tasks filed at the same instant are admitted in the order of their ids', async () => {
+  const b = board();
+  await fileAt(b, 'b', '2026-09-16T10:00:00.000Z');
+  await fileAt(b, 'a', '2026-09-16T10:00:00.000Z');
+  await fileAt(b, 'c', '2026-09-16T09:59:59.000Z');
+  assert.deepEqual(await admitted(b, 3), ['c', 'a', 'b'], 'the time first, and the id only between equal times');
+});
+
+test('a higher priority is admitted before an older, lower one — and the priority reaches no harness', async () => {
+  const b = board();
+  await b.run(file({ ...spec, id: 'older', brief: 'filed first, no priority' }));
+  await new Promise((r) => setTimeout(r, 5));
+  await b.run(file({ ...spec, id: 'newer', brief: 'filed after, above it', priority: 1 }));
+
+  await b.run(tick(1));
+  assert.deepEqual([...b.sessions.keys()], [nameFor('newer', 1)], 'the higher priority took the one slot');
+  assert.equal(await b.run(phaseOf('older', b)), 'pending', 'and the older task waits behind it');
+  assert.equal((await b.run(view('newer', new Map()))).state.priority, 1, 'on the record');
+  assert.equal('priority' in b.spawned[0]!, false, 'read at admission and nowhere else: the harness is not told');
+});
+
+test('priority first, higher before lower, then filing order within one — no priority is 0, below it is below that', async () => {
+  const b = board();
+  await fileAt(b, 'a', '2026-09-16T10:00:02.000Z');
+  await fileAt(b, 'b', '2026-09-16T10:00:00.000Z', { priority: 0 });
+  await fileAt(b, 'c', '2026-09-16T10:00:03.000Z', { priority: 5 });
+  await fileAt(b, 'd', '2026-09-16T10:00:01.000Z', { priority: 5 });
+  await fileAt(b, 'e', '2026-09-16T09:00:00.000Z', { priority: -1 });
+  // What the Effect door, which refuses nothing, can journal: read as no priority, never as above or below every other.
+  await fileAt(b, 'f', '2026-09-16T10:00:04.000Z', { priority: Number.NaN });
+  assert.deepEqual(await admitted(b, 6), ['d', 'c', 'b', 'a', 'f', 'e']);
 });
 
 // ─── isolation ──────────────────────────────────────────────────────────────
@@ -550,10 +621,10 @@ test('no schema, no statement: a task ends exactly as it did before', async () =
 
 import fs from 'node:fs';
 
-test('tools, disallowedTools, effort and mcp are declared by the task and reach every attempt untouched', async () => {
+test('tools, disallowedTools, effort, mcp and remoteControl are declared by the task and reach every attempt untouched', async () => {
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
-  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, budgetUsd: 0.5 }));
+  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, budgetUsd: 0.5, remoteControl: true }));
   await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'failed' });
   await b.run(tick());
@@ -564,6 +635,7 @@ test('tools, disallowedTools, effort and mcp are declared by the task and reach 
     assert.equal(r.effort, 'low');
     assert.deepEqual(r.mcp, mcp, 'and given the same servers');
     assert.equal(r.budgetUsd, 0.5, 'and the same cap');
+    assert.equal(r.remoteControl, true, 'and bridged the same');
   }
 
   const plain = board();
@@ -574,13 +646,14 @@ test('tools, disallowedTools, effort and mcp are declared by the task and reach 
   assert.equal(plain.spawned[0]!.effort, undefined);
   assert.equal(plain.spawned[0]!.mcp, undefined, 'no map, no servers of its own');
   assert.equal(plain.spawned[0]!.budgetUsd, undefined, 'no budget, no cap');
+  assert.equal(plain.spawned[0]!.remoteControl, undefined, 'no Remote Control unless asked');
 });
 
-test('decide never reads tools, effort, MCP servers, a budget, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
+test('decide never reads tools, effort, MCP servers, a budget, Remote Control, a priority, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.costUsd/);
+  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.costUsd|\.remoteControl|\.priority|\.filedAt/);
 });
 
 test('a session its harness ended at its budget ends failed, reason budget, with what it cost — and the task settles failed naming it, with an attempt left, even under resume: always', async () => {

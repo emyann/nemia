@@ -125,6 +125,20 @@ test('start() ticks on a timer and never overlaps', async () => {
   assert.equal(ticks, seen, 'stop() means stopped');
 });
 
+test('a free slot goes to the task filed first, by the time file() wrote — not to the id first in the alphabet', async () => {
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({
+    journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake', maxConcurrent: 1,
+  });
+  await engine.file({ brief: 'waiting', cwd: '/r', id: 'zz-waiting' });
+  await new Promise((r) => setTimeout(r, 5));
+  await engine.file({ brief: 'filed later', cwd: '/r', id: 'aa-later' });
+
+  await engine.tick();
+  assert.deepEqual([...sessions.keys()], [nameFor('zz-waiting', 1)], 'the task filed first started');
+  assert.equal((await engine.view('aa-later')).phase, 'pending');
+});
+
 test('tasks that name the harness and tasks that do not share ONE pool', async () => {
   // The bug this pins: an unresolved harness counted as its own pool, so one subscription got
   // two ceilings. Three explicit + three implicit, ceiling of two, must admit two in total.
@@ -235,7 +249,7 @@ test('watch() keeps its host process alive, even with a store that cannot push',
 
 // ─── the door refuses what the loop cannot run ──────────────────────────────
 
-import { type Engine, type HarnessSpec, type ResumePolicy, type TaskSpec } from '../src/facade.ts';
+import { claudeDetached, codex, type Engine, type HarnessSpec, type ResumePolicy, type TaskSpec } from '../src/facade.ts';
 
 /** An engine at shipped defaults — the three built-in harnesses — over a store a test can read. */
 const shipped = () => {
@@ -405,6 +419,63 @@ test('file() refuses a budgetUsd that is not dollars above 0, and one on a harne
   const [filed] = await journal.read(id);
   assert.equal((filed as { budgetUsd?: number }).budgetUsd, 0.25, 'on the record, for the runner');
   assert.equal((await engine.view(id)).state.budgetUsd, 0.25);
+});
+
+test('file() refuses a priority that is not a finite number, on every harness — and journals one that is, below 0 or between whole numbers too', async () => {
+  const { journal, engine } = shipped();
+  for (const harness of ['claude', 'codex', 'claude-detached']) {
+    await refused(engine, { brief: 'b', cwd: '/r', harness, priority: Number.NaN }, /`priority: NaN` is not a number\. Give a finite number/);
+  }
+  await refused(engine, { brief: 'b', cwd: '/r', priority: 'high' as unknown as number }, /`priority: "high"` is not a number\. Give a finite number — a higher one is admitted first/);
+  await refused(engine, { brief: 'b', cwd: '/r', priority: Infinity }, /`priority: Infinity` is not a number/);
+  await refused(engine, { brief: 'b', cwd: '/r', priority: null as unknown as number }, /`priority: null` is not a number/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  for (const priority of [2, -1, 0.5, 0]) {
+    const id = await engine.file({ brief: 'b', cwd: '/r', priority });
+    const [filed] = await journal.read(id);
+    assert.equal((filed as { priority?: number }).priority, priority, 'on the record, for the pass');
+    assert.equal((await engine.view(id)).state.priority, priority);
+  }
+});
+
+test('file() refuses remoteControl on every harness with no such flag, by name — codex, claude-detached and a check — and a value that is not true or false; claude journals it', async () => {
+  const check: HarnessSpec = { name: 'check', command: () => ({ cmd: 'sh', args: ['-c', 'true'] }) };
+  const journal = memoryJournal();
+  const engine = createEngine({ journal, harnesses: { claude: 'claude-bg', codex, 'claude-detached': claudeDetached, check } });
+  for (const harness of ['codex', 'claude-detached', 'check']) {
+    await refused(engine, { brief: 'b', cwd: '/r', harness, remoteControl: true },
+      new RegExp(`\`remoteControl: true\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness has no such flag.*File the task on \`claude\`, or leave \`remoteControl\` off`));
+  }
+  for (const remoteControl of ['true', 1, null]) {
+    await refused(engine, { brief: 'b', cwd: '/r', remoteControl: remoteControl as unknown as boolean }, /`remoteControl: .*` is not true or false\. Give true to bridge the session to claude\.ai, or leave it out/);
+  }
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  const id = await engine.file({ brief: 'b', cwd: '/r', remoteControl: true });
+  const [filed] = await journal.read(id);
+  assert.equal((filed as { remoteControl?: boolean }).remoteControl, true, 'on the record, for the runner');
+  assert.equal((await engine.view(id)).state.remoteControl, true);
+  for (const harness of ['codex', 'claude-detached', 'check']) {
+    assert.ok(await engine.file({ brief: 'b', cwd: '/r', harness, remoteControl: false }), `false asks ${harness} for nothing`);
+  }
+
+  // Named by what the engine has: no harness brought as 'claude-bg', none to file on.
+  const bare = createEngine({ journal: memoryJournal(), harnesses: { codex } });
+  await refused(bare, { brief: 'b', cwd: '/r', remoteControl: true }, /the `codex` harness has no such flag.*Leave `remoteControl` off: none of this engine's harnesses bridges a session/);
+});
+
+test('a harness brought as a runner is asked nothing of remoteControl, and is handed it on the spawn', async () => {
+  const sessions = new Map<string, Sighting>();
+  const asked: boolean[] = [];
+  const runner = fakeHarness(sessions);
+  const engine = createEngine({
+    journal: memoryJournal(), defaultHarness: 'mine',
+    harnesses: { mine: { ...runner, spawn: async (r) => { asked.push(r.remoteControl === true); await runner.spawn(r); } } },
+  });
+  await engine.file({ brief: 'b', cwd: '/r', remoteControl: true });
+  await engine.tick();
+  assert.deepEqual(asked, [true], 'its to honour');
 });
 
 test('a usage whose key has no value is not something new to write down — measured is written once a value arrives, not on every pass', async () => {

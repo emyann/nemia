@@ -11,8 +11,9 @@ session's conversation read as events (§4 S1), and `say`, a person's words into
 record (§6 item 3, the engine half), `find`, one session by its name without `claude agents` (§6 item 17), and
 bug 1, a quiet session with no closeout recorded a success (§6 item 18), and what a session cost, read from its harness,
 with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small items: a view that observes its task's own
-harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20);
-agent-workflows `0e7b02a`.
+harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
+admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-workflows
+`0e7b02a`.
 
 ## Bugs
 
@@ -285,6 +286,82 @@ their own.
 - **The Effect door** counts per harness unless its caller passes `tick` the pools: it has no harness configs to read
   them from. `createEngine` passes them.
 
+### 21. A free slot goes to the oldest filing, and the filer's clock says which that is
+
+**What changed** (2026-09-16). A pass walks the board in filing order — the `at` of each task's `filed` entry, oldest first,
+and the ids' order only between two filed at the same instant (`admissionOrder` in `agent-engine/src/engine.ts`; `State`
+carries `filedAt`, and `decide` never reads it). It walked `journal.list`'s order, the ids sorted, so which of two waiting
+tasks took a free slot was the alphabet of their ids. `test/engine.test.ts` makes a later filing that sorts first wait behind an
+earlier one, drains three tasks at a ceiling of one in filing order, and breaks a tie by id; `test/facade.test.ts` does
+the first with the times `file()` writes.
+
+**What is left.**
+
+- **Filing order does not give a run its momentum.** A run's next step is filed a check and a pass after its last ended,
+  so a task filed in that gap is older and still goes first. Measured 2026-09-16 (agent-workflows `docs/features.md`,
+  Engine-side work): a card's run filed at 23:53:07Z took the slot a lane's implement released at 23:53:18Z, and that
+  lane's review, filed 23:54:44Z, then waited behind four sessions. Filing order admits the card's run first all the same:
+  a `priority` the upper layer files is what keeps the slot with the run (issue 22).
+- **The time is the filer's clock.** `file()` stamps `new Date()` in the process that files, so two processes with skewed
+  clocks filing onto one board are ordered by their clocks. One machine, one clock, today.
+- **A retry keeps its task's place.** A task between attempts is ordered by its filing, not by when its last attempt
+  ended, so an old task's retry goes before newer work waiting on the same pool. Older work first, on purpose.
+- **A time that does not parse** — a `PromiseJournal` that stores `at` in another shape — orders its task after every task
+  whose time does, and by id among such tasks: admitted last, never refused.
+- **`ae ls` and `list()` are still in id order.** Only the pass's walk changed.
+
+### 22. A task's `priority` is read when a slot is free, and only then
+
+**What changed** (2026-09-16). `priority` is a number on the filing, 0 when absent, carried on the `filed` event and
+`State`. A pass orders the board by it before filing order: higher first, the oldest filing within one, the id between
+equal times (`admissionOrder` in `agent-engine/src/engine.ts`). Nothing else reads it: no runner is told it (`SpawnRequest`
+has no such field), and `decide` does not — `test/engine.test.ts` reads `decide`'s body for `.priority` and `.filedAt`, and
+failed with a read planted there. `createEngine().file()` refuses one that is not a finite number (`NaN`, `Infinity`,
+`"high"`, `null`) on every harness, naming the fix, and `ae ls` prints `priority N` beside a task filed with one.
+`test/engine.test.ts`: a higher priority filed after a lower one takes a ceiling of one, and six tasks drain in the order
+priority, then filing, a negative one last; `test/facade.test.ts`: every refusal, and what is journalled.
+
+**What is left.**
+
+- **No preemption.** A higher priority waits for a slot like any task: a running session is never stopped for one.
+  Kubernetes' scheduler preempts; this does not, and nothing has asked it to.
+- **No aging.** A steady stream of higher-priority work keeps a lower one waiting for as long as the stream lasts.
+- **agent-workflows files none yet.** The run's momentum — every filing after a run's first step above a new run's
+  first — is the upper layer's, and a run of its own (agent-workflows `docs/features.md`, Engine-side work).
+- **Not a brief key.** `ae start` cannot file one; a task filed through the API shows it in `ae ls` all the same.
+- **The Effect door** journals any value (issue 6). One that is not a finite number — a file journal writes `NaN` back as
+  `null` — is read as 0 when the board is ordered, never as above or below every other.
+
+### 23. `remoteControl` bridges a session, and nothing reads whether it was bridged
+
+**What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
+(`claudeOps` in `agent-engine/src/runner.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
+2.1.273 (agent-workflows `docs/features.md` §2): a `--bg` session gets a `bridgeSessionId` only with the flag. The flag takes
+an optional name, so it goes before `--permission-mode` and never before the prompt. `createEngine().file()` refuses a value
+that is not true or false, and `true` on any `HarnessSpec` — `codex`, `claude-detached`, agent-workflows' `check` — naming the
+harness and the `'claude-bg'` one to file on; a `PromiseRunner` is handed it and asked nothing. `test/completion.test.ts`:
+the flag's place in the argv, and at `createEngine()`'s own harnesses a fake `claude` given it on a first attempt and a
+retry, and never for a task without it; `test/engine.test.ts`: carried to every attempt, and not read by `decide`;
+`test/facade.test.ts`: every refusal, by name. Measured under the engine (Verified live, below).
+
+**What is left.**
+
+- **Nothing reads whether a session was bridged.** The runner passes the flag, and the `bridgeSessionId` is in the session's
+  registration, which `find` reads for its id alone. A session that could not be bridged — an account signed out of
+  claude.ai, Remote Control off for the organisation — runs unbridged and says so to nobody; `view` and `ae ls` do not say
+  whether a session is reachable. The board's "reachable from the phone" (features.md §2) needs that read first.
+- **Driven outside the record.** Whatever a person types into a bridged session from the web, and every prompt they answer
+  there, reaches it without `say`, so none of it is journalled: `state.said` is not the whole of what such a session was
+  told.
+- **A session let go.** The engine stops and removes a session once its end is written (`release`); whether the agents view
+  drops a released session at once was not looked at.
+- **The Effect door refuses nothing** (issue 6): a `remoteControl: true` that reaches `codex` or `claude-detached` through it
+  is dropped without a word.
+- **Not a brief key**, and agent-workflows files none yet: a step key (`remote:`, features.md §2) is a run of its own.
+- **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
+  that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`
+  fails the day the control is bridged without it, or the flagged session is not.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
@@ -323,6 +400,13 @@ their own.
   the Effect door) made 40 tool calls, ended `done` and settled `succeeded`, and its attempt recorded $0.3439, 125.6 s of API
   time and 247 ms of tool time, read once its release had stopped it (issues 17, 18). The first version of this brief —
   read one short file forty times — was declined by haiku as a waste, which Claude Code listed `blocked`.
+
+- **`remoteControl` under `--bg`** (issue 23). `test/live.test.ts` on Claude Code 2.1.274, 2026-09-16, `--model haiku`, no
+  tools, run once by the implementing step: a session filed with `remoteControl: true` registered under
+  `~/.claude/sessions/` with a `bridgeSessionId` (`session_012gj9r5…`), and an identical session filed without it registered
+  with none, looked at again fifteen seconds after both had registered. Both were stopped and removed by the test, and were
+  gone from `claude agents` afterwards. Whether the agents view listed the bridged one was not looked at: the registration's
+  `bridgeSessionId` is what the 2.1.273 measurement found the view follows.
 
 ## Verified by tests, not by a live run
 

@@ -2895,6 +2895,57 @@ One agent-workflows run (the vocabulary, `wf ship`, the ship task, tests that re
 one whose branch is gone, of one already shipped; a failed trial merge aborted with the tree clean), then one apps run
 (the counts, the group, Ship and Drop on the run page, e2e with a to-decide run in the seed).
 
+## 9. The supervisor: what the operator's session did on 2026-09-16 and 17, as a step that never ends
+
+**Registered** 2026-09-17, by the operator, after a day of watching this session run the board: "what if I had what you
+did in the board? What shape would that have?"
+
+**What the session did, as a loop.** It watched the store (`wf ls`, the daemon's log) for four kinds of moment and acted
+on each, then wrote down what it learned:
+
+- **a run at its result:** read `wf decide`, the branch's commits and stat, the e2e's screenshots for a web change; ran the
+  trial merge (`git merge --no-ff --no-commit`, the full check, resolving conflicts that were additive by keeping both
+  sides); put a brief to the person — rounds and cost, what shipped, what the review left, what was resolved — as one
+  question with two answers, merge or hold; acted on the answer; recorded the merge in the plan; restarted the daemon
+  when the merged code was the tick's; the chained runs then started on their own;
+- **a plan that stopped for approval:** read its `needs`, put its questions to the person with the options as the plan
+  wrote them, wrote the answer back with `wf retry --message`;
+- **a stall:** a session idle after a lost connection, one that signed off in prose, one held by its own background
+  shell — diagnosed off the registry, the transcript and the process tree, continued it with a note or ended the shell,
+  and recorded the trap (engine open issue 24, CLAUDE.md);
+- **an idea from the operator:** registered as a section here with the design, filed as a run when told to.
+
+**The shape.** Three layers, two of which the packages already have or have registered:
+
+- **Machinery, no model:** the gate (§6, shipped), the queue (§3, shipped), *to decide* and `wf ship` as a task (§8), the
+  ceilings. These make every moment above a state the tick reads and the board shows, with a button. A person who runs
+  no supervisor still sees the gate pop on the board and acts on it there.
+- **The supervisor, a model:** a workflow of one step that never ends — `workflows/supervisor/`, harness `claude`, run in
+  the repository's main checkout rather than a worktree (its commits are bookkeeping: the plan, features.md, CLAUDE.md
+  lessons; a `workspace: main` key, refused on any step with a `check:`), `remote: true` so a phone can open it (§2),
+  and its tools the `wf` verbs plus git and the suite. Its brief is the loop above. **Its questions to the person are
+  gates on its own run:** at each decision it signs off `blocked` with the brief and the options in `needs`; the board
+  shows *waiting on you: approve supervisor* with the words box (§6's board half, shipped); the answer continues the
+  same session (`wf retry --message`, or Approve on the run page), so the session keeps its context as the operator's did
+  today. The supervisor takes a session slot but no run slot; the queue does not hold it. A step that never ends needs
+  what a long session needs: compaction is the harness's, the transcript is on the record, and `wf say` steers it.
+- **Policy as data:** what *ship* means is the repository's, not the supervisor's. `wf decide`'s commands come from
+  `decision`; a `ship:` policy — on the repository (a `.agent-workflows.json`, say) or the workflow's README — names it:
+  `merge` (today: trial merge, the check, commit), or `pr` (`gh pr create` against the base with the closeout as the body,
+  then merge the PR when its checks pass, or leave that to the reviewer on the forge). `wf ship` runs the policy as the
+  task (§8); `wf decide` prints the policy's command; `isShipped` reads the branch on the base after a `git fetch`, which a
+  merged PR satisfies. The supervisor runs `wf ship` and reads its verdict; it never types git itself. A product user who
+  wants PRs changes one line and keeps the loop.
+
+**What the supervisor would need that the packages lack today:** `workspace: main` on a step; `wf ship` and the policy
+(§8); a run that never ends (a step with no closeout schema that signs off `blocked` many times — `retryable` treats each
+answer as a try, which is what the plan step already does); the board's Approve box taking an *answer* as well as an
+approval (it does: Send back is the answer box); reading a run's screenshots from the store (the `look` skill, present);
+and one measurement — how long such a session lasts before the harness compacts it, and what it forgets.
+
+Order: §8 first (it is the supervisor's hands), then the step's `workspace: main`, then the workflow folder and a first
+run supervising this repository for a day, with the operator watching what it asks.
+
 ## Engine-side work
 
 Not agent-workflows features, listed so nothing is lost:

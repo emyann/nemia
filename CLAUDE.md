@@ -120,7 +120,8 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.
 - `.claude/skills/` — the repository's skills, which every step whose tools include `Skill` can use: `look` (ours)
   and `shadcn` (third-party, installed with `npx skills add shadcn/ui --agent claude-code --copy`, pinned by hash in
-  `skills-lock.json`; the `migrate-radix-to-base` skill it ships was dropped, the app is on Radix). The shadcn skill
+  `skills-lock.json`; the `migrate-radix-to-base` skill it ships was dropped: it targets Base UI, and the app is on Radix today with
+  React Aria wanted as its base, features.md §7). The shadcn skill
   reads `components.json` from the session's cwd when it loads, and this repository's is `apps/web/components.json`,
   so its CLI runs from `apps/web`. Its Bash commands (`npx shadcn@latest …`) are denied without a prompt in a
   `dontAsk` step unless `.claude/settings.json` allows them; implement steps run in the harness's own mode.

@@ -2058,6 +2058,27 @@ One agent-workflows run (the key, the record field, `assess`, the verb, the brie
 a gated step's dependents never filed without the file, an approval for the wrong step refused, a send-back spending
 the approval) — about $40; then one apps run (the button, the card's need, the e2e) — about $30.
 
+## 7. The web app's components on React Aria, not Radix
+
+**Registered** 2026-09-17, by the operator: the shadcn base for `apps/web` should be React Aria rather than Radix.
+
+**What exists.** `apps/web/components.json` says `"style": "radix-nova"`; `radix-ui` 1.6.7 and `shadcn` 4.21.0 are in
+`apps/web/package.json`; the board's own components and the `ai-elements` ones compose Radix primitives (`asChild`
+triggers, Radix menus and dialogs). The repository carries the `shadcn` skill (`.claude/skills/shadcn`, installed
+2026-09-17), whose rules distinguish the bases (`base-vs-radix.md`, and the toast rule that names React Aria projects).
+The e2e visits every page in both themes and finds elements by role and name, so a base switch that keeps the roles
+keeps the checks.
+
+**What it needs.** A study first, on `workflows/dev-planned-build` with the shadcn skill in hand: which bases the
+installed shadcn CLI offers and the exact name of the React Aria one (`npx shadcn@latest info`, `docs`, and the
+preset builder), which of the app's installed components exist for that base and which do not, and what the app's
+own compositions must change (`asChild` and the like). Then the switch: `components.json` on the new base, each
+component re-added with `--dry-run` and `--diff` and the local edits carried over, the app's compositions adapted,
+`npm run build` and `npm run e2e` green in both themes, every page looked at (the `look` skill). What the base does
+not offer is named, not worked around. The lockfile committed with the dependency changes.
+
+One `dev-planned-build` run, the plan waiting for approval; likely the largest apps change so far.
+
 ## Engine-side work
 
 Not agent-workflows features, listed so nothing is lost:

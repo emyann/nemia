@@ -405,3 +405,59 @@ test("REFUSED to hide why a step stopped past its budget: `wf decide` on a step 
     assert.ok(!lines.some((l) => /its tries have cost its budget: or more/.test(l)), 'the shared reason is gone');
   }
 });
+
+test("the branch's standing against the base is a fact on every screen — on it, ahead by N, gone", async (t) => {
+  const { run, repo, branch, e } = await awaiting();
+  assert.ok((await screen(t, e, run.id)).includes(`  branch    ${branch} is ahead of main by 1 commit`));
+
+  // Merged by hand, as a person ships a run with no ending step: the run reads shipped, and there is nothing left to decide.
+  git(repo, 'merge', '-q', '--no-ff', '--no-edit', branch);
+  assert.deepEqual(await screen(t, e, run.id), [`${run.id}  add sub`, '', `  shipped — ${branch} is already on main`]);
+
+  // And once the branch is deleted after the merge, git still says where it went, by the tip the run's own tick recorded.
+  const { run: other, repo: otherRepo, branch: otherBranch, e: otherEngine } = await awaiting();
+  git(otherRepo, 'branch', '-D', otherBranch);
+  assert.ok((await screen(t, otherEngine, other.id)).includes(`  branch    ${otherBranch} is gone: git no longer has it`), 'no tip was recorded for it');
+});
+
+test("a folder whose last step is an ending: `wf decide` says what that step would do in the folder's words, and the word that runs it — and prints no git command, since the step is the one that merges", async (t) => {
+  const repo = aRepo();
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it: trial merge this run\'s result branch onto main, run the check, and commit.\n\nAbort on any failure.\n');
+  const run = start({ brief: 'add sub', repo, workflowDir: dir, isolate: false });
+  const branch = `wf/${run.id}`;
+  branchOff(repo, branch, () => write(repo, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b;\nexport const sub = (a, b) => a - b;\n'));
+
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  const record = readRun(run.id);
+  record.steps.implement!.branch = branch;
+  fs.writeFileSync(path.join(ROOT, 'runs', `${run.id}.json`), JSON.stringify(record, null, 2));
+  assert.equal(record.steps.ship!.taskId, null, 'nothing of the ending is filed without a person');
+
+  const lines = await screen(t, e, run.id);
+  indexOf(lines, '  AWAITING APPROVAL, waiting on you: ship  — signed off at its gate; nothing after it is filed until you approve it, or send it back');
+  indexOf(lines, `  branch    ${branch} is ahead of main by 1 commit`);
+  const decide = indexOf(lines, "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:");
+  assert.deepEqual(lines.slice(decide + 1, decide + 5), [
+    "    Ship it: trial merge this run's result branch onto main, run the check, and commit.",
+    '',
+    `  approve it    wf approve ${run.id} ship [--message "<words>"]`,
+    `  send it back  wf retry ${run.id} implement --message "<objection>"`,
+  ]);
+  assert.ok(!lines.some((l) => /ship it   git|drop it   git/.test(l)), 'the folder says what shipping is, so nobody is told to type it');
+
+  // And `wf ls` says the same, in one line, where it says who the run waits on.
+  const listed = await (async () => {
+    const out: string[] = [];
+    const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.map(String).join(' ')); });
+    try { await main(['ls', run.id], e); } finally { log.mock.restore(); }
+    return out.join('\n').split('\n');
+  })();
+  indexOf(listed, `   → to decide: Ship it: trial merge this run's result branch onto main, run the check, and commit. — wf approve ${run.id} ship`);
+  assert.ok(!listed.some((l) => l.includes('waiting on you')), 'the ending is not said twice');
+  indexOf(listed, /^   ship {11}awaiting approval/);
+});

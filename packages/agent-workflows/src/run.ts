@@ -452,7 +452,7 @@ export function toDecide(
   standings: readonly BranchStanding[] = [],
 ): ToDecide | undefined {
   if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined;
-  const ends = terminalSteps(steps).filter((s) => hasGate(s, run));
+  const ends = endingSteps(steps, run);
   if (ends.length) {
     const waiting = ends.find((s) => statusOf(s.name) === 'awaiting approval');
     return waiting ? { kind: 'approve', step: waiting.name, says: firstLine(waiting.body) } : undefined;
@@ -462,6 +462,15 @@ export function toDecide(
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
   return ahead.length ? { kind: 'git', branches: ahead } : undefined;
 }
+
+/**
+ * The workflow's ending steps: the steps nothing waits on that have a gate (`hasGate`). Pure.
+ *
+ * An ending is where the folder says, in prose, what happens when the work is done — merge it, open a pull request, publish the study —
+ * and its gate is where a person decides. A folder with none ends by handing a branch to a person, and `wf decide` prints the git
+ * commands for it, as it always did. Usually one; several only where a workflow deliberately ends wide.
+ */
+export const endingSteps = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): Workflow[] => terminalSteps(steps).filter((s) => hasGate(s, run));
 
 /** What a run waits on a person to decide (`toDecide`): its ending step, which approving runs — or its result branches, which git ships. */
 export type ToDecide = { kind: 'approve'; step: string; says: string } | { kind: 'git'; branches: string[] };

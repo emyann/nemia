@@ -105,10 +105,11 @@ export function triedLine(entry: Pick<InboxEntry, 'repo' | 'error'> & { tried: N
 }
 
 /**
- * The Factory's line on the cap: `2 of 4 runs in flight · 3 queued`, or `no cap · 3 queued` — the queue left out when it is empty. The count is the
- * cap's (`Ceilings.inFlight`), not the floor's.
+ * The Factory's line on the cap: `2 of 4 run slots taken · 3 queued`, or `no cap · 3 queued` — the queue left out when it is empty. The count is the
+ * cap's (`Ceilings.inFlight`), not the floor's, and said in the package's word for what the cap holds, a run slot (`slotWord`): beside the floor's
+ * `4 in flight`, which counts a run waiting on runs too, `3 of 4 runs in flight` read as a full floor with a slot free.
  */
 export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: number): string {
-  const cap = ceilings.cap > 0 && ceilings.inFlight ? `${ceilings.inFlight.length} of ${ceilings.cap} runs in flight` : 'no cap';
+  const cap = ceilings.cap > 0 && ceilings.inFlight ? `${ceilings.inFlight.length} of ${ceilings.cap} run slots taken` : 'no cap';
   return queued > 0 ? `${cap} · ${queued} queued` : cap;
 }

@@ -473,7 +473,7 @@ async function everyView(): Promise<Views> {
 const seenBy = (views: Views): typeof e => ({ ...e, view: async (taskId) => views.get(taskId) ?? e.view(taskId) });
 
 /**
- * The cap on runs in flight, as the board says it over the Factory: `2 of 4 runs in flight`, or `no cap`.
+ * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.
  *
  * `last` is what the daemon's last pass ran with (`lastCeilings`, `$WF_ROOT/tick.json`): sessions at work per pool (`WF_MAX_CONCURRENT`) and
  * runs in flight (`WF_MAX_RUNS`, 0 for no cap) — null before any pass has written them. `cap` is the cap a run is judged by, as `wf ls` and

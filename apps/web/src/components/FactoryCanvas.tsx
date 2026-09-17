@@ -107,7 +107,7 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  * browser with the layout.
  *
  * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says the
- * runs in flight against the cap the daemon runs with (`CapLine`). Both are read again every 5 s, as the runs are: the daemon starts a card
+ * run slots taken of the cap the daemon runs with (`CapLine`). Both are read again every 5 s, as the runs are: the daemon starts a card
  * when a run slot frees, and nothing on the board asks it to.
  */
 export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
@@ -531,7 +531,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
 }
 
 /**
- * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 runs in flight · 3 queued`, or `no cap`. Its count is the
+ * The cap on runs in flight, as the daemon's last pass ran with it (`capLine`): `2 of 4 run slots taken · 3 queued`, or `no cap`. Its count is the
  * cap's — a run with a task filed and not settled, or started with something due — which a run waiting on runs, on the floor, is not; the
  * difference is said on hover. Nothing until the cap is read; why, when it cannot be.
  */
@@ -549,7 +549,7 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
     ? `as the daemon's last pass ran with it (WF_MAX_RUNS=${data.last.runs}, WF_MAX_CONCURRENT=${data.last.sessions})`
     : "as the api's environment sets it: no pass of the daemon has written its own";
   const title = data.cap > 0
-    ? `Runs in flight against the cap, ${by}. A run counts while a task of it is filed and not settled, or, once started, while it has something due; a run waiting on runs counts once it starts. ${data.held.length ? `Held for a slot: ${data.held.map((h) => h.run).join(', ')}.` : ''}`
+    ? `Runs in flight against the cap, ${by}. A run takes a slot while a task of it is filed and not settled, or, once started, while it has something due; a run waiting on runs, which the floor counts in flight, takes none until it starts. ${data.held.length ? `Held for a slot: ${data.held.map((h) => h.run).join(', ')}.` : ''}`
     : `No cap on runs in flight, ${by}: every run is filed as soon as it is ready.`;
   return (
     <p data-cap={data.cap} title={title.trim()} className="border-l pl-4 text-sm text-muted-foreground">

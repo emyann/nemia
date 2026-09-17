@@ -1026,7 +1026,9 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   `dev`) — one round, $10.49, **merged, `de8ea12`**; **after W11 and B13:** B14 `the-workflow-builder-on-the-4ifo` (apps: the builder on the Workflows page, writing the store's
   folder only; `dev-build`) — three rounds, $55.91, **merged, `0f2fbc8`** (it ended its first try in prose; a continued try signed it
   off for 65 cents); **after B14:** B15 `the-web-app-s-components-on-3xq9` (apps: React Aria as the base, §7, the plan waiting
-  for approval; `dev-planned-build`).
+  for approval; `dev-planned-build`) — the study, the operator's four answers (aria; folds mount only while open; one run; the
+  settings allow `npx shadcn@latest`, `d06cff6`), two rounds, $63.03, **merged, `cc512be`**, `npm install` run on main. **All eight
+  are merged** by 2026-09-17 07:50Z; nothing in flight.
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
 `each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
 the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,

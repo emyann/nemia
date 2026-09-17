@@ -45,6 +45,10 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).
+- **React Flow moves a dragged node from the second pointer move, not the first.** The first move past its threshold
+  only starts the drag. Playwright's `dragTo`, and the browser tool's `browser_drag` on top of it, send one move and move
+  nothing: drag with `page.mouse.move(…, { steps: 12 })` in an e2e, and in the browser tools with mouse events synthesized
+  from `browser_evaluate` a few milliseconds apart (learned by the run that made the Factory's steps draggable).
 - **The engine's task view carries no filing time; its feed does.** A slot wait is filed → first attempt, so the timeline
   reads filings off `e.feed` (`readFilings`). A store written by hand — the e2e's seed — writes `engine/feed.jsonl` too
   (`seedFeed`), or every queue time reads `not known` (learned by the run that added the timeline).

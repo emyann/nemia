@@ -161,6 +161,32 @@ test("a busy session carrying only the closeout of the session it continues is n
   assert.equal(seen?.closeout, undefined);
 });
 
+test('a busy session over a cold transcript is read ONCE, and again only once the transcript grows — not on every pass of a long tool call', async () => {
+  // The read this branch makes is a full read of a transcript that runs to tens of megabytes (measured: 174–282 ms
+  // on a 39.5 MB one, against 17–60 ms for the mtime that gates it), and a tool call that runs for minutes reaches
+  // it on every pass. It is safe to keep precisely because the branch is reached only while nothing has written.
+  const restore = withFakeClaude(busyRow);
+  try {
+    let asked = 0;
+    let written = STARTED;
+    let t = STARTED + QUIESCENT_AFTER_MS;
+    const ops = claudeOps({
+      now: () => t, transcriptTime: async () => written,
+      closeoutFrom: async () => { asked++; return undefined; },
+    });
+    await Effect.runPromise(ops.observe);
+    await Effect.runPromise(ops.observe);
+    await Effect.runPromise(ops.observe);
+    assert.equal(asked, 1, 'three passes over a transcript nothing has written: one read');
+
+    // It wrote again — a tool result — and went quiet for another window. What it says now may differ.
+    written = t;
+    t += QUIESCENT_AFTER_MS;
+    await Effect.runPromise(ops.observe);
+    assert.equal(asked, 2, 'written since the read: read again');
+  } finally { restore(); }
+});
+
 test('a busy session the registry gives no start is left alone: its conversation could not be told from the one it continues', async () => {
   const restore = withFakeClaude(row('working', 'busy'));
   try {

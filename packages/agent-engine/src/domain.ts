@@ -73,8 +73,17 @@ export type Sighting = {
    */
   closeout?: { payload: unknown; at: number };
   /**
-   * How long the session has been quiet — working, not busy, nothing written — present once that is long enough that
-   * its runner holds it has stopped rather than paused between steps it drives itself (Claude Code: ninety seconds).
+   * How long the session has been quiet — nothing written — present once that is long enough that its runner holds it
+   * has stopped rather than paused between steps it drives itself (Claude Code: ninety seconds).
+   *
+   * **A sighting can be `busy` and quiet at once**, and that combination is the whole of issue 24: a session whose
+   * process is doing something other than the work — a background shell it left running — while the last word in its
+   * conversation is its own closing statement. Whether a runner can tell those apart is its harness's business; this
+   * field is the answer, and `busy` is a separate fact about the process. So a reader of a sighting, and a runner
+   * written against this type, must not take quiet to mean not busy. (`closedOut` in `engine.ts` does refuse to act on
+   * a statement from a busy session — a verdict it may yet revise — which is why quiet, not the statement, is what
+   * ends such an attempt.)
+   *
    * A fact about the session, not a verdict on the work: a quiet session is the end of a task that asked for nothing,
    * and an unsigned attempt of one that asked for a closing statement and was told none. Only the journal knows which,
    * so `decide` reads this, and no runner turns it into `done`.

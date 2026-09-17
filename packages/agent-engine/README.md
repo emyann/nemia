@@ -559,6 +559,14 @@ the last word (a session that spoke after its closeout is still going), and *its
 parent's closing turn, and has said nothing of its own until it writes). Everything else about a busy session is
 unchanged: with no statement it is left to the deadline exactly as before.
 
+**What that read costs, and why it is kept.** A busy session costs its transcript's mtime and nothing else until that
+has been cold for ninety seconds — which every tool call longer than ninety seconds is, `npm ci` and this repository's
+own suite included. The read that follows is then kept for as long as the transcript stays as it found it, by the same
+mtime machinery a finished session's read uses, so a long call costs one read rather than one per pass: measured on a
+39.5 MB transcript, a read is 174–282 ms against 17–60 ms for the mtime. Keeping it changes no answer, because the
+branch is only reached while nothing has been written — which is exactly the condition under which reading again would
+say the same thing.
+
 **What the registry's words are.** `status` is one of `busy`, `shell`, `idle` and `waiting` (2.1.274's own list), and
 Claude Code's view renders `busy` and `shell` alike as working. The engine reads only `busy` as busy: `shell` is not a
 turn, so the first quiet rule already ends such a session. The reading rests on a registry field and a transcript's

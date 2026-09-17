@@ -398,6 +398,14 @@ an injected clock and transcript; `test/shell.test.ts`, end to end with a fake r
   own yet would otherwise be read as finished before it began. Judged against the session's own start in the registry,
   as usage is; no start, no reading.
 
+**What it costs a pass** (found in review, round 1). A busy session now costs its transcript's mtime every pass, and a
+read of the transcript once it has been cold for the floor — which every tool call longer than ninety seconds is. That
+read is kept while the transcript stays as it found it, by the machinery a finished session's read already used
+(`keptRead`, now told by its caller which reads are worth keeping), so such a call costs one read, not one per pass.
+Measured on the largest transcript on this machine, 39.5 MB: a read and its scan 174–282 ms, the mtime through the SDK's
+`getSessionInfo` 17–60 ms. Keeping it changes no answer — the branch is reached only while nothing has written, which is
+the condition under which a second read would say the same thing — and the pin drops the moment the mtime passes it.
+
 **What it rests on**, with issue 13's caveats. `claude agents --json` prints each row's `status` from the session's
 registration; 2.1.274's own vocabulary is `busy`, `shell`, `idle`, `waiting`, and its view renders `busy` and `shell`
 alike as working. The engine reads only `busy` as busy — `shell` is not a turn, and the ordinary floor already ends such

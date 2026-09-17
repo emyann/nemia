@@ -870,7 +870,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const [runId, stepName, ...more] = rest;
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
       const { approval, file } = await approve(e, runId, stepName, approveHow(more));
-      console.log(`${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — the next tick files what waits on it`);
+      // What the approval lets happen: a step something waits on is filed by the next tick; a last step hands its run on to be decided.
+      const waited = stepsOf(readRun(runId)).some((s) => s.after.includes(stepName));
+      console.log(`${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`);
       console.log(`   ${file}`);
       return;
     }

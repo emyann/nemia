@@ -2204,7 +2204,7 @@ What was built, four commits:
 
 What was measured:
 
-- From the root, `npx turbo run test --force`: agent-workflows 517 (516 passed, 1 skipped), from 490; api 166 and web 203, unchanged;
+- From the root, `npx turbo run test --force`: agent-workflows 520 (519 passed, 1 skipped) after round 3, from 490; api 166 and web 203, unchanged;
   agent-engine 313 (305 passed, 8 skipped), unchanged. `npm run typecheck` clean in all four.
 - New tests. `workflow.test.ts`: `gate: true` read, and `false`, other words, no value and twice refused. `inbox.test.ts`: a card's
   `gate:` through the listing, its line, `queuedText` and `ideaCard`; a list, `true`, no value and twice refused. `run.test.ts`: the

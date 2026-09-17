@@ -5,8 +5,9 @@ measured counts and this closeout. `packages/agent-workflows` only — `src/`, `
 `docs/features.md`. Nothing in `apps/`, nothing in `packages/agent-engine`.
 
 `npm test && npm run typecheck` from the root: green on the tree as committed. Counted with
-`npx turbo run test --force`: agent-workflows 592 (590 passed, 2 skipped), from 587; api 202, web 248
-and agent-engine 340 (331 passed, 9 skipped) unchanged.
+`npx turbo run test --force`: agent-workflows 593 (591 passed, 2 skipped), from 587; api 202, web 248
+and agent-engine 340 (331 passed, 9 skipped) unchanged. Round 2 of review added a commit each for its
+two findings — the last section but one says what they were.
 
 ## 1. `wf inbox queue` keeps the card file's modified time
 
@@ -36,19 +37,20 @@ The store test: a pass over such a card writes nothing at all to `process.stderr
 still says `no-git-a1b2 not started: Command failed: git rev-parse HEAD / fatal: not a git
 repository…`. Without the `stdio`, the test fails.
 
-## 3. A `wf up` says what the queue is stuck on, on its first pass
+## 3. A `wf up` says what the queue is stuck on, once, and it is the daemon that counts
 
 `src/cli.ts`, the `up` loop. A start that fails without a refusal is tried on every pass and said
-once: the tick writes the failure down, and `wf up` holds its tongue while the next pass fails the
+once: the tick writes the failure down, and `wf up` held its tongue while the next pass failed the
 same way on the same repository. But `again` is a fact about the store, not about this daemon — the
 pass that said it may have been another `wf up`, or a `wf tick`, and its line is on a terminal that is
 gone. A person restarting the daemon to find out why cards stopped starting was met with the runs
-advancing and nothing about the card. The first pass says whatever it finds; from the second, silence
-as before. `wf tick` is unchanged: it says every pass it is asked for.
+advancing and nothing about the card. The loop keeps the last failure it printed itself and says
+anything else; `again` is not read there. `wf tick` is unchanged: it says every pass it is asked for.
 
 The test that pinned the silence changed, with the reason in a comment above it: over two passes of
-`wf up` it now reads exactly one line, matched whole. Silent on the first pass fails it; said on every
-pass fails it too.
+`wf up` it now reads exactly one line, matched whole, and said on every pass fails it. Beside it, a
+test at a cap of 1 (round 2, below): a daemon whose first pass reads no queue at all names the card on
+its second.
 
 ## 4. `writeWorkflow`: a rename by case, and a step's file that is a link
 
@@ -76,6 +78,28 @@ words: a link a step would be written through, a link whose step is gone, a link
 README given — each with what the link points at untouched — beside a linked README with none given,
 which the write does not touch. Writing before removing fails the first; the refusal dropped fails the
 third.
+
+## Round 2 of review: two findings, both fixed
+
+**The first pass was the wrong thing to key on** (`src/cli.ts`). Review was right, and about the very
+case item 3 is for: `tick` calls `startQueued` only while a run slot is free, so a pass at a full cap
+reads no queue at all and prints nothing about it — and my flag was spent on it all the same. With
+`WF_MAX_RUNS=1` and a run in flight, a daemon restarted after a card's start failed said nothing on
+its first pass, and by the time the slot freed the failure matched the try the last daemon wrote, so
+`again` silenced it for good.
+
+The loop keeps the last failure it printed itself now — the card, the repository it was tried on, and
+why — and says anything else. `again` is not read there any more: it is a fact about the store, and
+what is wanted is a fact about this terminal. Nothing is decided on the variable; it only says what
+has been shown. A test at a cap of 1 pins it: the daemon's first pass files a run and reads no queue,
+its second sees the run finish and names the card. That test fails on the first-pass flag, and the
+existing two-pass test fails if the failure is said on every pass — the silence is still held.
+
+**The order test read `readdirSync`'s order** (`test/write-workflow.test.ts`). Also right: `removed`
+keeps the order the folder listed its entries in, which is the filesystem's and neither sorted nor
+stable across machines, and this is the only test that proves the rule where the filesystem tells case
+apart. It asserts the rule itself now — every removal before the write, and nothing removed after it —
+rather than the sequence. Moving the removals back after the writes still fails it.
 
 ## For CLAUDE.md, at the merge
 

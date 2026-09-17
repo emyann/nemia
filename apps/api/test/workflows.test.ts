@@ -20,7 +20,7 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { listWorkflows } = await import('../src/workflows.ts');
+const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { HOME_REPO } = await import('../src/capabilities.ts');
 const { parentRecord, readRun } = await import('agent-workflows');
 const { afterRefusal } = await import('agent-workflows/run');
@@ -90,8 +90,11 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
   const refused = loaderRefusal(broken);
   assert.match(refused, /review: `afer` is not a key a step has/);
 
-  assert.deepEqual(await res.json(), [
-    { name: 'broken', from: 'repo', dir: broken, description: 'A reviewer with a misspelt key.', steps: [], graph: { roots: [], edges: [] }, schemas: [], error: refused },
+  const listing = await res.json();
+  // Each at the version its files are at: what a save from the board carries.
+  for (const w of listing) assert.equal(w.version, versionOf(w.dir), w.name);
+  assert.deepEqual(listing, [
+    { name: 'broken', from: 'repo', dir: broken, description: 'A reviewer with a misspelt key.', steps: [], graph: { roots: [], edges: [] }, schemas: [], version: versionOf(broken), error: refused },
     {
       name: 'good', from: 'repo', dir: good, description: 'Implement it, then review it, two rounds at most.',
       // The README is not among the steps.
@@ -102,6 +105,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       // `graphOf` the steps, as a run of it is drawn.
       graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 2 }] },
       schemas: ['review.json'],
+      version: versionOf(good),
       error: null,
     },
     {
@@ -109,6 +113,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       steps: [{ name: 'plan', spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }), body: 'Write PLAN.md.' }],
       graph: { roots: ['plan'], edges: [] },
       schemas: [],
+      version: versionOf(mine),
       error: null,
     },
   ]);

@@ -14,6 +14,7 @@
  * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
  * the page itself has on the board..
  */
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
@@ -71,6 +72,11 @@ export type WorkflowListing = {
   steps: ListedStep[];
   graph: RunGraph;
   schemas: string[];
+  /**
+   * What the folder's files held when it was listed (`versionOf`): a builder's save carries it, and is refused when the folder no longer
+   * holds that, rather than written over what changed.
+   */
+  version: string;
   error: string | null;
 };
 
@@ -116,13 +122,36 @@ export function listWorkflows(repo: string, home: string = HOME): WorkflowListin
 export function listed(name: string, from: WorkflowSource, dir: string): WorkflowListing {
   const description = workflowDescription(dir);
   const schemas = schemasIn(dir);
+  const version = versionOf(dir);
   let steps: Workflow[];
   try {
     steps = loadWorkflows(dir);
   } catch (err) {
-    return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, error: messageOf(err) };
+    return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, version, error: messageOf(err) };
   }
-  return { name, from, dir, description, steps: steps.map((step) => ({ name: step.name, spec: specOf(step), body: step.body })), graph: graphOf(steps), schemas, error: null };
+  return { name, from, dir, description, steps: steps.map((step) => ({ name: step.name, spec: specOf(step), body: step.body })), graph: graphOf(steps), schemas, version, error: null };
+}
+
+/**
+ * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what a
+ * save writes, removes or reads — by name, with what it holds. Any of them edited, added or removed changes it, and nothing else does: a
+ * note beside the steps, or a hidden file, is no step. A file that cannot be read counts as what it says, so it changes the word too.
+ */
+export function versionOf(dir: string): string {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.isDirectory() && !e.name.startsWith('.') && /\.(md|json)$/.test(e.name)).map((e) => e.name).sort();
+  } catch {
+    names = [];
+  }
+  const files = names.map((name) => {
+    try {
+      return [name, fs.readFileSync(path.join(dir, name), 'utf8')];
+    } catch (err) {
+      return [name, { unreadable: messageOf(err) }];
+    }
+  });
+  return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
 }
 
 /** The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed. */

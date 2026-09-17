@@ -5,8 +5,14 @@
  * A folder is written by the package's `writeWorkflow` (agent-workflows' runner.ts), which judges the whole folder before a byte is written:
  * each refusal is the parser's sentence, naming the step, and the api answers it with a 422 carrying the steps it names (`stepsNamed`), so
  * the board shows it by them. The body's shape is the api's own to refuse (400), and what was written is answered read back from disk
- * (`listed`), never echoed from the request. A schema is the one file `writeWorkflow` never writes, so its PUT is the api's, judged as the
- * folder would read with it before it is written.
+ * (`listed`), never echoed from the request.
+ *
+ * A schema pasted for an `output:` is the one file `writeWorkflow` never writes, so it travels in the same PUT (`schemas`) and is judged with
+ * the steps, the folder parsed in memory as it would read with it, before a byte of either is written (`judgedWith`). As two writes, a schema
+ * written and the folder then refused left the file behind under "nothing written".
+ *
+ * A save carries the `version` the folder was listed at (`versionOf`), and is refused (409) when the folder no longer holds it: a step edited,
+ * added or removed by hand while the board had it open would otherwise be written over, or deleted, from a draft that never saw it.
  *
  * Yours only: the store's `workflows/`. A write to the repository's is refused (403) with the copy to make by hand, since the api writes nothing
  * into a checkout. Every write passes the guard (guard.ts) before its body is read.
@@ -15,10 +21,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, writeWorkflow } from 'agent-workflows';
-import { EFFORTS, HARNESSES, isReadme, parseFolder, PERMISSION_MODES, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
+import { EFFORTS, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { folderOf, foldersIn, listed, type WorkflowListing } from './workflows.ts';
+import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './workflows.ts';
 
 /**
  * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`); `step`,
@@ -88,9 +94,8 @@ const messageOf = (err: unknown): string => (err instanceof Error ? err.message 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
 const STEP_SHAPE = '`{ "name": "<step>", "spec": { "after": ["<step>"], "harness": "claude", … }, "body": "<what its agent is told>" }`, as GET /api/workflows lists a step, a key unset as null or left out';
-const PUT_SHAPE = `\`{ "steps": [<step>, …], "readme"?: "<README.md>" }\`, each step ${STEP_SHAPE}`;
+const PUT_SHAPE = `\`{ "version": "<as GET /api/workflows lists it>", "steps": [<step>, …], "schemas"?: [{ "file": "<name>.json", "text": "<a JSON Schema>" }, …], "readme"?: "<README.md>" }\`, each step ${STEP_SHAPE}`;
 const POST_SHAPE = `\`{ "name": "<workflow>", "step": <step>, "readme"?: "<README.md>" }\`, the step ${STEP_SHAPE}`;
-const SCHEMA_SHAPE = '`{ "text": "<a JSON Schema>" }`';
 
 /** A write of yours, as the guard's refusals word it (guard.ts). */
 const buildGuard = (route: string, does: string, shape: string): Guarded => ({
@@ -188,16 +193,104 @@ export function schemaNameRefusal(file: string): string | undefined {
   return undefined;
 }
 
-/** A folder written through the package, or its refusal (422, with the steps it names), then read back from disk. */
-function write(name: string, dir: string, steps: readonly StepDraft[], readme: string | undefined): WorkflowSaved | BuildRefused {
+/** A schema a save writes beside the steps: its file's name and its text, as it is written. */
+export type SchemaFile = { file: string; text: string };
+
+/**
+ * The schemas a PUT carries, or why not: not a list of `{ file, text }` (400), a file that is not a schema's (400, `schemaNameRefusal`) or given
+ * twice (400). Each text is written ending in a line break, as a file is. Whether it is a schema a step can name is judged with the steps.
+ */
+function schemasOf(schemas: unknown, route: string): SchemaFile[] | Refusal {
+  if (schemas === undefined) return [];
+  const bad = (why: string): Refusal => ({ status: 400, error: `${route}: ${why} Send ${PUT_SHAPE}.` });
+  if (!Array.isArray(schemas)) return bad(`\`schemas\` is the schemas to write beside the steps, a list, or left out for none — this request's was ${JSON.stringify(schemas)}.`);
+  const out: SchemaFile[] = [];
+  for (const [i, schema] of schemas.entries()) {
+    if (!isObject(schema) || typeof schema.file !== 'string' || typeof schema.text !== 'string') {
+      return bad(`schema ${i + 1} is ${JSON.stringify(schema)}, and a schema is \`{ "file": "<name>.json", "text": "<a JSON Schema>" }\`.`);
+    }
+    const refused = schemaNameRefusal(schema.file);
+    if (refused) return { status: 400, error: refused };
+    if (out.some((s) => s.file === schema.file)) return bad(`${schema.file} is given twice, and a file holds one schema. Give it once.`);
+    out.push({ file: schema.file, text: schema.text.endsWith('\n') ? schema.text : `${schema.text}\n` });
+  }
+  return out;
+}
+
+/** The steps whose `output:` names `file`, which a refusal of its schema is shown by. */
+const namingSchema = (steps: readonly StepDraft[], file: string): string[] => steps.filter((s) => s.output?.file === file).map((s) => s.name);
+
+/**
+ * Why the folder at `dir` would not read with `steps` and `schemas` written, or null: each schema a JSON object, then each step rendered and
+ * the folder parsed in memory as `writeWorkflow` parses it, with the schemas read as given and every other file as it is on disk. The package's
+ * words, naming the steps. A step's name `writeWorkflow` refuses first is left to it (`unnamed`), which writes nothing on it either.
+ */
+function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly SchemaFile[]): BuildRefused | null {
+  for (const { file, text } of schemas) {
+    let schema: unknown;
+    try {
+      schema = JSON.parse(text);
+    } catch (err) {
+      return { error: `${file} is not JSON (${messageOf(err)}). A schema is a JSON object — \`{ "type": "object", "properties": { … } }\`.`, steps: namingSchema(steps, file) };
+    }
+    if (!isObject(schema)) return { error: `${file} is ${JSON.stringify(schema)}, and a schema is a JSON object — \`{ "type": "object", "properties": { … } }\`.`, steps: namingSchema(steps, file) };
+  }
+  const given = new Map(schemas.map((s) => [s.file, s.text]));
+  const read = (file: string): string | undefined => {
+    const pasted = given.get(path.normalize(file));
+    if (pasted !== undefined) return pasted;
+    try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
+  };
+  try {
+    parseFolder(steps.map((step) => [step.name, renderStep(step)] as const), read);
+    return null;
+  } catch (err) {
+    if (!(err instanceof WorkflowError)) throw err;
+    return { error: err.message, steps: stepsNamed(err.message, steps.map((s) => s.name)) };
+  }
+}
+
+/** Whether `writeWorkflow` refuses the steps by their names — none, one not a file's, one twice — before it renders any: its words, not these. */
+const unnamed = (steps: readonly StepDraft[]): boolean =>
+  !steps.length || steps.some((s) => stepNameRefusal(s.name) !== undefined) || new Set(steps.map((s) => s.name)).size < steps.length;
+
+/**
+ * A folder written through the package, with the schemas pasted for it, or its refusal (422, with the steps it names), then read back from disk.
+ *
+ * Judged whole before a byte is written: the steps' names by `writeWorkflow` itself, which refuses them before anything; the schemas and the
+ * steps together by `judgedWith`. Then the schemas are written and the folder after them, whose parse now reads them from disk. Should
+ * `writeWorkflow` refuse all the same — the folder changed between the two reads — each schema is put back as it was.
+ */
+function write(name: string, dir: string, steps: readonly StepDraft[], readme: string | undefined, schemas: readonly SchemaFile[] = []): WorkflowSaved | BuildRefused {
+  const refused = (message: string): BuildRefused => ({ error: message, steps: stepsNamed(message, steps.map((s) => (typeof s.name === 'string' ? s.name : ''))) });
+  const writing = unnamed(steps) ? [] : schemas;
+  if (writing.length) {
+    const judged = judgedWith(dir, steps, writing);
+    if (judged) return judged;
+  }
+  const before = writing.map(({ file }) => {
+    try { return { file, was: fs.readFileSync(path.join(dir, file), 'utf8') }; } catch { return { file, was: undefined }; }
+  });
+  const schemasWritten = writing.filter((s, i) => s.text !== before[i]!.was).map((s) => s.file);
+  for (const { file, text } of writing) fs.writeFileSync(path.join(dir, file), text);
   let result;
   try {
     result = writeWorkflow(dir, steps, readme);
   } catch (err) {
-    if (err instanceof WorkflowError) return { error: err.message, steps: stepsNamed(err.message, steps.map((s) => (typeof s.name === 'string' ? s.name : ''))) };
+    for (const { file, was } of before) {
+      if (was === undefined) fs.rmSync(path.join(dir, file), { force: true });
+      else fs.writeFileSync(path.join(dir, file), was);
+    }
+    if (err instanceof WorkflowError) return refused(err.message);
     throw err;
   }
-  return { workflow: listed(name, 'yours', dir), written: result.written, kept: result.kept, removed: result.removed };
+  const kept = writing.filter((s) => !schemasWritten.includes(s.file)).map((s) => s.file);
+  return {
+    workflow: listed(name, 'yours', dir),
+    written: [...result.written, ...schemasWritten].sort(),
+    kept: [...result.kept, ...kept].sort(),
+    removed: result.removed,
+  };
 }
 
 /** A body read as JSON, or why not (400). */
@@ -266,6 +359,11 @@ export const builder = new Hono()
     if (!isObject(body)) return c.json({ error: `${route} takes a JSON object: ${PUT_SHAPE}.` }, 400);
     const other = body.from === undefined ? null : yoursOnly(route, body.from, name, repo);
     if (other) return c.json({ error: other.error }, other.status);
+    if (typeof body.version !== 'string' || !body.version) {
+      return c.json({
+        error: `${route} takes the \`version\` the folder was read at, as GET /api/workflows lists it, so a save of a folder that has changed since is refused rather than written over what changed. This request's was ${JSON.stringify(body.version)}: read the folder, then send ${PUT_SHAPE}.`,
+      }, 400);
+    }
     if (!Array.isArray(body.steps)) return c.json({ error: `${route} takes the workflow's steps in \`steps\`, a list: ${PUT_SHAPE}.` }, 400);
     const steps: StepDraft[] = [];
     for (const [i, step] of body.steps.entries()) {
@@ -273,6 +371,8 @@ export const builder = new Hono()
       if ('status' in draft) return c.json({ error: draft.error }, draft.status);
       steps.push(draft);
     }
+    const schemas = schemasOf(body.schemas, route);
+    if ('status' in schemas) return c.json({ error: schemas.error }, schemas.status);
     const readme = readmeOf(body.readme, route, PUT_SHAPE);
     if ('status' in readme) return c.json({ error: readme.error }, readme.status);
     try {
@@ -281,69 +381,18 @@ export const builder = new Hono()
         const make = folder.status === 404 ? ` To make a new one, POST /api/workflows/yours with its name and a first step.` : '';
         return c.json({ error: `${folder.error}${make}` }, folder.status);
       }
-      const saved = write(name, folder.dir, steps, readme.readme);
+      // What the draft was read from, against what the folder holds now: a step edited, added or removed since would be written over.
+      const now = versionOf(folder.dir);
+      if (now !== body.version) {
+        return c.json({
+          error: `${folder.dir} has changed since it was read at version ${body.version}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`,
+          steps: [],
+        }, 409);
+      }
+      const saved = write(name, folder.dir, steps, readme.readme, schemas);
       if ('error' in saved) return c.json(saved, 422);
       return c.json(saved, 200);
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);
     }
-  })
-  // A schema beside the steps, which an `output:` names: the one file `writeWorkflow` never writes. Judged as the folder would read with it,
-  // when it reads now, so a schema a step already names cannot leave the folder unreadable.
-  .put('/api/workflows/:from/:name/schemas/:file', async (c) => {
-    const { from, name, file } = c.req.param();
-    const route = `PUT /api/workflows/${from}/${name}/schemas/${file}`;
-    const refused = refusedBeforeReading(buildGuard(route, "writes a workflow's schema", SCHEMA_SHAPE), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
-    if (refused) return c.json({ error: refused.error }, refused.status);
-    const repo = repoOf();
-    const where = yoursOnly(route, from, name, repo);
-    if (where) return c.json({ error: where.error }, where.status);
-    const nameRefused = schemaNameRefusal(file);
-    if (nameRefused) return c.json({ error: nameRefused }, 400);
-    const read = await jsonOf(c.req, route, SCHEMA_SHAPE);
-    if ('status' in read) return c.json({ error: read.error }, read.status);
-    const { body } = read;
-    if (!isObject(body) || typeof body.text !== 'string') return c.json({ error: `${route} takes the schema as text: ${SCHEMA_SHAPE}.` }, 400);
-    const text = body.text.endsWith('\n') ? body.text : `${body.text}\n`;
-    let schema: unknown;
-    try {
-      schema = JSON.parse(text);
-    } catch (err) {
-      return c.json({ error: `${file} is not JSON (${messageOf(err)}). A schema is a JSON object — \`{ "type": "object", "properties": { … } }\` — and nothing was written.`, steps: [] }, 422);
-    }
-    if (!isObject(schema)) return c.json({ error: `${file} is ${JSON.stringify(schema)}, and a schema is a JSON object — \`{ "type": "object", "properties": { … } }\`. Nothing was written.`, steps: [] }, 422);
-    try {
-      const folder = folderOf(name, 'yours', repo, HOME);
-      if ('status' in folder) return c.json({ error: folder.error }, folder.status);
-      const judged = judgedWith(folder.dir, file, text);
-      if (judged) return c.json(judged, 422);
-      fs.writeFileSync(path.join(folder.dir, file), text);
-      return c.json({ file, dir: folder.dir, schemas: listed(name, 'yours', folder.dir).schemas }, 200);
-    } catch (err) {
-      return c.json({ error: messageOf(err) }, 500);
-    }
   });
-
-/**
- * Why the folder at `dir` would no longer read with `text` at `file`, in the parser's words, or null: judged only when the folder reads as it
- * is, so a folder already refused for something else is not refused a schema for it.
- */
-function judgedWith(dir: string, file: string, text: string): BuildRefused | null {
-  const steps = fs.readdirSync(dir).filter((f) => f.endsWith('.md') && !isReadme(f)).map((f) => [f.slice(0, -3), fs.readFileSync(path.join(dir, f), 'utf8')] as const);
-  const read = (at: string, over?: string) => (f: string): string | undefined => {
-    if (over !== undefined && path.normalize(f) === at) return over;
-    try { return fs.readFileSync(path.resolve(dir, f), 'utf8'); } catch { return undefined; }
-  };
-  try {
-    parseFolder(steps, read(file));
-  } catch {
-    return null;
-  }
-  try {
-    parseFolder(steps, read(file, text));
-    return null;
-  } catch (err) {
-    const message = messageOf(err);
-    return { error: message, steps: stepsNamed(message, steps.map(([name]) => name)) };
-  }
-}

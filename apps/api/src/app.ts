@@ -1594,8 +1594,8 @@ export const app = new Hono()
   .get('/api/capabilities', async (c) => c.json(await capabilitiesWithSteps(repoOf())))
   // A repository's workflows, listed, and a run of one started — the board's first write — or of an inbox card (workflows.ts).
   .route('/', workflows)
-  // A folder of yours built on the board: put back from its steps, made with a first step, and a schema beside them — three writes, guarded
-  // as a start is, each the package's `writeWorkflow` but the schema's (builder.ts).
+  // A folder of yours built on the board: made with a first step, and put back from its steps with the schemas pasted for them — two writes,
+  // guarded as a start is, each through the package's `writeWorkflow` (builder.ts).
   .route('/', builder)
   // The inbox: its cards listed, one filed, one dropped — two writes, guarded as a start is (inbox.ts).
   .route('/', inbox)

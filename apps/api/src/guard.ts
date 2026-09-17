@@ -1,14 +1,14 @@
 /**
  * The guard on the board's writes: a request refused before its body is read, whatever it asks for.
  *
- * Ten writes pass it: a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the card; an ask
+ * Nine writes pass it: a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the card; an ask
  * for another try (`POST /api/runs/:id/steps/:step/retry`, app.ts) or another round (`POST /api/runs/:id/round`, app.ts), each of which writes a
  * person's ask file; an approval of a step waiting at its gate (`POST /api/runs/:id/steps/:step/approve`, app.ts), which writes a person's
  * approval file; words for a step's running session (`POST /api/runs/:id/steps/:step/say`, app.ts), which the engine hands the session and
  * journals; a card filed in the inbox (`POST /api/inbox`, inbox.ts) or dropped from it (`DELETE /api/inbox/:name`, inbox.ts), each of which
- * writes the store's inbox; and a workflow of yours built on the board — made (`POST /api/workflows/yours`), put back from its steps
- * (`PUT /api/workflows/yours/:name`), or given a schema (`PUT /api/workflows/yours/:name/schemas/:file`), builder.ts — each of which writes the
- * store's `workflows/`, and removes a step's file the folder no longer has. Each is what an agent acts on in the repository — once a tick files
+ * writes the store's inbox; and a workflow of yours built on the board — made (`POST /api/workflows/yours`), or put back from its steps and
+ * the schemas pasted for them (`PUT /api/workflows/yours/:name`), builder.ts — each of which writes the store's `workflows/`, and removes a
+ * step's file the folder no longer has. Each is what an agent acts on in the repository — once a tick files
  * it, or at once, or once a person starts the card or the workflow — or a person's idea or step gone, so a page on another site must not be able
  * to make any of them; and a `fetch` with a body, from any page, reaches
  * the api without the browser asking it first, unless the body is JSON.

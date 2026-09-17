@@ -1,6 +1,6 @@
 /**
- * The workflow builder's api (builder.ts): a folder of yours put back from its steps, made with a first step, given a schema, and the form a
- * step's keys are drawn in — in a scratch store and a scratch repository. Every write is read back from disk, and every refusal is made to
+ * The workflow builder's api (builder.ts): a folder of yours put back from its steps and the schemas pasted for them, made with a first step,
+ * and the form a step's keys are drawn in — in a scratch store and a scratch repository. Every write is read back from disk, and every refusal is made to
  * refuse, with the folder asserted as it was.
  */
 import './harness.ts';
@@ -20,7 +20,7 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
 const { DEFAULT_HARNESS, stepsNamed } = await import('../src/builder.ts');
-const { listWorkflows } = await import('../src/workflows.ts');
+const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { writeWorkflow } = await import('agent-workflows');
 const { EFFORTS, HARNESSES, loadWorkflows, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-workflows/workflow');
 type KeyForm = import('../src/builder.ts').KeyForm;
@@ -74,12 +74,18 @@ async function listedSteps(name: string, from = 'yours'): Promise<ListedStep[]> 
 }
 
 const json = { 'content-type': 'application/json' };
-const put = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) =>
-  app.request(`/api/workflows/${from}/${name}`, { method: 'PUT', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+/**
+ * A PUT of `body`: sent with the folder's version as it is on disk now, as a board that has just read it sends it — unless the body says
+ * `version` itself, which the tests of a stale or a missing one do.
+ */
+const put = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) => {
+  const read = typeof body === 'object' && body !== null && !Array.isArray(body) && !('version' in body)
+    ? { version: versionOf(path.join(STORE, decodeURIComponent(name))), ...body }
+    : body;
+  return app.request(`/api/workflows/${from}/${name}`, { method: 'PUT', headers, body: typeof read === 'string' ? read : JSON.stringify(read) });
+};
 const post = (body: unknown, from = 'yours', headers: Record<string, string> = json) =>
   app.request(`/api/workflows/${from}`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
-const putSchema = (name: string, file: string, body: unknown, from = 'yours', headers: Record<string, string> = json) =>
-  app.request(`/api/workflows/${from}/${name}/schemas/${file}`, { method: 'PUT', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
@@ -208,7 +214,6 @@ test("REFUSED at shipped defaults: a write to the repository's workflows is a 40
     [await put('mine', { steps: [step], from: 'repo' }), 'PUT /api/workflows/yours/mine', 'mine'],
     [await post({ name: 'good', step }, 'repo'), 'POST /api/workflows/repo', null],
     [await post({ name: 'new', step, from: 'repo' }), 'POST /api/workflows/yours', 'new'],
-    [await putSchema('good', 'x.schema.json', { text: again }, 'repo'), 'PUT /api/workflows/repo/good/schemas/x.schema.json', 'good'],
   ] as const) {
     assert.equal(res.status, 403, route);
     assert.equal((await res.json()).error, sentence(route, name), route);
@@ -223,14 +228,13 @@ test("REFUSED at shipped defaults: a write to the repository's workflows is a 40
   assert.equal(fs.existsSync(path.join(STORE, 'x')), false);
 });
 
-test('REFUSED at shipped defaults: a write another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — for each of the three writes, and nothing is written', async () => {
+test('REFUSED at shipped defaults: a write another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — for both writes, and nothing is written', async () => {
   const dir = planned('guarded');
   const before = snapshot(dir);
   const steps = await listedSteps('guarded');
   const writes = [
     ['PUT /api/workflows/yours/guarded', (h: Record<string, string>) => put('guarded', { steps: [steps[0]] }, 'yours', h)],
     ['POST /api/workflows/yours', (h: Record<string, string>) => post({ name: 'guarded-2', step: steps[0] }, 'yours', h)],
-    ['PUT /api/workflows/yours/guarded/schemas/x.schema.json', (h: Record<string, string>) => putSchema('guarded', 'x.schema.json', { text: again }, 'yours', h)],
   ] as const;
   for (const [route, send] of writes) {
     const type = await send({ 'content-type': 'text/plain;charset=UTF-8' });
@@ -268,6 +272,13 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
     [{ steps: [{ ...plan, spec: { output: { file: 'x.json' } } }] }, /`output` is a string, the schema file's name/],
     [{ steps: [{ ...plan, spec: { tools: ['Read', 3] } }] }, /`tools` is a list of strings/],
     [{ steps: [plan], readme: 42 }, /`readme` is the README's text, a string, or left out/],
+    // What the draft was read from: required, so a save that does not say is never written over a folder changed since.
+    [{ version: undefined, steps: [plan] }, /takes the `version` the folder was read at, as GET \/api\/workflows lists it.*This request's was undefined/],
+    [{ version: '', steps: [plan] }, /takes the `version` the folder was read at/],
+    [{ version: 42, steps: [plan] }, /This request's was 42/],
+    [{ steps: [plan], schemas: 'plan.schema.json' }, /`schemas` is the schemas to write beside the steps, a list, or left out for none/],
+    [{ steps: [plan], schemas: [{ file: 'plan.schema.json' }] }, /schema 1 is \{"file":"plan\.schema\.json"\}, and a schema is/],
+    [{ steps: [plan], schemas: [{ file: 'a.json', text: again }, { file: 'a.json', text: again }] }, /a\.json is given twice/],
   ];
   for (const [body, said] of cases) {
     const res = await put('shaped', body);
@@ -276,7 +287,14 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
     assert.match(error, said, error);
     assert.ok(error.startsWith('PUT /api/workflows/yours/shaped'), error);
   }
+  // A schema's file that is not one directly in the folder, in `schemaNameRefusal`'s words.
+  for (const [file, said] of [['review.txt', /ends in \.json/], ['.hidden.json', /is hidden/], ['../x.json', /a slash names a file in another/], ['sub/x.json', /a slash/], ['.json', /is hidden/], ['tab\t.json', /control character/]] as const) {
+    const res = await put('shaped', { steps: [plan], schemas: [{ file, text: again }] });
+    assert.equal(res.status, 400, file);
+    assert.match((await res.json()).error, said, file);
+  }
   assert.deepEqual(snapshot(dir), before);
+  assert.equal(fs.existsSync(path.join(STORE, 'x.json')), false);
 });
 
 test("REFUSED at shipped defaults: a put to a folder yours does not have is a 404 that says how to make one — a name only the repository has, a hidden folder, a name that climbs — and nothing is made", async () => {
@@ -351,58 +369,128 @@ test("REFUSED at shipped defaults: a new folder whose name is not a folder's (40
   assert.deepEqual(snapshot(STORE), listing);
 });
 
-test('PUT /api/workflows/yours/:name/schemas/:file writes a schema beside the steps, which the listing then offers and a step may name', async () => {
+const risks = JSON.stringify({ type: 'object', properties: { risks: { type: 'array', items: { type: 'string' } } }, required: ['risks'], additionalProperties: false }, null, 2);
+
+test('PUT /api/workflows/yours/:name writes the schemas pasted for it beside the steps, then the steps that name them — a new schema, and one replaced — and says which it wrote', async () => {
   const dir = planned('schemed');
-  const text = JSON.stringify({ type: 'object', properties: { risks: { type: 'array', items: { type: 'string' } } }, required: ['risks'], additionalProperties: false }, null, 2);
-  const res = await putSchema('schemed', 'plan.schema.json', { text });
-  assert.equal(res.status, 200, await res.clone().text());
-  assert.deepEqual(await res.json(), { file: 'plan.schema.json', dir, schemas: ['build.schema.json', 'plan.schema.json'] });
-  assert.equal(fs.readFileSync(path.join(dir, 'plan.schema.json'), 'utf8'), `${text}\n`);
-
   const [plan, build] = await listedSteps('schemed') as [ListedStep, ListedStep];
-  const named = await put('schemed', { steps: [{ ...plan, spec: { ...plan.spec, output: 'plan.schema.json' } }, { ...build, spec: { ...build.spec, input: ['plan'] } }] });
-  assert.equal(named.status, 200, await named.clone().text());
-  const saved: WorkflowSaved = await named.json();
+  const res = await put('schemed', {
+    steps: [{ ...plan, spec: { ...plan.spec, output: 'plan.schema.json' } }, { ...build, spec: { ...build.spec, input: ['plan'] } }],
+    schemas: [{ file: 'plan.schema.json', text: risks }],
+  });
+  assert.equal(res.status, 200, await res.clone().text());
+  const saved: WorkflowSaved = await res.json();
+  assert.deepEqual([saved.written, saved.kept, saved.removed], [['build.md', 'plan.md', 'plan.schema.json'], [], []]);
+  assert.equal(fs.readFileSync(path.join(dir, 'plan.schema.json'), 'utf8'), `${risks}\n`, 'written ending in a line break');
   assert.deepEqual(saved.workflow.steps.map((s) => [s.name, s.spec.output, s.spec.input]), [['plan', 'plan.schema.json', []], ['build', null, ['plan']]]);
+  assert.deepEqual(saved.workflow.schemas, ['build.schema.json', 'plan.schema.json']);
+  assert.equal(saved.workflow.version, versionOf(dir), 'at the version the folder is at now, for the next save');
 
-  // Written again, it is replaced.
-  const replaced = await putSchema('schemed', 'plan.schema.json', { text: text.replace('risks', 'risks') });
-  assert.equal(replaced.status, 200);
+  // The same text again is kept; another text replaces the file.
+  const steps = saved.workflow.steps;
+  const same = await put('schemed', { steps, schemas: [{ file: 'plan.schema.json', text: `${risks}\n` }] });
+  assert.deepEqual((({ written, kept }) => [written, kept])(await same.json() as WorkflowSaved), [[], ['build.md', 'plan.md', 'plan.schema.json']]);
+  const wider = risks.replace('"risks"', '"notes"').replace('"risks"', '"notes"');
+  const replaced = await put('schemed', { steps, schemas: [{ file: 'plan.schema.json', text: wider }] });
+  assert.equal(replaced.status, 200, await replaced.clone().text());
+  assert.deepEqual((await replaced.json() as WorkflowSaved).written, ['plan.schema.json']);
+  assert.equal(fs.readFileSync(path.join(dir, 'plan.schema.json'), 'utf8'), `${wider}\n`);
 });
 
-test("REFUSED at shipped defaults: a schema whose file is not a schema's (400), whose text is not JSON or not an object (422), that a step names and would no longer read with (422, naming it), or in a folder yours does not have (404) — and nothing is written", async () => {
-  const loops = path.join(STORE, 'loops');
-  write(path.join(loops, 'implement.md'), 'Implement it.\n');
-  write(path.join(loops, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\n---\nReview it.\n');
-  write(path.join(loops, 'review.schema.json'), again);
-  assert.deepEqual(loadWorkflows(loops).map((s) => s.name), ['implement', 'review']);
-  const before = snapshot(loops);
-
-  for (const [file, said] of [['review.txt', /ends in \.json/], ['.hidden.json', /is hidden/], ['..%2Fx.json', /a slash names a file in another/], ['.json', /is hidden/]] as const) {
-    const res = await putSchema('loops', file, { text: again });
-    assert.equal(res.status, 400, file);
-    assert.match((await res.json()).error, said, file);
-  }
-  for (const body of ['not json', {}, { text: 42 }]) assert.equal((await putSchema('loops', 'x.schema.json', body)).status, 400, JSON.stringify(body));
-  const notJson = await putSchema('loops', 'x.schema.json', { text: '{ "type": ' });
-  assert.equal(notJson.status, 422);
-  assert.match((await notJson.json()).error, /^x\.schema\.json is not JSON \(.+\)\. A schema is a JSON object/);
-  const notObject = await putSchema('loops', 'x.schema.json', { text: '["again"]' });
-  assert.equal(notObject.status, 422);
-  assert.match((await notObject.json()).error, /^x\.schema\.json is \["again"\], and a schema is a JSON object/);
-
-  // review loops, so its schema declares `again`: one without it would leave the folder unreadable, in the parser's words.
+test("REFUSED at shipped defaults: a pasted schema is judged with the steps before a byte of either is written — not JSON, not an object, not strict, a loop's schema without `again`, and a schema beside steps refused for something else, a cycle or a name — 422 or the package's refusal, naming the steps, and no schema written or replaced", async () => {
+  const dir = path.join(STORE, 'pasted');
+  write(path.join(dir, 'implement.md'), 'Implement it.\n');
+  write(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\n---\nReview it.\n');
+  write(path.join(dir, 'review.schema.json'), again);
+  const before = snapshot(dir);
+  const [implement, review] = await listedSteps('pasted') as [ListedStep, ListedStep];
+  const outputOf = (step: ListedStep, file: string): ListedStep => ({ ...step, spec: { ...step.spec, output: file } });
+  const loose = JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } } });
   const without = JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false });
-  const breaks = await putSchema('loops', 'review.schema.json', { text: without });
-  assert.equal(breaks.status, 422);
-  const { error, steps } = await breaks.json();
-  assert.equal(error, 'review: `loop: implement` runs implement again when this step\'s closeout says `again: true`, and `output: review.schema.json` does not declare `again`. Declare it — `"again": { "type": "boolean" }`, listed in `required` — so the run reads a yes or a no, never prose.');
-  assert.deepEqual(steps, ['review']);
 
-  const nowhere = await putSchema('nope', 'x.schema.json', { text: again });
-  assert.equal(nowhere.status, 404);
-  assert.deepEqual(snapshot(loops), before, 'nothing written');
-  assert.equal(fs.existsSync(path.join(STORE, 'nope')), false);
+  const cases: Array<[string, unknown, RegExp | string, string[], number]> = [
+    ['not JSON', { steps: [outputOf(implement, 'implement.schema.json'), review], schemas: [{ file: 'implement.schema.json', text: '{ "type": ' }] },
+      /^implement\.schema\.json is not JSON \(.+\)\. A schema is a JSON object/, ['implement'], 422],
+    ['not an object', { steps: [outputOf(implement, 'implement.schema.json'), review], schemas: [{ file: 'implement.schema.json', text: '["again"]' }] },
+      /^implement\.schema\.json is \["again"\], and a schema is a JSON object/, ['implement'], 422],
+    // Any JSON object used to be written: the parser judges it only once a step names it, which the folder on disk did not yet.
+    ['not strict, for a new output', { steps: [outputOf(implement, 'implement.schema.json'), review], schemas: [{ file: 'implement.schema.json', text: loose }] },
+      /^implement: `output: implement\.schema\.json` is not strict at /, ['implement'], 422],
+    ["a loop's schema replaced without `again`", { steps: [implement, review], schemas: [{ file: 'review.schema.json', text: without }] },
+      'review: `loop: implement` runs implement again when this step\'s closeout says `again: true`, and `output: review.schema.json` does not declare `again`. Declare it — `"again": { "type": "boolean" }`, listed in `required` — so the run reads a yes or a no, never prose.', ['review'], 422],
+    ['a good schema beside a cycle', { steps: [{ ...implement, spec: { ...implement.spec, after: ['review'] } }, review], schemas: [{ file: 'review.schema.json', text: `${again}\n\n` }, { file: 'x.schema.json', text: risks }] },
+      'these steps wait on each other: implement, review', ['implement', 'review'], 422],
+    // A name is refused before anything else, a cycle included, as `writeWorkflow` refuses it: the pasted schemas are not judged ahead of it.
+    ['a good schema beside a name refused, and a cycle', { steps: [{ ...implement, spec: { ...implement.spec, after: ['review/it'] } }, { ...review, name: 'review/it' }], schemas: [{ file: 'x.schema.json', text: risks }] },
+      /^`review\/it` is not a step's name: a step is a file in its workflow's folder/, ['review/it'], 422],
+  ];
+  for (const [what, body, said, named, status] of cases) {
+    const res = await put('pasted', body);
+    assert.equal(res.status, status, `${what}: ${await res.clone().text()}`);
+    const { error, steps } = await res.json();
+    if (typeof said === 'string') assert.equal(error, said, what);
+    else assert.match(error, said, `${what}: ${error}`);
+    assert.deepEqual(steps, named, `${what}: ${error}`);
+    assert.deepEqual(snapshot(dir), before, `${what}: no schema written or replaced, and no step`);
+  }
+});
+
+test("REFUSED at shipped defaults: a save of a folder that changed since it was read — a step edited, added or removed by hand, a schema or the README edited — is a 409 that says to read it again, and nothing is written over the change", async () => {
+  const dir = planned('edited');
+  write(path.join(dir, 'README.md'), '# edited\n');
+  const [plan, build] = await listedSteps('edited') as [ListedStep, ListedStep];
+  const read = versionOf(dir);
+  const draft = { version: read, steps: [plan, { ...build, spec: { ...build.spec, retries: 2 } }] };
+  const handEdits: Array<[string, () => void, () => void]> = [
+    ['plan.md edited', () => write(path.join(dir, 'plan.md'), '---\nharness: claude\ncheck: test -f PLAN.md\n---\nWrite PLAN.md.\n'), () => write(path.join(dir, 'plan.md'), '---\n# Plans first.\nharness: claude\n---\nWrite PLAN.md.\n')],
+    ['ship.md added', () => write(path.join(dir, 'ship.md'), '---\nafter: build\n---\nShip it.\n'), () => fs.rmSync(path.join(dir, 'ship.md'))],
+    ['build.md removed', () => fs.rmSync(path.join(dir, 'build.md')), () => write(path.join(dir, 'build.md'), '---\nafter: plan\ncheck: npm test\n---\nBuild what PLAN.md says.\n')],
+    ['a schema edited', () => write(path.join(dir, 'build.schema.json'), `${again}\n`), () => write(path.join(dir, 'build.schema.json'), again)],
+    ['the README edited', () => write(path.join(dir, 'README.md'), '# edited, by hand\n'), () => write(path.join(dir, 'README.md'), '# edited\n')],
+  ];
+  for (const [what, edit, undo] of handEdits) {
+    edit();
+    const edited = snapshot(dir);
+    const now = versionOf(dir);
+    assert.notEqual(now, read, `${what}: the folder's version moves`);
+    const res = await put('edited', draft);
+    assert.equal(res.status, 409, `${what}: ${await res.clone().text()}`);
+    const { error, steps } = await res.json();
+    assert.equal(error, `${dir} has changed since it was read at version ${read}: a step, the README or a schema there was edited, added or removed, and this save would write over it. Nothing was written. Read the folder again (it is at version ${now}), make the change on what it holds now, and save that.`, what);
+    assert.deepEqual(steps, []);
+    assert.deepEqual(snapshot(dir), edited, `${what}: the hand edit is kept, and nothing else written`);
+    undo();
+    assert.equal(versionOf(dir), read, `${what}: undone, the folder is at the version it was read at again`);
+  }
+
+  // What is no step moves nothing: a note beside the steps, a hidden file, a folder inside it.
+  write(path.join(dir, 'NOTES.txt'), 'Ideas.\n');
+  write(path.join(dir, '.draft.md'), 'Draft.\n');
+  write(path.join(dir, 'sub', 'x.md'), 'Not a step.\n');
+  assert.equal(versionOf(dir), read);
+
+  // Read at the version it is at, the save is taken; and the version it was read at before that save is stale after it.
+  const taken = await put('edited', draft);
+  assert.equal(taken.status, 200, await taken.clone().text());
+  assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^retries: 2$/m);
+  const again409 = await put('edited', { ...draft, steps: [plan, build] });
+  assert.equal(again409.status, 409, 'a second save from the same read is refused: the first one changed the folder');
+  assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^retries: 2$/m, 'and the first save stands');
+});
+
+test('a write the package does not refuse but the disk does puts each pasted schema back as it was: a step file that is a folder', async () => {
+  const dir = path.join(STORE, 'blocked');
+  write(path.join(dir, 'build.md'), 'Build it.\n');
+  fs.mkdirSync(path.join(dir, 'plan.md'));
+  write(path.join(dir, 'kept.schema.json'), again);
+  const before = snapshot(dir);
+  const res = await put('blocked', {
+    steps: [{ name: 'plan', spec: spec({ output: 'new.schema.json' }), body: 'Plan it.' }, { name: 'build', spec: spec({ output: 'kept.schema.json' }), body: 'Build it.' }],
+    schemas: [{ file: 'new.schema.json', text: risks }, { file: 'kept.schema.json', text: risks }],
+  });
+  assert.equal(res.status, 500, await res.clone().text());
+  assert.match((await res.json()).error, /EISDIR/);
+  assert.deepEqual(snapshot(dir), before, 'the new schema removed, the replaced one written back');
 });
 
 test("stepsNamed: the steps a refusal names — a cycle's several, a name refused or given twice, and the step a refusal opens on, the longest name first", () => {

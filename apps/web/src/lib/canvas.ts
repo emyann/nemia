@@ -204,6 +204,9 @@ const FACTORY_KEY = 'hkb:factory-layout';
 /** The Factory's open runs, one list per browser, beside its arrangement: whose graphs are unfolded, in the order opened. */
 const FACTORY_OPEN_KEY = 'hkb:factory-open';
 
+/** The Factory's steps a person dragged, one map per browser, beside its arrangement: how far each was moved from where the layering puts it, by the step's node (`stepId`). */
+const FACTORY_STEPS_KEY = 'hkb:factory-steps';
+
 export const readLayout = (runId: string): Map<string, Point> | null => readAt(layoutKey(runId), parseLayout, null);
 export const saveLayout = (runId: string, at: ReadonlyMap<string, Point>): void => saveAt(layoutKey(runId), Object.fromEntries(at));
 export const forgetLayout = (runId: string): void => forgetAt(layoutKey(runId));
@@ -215,6 +218,10 @@ export const forgetFactoryLayout = (): void => forgetAt(FACTORY_KEY);
 export const readFactoryOpen = (): string[] => readAt(FACTORY_OPEN_KEY, parseOpen, []);
 export const saveFactoryOpen = (ids: readonly string[]): void => saveAt(FACTORY_OPEN_KEY, ids);
 export const forgetFactoryOpen = (): void => forgetAt(FACTORY_OPEN_KEY);
+
+export const readFactorySteps = (): Map<string, Point> => readAt(FACTORY_STEPS_KEY, parseLayout, null) ?? new Map();
+export const saveFactorySteps = (dragged: ReadonlyMap<string, Point>): void => saveAt(FACTORY_STEPS_KEY, Object.fromEntries(dragged));
+export const forgetFactorySteps = (): void => forgetAt(FACTORY_STEPS_KEY);
 
 /** The open runs as they were saved: run ids, each once, in order; none for anything that is not a list of ids. */
 export function parseOpen(raw: string | null): string[] {

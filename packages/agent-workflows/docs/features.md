@@ -2843,7 +2843,11 @@ What the board does with it, an item a commit — §8's apps half, the run after
   asks git only where the answer can decide anything (`standingsOf`): not for a run called off, one still going, one that worked on its
   base branch, or a folder whose ending merges — a gate says a run is one to decide with no `git` call at all, which is what the list the
   Factory polls every five seconds is. Level-triggered as the package is: a branch merged by hand stops being one to decide on the next
-  read, and the test merges one by hand. Beside it, `GET /api/runs/:id/decision` carries `standings` — where each result branch stands and
+  read, and the test merges one by hand — with one thing remembered, the branches already on the base (`onTheBase`), since a merged branch
+  does not come off its base and that is the answer that says there is nothing to decide: remembering it can only forget a decision, never
+  invent one, and the answer that holds a person up is asked every poll. It is what the store's long tail costs: of the author's 69 runs
+  with a result branch on 2026-09-17, 66 were already on main — the first read of the list 691 ms of `git`, every later one three branches.
+  Beside it, `GET /api/runs/:id/decision` carries `standings` — where each result branch stands and
   git's own diff stat of it (`branchWord`, `diffStat`) — reads the result with `resultSteps` rather than `terminalSteps`, and offers
   `ship it` and `drop it` no more for a folder whose ending merges, as `wf decide` never has.
 - **The Factory counts them (`2 to decide`), and their cards stay on the floor**, whatever "Show finished" says, until they are decided:
@@ -2858,7 +2862,11 @@ What the board does with it, an item a commit — §8's apps half, the run after
   own: beside Approve and Send back, the panel shows what it would act on — each result branch's standing and diff stat, then each step it
   waits on with the closeout it handed on, rendered, and the files it named. And its Send back goes to the work, since `wf retry <run>
   <the ending>` is refused: the button asks for a try of the steps `sendBackTo` names, and where an ending waits on several a person picks
-  which. A gate on a step that has run is unchanged, to the markup. Found by the panel: **a write invalidated the decision key the page was
+  which, and none at all for an ending that waits on nothing, whose approval is the only word there is — as `wf ls`'s gate note prints it
+  (`gateNote`). The words a person approves with are the terms that step acts on, which is what its own brief is handed (`approvedSection`),
+  so its box says that and not that they go to the steps after it; and the run's detail now carries `workspace` on a step's spec, which is
+  what tells such a gate from §6's — the two read the same off a step's record — so its facts row says where the gate holds instead of
+  saying it holds once a step that never signs off first has signed off. A gate on a step that has run is unchanged, to the markup. Found by the panel: **a write invalidated the decision key the page was
   on**, and the refetch filled that key — which stands for the state the decision was read for (`decisionStamp`) — with the answer for the
   state after the write. A run whose state then went back to one already read showed a blank Decide section and a panel still reading, until
   a reload. A write now invalidates the run's record alone (`exact`), which is the key that means "the run as it is".
@@ -2882,6 +2890,12 @@ between two rows.
 
 What it leaves:
 
+- **The standings are two or three `git` calls a branch**, spawned one after another on a request the board polls: `isShipped`'s two
+  `merge-base --is-ancestor`, then `rev-parse` and `rev-list` for a branch that is not on the base. The api asks only where the answer can
+  decide anything and remembers the branches on the base (`standingsOf`, `onTheBase`), which leaves the branches still ahead — a handful —
+  and nothing to cache against. Asked once per repository instead of twice per branch (`git for-each-ref --merged <base>`) it would be one
+  spawn for a whole store, but the judgement is `isShipped`'s, which reads a deleted branch by the tip the run recorded: the batching
+  belongs beside it in the package, not in a second reading on the board.
 - **An approval given and then a send-back of the work asked for.** `wf approve` refuses the second order, and `approvalRefusal` refuses
   approving while an ask is pending; but an approval written first and a send-back asked for after it stands for the next result too — the
   approval names the ending's try, which a send-back of another step does not spend. Approve after the work, not before it.

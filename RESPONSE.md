@@ -28,11 +28,33 @@ both are in `apps/web`:
 **The cost of the branch standings.** `assess` and `listing` want them for the git kind of `to decide`,
 and they read git. The api asks only where the answer can decide anything — not for a run called off,
 one still going, one that worked on its base branch, or a folder whose ending merges — so a run at a
-gate costs no `git` at all, and an api test counts the calls to say so. Measured on the operator's own
-store (75 runs, 2026-09-17): 68 runs have a result branch to read, and reading every one of them takes
-580 ms, which is the upper bound for a poll of the list; the real set is the succeeded ones among them.
-If that shows on the board, the next step is not to store the answer — `shipped` is deliberately asked
-each pass — but to ask git once per repository rather than twice per branch.
+gate costs no `git` at all, and an api test counts the calls to say so.
+
+Round 2 narrowed it further, after the review put a number on it: the api now remembers the result
+branches it has seen **on** their base branch (`onTheBase` in app.ts), which is the one answer that
+cannot change without a history rewrite and the one that says there is nothing to decide. Remembering
+it can only forget a decision, never invent one, and the answer that holds a person up — a branch ahead
+of the base — is asked on every poll, with a test that counts the calls both ways. On the operator's
+own store (2026-09-17): 69 runs have a result branch, 66 of them already on main, so the first read of
+the list spends 691 ms in `git` and every later one asks about three branches.
+
+What is left is the package's: `isShipped` is two `merge-base` calls a branch because it reads a
+deleted branch by the tip the run recorded. One `git for-each-ref --merged <base>` per repository would
+answer for a whole store in one spawn, and it belongs beside that judgement rather than as a second
+reading on the board. features.md's leaves say so.
+
+## Round 2
+
+Review's five findings: four fixed — the approve box's placeholder at an ending's gate (the words are
+the terms that step acts on, which is what its brief is handed, not something passed to steps after
+it); the panel shown the moment a word is taken (it named the ending for a try filed for the work, and
+told an approval it files what waits on it, where nothing does — `takenOf`); an ending that waits on
+nothing, which was offered a send-back the package refuses, and now gets the approval alone as
+`wf ls`'s gate note prints it; and the gate's facts row, which said "holds once it has signed off" of a
+step that never signs off before its gate — the run's detail now carries `workspace` on a step's spec,
+which is what tells such a gate from §6's, and `gateWord` says where it really holds. The fifth, the
+`git` on the polled list, is narrowed as above rather than left for a person: the design call that
+remains is the package's batching, not the board's.
 
 ## What I left
 

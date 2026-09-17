@@ -1,7 +1,10 @@
+import { useEffect, useRef, useState } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
 import { Markdown } from '../components/Markdown';
+import { NewWorkflow } from '../components/NewWorkflow';
 import { StartRun } from '../components/StartRun';
+import { WorkflowBuilder } from '../components/WorkflowBuilder';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { workflowsQuery, type WorkflowListing } from '../lib/api';
 
@@ -19,18 +22,26 @@ export const Route = createFileRoute('/workflows')({
 const where = <code className="font-mono text-xs">workflows/</code>;
 const yours = <code className="font-mono text-xs">~/.agent-workflows/workflows/</code>;
 
-/** Every workflow the repository carries, then yours: a card each, drawn, and startable. */
+/** Every workflow the repository carries, then yours: a card each, drawn, and startable — and yours built on the board, a new one included. */
 function WorkflowsPage() {
   const { data: workflows } = useSuspenseQuery(workflowsQuery);
+  // The workflow just made, whose card opens in its builder.
+  const [made, setMade] = useState<string | null>(null);
 
   return (
     <article className="space-y-6">
-      <p className="text-sm text-neutral-500">
-        A workflow is a folder of steps: this repository's under {where}, and yours under {yours}. Starting a run writes its
-        record as <code className="font-mono text-xs">wf start</code> does, and files nothing: <code className="font-mono text-xs">wf up</code> files its steps.
-      </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="min-w-0 flex-1 text-sm text-neutral-500">
+          A workflow is a folder of steps: this repository's under {where}, and yours under {yours}. Starting a run writes its
+          record as <code className="font-mono text-xs">wf start</code> does, and files nothing: <code className="font-mono text-xs">wf up</code> files its steps.
+          Yours are built here too.
+        </p>
+        <NewWorkflow onCreated={setMade} />
+      </div>
       {workflows.length ? (
-        workflows.map((workflow) => <WorkflowCard key={`${workflow.from}:${workflow.name}`} workflow={workflow} />)
+        workflows.map((workflow) => (
+          <WorkflowCard key={`${workflow.from}:${workflow.name}`} workflow={workflow} building={workflow.from === 'yours' && workflow.name === made} />
+        ))
       ) : (
         <p className="text-sm text-neutral-500">
           No workflows. Add a folder of steps under {where} in the repository — <code className="font-mono text-xs">workflows/dev/implement.md</code>, say — or under {yours}.
@@ -40,11 +51,21 @@ function WorkflowsPage() {
   );
 }
 
-function WorkflowCard({ workflow }: { workflow: WorkflowListing }) {
+/**
+ * A workflow's card: what it is, drawn, its steps' pages and a start — or, for one of yours, its builder in their place (`WorkflowBuilder`).
+ * `building` opens it in the builder, as a workflow just made is. The repository's show none, and say why: the api writes nothing into a checkout.
+ */
+function WorkflowCard({ workflow, building: opened = false }: { workflow: WorkflowListing; building?: boolean }) {
   const { name, from, dir, description, steps, error } = workflow;
+  const [building, setBuilding] = useState(opened && from === 'yours' && !error);
+  const card = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (opened) card.current?.scrollIntoView({ block: 'start' });
+  }, [opened]);
 
   return (
     <section
+      ref={card}
       aria-label={`Workflow ${name}`}
       data-from={from}
       className="space-y-4 rounded-lg border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950"
@@ -66,8 +87,28 @@ function WorkflowCard({ workflow }: { workflow: WorkflowListing }) {
               {steps.length} {steps.length === 1 ? 'step' : 'steps'}
             </span>
           )}
+          {from === 'yours' && !error && !building && (
+            <button
+              type="button"
+              onClick={() => setBuilding(true)}
+              className="ml-auto rounded border border-neutral-300 px-2 py-0.5 text-xs font-medium hover:bg-neutral-100 dark:border-neutral-700 dark:hover:bg-neutral-900"
+            >
+              Build
+            </button>
+          )}
         </div>
         <p className="font-mono text-[11px] break-all text-neutral-500">{dir}</p>
+        {from === 'repo' && (
+          <p data-no-builder className="text-xs text-neutral-500">
+            No builder: the board writes only yours, and nothing into this checkout. To build it, copy the folder into {yours}, build it there,
+            and copy it back into the repository by hand.
+          </p>
+        )}
+        {from === 'yours' && error && (
+          <p data-no-builder className="text-xs text-neutral-500">
+            No builder until the folder reads: the builder puts back the steps a folder reads as. Fix its files by hand first.
+          </p>
+        )}
       </header>
 
       {description ? (
@@ -83,6 +124,8 @@ function WorkflowCard({ workflow }: { workflow: WorkflowListing }) {
           <p className="text-sm font-medium text-red-800 dark:text-red-300">Does not read as a workflow, so it cannot start:</p>
           <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error}</p>
         </div>
+      ) : building ? (
+        <WorkflowBuilder workflow={workflow} onClose={() => setBuilding(false)} />
       ) : (
         <>
           <WorkflowCanvas workflow={workflow} />

@@ -427,8 +427,15 @@ export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
  * One read per task per pass, shared by everything that then wants an answer: `advance` needs the
  * views themselves (for the session id a `resume:` step continues), and the pure functions need
  * only the phase.
+ *
+ * `earlierTries` reads each try a step has left behind as well. They are read for one thing — what the step's tries have cost together,
+ * which the cap in force on it is held to (`stepSpend`, `overBudget`, `budgetUsdFor`) — and every reader of that is gated on there being a
+ * cap (`budgetOf`), so with none in force they are read and never asked. A screen reads them all the same (`decide` prints what a run cost
+ * and its timeline over every try), and so does anything that must answer for a try that is over. The tick does not: `advance` asks for
+ * them only while a cap is in force, because a step answered without limit — the supervisor, which is answered for as long as a person
+ * keeps answering — would otherwise add one journal read per answer to every pass of every four seconds, for ever, buying nothing.
  */
-async function taskPhases(e: Engine, run: Run): Promise<{
+async function taskPhases(e: Engine, run: Run, { earlierTries = true }: { earlierTries?: boolean } = {}): Promise<{
   views: Map<string, TaskView>;
   phaseOf: (taskId: string) => TaskPhase;
 }> {
@@ -436,15 +443,21 @@ async function taskPhases(e: Engine, run: Run): Promise<{
   for (const { taskId, check, tries } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
     if (check) views.set(check.taskId, await e.view(check.taskId));
-    // Each earlier try's session, once: what the step's tries have cost together, which its `budget:` is held to (`stepSpend`). A settled
-    // task is read off its journal, and asks no harness.
-    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
+    // A settled task is read off its journal, and asks no harness — but it is still a read, once per try per pass.
+    if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
   }
   return {
     views,
     phaseOf: (taskId) => phaseOfView(views.get(taskId)),
   };
 }
+
+/**
+ * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
+ * record, with nothing asked of the engine. What the tick's pass reads the earlier tries for (`taskPhases`): with no cap anywhere, what
+ * they cost is a number nothing in the pass looks at.
+ */
+const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run.steps[s.name]) !== undefined);
 
 /**
  * Checks a pass filed and never wrote down, put back on the record. In memory: `advance` is the one
@@ -1493,7 +1506,9 @@ export type Advanced = {
 export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Advanced> {
   const steps = stepsOf(run);
 
-  const { views, phaseOf } = await taskPhases(e, run);
+  // Every try's session, or only the current ones: what the earlier ones cost is read by nothing here unless a cap is in force
+  // (`underBudget`), and a step answered without limit grows that read for ever.
+  const { views, phaseOf } = await taskPhases(e, run, { earlierTries: underBudget(steps, run) });
   const signedOff = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);

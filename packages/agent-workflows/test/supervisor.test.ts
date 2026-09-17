@@ -55,18 +55,24 @@ const folderOf = (steps: Record<string, string>): string => {
  */
 const board = () => {
   type Filed = { id: string; brief: string; closeoutSchema?: object } & Record<string, unknown>;
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; costUsd?: number }>();
   const filings: string[] = [];
   const stopped: string[] = [];
+  /** Every `view` the caller asked for, in order: what a pass costs the engine, which is the point of one of the tests below. */
+  const reads: string[] = [];
   const e = {
     view: async (id: string) => {
       const t = tasks.get(id);
+      reads.push(id);
       const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
       return {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
           brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: [],
-          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: null }],
+          attempts: !t || t.phase === 'pending' ? [] : [{
+            n: 1, ended: null, endedAt: settled ? '2026-09-17T00:00:00.000Z' : null, nativeId: `native-${id}`,
+            closeout: t.closeout, exitCode: t.exitCode ?? null, usage: t.costUsd === undefined ? null : { costUsd: t.costUsd },
+          }],
         },
       };
     },
@@ -76,8 +82,9 @@ const board = () => {
     feed: async () => ({ entries: [], cursor: 0 }),
     tick: async () => {},
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
-  return { e, tasks, filings, stopped, settle };
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, costUsd?: number) =>
+    Object.assign(tasks.get(id)!, { phase, closeout, exitCode, costUsd });
+  return { e, tasks, filings, stopped, reads, settle };
 };
 
 // ─── the folder, held to its shape ──────────────────────────────────────────
@@ -165,6 +172,50 @@ test('a step answered five times over keeps working: each answer a try of the sa
   }
   assert.equal(readRun(run.id).steps.supervise?.tries?.length, 5, 'five tries behind the one it is on, and the sixth running');
   assert.equal(filings.length, 6);
+});
+
+test("a pass over a step answered again and again reads what it is working on, not every try it has left behind — and with a cap in force it reads them all", async () => {
+  const repo = aRepo();
+  const { e, reads, settle } = board();
+  const run = start({ brief: 'supervise this repository', repo, workflowDir: FOLDER });
+  await advance(e, readRun(run.id));
+
+  /** What one pass asked the engine for, over a step that has been answered `n` times. */
+  const passReads = async (): Promise<string[]> => {
+    reads.length = 0;
+    await advance(e, readRun(run.id));
+    return [...reads];
+  };
+  const answer = async (n: number) => {
+    const taskId = n === 1 ? `${run.id}-supervise` : `${run.id}-supervise-try${n}`;
+    settle(taskId, 'succeeded', { outcome: 'blocked', summary: `round ${n}`, artifacts: [], needs: 'Merge it?' });
+    await advance(e, readRun(run.id));
+    await retry(e, run.id, 'supervise', { mode: 'nudge', message: `yes (${n})` });
+    await advance(e, readRun(run.id));
+  };
+
+  await answer(1);
+  const early = await passReads();
+  for (let n = 2; n <= 6; n++) await answer(n);
+  assert.equal(readRun(run.id).steps.supervise?.tries?.length, 6, 'six answered tries behind the one it is on');
+  const later = await passReads();
+  assert.deepEqual(later, [`${run.id}-supervise-try7`], 'the try it is on, and nothing else');
+  assert.equal(later.length, early.length, 'a pass costs the same at six answers as at one: it does not grow with them');
+
+  // A cap in force is the one thing those tries are read for — what they have cost together — so a run with one reads every last one,
+  // and the step it holds still reads over budget.
+  const capped = start({ brief: 'do the work', repo, workflowDir: folderOf({ implement: 'harness: claude\nbudget: 1' }), isolate: false });
+  await advance(e, readRun(capped.id));
+  settle(`${capped.id}-implement`, 'failed', undefined, undefined, 0.6);
+  await advance(e, readRun(capped.id));
+  await retry(e, capped.id, 'implement', { mode: 'fresh' });
+  await advance(e, readRun(capped.id));
+  settle(`${capped.id}-implement-try2`, 'failed', undefined, undefined, 0.6);
+  reads.length = 0;
+  await advance(e, readRun(capped.id));
+  assert.ok(reads.includes(`${capped.id}-implement`), `try 1 is read while a cap is in force: ${reads.join(', ')}`);
+  const held = await list(e, readRun(capped.id));
+  assert.deepEqual(held.steps.map((st) => st.status), ['over budget $1.20 of $1'], 'the two tries counted together against the cap');
 });
 
 // ─── and one the cap on runs in flight does not hold ────────────────────────

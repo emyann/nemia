@@ -2906,8 +2906,18 @@ What was built, four commits:
   check, so there is none to be given it. (The review of §8's run found this; it is that finding, closed.) And a run whose ending step
   is its whole workflow cut no branch, so "the run's work is on the run's result branch" was followed by an empty fence: it is told
   there is no work of its to read, and the base it is standing on.
+- **What a pass reads of a step answered without limit.** Every try a step leaves behind was read from the engine on every pass, by
+  every caller of `taskPhases` — the tick's included. They are read for one thing, what the tries have cost together, and every reader
+  of that is gated on a cap being in force (`budgetOf`, `overBudget`, `budgetUsdFor`), so for a step with no `budget:` each of those
+  reads buys nothing. For every other workflow the count is bounded by `retries:` and a person's patience; a step answered for as long
+  as somebody keeps answering would have added one journal read per answer to every pass, every four seconds, for ever. So `advance`
+  asks for them only while a cap is in force (`underBudget`, read off the record with nothing asked of the engine), and a screen still
+  reads them all — `wf decide` prints what a run cost and its timeline over every try. Found by the review, round 2.
 - **The README's section** — what the supervisor is, how to start it, how to answer it — beside the two bullets the key needed: the
-  keys' closed list, and the cap's own section.
+  keys' closed list, and the cap's own section. With, from round 2: what a supervisor costs in sessions (`WF_MAX_CONCURRENT` is 2
+  unless set, per harness pool, and a session that is watching is a session at work — so at the default it leaves one slot for the work
+  it watches, and the ceiling is worth raising before starting one), and the artifacts bullet that said a step is told both ways, which
+  a `workspace: main` step is not.
 
 What was measured:
 
@@ -2917,7 +2927,7 @@ What was measured:
   — blocked, answered, blocked again, five times over, each try resuming the session before it and carrying `## Your answer` — and
   probed by hand to twelve, which files the twelfth as it files the second. What a step with `output:` would hit is not a cap but its
   own schema: it would have to declare its fields on every one of those sign-offs. The supervisor declares none.
-- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 585 (584 passed, 1 skipped), from
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 586 (585 passed, 1 skipped), from
   575. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged — no test was added outside the package, and the two
   pinned `spec()` fixtures in the api's tests each gained a `slot: null` row, which is the fourth and fifth obligation a new key has
   outside the package beside CLAUDE.md's three. `npm run typecheck` clean in all four.
@@ -2933,6 +2943,10 @@ What was measured:
   switched (1), the empty fence back (1). Each failed.
 - The screens were printed and read on a supervisor run that had asked its first question: `wf ls` says `supervise succeeded · BLOCKED`
   and `→ waiting on you: supervise`; `wf decide` prints the brief, the `needs` and the `wf retry --message` that answers it.
+- **What a pass reads, counted** (round 2, `supervisor.test.ts`, over a board that records every `view`): one read, the try the step is
+  on, after one answer and again after six — the same number, so it does not grow with the answers. With a cap in force the pass reads
+  every try, and two tries of $0.60 against `budget: 1` still read `over budget $1.20 of $1`. Both directions were broken on purpose:
+  never reading them lets the cap through, always reading them brings the growth back, and each failed the test.
 
 What it leaves:
 
@@ -2950,6 +2964,11 @@ What it leaves:
   since its one step works in the checkout.
 - **`wf decide` on a supervisor run says `touched master — nothing`**: the run has no result branch, so what it reports against the base
   is the base. Honest, and not useful.
+- **A screen of a long-lived run still reads every try.** `wf decide` prints what the run cost and its timeline over all of them, and
+  the api reads the whole engine board for the Factory, so at five hundred answers those are five hundred reads — of a person's
+  command, and of a poll that was already reading the board. The record's `tries` array grows with them too, and the pass rewrites it.
+  The lever for all three is engine-side: a view the engine caches, or a settled task's fold kept once (agent-engine's open issues).
+  The tick, which is what runs every four seconds, no longer pays it.
 
 ## 1. A run that grows steps from a plan
 

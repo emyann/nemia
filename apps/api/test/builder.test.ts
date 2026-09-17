@@ -19,7 +19,7 @@ process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { DEFAULT_HARNESS, stepsNamed } = await import('../src/builder.ts');
+const { DEFAULT_HARNESS, putSchemasBack, stepsNamed } = await import('../src/builder.ts');
 const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { writeWorkflow } = await import('agent-workflows');
 const { EFFORTS, HARNESSES, loadWorkflows, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-workflows/workflow');
@@ -497,6 +497,48 @@ test('a write the package does not refuse but the disk does puts each pasted sch
   assert.equal(res.status, 500, await res.clone().text());
   assert.match((await res.json()).error, /EISDIR/);
   assert.deepEqual(snapshot(dir), before, 'the new schema removed, the replaced one written back');
+});
+
+test('a pasted schema the disk refuses at the open puts back every schema written before it: one of two read-only', { skip: process.getuid?.() === 0 ? 'root writes a read-only file all the same' : false }, async () => {
+  const dir = path.join(STORE, 'read-only');
+  write(path.join(dir, 'plan.md'), 'Plan it.\n');
+  write(path.join(dir, 'build.md'), '---\nafter: plan\n---\nBuild it.\n');
+  write(path.join(dir, 'kept.schema.json'), again);
+  fs.chmodSync(path.join(dir, 'kept.schema.json'), 0o444);
+  const before = snapshot(dir);
+  try {
+    // `new.schema.json` is written, then `kept.schema.json` is not: the write of the first is undone, as a refusal of the folder undoes it.
+    const res = await put('read-only', {
+      steps: [{ name: 'plan', spec: spec({ output: 'new.schema.json' }), body: 'Plan it.' }, { name: 'build', spec: spec({ after: ['plan'], output: 'kept.schema.json' }), body: 'Build it.' }],
+      schemas: [{ file: 'new.schema.json', text: risks }, { file: 'kept.schema.json', text: risks }],
+    });
+    assert.equal(res.status, 500, await res.clone().text());
+    assert.match((await res.json()).error, /EACCES/);
+    assert.deepEqual(snapshot(dir), before, 'the schema written before it removed, the read-only one as it was, and no step written');
+  } finally {
+    fs.chmodSync(path.join(dir, 'kept.schema.json'), 0o644);
+  }
+});
+
+test("putSchemasBack: a schema a write truncated is put back, one the write never opened is left alone — a read-only file, which writing back would refuse in turn — and one the save made is removed", { skip: process.getuid?.() === 0 ? 'root writes a read-only file all the same' : false }, () => {
+  const dir = path.join(STORE, 'put-back');
+  write(path.join(dir, 'cut.schema.json'), again);
+  write(path.join(dir, 'locked.schema.json'), again);
+  fs.chmodSync(path.join(dir, 'locked.schema.json'), 0o444);
+  write(path.join(dir, 'made.schema.json'), risks);
+  // What a write that failed after the open leaves — the disk full, a read that broke: `fs.writeFileSync` truncates first, so the file is
+  // there and shorter than it was. Nothing the save can tell from which writes returned.
+  fs.writeFileSync(path.join(dir, 'cut.schema.json'), '{ "type": ');
+  try {
+    putSchemasBack(dir, [
+      { file: 'cut.schema.json', was: again },
+      { file: 'locked.schema.json', was: again },
+      { file: 'made.schema.json', was: undefined },
+    ]);
+    assert.deepEqual(snapshot(dir), { 'cut.schema.json': again, 'locked.schema.json': again }, 'the truncated schema back as it was, the read-only one untouched, the new one gone');
+  } finally {
+    fs.chmodSync(path.join(dir, 'locked.schema.json'), 0o644);
+  }
 });
 
 test("stepsNamed: the steps a refusal names — a cycle's several, a name refused or given twice, and the step a refusal opens on, the longest name first", () => {

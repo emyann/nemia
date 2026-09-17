@@ -204,9 +204,9 @@ test('an open run spans its card\'s cell and as many to the right as its graph i
   // The e2e's fake run is a chain of three: a whole row of the grid.
   assert.deepEqual(spanOf(graphAt(chain(3))), { columns: 4, rows: 1 });
   assert.deepEqual(spanOf(graphAt(chain(5))), { columns: 6, rows: 1 }, 'wider than the grid');
-  // Taller than a cell, so it takes the row below as well.
+  // Taller than a cell, so each takes the row below as well: the fan-out's two lanes, and the diamond's three, which reach further down.
   assert.deepEqual(spanOf(graphAt(fanOut)), { columns: 3, rows: 2 });
-  assert.deepEqual(spanOf(graphAt(diamond)), { columns: 5, rows: 3 });
+  assert.deepEqual(spanOf(graphAt(diamond)), { columns: 5, rows: 2 });
   // A step whose right edge ends a gap short of a cell's edge, and one a pixel past that; one whose row ends at a cell's edge, and a pixel past.
   const edge = 2 * CELL_WIDTH - (CELL_WIDTH - CARD_WIDTH) - NODE_WIDTH;
   assert.deepEqual(spanOf(new Map([['s', { x: edge, y: GRAPH_TOP }]])), { columns: 2, rows: 1 });

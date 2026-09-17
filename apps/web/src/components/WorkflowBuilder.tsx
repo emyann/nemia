@@ -54,8 +54,8 @@ const INPUT =
  *
  * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (`PUT /api/workflows/yours/:name`), at
  * the version the draft was read from. The api answers the folder read back from disk, which the draft starts again from; or the package's
- * refusal, shown above the canvas and on each step it names; or, for a folder changed on disk since, a 409 with Read the folder again. Changes
- * not saved are marked on the card and on each step.
+ * refusal, shown above the canvas and on each step it names (`SaveRefused`); or, for a folder changed on disk since, a 409 with Read the folder
+ * again. Changes not saved are marked on the card and on each step.
  */
 export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListing; onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -114,7 +114,9 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       setRefusal(null);
       setSaved(null);
     },
-    onError: (err) => setRefusal(new BuildRefusal(`Could not read the folder again: ${err.message}`, [])),
+    // The read failed, and the save's answer still says what the folder may hold: its status is kept, so a 409's "nothing written" is not
+    // turned into "it may have been written" by a read that wrote nothing either (`SaveRefused`).
+    onError: (err) => setRefusal((was) => new BuildRefusal(`Could not read the folder again: ${err.message}`, [], was?.status ?? null)),
   });
 
   const dirty = unsaved(steps, base);
@@ -192,23 +194,7 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
         </button>
       </div>
 
-      {refusal && (
-        <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">
-            Not saved, and nothing written. The api refused it
-            {refusal.steps.length > 0 && <>, for {refusal.steps.join(' and ')}</>}:
-          </p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
-          {refusal.status === 409 && (
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <button type="button" disabled={reread.isPending} onClick={() => reread.mutate()} className={BUTTON}>
-                {reread.isPending ? 'Reading…' : 'Read the folder again'}
-              </button>
-              <span className="text-xs text-red-800 dark:text-red-300">The changes drawn here are let go; copy what you need first.</span>
-            </div>
-          )}
-        </div>
-      )}
+      {refusal && <SaveRefused refusal={refusal} rereading={reread.isPending} onReread={() => reread.mutate()} />}
       {saved && !dirty && (
         <p data-saved className="text-xs text-neutral-500">
           Saved to <code className="font-mono break-all">{saved.workflow.dir}</code>: {fileLine(saved)}.
@@ -288,6 +274,46 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
         </aside>
       </div>
     </section>
+  );
+}
+
+/**
+ * What a save that did not go through says, by what the api answered.
+ *
+ * A 4xx is the api's judgement of the request — the package's refusal, a body it will not read, a folder changed since (409) — and it writes
+ * nothing, so the banner says so. Anything else leaves what the folder holds unknown: a 500 is a write that broke off partway, and an answer
+ * with no status of its own may have been carried out all the same — a fetch that never landed, or one the api answered without what it wrote
+ * (`build` in lib/api.ts), which is why the words for it are what the api did not say rather than that it said nothing. None of them says
+ * nothing was written, and each offers to read the folder again, as a 409 does — the one way back to what is on disk, since the draft is a
+ * folder read at a version the api no longer has.
+ */
+export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRefusal; rereading: boolean; onReread: () => void }) {
+  const nothingWritten = refusal.status !== null && refusal.status < 500;
+  return (
+    <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">
+        {nothingWritten ? (
+          <>
+            Not saved, and nothing written. The api refused it
+            {refusal.steps.length > 0 && <>, for {refusal.steps.join(' and ')}</>}:
+          </>
+        ) : (
+          <>
+            Not saved. The folder may have been written all the same: {refusal.status === null ? 'the api did not say what it wrote' : `the api broke off (${refusal.status})`},
+            and what the folder holds is what is on disk:
+          </>
+        )}
+      </p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
+      {(!nothingWritten || refusal.status === 409) && (
+        <div className="flex flex-wrap items-center gap-2 pt-1">
+          <button type="button" disabled={rereading} onClick={onReread} className={BUTTON}>
+            {rereading ? 'Reading…' : 'Read the folder again'}
+          </button>
+          <span className="text-xs text-red-800 dark:text-red-300">The changes drawn here are let go; copy what you need first.</span>
+        </div>
+      )}
+    </div>
   );
 }
 

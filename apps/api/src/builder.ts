@@ -255,12 +255,38 @@ function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly 
 const unnamed = (steps: readonly StepDraft[]): boolean =>
   !steps.length || steps.some((s) => stepNameRefusal(s.name) !== undefined) || new Set(steps.map((s) => s.name)).size < steps.length;
 
+/** A schema as the folder held it before a save wrote it: its text, or undefined where the folder had no such file. */
+export type SchemaWas = { file: string; was: string | undefined };
+
+/**
+ * The schemas a save wrote put back as the folder held them: removed where it had no such file, and written back where what the file holds now
+ * is not what it held. Then a file the failing write never opened is not written to — a read-only one, which putting back would refuse in turn —
+ * and one a write truncated and did not finish is put back all the same. `fs.writeFileSync` truncates before it writes, so a write that fails
+ * after the open (the disk full, a read that broke) leaves a file shorter than it was, and no bookkeeping of which writes returned can tell.
+ *
+ * Exported for the test, which reads and refuses each of those three.
+ */
+export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void {
+  for (const { file, was } of written) {
+    const at = path.join(dir, file);
+    if (was === undefined) {
+      fs.rmSync(at, { force: true });
+      continue;
+    }
+    let holds: string | undefined;
+    try { holds = fs.readFileSync(at, 'utf8'); } catch { /* gone, or no longer readable: written back below */ }
+    if (holds !== was) fs.writeFileSync(at, was);
+  }
+}
+
 /**
  * A folder written through the package, with the schemas pasted for it, or its refusal (422, with the steps it names), then read back from disk.
  *
  * Judged whole before a byte is written: the steps' names by `writeWorkflow` itself, which refuses them before anything; the schemas and the
  * steps together by `judgedWith`. Then the schemas are written and the folder after them, whose parse now reads them from disk. Should
- * `writeWorkflow` refuse all the same — the folder changed between the two reads — each schema is put back as it was.
+ * `writeWorkflow` refuse all the same — the folder changed between the two reads — each schema is put back as it was; and so it is when the
+ * disk refuses a schema itself, whether it refuses the open (a file read-only among them) or the write after it (the disk full), which leaves
+ * the save no more written than a refusal does.
  */
 function write(name: string, dir: string, steps: readonly StepDraft[], readme: string | undefined, schemas: readonly SchemaFile[] = []): WorkflowSaved | BuildRefused {
   const refused = (message: string): BuildRefused => ({ error: message, steps: stepsNamed(message, steps.map((s) => (typeof s.name === 'string' ? s.name : ''))) });
@@ -269,19 +295,22 @@ function write(name: string, dir: string, steps: readonly StepDraft[], readme: s
     const judged = judgedWith(dir, steps, writing);
     if (judged) return judged;
   }
-  const before = writing.map(({ file }) => {
+  const before: SchemaWas[] = writing.map(({ file }) => {
     try { return { file, was: fs.readFileSync(path.join(dir, file), 'utf8') }; } catch { return { file, was: undefined }; }
   });
   const schemasWritten = writing.filter((s, i) => s.text !== before[i]!.was).map((s) => s.file);
-  for (const { file, text } of writing) fs.writeFileSync(path.join(dir, file), text);
+  // Every schema the save has reached, the one it is writing among them: what is put back should that write fail, or a later one, or the
+  // folder. A write that fails partway has changed the file all the same, so a schema counts as written before the write, not after it.
+  const written: SchemaWas[] = [];
   let result;
   try {
+    for (const [i, { file, text }] of writing.entries()) {
+      written.push(before[i]!);
+      fs.writeFileSync(path.join(dir, file), text);
+    }
     result = writeWorkflow(dir, steps, readme);
   } catch (err) {
-    for (const { file, was } of before) {
-      if (was === undefined) fs.rmSync(path.join(dir, file), { force: true });
-      else fs.writeFileSync(path.join(dir, file), was);
-    }
+    putSchemasBack(dir, written);
     if (err instanceof WorkflowError) return refused(err.message);
     throw err;
   }

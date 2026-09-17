@@ -56,6 +56,10 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **Something beside the Factory's floor that mounts after its first render narrows a floor already fitted.** The e2e still passes, and
   the picture shows the last card cut at the right. Load what it draws in the route's loader (`prefetchQuery`, which never throws), and fit
   again when it comes or goes (the queue's lane, learned by the run that drew queued cards on the Factory).
+- **A card on the Factory must fit its cell.** The grid puts the card beneath a `CELL_HEIGHT` below, so a card drawn taller reaches
+  over it on every layout, and no screenshot shows it: the tall cards are finished runs, off the default floor. The e2e measures it
+  after a Reset layout (`expectClearOfEachOther` in `apps/web/test/e2e/run.ts`); a card that grows a line is measured there, not seen
+  (learned by the run that took up the board's review leftovers).
 - **An EventSource closed on the server's last event aborts a request the server has answered.** The api writes `settled` and ends the
   response; closed the moment the event arrives, before the end does, Chromium reports `net::ERR_ABORTED`, and the e2e's watch fails the page
   now and then. Close it on the `error` fired as the response ends, or after a grace (`follow`, learned by the run that drew the queue).

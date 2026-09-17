@@ -7,13 +7,21 @@ import type { Ceilings, InboxEntry, WorkflowListing } from './api';
 export const newestCardsFirst = (entries: readonly InboxEntry[]): InboxEntry[] =>
   [...entries].sort((a, b) => (b.filedAt ?? '').localeCompare(a.filedAt ?? '') || a.name.localeCompare(b.name));
 
+/** Whether an entry of the inbox is a card's file, `<name>.md`, and not a stray file the listing shows with why it is not a card. */
+const isCard = (entry: Pick<InboxEntry, 'file'>): boolean => entry.file.endsWith('.md');
+
 /**
- * Whether an entry of the inbox has a page, `/inbox/<name>`: whether its name is one the api takes (the package's `inboxNameRefusal`). Every
- * card's and every stray file's is, but a folder's, which the listing names `sub/`, and a file's with a backslash in it: the api would refuse
- * the name the page asks for, and a link would open a refusal of what the Inbox page has just listed.
+ * Whether an entry of the inbox has a page, `/inbox/<name>`, among the entries listed with it: whether its name is one the api takes (the
+ * package's `inboxNameRefusal`). Every card's is, and a stray file's where nothing else answers to its name, but a folder's, which the listing
+ * names `sub/`, and a file's with a backslash in it: the api would refuse the name the page asks for, and a link would open a refusal of what
+ * the Inbox page has just listed.
+ *
+ * And not a stray file's where a card of that name is listed beside it: `/inbox/notes` is `notes.md`, which the api's card page reads before a
+ * stray `notes`, so the stray's link would open the card's page — another file's — under its own name.
  */
-export const hasPage = (entry: Pick<InboxEntry, 'name'>): boolean =>
-  entry.name.trim() !== '' && !/[\\/\0]/.test(entry.name) && !entry.name.startsWith('.');
+export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: readonly Pick<InboxEntry, 'name' | 'file'>[]): boolean =>
+  entry.name.trim() !== '' && !/[\\/\0]/.test(entry.name) && !entry.name.startsWith('.')
+  && (isCard(entry) || !entries.some((other) => other.name === entry.name && isCard(other)));
 
 /** A start, a drop, a queue or its taking back the api refused: the card as the page listed it, what was asked, and the api's words. */
 export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue'; message: string };
@@ -25,13 +33,17 @@ export type CardLine = { entry: InboxEntry; refusal: CardRefusal | null; gone: b
  * The inbox page's lines, newest first (`newestCardsFirst`): each card listed, with its refusal; and each card refused that the inbox, read again
  * after the refusal, no longer lists — dropped or started behind the page's back — in the place it was listed, so the refusal's sentence stays
  * where the person asked. A refusal of a card still listed is on that card, and on no line of its own.
+ *
+ * By the file, not the name: two entries may answer to one name — a card and a stray file beside it, `notes.md` and `notes` (`hasPage`) — and
+ * a refusal is of the one the page asked about. Matched by name, a refused Remove of the card drew its sentence under the stray file too,
+ * which has no Remove to be refused.
  */
 export function cardLines(entries: readonly InboxEntry[], refusals: readonly CardRefusal[]): CardLine[] {
-  const listed = new Set(entries.map((entry) => entry.name));
-  const gone = refusals.filter((r) => !listed.has(r.entry.name));
+  const listed = new Set(entries.map((entry) => entry.file));
+  const gone = refusals.filter((r) => !listed.has(r.entry.file));
   return newestCardsFirst([...entries, ...gone.map((r) => r.entry)]).map((entry) => {
-    const refusal = refusals.find((r) => r.entry.name === entry.name) ?? null;
-    return { entry, refusal, gone: !listed.has(entry.name) };
+    const refusal = refusals.find((r) => r.entry.file === entry.file) ?? null;
+    return { entry, refusal, gone: !listed.has(entry.file) };
   });
 }
 

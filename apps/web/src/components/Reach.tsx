@@ -8,6 +8,8 @@ export const STRUCK = 'bg-red-50 text-red-800 line-through decoration-red-500 da
 const RUNS = 'bg-emerald-50 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300';
 /** One said to, and not measured. */
 const DOCUMENTED = 'border border-dashed border-emerald-400 text-emerald-800 dark:border-emerald-700 dark:text-emerald-300';
+/** One an ask rule makes ask, outside dontAsk: it prompts. In dontAsk, which denies what asks, it is struck. */
+export const ASKS = 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300';
 
 /** One part of what a step gets, under its label. */
 export function Reach({ label, children }: { label: string; children: ReactNode }) {
@@ -20,13 +22,15 @@ export function Reach({ label, children }: { label: string; children: ReactNode 
 }
 
 /**
- * What a Claude Code step runs without being asked: Claude Code's read-only commands, which ask for no rule in any mode, then what the settings
- * allow of what asks. In `dontAsk` the rest of what asks is denied without a prompt, so the part is its Bash; in any other mode, what asks is
- * the mode's to decide. Then the allows a deny takes back, and those of a tool the step does not have.
+ * What a Claude Code step runs without being asked: Claude Code's read-only commands, which ask for no rule in any mode unless an ask rule names
+ * one, then what the settings allow of what asks. In `dontAsk` the rest of what asks is denied without a prompt, so the part is its Bash; in any
+ * other mode, what asks is the mode's to decide. Then the allows a deny takes back, those an ask rule takes back, and those of a tool the step
+ * does not have.
  */
 export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepReach['allowed']; readOnly: StepReach['readOnly']; commands: ReadOnlyCommands }) {
-  const exceptOf = (rule: string) => allowed.exceptions.find((e) => e.rule === rule)?.except ?? [];
+  const exceptionOf = (rule: string) => allowed.exceptions.find((e) => e.rule === rule) ?? { except: [], asks: [] };
   const runsReadOnly = readOnly !== null && readOnly.length > 0;
+  const { dontAsk } = allowed;
 
   return (
     <Reach label={allowed.dontAsk ? 'Bash it may run' : 'Allowed without asking'}>
@@ -39,14 +43,14 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
               In dontAsk, a command that asks is denied without a prompt unless a rule allows it.{' '}
               {runsReadOnly && `${commands.harness}'s read-only commands do not ask:`}
             </p>
-            {runsReadOnly && <ReadOnly readOnly={readOnly} commands={commands} />}
+            {runsReadOnly && <ReadOnly readOnly={readOnly} commands={commands} dontAsk />}
             <p className="text-xs text-neutral-500">Of the commands that ask, the settings allow it:</p>
             {allowed.bash.length ? (
               <span className="flex flex-wrap gap-x-3 gap-y-1">
                 {allowed.bash.map((b) => (
                   <span key={b.rule} className="inline-flex flex-wrap items-center gap-1">
                     <code data-bash={b.command} className={`${CHIP} ${RUNS}`}>{b.command}</code>
-                    {b.except.length > 0 && <span data-except={b.command} className="text-[11px] text-neutral-500">except {b.except.join(', ')}</span>}
+                    <Exceptions of={b.command} except={b.except} asks={b.asks} dontAsk />
                   </span>
                 ))}
               </span>
@@ -62,7 +66,7 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
               {allowed.rules.map((rule) => (
                 <span key={rule} className="inline-flex flex-wrap items-center gap-1">
                   <code data-allowed={rule} className={`${CHIP} ${PLAIN}`}>{rule}</code>
-                  {exceptOf(rule).length > 0 && <span data-except={rule} className="text-[11px] text-neutral-500">except {exceptOf(rule).join(', ')}</span>}
+                  <Exceptions of={rule} {...exceptionOf(rule)} dontAsk={false} />
                 </span>
               ))}
             </span>
@@ -72,7 +76,7 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
           {runsReadOnly && (
             <>
               <p className="text-xs text-neutral-500">And, in every mode, {commands.harness}&apos;s read-only commands, which ask for no rule:</p>
-              <ReadOnly readOnly={readOnly} commands={commands} />
+              <ReadOnly readOnly={readOnly} commands={commands} dontAsk={false} />
             </>
           )}
         </>
@@ -82,6 +86,14 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
           Taken back by a deny, which beats an allow:
           {allowed.takenBack.map(({ rule, by }) => (
             <code key={rule} data-taken-back={rule} title={`Denied by ${by.rule} (${by.source})`} className={`${CHIP} ${STRUCK}`}>{rule}</code>
+          ))}
+        </p>
+      )}
+      {allowed.asked.length > 0 && (
+        <p className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
+          {dontAsk ? 'Taken back by an ask rule, which beats an allow, and dontAsk denies what asks:' : 'Taken back by an ask rule, which beats an allow: these ask.'}
+          {allowed.asked.map(({ rule, by }) => (
+            <code key={rule} data-asked={rule} title={`Asks by ${by.rule} (${by.source})`} className={`${CHIP} ${dontAsk ? STRUCK : ASKS}`}>{rule}</code>
           ))}
         </p>
       )}
@@ -95,37 +107,69 @@ export function AllowedReach({ allowed, readOnly, commands }: { allowed: StepRea
   );
 }
 
+/** After an allow that stands, what of it a narrower deny still refuses, and what a narrower ask rule still makes ask — in dontAsk, denied. */
+function Exceptions({ of, except, asks, dontAsk }: { of: string; except: readonly string[]; asks: readonly string[]; dontAsk: boolean }) {
+  return (
+    <>
+      {except.length > 0 && <span data-except={of} className="text-[11px] text-neutral-500">except {except.join(', ')}</span>}
+      {asks.length > 0 && (
+        <span data-asks={of} className="text-[11px] text-neutral-500">
+          {except.length > 0 ? 'and ' : ''}asks for {asks.join(', ')}{dontAsk ? ', which dontAsk denies' : ''}
+        </span>
+      )}
+    </>
+  );
+}
+
+/** A read-only command as a sentence names it. */
+const named = (command: string) => (command === 'git' ? 'read-only git' : command);
+
 /**
  * Claude Code's read-only commands as they reach a step: solid where they were measured running without a rule, dashed where only its docs say
- * so, struck where a deny refuses the whole command — then when, on which version and from where that was learned, never claimed current.
+ * so, amber where an ask rule makes one ask, struck where a deny refuses the whole command or, in dontAsk, an ask rule does — each of those said
+ * with its rule — then the day and the version it was measured on, and where that is recorded: a measurement of that day, never claimed current.
  */
-function ReadOnly({ readOnly, commands }: { readOnly: NonNullable<StepReach['readOnly']>; commands: ReadOnlyCommands }) {
+function ReadOnly({ readOnly, commands, dontAsk }: { readOnly: NonNullable<StepReach['readOnly']>; commands: ReadOnlyCommands; dontAsk: boolean }) {
+  const taken = readOnly.filter((c) => c.denied || c.asks);
   return (
     <>
       <span className="flex flex-wrap gap-1">
-        {readOnly.map(({ command, measured, denied }) => (
+        {readOnly.map(({ command, measured, denied, asks }) => (
           <code
             key={command}
             data-read-only={command}
             data-documented={measured ? undefined : true}
             data-denied={denied?.rule}
+            data-asks={asks?.rule}
             title={
-              denied
-                ? `Denied by ${denied.rule} (${denied.source}), which beats the harness's own leave`
-                : measured
-                  ? `Ran with no rule allowing it on ${commands.measuredAt}, ${commands.harness} ${commands.version}`
-                  : `Named by ${commands.harness}'s docs, not measured`
+              asks
+                ? `Asks by ${asks.rule} (${asks.source}), which beats the harness's own leave${denied ? ', and dontAsk denies what asks' : ''}`
+                : denied
+                  ? `Denied by ${denied.rule} (${denied.source}), which beats the harness's own leave`
+                  : measured
+                    ? `Measured on ${commands.measuredAt}, ${commands.harness} ${commands.version}: it ran with no rule allowing it, under that day's settings`
+                    : `Named by ${commands.harness}'s docs, not measured`
             }
-            className={`${CHIP} ${denied ? STRUCK : measured ? RUNS : DOCUMENTED}`}
+            className={`${CHIP} ${denied ? STRUCK : asks ? ASKS : measured ? RUNS : DOCUMENTED}`}
           >
             {command === 'git' ? 'git, read-only' : command}
           </code>
         ))}
       </span>
+      {taken.length > 0 && (
+        <p data-read-only-taken className="text-xs text-neutral-500">
+          {taken.map(({ command, denied, asks }) =>
+            asks
+              ? `${named(command)} asks, by ${asks.rule} (${asks.source})${dontAsk ? ', which dontAsk denies' : ''}`
+              : `${named(command)} is denied, by ${denied!.rule} (${denied!.source})`,
+          ).join('; ')}.
+        </p>
+      )}
       <p data-read-only-measured={commands.measuredAt} className="text-xs text-neutral-500">
-        The solid ones ran with no rule allowing them on {commands.measuredAt} with {commands.version} ({commands.source}). The dashed ones are named
-        by its docs ({commands.docs}), which say the set includes them, not that it is all of it; git is its read-only forms. A deny naming one
-        still refuses it. Not asked again: a later version may run others.
+        The solid ones were measured on {commands.measuredAt} with {commands.version} ({commands.source}): that day, under that day&apos;s settings, they
+        ran with no rule allowing them. The dashed ones are named by its docs ({commands.docs}), which say the set includes them, not that it is all
+        of it; git is its read-only forms. A deny covering one
+        still refuses it, and an ask rule covering one makes it ask{dontAsk ? ', which dontAsk denies' : ''}. Not asked again: a later version may run others.
       </p>
     </>
   );

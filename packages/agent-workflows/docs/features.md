@@ -1717,6 +1717,8 @@ What it leaves:
   which covers one page, not two.
 - **Remove asks nothing first.** A card dropped is gone, as with `wf inbox rm`.
 - **The page is not polled.** A card filed or dropped in a terminal shows on the next visit.
+- **The Capabilities page reads ask rules, and no rule written with a glob tool name.** `permissions.ask` is listed beside the deny rules, and what it covers — a read-only command, an allow, a server's tool — is marked asking, and struck on a dontAsk step (two findings, 2026-09-16); `*` or `mcp__*` in a deny or an ask rule is read as nothing.
+- **The read-only commands are 2026-09-15's measurement, under that day's settings, and are not measured again.** A guard refuses the list without a day, a version or a source, and no test holds it to today's `.claude/settings.json` (two findings, 2026-09-16).
 
 ## Shipped: forgetting a run — `wf rm`
 

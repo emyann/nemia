@@ -1716,9 +1716,9 @@ const PAGES: PageSpec[] = [
     expect: async (page) => {
       await sidebar(page);
       await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Capabilities' }), 'the sidebar lights Capabilities on its page');
-      const { skill, bareSkill, agent, server, missing, denied } = CHECKOUT;
+      const { skill, bareSkill, agent, server, missing, denied, asked } = CHECKOUT;
       const section = (title: string) => page.locator(`section[aria-label="${title}"]`);
-      for (const [title, count] of [['Skills', 2], ['Agents', 1], ['MCP servers', 2], ['Denied', denied.length]] as const) {
+      for (const [title, count] of [['Skills', 2], ['Agents', 1], ['MCP servers', 2], ['Denied', denied.length], ['Asks', asked.length]] as const) {
         await expectVisible(section(title).locator('h2 [data-count]', { hasText: new RegExp(`^${count}$`) }), `the ${title} section counts ${count}`);
       }
 
@@ -1748,6 +1748,10 @@ const PAGES: PageSpec[] = [
       const rules = section('Denied');
       for (const rule of denied) await expectVisible(rules.getByText(rule, { exact: true }), `the denied list has ${rule}`);
       await expectVisible(rules.getByText(`refuses ${server.name} · wipe`), `the denied list says which listed tool ${server.denied} refuses`);
+      // The settings' ask rules, listed for the repository as its deny rules are — whether or not a step reads them.
+      const asks = section('Asks');
+      for (const rule of asked) await expectVisible(asks.getByText(rule, { exact: true }), `the ask list has ${rule}`);
+      await expectVisible(asks.getByText('.claude/settings.json', { exact: true }), 'with where it was read from');
 
       // What each step gets: the checkout's dev — review fenced to its tools in dontAsk, implement on the harness's own set — and yours, on Codex.
       const { good, yours } = WORKFLOWS;
@@ -1767,10 +1771,20 @@ const PAGES: PageSpec[] = [
         'review, in dontAsk, says a command that asks is denied — not every command no rule allows',
       );
       await expectCount(page.getByText(/a command no rule allows is denied/), 0, 'and nowhere that a command no rule allows is denied, which the read-only commands are not');
-      await expectVisible(review.locator('[data-read-only="cat"]:not([data-documented]):not([data-denied])'), 'review runs cat without a rule, as measured');
+      await expectVisible(review.locator('[data-read-only="ls"]:not([data-documented]):not([data-denied])'), 'review runs ls without a rule, as measured');
       await expectVisible(review.locator('[data-read-only="wc"][data-documented]:not([data-denied])'), 'and wc, as the docs name it, marked not measured');
       await expectVisible(review.locator('[data-read-only="find"][data-denied="Bash(find:*)"]'), 'and not find, which the settings deny (Bash(find:*))');
-      await expectVisible(review.locator('[data-read-only-measured="2026-09-15"]', { hasText: '2.1.272' }), 'with the date and version the read-only commands were measured on');
+      const [ask] = CHECKOUT.asked;
+      await expectVisible(review.locator(`[data-read-only="cat"][data-asks="${ask}"][data-denied="${ask}"]`), `nor cat, which the settings make ask (${ask}), and dontAsk denies`);
+      await expectVisible(
+        review.locator('[data-read-only-taken]', { hasText: `cat asks, by ${ask} (.claude/settings.json), which dontAsk denies` }),
+        'review says why cat is struck, beside the commands',
+      );
+      await expectVisible(review.locator(`[data-ask-rule="${ask}"]`), `review lists the ask rule that holds for it (${ask})`);
+      await expectVisible(
+        review.locator('[data-read-only-measured="2026-09-15"]', { hasText: /were measured on 2026-09-15 with 2\.1\.272 \(.+\): that day, under that day's settings/ }),
+        'with the day and version the read-only commands were measured on, as a measurement of that day',
+      );
       await expectVisible(review.locator('[data-mcp-tool="echo"][data-not-allowed]'), "review's server tool no rule allows is marked: dontAsk denies it without a prompt");
       await expectVisible(review.locator(`[data-mcp-tool="wipe"][data-denied="${server.denied}"]`), `review's server tool the settings deny is marked denied (${server.denied})`);
       const implement = steps.locator(`li[data-step="${good.name}/implement"]`);
@@ -1781,9 +1795,10 @@ const PAGES: PageSpec[] = [
       await expectCount(implement.locator(`[data-tool="${good.disallow}"]`), 0, `and ${good.disallow} is not among its tools`);
       await expectVisible(implement.locator(`[data-skill="${skill.name}"]`), `implement, with Skill, can load the repository's skill (${skill.name})`);
       await expectVisible(implement.locator('[data-read-only="grep"]:not([data-documented])'), 'implement, in no mode, runs the read-only commands without a rule too (grep)');
+      await expectVisible(implement.locator(`[data-read-only="cat"][data-asks="${ask}"]:not([data-denied])`), `and cat asks there (${ask}), which no mode but dontAsk denies`);
       const codexed = steps.locator(`li[data-step="${yours.name}/${yours.steps[0]}"]`);
       await expectVisible(codexed.locator('[data-not-claimed]', { hasText: /was not measured.*reads no \.claude\/settings\.json/ }), `yours, on Codex, claims no tool it was not measured to have, and no rule of settings it does not read`);
-      await expectCount(codexed.locator('[data-tool], [data-bash], [data-allowed], [data-read-only]'), 0, 'and shows none, nor a read-only command it was not measured to run');
+      await expectCount(codexed.locator('[data-tool], [data-bash], [data-allowed], [data-read-only], [data-ask-rule]'), 0, 'and shows none, nor a read-only command it was not measured to run, nor an ask rule of settings it does not read');
     },
   },
 ];

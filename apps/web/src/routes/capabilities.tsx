@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { when } from '../components/Facts';
-import { AllowedReach, CHIP, PLAIN, Reach, STRUCK } from '../components/Reach';
+import { AllowedReach, ASKS, CHIP, PLAIN, Reach, STRUCK } from '../components/Reach';
 import { capabilitiesQuery, type Capabilities, type Described, type McpServer, type MeasuredTools, type ReadOnlyCommands, type StepReach } from '../lib/api';
 
 export const Route = createFileRoute('/capabilities')({
@@ -22,7 +22,7 @@ export const Route = createFileRoute('/capabilities')({
 /** What the repository offers a step, section by section, each thing with the file it was read from. */
 function CapabilitiesPage() {
   const { data } = useSuspenseQuery(capabilitiesQuery);
-  const { repo, skills, agents, mcp, denied, warnings, measured, readOnly, steps } = data;
+  const { repo, skills, agents, mcp, denied, asked, warnings, measured, readOnly, steps } = data;
 
   return (
     <article className="space-y-8">
@@ -54,7 +54,15 @@ function CapabilitiesPage() {
         count={denied.length}
         empty={<>Nothing denied: <Path path=".claude/settings.json" /> has no <code className="font-mono text-xs">permissions.deny</code>.</>}
       >
-        {denied.map(({ rule, source }) => <DeniedRow key={rule} rule={rule} source={source} refuses={refusedBy(mcp, rule)} />)}
+        {denied.map(({ rule, source }) => <RuleRow key={rule} rule={rule} source={source} refuses={refusedBy(mcp, rule)} />)}
+      </Section>
+
+      <Section
+        title="Asks"
+        count={asked.length}
+        empty={<>Nothing asks by a rule: <Path path=".claude/settings.json" /> has no <code className="font-mono text-xs">permissions.ask</code>.</>}
+      >
+        {asked.map(({ rule, source }) => <RuleRow key={rule} rule={rule} source={source} />)}
       </Section>
 
       <Section
@@ -182,7 +190,8 @@ function ServerRow({ server }: { server: McpServer }) {
 const refusedBy = (mcp: Capabilities['mcp'], rule: string): string[] =>
   mcp.flatMap((server) => (server.tools ?? []).filter((tool) => tool.denied === rule).map((tool) => `${server.name} · ${tool.name}`));
 
-function DeniedRow({ rule, source, refuses }: { rule: string; source: string; refuses: string[] }) {
+/** A rule of the settings — a deny, with the listed tools it refuses, or an ask rule — and where it was read. */
+function RuleRow({ rule, source, refuses = [] }: { rule: string; source: string; refuses?: string[] }) {
   return (
     <li className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 px-3 py-2">
       <span className="break-all font-mono text-xs">{rule}</span>
@@ -202,11 +211,11 @@ const OWN = "the harness's own";
 
 /**
  * What one step of a workflow gets: the fence its file declares, then — on Claude Code, whose set was measured — the tools it has (what was only
- * inferred, dashed), the skills it can load, the tools of each server the checkout enables, the deny rules that hold for it, and what it runs
+ * inferred, dashed), the skills it can load, the tools of each server the checkout enables, the deny and ask rules that hold for it, and what it runs
  * without asking: Claude Code's read-only commands, and what the settings allow it. A Codex step is its fence and nothing more: it reads no settings, and what a Codex session is given was not measured.
  */
 function StepRow({ step, measured, readOnly }: { step: StepReach; measured: MeasuredTools; readOnly: ReadOnlyCommands }) {
-  const { fence, tools, skills, mcp, denied, allowed } = step;
+  const { fence, tools, skills, mcp, denied, asked, allowed } = step;
   const whyInferred = new Map(measured.inferred.map((t) => [t.name, t.why]));
 
   return (
@@ -303,15 +312,18 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
                               key={tool.name}
                               data-mcp-tool={tool.name}
                               data-denied={tool.denied?.rule}
+                              data-asks={tool.asks?.rule}
                               data-not-allowed={tool.denied === null && allowed.dontAsk && !tool.allowed ? true : undefined}
                               title={
                                 tool.denied
                                   ? `Denied by ${tool.denied.rule} (${tool.denied.source})`
-                                  : refused
-                                    ? 'No rule allows it, so dontAsk denies it without a prompt'
-                                    : `mcp__${server.server}__${tool.name}`
+                                  : tool.asks
+                                    ? `Asks by ${tool.asks.rule} (${tool.asks.source})${refused ? ', so dontAsk denies it without a prompt' : ''}`
+                                    : refused
+                                      ? 'No rule allows it, so dontAsk denies it without a prompt'
+                                      : `mcp__${server.server}__${tool.name}`
                               }
-                              className={`${CHIP} ${tool.denied ? STRUCK : refused ? 'bg-amber-50 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300' : PLAIN}`}
+                              className={`${CHIP} ${tool.denied ? STRUCK : refused ? ASKS : PLAIN}`}
                             >
                               {tool.name}
                             </span>
@@ -342,6 +354,21 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
               <p className="text-xs text-neutral-500">Nothing: the settings deny nothing, and neither does the step.</p>
             )}
           </Reach>
+
+          {asked.length > 0 && (
+            <Reach label="Asks">
+              <span className="flex flex-wrap gap-x-3 gap-y-0.5">
+                {asked.map(({ rule, source }) => (
+                  <span key={rule} data-ask-rule={rule} className="font-mono text-xs" title={source}>
+                    {rule} <span className="text-neutral-500">· {source}</span>
+                  </span>
+                ))}
+              </span>
+              <p className="text-xs text-neutral-500">
+                What these match asks, whatever an allow or the harness&apos;s own leave says{allowed.dontAsk ? ', and dontAsk denies it without a prompt' : ''}.
+              </p>
+            </Reach>
+          )}
 
           <AllowedReach allowed={allowed} readOnly={step.readOnly} commands={readOnly} />
         </>

@@ -479,24 +479,32 @@ export type StepReach = {
   fence: { tools: string[] | null; disallow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
   tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: Array<{ name: string; rule: string; source: string; of: string | null }> } | null;
   skills: { names: string[]; why: string | null } | null;
-  mcp: Array<{ server: string; tools: Array<{ name: string; denied: Rule | null; allowed: boolean }> | null; why: string | null }> | null;
+  /** Each tool of each server: the deny over it, the ask rule over it when no deny is, and whether an allow reaches it with neither. */
+  mcp: Array<{ server: string; tools: Array<{ name: string; denied: Rule | null; asks: Rule | null; allowed: boolean }> | null; why: string | null }> | null;
   denied: Rule[];
+  /** The settings' ask rules: what asks whatever an allow says, and in dontAsk is denied. None off Claude Code. */
+  asked: Rule[];
   /**
-   * Mirrors `AllowedFor`: the allow rules that stand, those a deny takes back and of a tool the step does not have; the Bash rules that stand,
-   * each with the narrower denies that still refuse some of it; and why there is no Bash command, for a step with no Bash.
+   * Mirrors `AllowedFor`: the allow rules that stand, those a deny takes back, those an ask rule takes back, and of a tool the step does not have;
+   * the Bash rules that stand, each with the narrower denies that still refuse some of it and the narrower ask rules that make some of it ask;
+   * and why there is no Bash command, for a step with no Bash.
    */
   allowed: {
     rules: string[];
     takenBack: Array<{ rule: string; by: Rule }>;
+    asked: Array<{ rule: string; by: Rule }>;
     unused: string[];
-    bash: Array<{ rule: string; command: string; except: string[] }>;
-    /** Every standing rule a narrower deny still refuses part of — a Bash command, one tool of a server — with those denies. */
-    exceptions: Array<{ rule: string; except: string[] }>;
+    bash: Array<{ rule: string; command: string; except: string[]; asks: string[] }>;
+    /** Every standing rule a narrower deny still refuses part of, or a narrower ask rule makes part of ask — a Bash command, one tool of a server. */
+    exceptions: Array<{ rule: string; except: string[]; asks: string[] }>;
     dontAsk: boolean;
     why: string | null;
   };
-  /** Mirrors `ReadOnlyCommand`: Claude Code's read-only commands, each measured or documented, and the deny that refuses it; none without Bash, null off Claude Code. */
-  readOnly: Array<{ command: string; measured: boolean; denied: Rule | null }> | null;
+  /**
+   * Mirrors `ReadOnlyCommand`: Claude Code's read-only commands, each measured or documented; the ask rule that makes it ask, when no deny refuses
+   * it; and the rule that refuses it — a deny, or in dontAsk that ask rule. None without Bash, null off Claude Code.
+   */
+  readOnly: Array<{ command: string; measured: boolean; denied: Rule | null; asks: Rule | null }> | null;
 };
 
 /** Mirrors `CapabilitiesWithSteps` in apps/api/src/reach.ts: what the repository the api runs in offers a step, and what each step gets. */
@@ -506,6 +514,8 @@ export type Capabilities = {
   agents: Described[];
   mcp: McpServer[];
   denied: Rule[];
+  /** `permissions.ask` in the settings, in its order. */
+  asked: Rule[];
   /** `permissions.allow` in the settings, in its order. */
   allowed: Rule[];
   warnings: string[];

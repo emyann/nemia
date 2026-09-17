@@ -85,7 +85,7 @@ Every `.md` in the folder is a step but its `README.md` (in any case), which say
 for: its first paragraph, past a heading, is the description the board lists the workflow with
 (`workflowDescription`). A folder with a README and no step is refused as a folder with no step is.
 A repository carries its workflows checked in, one folder each under `<repo>/workflows/`, as
-`.github/workflows/` holds a repository's CI — this one has `dev`, `dev-build`, `dev-planned` and `ui` there — and
+`.github/workflows/` holds a repository's CI — this one has `dev`, `dev-build`, `dev-planned`, `ui` and `supervisor` there — and
 `wf start <brief> --workflows dev` picks one: a bare name is a folder under `<repo>/workflows/`, and a path to any
 workflow folder works too, looked at first. The board lists them, and the folders under
 `~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
@@ -110,7 +110,7 @@ The run's record is keyed in that order, and `wf ls`, `wf decide` and the board 
 keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf decide`; one whose order already runs forward
 reads as it was written.
 
-A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `harness`, `model`, `effort`,
+A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `harness`, `model`, `effort`,
 `permissionMode`, `tools`, `disallow`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`, `gate`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
@@ -123,7 +123,8 @@ The interesting decisions in this kind of work — *is this good enough*, *did i
 belongs to a step with an agent in it. **The workflow is a team, not a program.** The prose is the
 logic: `after` orders, `resume` continues, `check` measures, `retries` counts, `gate` waits for a person,
 `output` declares and `input` reads, `loop` is the edge back and `rounds` counts it, `workspace` says which
-directory a step works in, and the rest say who does the work and for how long. Whether the work goes round again is still a judgement: the looping step's own `again`
+directory a step works in, `slot` says whether the run is one the cap on runs in flight holds, and the rest say
+who does the work and for how long. Whether the work goes round again is still a judgement: the looping step's own `again`
 (*Going round again*, under the check).
 
 `permissionMode` is the harness's word, checked against the harness the step runs on. On codex,
@@ -923,7 +924,10 @@ it files the step.
 
 - **The step is told both ways**, on its brief, beside the closeout contract (`artifactsContract`): put a
   file in `<dir>` and name it by absolute path, or leave it in the workspace and name it by its path from
-  the workspace root. Mechanism, like the closeout: no workflow author has to remember to say it.
+  the workspace root. Mechanism, like the closeout: no workflow author has to remember to say it. **Except a
+  step that works in the repository's own checkout** (`workspace: main`), which is told the first way only:
+  the run hands nothing off there, so a file left in that workspace is neither collected nor committed — it
+  stays in a person's checkout, and `wf decide` reads it as `not collected`.
 - **A file named from the workspace root is collected.** On the pass that hands the step off, before its
   check is filed, the tick copies each such file into `<dir>` at the same path (`collectArtifacts`), and
   the run reads it from there. So a step that cannot write outside its worktree — Codex in
@@ -1245,6 +1249,64 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   the answer box, beside it. The banner and the Factory's card say `approve plan`, and `POST /api/runs/:id/steps/:step/approve` calls
   `approve()`, refused in its words.
 
+## The supervisor: a session that watches the runs — `workflows/supervisor/` and `slot: none`
+
+The three sections above are the machinery a person needs to run this board by hand: the gate says when a
+run wants them, the ending step says what shipping means, and `→ to decide` counts the runs nobody has
+decided. The supervisor is that person's first reader. It is **a workflow of one step that never ends**:
+
+```md
+---
+workspace: main       # the repository's own checkout: it reads the store and the runs' branches
+slot: none            # not one of the runs the cap holds — it watches them
+harness: claude
+remote: true          # bridged to claude.ai, so the person it asks can answer from a phone
+disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger
+---
+Watch this repository's runs, and put what needs a person in front of the person.
+```
+
+**What it is.** A session whose loop is `wf ls`: a run at its result to decide, a step that signed off
+`blocked` with a question, a session that has stalled — idle after a lost connection, `unsigned`, or held by
+a background shell of its own. For a run to decide it reads that run's workflow folder first — the README
+and the last step's file, which say what *that* workflow's ending is — then `wf decide`, the diff, and the
+screenshots through the look skill, and prepares the brief a person decides from. **It decides nothing
+itself, and it never types git for a run**: on a yes it says `wf approve <run> <step>`, and the run's own
+ending step does the shipping, in its folder's words, with the person's words on its brief.
+
+**How to start it**, once, and leave it running:
+
+```bash
+wf start "supervise this repository" --workflows workflows/supervisor
+```
+
+**How to answer it.** Its questions are gates on its own run: it signs off `blocked` with the brief in
+`summary` and the question and options in `needs`, so `wf ls` says `→ waiting on you: supervise` and the
+board draws the closeout with the answer box. The answer is a try of that step, which **continues the same
+session** — it keeps everything it had read:
+
+```bash
+wf decide <run>                                         # its brief, and its question under `needs`
+wf retry <run> supervise --message "Merge it."          # the answer; the session carries on
+```
+
+There is no cap on how many times that happens. A step with no `output:` signs off, is answered, and is
+filed again for as long as a person keeps answering — each answer a try, each try resuming the session
+before it, with the words under `## Your answer` (*Trying again*, under the check). What ends the run is
+`wf cancel <run>`.
+
+**`slot: none`** keeps its run out of the cap on runs in flight (`WF_MAX_RUNS`, below). The cap holds the
+work this machine does at once; a supervisor behind it would be held by the very runs it exists to answer.
+The key is refused at load on a step of a workflow that has another — a slot is a run's, not a step's, so
+the work beside it would run outside the cap too. Nothing else about such a run differs: it is started,
+cancelled, listed and answered as any other.
+
+**It still takes a session slot, and holds it nearly all the time.** `WF_MAX_CONCURRENT` is 2 unless set,
+counted per harness pool, and the supervisor is on `claude` — the pool `dev`'s implement, review and ship
+share. A session that is watching is a session at work, so at the default a supervisor leaves one slot for
+the work it watches, freeing its own only between signing off and being answered. Raise the ceiling before
+starting one: `WF_MAX_CONCURRENT=3 wf up`.
+
 ## A run that waits on a run: `wf start --after`
 
 ```bash
@@ -1487,6 +1549,10 @@ up — every 4000ms, ^C to stop
   one — and counts those in flight once each pass is done. Then it takes the runs with nothing filed by `createdAt` (`admissionOrder`), each
   judged against the count so far and counted, once it has filed, for the next — as the engine admits its tasks. The next pass counts again,
   so a run finishing, or called off and stopped, frees its slot on the pass that sees it.
+- **A run of a one-step workflow that says `slot: none` is not counted, and never waits.** It is a session that watches the runs the
+  cap holds — the supervisor, above — so it files its step at a full cap, counts against nothing and holds nobody behind it
+  (`takesNoSlot`, read by `slotNeed`, `runAdmitted` and the pass's count). It takes a session slot like every session. A queued inbox
+  card of such a workflow still waits for a free slot to be started, since the queue starts one card a pass whatever it is.
 - **A run waiting on `--after` counts only once it is filed.** Until its parents ship it wants no slot, and a run started after it takes one;
   once they have, it waits for a slot in `createdAt` order like any other.
 - **`wf ls` says it on the roots**, where `waiting` would be: `waiting for a run slot (2 of 2 in flight)`, judged over the whole store as the

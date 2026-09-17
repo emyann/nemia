@@ -516,6 +516,49 @@ test("a run that worked on the base branch itself says so, and still says what i
   assert.ok(!direct.some((l) => /ship it   git|drop it   git/.test(l)), 'nor a merge of the branch it is already on');
 });
 
+test("a run whose one step works in the checkout is not shown the base branch's diff: its work is not on it, and the base moves under it", async (t) => {
+  const repo = aRepo();
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nworkspace: main\nslot: none\n---\nWatch the runs.\n');
+  const run = start({ brief: 'supervise this repository', repo, workflowDir: dir });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-supervise`, 'succeeded', { outcome: 'blocked', summary: 'add-sub is ready to merge.', artifacts: [], needs: 'Merge add-sub, or hold it?' });
+  await advance(e, readRun(run.id));
+  // The step worked in the repository's own checkout, so the record names the base branch, not a branch of the run's.
+  assert.equal(readRun(run.id).steps.supervise?.branch, 'main');
+
+  // And main moves on while the run watches: another run's merge, which touches a test and CLAUDE.md.
+  write(repo, 'packages/x/test/add.test.ts', "import assert from 'node:assert';\nassert.ok(true);\n");
+  write(repo, 'CLAUDE.md', 'a lesson somebody else wrote\n');
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'another run, merged');
+  // That diff is there to be read: what is refused is reading it AS this run's work.
+  const moved = touchedBy(readRun(run.id), 'main');
+  assert.ok(!('error' in moved) && moved.changes.length === 2, JSON.stringify(moved));
+
+  const lines = await screen(t, e, run.id);
+  assert.ok(!lines.some((l) => /^  touched /.test(l)), `no branch to read:\n${lines.join('\n')}`);
+  assert.ok(!lines.some((l) => /^  lesson /.test(l)), 'nor a lesson credited to it for what another run merged');
+  assert.ok(!lines.some((l) => /in full: the check-affecting files/.test(l)), 'nor every check-affecting file merged since, above the question');
+  // What the person came for is what they get.
+  const said = indexOf(lines, '    add-sub is ready to merge.');
+  assert.ok(indexOf(lines, '    needs: Merge add-sub, or hold it?') > said);
+  indexOf(lines, `    to answer it:  wf retry ${run.id} supervise --message "<answer>"`);
+
+  // A run that worked on the base branch ITSELF (--no-worktree) is unchanged, on the same fallback: its implement failed, so the
+  // terminal step has no branch and the screen reads every branch a step worked on — which is main, where that run's work really is.
+  const direct = start({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false });
+  fs.appendFileSync(path.join(repo, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
+  git(repo, 'commit', '-q', '-am', 'the work, on the base branch itself');
+  await advance(e, readRun(direct.id));
+  settle(`${direct.id}-implement`, 'failed');
+  const worked = await screen(t, e, direct.id);
+  assert.equal(readRun(direct.id).steps.review?.branch, undefined, 'the terminal step has no branch: the fallback is what answers');
+  const where = indexOf(worked, '  touched  main');
+  assert.match(worked[where + 1]!, /^ {4}packages\/x\s+1 file\s+\+1 −0$/, worked.slice(where, where + 3).join('\n'));
+});
+
 test('REFUSED at `wf start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch', () => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));

@@ -1126,7 +1126,8 @@ What was built:
   file is the branch's to answer, as before collection, so a run from before it reads as it did. `artifactLines` gives each reason its own line on `wf decide`'s screen: not in the
   workspace, a directory, not collected, not in the directory, outside the workspace, outside the directory.
 - `artifactsContract`, on every brief, says both ways. Put a file in the directory and name it by absolute path, or leave it in
-  the workspace and name it by its path from the root.
+  the workspace and name it by its path from the root. (Amended since, in *Shipped: the supervisor*: a `workspace: main` step is told
+  the first way alone, because the run hands nothing off in a person's checkout.)
 
 What was measured:
 
@@ -2867,6 +2868,121 @@ What the board's run should call:
 - **Approve and Send back** are `approve(e, runId, step, message?)` and `retry(e, runId, <the work>, { mode: 'nudge', message })`, as for
   §6's gate; `sendBackTo(step, run)` says which step the send-back names, and `approvalRefusal` greys the button out in its words.
 
+## Shipped: the supervisor — a workflow of one step that never ends
+
+§9 below, the package half: the folder, what the package lacked for a step that does not end, and the tests that hold both. The board
+half, and the first run itself, are what is left — and the first run is where §9's one measurement is. Read first:
+`workflows/supervisor/README.md` and `supervise.md`, `takesNoSlot`, `slotNeed` and `runAdmitted` in run.ts, and
+`test/supervisor.test.ts`.
+
+The operator's session spent two days doing by hand what the last three sections made a state on the board: reading a run at its
+result, putting a brief to a person, approving, answering a plan, unsticking a stalled session. §9 asked for that session as a
+workflow. It is one step, and everything that made it possible is already here: the gate, the ending step, `to decide`, `remote:`,
+the look skill, and a step that signs off `blocked` and is answered — which is how it asks.
+
+What was built, four commits:
+
+- **`slot: none` on a step**, in `STEP_KEYS` after `workspace` with its line in `STEP_KEY_MEANINGS`: the run of that workflow is not
+  one the cap on runs in flight (`WF_MAX_RUNS`) counts or holds. `takesNoSlot` is the one judgement, and `slotNeed`, `runAdmitted` and
+  the pass's own count all read it, so a run that watches files its step at a full cap, counts against nothing and holds nobody behind
+  it. Refused by the parser on any other word, on no value and on the line twice; refused at load on a step of a workflow that has
+  another — a slot is a run's, not a step's, so the work beside it would leave the cap too — which is `wf start`'s refusal, with
+  nothing written. It still takes a session slot (`WF_MAX_CONCURRENT`), as every session does: what the cap holds is work, and this
+  session is not that.
+- **`workflows/supervisor/`**, one step: `workspace: main` (the store and the runs' branches are what it reads; the little it writes
+  is bookkeeping), `slot: none`, `remote: true` so the person it asks can answer from a phone, `harness: claude` on opus, implement's
+  denies, no `check:` — it produces questions and approvals, and there is nothing to verify — and no `output:`, which is what lets it
+  sign off `blocked` for ever without inventing declared fields each time. Its brief is the loop: `wf ls` as the pass; a run to decide,
+  read in order (that folder's README and last step, then `wf decide`, then the diff and the screenshots through the look skill); a
+  plan waiting, put to the person in the step's own words; a stall, diagnosed off the registry, the engine's board, the step's output
+  and the process tree, and continued with `wf retry --message` or `wf say`; an idea, registered where the next agent reads. It asks by
+  signing off `blocked` — the brief in `summary`, the question and options in `needs` — and on a yes says `wf approve <run> <step>` and
+  nothing more. **It never types git for a run**, and what it commits here it commits by path.
+- **What a step in the person's checkout is told.** Two things the brief had wrong, both found by reading the supervisor's own first
+  brief. The artifacts contract offered it the second way — leave the file in this workspace — which for a `workspace: main` step is
+  false and does harm: the run hands nothing off there (`handOffDue` skips it), so the file is never collected, never committed, and
+  stays in a person's checkout, where the next run's ending step reads `git status --porcelain` as dirty and stops. Such a step is now
+  told the one way that is true, under a heading that names its reader, with no `WF_ARTIFACTS` sentence — `workspace: main` refuses a
+  check, so there is none to be given it. (The review of §8's run found this; it is that finding, closed.) And a run whose ending step
+  is its whole workflow cut no branch, so "the run's work is on the run's result branch" was followed by an empty fence: it is told
+  there is no work of its to read, and the base it is standing on.
+- **What a pass reads of a step answered without limit.** Every try a step leaves behind was read from the engine on every pass, by
+  every caller of `taskPhases` — the tick's included. They are read for one thing, what the tries have cost together, and every reader
+  of that is gated on a cap being in force (`budgetOf`, `overBudget`, `budgetUsdFor`), so for a step with no `budget:` each of those
+  reads buys nothing. For every other workflow the count is bounded by `retries:` and a person's patience; a step answered for as long
+  as somebody keeps answering would have added one journal read per answer to every pass, every four seconds, for ever. So `advance`
+  asks for them only while a cap is in force (`underBudget`, read off the record with nothing asked of the engine), and a screen still
+  reads them all — `wf decide` prints what a run cost and its timeline over every try. Found by the review, round 2.
+- **What `wf decide` reads of a run whose work is not on a branch.** The screen reads the run's result branches, or — when no terminal
+  step has one — every branch a step worked on. A workflow of one step in the repository's own checkout has neither: `resultSteps` is
+  empty, and the branch its step recorded is the base branch itself. So the screen diffed the run's frozen base against a branch every
+  other run's merge moves, and printed it as this run's work — the radius, a `lesson` line crediting it with what somebody else wrote,
+  and the whole diff of every check-affecting file merged since — above the question the person opened the screen to answer. It grows
+  with each merge; on day one it reads `nothing`, which is how this section first recorded it. `branchesToRead` now takes the base
+  branch of a run that cut worktrees and drops it from that fallback, as `tipBranches` already refuses it: such a run's work is never
+  on it. A run that worked on its base branch itself (`--no-worktree`) gives none, since there that branch is exactly where its work
+  is. Found by the review, round 3.
+- **The README's section** — what the supervisor is, how to start it, how to answer it — beside the two bullets the key needed: the
+  keys' closed list, and the cap's own section. With, from round 2: what a supervisor costs in sessions (`WF_MAX_CONCURRENT` is 2
+  unless set, per harness pool, and a session that is watching is a session at work — so at the default it leaves one slot for the work
+  it watches, and the ceiling is worth raising before starting one), and the artifacts bullet that said a step is told both ways, which
+  a `workspace: main` step is not.
+
+What was measured:
+
+- **Nothing caps a step answered many times, and there was nothing to lift.** §9 asked for the cap to be found "if anything" and
+  lifted for a step with no `output:`. A step's tries are counted nowhere: `retries:` counts only the tries the run spends on its own
+  word, an ask names the try it asks for, and `retriesDue` files any try a person asks for, for ever. Held by a test with a fake engine
+  — blocked, answered, blocked again, five times over, each try resuming the session before it and carrying `## Your answer` — and
+  probed by hand to twelve, which files the twelfth as it files the second. What a step with `output:` would hit is not a cap but its
+  own schema: it would have to declare its fields on every one of those sign-offs. The supervisor declares none.
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 587 (586 passed, 1 skipped), from
+  575. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged — no test was added outside the package, and the two
+  pinned `spec()` fixtures in the api's tests each gained a `slot: null` row, which is the fourth and fifth obligation a new key has
+  outside the package beside CLAUDE.md's three. `npm run typecheck` clean in all four.
+- New tests. `workflow.test.ts`: `slot: none` read, and another word, no value and the line twice refused; the key refused at load on
+  every shape of a workflow that has another step, and allowed on one step; the key rendered back in `STEP_KEYS` order, and read back
+  as the step. `run.test.ts`: `slotNeed` and `runAdmitted` on the same run judged with the workflow and without it, and `heldRuns`
+  admitting the work a counted watcher would have held; the brief of a step in the checkout whose run cut no branch, and the one place
+  its files go. `supervisor.test.ts`, new, on disk with a board a test settles: the folder held to its keys and its brief; the step
+  answered five times over; the run filing its step at a full cap, counting against nothing and holding nobody while the run beside it
+  waits; and `wf start` refusing the key on three shapes of workflow that has another step, with nothing written.
+- Each guard broken on purpose, and the tests rerun: the parser taking any word (1 test), `validate` not called (1), `slotNeed`
+  counting it (1), `runAdmitted` holding it (1 pure, 1 on disk), the pass counting what it files (1), the artifacts contract not
+  switched (1), the empty fence back (1). Each failed.
+- The screens were printed and read on a supervisor run that had asked its first question: `wf ls` says `supervise succeeded · BLOCKED`
+  and `→ waiting on you: supervise`; `wf decide` prints the brief, the `needs` and the `wf retry --message` that answers it.
+- **The screen of a run whose one step works in the checkout** (round 3, `decide.test.ts`, on a real repository): the base advanced by
+  another run's merge — a test and a CLAUDE.md, which `touchedBy` reads as two changes — and the screen shows no `touched`, no `lesson`
+  and no check-affecting diff, with the closeout, the `needs` and the `wf retry` that answers it where they were. Beside it, a
+  `--no-worktree` run on the same fallback — its implement failed, so no terminal step has a branch — still reads `touched main` with
+  its radius. Broken three ways: the base read as the work (the old behaviour), the rule ignored in `branchesToRead`, and the base
+  dropped for every run rather than one with worktrees. Each failed.
+- **What a pass reads, counted** (round 2, `supervisor.test.ts`, over a board that records every `view`): one read, the try the step is
+  on, after one answer and again after six — the same number, so it does not grow with the answers. With a cap in force the pass reads
+  every try, and two tries of $0.60 against `budget: 1` still read `over budget $1.20 of $1`. Both directions were broken on purpose:
+  never reading them lets the cap through, always reading them brings the growth back, and each failed the test.
+
+What it leaves:
+
+- **The measurement, which only the first run can make** (§9's own): how long such a session lasts before its harness compacts it, and
+  what it forgets after. It wants a day of real runs, not a test. The operator starts the first one and watches it; what to watch for
+  is whether the answer to a question it asked an hour ago still finds a session that remembers the run it was about.
+- **The board's half.** A run that never ends is drawn as any other: the Factory keeps a card for it for ever, and nothing says "this
+  one is the supervisor". `apps/web`'s builder cannot set `slot:`, as it cannot set `workspace:` — its mirror of `WorkflowStepSpec`
+  carries neither — though a folder that has the key rides a round trip. The api reads the key (`specOf`) and counts the cap with the
+  run's steps in hand, so its numbers agree with the tick's.
+- **A queued inbox card of such a workflow still waits for a free slot.** The queue starts one card a pass while a slot is free,
+  whatever workflow the card names, and `startQueued` is not given the folder's steps. Start the supervisor by hand, as its README says.
+- **`--no-worktree` is refused for it**, because its step says `workspace: main` and `stepsToStart` reads that as a folder that merges.
+  The words are about merging, which this folder does not do; the default start is what it wants, and the run's worktree costs nothing
+  since its one step works in the checkout.
+- **A screen of a long-lived run still reads every try.** `wf decide` prints what the run cost and its timeline over all of them, and
+  the api reads the whole engine board for the Factory, so at five hundred answers those are five hundred reads — of a person's
+  command, and of a poll that was already reading the board. The record's `tries` array grows with them too, and the pass rewrites it.
+  The lever for all three is engine-side: a view the engine caches, or a settled task's fold kept once (agent-engine's open issues).
+  The tick, which is what runs every four seconds, no longer pays it.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
@@ -3105,6 +3221,10 @@ then one apps run (the counts, the group, the banner; the run page's gate panel 
 closeout; e2e with a to-decide run and an approved ending in the seed).
 
 ## 9. The supervisor: what the operator's session did on 2026-09-16 and 17, as a step that never ends
+
+Shipped 2026-09-17 as *Shipped: the supervisor — a workflow of one step that never ends*, above: the folder, `slot: none` for a run the
+cap does not hold, and the never-ending path held by tests — with the first run, its measurement and the board's half still to come.
+What was registered is kept as it was asked.
 
 **Registered** 2026-09-17, by the operator, after a day of watching this session run the board: "what if I had what you
 did in the board? What shape would that have?"

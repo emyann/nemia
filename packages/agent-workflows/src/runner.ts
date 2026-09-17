@@ -26,7 +26,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, resultSteps, slotFree, afterRefusal, type BranchStanding, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, type BranchStanding, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -427,8 +427,15 @@ export const phaseOfView = (v: TaskView | undefined): TaskPhase => {
  * One read per task per pass, shared by everything that then wants an answer: `advance` needs the
  * views themselves (for the session id a `resume:` step continues), and the pure functions need
  * only the phase.
+ *
+ * `earlierTries` reads each try a step has left behind as well. They are read for one thing — what the step's tries have cost together,
+ * which the cap in force on it is held to (`stepSpend`, `overBudget`, `budgetUsdFor`) — and every reader of that is gated on there being a
+ * cap (`budgetOf`), so with none in force they are read and never asked. A screen reads them all the same (`decide` prints what a run cost
+ * and its timeline over every try), and so does anything that must answer for a try that is over. The tick does not: `advance` asks for
+ * them only while a cap is in force, because a step answered without limit — the supervisor, which is answered for as long as a person
+ * keeps answering — would otherwise add one journal read per answer to every pass of every four seconds, for ever, buying nothing.
  */
-async function taskPhases(e: Engine, run: Run): Promise<{
+async function taskPhases(e: Engine, run: Run, { earlierTries = true }: { earlierTries?: boolean } = {}): Promise<{
   views: Map<string, TaskView>;
   phaseOf: (taskId: string) => TaskPhase;
 }> {
@@ -436,15 +443,21 @@ async function taskPhases(e: Engine, run: Run): Promise<{
   for (const { taskId, check, tries } of Object.values(run.steps)) {
     if (taskId) views.set(taskId, await e.view(taskId));
     if (check) views.set(check.taskId, await e.view(check.taskId));
-    // Each earlier try's session, once: what the step's tries have cost together, which its `budget:` is held to (`stepSpend`). A settled
-    // task is read off its journal, and asks no harness.
-    for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
+    // A settled task is read off its journal, and asks no harness — but it is still a read, once per try per pass.
+    if (earlierTries) for (const t of tries ?? []) if (!views.has(t.taskId)) views.set(t.taskId, await e.view(t.taskId));
   }
   return {
     views,
     phaseOf: (taskId) => phaseOfView(views.get(taskId)),
   };
 }
+
+/**
+ * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
+ * record, with nothing asked of the engine. What the tick's pass reads the earlier tries for (`taskPhases`): with no cap anywhere, what
+ * they cost is a number nothing in the pass looks at.
+ */
+const underBudget = (steps: readonly Workflow[], run: Run): boolean => steps.some((s) => budgetOf(s, run.steps[s.name]) !== undefined);
 
 /**
  * Checks a pass filed and never wrote down, put back on the record. In memory: `advance` is the one
@@ -1493,7 +1506,9 @@ export type Advanced = {
 export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Advanced> {
   const steps = stepsOf(run);
 
-  const { views, phaseOf } = await taskPhases(e, run);
+  // Every try's session, or only the current ones: what the earlier ones cost is read by nothing here unless a cap is in force
+  // (`underBudget`), and a step answered without limit grows that read for ever.
+  const { views, phaseOf } = await taskPhases(e, run, { earlierTries: underBudget(steps, run) });
   const signedOff = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);
@@ -1557,8 +1572,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   const starting = !hasStarted(run);
   // And a run with nothing filed files its roots only while the cap on runs in flight leaves a slot (`runAdmitted`): one that wants a slot and
   // is not admitted is held, and files nothing.
-  const need = slotNeed(run, phaseOf, assessed, (id) => parent(id).shipped);
-  const admitted = runAdmitted(run, slot);
+  const need = slotNeed(run, phaseOf, assessed, (id) => parent(id).shipped, steps);
+  const admitted = runAdmitted(run, slot, steps);
   const held = need.wants && !admitted ? slot : undefined;
   const ready = runReady(run, (id) => parent(id).shipped) && admitted ? assessed.ready : [];
   const waiting = waitsOf(run, parent);
@@ -1823,7 +1838,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
 
   return {
     run, filed, checked, tried, looped, status, blocked, notes, waiting,
-    inFlight: need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0,
+    // A run outside the cap (`slot: none`) counts for nothing it filed either: what it files is its own watching, not a run's work.
+    inFlight: !takesNoSlot(steps) && (need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0),
     ...(held ? { held } : {}),
   };
 }
@@ -2082,7 +2098,7 @@ export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Pr
     const { asks, rounds } = readAsks(run.id);
     const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
     const parent = await parentsOf(e, run);
-    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phaseOf, a, (id) => parent(id).shipped) });
+    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phaseOf, a, (id) => parent(id).shipped, steps) });
   }
   return heldRuns(needs, cap);
 }

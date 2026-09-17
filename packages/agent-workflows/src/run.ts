@@ -607,8 +607,20 @@ export function runCapOf(value: string | undefined): number {
  *
  * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is what
  * it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
+ *
+ * Neither, for a run whose workflow takes no slot at all (`takesNoSlot`, `slot: none`): it is a session that watches the runs the cap holds,
+ * so the cap neither counts it nor holds it. Judged without the steps — a caller that passes none — every run is counted, as every run was.
  */
-export function slotNeed(run: Run, phaseOf: (taskId: string) => TaskPhase, a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round'>, shipped: (runId: string) => boolean): { inFlight: boolean; wants: boolean } {
+export function slotNeed(
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round'>,
+  shipped: (runId: string) => boolean,
+  /** The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted, as every run was. */
+  steps: readonly Pick<Workflow, 'slot'>[] = [],
+): { inFlight: boolean; wants: boolean } {
+  // A run that watches the others is in nobody's way and waits for nobody: it neither counts against the cap nor asks it for anything.
+  if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
   const due = a.ready.length + a.check.length + a.retry.length + a.round.length > 0;
   return {
@@ -618,10 +630,18 @@ export function slotNeed(run: Run, phaseOf: (taskId: string) => TaskPhase, a: Pi
 }
 
 /**
- * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that has
- * started — the cap holds only a run with nothing filed — and for one judged with no slot, which is `advance` called outside a tick.
+ * Whether a run of these steps is outside the cap on runs in flight: its workflow says `slot: none`, which `validate` allows only on a
+ * workflow of one step. Pure. It counts against nothing and waits for nothing — a session that watches the runs the cap holds.
  */
-export const runAdmitted = (run: Run, slot: RunSlot | undefined): boolean => hasStarted(run) || !slot || slotFree(slot);
+export const takesNoSlot = (steps: readonly Pick<Workflow, 'slot'>[]): boolean => steps.some((s) => s.slot === 'none');
+
+/**
+ * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that has
+ * started — the cap holds only a run with nothing filed — for one judged with no slot, which is `advance` called outside a tick, and for one
+ * whose workflow takes no slot at all (`takesNoSlot`).
+ */
+export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly Pick<Workflow, 'slot'>[] = []): boolean =>
+  hasStarted(run) || !slot || slotFree(slot) || takesNoSlot(steps);
 
 /** Whether a run slot is free: fewer runs in flight than the cap, or no cap. Pure. What a queued card is started on, after every run has been advanced. */
 export const slotFree = (slot: RunSlot): boolean => slot.cap <= 0 || slot.inFlight < slot.cap;
@@ -2667,8 +2687,24 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  * Both ways are said, because not every step can use the first: Codex in `workspace-write` writes only its
  * worktree, and the engine gives it no other directory. A file named from the workspace root is collected into
  * the directory at hand-off, before the check (`collectArtifacts` in runner.ts), so such a step hands it over too.
+ *
+ * `inMain` for a step that works in the repository's own checkout (`workspace: main`): there the second way is
+ * false and does harm. The run hands nothing off in a person's checkout (`handOffDue`), so nothing is collected
+ * and nothing is committed — a file left there stays in their checkout for ever, and the next run's ending step
+ * reads `git status --porcelain` as dirty and stops. Such a step has no check to be given `WF_ARTIFACTS` either,
+ * since `workspace: main` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
  */
-export const artifactsContract = (dir: string): string => [
+export const artifactsContract = (dir: string, inMain = false): string => (inMain ? [
+  '', '## Files for the person who decides', '',
+  `A report, a log or a screenshot reaches them one way: put it in \`${dir}\`, and name it in \`artifacts\` by`,
+  'absolute path. The run made that directory for this step, outside every workspace, and a file there is the',
+  'only one it keeps.',
+  '',
+  'This workspace is the repository\'s own checkout, where the run hands nothing off: a file you leave here is',
+  'not collected and not committed — it stays in a person\'s checkout, and `wf decide` reads a path named from',
+  'the workspace root as `not collected`. Name each file by its absolute path in that directory; a directory is',
+  'not collected, nor a file that is not there.',
+] : [
   '', '## Files for the steps after you', '',
   'A screenshot, a log or a report reaches the steps after you and the person who decides in either of two ways.',
   '',
@@ -2682,7 +2718,7 @@ export const artifactsContract = (dir: string): string => [
   "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
   'path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a',
   'file that is not there: name each file.',
-].join('\n');
+]).join('\n');
 
 /**
  * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
@@ -3185,7 +3221,7 @@ export function composeBrief(
   // round answers the findings it was handed, filed as the round or tried again within it.
   const contracts = [
     ...(step.check ? [checkContract(step.check)] : []),
-    ...(artifactsDir ? [artifactsContract(artifactsDir)] : []),
+    ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main')] : []),
     closeoutContract(step, Boolean(round) || owesReplies(steps, run, step.name)),
   ].join('\n');
   const again = retry ? retrySection(step, retry) + retriedInRound(step, run, steps, retry, closeoutOf)
@@ -3237,14 +3273,22 @@ export function composeBrief(
     // The one step that is not where the run's work is. Its directory is the repository as a person left it, and the work is on the
     // run's branches, so it is told those rather than told to read the workspace. What it does here, a person sees in their checkout.
     const results = resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+    parts.push(`You are in ${run.repo}, the repository's own checkout, on ${run.branch} — not in a worktree of this run's.`);
+    // A run whose ending step is its whole workflow cut no branch and has no work of its own to name: saying where the work is, with
+    // nothing to say, printed an empty fence and told a session to look for a branch that was never made.
+    if (results.length) {
+      parts.push(
+        `${earlier.length ? `The work of ${earlier.join(', ')} is not in this directory: it is` : 'The run\'s work is'} on ${results.join(' and ')}, cut from \`${run.baseRef}\`:`,
+        '',
+        '```',
+        ...results.flatMap((b) => [`git log --oneline ${run.branch}..${b}`, `git diff ${run.branch}...${b}`]),
+        '```',
+        '',
+      );
+    } else {
+      parts.push(`This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look. The checkout is at \`${run.baseRef}\`.`, '');
+    }
     parts.push(
-      `You are in ${run.repo}, the repository's own checkout, on ${run.branch} — not in a worktree of this run's.`,
-      `${earlier.length ? `The work of ${earlier.join(', ')} is not in this directory: it is` : 'The run\'s work is'} on ${results.length ? results.join(' and ') : 'the run\'s result branch'}, cut from \`${run.baseRef}\`:`,
-      '',
-      '```',
-      ...results.flatMap((b) => [`git log --oneline ${run.branch}..${b}`, `git diff ${run.branch}...${b}`]),
-      '```',
-      '',
       'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
       'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',
     );

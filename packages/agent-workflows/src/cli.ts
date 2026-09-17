@@ -113,7 +113,8 @@ what, who may drive it, for how long and for how much. Everything else the agent
                      codex and checks their own; a blocked session holds no slot; one run's review
                      competes with another run's implement
   WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
-                     slot, oldest first; a run waiting on --after counts once it is filed
+                     slot, oldest first; a run waiting on --after counts once it is filed; a run of a
+                     one-step workflow that says slot: none is not counted and never waits for one
 
 To follow what the engine is doing, use the engine — a run's task ids carry the run and the step,
 so its output already names the work. Point it at this board:
@@ -771,7 +772,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // whether among them are the files an agent reads as instructions or those that decide what its
       // check means. Then the lesson — CLAUDE.md's "When you miss", held to — and those check files in
       // full, because a check that passed says nothing about a check that was changed to pass.
-      const touched = branchesToRead(decision.branches, namesInOrder(run, steps).map((name) => run.steps[name]!.branch))
+      // Never the run's own base branch on a run that cut worktrees: a step that recorded it worked in the repository's checkout, and
+      // what that branch holds against the run's frozen base is every other run's merge since, not this run's work (`branchesToRead`).
+      const touched = branchesToRead(decision.branches, namesInOrder(run, steps).map((name) => run.steps[name]!.branch), run.isolate ? run.branch : undefined)
         .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
       if (touched.length) {
         console.log();

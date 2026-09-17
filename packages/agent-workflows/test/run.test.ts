@@ -292,6 +292,36 @@ test("an ending step is told where the work is — the branches, not the workspa
   assert.doesNotMatch(brief, /This workspace has already been worked in by/, 'the work is not here');
 });
 
+test("a step in the checkout whose run cut no branch — the whole workflow is that step — is told so, and is given no empty fence to read", () => {
+  const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'main', slot: 'none' };
+  const r = run({ supervise: 't1' }, { steps: { supervise: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
+  const brief = composeBrief(watcher, r, [watcher], () => undefined, FILES);
+  assert.match(brief, /You are in \/repo, the repository's own checkout, on main — not in a worktree of this run's\./);
+  assert.match(brief, /This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read/);
+  assert.doesNotMatch(brief, /result branch/);
+  assert.doesNotMatch(brief, /```\n```/, 'no fence with nothing in it');
+  assert.match(brief, /the run commits nothing here for you/);
+});
+
+test("a step in the checkout is told the one place its files go: the run hands nothing off there, so nothing it leaves is collected or committed", () => {
+  const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'main', gate: true };
+  const dev = [step('implement'), step('review', ['implement']), ending];
+  const r = run({ implement: 't1', review: 't2', ship: null }, {
+    steps: { implement: { taskId: 't1', workspace: '/wt/implement', branch: 'wf/r-1/implement' }, review: { taskId: 't2', workspace: '/wt/implement', branch: 'wf/r-1/implement' }, ship: { taskId: null } },
+  });
+  const brief = composeBrief(ending, r, dev, () => undefined, FILES);
+  assert.match(brief, /\n## Files for the person who decides\n/);
+  assert.doesNotMatch(brief, /## Files for the steps after you/, 'nothing follows it, and this is not a workspace it hands off');
+  assert.doesNotMatch(brief, /Or leave it in this workspace/, 'the second way is false here: it would be left in a person\'s checkout for ever');
+  assert.doesNotMatch(brief, /WF_ARTIFACTS/, 'and `workspace: main` refuses a check, so there is none to be given it');
+  assert.ok(brief.includes(FILES), 'the directory the run made, by absolute path');
+  assert.match(artifactsContract(FILES, true), /a file you leave here is\nnot collected and not committed/);
+  assert.match(artifactsContract(FILES, true), /`wf decide` reads a path named from\nthe workspace root as `not collected`/);
+  // Every other step is told both ways, as it was.
+  assert.match(composeBrief(dev[1]!, r, dev, () => undefined, FILES), /\n## Files for the steps after you\n/);
+  assert.match(artifactsContract(FILES), /Or leave it in this workspace/);
+});
+
 test('a fan-in step is told it is holding merged work, and that conflicts are its job', () => {
   const merge: Workflow = { name: 'integrate', after: ['a', 'b'], body: 'combine them' };
   const brief = composeBrief(merge, run({ a: 't1', b: 't2', integrate: null }), [step('a'), step('b'), merge]);
@@ -340,6 +370,27 @@ test('REFUSED at a cap: `runAdmitted` files the roots of a run with nothing file
   assert.equal(runAdmitted(run({ implement: 't1', review: null }), { inFlight: 9, cap: 2 }), true, 'a run that has started is never held');
   assert.equal(runAdmitted(run({ implement: null, review: null }, { steps: { implement: { taskId: null, tries: [{ taskId: 't1', then: 'round' }] }, review: { taskId: null } } }), { inFlight: 2, cap: 2 }), true, 'nor one a round moved behind');
   assert.equal(slotWord({ inFlight: 2, cap: 2 }), 'waiting for a run slot (2 of 2 in flight)');
+});
+
+test('`slot: none`: a run of a workflow that says it is never in flight for the cap and never wants a slot, whatever it has filed — and `runAdmitted` files its roots at a full cap', () => {
+  const watching = [{ name: 'supervise', after: [], body: 'x', slot: 'none' } as Workflow];
+  const need = (r: Run, p: Record<string, TaskPhase>, steps?: readonly Workflow[]) =>
+    slotNeed(r, phases(p), assess(STEPS, r, phases(p), signedDone, asked), () => true, steps);
+  // The same run, judged with the workflow and without it: the rule is the workflow's word, and nothing else about the run changes.
+  const running = run({ implement: 't1', review: null });
+  assert.deepEqual(need(running, { t1: 'running' }), { inFlight: true, wants: false }, 'counted without the line');
+  assert.deepEqual(need(running, { t1: 'running' }, watching), { inFlight: false, wants: false }, 'and never with it');
+  const fresh = run({ implement: null, review: null });
+  assert.deepEqual(need(fresh, {}), { inFlight: false, wants: true }, 'a root ready: it waits for a slot');
+  assert.deepEqual(need(fresh, {}, watching), { inFlight: false, wants: false }, 'and with the line it waits for nothing');
+  assert.deepEqual(need(running, { t1: 'running' }, [{ name: 'implement', after: [], body: 'x' }]), { inFlight: true, wants: false }, 'steps that say nothing count as they did');
+
+  assert.equal(runAdmitted(fresh, { inFlight: 2, cap: 2 }, watching), true, 'its roots are filed at a full cap');
+  assert.equal(runAdmitted(fresh, { inFlight: 2, cap: 2 }), false, 'and any other run with nothing filed waits');
+  // It holds no slot, so the cap holds nobody on its account: a run the cap would hold behind it is admitted.
+  const runs = [{ id: 'watcher', createdAt: '2026-09-17T01:00:00.000Z', ...need(running, { t1: 'running' }, watching) }, { id: 'work', createdAt: '2026-09-17T02:00:00.000Z', ...need(fresh, {}) }];
+  assert.deepEqual([...heldRuns(runs, 1)], [], 'one slot, and the work takes it');
+  assert.deepEqual([...heldRuns([{ ...runs[0]!, ...need(running, { t1: 'running' }) }, runs[1]!], 1)], [['work', { inFlight: 1, cap: 1 }]], 'counted, it would have held the work');
 });
 
 test('`heldRuns`: every run in flight counted, then each that wants a slot admitted oldest first and counted for the next, and the rest held at the count — none with no cap, and a run waiting on runs neither counted nor held', () => {

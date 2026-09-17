@@ -40,6 +40,8 @@ export type WorkflowStepSpec = {
   input: string[];
   /** `workspace: main`: the step runs in the repository's own checkout. Null for a step without the line, which is the only other thing a step can say. */
   workspace: 'main' | null;
+  /** `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can say. */
+  slot: 'none' | null;
   permissionMode: string | null;
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallow:`): empty where the step denies nothing. */
@@ -175,6 +177,7 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
   resume: step.resume ?? null,
   input: step.input ?? [],
   workspace: step.workspace ?? null,
+  slot: step.slot ?? null,
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,
   disallow: step.disallow ?? [],

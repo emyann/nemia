@@ -224,10 +224,17 @@ test('a workspace glob with `**` is not refused but named on the screen — and 
   assert.deepEqual(touchedLines([{ branch: 'wf/a', radius: r }]).filter((l) => l.includes('packages/**')).length, 1);
 });
 
-test('the screen reads the result branches, or — before a terminal step has one — every branch a step worked on', () => {
+test('the screen reads the result branches, or — before a terminal step has one — every branch a step worked on, never the base branch of a run that cut worktrees', () => {
   assert.deepEqual(branchesToRead(['wf/r/review'], ['wf/r/implement', 'wf/r/review']), ['wf/r/review']);
   assert.deepEqual(branchesToRead([], ['wf/r/implement', undefined, 'wf/r/implement']), ['wf/r/implement']);
   assert.deepEqual(branchesToRead([], [undefined]), []);
+
+  // A step that recorded the base branch worked in the repository's own checkout, where the run commits nothing: what that branch holds
+  // against the run's frozen base is every other run's merge since. Dropped for a run with worktrees, and only there.
+  assert.deepEqual(branchesToRead([], ['main'], 'main'), [], 'a workflow of one step that works in the checkout: nothing of the run is on a branch');
+  assert.deepEqual(branchesToRead([], ['wf/r/implement', 'main'], 'main'), ['wf/r/implement'], 'the work is read, the base is not');
+  assert.deepEqual(branchesToRead([], ['main']), ['main'], 'a run that worked on its base branch itself (--no-worktree): that branch is its work');
+  assert.deepEqual(branchesToRead(['main'], ['main'], 'main'), ['main'], 'a result branch is read whatever it is called');
 });
 
 test('what a session used, with the api and tool time its harness counted — beside the counts once either is measured — and its cost to the cent, three figures under one', () => {

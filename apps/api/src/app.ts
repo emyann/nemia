@@ -550,7 +550,7 @@ async function ceilingsOf(): Promise<Ceilings> {
     const a = assess(steps, run, phase, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
     const parents = new Map<string, ParentRun>();
     if (gated(run)) for (const id of new Set(run.after)) parents.set(id, await parentOf(reader, id));
-    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false) });
+    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false, steps) });
   }
   return {
     last,
@@ -1290,7 +1290,8 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Rea
  * A run still running with nobody waited on is `running`, and git is not asked a thing: the page asks while a run is
  * decidable, and the Factory's card only for a run waiting on you, but a request is a request. Otherwise judged as the
  * CLI judges it (`decision`): called off, or already shipped, is `nothing`. Then the branches the CLI reads
- * (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one — each
+ * (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one, never the base branch of a
+ * run that cut worktrees, whose work is not on it — each
  * read with `touchedBy`, and with `sensitiveDiff` over the default check-affecting list. A branch git cannot read is
  * an `error` on its entry, never a failed request. A few `git` calls a branch, so read once, never on a poll.
  *
@@ -1324,7 +1325,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   const result = d.kind === 'awaiting'
     ? d.branches
     : terminalSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
-  const touched: Touched[] = branchesToRead(result, Object.values(run.steps).map((s) => s.branch))
+  const touched: Touched[] = branchesToRead(result, Object.values(run.steps).map((s) => s.branch), run.isolate ? run.branch : undefined)
     .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);

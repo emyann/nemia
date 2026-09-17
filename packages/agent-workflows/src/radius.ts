@@ -232,9 +232,17 @@ export function radiusLines(r: Radius): string[] {
  * The branches whose diff the screen reads: the run's result branches, or — when no terminal step has
  * one yet, as when the first step's check refused it — every branch a step worked on, since that is
  * where the work a person has to judge is.
+ *
+ * `base` is the run's own base branch, given only for a run that cut worktrees (`isolate`): it is dropped from that fallback, because
+ * such a run's work is never on it. A step that recorded the base branch worked in the repository's own checkout (`workspace: main`),
+ * where the run commits nothing — so the diff between the run's frozen base and that branch is not the run's work but the base moving
+ * under it, which every other run's merge adds to. Read as the work, a workflow of one such step showed a person everything merged
+ * since it started, above the question it was asking them. `tipBranches` refuses the same branch for the same reason.
+ *
+ * A run that worked on its base branch itself (`--no-worktree`) gives none: there that branch is exactly where its work is.
  */
-export const branchesToRead = (result: readonly string[], worked: ReadonlyArray<string | undefined>): string[] =>
-  result.length ? [...result] : [...new Set(worked.filter((b): b is string => Boolean(b)))];
+export const branchesToRead = (result: readonly string[], worked: ReadonlyArray<string | undefined>, base?: string): string[] =>
+  result.length ? [...result] : [...new Set(worked.filter((b): b is string => Boolean(b) && b !== base))];
 
 /** The paths whose whole diff the screen prints: every end of every change a glob names. */
 export const sensitivePaths = (changes: readonly Change[], globs: readonly string[]): string[] =>

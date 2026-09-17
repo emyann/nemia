@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, writeWorkflow } from 'agent-workflows';
-import { EFFORTS, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
+import { EFFORTS, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './workflows.ts';
@@ -31,7 +31,7 @@ import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './
  * one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
  * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallow`); `count`, a whole number;
  * `dollars`, an amount; `flag`, `true` or `false` as `choices` has them (`remote`, `gate`); `schema`, a file beside the step (`output`).
- * `workspace` is a `choice` of one word, `main`, since a step either says it or says nothing.
+ * `workspace` is a `choice` of one word, `main`, and `slot` of one word, `none`, since a step either says it or says nothing.
  */
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'flag' | 'schema';
 
@@ -40,7 +40,7 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
  * does not export: `test/builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
-  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', permissionMode: 'harness-word',
+  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', permissionMode: 'harness-word',
   tools: 'list', disallow: 'list', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
@@ -62,7 +62,7 @@ export const keyForm = (): KeyForm => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
     kind: KINDS[key],
-    choices: key === 'harness' ? HARNESSES : key === 'workspace' ? WORKSPACES : FLAGS[key] ?? null,
+    choices: key === 'harness' ? HARNESSES : key === 'workspace' ? WORKSPACES : key === 'slot' ? SLOTS : FLAGS[key] ?? null,
     byHarness: key === 'effort' ? EFFORTS : key === 'permissionMode' ? PERMISSION_MODES : null,
   })),
   defaultHarness: DEFAULT_HARNESS,

@@ -16,14 +16,23 @@ import {
   XCircleIcon,
 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+import { useContext } from "react";
+import { DisclosureStateContext } from "react-aria-components";
 import { CodeBlock, type CodeLanguage } from "./code-block";
 
 // From AI Elements (registry.ai-sdk.dev/tool.json), with a call's state in a transcript's words rather than the AI SDK's
 // `ToolUIPart`: the board draws a conversation that happened, and hosts no model, so it has no `ai` package to type it by.
 // A call is running while its session may still answer it, and has no result once it cannot.
+//
+// AI Elements is written on Radix, with no React Aria variant, so this is adapted by hand to the aria base's `Collapsible`,
+// React Aria's `Disclosure`: `defaultExpanded` for `defaultOpen`, and the chevron turned by the trigger's `aria-expanded`
+// rather than Radix's `data-state`. `ToolContent` draws its children only while the call is open: a `DisclosurePanel`
+// keeps them mounted and hidden, where Radix's unmounted them, and a folded result (highlighted, and some are long) should
+// cost nothing until someone opens it. Its `className` styles what is drawn, not the panel: a panel hidden `until-found` is
+// still laid out, so a margin or a border on it would show under a closed fold.
 export type ToolState = "running" | "completed" | "error" | "no-result";
 
-export type ToolProps = ComponentProps<typeof Collapsible>;
+export type ToolProps = Omit<ComponentProps<typeof Collapsible>, "className"> & { className?: string };
 
 export const Tool = ({ className, ...props }: ToolProps) => (
   <Collapsible
@@ -86,22 +95,26 @@ export const ToolHeader = ({
     </div>
     <div className="flex shrink-0 items-center gap-2">
       {getStatusBadge(state)}
-      <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-aria-expanded:rotate-180" />
     </div>
   </CollapsibleTrigger>
 );
 
-export type ToolContentProps = ComponentProps<typeof CollapsibleContent>;
+export type ToolContentProps = Omit<ComponentProps<typeof CollapsibleContent>, "className" | "children"> & {
+  className?: string;
+  children?: ReactNode;
+};
 
-export const ToolContent = ({ className, ...props }: ToolContentProps) => (
-  <CollapsibleContent
-    className={cn(
-      "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
-      className
-    )}
-    {...props}
-  />
-);
+export const ToolContent = ({ className, children, ...props }: ToolContentProps) => {
+  const expanded = useContext(DisclosureStateContext)?.isExpanded ?? false;
+  return (
+    <CollapsibleContent {...props}>
+      {expanded && (
+        <div className={cn("fade-in-0 slide-in-from-top-2 animate-in text-popover-foreground", className)}>{children}</div>
+      )}
+    </CollapsibleContent>
+  );
+};
 
 export type ToolInputProps = ComponentProps<"div"> & {
   input: unknown;

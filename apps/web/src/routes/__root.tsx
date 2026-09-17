@@ -1,8 +1,9 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { createRootRouteWithContext, Link, Outlet, useMatches, useRouterState } from '@tanstack/react-router';
+import { createLink, createRootRouteWithContext, Outlet, useMatches, useRouter, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Workflow } from 'lucide-react';
+import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import { NAV } from '@/components/nav';
 import {
   Sidebar,
@@ -19,7 +20,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: Root,
@@ -29,9 +29,12 @@ function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
   const section = NAV.find((item) => item.active(path))?.label;
+  const router = useRouter();
 
   return (
-    <TooltipProvider>
+    // React Aria's links follow a link pressed from the keyboard with a click of their own, which never reaches the router's `onClick`
+    // (`createLink`): without this, Enter on a place in the menu loads the whole page again.
+    <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       <SidebarProvider>
         <AppSidebar path={path} />
         <SidebarInset className="min-w-0">
@@ -51,9 +54,12 @@ function Root() {
       </SidebarProvider>
       <ReactQueryDevtools buttonPosition="bottom-left" />
       <TanStackRouterDevtools position="bottom-right" />
-    </TooltipProvider>
+    </AriaRouterProvider>
   );
 }
+
+/** A place in the menu: the sidebar's button, which is React Aria's link once it has an `href`, given the router's typed `to` and its click. */
+const NavLink = createLink(SidebarMenuButton);
 
 function AppSidebar({ path }: { path: string }) {
   const { isMobile, setOpenMobile } = useSidebar();
@@ -67,14 +73,12 @@ function AppSidebar({ path }: { path: string }) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="hkb">
-              <Link to="/" onClick={picked}>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-foreground text-sidebar">
-                  <Workflow className="size-4" />
-                </span>
-                <span className="font-semibold tracking-tight">hkb</span>
-              </Link>
-            </SidebarMenuButton>
+            <NavLink to="/" size="lg" tooltip="hkb" onClick={picked}>
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-foreground text-sidebar">
+                <Workflow className="size-4" />
+              </span>
+              <span className="font-semibold tracking-tight">hkb</span>
+            </NavLink>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -84,12 +88,10 @@ function AppSidebar({ path }: { path: string }) {
             <SidebarMenu>
               {NAV.map((item) => (
                 <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton asChild isActive={item.active(path)} tooltip={item.label}>
-                    <Link to={item.to} onClick={picked}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
+                  <NavLink to={item.to} isActive={item.active(path)} tooltip={item.label} onClick={picked}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </NavLink>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

@@ -2040,7 +2040,9 @@ What was built:
   card on the workflow it names, and `--workflow` stays the command line's. The package's refusals keep its sentence, with a status for what is
   on disk once refused (`queueRefusalStatus`): 404 for no card, 422 for a card that does not read or names no workflow, and 409 for one queued
   already or named by a record. The answer is `{ name, file, was, queued, place, of }`: `was` is `queued`, `taken back`, or `not queued` for
-  a DELETE of a card not in the queue, which writes nothing.
+  a DELETE of a card not in the queue, which writes nothing. The card's file keeps its mtime across the write: the package renames a new file
+  over the card, and the mtime is the `filedAt` the Inbox page orders the cards by, so a card queued or taken back from the board would have
+  jumped to the top of the list with the queue's time as its own. From review, round 2.
 - **`GET /api/ceilings`** (`apps/api/src/app.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
   before any pass has written them. `cap` is what `runSlots` judges by: the last pass's cap, or before any pass, the api's own `WF_MAX_RUNS`,
   whose non-count is a 500 in `runCapOf`'s sentence. `inFlight` lists the runs counted against the cap, oldest first. `held` lists the runs
@@ -2054,7 +2056,7 @@ What was built:
 - **The Factory** (`components/QueueLane.tsx`, `FactoryCanvas.tsx`): queued cards wait at the floor's left edge as dashed ghosts, in the
   order the tick starts them (`queueOf`). Each shows its place (`1st`), how long it has been queued, its first line, its workflow and its
   repository (`wf up's repository` for a card that names none). A refused try is marked in amber, a failed one muted, with why in two lines
-  and in full on hover. A ghost opens the card's page. The header says the runs in flight against the cap, `3 of 4 runs in flight · 3
+  and in full on hover. A ghost opens the card's page. The header says the run slots taken of the cap, `3 of 4 run slots taken · 3
   queued`, or `no cap` (`capLine`), and the hover says what the cap counts and which runs it holds. The Factory reads the inbox and the cap
   every 5 s, as it reads the runs, and its loader prefetches the inbox, so the floor is fitted beside the lane; the floor is fitted again
   when the lane comes or goes. The lane is off while a step's inspector is open, since the two together left the floor too narrow to read;
@@ -2067,10 +2069,12 @@ What was decided, and why:
   would be a card with no edges, laid out by `placeRuns`, saved in the browser's arrangement, fitted, drawn on the minimap, and counted by the
   e2e as a node. In a lane it touches none of that. The cards' ids, the diamond's edges and the switch are what they were, and the queue stays
   in view however the floor is panned. The cost is width: on a wide screen the lane takes 16rem from the floor.
-- **The header's two counts are two things.** `4 in flight` is the floor's (`inFlight` in lib/factory.ts: a run that moves, or `assess` has
-  running). `3 of 4 runs in flight` is the cap's (`slotNeed`). The diamond's bottom waits on a run: it is on the floor, and not in flight against
-  the cap, since it has filed nothing. They sit side by side with a rule between them, and the cap's hover says what it counts. Rewording the
-  floor's count, which the e2e holds, was not asked.
+- **The header's two counts are two things, and say so.** `4 in flight` is the floor's (`inFlight` in lib/factory.ts: a run that moves, or
+  `assess` has running). The cap's is `slotNeed`'s: the diamond's bottom waits on a run, so it is on the floor, and takes no run slot, since it
+  has filed nothing. The brief worded the cap's count `2 of 4 runs in flight`. Beside the floor's `4 in flight` with a cap of 4, round 2's review
+  found `3 of 4 runs in flight` read as a full floor with a slot free. It is now worded in the package's own word for what the cap holds,
+  `3 of 4 run slots taken`, as `wf ls` says `waiting for a run slot` and the lane `started in this order as run slots free`. The floor's
+  count, which the e2e holds, is as it was.
 - **`--off` is `DELETE` on the queue.** The mark is a thing the card has, taken away, as a drop is `DELETE` on the card. A body flag would
   have made a POST that sometimes writes and sometimes takes away.
 - **A route of its own for the cap, not a field on `GET /api/runs`.** The list is an array, compared whole by the api's tests. Its own
@@ -2081,9 +2085,10 @@ What was decided, and why:
 
 What was measured:
 
-- `apps/api/test/queue.test.ts`, 9 tests: the listing's `queued` and `tried` compared whole with `readInbox()`'s; a queue with its place, a
+- `apps/api/test/queue.test.ts`, 10 tests: the listing's `queued` and `tried` compared whole with `readInbox()`'s; a queue with its place, a
   second behind it, `{}` taken as no body, DELETE taking one back and the card behind moving up, and a DELETE of a card not queued writing
-  nothing. A queued card whose repository is gone is taken back. Refused, each compared with `queueInInbox`'s own sentence and nothing written:
+  nothing. A card filed an hour before another, queued and taken back, keeps its `filedAt` each time, and a refusal sets none. A queued card
+  whose repository is gone is taken back. Refused, each compared with `queueInInbox`'s own sentence and nothing written:
   no workflow and a card that does not read (422, for POST and for DELETE), not there and a name with `.md` (404), queued already and started
   (409). A name refused (a hidden one, and a slash or a backslash sent encoded, 400 for both verbs). A body with `workflow`, `{"off":true}`,
   `[]`, a string and not JSON (400). The guard on both writes: three content types and none (415), three sites and three hosts (403), then the
@@ -2094,7 +2099,8 @@ What was measured:
   cap, `WF_MAX_RUNS=two` is a 500 in `runCapOf`'s words, and it is not read once a pass has.
 - Each api guard broken on purpose and the file run again, 11 breaks, each failing 1 to 4 tests: the queue unguarded; the name not refused in
   the route; the body not read; every refusal 422; a conflict 422; DELETE queueing; the api's environment over the pass; reading with no cap;
-  a run wanting a slot counted in flight; a parent never shipped read as shipped; views read per task.
+  a run wanting a slot counted in flight; a parent never shipped read as shipped; views read per task. From round 2, the mtime not set back
+  fails 1.
 - `apps/web/test/inbox.test.ts`, 7 new tests: `ordinal` through 113th; `queuedWord`; `queueOf` in place order, a started card out; `queueable`
   offered, and refused for no workflow, queued, started, and a card that does not read; `triedLine` refused with and without a repo, a why
   said once, and failed; `capLine` with and without a queue, `no cap`, and a count with no cap; `queueCard`'s POST and DELETE, the api's
@@ -2104,14 +2110,17 @@ What was measured:
     nobody has, and its refused try is written as the tick writes one. `tick.json` gets a cap of 4;
   - the `factory` page draws three ghosts in queue order, each with its place, first line, workflow and repository, linked to
     `/inbox/<name>`. The refused one says why in the package's words, and the others mark no try. No ghost is a node, every ghost is left of
-    the floor, and the header reads `3 of 4 runs in flight · 3 queued`. Every earlier expectation of the page held: node ids, the four edges,
+    the floor, and the header reads `3 of 4 run slots taken · 3 queued`. Every earlier expectation of the page held: node ids, the four edges,
     the switch, the layout. The lane is off while a step's inspector is open, the header still counting the queue, and back once it closes;
   - the `inbox` page lists six cards newest first. Each queued card shows its place and when it was queued, and offers Unqueue and not Queue.
     The refused card says why and that it stays queued. `planned` and `rich` offer Queue, `bare` does not, and the heading counts
-    `· 3 queued`. The card filed from the box is queued from its button, 4th, written with `queued:` last, and photographed
-    (`inbox-queued`). It is then taken off the queue with Unqueue, written as it was filed, and removed as before;
-  - in a page of its own, a Queue refused because the card was queued behind the page's back: a 409 with the package's sentence verbatim,
-    the card read again as `queued · 4th` offering Unqueue, and the sentence kept on it (`inbox-queue-refused`). That 409 and its console
+    `· 3 queued`. The card filed from the box is queued from its button, 4th, written with `queued:` last, then taken off the queue with
+    Unqueue, written as it was filed, and removed as before. From round 2: `planned`, listed third, is queued from its button and
+    photographed (`inbox-queued`), then taken off the queue, and each time the list's order, the card's filing time as shown, and its
+    file's mtime are what they were before, and the card is written back as it was;
+  - in a page of its own, a Queue refused because the card was queued behind the page's back, from another tab through the api: a 409 with
+    the package's sentence verbatim, the card read again as `queued · 4th` offering Unqueue, listed where it was, and the sentence kept on it
+    (`inbox-queue-refused`). Until round 2 the e2e queued it by writing the file by hand, which moved its mtime and the card to the top. That 409 and its console
     line are all its watch sees. The card is written back, dated as it was;
   - the pictures (`factory`, `factory-diamond`, `inbox`, `inbox-queued`, `inbox-queue-refused`, each in both themes) were read, with the
     `look` skill. They showed the diamond's last card cut at the floor's right edge, because the lane arrived after the floor was fitted;
@@ -2122,6 +2131,12 @@ What was measured:
   agent-workflows 490 (489 passed, 1 skipped), api 175 and web 210. `npm run e2e` ran four times on this branch. Three passed in both themes.
   One failed on the `say` page in the light theme, which this work does not touch: the watch saw `GET …/steps/draft/transcript/stream?after=…
   — net::ERR_ABORTED`, a request of the session stream's aborted. It passed on the run straight after.
+- In round 2, the same failure again, two runs in five, so not left as a flake. The cause was on main: the api writes a stream's `settled`
+  and ends its response, and `follow` (`apps/web/src/lib/following.ts`) closed the EventSource the moment that event arrived. When the end of the
+  response had not arrived yet, the browser aborted a request answered in full, and the watch counted it. `follow` now closes such a stream
+  once the api has ended it (the `error` the EventSource fires before it would reconnect), or after `END_GRACE_MS`, 2 s; the page stops
+  following at once as before. `apps/web/test/following.test.ts` holds it: not closed on `settled` or on a read that will not work again, closed
+  when the response ends, and after the grace with none, the grace cleared by either and by the page stopping. Closing at once again fails it.
 
 What it leaves:
 
@@ -2138,6 +2153,9 @@ What it leaves:
   with `wf inbox queue <name> --workflow <w>`.
 - **A card's page says nothing of its place or its tries.** It shows `queued:` as the key's value alone.
 - **A ghost cuts a refused try's why to two lines.** It is whole on hover and on the Inbox page.
+- **`wf inbox queue` at the command line still moves a card to the top of the Inbox page.** `queueInInbox` writes the card through a file
+  renamed over it, which gives it a new mtime, and the page orders cards by mtime. The api sets the mtime back after its own write; the package
+  could keep it in `queueInInbox` itself, which would cover both, and the api's `utimesSync` could then go.
 ## Shipped: markdown on the board, and a card's page with its keys explained
 
 The board showed every piece of prose as preformatted text: a run's brief, a step's body, a closeout's summary and needs, each reply, a

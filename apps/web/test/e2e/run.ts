@@ -189,7 +189,7 @@ const PAGES: PageSpec[] = [
 
       // The queue, at the floor's left edge: a ghost per queued card, in the order the tick starts them, each saying its place, first line,
       // workflow and repository, and linked to its card's page — the refused one marked with why — and none of them a node on the floor. Over
-      // the floor, the runs in flight against the cap the daemon's last pass ran with, and how many are queued.
+      // the floor, the run slots taken of the cap the daemon's last pass ran with, and how many are queued.
       const lane = page.locator('aside[aria-label="Queued cards"]');
       const ghosts = lane.locator('a[data-ghost]');
       await expectCount(ghosts, QUEUED.length, `a ghost per queued card (${QUEUED.map((c) => c.name).join(', ')})`);
@@ -218,8 +218,8 @@ const PAGES: PageSpec[] = [
       await expectLeftOf(ghosts, floor, "the ghosts wait at the floor's left edge");
       await expectTexts(
         page.locator('[data-cap]'),
-        [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} runs in flight · ${QUEUED.length} queued`],
-        `the header says the runs in flight against the cap the daemon last ran with (WF_MAX_RUNS=${QUEUE.cap}), and how many are queued`,
+        [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued`],
+        `the header says the run slots taken of the cap the daemon last ran with (WF_MAX_RUNS=${QUEUE.cap}), and how many are queued — in slots, not beside the floor's 4 in flight as a second count of runs in flight`,
       );
       const { card, steps, run, step } = onTheFloor(page);
       const beside = page.locator(`.react-flow__node[data-id="${NEIGHBOUR.id}"]`);
@@ -394,7 +394,7 @@ const PAGES: PageSpec[] = [
       await expectVisible(inspector, 'the step inspector opens on a click on review');
       // Beside the inspector, the queue's lane gives the floor its width back; the header still counts the queue.
       await expectCount(page.locator('aside[aria-label="Queued cards"]'), 0, "the queue's lane is off while a step's inspector is open beside the floor");
-      await expectTexts(page.locator('[data-cap]'), [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} runs in flight · ${QUEUED.length} queued`], 'and the header still counts the queue');
+      await expectTexts(page.locator('[data-cap]'), [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} run slots taken · ${QUEUED.length} queued`], 'and the header still counts the queue');
       await expectVisible(inspector.getByText(FAKE.title), 'the inspector names the run the step is in');
       // The floor narrows for the inspector and brings the run back into view; judged once it has.
       await settled(page);
@@ -1519,8 +1519,6 @@ const PAGES: PageSpec[] = [
         }
         await expectTexts(fresh.locator('[data-queued]'), [`queued · ${PLACES_SAID[QUEUED.length]}`], `the card says its place once queued (queued · ${PLACES_SAID[QUEUED.length]})`);
         await expectCount(fresh.getByRole('button', { name: 'Queue', exact: true }), 0, 'and offers Queue no more');
-        await settled(page);
-        await page.screenshot({ path: path.join(OUT, `inbox-queued-${await themeOf(page)}.png`), fullPage: true });
         const [unqueued] = await Promise.all([
           page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${name}/queue`, { timeout: WAIT_MS }),
           fresh.getByRole('button', { name: 'Unqueue' }).click(),
@@ -1538,6 +1536,49 @@ const PAGES: PageSpec[] = [
         if (fs.existsSync(written)) throw new Refused(`and out of the inbox — ${written} is still there`);
       } finally {
         fs.rmSync(written, { force: true });
+      }
+
+      // Queued and taken off the queue from its buttons, a card that is not the newest: it keeps its place in the list and the time it was
+      // filed, and its file its mtime — a queue is no edit of the idea — and it is written back as it was. Put back all the same.
+      {
+        const file = path.join(inbox, `${planned.name}.md`);
+        const [text, mtime] = [fs.readFileSync(file, 'utf8'), fs.statSync(file).mtimeMs];
+        const item = cardIn(page, planned.name);
+        const filedTime = item.locator('time[title="When its file was last written"]');
+        const shownAs = async () => ({ order: await order(page), filedAt: await filedTime.getAttribute('datetime'), shown: await filedTime.textContent() });
+        const before = await shownAs();
+        if (before.order.indexOf(planned.name) === 0) throw new Refused(`${planned.name} is not the newest card, so a move would show — it is listed first`);
+        const unmoved = async (when: string) => {
+          const now = await shownAs();
+          if (JSON.stringify(now) !== JSON.stringify(before)) {
+            throw new Refused(`${when}, ${planned.name} keeps its place and its filing time — it was ${JSON.stringify(before)}, and is ${JSON.stringify(now)}`);
+          }
+          if (fs.statSync(file).mtimeMs !== mtime) throw new Refused(`${when}, ${file} keeps its mtime — it was ${new Date(mtime).toISOString()}, and is ${fs.statSync(file).mtime.toISOString()}`);
+        };
+        try {
+          const [queued] = await Promise.all([
+            page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/inbox/${planned.name}/queue`, { timeout: WAIT_MS }),
+            item.getByRole('button', { name: 'Queue', exact: true }).click(),
+          ]);
+          if (queued.status() !== 200) throw new Refused(`the api queues ${planned.name} — it answered ${queued.status()}: ${await queued.text()}`);
+          await expectTexts(item.locator('[data-queued]'), [`queued · ${PLACES_SAID[QUEUED.length]}`], `${planned.name} says its place once queued (queued · ${PLACES_SAID[QUEUED.length]})`);
+          await page.waitForLoadState('networkidle');
+          await unmoved('queued');
+          await settled(page);
+          await page.screenshot({ path: path.join(OUT, `inbox-queued-${await themeOf(page)}.png`), fullPage: true });
+          const [unqueued] = await Promise.all([
+            page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/inbox/${planned.name}/queue`, { timeout: WAIT_MS }),
+            item.getByRole('button', { name: 'Unqueue' }).click(),
+          ]);
+          if (unqueued.status() !== 200) throw new Refused(`the api takes ${planned.name} off the queue — it answered ${unqueued.status()}: ${await unqueued.text()}`);
+          await expectCount(item.locator('[data-queued]'), 0, `Unqueue takes ${planned.name} off the queue`);
+          await page.waitForLoadState('networkidle');
+          await unmoved('taken off the queue');
+          if (fs.readFileSync(file, 'utf8') !== text) throw new Refused(`${planned.name} is written back as it was — ${file} holds ${JSON.stringify(fs.readFileSync(file, 'utf8'))}`);
+        } finally {
+          fs.writeFileSync(file, text);
+          fs.utimesSync(file, new Date(mtime), new Date(mtime));
+        }
       }
 
       // A card's start form: the workflow preset from the card, the brief prefilled from its body, and the runs to wait on.
@@ -1912,9 +1953,10 @@ const PAGES: PageSpec[] = [
         fs.rmSync(startedRecord, { force: true });
       }
 
-      // Queue refused with a 409, in a page of its own whose one refusal is the point: the card queued behind the page's back — wf inbox queue in
-      // a terminal — after the page listed it. The inbox read again says it is queued, in its place, and offers Unqueue; the package's sentence
-      // stays on the card, word for word. Taken back: the card written, and dated, as it was.
+      // Queue refused with a 409, in a page of its own whose one refusal is the point: the card queued behind the page's back — from another tab
+      // of the board, through the api, which this page's watch does not see — after the page listed it. The inbox read again says it is queued,
+      // offers Unqueue, and lists it where it was; the package's sentence stays on the card, word for word. Taken back: the card written, and
+      // dated, as it was.
       const plannedText = fs.readFileSync(cardFile, 'utf8');
       const plannedTime = fs.statSync(cardFile).mtime;
       const requeued = await page.context().newPage();
@@ -1924,8 +1966,11 @@ const PAGES: PageSpec[] = [
         const item = cardIn(requeued, planned.name);
         const queueIt = item.getByRole('button', { name: 'Queue', exact: true });
         await expectVisible(queueIt, `${planned.name} offers Queue`);
-        const behind = new Date().toISOString();
-        fs.writeFileSync(cardFile, queuedCardText(planned, behind, checkout));
+        const listedBefore = await order(requeued);
+        const elsewhere = await fetch(new URL(`/api/inbox/${planned.name}/queue`, requeued.url()), { method: 'POST', headers: { 'content-type': 'application/json' } });
+        const { queued: behind } = (await elsewhere.json()) as { queued?: string };
+        if (elsewhere.status !== 200 || !behind) throw new Refused(`another tab queues ${planned.name} through the api — it answered ${elsewhere.status}`);
+        if (fs.readFileSync(cardFile, 'utf8') !== queuedCardText(planned, behind, checkout)) throw new Refused(`the card is queued behind the page's back — ${cardFile} holds ${JSON.stringify(fs.readFileSync(cardFile, 'utf8'))}`);
         const reread = rereadOf(requeued);
         const [answered] = await Promise.all([
           requeued.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/inbox/${planned.name}/queue`, { timeout: WAIT_MS }),
@@ -1941,6 +1986,9 @@ const PAGES: PageSpec[] = [
         await requeued.waitForLoadState('networkidle');
         await expectTexts(item.locator('[data-queued]'), [`queued · ${PLACES_SAID[place - 1]}`], `the card, read again, says it is queued, in its place (queued · ${PLACES_SAID[place - 1]})`);
         await expectVisible(item.getByRole('button', { name: 'Unqueue' }), 'and offers Unqueue in place of Queue');
+        if (JSON.stringify(await order(requeued)) !== JSON.stringify(listedBefore)) {
+          throw new Refused(`the card, queued elsewhere, is listed where it was — ${listedBefore.join(', ')} — and the list is ${(await order(requeued)).join(', ')}`);
+        }
         await expectVisible(item.locator('[data-refused="queue"]', { hasText: 'Not queued. The api refused it:' }), 'and the refusal stays, on the card');
         const shown = await item.locator('[data-refused] p.font-mono').textContent();
         if (shown !== error) throw new Refused(`the refusal on the card is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);

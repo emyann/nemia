@@ -634,6 +634,25 @@ test('a card beside the diamond keeps the grid, and one placed after it lands on
   assert.deepEqual(overlapping(at), []);
 });
 
+test('a card a person dropped between two rows holds both, so the card placed next is not drawn over its foot', () => {
+  // Dropped 45 short of the second row — where the e2e's floor had one, its own height leaving 27 of its cell — and a card coming onto
+  // the floor. The row it hangs into is not free: a card there would be drawn over the top of this one.
+  const dropped = new Map([['a', { x: 0, y: CELL_HEIGHT - 45 }]]);
+  const at = placeRuns(['a', 'b'], dropped, null);
+  assert.deepEqual(at.get('a'), { x: 0, y: CELL_HEIGHT - 45 }, 'a person put it there, and it stays');
+  assert.deepEqual(at.get('b'), { x: CELL_WIDTH, y: 0 }, 'and the next card goes beside it, not into the row it hangs into');
+  // A card the layering puts halfway down a row holds both rows too, as it always has.
+  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b'], new Map([['a', { x: 0, y: CELL_HEIGHT / 2 }]]), null)), {
+    a: { x: 0, y: CELL_HEIGHT / 2 },
+    b: { x: CELL_WIDTH, y: 0 },
+  });
+  // On the grid, a card holds its own row and no other: the floor fills row by row.
+  assert.deepEqual(Object.fromEntries(placeRuns(['a', 'b'], new Map([['a', { x: 0, y: CELL_HEIGHT }]]), null)), {
+    a: { x: 0, y: CELL_HEIGHT },
+    b: { x: 0, y: 0 },
+  });
+});
+
 test('a run that starts while the runs it waits on are on the floor goes right of the rightmost of them — past the grid, rather than left of one', () => {
   const onFloor = new Map([['a', { x: 0, y: 0 }], ['b', { x: CELL_WIDTH, y: 0 }], ['x', { x: 2 * CELL_WIDTH, y: 0 }]]);
   const at = placeRuns(['a', 'b', 'x', 'd'], onFloor, null, new Map(), new Map([['d', ['a', 'b']]]));

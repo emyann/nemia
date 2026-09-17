@@ -404,14 +404,19 @@ export function placeRuns(
 }
 
 /**
- * The cells a card at `point` is in, as `row:column`: from the cell nearest its corner, `span` across and down, on the grid or off it.
- * A card a quarter of a row or more from its nearest row is in the row it straddles too: the layering puts a card halfway down a row, level
- * with the middle of the two beside it, and a card placed beneath it must not land on its lower half.
+ * The cells a card at `point` is in, as `row:column`: `span` across, from the column nearest its corner, and down every row it reaches.
+ *
+ * A card between two rows is in both of them, since a card is drawn up to a cell tall (`CELL_HEIGHT`): the layering puts a card halfway
+ * down a row, level with the middle of the two beside it, and a person drags a card wherever they like. Rounding to the nearest row
+ * instead left the row a card hangs a little way into free, and the card placed there was drawn over its foot — the e2e's floor had a
+ * card 45 short of its row over the bottom of a card 27 short of a cell, and the two overlapped by the difference.
+ *
+ * Across it still rounds: cards are narrower than their cell by the gap between them, so two columns' cards never touch.
  */
 function cellsOf({ x, y }: Point, span: Span): string[] {
   const column = Math.round(x / CELL_WIDTH);
-  const top = Math.round(y / CELL_HEIGHT - 0.25);
-  const bottom = Math.round(y / CELL_HEIGHT + 0.25) + span.rows - 1;
+  const top = Math.floor(y / CELL_HEIGHT);
+  const bottom = Math.ceil(y / CELL_HEIGHT + span.rows) - 1;
   const cells: string[] = [];
   for (let r = top; r <= bottom; r++) {
     for (let c = column; c < column + span.columns; c++) cells.push(`${r}:${c}`);

@@ -1011,8 +1011,18 @@ two groups (`the-runs-page-should-sort-th-zdoe`, $6.05, `6886203`). The markdown
 `markdown-rendered-on-the-boa-699m` on the new `./workflows/dev-planned-build`: the plan compared four renderers with dated sources and
 stopped for approval; the operator chose react-markdown; two rounds after, $52.67 in all, **merged, `0dd210d`** — react-markdown with
 remark-gfm replacing streamdown, a card's page and a step's page with their keys explained, `npm install` run on main for the lockfile.
-Nothing in flight at 2026-09-17 02:00Z. Registered and not filed: the queue's board half (§3), the builder (§4), the gate (§6), React
-Aria (§7), and the engine's admission order, `priority` and Remote Control field. The Factory's
+On 2026-09-17 02:10Z the operator said to file everything that can run in parallel; eight runs went in, three lanes, the
+dependent ones `--after` the runs they need so each is cut from a main that has them and merges clean:
+- **now:** E10 `three-small-items-in-agent-e-0uqf` (engine: admission in filing order, `priority`, `remoteControl`; `dev`); W9
+  `a-gate-a-step-s-handoff-that-18iy` (agent-workflows: the gate, features.md §6; `dev`); B12 `the-queue-on-the-board-queue-ppu1`
+  (apps: queued cards as Factory ghosts, Queue from the Inbox page, the ceilings on the board; `dev-build`);
+- **after E10 and W9:** W10 `two-small-items-in-agent-wor-5l9e` (agent-workflows: `priority: 1` on every filing after a run's first,
+  `remote:` on a step; `dev`); **after W9:** B13 `the-gate-on-the-board-approv-4t7s` (apps: Approve and Send back on the run page, the
+  card's need; `dev-build`); **after W10:** W11 `the-workflow-builder-s-packa-x2ha` (agent-workflows: `renderStep`, `writeWorkflow`;
+  `dev`); **after W11 and B13:** B14 `the-workflow-builder-on-the-4ifo` (apps: the builder on the Workflows page, writing the store's
+  folder only; `dev-build`); **after B14:** B15 `the-web-app-s-components-on-3xq9` (apps: React Aria as the base, §7, the plan waiting
+  for approval; `dev-planned-build`).
+Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The Factory's
 ghosts for queued cards wait for W8, in its second round. Left: item 20 (settings, by hand). Items 27, 28, 30 and 31 are done.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 

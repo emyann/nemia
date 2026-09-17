@@ -3482,6 +3482,18 @@ test("REFUSED while the work goes round again: an ending's gate does not hold on
   const handed = assess(looping, r, DONE, said(false), asked, () => undefined, [], [], () => false, () => undefined, AHEAD);
   assert.deepEqual([handed.round, handed.toDecide?.kind], [[], 'approve']);
   assert.equal(stepStatus(SHIP, r, DONE, said(false), asked, looping), 'awaiting approval');
+
+  // REFUSED there, and not with "What waits on it has been filed": nothing has been, and what the run waits for is a person's word.
+  assert.deepEqual(roundAsk(looping, r, 'review', DONE, said(false), asked), {
+    refusal: 'review signed off without asking for another round (`again: false`), so its loop is over — and nothing waiting on it has been filed: the run is at ship\'s gate, '
+      + 'where nothing of ship has run and your approval is what files it. Approve it: wf approve r-1 ship — or send the work back: wf retry r-1 review --message "<objection>".',
+  });
+  // A loop whose follower is a step like any other says what it always said: what waits on it HAS been filed.
+  const plain: Workflow[] = [looping[0]!, looping[1]!, step('docs', ['review'])];
+  const withDocs = run({}, { steps: { ...r.steps, docs: { taskId: 't3', workspace: '/wt', branch: 'wf/r-1/implement' } } });
+  assert.deepEqual(roundAsk(plain, withDocs, 'review', DONE, said(false), asked), {
+    refusal: 'review signed off without asking for another round (`again: false`), so its loop is over and there is nothing to go round again. What waits on it has been filed: wf ls r-1.',
+  });
 });
 
 test("REFUSED while a send-back is being filed: an ending held at its gate reads as waiting once a try of the work is due, so no merge is offered in the moment somebody objected", () => {

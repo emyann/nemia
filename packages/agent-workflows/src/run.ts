@@ -2002,6 +2002,15 @@ export function roundAsk(
     return no(`the run goes round again itself: ${looping.name} asked for another round, and \`rounds: ${capOf(looping)}\` has ${capOf(looping) - now} left, so the next tick files round ${now + 1}. Wait for it: wf ls ${run.id}.`);
   }
   if (satisfiesAfter(status)) {
+    // What waits on it may be an ending held at its gate before it is filed (`waitsAtGate`): nothing has been filed, and saying so would
+    // send a person to `wf ls` to read a run that is waiting for them. The two things there are to say to it are the approval that files
+    // it and an objection to the work it would act on (`sendBackTo`), which is this loop.
+    const ending = steps.find((s) => s.after.includes(looping.name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, () => undefined));
+    if (ending) {
+      const back = sendBackTo(ending, run).map((n) => `wf retry ${run.id} ${n} --message "<objection>"`).join(' or ');
+      return no(`${looping.name} signed off without asking for another round (\`again: false\`), so its loop is over — and nothing waiting on it has been filed: the run is at ${ending.name}'s gate, `
+        + `where nothing of ${ending.name} has run and your approval is what files it. Approve it: wf approve ${run.id} ${ending.name}${back ? ` — or send the work back: ${back}` : ''}.`);
+    }
     return no(`${looping.name} signed off without asking for another round (\`again: false\`), so its loop is over and there is nothing to go round again. What waits on it has been filed: wf ls ${run.id}.`);
   }
   return no(`round ${now} of ${looping.name}'s loop is still running, so there is nothing to go round again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`);

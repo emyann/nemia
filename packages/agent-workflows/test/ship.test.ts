@@ -19,7 +19,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, approve, decide, isShipped, list, readRun, retry, start } = await import('../src/runner.ts');
+const { advance, approve, decide, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -72,6 +72,21 @@ const board = () => {
   } as unknown as Engine;
   const settle = (id: string, phase: TaskPhase, closeout?: unknown) => Object.assign(tasks.get(id)!, { phase, closeout });
   return { e, tasks, filings, settle };
+};
+
+/**
+ * `implement ⇄ review → ship`, as the dev folders are, with the shipped `workflows/dev/ship.md` as its ending, whose `after: review` is
+ * what this folder has: what a person types `wf round` at once the loop has handed on.
+ */
+const loopingFolder = (): string => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify({
+    type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false,
+  }, null, 2));
+  fs.writeFileSync(path.join(dir, 'ship.md'), fs.readFileSync(path.join(REPO_ROOT, 'workflows', 'dev', 'ship.md'), 'utf8'));
+  return dir;
 };
 
 /** A folder of one step, for a run started `--after` another. */
@@ -283,6 +298,26 @@ test("REFUSED at shipped defaults: a try of the ending step itself, which has no
     return true;
   });
   assert.equal(readRun(id).steps.ship!.taskId, null, 'and nothing was written');
+});
+
+test("REFUSED at shipped defaults: `wf round` at an ending's gate says the run is at that gate — not that what waits on the loop has been filed", async () => {
+  const run = start({ brief: 'add sub', repo: aRepo(), workflowDir: loopingFolder() });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: false });
+  const pass = await advance(e, readRun(run.id));
+  assert.deepEqual([pass.looped, pass.filed], [[], []], 'the loop has handed on, and the ending waits at its gate');
+  assert.equal((await list(e, readRun(run.id))).steps.find((s) => s.name === 'ship')!.status, 'awaiting approval');
+
+  await assert.rejects(round(e, run.id, 'review'), (err: Error & { exitCode?: number }) => {
+    assert.equal(err.exitCode, 2);
+    assert.equal(err.message, "review signed off without asking for another round (`again: false`), so its loop is over — and nothing waiting on it has been filed: the run is at ship's gate, "
+      + `where nothing of ship has run and your approval is what files it. Approve it: wf approve ${run.id} ship — or send the work back: wf retry ${run.id} review --message "<objection>".`);
+    return true;
+  });
+  assert.ok(!fs.existsSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'round-review-2')), 'and no ask was written');
 });
 
 test("a check that refuses leaves the checkout clean: the abort the ending's prose names takes the trial merge back, and the run says what happened", async () => {

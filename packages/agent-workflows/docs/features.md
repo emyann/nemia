@@ -2826,6 +2826,10 @@ What was built, four commits:
   answered `ship is awaiting approval, and there is nothing to try again` — the end of the road, in the one place a person who typed the
   step's own name would look. It now says nothing of it has run, so there is no try of it to replace, and names the two things there are:
   `wf approve <run> ship`, and the send-back `sendBackTo` computes. Found by the review, round 4.
+- **`wf round <run> review` at an ending's gate no longer says "What waits on it has been filed"** (`roundAsk`): nothing has been — the
+  ending is held before it is filed, and a person's word is what files it. It says the run is at that gate and names the approval and the
+  send-back (`sendBackTo`), as the gate's other refusals do; a loop whose follower is a step like any other says what it always said. Found
+  by the review, round 4.
 - **`--no-worktree` is refused on a folder whose last step merges** (`stepsToStart`), before a run is written: such a run works on the base
   branch itself, so there is no result branch for the ending to merge — it would be told the work is on the branch it is standing on, merge
   a branch into itself, and pay for the folder's whole check to find nothing to commit. Found by the review, round 3.

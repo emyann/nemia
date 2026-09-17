@@ -27,7 +27,7 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { CELL_HEIGHT } from '../../src/lib/factory.ts';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, GATED, HELD, INBOX, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedQueue, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, ENDING, FAKE, GATED, HELD, INBOX, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedQueue, seedWorkflows, SESSION, SHIPPED, UNMERGED, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -436,11 +436,42 @@ const PAGES: PageSpec[] = [
       // Its followers read `waiting`, and will for ever; they do not keep it on the floor.
       await expectCount(card, 0, `a run whose check refused is finished, not in flight: no card on the floor by default (${FAKE.id})`);
       // So is the loop out of rounds: it waits on a person, and nothing of it moves.
-      // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. Waiting on you: FAKE, LOOPING, COSTLY, GATED, and the run waiting on one called off.
-      await expectVisible(page.getByText('4 in flight · 8 finished · 5 waiting on you'), 'the Factory counts the runs in flight, the finished, and those waiting on you');
+      // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. To decide: ENDING and UNMERGED. Waiting on you: FAKE,
+      // LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off.
+      await expectVisible(
+        page.getByText('4 in flight · 11 finished · 2 to decide · 6 waiting on you'),
+        'the Factory counts the runs in flight, the finished, those nobody has decided, and those waiting on you',
+      );
       // A run at its gate is finished too: nothing of it moves until a person approves its step.
       await expectCount(cardOf(page, GATED.id), 0, `a run waiting at its gate is not in flight: no card on the floor by default (${GATED.id})`);
+
+      // A run nobody has decided is finished too — and its card is on the floor all the same, until it is decided: at its ending's gate,
+      // in the folder's own words with the command that approves it; or with a branch nobody merged, which git ends.
+      const ending = cardOf(page, ENDING.id);
+      await expectVisible(ending, `a run at its ending's gate keeps its card on the floor with no Show finished (${ENDING.id})`);
+      await expectVisible(
+        ending.locator('[data-to-decide="approve"]', { hasText: `to decide: ${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}` }),
+        `its card says what its ending would do and the command that approves it, in wf ls's words`,
+      );
+      await expectVisible(ending.getByText('to decide', { exact: true }), 'and is marked to decide');
+      await expectVisible(ending.locator(`[data-state="awaiting-approval"]`, { hasText: 'awaiting approval' }), `and shows ${ENDING.ending} as awaiting approval`);
+      await expectCount(
+        ending.locator(`[data-need="approve"][data-step="${ENDING.ending}"]`),
+        0,
+        'and does not ask for the same step twice: the to-decide line names it and the command, as wf ls prints it',
+      );
+      const unmerged = cardOf(page, UNMERGED.id);
+      await expectVisible(unmerged, `a finished run whose branch nobody merged keeps its card on the floor too (${UNMERGED.id})`);
+      await expectVisible(unmerged.locator('[data-to-decide="git"]', { hasText: `to decide: ${UNMERGED.said}` }), 'its card says the branch is ahead, and the command that reads it');
+      await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
+      // Decided: its ending merged the branch, so there is nothing to decide and its card is off the floor with the finished.
+      await expectCount(cardOf(page, SHIPPED.id), 0, `a run whose ending merged it is decided: no card on the floor by default (${SHIPPED.id})`);
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `factory-to-decide-${await themeOf(page)}.png`), fullPage: true });
+
       await showFinished(page);
+      await expectVisible(cardOf(page, SHIPPED.id), `the shipped run's card, once finished runs are shown (${SHIPPED.id})`);
+      await expectCount(cardOf(page, SHIPPED.id).locator('[data-to-decide]'), 0, 'and it says nothing to decide');
       // The run called off, and the one that waits on it: for ever, so on you, and its card names the run it waits on and why.
       await expectVisible(
         cardOf(page, orphan.id).locator('[data-waiting="on-you"]', { hasText: DIAMOND.words.orphan }),
@@ -648,29 +679,58 @@ const PAGES: PageSpec[] = [
       await sidebar(page);
       // The runs in flight on top, then the rest, each newest first; in flight as the Factory counts them, which the api's id order is not.
       const rows = page.locator('li[data-in-flight]');
-      await expectCount(rows, 12, 'the runs list has a row for each of the twelve runs the Factory counts');
+      await expectCount(rows, 15, 'the runs list has a row for each of the fifteen runs the Factory counts');
       // Under a heading each, which says where the runs in flight end: the first finished row is newer than the last in flight.
       const flying = page.locator('section[data-group="in-flight"]');
+      const deciding = page.locator('section[data-group="to-decide"]');
       const finished = page.locator('section[data-group="finished"]');
       await expectCount(flying.locator('li[data-in-flight="true"]'), 4, 'the four runs in flight, as the Factory counts them, are under In flight');
       await expectCount(flying.locator('li[data-in-flight="false"]'), 0, 'and no finished run is');
-      await expectCount(finished.locator('li[data-in-flight="false"]'), 8, 'the eight finished runs are under Finished');
+      await expectCount(finished.locator('li[data-in-flight="false"]'), 9, 'the nine finished runs nobody has to decide are under Finished');
       await expectCount(finished.locator('li[data-in-flight="true"]'), 0, 'and no run in flight is');
       await expectVisible(flying.getByRole('heading', { name: /^In flight 4 something of each still moves, newest first$/ }), 'In flight is headed with its count and its order');
       await expectVisible(
-        finished.getByRole('heading', { name: /^Finished 8 nothing of these moves any more, newest first · 5 waiting on you$/ }),
+        finished.getByRole('heading', { name: /^Finished 9 nothing of these moves any more, newest first · 5 waiting on you$/ }),
         'Finished is headed with its count, its order, and how many of them wait on you, as the Factory counts them',
       );
       await expectBeneath(finished, flying, 'the finished runs are listed beneath the runs in flight');
+
+      // Between the two, the runs nobody has decided: a group of its own, newest first, with its count and how many wait on you.
+      await expectCount(deciding.locator('li[data-in-flight="false"]'), 2, 'the two runs nobody has decided are under To decide');
+      await expectVisible(
+        deciding.getByRole('heading', { name: /^To decide 2 each is at its result, and nobody has decided it, newest first · 1 waiting on you$/ }),
+        'To decide is headed with its count, its order, and the one of them a step waits on you for',
+      );
+      await expectBeneath(deciding, flying, 'the runs to decide are listed beneath the runs in flight');
+      await expectBeneath(finished, deciding, 'and the finished beneath those');
+      // Each row says what there is to decide, in `wf ls`'s words: the ending's gate with the command that approves it, and the branch nobody took.
+      await expectVisible(
+        deciding.locator(`li a[href="/runs/${ENDING.id}"] [data-to-decide="approve"]`, { hasText: `to decide: ${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}` }),
+        `the row of a run at its ending's gate says what it would do and the command that approves it`,
+      );
+      await expectCount(
+        deciding.locator(`li a[href="/runs/${ENDING.id}"] [data-waiting-on-you]`),
+        0,
+        'and does not name the same step above it: the decision is the whole of what it waits on you for',
+      );
+      await expectVisible(
+        deciding.locator(`li a[href="/runs/${UNMERGED.id}"] [data-to-decide="git"]`, { hasText: `to decide: ${UNMERGED.said}` }),
+        'the row of a finished run whose branch nobody merged says so, and names wf decide',
+      );
+      await expectCount(finished.locator(`li a[href="/runs/${SHIPPED.id}"]`), 1, `the run whose ending merged it is among the finished (${SHIPPED.id})`);
+      await expectCount(finished.locator('[data-to-decide]'), 0, 'and no finished row has anything to decide');
       const listed = await rows.evaluateAll((lis) => lis.map((li) => ({
         id: li.querySelector('a[href^="/runs/"]')?.getAttribute('href')?.slice('/runs/'.length) ?? '',
         inFlight: li.getAttribute('data-in-flight') === 'true',
+        group: li.closest('section[data-group]')?.getAttribute('data-group') ?? '',
         at: li.querySelector('time')?.getAttribute('datetime') ?? '',
       })));
-      const ordered = [...listed].sort((a, b) => Number(b.inFlight) - Number(a.inFlight) || b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
-      if (listed.some((r, i) => r.id !== ordered[i]!.id)) {
-        const said = (rs: typeof listed) => rs.map((r) => `${r.id} (${r.inFlight ? 'in flight' : 'not'}, ${r.at})`).join('\n    ');
-        throw new Refused(`the runs list has the runs in flight first, then the rest, each newest first — it lists:\n    ${said(listed)}\n  and not:\n    ${said(ordered)}`);
+      // The three groups in their order, and each newest first: in flight, then what nobody has decided, then the rest.
+      const GROUPS = ['in-flight', 'to-decide', 'finished'];
+      const ordered = [...listed].sort((a, b) => GROUPS.indexOf(a.group) - GROUPS.indexOf(b.group) || b.at.localeCompare(a.at) || a.id.localeCompare(b.id));
+      if (listed.some((r, i) => r.id !== ordered[i]!.id) || listed.some((r) => r.inFlight !== (r.group === 'in-flight'))) {
+        const said = (rs: typeof listed) => rs.map((r) => `${r.id} (${r.group}, ${r.inFlight ? 'in flight' : 'not'}, ${r.at})`).join('\n    ');
+        throw new Refused(`the runs list has the runs in flight first, then those to decide, then the rest, each newest first — it lists:\n    ${said(listed)}\n  and not:\n    ${said(ordered)}`);
       }
       const row = page.locator(`li a[href="/runs/${FAKE.id}"]`);
       await expectVisible(row, `the runs list has a row for ${FAKE.id}`);
@@ -717,7 +777,7 @@ const PAGES: PageSpec[] = [
       await enterOnPlace(page, 'Inbox', '/inbox');
       await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }), 'reached with Enter, the Inbox is lit in the menu');
       await enterOnPlace(page, 'Runs', '/runs');
-      await expectCount(rows, 12, 'back on Runs with Enter, the list has its twelve rows again');
+      await expectCount(rows, 15, 'back on Runs with Enter, the list has its fifteen rows again');
     },
   },
   {
@@ -1215,6 +1275,86 @@ const PAGES: PageSpec[] = [
 
       fs.rmSync(asks, { recursive: true, force: true });
       await expectVisible(approveOf(page), `with the send-back taken back, ${gated} waits at its gate again, and the page ends as it began`);
+      await settled(page);
+    },
+  },
+  {
+    // A run at its ending's gate: what there is to decide, said above the page, and what the ending would act on beside its gate.
+    name: 'decide',
+    route: `/runs/${ENDING.id}`,
+    expect: async (page) => {
+      await sidebar(page);
+      const { id, ending, back } = ENDING;
+      const asks = path.join(store!, 'runs', `${id}.asks`);
+      const said = `${ENDING.says} — wf approve ${id} ${ending}`;
+
+      // Above the page, as `wf ls` prints `→ to decide:` above `→ waiting on you`: the ending's own words, linked to its section.
+      const banner = page.locator('section[aria-label="To decide"]');
+      await expectVisible(banner.locator('[data-approve]', { hasText: said }), `the banner says ${said}, linked to the step's section`);
+      await expectCount(banner.locator(`a[data-approve="${ending}"][href="#step-${ending}"]`), 1, `to ${ending}'s section, where Approve is`);
+      await expectCount(page.locator('section[aria-label="Waiting on you"]'), 0, 'and the banner below says nothing: the decision is the whole of what it waits on you for');
+
+      // On the graph: a human gate, since nothing after it is filed until a person's word — and nobody runs it meanwhile.
+      const node = page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${ending}"]`);
+      await expectVisible(node.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }), `${ending}'s chip reads awaiting approval`);
+      await expectVisible(node.locator('[data-need="approve"]', { hasText: `approve ${ending}` }), `${ending} is a human gate on the graph`);
+
+      // Its section: what it would act on — the branch's standing and git's own diff stat, and the work's closeout with the file it named
+      // — beside the gate. It has handed nothing on: its approval is what runs it.
+      const section = page.locator(`article > section#step-${ending}`);
+      const acts = section.locator(`section[aria-label="What ${ending} would act on"]`);
+      const gate = section.locator(`section[aria-label="The gate of ${ending}"]`);
+      await expectVisible(acts.locator('[data-standing="ahead"]', { hasText: ENDING.standing }), `the panel says where the branch stands (${ENDING.standing})`);
+      await expectVisible(acts.locator('[data-stat]', { hasText: ENDING.stat }), `and git's own diff stat of it (${ENDING.stat})`);
+      // What the work handed on, rendered as the markdown it is — scoped to the markdown, since the files beside it are a list too.
+      await expectRendered(acts.locator('[data-markdown]'), ENDING.review);
+      await expectVisible(acts.locator(`[aria-label="Artifacts of ${back}"] a`, { hasText: ENDING.artifact }), `and the file ${back} named (${ENDING.artifact})`);
+      await expectVisible(gate, `${ending}'s section has its gate`);
+      await expectLeftOf(acts, gate, 'the gate is beside what the ending would act on');
+      await expectVisible(
+        gate.getByText(`nothing of it runs until you approve it — your approval is what files it — or you send ${back} back.`),
+        'the gate says approving is what files it: an ending has handed nothing on',
+      );
+      const approve = gate.getByRole('button', { name: 'Approve', exact: true });
+      if (!(await approve.isEnabled())) throw new Refused('Approve is enabled with no words: an approval needs none');
+      // The send-back goes to the work, which is what the objection is about: `wf retry` of the step at this gate is refused.
+      const sendBack = gate.getByRole('form', { name: `Send ${back} back` });
+      await expectVisible(sendBack, `the send-back names ${back}, the step the package sends it to`);
+      await expectCount(gate.getByRole('form', { name: `Send ${ending} back` }), 0, `and never ${ending}, which has nothing of its own to object to`);
+
+      // The Decide section's commands are the gate's, and never `git merge` by hand: this folder's ending is what merges.
+      const decide = page.locator('section[aria-label="Decide"]');
+      await expectVisible(decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^wf approve ${id} ${ending}$`) }), 'the Decide section offers the approval to copy');
+      await expectVisible(decide.locator('[data-command="send back"] code', { hasText: `wf retry ${id} ${back} --message "<objection>"` }), 'and the send-back, to the work');
+      await expectCount(decide.locator('[data-command="ship it"], [data-command="drop it"]'), 0, 'and no git merge by hand: the ending step is what merges this branch');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `decide-awaiting-${await themeOf(page)}.png`), fullPage: true });
+
+      // Sent back: the ask is written for the work, as `wf retry --message` writes it, and nothing else. The gate un-holds until it signs
+      // off again, so the banner and the gate go with it.
+      const retried = (r: Response) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${back}/retry`;
+      await sendBack.getByRole('textbox').fill(ENDING.objection);
+      const [sent] = await Promise.all([page.waitForResponse(retried, { timeout: WAIT_MS }), sendBack.getByRole('button', { name: 'Send back', exact: true }).click()]);
+      if (sent.status() !== 202) throw new Refused(`the api takes the send-back to ${back} — it answered ${sent.status()}: ${await sent.text()}`);
+      const ask = path.join(asks, `retry-${back}-2`);
+      const asked = fs.existsSync(ask) ? JSON.parse(fs.readFileSync(ask, 'utf8')) : undefined;
+      if (asked?.step !== back || asked?.try !== 2 || asked?.mode !== 'nudge' || asked?.message !== ENDING.objection) {
+        throw new Refused(`the send-back is written as wf retry --message writes it, for ${back} — ${ask} holds ${JSON.stringify(asked)}`);
+      }
+      if (fs.readdirSync(asks).length !== 1) throw new Refused(`and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
+      const note = 'try 2 asked (--nudge, with your answer) — the next tick files it';
+      await expectVisible(page.locator(`article > section#step-${back} [data-note]`, { hasText: note }), `${back}'s section says what wf ls says of the try asked`);
+      await expectCount(page.locator('section[aria-label="To decide"]'), 0, 'and there is nothing to decide while the work is asked for again');
+      await expectCount(gate, 0, 'and the gate holds nothing: it holds on the work, and the work was sent back');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `decide-sent-back-${await themeOf(page)}.png`), fullPage: true });
+
+      // Taken back, and the page ends as it began — the branch read again for the state it is back in, so its photograph is of the whole
+      // panel and not of a panel still reading.
+      fs.rmSync(asks, { recursive: true, force: true });
+      await expectVisible(banner.locator('[data-approve]', { hasText: said }), 'with the send-back taken back, the gate holds again once the run is read again');
+      await expectVisible(gate, `and ${ending} waits at it`);
+      await expectVisible(acts.locator('[data-standing="ahead"]', { hasText: ENDING.standing }), 'and the panel says where the branch stands again');
       await settled(page);
     },
   },

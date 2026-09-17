@@ -1007,8 +1007,12 @@ from `./workflows/dev-build` — one round, $21.16, **merged, `452a772`**; item 
 00:20Z as `two-findings-the-apps-lane-s-1qur` (`dev-build`) — two rounds, $20.25, **merged, `ba8dbd8`**: ask rules read and shown, the
 read-only list held to its date. The operator's first two inbox cards, started from the board, both
 merged the same night: the Inbox first in the menu (`make-the-inbox-be-the-first-7vms`, $2.40, `a622309`) and the Runs page in
-two groups (`the-runs-page-should-sort-th-zdoe`, $6.05, `6886203`). The markdown study (features.md §5) is filed as
-`markdown-rendered-on-the-boa-699m` on the new `./workflows/dev-planned-build`, its plan waiting for approval. The Factory's
+two groups (`the-runs-page-should-sort-th-zdoe`, $6.05, `6886203`). The markdown study (features.md §5) ran as
+`markdown-rendered-on-the-boa-699m` on the new `./workflows/dev-planned-build`: the plan compared four renderers with dated sources and
+stopped for approval; the operator chose react-markdown; two rounds after, $52.67 in all, **merged, `0dd210d`** — react-markdown with
+remark-gfm replacing streamdown, a card's page and a step's page with their keys explained, `npm install` run on main for the lockfile.
+Nothing in flight at 2026-09-17 02:00Z. Registered and not filed: the queue's board half (§3), the builder (§4), the gate (§6), React
+Aria (§7), and the engine's admission order, `priority` and Remote Control field. The Factory's
 ghosts for queued cards wait for W8, in its second round. Left: item 20 (settings, by hand). Items 27, 28, 30 and 31 are done.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 

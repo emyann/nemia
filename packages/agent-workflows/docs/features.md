@@ -2917,8 +2917,9 @@ What was measured:
   probed by hand to twelve, which files the twelfth as it files the second. What a step with `output:` would hit is not a cap but its
   own schema: it would have to declare its fields on every one of those sign-offs. The supervisor declares none.
 - From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 585 (584 passed, 1 skipped), from
-  575; api 202, from 200 — no api test was added, and two pinned spec fixtures gained a `slot: null` row; web 248 and agent-engine 340
-  (331 passed, 9 skipped) unchanged. `npm run typecheck` clean in all four.
+  575. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged — no test was added outside the package, and the two
+  pinned `spec()` fixtures in the api's tests each gained a `slot: null` row, which is the fourth and fifth obligation a new key has
+  outside the package beside CLAUDE.md's three. `npm run typecheck` clean in all four.
 - New tests. `workflow.test.ts`: `slot: none` read, and another word, no value and the line twice refused; the key refused at load on
   every shape of a workflow that has another step, and allowed on one step; the key rendered back in `STEP_KEYS` order, and read back
   as the step. `run.test.ts`: `slotNeed` and `runAdmitted` on the same run judged with the workflow and without it, and `heldRuns`

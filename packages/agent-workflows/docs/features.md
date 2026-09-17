@@ -3028,6 +3028,10 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   refusal, in its words, for a link a step would be written through, for a link whose step is gone, and for a linked README with a README
   given, each with what the link points at untouched — and, beside them, that a linked README with no README given is nothing the write
   touches. Writing before removing fails the first; the refusal dropped fails the third.
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 592 (590 passed, 2 skipped), from 587 —
+  four new tests, one of them the case rename, which skips where the filesystem tells `implement.md` from `Implement.md` apart, and one
+  changed test, the `wf up` silence. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged: nothing outside the package
+  changed. `npm run typecheck` clean in all four.
 
 What it leaves:
 

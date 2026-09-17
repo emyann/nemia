@@ -607,6 +607,9 @@ export function runCapOf(value: string | undefined): number {
  *
  * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is what
  * it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
+ *
+ * Neither, for a run whose workflow takes no slot at all (`takesNoSlot`, `slot: none`): it is a session that watches the runs the cap holds,
+ * so the cap neither counts it nor holds it. Judged without the steps — a caller that passes none — every run is counted, as every run was.
  */
 export function slotNeed(
   run: Run,

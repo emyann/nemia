@@ -113,7 +113,8 @@ what, who may drive it, for how long and for how much. Everything else the agent
                      codex and checks their own; a blocked session holds no slot; one run's review
                      competes with another run's implement
   WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
-                     slot, oldest first; a run waiting on --after counts once it is filed
+                     slot, oldest first; a run waiting on --after counts once it is filed; a run of a
+                     one-step workflow that says slot: none is not counted and never waits for one
 
 To follow what the engine is doing, use the engine — a run's task ids carry the run and the step,
 so its output already names the work. Point it at this board:

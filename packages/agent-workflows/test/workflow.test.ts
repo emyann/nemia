@@ -328,8 +328,8 @@ test('the shipped examples are valid workflows too', () => {
 const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n---\nDo the work.\n`);
 
 test('every key a step has is read — none is accepted and then dropped', () => {
-  // Every key but `workspace:`, which no step may set beside a `check:`: it is read on the ending step below.
-  const values: Record<Exclude<StepKey, 'workspace'>, string> = {
+  // Every key but `workspace:`, which no step may set beside a `check:`, and `slot:`, which is a workflow of one step's: both are read below.
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
     tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
@@ -338,7 +338,9 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   const w = parseWorkflow('review', text, (file) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined));
   const ending = fm('ship', 'after: review\nworkspace: main');
   assert.equal(ending.workspace, 'main');
-  const all = { ...w, workspace: ending.workspace };
+  const watching = fm('supervise', 'slot: none');
+  assert.equal(watching.slot, 'none');
+  const all = { ...w, workspace: ending.workspace, slot: watching.slot };
   for (const key of STEP_KEYS) assert.notEqual(all[key], undefined, `${key} is on the list and never read`);
   assert.equal(w.deadlineSeconds, 900);
   assert.equal(w.retries, 1);
@@ -377,7 +379,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, harness, model, effort, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, harness, model, effort, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -821,6 +823,29 @@ test("`workspace: main` runs a step in the repository's own checkout, and a step
   refused('workspace: main\nworkspace: main', /^ship: `workspace` is set twice/);
 });
 
+test("`slot: none` takes a run out of the cap on runs in flight, and a run without the line waits for a slot like any other; REFUSED at load: another word, no value, and the line twice", () => {
+  assert.equal(fm('supervise', 'slot: none').slot, 'none');
+  assert.equal(fm('implement', 'check: npm test').slot, undefined, 'counted unless it says otherwise');
+  const refused = (lines: string, pattern: RegExp) => assert.throws(() => fm('supervise', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
+  for (const word of ['None', 'false', '0', 'off', 'one', 'true']) {
+    refused(`slot: ${word}`, new RegExp(`^supervise: \`slot: ${word}\` is not \`none\`\\. \`slot: none\` keeps this step's run out of the cap on runs in flight \\(WF_MAX_RUNS\\), for a workflow of one step that watches the other runs rather than doing a run's work\\. Without the line, the run waits for a slot and holds one, like every other run\\.$`));
+  }
+  refused('slot:', /^supervise: `slot` has no value\. Delete the line rather than leaving it blank/);
+  refused('slot: none\nslot: none', /^supervise: `slot` is set twice/);
+});
+
+test("REFUSED at load: `slot: none` on a step of a workflow that has another — a slot is a run's, not a step's, so the work beside it would run outside the cap too", () => {
+  const watcher = { name: 'supervise', after: [], body: 'x', slot: 'none' } as Workflow;
+  assert.doesNotThrow(() => validate([watcher]), 'a workflow of one step is what takes no slot');
+  const refused = (steps: Workflow[], pattern: RegExp) => assert.throws(() => validate(steps), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), pattern.source);
+  refused([watcher, { name: 'implement', after: [], body: 'x' }],
+    /^supervise: `slot: none` takes this step's whole RUN out of the cap on runs in flight \(WF_MAX_RUNS\), and this workflow has implement beside it — a slot is a run's, not a step's, so implement would run outside the cap too\. A run that takes no slot is one step: a session that watches the other runs\. Delete the line, or give supervise a folder of its own\.$/);
+  // Wherever it is written: on the first step of a chain, on the last, or on a step beside another.
+  refused([{ name: 'implement', after: [], body: 'x' }, { ...watcher, after: ['implement'] }], /and this workflow has implement beside it/);
+  refused([{ ...watcher, slot: 'none' }, { name: 'review', after: ['supervise'], body: 'x' }], /and this workflow has review beside it/);
+  refused([watcher, { name: 'implement', after: [], body: 'x' }, { name: 'review', after: ['implement'], body: 'x' }], /this workflow has implement, review beside it/);
+});
+
 test("REFUSED at load: a `resume:` on a step that runs in the repository's checkout — its session ran in another directory, and an ending starts cold", () => {
   assert.throws(() => fm('ship', 'workspace: main\nresume: review'), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `resume: review` continues review's session, which ran in the worktree review worked in — the same conversation, in another directory, told none of what this step needs\. A step that ends a run starts cold, where the base branch is, and is told which branch to act on\. Delete one of the two lines\.$/.test(e.message));
   assert.throws(() => fm('ship', 'resume: review\nworkspace: main'), /`workspace: main` runs the step in the repository's own checkout, and `resume: review`/, 'whichever order the two lines are written in');
@@ -961,14 +986,14 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
 
 test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
-  // Every key but `workspace:`, which the parser refuses beside a `check:`: an ending step renders it below.
-  const values: Record<Exclude<StepKey, 'workspace'>, string> = {
+  // Every key but `workspace:`, which the parser refuses beside a `check:`, and `slot:`, which is a workflow of one step's: both render below.
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
     tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
-  for (const key of STEP_KEYS) if (key !== 'workspace') assert.notEqual(step[key], undefined, key);
+  for (const key of STEP_KEYS) if (key !== 'workspace' && key !== 'slot') assert.notEqual(step[key], undefined, key);
   const text = renderStep(step);
   assert.equal(text, [
     '---',
@@ -1006,6 +1031,12 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   const rendered = renderStep(ending);
   assert.equal(rendered, ['---', 'after: review', 'workspace: main', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'));
   assert.deepEqual(parseWorkflow('ship', rendered), ending);
+
+  // And `slot: none`, which only a workflow of one step sets: after `workspace`, before `harness`.
+  const watching = parseWorkflow('supervise', '---\nharness: claude\nslot: none\nworkspace: main\n---\nWatch the runs.\n');
+  const watched = renderStep(watching);
+  assert.equal(watched, ['---', 'workspace: main', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'));
+  assert.deepEqual(parseWorkflow('supervise', watched), watching);
 });
 
 test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input` or `disallow` are no line — and a step that sets nothing is its body', () => {

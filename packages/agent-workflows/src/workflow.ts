@@ -61,6 +61,19 @@ export type Workflow = {
    * or one that ends a workflow beside another: a run has one ending (`validate`).
    */
   workspace?: 'main';
+  /**
+   * `slot: none`: a run of this workflow takes no run slot (`WF_MAX_RUNS`).
+   *
+   * The cap on runs in flight is a cap on the work in flight — N runs' steps at once, and a run with nothing filed waits for one of
+   * them to finish. A session that WATCHES those runs is not one of them: it files nothing of anybody's work, and holding it behind
+   * the cap would hold the thing that answers the runs the cap is holding. So a workflow of one step may say its run is not counted:
+   * it is never in flight for the cap, and never waits for a slot. It takes a session slot like every session (`WF_MAX_CONCURRENT`),
+   * and costs what it costs.
+   *
+   * Refused on a step of a workflow that has another (`validate`): a run outside the cap is one session, and the line on one step of a
+   * workflow of work would put every step of it outside the cap.
+   */
+  slot?: 'none';
   /** Everything below the frontmatter: what the agent is told. */
   body: string;
   harness?: string;
@@ -168,7 +181,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -190,6 +203,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   resume: 'the step whose session this one continues instead of starting cold, which implies waiting on it',
   input: "the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on",
   workspace: "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
+  slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
   harness: 'what runs the session: `claude` (the default), `codex` or `claude-detached`',
   model: "the model the harness runs the session on: the harness's own default when unset",
   effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
@@ -320,6 +334,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     after,
     resume: meta.resume,
     workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume),
+    slot: slotOf(name, meta.slot),
     body,
     harness,
     model: meta.model,
@@ -668,6 +683,20 @@ function workspaceOf(step: string, workspace: string | undefined, check: string 
   return 'main';
 }
 
+/** The words `slot:` takes. One: a run is counted against the cap on runs in flight, or it is one that watches the counted ones. */
+export const SLOTS: readonly string[] = ['none'];
+
+/**
+ * `slot:` as written: `none`, or refused. There is one thing to say — that this run is not counted against the cap on runs in flight —
+ * and a step without the line is counted, as every step of every run is. `false`, `0` and `off` are words the run would have to
+ * interpret into that.
+ */
+function slotOf(step: string, slot: string | undefined): 'none' | undefined {
+  if (slot === undefined) return undefined;
+  if (slot === 'none') return 'none';
+  return refuse(`${step}: \`slot: ${slot}\` is not \`none\`. \`slot: none\` keeps this step's run out of the cap on runs in flight (WF_MAX_RUNS), for a workflow of one step that watches the other runs rather than doing a run's work. Without the line, the run waits for a slot and holds one, like every other run.`);
+}
+
 function checkOf(step: string, check: string | undefined): string | undefined {
   // Each of these reads as "no check" to a person and as a command to the shell, which cannot find
   // it: exit 127 on every attempt, for a check nobody meant to run.
@@ -946,6 +975,7 @@ export function validate(steps: readonly Workflow[]): void {
   }
 
   validateMainWorkspace(steps);
+  validateSlot(steps);
 
   // Kahn's algorithm: if anything is left when nothing else can be removed, it is a cycle.
   const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
@@ -983,6 +1013,25 @@ function validateMainWorkspace(steps: readonly Workflow[]): void {
       throw new WorkflowError(`${named}, and ${beside.join(', ')} ${beside.length > 1 ? 'end' : 'ends'} the workflow beside it, so both could be working in that one directory at once. A run has one ending: make ${s.name} wait on ${beside.join(', ')}, or delete the line.`);
     }
   }
+}
+
+/**
+ * The one way a run cannot take no run slot (`slot: none`): its workflow has another step.
+ *
+ * The cap on runs in flight holds the work this machine does at once. A run outside it is a session that watches the runs inside it —
+ * one step, which is how a reader tells the two apart at a glance, and how the machinery does. The line on one step of a workflow of
+ * work would take the whole run out of the cap, since a slot is a run's and not a step's, so it is refused here rather than the pass a
+ * cap nobody notices lets four runs through.
+ */
+function validateSlot(steps: readonly Workflow[]): void {
+  const watcher = steps.find((s) => s.slot === 'none');
+  const beside = steps.filter((s) => s !== watcher).map((s) => s.name);
+  if (!watcher || !beside.length) return;
+  throw new WorkflowError(
+    `${watcher.name}: \`slot: none\` takes this step's whole RUN out of the cap on runs in flight (WF_MAX_RUNS), and this workflow has ${beside.join(', ')} beside it`
+    + ` — a slot is a run's, not a step's, so ${beside.join(', ')} would run outside the cap too. A run that takes no slot is one step: a session that watches the other runs.`
+    + ` Delete the line, or give ${watcher.name} a folder of its own.`,
+  );
 }
 
 /**

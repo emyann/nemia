@@ -26,7 +26,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, resultSteps, slotFree, afterRefusal, type BranchStanding, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, type BranchStanding, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -1557,8 +1557,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   const starting = !hasStarted(run);
   // And a run with nothing filed files its roots only while the cap on runs in flight leaves a slot (`runAdmitted`): one that wants a slot and
   // is not admitted is held, and files nothing.
-  const need = slotNeed(run, phaseOf, assessed, (id) => parent(id).shipped);
-  const admitted = runAdmitted(run, slot);
+  const need = slotNeed(run, phaseOf, assessed, (id) => parent(id).shipped, steps);
+  const admitted = runAdmitted(run, slot, steps);
   const held = need.wants && !admitted ? slot : undefined;
   const ready = runReady(run, (id) => parent(id).shipped) && admitted ? assessed.ready : [];
   const waiting = waitsOf(run, parent);
@@ -1823,7 +1823,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
 
   return {
     run, filed, checked, tried, looped, status, blocked, notes, waiting,
-    inFlight: need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0,
+    // A run outside the cap (`slot: none`) counts for nothing it filed either: what it files is its own watching, not a run's work.
+    inFlight: !takesNoSlot(steps) && (need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0),
     ...(held ? { held } : {}),
   };
 }
@@ -2082,7 +2083,7 @@ export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Pr
     const { asks, rounds } = readAsks(run.id);
     const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
     const parent = await parentsOf(e, run);
-    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phaseOf, a, (id) => parent(id).shipped) });
+    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phaseOf, a, (id) => parent(id).shipped, steps) });
   }
   return heldRuns(needs, cap);
 }

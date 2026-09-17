@@ -550,7 +550,7 @@ async function ceilingsOf(): Promise<Ceilings> {
     const a = assess(steps, run, phase, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
     const parents = new Map<string, ParentRun>();
     if (gated(run)) for (const id of new Set(run.after)) parents.set(id, await parentOf(reader, id));
-    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false) });
+    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false, steps) });
   }
   return {
     last,

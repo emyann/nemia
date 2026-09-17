@@ -342,6 +342,27 @@ test('REFUSED at a cap: `runAdmitted` files the roots of a run with nothing file
   assert.equal(slotWord({ inFlight: 2, cap: 2 }), 'waiting for a run slot (2 of 2 in flight)');
 });
 
+test('`slot: none`: a run of a workflow that says it is never in flight for the cap and never wants a slot, whatever it has filed — and `runAdmitted` files its roots at a full cap', () => {
+  const watching = [{ name: 'supervise', after: [], body: 'x', slot: 'none' } as Workflow];
+  const need = (r: Run, p: Record<string, TaskPhase>, steps?: readonly Workflow[]) =>
+    slotNeed(r, phases(p), assess(STEPS, r, phases(p), signedDone, asked), () => true, steps);
+  // The same run, judged with the workflow and without it: the rule is the workflow's word, and nothing else about the run changes.
+  const running = run({ implement: 't1', review: null });
+  assert.deepEqual(need(running, { t1: 'running' }), { inFlight: true, wants: false }, 'counted without the line');
+  assert.deepEqual(need(running, { t1: 'running' }, watching), { inFlight: false, wants: false }, 'and never with it');
+  const fresh = run({ implement: null, review: null });
+  assert.deepEqual(need(fresh, {}), { inFlight: false, wants: true }, 'a root ready: it waits for a slot');
+  assert.deepEqual(need(fresh, {}, watching), { inFlight: false, wants: false }, 'and with the line it waits for nothing');
+  assert.deepEqual(need(running, { t1: 'running' }, [{ name: 'implement', after: [], body: 'x' }]), { inFlight: true, wants: false }, 'steps that say nothing count as they did');
+
+  assert.equal(runAdmitted(fresh, { inFlight: 2, cap: 2 }, watching), true, 'its roots are filed at a full cap');
+  assert.equal(runAdmitted(fresh, { inFlight: 2, cap: 2 }), false, 'and any other run with nothing filed waits');
+  // It holds no slot, so the cap holds nobody on its account: a run the cap would hold behind it is admitted.
+  const runs = [{ id: 'watcher', createdAt: '2026-09-17T01:00:00.000Z', ...need(running, { t1: 'running' }, watching) }, { id: 'work', createdAt: '2026-09-17T02:00:00.000Z', ...need(fresh, {}) }];
+  assert.deepEqual([...heldRuns(runs, 1)], [], 'one slot, and the work takes it');
+  assert.deepEqual([...heldRuns([{ ...runs[0]!, ...need(running, { t1: 'running' }) }, runs[1]!], 1)], [['work', { inFlight: 1, cap: 1 }]], 'counted, it would have held the work');
+});
+
 test('`heldRuns`: every run in flight counted, then each that wants a slot admitted oldest first and counted for the next, and the rest held at the count — none with no cap, and a run waiting on runs neither counted nor held', () => {
   const at = (h: number) => `2026-09-16T0${h}:00:00.000Z`;
   const runs = [

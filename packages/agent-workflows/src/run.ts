@@ -608,7 +608,16 @@ export function runCapOf(value: string | undefined): number {
  * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is what
  * it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
  */
-export function slotNeed(run: Run, phaseOf: (taskId: string) => TaskPhase, a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round'>, shipped: (runId: string) => boolean): { inFlight: boolean; wants: boolean } {
+export function slotNeed(
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round'>,
+  shipped: (runId: string) => boolean,
+  /** The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted, as every run was. */
+  steps: readonly Pick<Workflow, 'slot'>[] = [],
+): { inFlight: boolean; wants: boolean } {
+  // A run that watches the others is in nobody's way and waits for nobody: it neither counts against the cap nor asks it for anything.
+  if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
   const due = a.ready.length + a.check.length + a.retry.length + a.round.length > 0;
   return {
@@ -618,10 +627,18 @@ export function slotNeed(run: Run, phaseOf: (taskId: string) => TaskPhase, a: Pi
 }
 
 /**
- * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that has
- * started — the cap holds only a run with nothing filed — and for one judged with no slot, which is `advance` called outside a tick.
+ * Whether a run of these steps is outside the cap on runs in flight: its workflow says `slot: none`, which `validate` allows only on a
+ * workflow of one step. Pure. It counts against nothing and waits for nothing — a session that watches the runs the cap holds.
  */
-export const runAdmitted = (run: Run, slot: RunSlot | undefined): boolean => hasStarted(run) || !slot || slotFree(slot);
+export const takesNoSlot = (steps: readonly Pick<Workflow, 'slot'>[]): boolean => steps.some((s) => s.slot === 'none');
+
+/**
+ * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that has
+ * started — the cap holds only a run with nothing filed — for one judged with no slot, which is `advance` called outside a tick, and for one
+ * whose workflow takes no slot at all (`takesNoSlot`).
+ */
+export const runAdmitted = (run: Run, slot: RunSlot | undefined, steps: readonly Pick<Workflow, 'slot'>[] = []): boolean =>
+  hasStarted(run) || !slot || slotFree(slot) || takesNoSlot(steps);
 
 /** Whether a run slot is free: fewer runs in flight than the cap, or no cap. Pure. What a queued card is started on, after every run has been advanced. */
 export const slotFree = (slot: RunSlot): boolean => slot.cap <= 0 || slot.inFlight < slot.cap;

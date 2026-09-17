@@ -2717,9 +2717,9 @@ what it holds; with the folds drawn always, it fails. The e2e presses Show finis
 aimed at the hidden input is intercepted by the switch's label, and Playwright waits for ever. Nothing else in the e2e changed. Every role
 and name it finds by kept theirs, and React Aria passes through the `data-sidebar`, `data-active`, `data-turn` and `data-tool` it reads.
 
-**Looked at by hand**, since the e2e runs at 1280 × 800 and only clicks. Enter on a place in the menu navigates in place and keeps focus,
-and a click adds one entry to the history. Collapsed with Ctrl+B, the sidebar shows a place's name in a tooltip on hover. At 390 pixels the
-trigger opens the sheet, a pick closes it, and Escape gives focus back to the trigger. Show finished toggles with Tab and Space, and from its
+**Looked at by hand**, since the e2e runs at 1280 × 800 and only clicks. Enter on a place in the menu navigates in place, keeps focus and
+adds one entry to the history, as a click does. Collapsed with Ctrl+B, the sidebar shows a place's name in a tooltip on hover, and expanded,
+none. At 390 pixels the trigger opens the sheet, a pick closes it, by click or by Enter, and Escape gives focus back to the trigger. Show finished toggles with Tab and Space, and from its
 words. A fold opens and closes with Enter and keeps focus. Scroll to end shows once the conversation is scrolled up, and takes it back down.
 
 What the base does not offer, named rather than worked around:

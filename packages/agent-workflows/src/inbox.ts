@@ -41,6 +41,12 @@ export type InboxCard = {
 /** Every key an inbox card may set, each optional. Anything else is refused by name — `after:` with where it is said instead. */
 export const INBOX_KEYS = ['workflow', 'repo'] as const;
 
+/** What each of an inbox card's keys means, in one line, in `INBOX_KEYS`' order: what the board shows beside a card's value. */
+export const INBOX_KEY_MEANINGS: Readonly<Record<(typeof INBOX_KEYS)[number], string>> = {
+  workflow: "what runs the card when it is started: a workflow's name under the repository's `workflows/`, or a path to a workflow folder; else the start names one",
+  repo: 'the absolute path of the repository the idea is about: the repository the start is made in when unset',
+};
+
 function refuse(why: string): never {
   throw new WorkflowError(why);
 }

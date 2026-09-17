@@ -3,8 +3,15 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ideaCard, INBOX_KEYS, inboxLines, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, workflowAt, type InboxListing } from '../src/inbox.ts';
+import { ideaCard, INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, workflowAt, type InboxListing } from '../src/inbox.ts';
 import { fromNote } from '../src/run.ts';
+
+/** A table of one line of meaning per key, as the board lays a card's keys out: why `meanings` is not one, or null (as workflow.test.ts's). */
+function meaningsRefusal(keys: readonly string[], meanings: Readonly<Record<string, string>>): string | null {
+  if (JSON.stringify(Object.keys(meanings)) !== JSON.stringify(keys)) return `keys ${Object.keys(meanings).join(', ')} are not ${keys.join(', ')}, in that order`;
+  const bad = Object.entries(meanings).find(([, line]) => typeof line !== 'string' || !line.trim() || /[\r\n]/.test(line));
+  return bad ? `${bad[0]}'s meaning is not one line: ${JSON.stringify(bad[1])}` : null;
+}
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
@@ -13,6 +20,13 @@ const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) =>
 const DIRS = new Set(['/home/me/code/app', '/home/me/code/other']);
 const isDirectory = (at: string) => DIRS.has(at);
 const read = (text: string, file = 'cache-the-views-k2q9.md') => parseInboxCard(file, text, isDirectory);
+
+test("each of an inbox card's keys has one line of meaning, in the keys' order", () => {
+  assert.equal(meaningsRefusal(INBOX_KEYS, INBOX_KEY_MEANINGS), null);
+  const { workflow } = INBOX_KEY_MEANINGS;
+  assert.match(String(meaningsRefusal(INBOX_KEYS, { workflow })), /are not workflow, repo/, 'refused: repo without a line');
+  assert.match(String(meaningsRefusal(INBOX_KEYS, { ...INBOX_KEY_MEANINGS, repo: '' })), /^repo's meaning is not one line/, 'refused: an empty line');
+});
 
 test('an inbox card is its file: the name without .md, `workflow:` and `repo:` from its frontmatter when set — each optional — and the body', () => {
   assert.deepEqual(INBOX_KEYS, ['workflow', 'repo']);

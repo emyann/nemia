@@ -146,6 +146,39 @@ export const STEP_KEYS = [
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
+/** The keys that are counts: what each counts, the least that means anything, and an example. */
+const COUNTS = {
+  deadlineSeconds: { least: 1, counts: 'the seconds the engine lets the step run before stopping it', example: 900 },
+  maxAttempts: { least: 1, counts: 'how many attempts the engine may make at the step', example: 1 },
+  retries: { least: 0, counts: 'how many times the run re-files the step after its check refuses it', example: 1 },
+  rounds: { least: 1, counts: 'how many rounds `loop:` may run, the first included', example: 3 },
+} as const;
+
+/**
+ * What each key means, in one line, in `STEP_KEYS`' order: what the board shows beside a step's value, in the README's sense of the key.
+ * A count's line is `COUNTS`' own, the words its refusal uses. A key without a line does not typecheck, and
+ * `test/workflow.test.ts` holds the order and the one line.
+ */
+export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
+  after: 'the steps that must finish first, verified, or unverified where one has no check — the step `resume:` names included; none, and it starts at once',
+  resume: 'the step whose session this one continues instead of starting cold, which implies waiting on it',
+  input: "the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on",
+  harness: 'what runs the session: `claude` (the default), `codex` or `claude-detached`',
+  model: "the model the harness runs the session on: the harness's own default when unset",
+  effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
+  permissionMode: "the harness's permission mode — on codex, its sandbox — checked against the harness the step runs on",
+  tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
+  disallow: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
+  deadlineSeconds: COUNTS.deadlineSeconds.counts,
+  maxAttempts: COUNTS.maxAttempts.counts,
+  budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
+  check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
+  retries: COUNTS.retries.counts,
+  output: "a JSON Schema file beside the step: what its closeout declares, for a step that reads it with `input:`",
+  loop: "the step to run again when this one's closeout says `again: true`: one it waits on",
+  rounds: COUNTS.rounds.counts,
+};
+
 /**
  * The four fields every closeout has. They are the run's: `summary` goes to the person who decides and
  * nowhere else, so an `output:` may not declare one of them and have it travel to a step. The schema
@@ -207,14 +240,6 @@ export const EFFORTS: Readonly<Record<string, readonly string[]>> = {
   codex: ['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'],
   'claude-detached': CLAUDE_EFFORTS,
 };
-
-/** The keys that are counts: what each counts, the least that means anything, and an example. */
-const COUNTS = {
-  deadlineSeconds: { least: 1, counts: 'the seconds the engine lets the step run before stopping it', example: 900 },
-  maxAttempts: { least: 1, counts: 'how many attempts the engine may make at the step', example: 1 },
-  retries: { least: 0, counts: 'how many times the run re-files the step after its check refuses it', example: 1 },
-  rounds: { least: 1, counts: 'how many rounds `loop:` may run, the first included', example: 3 },
-} as const;
 
 export class WorkflowError extends Error {
   /** A step that is wrong is its author's to fix, and the message says how. */

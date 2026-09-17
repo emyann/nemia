@@ -25,7 +25,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
+import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
@@ -37,14 +37,14 @@ const OUT = path.resolve(process.env.WF_ARTIFACTS || path.join(REPO, '.e2e'));
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
 
-/** On every page: the menu, with each of its places. */
+/** The menu's places, in its order: the Inbox first. */
+const PLACES = ['Inbox', 'Factory', 'Runs', 'Workflows', 'Capabilities'];
+
+/** On every page: the menu, with each of its places, in its order. */
 async function sidebar(page: Page): Promise<void> {
   const menu = page.locator('[data-sidebar="sidebar"]');
-  await expectVisible(menu.getByRole('link', { name: 'Factory' }), 'the sidebar has Factory');
-  await expectVisible(menu.getByRole('link', { name: 'Runs' }), 'the sidebar has Runs');
-  await expectVisible(menu.getByRole('link', { name: 'Workflows' }), 'the sidebar has Workflows');
-  await expectVisible(menu.getByRole('link', { name: 'Inbox' }), 'the sidebar has Inbox');
-  await expectVisible(menu.getByRole('link', { name: 'Capabilities' }), 'the sidebar has Capabilities');
+  for (const place of PLACES) await expectVisible(menu.getByRole('link', { name: place }), `the sidebar has ${place}`);
+  await expectTexts(menu.locator('[data-sidebar="content"] [data-sidebar="menu-button"]'), PLACES, 'the sidebar lists its places in order, the Inbox first');
 }
 
 /** Finished runs on the Factory's floor too. Off by default, on every visit. */

@@ -64,6 +64,15 @@ export async function expectCount(locator: Locator, count: number, assertion: st
   if (found !== count) throw new Refused(`${assertion} — expected ${count}, found ${found}`);
 }
 
+/** The elements matched read `texts`, one each and in that order, within `timeout`: a menu's places, the first one first. */
+export async function expectTexts(locator: Locator, texts: readonly string[], assertion: string, timeout = WAIT_MS): Promise<void> {
+  await until(async () => {
+    const found = (await locator.allTextContents()).map((text) => text.trim());
+    if (found.length === texts.length && found.every((text, i) => text === texts[i])) return null;
+    return `expected ${texts.join(', ')}, found ${found.length ? found.join(', ') : 'nothing'}`;
+  }, assertion, timeout);
+}
+
 /** Every element matched lies inside `frame`'s box: a node on its canvas, not hanging off the edge. */
 export async function expectInside(elements: Locator, frame: Locator, assertion: string): Promise<void> {
   const box = await frame.boundingBox();

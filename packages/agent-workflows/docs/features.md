@@ -2834,11 +2834,51 @@ What was measured:
   whose last step merges, with nothing written, and reads both screens: the ending that has not run, in its prose, and the gated step that
   has, by its name with its closeout above.
 
+What the board does with it, six commits — §8's apps half, the run after this one:
+
+- **`to decide` on the list and on a run's detail** (`RunSummary.toDecide`, `RunDetail.toDecide`), as the package decides it and words it:
+  `{ kind, step, says, branches }` with `said`, the whole of what `wf ls` prints after `→ to decide:`, and `command`, the command at the
+  end of it — `wf approve <run> <step>`, or `wf decide <run>` for the branches. The two cannot drift: `said` ends with `command`, and the
+  api's test says so. The branch standings `assess` and `listing` want for the second kind read git, so the api reads the status first and
+  asks git only where the answer can decide anything (`standingsOf`): not for a run called off, one still going, one that worked on its
+  base branch, or a folder whose ending merges — a gate says a run is one to decide with no `git` call at all, which is what the list the
+  Factory polls every five seconds is. Level-triggered as the package is: a branch merged by hand stops being one to decide on the next
+  read, and the test merges one by hand. Beside it, `GET /api/runs/:id/decision` carries `standings` — where each result branch stands and
+  git's own diff stat of it (`branchWord`, `diffStat`) — reads the result with `resultSteps` rather than `terminalSteps`, and offers
+  `ship it` and `drop it` no more for a folder whose ending merges, as `wf decide` never has.
+- **The Factory counts them (`2 to decide`), and their cards stay on the floor**, whatever "Show finished" says, until they are decided:
+  nothing of such a run moves, so `inFlight` has it finished and the switch would hide the one card on the board that is waiting for a
+  person rather than for a machine — which is the pain §8 was registered as. The card is marked with an emerald ring rather than dimmed, a
+  badge in its footer and a line in the package's words; the minimap draws it and the legend says what the ring means. The ending step's
+  own `approve ship` is not said twice, as `wf ls` does not say it twice (`onYouOf`, `needsOf`).
+- **The Runs page groups *To decide* between *In flight* and *Finished***, newest first, with its count and how many of them wait on you,
+  each row carrying the same line.
+- **The run page says it above everything, and an ending's gate shows the result.** An emerald banner where `wf ls` prints `→ to decide:`
+  above `→ waiting on you`, linked to the ending step's section. That step's gate holds before it is filed, so it has no closeout of its
+  own: beside Approve and Send back, the panel shows what it would act on — each result branch's standing and diff stat, then each step it
+  waits on with the closeout it handed on, rendered, and the files it named. And its Send back goes to the work, since `wf retry <run>
+  <the ending>` is refused: the button asks for a try of the steps `sendBackTo` names, and where an ending waits on several a person picks
+  which. A gate on a step that has run is unchanged, to the markup.
+- **The e2e's seed gains three runs** (`ENDING`, `SHIPPED`, `UNMERGED` in `apps/web/test/e2e/seed.ts`), with real branches in FAKE's
+  repository: one at its ending's gate, two commits ahead of main; one whose ending was approved, ran and merged, which leaves nothing to
+  decide; and one finished run whose branch nobody took, which is the git kind. A `decide` page reads the banner and the panel, sends the
+  work back — to `review`, never to `ship` — and takes that back, and the Factory and Runs pages check the counts, the marked cards and the
+  group. Found on the way: **a card a person dropped between two rows held only the row its top was nearest**, so a card placed in the
+  other one was drawn over its foot — the floor's cards overlapped by 18 units once the seed filled the grid. `cellsOf` now gives a card
+  every row it reaches, since a card is drawn up to a cell tall.
+
+What the board half measured, counted as this file counts them — tests, then passed and skipped: api 208 (from 202), web 256 (from 243),
+agent-workflows 575 (574 passed, 1 skipped) and agent-engine 340 (331 passed, 9 skipped) unchanged, no package having been touched.
+`npm run typecheck`, `npm run build` and `npm run e2e` clean, the e2e's pictures read in both themes. New tests: `to-decide.test.ts` in the
+api, on a real repository with every `git` it runs counted — both kinds on the list and on the detail, the `said` that ends with its own
+`command`, the branch merged by hand, the approved ending with nothing left to decide, and no `git` asked of a run still going, one called
+off or a folder whose ending merges; in the web, the floor keeping such a card whatever the switch says and a list from an api that carries
+no `toDecide`, the ending's gate left out of `waiting on you` twice over (`onYouOf`, `needsOf`), the to-decide banner in both kinds,
+`actsOnly`, the panel's standing and stat and the work's closeout, the ending's gate wording with its send-back named, and a card dropped
+between two rows.
+
 What it leaves:
 
-- **The board.** §8's apps half: the Factory's count and its marked card, the Runs page's *To decide* group, the run page's banner and its
-  gate panel — the diff and the artifacts beside the closeout — and an e2e with a to-decide run and an approved ending in the seed. What to
-  call is below.
 - **An approval given and then a send-back of the work asked for.** `wf approve` refuses the second order, and `approvalRefusal` refuses
   approving while an ask is pending; but an approval written first and a send-back asked for after it stands for the next result too — the
   approval names the ending's try, which a send-back of another step does not spend. Approve after the work, not before it.
@@ -2851,19 +2891,19 @@ What it leaves:
 - **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes
   into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide`.
 
-What the board's run should call:
+What the board calls:
 
 - **`listing(...).toDecide` and `assess(...).toDecide`** (`ToDecide`): `{ kind: 'approve', step, says }` — `says` is the ending step's first
   line, and `toDecideWords(run, t)` is the whole of `wf ls`'s line — or `{ kind: 'git', branches }`. `assess` and `listing` take the
   branch standings last (`branchStandings(run, resultBranches(run))` in runner.ts, which reads git); without them only the gate says a run
-  is one to decide, which is what the api does until it passes them.
+  is one to decide.
 - **`decide(e, id)`** carries `standings: BranchStanding[]` and `toDecide`, beside what it carried.
 - **A gated ending's step** is `awaiting approval` with no task filed: a board that reads a step's task to decide whether to show it must
-  show this one all the same. `onYou` already says `approve ship`, through `onYouWords`, and Approve on the run page already reaches it —
-  `needsOf` reads the word, not the task, and `taskOfStep` answers for a step with none — so the api needed no change for the verb. What
-  it has not got is the count, the group, the banner and the panel.
-- **`resultSteps(steps)`** is the run's result: `apps/api/src/app.ts` still reads `terminalSteps` for a running run's branches, which for a
-  folder with an ending step is a step with no branch yet — it should read `resultSteps`.
+  show this one all the same. `onYou` says `approve ship`, through `onYouWords`, and Approve on the run page reaches it — `needsOf` reads
+  the word, not the task, and `taskOfStep` answers for a step with none — so the api needed no change for the verb. It is also what tells
+  such a gate from §6's on the board: a gate awaiting approval with no task is an ending's (`actsOnly` in apps/web).
+- **`resultSteps(steps)`** is the run's result, which `apps/api/src/app.ts` reads for a run's branches: `terminalSteps` there named, for a
+  folder with an ending step, a step with no branch.
 - **Approve and Send back** are `approve(e, runId, step, message?)` and `retry(e, runId, <the work>, { mode: 'nudge', message })`, as for
   §6's gate; `sendBackTo(step, run)` says which step the send-back names, and `approvalRefusal` greys the button out in its words.
 
@@ -3054,8 +3094,8 @@ One `dev-planned-build` run, the plan waiting for approval; likely the largest a
 ## 8. The end of a run is a step of its workflow, and a finished run is a decision on the board
 
 Shipped 2026-09-17 as *Shipped: the end of a run is a step of its workflow*, above: the package half — `workspace: main`, the ending's
-gate, `to decide`, `wf decide`'s facts and `ship.md` on the four `dev*` folders — with the board's half still to come. What was registered
-is kept as it was asked.
+gate, `to decide`, `wf decide`'s facts and `ship.md` on the four `dev*` folders — and then the board's half, the Factory's count and its
+marked card, the Runs page's group, the run page's banner and the ending's gate panel. What was registered is kept as it was asked.
 
 **Registered** 2026-09-17, by the operator. First as a pain: a card started from the Inbox finished its run and, with nothing
 asking for a merge, seemed to vanish — off the Factory, a row among the finished, its branch waiting for a `wf decide` nobody

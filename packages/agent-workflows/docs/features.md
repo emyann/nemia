@@ -23,7 +23,8 @@ and its page on the board) — two small items from the plan's queue (§6 items 
 cards that start themselves (`wf inbox queue`) — and markdown rendered on the board, with a page for a card and for a step that
 explains their keys — and a gate, a step's handoff that waits for a person (`gate: true`, `--gate`, `wf approve`), in the package — and
 the engine's `priority` and `remoteControl` put to use: a run in flight filed above a newer run's first step, and `remote:` on a step (§2,
-its package half) — have shipped.
+its package half) — and the workflow builder's package half: a step rendered back to markdown and a folder written from its steps
+(`renderStep`, `writeWorkflow`, §4) — have shipped.
 
 ## Shipped: the check
 
@@ -2329,6 +2330,55 @@ built, measured and left. Left there for the board: the Factory drawing queued c
 session is the engine's (Engine-side work, below: filing order and `priority`). The number kept so §4–§7 keep theirs.
 
 ## 4. The workflow builder: steps and their edges drawn on the board, written back as the folder
+
+**The package half is built** (2026-09-17). The api, the board and the e2e are still to build. What was registered is kept below as it
+was asked.
+
+- **`renderStep(step)`**, pure, in workflow.ts. It writes the frontmatter with only the keys the step sets, in `STEP_KEYS` order, each
+  as the parser reads it: a list as `a, b`, a count or a budget as its number, `output:` as the file it names. The body follows.
+  `undefined` and `null` are unset, and so is an empty `after`, `input` or `disallow` list, since no line says the same thing. An empty
+  `tools` list is written, and the parser refuses it: no tools reads as every tool to one person and as none to another. `rounds:` is
+  written wherever the step has it, the default included, and `after:` lists the step `resume:` names, as the parser read it. A file's
+  comments are not on the step, so a render has none. It judges nothing the parser judges. It refuses only what a file cannot hold: a
+  key no step has, in the parser's own sentence, since the key would otherwise be dropped; a line break in a value, which would turn
+  what follows into a line of its own (a `check` of `npm test`, a line break and `harness: codex` would change the harness); and a
+  comma inside a name in `after:` or `input:`. A test loads every shipped folder — the repository's `dev`, `dev-build`,
+  `dev-planned`, `dev-planned-build` and `ui`, the package's `workflows/` and `workflows/ui`, and the examples. It renders each step,
+  parses it again and gets the same step back, and a second render gives the same text. Another test does this for a step that sets
+  every key.
+- **`writeWorkflow(dir, steps, readme?, { anywhere? })`** in runner.ts. The whole folder is judged before a byte is written:
+  - where the folder is;
+  - each name as a file's name (`stepNameRefusal`: no slash, no leading dot, no comma, no spaces around it, no `.md`, not the
+    README's, a file name of at most 255 bytes);
+  - no name used twice, and at least one step;
+  - each step rendered;
+  - the rendered folder parsed in memory by `parseFolder`. `loadWorkflows` now reads a folder with the same function, and the
+    `output:` schemas are read from the folder as they are.
+
+  So every parser refusal comes out first, in its words and naming the step, and the folder is left as it was. Tests make it refuse a
+  key a step does not have, an `after:` naming no step, a cycle, a loop that is not a back edge, an `output:` whose schema is not there
+  or is outside the folder, and a name that is not a file name. Each asserts every file of the folder is unchanged. Then each
+  `<name>.md` is written, except a file that already reads as its step, which is left as it is. Saving a workflow on the board keeps
+  the comments of every step it did not change, and the shipped folders are full of them. The `.md` of a step no longer in the set is
+  removed. A `*.schema.json` is never written. The README is written only when `readme` is given, under the name the folder's README
+  already has. The result is the steps as the folder now reads (`steps`) and its files by name (`written`, `kept`, `removed`).
+- **Where it writes.** A workflow directly inside the store's `workflows/` or a repository's (`<repo>/workflows/<name>`, with a `.git`
+  next to that `workflows/`). Those are the two places the api lists workflows from. A write removes files, so any other folder is
+  refused, with the fix named, unless the call passes `{ anywhere: true }`. `workflows/` itself and a folder below a workflow are
+  refused too. The package's own `workflows/` is in neither place.
+- **One change to the parser.** An `output:` naming a file outside its folder, whether absolute or climbing out with `..`, is refused
+  at load, before the file is read. The folder is what a run freezes and what the builder writes back. Through the api, a file read
+  from outside would also put its first bytes into the refusal, in the JSON parse error. No shipped folder names one.
+- **Left to `wf start`, as for a folder written by hand:** what start refuses beyond the parser, which is a step named for another
+  step's check or try, and `remote: true` on a harness other than `claude`. A write changes no run, since each run froze its folder at
+  `wf start`.
+- **What the board's run should call.** From `agent-workflows`: `writeWorkflow(dir, steps, readme?, { anywhere? })` and its result
+  type, `WorkflowWritten`. From `agent-workflows/workflow`: `type StepDraft` (a `Workflow` whose `output` may be only `{ file }`),
+  `renderStep` (a step's file, to preview), `stepNameRefusal` (a name refused while it is typed), `parseFolder` (a folder checked
+  before Save, with the api's own `read`), and `WorkflowError`, whose `message` is the sentence for a 422. One trap: the api's
+  `WorkflowStepSpec` has no `remote`, `budget`, `gate` or body today. A draft built from the listing alone would drop
+  `budget: 20` from `dev`'s review, and the write would take that as a change. So the listing needs those keys first, or the draft
+  should start from the step as `loadWorkflows` read it. `null` and `[]` pass as they are.
 
 **Registered** 2026-09-16, by the operator: define a step on the board, draw the workflow by dragging arrows between
 blocks, and have the builder amend the folder's files to match. To be written as an inbox card.

@@ -327,6 +327,66 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
 }
 
 /**
+ * A step as it is written back: what `renderStep` takes. A `Workflow` is one, and so is a step whose `output:` names its file without the
+ * schema, which is read from beside the step when the file is parsed, never from here.
+ */
+export type StepDraft = Omit<Workflow, 'output'> & { output?: Pick<StepOutput, 'file'> };
+
+/** The keys whose empty list says what no line says: nothing to wait on, to read, to deny. Not `tools:`, where none reads as every tool to one person. */
+const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow'];
+
+/**
+ * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as
+ * `a, b`, a count and a budget as the number, `output:` as the file it names — then the body. The inverse of `parseWorkflow`: a step it
+ * read renders to a file it reads back as the same step, which `test/workflow.test.ts` holds over every shipped folder. Pure.
+ *
+ * Unset is `undefined` or `null`, and an empty list where no line says the same (`EMPTY_IS_UNSET`). `rounds:` is written where the step
+ * has it, the default included, and `after:` lists the step `resume:` names too, as the parser read it. A file's comments are not on
+ * the step, so a render has none.
+ *
+ * It judges nothing the parser judges: a value the parser would refuse is written as given, and the parser refuses it in its own words
+ * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
+ * see: a key no step has, in the parser's words, since it would be dropped; a line break in a value, which ends the line and makes what
+ * follows a line of its own — a key, even; and a comma inside a step's name in `after:` or `input:`, which would be read as two names.
+ */
+export function renderStep(step: StepDraft): string {
+  const unknown = Object.keys(step).find((key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null);
+  if (unknown !== undefined) refuse(unknownKey(step.name, unknown));
+  const lines = STEP_KEYS.flatMap((key) => {
+    const value = writtenValue(step.name, key, step[key]);
+    return value === undefined ? [] : [`${key}: ${value}`];
+  });
+  const body = String(step.body ?? '').trim();
+  if (lines.length) return `---\n${lines.map((line) => `${line}\n`).join('')}---\n${body}\n`;
+  // A body that opens on `---` would be read as the frontmatter, were there none before it — and as its block, were that block empty.
+  return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : `${body}\n`;
+}
+
+/** One key's value as its line writes it, or `undefined` for a key the step does not set. */
+function writtenValue(step: string, key: StepKey, value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  let text: string;
+  if (Array.isArray(value)) {
+    if (!value.length && EMPTY_IS_UNSET.includes(key)) return undefined;
+    const entries = value.map(String);
+    const split = (key === 'after' || key === 'input') ? entries.find((entry) => entry.includes(',')) : undefined;
+    if (split !== undefined) {
+      refuse(`${step}: \`${key}\` lists \`${split}\`, and a list is split on every comma, so it would be read as ${split.split(',').map((s) => `\`${s.trim()}\``).join(', ')}. A step's name has no comma: give each step an entry of its own.`);
+    }
+    text = entries.join(', ');
+  } else if (key === 'output' && typeof value === 'object') {
+    // The file it names: the schema is the folder's. An `output` naming no file is written with no value, which the parser refuses.
+    text = writtenValue(step, key, (value as { file?: unknown }).file) ?? '';
+  } else {
+    text = String(value);
+  }
+  if (/[\r\n]/.test(text)) {
+    refuse(`${step}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line${key === 'check' ? ' — commands joined with `&&`' : ''}.`);
+  }
+  return text;
+}
+
+/**
  * `loop:` as written, refused unless the step can say whether to go round again: one step, and `again` declared
  * boolean in its `output:`. That the step it names comes before this one is the workflow's to say (`validate`).
  */
@@ -354,6 +414,11 @@ function roundsOf(step: string, loop: string | undefined, rounds: string | undef
   return loop === undefined ? undefined : countOf(step, 'rounds', rounds) ?? DEFAULT_ROUNDS;
 }
 
+/** The refusal of a key no step has, by name: with a reason of its own where it has one (`REFUSED`), and otherwise with the keys a step has. */
+const unknownKey = (step: string, key: string): string => (Object.hasOwn(REFUSED, key)
+  ? `${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`
+  : `${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`);
+
 /** The frontmatter as key → value: every line a key a step has, set once, to something. */
 function readKeys(step: string, block: string): Partial<Record<StepKey, string>> {
   const meta: Partial<Record<StepKey, string>> = {};
@@ -368,10 +433,7 @@ function readKeys(step: string, block: string): Partial<Record<StepKey, string>>
     const key = line.slice(0, i).trim();
     const value = line.slice(i + 1).trim();
 
-    if (Object.hasOwn(REFUSED, key)) refuse(`${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`);
-    if (!isStepKey(key)) {
-      refuse(`${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`);
-    }
+    if (!isStepKey(key)) refuse(unknownKey(step, key));
     // Refused rather than last-one-wins: both values are something the author meant, and picking
     // one silently is how a step ends up waiting on half of what it was written to wait on.
     if (Object.hasOwn(meta, key)) {
@@ -586,6 +648,11 @@ function checkOf(step: string, check: string | undefined): string | undefined {
 function outputOf(step: string, file: string | undefined, read: ((file: string) => string | undefined) | undefined): StepOutput | undefined {
   if (file === undefined) return undefined;
   const named = `${step}: \`output: ${file}\``;
+  // Refused before it is read: a folder is what a run freezes and the builder writes back, and a schema outside it is part of the step
+  // that neither carries. Read through the api, a file outside it would also answer a refusal with the start of whatever it holds.
+  if (path.isAbsolute(file) || path.normalize(file).split(/[\\/]/)[0] === '..') {
+    refuse(`${named} names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside ${step}.md and name it from there — \`output: ${step}.schema.json\` — or delete the line, and the step declares no output.`);
+  }
   if (!read) refuse(`${named} names a file beside the step, and this step was read without its folder. Load it with \`loadWorkflows(<folder>)\`, which reads the file.`);
   const text = read(file);
   if (text === undefined) {
@@ -676,6 +743,26 @@ function looseAt(node: unknown, at: string): { at: string; why: string } | { at:
  */
 export const isReadme = (file: string): boolean => /^readme\.md$/i.test(file);
 
+/**
+ * Why `name` cannot be a step's name, or `undefined` when it can. A step is its file, `<name>.md`, in its workflow's folder, and other steps
+ * name it in `after:`, `input:`, `resume:` and `loop:`: so a name is one file's in that folder, not hidden, not the README's, and one a list
+ * can hold. What `writeWorkflow` refuses a step with before it writes; a folder read from disk has its names from its files already.
+ */
+export function stepNameRefusal(name: unknown): string | undefined {
+  const fix = 'Name it as its file is named, without .md — implement, say.';
+  if (typeof name !== 'string' || !name.trim()) return `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`;
+  const as = `\`${name}\` is not a step's name:`;
+  if (/[\\/]/.test(name)) return `${as} a step is a file in its workflow's folder, and a slash names a file in another. ${fix}`;
+  if (/[\u0000-\u001f\u007f]/.test(name)) return `${as} it holds a control character — ${JSON.stringify(name)} — which a line of frontmatter cannot. ${fix}`;
+  if (name.startsWith('.')) return `${as} a name that starts with a dot is a hidden file, which a person listing the folder does not see. ${fix}`;
+  if (name !== name.trim()) return `${as} \`after:\` trims every name it lists, so no step could wait on it. Write it without the spaces around it.`;
+  if (name.includes(',')) return `${as} \`after:\` and \`input:\` split on every comma, so no step could wait on it. ${fix}`;
+  if (/\.md$/i.test(name)) return `${as} it is a file's name, and a step is named without its .md: \`${name.slice(0, -3)}\`.`;
+  if (isReadme(`${name}.md`)) return `${as} ${name}.md is the folder's README, which says what the workflow is for and is never read as a step. ${fix}`;
+  if (new TextEncoder().encode(`${name}.md`).length > 255) return `${as} ${name}.md is longer than a file's name may be, 255 bytes. ${fix}`;
+  return undefined;
+}
+
 /** The files of a folder that are steps: every `.md` but its README, sorted. */
 const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 
@@ -693,7 +780,20 @@ export function loadWorkflows(dir: string): Workflow[] {
   const read = (file: string): string | undefined => {
     try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
   };
-  const steps = files.map((f) => parseWorkflow(path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8'), read));
+  return parseFolder(files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]), read);
+}
+
+/**
+ * A folder's steps from the text of their files, `[name, text]` a step, checked as a folder on disk is checked: each step parsed, in the order
+ * of its file's name as a folder lists them, then the ways the steps do not form a workflow (`validate`), and in the order they run. Pure:
+ * `read` answers for a file beside the steps, as `parseWorkflow`'s does.
+ *
+ * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a folder
+ * written is refused for what a folder read would be, in the same words.
+ */
+export function parseFolder(files: ReadonlyArray<readonly [name: string, text: string]>, read?: (file: string) => string | undefined): Workflow[] {
+  const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
+  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read));
   validate(steps);
   return orderSteps(steps);
 }

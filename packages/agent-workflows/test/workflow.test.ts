@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
+import { parseFolder, renderStep, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -612,6 +613,24 @@ test('an `output:` file that is not there is refused at load, with the fix', () 
   assert.throws(() => parseWorkflow('review', '---\noutput: review.schema.json\n---\nreview it\n'), /review: `output: review\.schema\.json` names a file beside the step, and this step was read without its folder/);
 });
 
+test('REFUSED at load: an `output:` naming a file outside the workflow folder — up and out, or absolute — though the file is there and strict', () => {
+  const outside = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'wf-outside-')), 'review.schema.json');
+  fs.writeFileSync(outside, JSON.stringify(FINDINGS));
+  const naming = (file: string) => ({ 'review.md': `---\nafter: implement\noutput: ${file}\n---\nreview it\n` });
+  const fix = 'names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside review.md and name it from there — `output: review.schema.json` — or delete the line, and the step declares no output.';
+
+  const up = path.relative(outputFolder(), outside);
+  assert.match(up, /^\.\.\//, 'a path that climbs out of the folder');
+  assert.equal(refusal(naming(up)), `review: \`output: ${up}\` ${fix}`);
+  assert.equal(refusal(naming(outside)), `review: \`output: ${outside}\` ${fix}`);
+  assert.equal(refusal(naming('schemas/../../review.schema.json')), `review: \`output: schemas/../../review.schema.json\` ${fix}`, 'out, however it is spelled');
+  // Read without its folder, it is refused all the same: where the file is, not whether it can be read.
+  assert.throws(() => parseWorkflow('review', naming(outside)['review.md']), (e: Error) => e.message === `review: \`output: ${outside}\` ${fix}`);
+
+  // The same file, and a path that only passes through a folder, inside, loads.
+  assert.deepEqual(loadWorkflows(outputFolder({ ...naming('schemas/../review.schema.json') })).find((s) => s.name === 'review')!.output?.schema, FINDINGS);
+});
+
 test('an output schema that is not strict is refused, and says where', () => {
   const items = FINDINGS.properties.findings.items;
   const withItems = (changed: object) => ({ ...FINDINGS, properties: { findings: { type: 'array', items: { ...items, ...changed } } } });
@@ -845,4 +864,190 @@ test('REFUSED at shipped defaults: `workflowFolder` on a name the repository doe
   const bare = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-bare-'));
   assert.throws(() => workflowFolder('dev', bare, bare),
     refused(`no workflow folder at ${path.join(bare, 'dev')}, nor a workflow named dev in ${path.join(bare, 'workflows')}. Give the path to a workflow folder, or the name of a folder of steps under ${path.join(bare, 'workflows')}.`));
+});
+
+/** A folder's own files, for `parseWorkflow`'s `read`, as `loadWorkflows` reads them. */
+const readIn = (dir: string) => (file: string): string | undefined => {
+  try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
+};
+
+/** Every workflow folder this repository ships: its `workflows/`, this package's own and its `ui`, and the examples. */
+const shippedFolders = (): string[] => {
+  const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
+  const pkg = path.join(import.meta.dirname, '..');
+  const examples = path.join(pkg, 'wf-examples');
+  return [
+    ...fs.readdirSync(root).map((name) => path.join(root, name)),
+    path.join(pkg, 'workflows'),
+    path.join(pkg, 'workflows', 'ui'),
+    ...fs.readdirSync(examples).map((name) => path.join(examples, name)),
+  ].filter((dir) => fs.statSync(dir).isDirectory());
+};
+
+test('`renderStep` is the parser run backwards: every step of every shipped folder, loaded, rendered and parsed again, is the step it was — and the folder rendered is the folder', () => {
+  const folders = shippedFolders();
+  const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
+  for (const name of ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui']) assert.ok(folders.includes(path.join(root, name)), `${name} is among them`);
+  assert.ok(folders.includes(path.join(import.meta.dirname, '..', 'workflows')), "and the package's own");
+  for (const dir of folders) {
+    const steps = loadWorkflows(dir);
+    const read = readIn(dir);
+    for (const step of steps) {
+      const text = renderStep(step);
+      assert.deepEqual(parseWorkflow(step.name, text, read), step, `${path.relative(root, dir)}/${step.name}.md, rendered:\n${text}`);
+      assert.equal(renderStep(parseWorkflow(step.name, text, read)), text, 'and renders to the same text again');
+    }
+    assert.deepEqual(parseFolder(steps.map((step) => [step.name, renderStep(step)]), read), steps, dir);
+  }
+  // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then the body.
+  const review = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'review')!;
+  assert.ok(renderStep(review).startsWith([
+    '---', 'after: implement', 'harness: claude', 'model: opus', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
+  ].join('\n')), renderStep(review));
+  assert.doesNotMatch(renderStep(review).split('\n---\n')[0]!, /^#/m, 'the file has comments in its frontmatter, and the step does not carry them');
+  assert.match(fs.readFileSync(path.join(root, 'dev', 'review.md'), 'utf8'), /^# /m);
+});
+
+test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
+  const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
+  const values: Record<StepKey, string> = {
+    after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
+    tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
+    check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
+  };
+  const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
+  for (const key of STEP_KEYS) assert.notEqual(step[key], undefined, key);
+  const text = renderStep(step);
+  assert.equal(text, [
+    '---',
+    'after: implement',
+    'resume: implement',
+    'input: implement',
+    'harness: claude-detached',
+    'model: opus',
+    'effort: xhigh',
+    'permissionMode: dontAsk',
+    'tools: Read, Grep, Glob, Bash',
+    'disallow: Bash(npm run build), SendMessage',
+    'remote: true',
+    'deadlineSeconds: 900',
+    'maxAttempts: 2',
+    'budget: 2.5',
+    'check: npm test && node -e "console.log(1 ? 2 : 3)"',
+    'retries: 0',
+    'gate: true',
+    'output: review.schema.json',
+    'loop: implement',
+    'rounds: 2',
+    '---',
+    'Do the work.',
+    '',
+    'All of it.',
+    '',
+  ].join('\n'));
+  assert.deepEqual(parseWorkflow('review', text, read), step);
+  // `remote: false` is a setting the parser reads, and is written; `retries: 0` too.
+  assert.match(renderStep({ ...step, remote: false }), /^remote: false$/m);
+});
+
+test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input` or `disallow` are no line — and a step that sets nothing is its body', () => {
+  const bare: StepDraft = { name: 'implement', after: [], body: 'Implement it.' };
+  assert.equal(renderStep(bare), 'Implement it.\n');
+  assert.equal(renderStep({ ...bare, harness: undefined, input: [], disallow: [], model: null } as unknown as StepDraft), 'Implement it.\n', 'as the board lists a step: null and [] for what it does not set');
+  assert.deepEqual(parseWorkflow('implement', renderStep(bare)), { ...parseWorkflow('implement', 'Implement it.') }, 'and reads back as the step');
+
+  // A draft names its `output:` by file, and the schema is read from the folder; a loop's rounds are the default when it sets none.
+  const draft: StepDraft = { name: 'review', after: ['implement'], body: 'Review it.', output: { file: 'review.schema.json' }, loop: 'implement' };
+  const text = renderStep(draft);
+  assert.equal(text, '---\nafter: implement\noutput: review.schema.json\nloop: implement\n---\nReview it.\n');
+  const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
+  assert.deepEqual([parseWorkflow('review', text, read).output?.schema, parseWorkflow('review', text, read).rounds], [LOOPING, DEFAULT_ROUNDS]);
+
+  // A body that opens on `---` keeps an empty frontmatter before it, or it would be read as one.
+  const rule: StepDraft = { name: 'implement', after: [], body: '---\nThe brief, below a rule.' };
+  assert.equal(renderStep(rule), '---\n\n---\n---\nThe brief, below a rule.\n');
+  assert.throws(() => parseWorkflow('implement', '---\n---\n---\nThe brief, below a rule.\n'), /`---` is not `key: value`/, 'an empty block would not do');
+  assert.equal(parseWorkflow('implement', renderStep({ ...rule, model: 'opus' })).body, '---\nThe brief, below a rule.', 'nor is one needed after keys');
+  assert.equal(parseWorkflow('implement', renderStep(rule)).body, '---\nThe brief, below a rule.');
+});
+
+test("REFUSED by `renderStep`, in the parser's words where the parser has them: a key no step has, `guide`; and what a file cannot hold — a line break in a value, a comma in a step's name in a list", () => {
+  const step: StepDraft = { name: 'review', after: ['implement'], body: 'Review it.' };
+  const parsersWords = (lines: string): string => {
+    try { fm('review', lines); } catch (e) { return (e as Error).message; }
+    return assert.fail(`${lines} parsed`);
+  };
+  const refused = (draft: object) => (e: unknown) => e instanceof WorkflowError && e.exitCode === 2 && e.message === message(draft);
+  const message = (draft: object): string => {
+    try { renderStep(draft as StepDraft); } catch (e) { return (e as Error).message; }
+    return assert.fail(`${JSON.stringify(draft)} rendered`);
+  };
+
+  assert.equal(message({ ...step, afer: ['implement'] }), parsersWords('afer: implement'), 'a key no step has: the parser\'s sentence');
+  assert.match(message({ ...step, afer: ['implement'] }), /^review: `afer` is not a key a step has\. A step's keys are: after, /);
+  assert.equal(message({ ...step, guide: 'CLAUDE.md' }), parsersWords('guide: CLAUDE.md'));
+  assert.throws(() => renderStep({ ...step, colour: 'red' } as StepDraft), refused({ ...step, colour: 'red' }));
+  assert.doesNotThrow(() => renderStep({ ...step, colour: undefined, shade: null } as unknown as StepDraft), 'a key set to nothing is not set');
+
+  // Written as given, the break would end the line, and what follows would be a key of its own: a harness nobody chose.
+  const injected = { ...step, check: 'npm test\nharness: codex' };
+  assert.equal(message(injected), "review: `check` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line — commands joined with `&&`.");
+  assert.match(message({ ...step, model: 'opus\r' }), /^review: `model` holds a line break/);
+  assert.match(message({ ...step, tools: ['Read', 'Grep\nBash'] }), /^review: `tools` holds a line break/);
+
+  assert.equal(message({ ...step, after: ['implement, docs'] }),
+    "review: `after` lists `implement, docs`, and a list is split on every comma, so it would be read as `implement`, `docs`. A step's name has no comma: give each step an entry of its own.");
+  assert.match(message({ ...step, input: ['a,b'] }), /^review: `input` lists `a,b`/);
+
+  // What the parser judges, renderStep writes as given, for the parser to refuse.
+  for (const [draft, lines] of [
+    [{ ...step, tools: [] }, 'tools: '],
+    [{ ...step, model: '' }, 'model: '],
+    [{ ...step, deadlineSeconds: '5m' }, 'deadlineSeconds: 5m'],
+    [{ ...step, gate: false }, 'gate: false'],
+    [{ ...step, harness: 'banana' }, 'harness: banana'],
+    [{ ...step, disallow: ['Bash(git push, git reset)'] }, 'disallow: Bash(git push, git reset)'],
+    [{ ...step, output: {} }, 'output: '],
+  ] as const) {
+    const text = renderStep(draft as unknown as StepDraft);
+    assert.ok(text.includes(`\n${lines}\n`), text);
+    assert.throws(() => parseWorkflow('review', text), WorkflowError, lines);
+  }
+});
+
+test("`stepNameRefusal`: a step's name is its file's in the folder — REFUSED: none, a slash, a control character, a dot first, spaces around, a comma, its .md, the README's, too long", () => {
+  for (const name of ['implement', 'review-2', 'plan review', 'a.b', 'étape']) assert.equal(stepNameRefusal(name), undefined, name);
+  const fix = 'Name it as its file is named, without .md — implement, say.';
+  const cases: Array<[unknown, string]> = [
+    ['', `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`],
+    ['  ', `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`],
+    [undefined, `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`],
+    ['../review', `\`../review\` is not a step's name: a step is a file in its workflow's folder, and a slash names a file in another. ${fix}`],
+    ['ui\\review', `\`ui\\review\` is not a step's name: a step is a file in its workflow's folder, and a slash names a file in another. ${fix}`],
+    ['review\nharness: codex', `\`review\nharness: codex\` is not a step's name: it holds a control character — "review\\nharness: codex" — which a line of frontmatter cannot. ${fix}`],
+    ['..', `\`..\` is not a step's name: a name that starts with a dot is a hidden file, which a person listing the folder does not see. ${fix}`],
+    ['.review', `\`.review\` is not a step's name: a name that starts with a dot is a hidden file, which a person listing the folder does not see. ${fix}`],
+    [' review', "` review` is not a step's name: `after:` trims every name it lists, so no step could wait on it. Write it without the spaces around it."],
+    ['plan,review', `\`plan,review\` is not a step's name: \`after:\` and \`input:\` split on every comma, so no step could wait on it. ${fix}`],
+    ['review.md', "`review.md` is not a step's name: it is a file's name, and a step is named without its .md: `review`."],
+    ['README', `\`README\` is not a step's name: README.md is the folder's README, which says what the workflow is for and is never read as a step. ${fix}`],
+    ['readme', `\`readme\` is not a step's name: readme.md is the folder's README, which says what the workflow is for and is never read as a step. ${fix}`],
+    ['r'.repeat(253), `\`${'r'.repeat(253)}\` is not a step's name: ${'r'.repeat(253)}.md is longer than a file's name may be, 255 bytes. ${fix}`],
+  ];
+  for (const [name, why] of cases) assert.equal(stepNameRefusal(name), why, JSON.stringify(name));
+  assert.equal(stepNameRefusal('r'.repeat(252)), undefined, '252 and .md is 255');
+});
+
+test('`parseFolder` reads steps from their text as `loadWorkflows` reads a folder: in the order of their files, validated, in the order they run — refused in the same words', () => {
+  // `a-b.md` sorts before `a.md`, though `a` sorts before `a-b`: the files' order breaks the tie, as a folder lists them.
+  const files: Array<[string, string]> = [['a', 'first\n'], ['a-b', 'second\n'], ['c', '---\nafter: a\n---\nthird\n']];
+  const dir = folder(Object.fromEntries(files.map(([name, text]) => [`${name}.md`, text])));
+  assert.deepEqual(loadWorkflows(dir).map((s) => s.name), ['a-b', 'a', 'c']);
+  assert.deepEqual(parseFolder(files), loadWorkflows(dir));
+  assert.deepEqual(parseFolder([...files].reverse()), loadWorkflows(dir), 'whatever order they are given in');
+
+  const cycle: Array<[string, string]> = [['a', '---\nafter: b\n---\nx\n'], ['b', '---\nafter: a\n---\ny\n']];
+  const words = folderRefusal(folder(Object.fromEntries(cycle.map(([name, text]) => [`${name}.md`, text])))).message;
+  assert.equal(words, 'these steps wait on each other: a, b');
+  assert.throws(() => parseFolder(cycle), (e: Error) => e instanceof WorkflowError && e.message === words);
 });

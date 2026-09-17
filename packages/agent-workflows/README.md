@@ -91,6 +91,18 @@ workflow folder works too, looked at first. The board lists them, and the folder
 `~/.agent-workflows/workflows/` as yours, draws each, and starts a run of one (`apps/api`,
 `GET /api/workflows` and `POST /api/runs`). This package's own `workflows/` stays its shipped default.
 
+A folder can be written as well as read, and the board's builder saves through that write: `writeWorkflow(dir, steps, readme?)`
+in runner.ts. Each step is rendered by `renderStep` (workflow.ts), which is the parser run backwards: the keys the step sets, in
+the order listed below, each written as the parser reads it (a list as `a, b`, a count as its number, `output:` as the file it
+names), then the body. Before a byte is written, the folder as it would be is parsed in memory by `parseFolder`, the same reading
+`loadWorkflows` uses, with the schemas read from the folder as they are. So anything the parser would refuse is refused first, in
+its words and naming the step: a key a step does not have, an `after` naming no step, a cycle, a loop that is not a back edge, a
+schema that is not in the folder. A step name that is not a file name is refused too, and the folder is left as it was. Then each
+step's `<name>.md` is written; a file that already reads as its step is left alone, with its comments, since a render has none. The
+file of a step no longer in the set is removed. Schemas are never written, and the README only when one is given. The write goes
+to a workflow in the store's `workflows/` or a repository's, and anywhere else only with `{ anywhere: true }`, since it removes
+files. A run is not changed by it: a run froze its folder at `wf start`.
+
 A run lists its steps in the order they run, not in the folder's. Each step comes after every step its `after` names, and
 otherwise keeps the order it was given, which for a folder is by name; a loop's edge back orders nothing (`orderSteps`). So
 `wf start` on `plan → implement ⇄ review`, whose files sort implement, plan, review, prints `3 step(s): plan → implement → review`.
@@ -322,7 +334,8 @@ Review the change in this workspace as a second engineer would, and look at it a
   Its properties are merged into the closeout schema the step is filed with. The merged schema stays
   strict: every property required and no others allowed, because Codex enforces strict output
   schemas. At load, the run refuses a schema whose objects are not strict or that uses `$ref`, a schema that names
-  `outcome`, `summary`, `artifacts` or `needs`, and a file that is not there. Each refusal names the fix.
+  `outcome`, `summary`, `artifacts` or `needs`, a file that is not there, and a file outside the folder — absolute, or up
+  and out with `..` — before it is read. Each refusal names the fix.
 - **`input: <step>`** hands this step the producer's declared fields, under `## From <step>` in its
   brief, as JSON labelled as data. It gets those fields only, never the producer's summary, needs or
   artifacts. The producer must be a step this one waits on, directly or through `resume`, and must
@@ -1663,14 +1676,14 @@ holding a concurrency slot forever.
 
 | file | |
 |---|---|
-| `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a word the step's harness does not take, a `gate:` that is not `true`, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run; find a workflow folder by a path or by its name under `<repo>/workflows/` |
+| `src/workflow.ts` | the format: parse a folder of markdown, from disk or from text (`parseFolder`), and render a step back to it (`renderStep`); refuse an unknown key, a word the step's harness does not take, a `gate:` that is not `true`, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run; find a workflow folder by a path or by its name under `<repo>/workflows/` |
 | `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
 | `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`runAdmitted`**, whether the cap on runs in flight leaves them a slot, and which runs it holds (`heldRuns`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, **`approvalRefusal`**, whether `wf approve` may approve a step at its gate, and what a step is told, `## From <step>`, `## From run <id>`, `## Approved`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
-| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine and the two ceilings (`ceilings`), a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, queued, dropped and started from (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`, `startFromInbox`), a queued card started by the tick (`startQueued`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine and the two ceilings (`ceilings`), a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, queued, dropped and started from (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`, `startFromInbox`), a queued card started by the tick (`startQueued`), a workflow folder written from its steps (`writeWorkflow`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/cli.ts` | the verbs |
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):

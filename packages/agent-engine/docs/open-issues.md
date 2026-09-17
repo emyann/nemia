@@ -394,10 +394,18 @@ unsigned nudge says, it did not get either session to sign off; a person's sente
 **Effect.** A finished step costs a person's attention and a try to be read as done, on a path that is the common one
 for a long implement: the model summarises and stops.
 
-**Possible fix.** The nudge names the tool and says the work stands: "you ended without calling StructuredOutput; change
-nothing; call it now with your closeout". Measure on the next such session whether the wording alone closes it. The
-harness's `[structured-output-enforce]` message, seen on a step with an `output:` schema (run `the-queue-on-the-board-queue-ppu1`),
-did get a call; whether a step without a schema is given that enforcement is not known.
+**Fixed** (2026-09-17). The nudge names the tool and says the work stands: *"You ended without calling StructuredOutput,
+and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it.
+Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you
+cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-engine/src/domain.ts`). The words are the
+fix, so `test/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
+told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
+`claude --bg` runner reports it.
+
+**Not measured.** Whether the wording alone closes the next such session — the two that were measured were closed by a
+person. The harness's `[structured-output-enforce]` message, seen on a step with an `output:` schema (run
+`the-queue-on-the-board-queue-ppu1`), did get a call; whether a step without a schema is given that enforcement is not
+known.
 
 ## Verified live, once
 
@@ -599,6 +607,7 @@ did get a call; whether a step without a schema is given that enforcement is not
 | a `view` of a task whose harness cannot `find` — a `check`, a Codex step — or of any attempt in flight observed every harness, so each read of one cost a `claude agents` call and a Codex listing (§6 item 27, E7's last review) | a view observes its task's own harness, the one `harnessOf` names for `logs` and `transcript`, and the fallback's for a harness the engine no longer has | engine, §6 item 27 |
 | a session waiting on a permission prompt held a concurrency slot until a person answered or its deadline came, though it makes no API calls | the ceiling counts sessions observed `working`; `LIVE`, which still has `blocked`, keeps what else it guards (issue 19) | engine, 2026-09-16 |
 | two `claude` and two `claude-detached` sessions ran at a ceiling of 2 — four Claude Code sessions on one subscription, counted as two pools | a harness declares the pool it is counted in, its own name by default; `'claude-bg'` and the engine's `claudeDetached` are both counted in `claude`, with no caller saying so (issue 20) | engine, 2026-09-16 |
+| the nudge sent to a session that ended in prose asked for "your closing statement" and named no tool: twice it got no sign-off, and a person's sentence naming `StructuredOutput` got one in thirty seconds | the nudge names the tool and says the work stands, with its words pinned by a test (issue 25) | engine, 2026-09-17 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

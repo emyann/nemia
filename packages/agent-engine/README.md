@@ -583,11 +583,19 @@ reports how long a session has been quiet, and `decide` says what that means:
 
 `unsigned` is continued under `interrupted` and `always`, as `lost` is: the work in the transcript is real, and nobody
 has judged it, the session included. Its session is stopped first if it still runs — quiet is not gone — and the next
-attempt `--resume`s it, told why it is back instead of the brief it already has: *"You stopped without giving your
-closing statement, and this task asks for one. If the work is done, give it now. If it is not, finish the work, then
-give it. If you cannot finish, give it anyway, saying what stops you."* The nudge is journalled on the attempt's
+attempt `--resume`s it, told why it is back instead of the brief it already has: *"You ended without calling
+StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is
+being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then
+call it; if you cannot finish it, call it anyway, saying what stops you."* The nudge is journalled on the attempt's
 `starting` entry, and read as `state.attempts[n].nudge`. Out of attempts, the task settles `failed` with the note
 `N attempt(s), none succeeded: the last went quiet without the closing statement it was asked for`.
+
+**The nudge names the tool, and its words are pinned by a test.** It asked for "your closing statement" and named
+nothing until 2026-09-17, and twice that did not get a finished step to sign off: each had done all its work and ended
+its turn with a prose summary, and each signed off within thirty seconds of a person's `wf retry --message` naming
+`StructuredOutput` and saying to change nothing (issue 25). The tool's name is Claude Code's, and that is the only
+harness a nudge reaches — `unsigned` needs quiet, which only the `claude --bg` runner reports. Whether the wording
+alone closes the next such session is not measured.
 
 Quiet is counted from the later of the transcript's last write and the session's own start in `claude agents`: a
 continuation `--resume`s a transcript that may have been cold for an hour, and measured by the transcript alone it

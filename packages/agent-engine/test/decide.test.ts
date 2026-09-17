@@ -131,8 +131,17 @@ test('UNSIGNED with an attempt left: its session is stopped while it still runs,
   const a = decide(s, seen(), now(9));
   assert.equal(a.do, 'start');
   assert.equal(a.do === 'start' && a.resumeFrom, 'n1', 'continues the session: nobody judged that work, the session included');
-  assert.match(a.do === 'start' ? a.nudge ?? '' : '', /stopped without giving your closing statement/);
+  assert.match(a.do === 'start' ? a.nudge ?? '' : '', /^You ended without calling StructuredOutput/);
   assert.deepEqual(decide(s, seen([N1, 'stopped']), now(9)), a, 'a stopped session is let go enough');
+});
+
+test('THE NUDGE, word for word: it names the tool and says the work stands', () => {
+  // Pinned, not matched loosely: two sessions that had finished their work read a nudge asking for "your closing
+  // statement" and signed off for neither; a person's sentence naming StructuredOutput got each within thirty
+  // seconds (issue 25). The words are the fix, so changing them is a decision, not an edit.
+  const a = decide(fold(TASK, unsigned(2)), seen(), now(9));
+  assert.equal(a.do === 'start' ? a.nudge : undefined,
+    'You ended without calling StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you cannot finish it, call it anyway, saying what stops you.');
 });
 
 test("UNSIGNED under `resume: never` starts clean, and a clean start is told the brief, not a nudge", () => {

@@ -2859,41 +2859,54 @@ not offer is named, not worked around. The lockfile committed with the dependenc
 
 One `dev-planned-build` run, the plan waiting for approval; likely the largest apps change so far.
 
-## 8. A finished run is a decision waiting on a person, and shipping is a task
+## 8. The end of a run is a step of its workflow, and a finished run is a decision on the board
 
-**Registered** 2026-09-17, by the operator: a card started from the Inbox finished its run and, with nothing asking for a
-merge, it seemed to vanish — off the Factory (which shows runs in flight), a row in the Runs list among the finished, its
-result branch waiting for `wf decide` that nobody was told to run. "Since we don't have a guard at the end of this
-workflow that asks me to merge, it is just like it vanished."
+**Registered** 2026-09-17, by the operator. First as a pain: a card started from the Inbox finished its run and, with nothing
+asking for a merge, seemed to vanish — off the Factory, a row among the finished, its branch waiting for a `wf decide` nobody
+was told to run. Then as a design: the end of a run must not be a policy in code (merge, or a PR), because what a person does
+with a run's product varies — merge a branch, open a PR, publish a study, read an artifact and keep it — and the product
+should let each user write their own ending the way they write everything else here, in markdown.
 
-**What exists.** The run boundary is the gate (plan §5): a finished run's result is a branch, `wf decide` says ship it or
-drop it, and a person merges after a trial merge runs the suite. The board says `finished` and links `wf decide`; its
-"waiting on you" covers blocked, unsigned, over budget and at a gate — not a result nobody has decided. The Runs page
-groups in flight and finished; the Factory hides the finished by default. Nothing counts results to decide, and nothing
-on the board can merge.
+**What exists.** The run boundary is the gate (plan §5): a run's result is a branch, `wf decide` prints `git merge` and
+`git branch -D` as ship it and drop it, and a person merges after a trial merge. A run that succeeded with nothing committed
+counts as shipped for `--after`. The board says `finished`; its "waiting on you" covers blocked, unsigned, over budget and at
+a gate (§6, shipped 2026-09-17: `gate: true` on a step, `--gate <step>` at start, `wf approve`, Approve and Send back on the
+run page), never a result nobody has decided. Nothing counts results to decide.
 
-**What it needs.**
+**The shape.**
 
-- **The vocabulary:** a run at its result whose branch is not on the base and not deleted is *to decide* — a fifth reason a
-  run waits on a person, in `wf ls` (`→ to decide: ship it or drop it — wf decide <run>`), `listing`, and the api's `onYou`.
-  Shipped (the branch on the base), dropped (the branch gone) or forgotten (`wf rm`) ends it. Level-triggered: read off git
-  each pass, as `runReady` reads a parent.
-- **The board:** the Factory's header counts them (`2 to decide`) and keeps a to-decide card on the floor, marked, until it
-  is decided; the Runs page groups *To decide* between *In flight* and *Finished*; the run page's banner says it.
-- **Shipping as a task.** `wf ship <run>` files the trial merge as an engine task on the `check` harness — `git merge
-  --no-ff --no-commit <branch> && npm test && npm run typecheck [&& npm run build && npm run e2e] && git commit`, or
-  `git merge --abort` on any failure — so it outlives a tick, is stopped by `wf cancel`, has a deadline, and its exit
-  code is the verdict: `shipping`, then `shipped` or `ship failed (exit 1)` with the log. The command is the workflow's to
-  declare (`ship:` on the folder's README or a step key on the last step, default the check of its last checked step), never
-  a checkout's. The board offers Ship and Drop on a to-decide run — the seventh and eighth guarded writes after the builder's
-  — which is what a phone needs once Remote Control (§2) lands. `wf decide` keeps its commands for the person who wants
-  them by hand.
-- **The watch:** whoever supervises (§2's supervisor, or the operator's session) reads *to decide* off `wf ls`, not off the
-  ids it filed: a card the operator starts from the board is theirs to be asked about too.
+- **The end is a step.** What happens when the work is done is the workflow's last step, in prose. `workflows/dev/ship.md`
+  says: trial merge onto the base branch, the full check, commit or abort, in the folder's own words — a person can read and
+  edit it, and another repository's says "open a PR with the closeout as the body" instead. A research workflow has no such
+  step. Nothing in the packages knows what shipping means.
+- **The gate is the decision.** `gate: true` on that last step (or `--gate ship` at start) stops the run before it runs:
+  the board shows *waiting on you: approve ship* with the closeout rendered, the branch's diff, the screenshots; Approve with
+  words runs the step, Send back objects. This is the loop the operator's session ran by hand on 2026-09-16 and 17, without
+  a supervisor.
+- **A research run is the same shape with nothing after the gate.** Its last step, the study, is gated; approving it is the
+  acceptance; the product is the closeout and the artifacts in the store; nothing is merged and nothing is dropped —
+  dropping deletes a branch, and this branch holds nothing. The run stays as a record until `wf rm`.
+- **`wf decide` reports facts, not verbs:** what the branch holds against the base (on it, ahead by N, gone), the closeout,
+  the artifacts, and what the last step would do next in the folder's words, with the command that approves it. The git
+  commands remain only for a folder whose last step is not an ending — the hand-driven fallback, as today.
+- **To decide**, a fifth reason a run waits on a person: a run at its result whose last gated step nobody has approved; or,
+  in a folder with no gated ending, whose branch is ahead of the base and not gone. Approval, or git, ends it; level-triggered,
+  read each pass. `wf ls` says `→ to decide: <last step's first line> — wf approve <run> <step>`; the api's `onYou` carries
+  it; the Factory's header counts them (`2 to decide`) and keeps such a card on the floor, marked, until decided; the Runs page
+  groups *To decide* between *In flight* and *Finished*; the run page's banner says it.
+- **`workspace: main` on a step**: it runs in the repository's checkout rather than a worktree, since merging onto the base
+  is the one thing a worktree cannot do; refused on any step with a `check:`, and on any step that is not the last; its
+  session gets the checkout's `.claude/settings.json` as any step does. The `dev*` folders gain `ship.md` with it, gated by
+  default — so every run of them stops at Approve, the way the operator decided each merge by hand today — and the fence
+  test holds it to the same denies as implement.
+- **`--after` is unchanged:** a child starts when its parent is shipped as git sees it (the branch on the base, or nothing
+  to commit), which a run's `ship.md` makes true when it merges, and a research run makes true by succeeding.
 
-One agent-workflows run (the vocabulary, `wf ship`, the ship task, tests that refuse: a ship of a run not at its result, of
-one whose branch is gone, of one already shipped; a failed trial merge aborted with the tree clean), then one apps run
-(the counts, the group, Ship and Drop on the run page, e2e with a to-decide run in the seed).
+One agent-workflows run (`workspace: main`; *to decide* in `assess`, `listing` and the vocabulary; `wf decide`'s facts;
+`ship.md` on the four `dev*` folders, gated; tests that refuse: a check on a main-workspace step, a main workspace on a step
+that is not last, a to-decide run that never reads shipped, an approved ending that runs and a sent-back one that does not),
+then one apps run (the counts, the group, the banner; the run page's gate panel showing the diff and the artifacts beside the
+closeout; e2e with a to-decide run and an approved ending in the seed).
 
 ## 9. The supervisor: what the operator's session did on 2026-09-16 and 17, as a step that never ends
 
@@ -2915,36 +2928,33 @@ on each, then wrote down what it learned:
   and recorded the trap (engine open issue 24, CLAUDE.md);
 - **an idea from the operator:** registered as a section here with the design, filed as a run when told to.
 
-**The shape.** Three layers, two of which the packages already have or have registered:
+**The shape.**
 
-- **Machinery, no model:** the gate (§6, shipped), the queue (§3, shipped), *to decide* and `wf ship` as a task (§8), the
-  ceilings. These make every moment above a state the tick reads and the board shows, with a button. A person who runs
-  no supervisor still sees the gate pop on the board and acts on it there.
-- **The supervisor, a model:** a workflow of one step that never ends — `workflows/supervisor/`, harness `claude`, run in
-  the repository's main checkout rather than a worktree (its commits are bookkeeping: the plan, features.md, CLAUDE.md
-  lessons; a `workspace: main` key, refused on any step with a `check:`), `remote: true` so a phone can open it (§2),
-  and its tools the `wf` verbs plus git and the suite. Its brief is the loop above. **Its questions to the person are
-  gates on its own run:** at each decision it signs off `blocked` with the brief and the options in `needs`; the board
-  shows *waiting on you: approve supervisor* with the words box (§6's board half, shipped); the answer continues the
-  same session (`wf retry --message`, or Approve on the run page), so the session keeps its context as the operator's did
-  today. The supervisor takes a session slot but no run slot; the queue does not hold it. A step that never ends needs
-  what a long session needs: compaction is the harness's, the transcript is on the record, and `wf say` steers it.
-- **Policy as data:** what *ship* means is the repository's, not the supervisor's. `wf decide`'s commands come from
-  `decision`; a `ship:` policy — on the repository (a `.agent-workflows.json`, say) or the workflow's README — names it:
-  `merge` (today: trial merge, the check, commit), or `pr` (`gh pr create` against the base with the closeout as the body,
-  then merge the PR when its checks pass, or leave that to the reviewer on the forge). `wf ship` runs the policy as the
-  task (§8); `wf decide` prints the policy's command; `isShipped` reads the branch on the base after a `git fetch`, which a
-  merged PR satisfies. The supervisor runs `wf ship` and reads its verdict; it never types git itself. A product user who
-  wants PRs changes one line and keeps the loop.
+- **Machinery first, no model:** the gate (§6, shipped), the queue (§3, shipped), the end as a step and *to decide* (§8).
+  These make every moment above a state the tick reads and the board shows, with a button. A person who runs no
+  supervisor sees the gate pop on the board and acts on it there. With §8, the merge the session ran by hand today is the
+  `ship.md` step a person approves.
+- **The supervisor, a model, reads the workflow's own markdown and never decides what an ending means.** A workflow of
+  one step that never ends — `workflows/supervisor/`, harness `claude`, `workspace: main` (§8; its commits are bookkeeping:
+  the plan, features.md, CLAUDE.md lessons), `remote: true` so a phone can open it (§2), and its tools the `wf` verbs plus
+  git and the suite. Its brief is the loop above. For a run to decide it reads the folder's README and last step — what
+  that workflow's ending is — the closeout, the diff and the screenshots, and prepares the decision: the brief a person
+  decides from. **Its questions to the person are gates on its own run:** it signs off `blocked` with the brief and the
+  options in `needs`; the board shows *waiting on you: approve supervisor* with the words box; the answer continues the
+  same session (`wf retry --message`, or the run page), so the session keeps its context as the operator's did. On a yes it
+  approves the run's own gate (`wf approve <run> ship`), and the folder's step does the shipping; the supervisor never types
+  git for a run. It takes a session slot and no run slot; the queue does not hold it.
+- **Stalls are its second job:** a run at its result is the common case, but a session gone quiet, one that signed off in
+  prose, one held by its own shell are what cost the operator's attention today. It reads them off the registry and the
+  transcript as the session did, continues with a note, ends a shell, and records the trap where the next agent reads.
 
-**What the supervisor would need that the packages lack today:** `workspace: main` on a step; `wf ship` and the policy
-(§8); a run that never ends (a step with no closeout schema that signs off `blocked` many times — `retryable` treats each
-answer as a try, which is what the plan step already does); the board's Approve box taking an *answer* as well as an
-approval (it does: Send back is the answer box); reading a run's screenshots from the store (the `look` skill, present);
-and one measurement — how long such a session lasts before the harness compacts it, and what it forgets.
+**What the supervisor would need that the packages lack today:** §8 in full (it is the supervisor's hands); a step that
+never ends — a step with no closeout schema that signs off `blocked` many times, each answer a try, which the plan step
+already does; a way for it to read a run's screenshots from the store (the `look` skill, present); and one measurement —
+how long such a session lasts before the harness compacts it, and what it forgets after.
 
-Order: §8 first (it is the supervisor's hands), then the step's `workspace: main`, then the workflow folder and a first
-run supervising this repository for a day, with the operator watching what it asks.
+Order: §8, then the workflow folder and a first run supervising this repository for a day, with the operator watching what
+it asks and what it gets wrong.
 
 ## Engine-side work
 

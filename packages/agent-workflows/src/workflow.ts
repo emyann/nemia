@@ -56,8 +56,9 @@ export type Workflow = {
    * way — and merging one of those branches onto the base branch is the one thing a worktree cannot do, since the base branch is
    * checked out in the repository. So the step that ends a run works where a person would.
    *
-   * Refused on a step with a `check:` — the run would execute it in a person's checkout, which is no verdict on the step's work —
-   * and on a step anything waits on, or one that ends a workflow beside another: a run has one ending (`validate`).
+   * Refused on a step with a `check:` — the run would execute it in a person's checkout, which is no verdict on the step's work — on one
+   * with a `resume:`, whose session ran in another directory and was told none of what an ending needs, and on a step anything waits on,
+   * or one that ends a workflow beside another: a run has one ending (`validate`).
    */
   workspace?: 'main';
   /** Everything below the frontmatter: what the agent is told. */
@@ -318,7 +319,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     name,
     after,
     resume: meta.resume,
-    workspace: workspaceOf(name, meta.workspace, meta.check),
+    workspace: workspaceOf(name, meta.workspace, meta.check, meta.resume),
     body,
     harness,
     model: meta.model,
@@ -650,7 +651,7 @@ export const WORKSPACES: readonly string[] = ['main'];
  * worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is a directory the run
  * would have to invent. Refused too on a step with a `check:`, whose command the run executes in the step's workspace.
  */
-function workspaceOf(step: string, workspace: string | undefined, check: string | undefined): 'main' | undefined {
+function workspaceOf(step: string, workspace: string | undefined, check: string | undefined, resume: string | undefined): 'main' | undefined {
   if (workspace === undefined) return undefined;
   if (workspace === 'worktree') {
     refuse(`${step}: \`workspace: worktree\` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues. Delete the line, or write \`workspace: main\` to run the step in the repository's own checkout.`);
@@ -660,6 +661,9 @@ function workspaceOf(step: string, workspace: string | undefined, check: string 
   }
   if (check !== undefined) {
     refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there after the step hands off — a verdict on whatever is in that checkout by then, not on this step's work. A step that ends a run runs its check itself, in its prose, and says in its closeout what it found. Delete one of the two lines.`);
+  }
+  if (resume !== undefined) {
+    refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`resume: ${resume}\` continues ${resume}'s session, which ran in the worktree ${resume} worked in — the same conversation, in another directory, told none of what this step needs. A step that ends a run starts cold, where the base branch is, and is told which branch to act on. Delete one of the two lines.`);
   }
   return 'main';
 }

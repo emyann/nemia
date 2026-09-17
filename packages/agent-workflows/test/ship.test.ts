@@ -74,6 +74,13 @@ const board = () => {
   return { e, tasks, filings, settle };
 };
 
+/** A folder of one step, for a run started `--after` another. */
+const oneStep = (): string => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-one-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  return dir;
+};
+
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 const BLOCKED = { outcome: 'blocked', summary: 'the check refused', artifacts: [], needs: 'read the suite' };
 
@@ -153,6 +160,25 @@ test('an approved ending is filed, in the repository\'s own checkout, and the me
   assert.deepEqual([decision.kind, toDecide, standings], ['shipped', undefined, [{ branch, where: 'on' }]]);
   // The run committed nothing of its own in that checkout: the merge commit is the step's, and the only one.
   assert.equal(git(repo, 'log', '-1', '--format=%s'), `Merge branch '${branch}'`);
+});
+
+test("a run another waited on hands forward what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing", async () => {
+  const { repo, id, branch, e, settle, tasks } = await atTheGate();
+  await approve(e, id, 'ship');
+  await advance(e, readRun(id));
+  git(repo, 'merge', '--no-ff', '--no-commit', branch);
+  git(repo, 'commit', '--no-edit');
+  settle(`${id}-ship`, 'succeeded', { ...SIGNED, summary: 'SHIP-ACCOUNT: merged it onto main, the check passed' });
+  await advance(e, readRun(id));
+
+  const child = start({ brief: 'read the flag', repo, workflowDir: oneStep(), after: [id] });
+  const filed = await advance(e, readRun(child.id));
+  assert.deepEqual(filed.filed, ['implement'], 'the parent shipped, so the child is filed');
+  const brief = tasks.get(`${child.id}-implement`)!.spec.brief;
+  assert.match(brief, new RegExp(`## From run ${id}\\n`));
+  assert.match(brief, /What implement said when it signed off, its `summary`:\n\n```text\ndid the work\n```/);
+  assert.doesNotMatch(brief, /SHIP-ACCOUNT/, "the ending's account is of the merge, and says nothing of the work");
+  assert.doesNotMatch(brief, /What ship said when it signed off/);
 });
 
 test('a sent-back ending merges nothing: the work is filed again, the checkout is untouched, and the gate holds again once it signs off', async () => {

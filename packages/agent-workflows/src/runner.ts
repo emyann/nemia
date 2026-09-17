@@ -19,7 +19,7 @@ export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, doll
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, endingSteps, firstLine, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
-import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, stepNameRefusal, terminalSteps, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
+import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
@@ -2590,8 +2590,15 @@ async function parentsOf(e: Engine, run: Run): Promise<(id: string) => ParentRun
 
 /**
  * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief, and
- * each terminal step's closeout on the engine's record of its current try, read as `wf decide` reads one (`closeoutOf`). Read once, on the
- * pass that files the roots. It never throws: a parent whose record or workflow no longer reads, a step never filed, a task the engine holds
+ * the closeout of each step whose work is that run's result (`resultSteps`), on the engine's record of its current try, read as `wf decide`
+ * reads one (`closeoutOf`). Read once, on the pass that files the roots.
+ *
+ * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: main`), that step's account
+ * is of the merge — "merged wf/…/implement onto main, the check passed" — and it declares nothing, so a child handed it would be handed
+ * nothing about the work. What the child wants is what the work said, which is the step the ending acts on. A folder with no ending step
+ * is unchanged: its terminal steps are its result.
+ *
+ * It never throws: a parent whose record or workflow no longer reads, a step never filed, a task the engine holds
  * no closeout for — a failed step whose work a person merged all the same — and a closeout that does not parse each say so in the section,
  * and the roots are filed all the same.
  */
@@ -2608,7 +2615,7 @@ async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<Paren
       continue;
     }
     const said: ParentStep[] = [];
-    for (const step of terminalSteps(steps)) {
+    for (const step of resultSteps(steps)) {
       const taskId = record.steps[step.name]?.taskId;
       if (!taskId) {
         said.push({ name: step.name, unreadable: 'it was never filed' });

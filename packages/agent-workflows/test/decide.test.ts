@@ -450,6 +450,21 @@ test("a folder whose last step is an ending: `wf decide` says what that step wou
   ]);
   assert.ok(!lines.some((l) => /ship it   git|drop it   git/.test(l)), 'the folder says what shipping is, so nobody is told to type it');
 
+  // A run that worked on the base branch itself (`--no-worktree`) says what it says about the base branch — and the ending's words all
+  // the same: it is the one screen that used to return before anything about the decision was printed.
+  const bare = start({ brief: 'add sub, directly', repo: aRepo(), workflowDir: dir, isolate: false });
+  const { e: bareEngine, settle: settleBare } = board();
+  await advance(bareEngine, readRun(bare.id));
+  settleBare(`${bare.id}-implement`, 'succeeded', SIGNED);
+  await advance(bareEngine, readRun(bare.id));
+  const direct = await screen(t, bareEngine, bare.id);
+  const worked = indexOf(direct, /^  worked directly on main; nothing to merge; the base was /);
+  const said = indexOf(direct, "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:");
+  assert.ok(worked < said, 'the branch facts, then what to decide');
+  indexOf(direct, `  approve it    wf approve ${bare.id} ship [--message "<words>"]`);
+  assert.ok(!direct.some((l) => /^  branch    /.test(l)), 'no standing: it would read `main is on main`');
+  assert.ok(!direct.some((l) => /ship it   git|drop it   git/.test(l)));
+
   // And `wf ls` says the same, in one line, where it says who the run waits on.
   const listed = await (async () => {
     const out: string[] = [];

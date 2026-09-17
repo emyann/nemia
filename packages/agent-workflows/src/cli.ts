@@ -859,16 +859,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         }
       }
 
-      // Worked on the base branch itself: `merge --no-ff main` into main is nothing, and
-      // `branch -D main` is not a command to print beside it.
+      // Worked on the base branch itself (`--no-worktree`): `merge --no-ff main` into main is nothing, `branch -D main` is not a command
+      // to print beside it, and a standing would read `main is on main`. What there is to decide is still said, below.
       if (decision.direct) {
         console.log(`\n  worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`);
         console.log(`  read it    git -C ${run.repo} diff ${run.baseRef}...${run.branch}`);
-        return;
-      }
-
-      // The facts about the result, before anything to do about it: where each branch stands against the base branch, as git says it now.
-      if (standings.length) {
+      } else if (standings.length) {
+        // The facts about the result, before anything to do about it: where each branch stands against the base branch, as git says it now.
         console.log();
         for (const s of standings) console.log(`  branch    ${branchWord(run, s)}`);
       }
@@ -887,8 +884,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       }
 
       // And with no ending step, the commands a person runs by hand: this folder says nothing about what happens when the work is done.
+      // None for a run that worked on the base branch itself: there is nothing to merge, and its own lines are above.
       const first = decision.branches[0];
-      if (first && !ending.length) {
+      if (first && !ending.length && !decision.direct) {
         console.log(`\n  ship it   git -C ${run.repo} merge --no-ff ${first}`);
         console.log(`  drop it   git -C ${run.repo} branch -D ${decision.branches.join(' ')}`);
       }

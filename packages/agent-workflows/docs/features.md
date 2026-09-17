@@ -2795,8 +2795,9 @@ What was built, four commits:
 
 What was measured:
 
-- From the root, `npx turbo run test --force`: agent-workflows 565 from 547, api 200 from 198 (the two new ones are the rows below), web
-  243 and agent-engine 317 unchanged. `npm run typecheck` clean in all four.
+- From the root, `npx turbo run test --force`, counted as this file counts them — tests, then passed and skipped: agent-workflows 569
+  (568 passed, 1 skipped), from 548; api 200, web 243 and agent-engine 326 (317 passed, 9 skipped) unchanged — the two api tests that
+  changed are the rows below, and no api test was added. `npm run typecheck` clean in all four.
 - New tests. `workflow.test.ts`: `workspace: main` read; `worktree`, another word, no value and the line twice refused; a `check:` beside
   it refused, either order; a step anything waits on, and one beside another ending, refused at load; the key rendered back in
   `STEP_KEYS` order. `run.test.ts`: `workspacePlan`, `resultSteps` and `tipBranches` on an ending; the brief that names the branches; the
@@ -2822,8 +2823,10 @@ What it leaves:
 - **An approval given and then a send-back of the work asked for.** `wf approve` refuses the second order, and `approvalRefusal` refuses
   approving while an ask is pending; but an approval written first and a send-back asked for after it stands for the next result too — the
   approval names the ending's try, which a send-back of another step does not spend. Approve after the work, not before it.
-- **The board's builder drops `workspace:`** until apps/web's own `WorkflowStepSpec` carries it. The api's does (`specOf`, `draftOf`), and
-  `builder.test.ts` holds a `dev` folder's round trip to it.
+- **The board's builder cannot set `workspace:`** until apps/web's own `WorkflowStepSpec` carries it — and `UNSET`, which a step drawn
+  starts from, and the key form's union. It does not lose it: `draftOf` and `changed` (`apps/web/src/lib/builder.ts`) spread the spec they
+  were given, so the key rides a round trip of a folder that already has it, and the api's side is lossless by type (`WorkflowStepSpec`,
+  `specOf`, `draftOf`), which `builder.test.ts` holds on a `dev` folder.
 - **A run with two endings.** `validate` refuses two `workspace: main` steps side by side, and `toDecide` names the first ending that waits;
   a workflow that deliberately ends wide with two gated endings is not something anybody has run.
 - **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes

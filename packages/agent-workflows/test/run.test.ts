@@ -3399,7 +3399,13 @@ test("an ending step is handed its own approval and the words given with it — 
 });
 
 test('REFUSED at an ending gate: `wf rm` holds the run and `wf cancel` calls it off — an approval would file the step that acts', () => {
-  assert.match(String(forgetRefusal(ENDS, atEnd(), DONE, [], signedDone, asked)), /ship waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve r-1 ship/);
+  assert.match(String(forgetRefusal(ENDS, atEnd(), DONE, [], signedDone, asked)), /ship waits at its gate for your approval, and it is filed once it is approved: wf approve r-1 ship/);
+  // A gate that holds a step which has run still says what the approval files: what waits on it.
+  const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
+  const gatedReview: Workflow[] = [ENDS[0]!, { ...ENDS[1]!, gate: true }, ENDS[2]!];
+  assert.match(String(forgetRefusal(gatedReview, run({ implement: 't1', review: 't2', ship: null }), DONE, [], signedDone, asked)),
+    /review waits at its gate for your approval, and what waits on it is filed once it is approved/);
+  assert.equal(forgetRefusal(ENDS, ran, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), [], signedDone, asked), null, 'an ending approved, run and signed off holds nothing');
   assert.deepEqual(cancelPlan(ENDS, atEnd(), DONE, signedDone, asked), { kind: 'cancel', stop: [] });
 });
 

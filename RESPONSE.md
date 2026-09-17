@@ -27,17 +27,20 @@ Two consequences worth reading as decisions, not details:
 ## Outside the package, which the brief reserved
 
 A new key in `STEP_KEYS` is not only the package's: `apps/api/src/builder.ts`'s `KINDS` does not typecheck
-without a row for it, and `WorkflowStepSpec`/`specOf` (`apps/api/src/workflows.ts`) drop a key they do not
-name, so the board's builder would silently delete `workspace: main` from `ship.md` on the next save. Both are
-one line each; four more lines are in api tests that pin this repository's `dev` folders, which now have a
-`ship` step. Nothing else in `apps/`, and nothing in `packages/agent-engine`.
+without a row for it, and `WorkflowStepSpec`/`specOf` (`apps/api/src/workflows.ts`) read a step through a typed
+literal, so a key they do not name never reaches the board at all. Both are one line each; four more lines are
+in api tests that pin this repository's `dev` folders, which now have a `ship` step. Nothing else in `apps/`,
+and nothing in `packages/agent-engine`.
 
-`apps/web`'s own mirror of that spec still drops the key, which is the board run's to fix (features.md says so
-under *What it leaves*). That is the one known gap, and it bites only a person who edits a `dev*` folder in
-the board's builder.
+`apps/web`'s own mirror of that spec does not name `workspace` either, so the board can neither show it nor set
+it on a step drawn there (`UNSET` in `apps/web/src/lib/builder.ts`). It does not lose it: the builder spreads
+the spec it was given, so a `dev` folder saved from the board keeps `workspace: main`. The board run adds the
+key to the mirror; until then the gap is *cannot edit*, not *drops*.
 
 ## For CLAUDE.md, if the merger agrees
 
 A trap worth the file, which cost a round here: **a key added to `STEP_KEYS` has three obligations outside the
 package** — `KINDS` in `apps/api/src/builder.ts` (or api typecheck fails), `WorkflowStepSpec` and `specOf` in
-`apps/api/src/workflows.ts` (or the builder drops it on save), and `apps/web/src/lib/api.ts`'s mirror.
+`apps/api/src/workflows.ts` (or the key never reaches the board), and `apps/web/src/lib/api.ts`'s mirror with
+`UNSET` beside it (or the board can read the key on a folder that has it, and never set it on one that does
+not).

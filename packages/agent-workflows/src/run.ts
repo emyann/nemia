@@ -2046,7 +2046,7 @@ const andList = (items: readonly string[]): string =>
  * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
  *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by deleting its file (`askAt`).
  * - **a step waiting at its gate** (`awaiting approval`), on a run nobody called off: something is due to be asked for, and an approval
- *   files what waits on it. Approve it, or call the run off first.
+ *   files what waits on it — or, at an ending step's gate, the step itself, which has not run. Approve it, or call the run off first.
  * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever.
  *
  * A cancelled run whose tasks have settled is forgettable: it files nothing, and its asks are never honoured. `steps` is undefined for a
@@ -2103,7 +2103,12 @@ export function forgetRefusal(
       atGates = steps.filter((s) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval').map((s) => s.name);
       if (atGates.length) {
         const one = atGates.length === 1;
-        held.push(`${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and what waits on ${one ? 'it' : 'them'} is filed once ${one ? 'it is' : 'each is'} approved: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`);
+        // What the approval would file: what waits on a step that has run and handed on — and the step itself, at an ending's gate, which
+        // holds before it is filed and has nothing waiting on it.
+        const files = atGates.every((name) => !run.steps[name]?.taskId) ? (one ? 'it is filed' : 'each is filed')
+          : atGates.some((name) => !run.steps[name]?.taskId) ? 'each is filed, or what waits on it is'
+          : `what waits on ${one ? 'it' : 'them'} is filed`;
+        held.push(`${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and ${files} once ${one ? 'it is' : 'each is'} approved: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`);
       }
     }
     if (due.length) held.push(`${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`);

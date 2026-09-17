@@ -821,6 +821,14 @@ test("`workspace: main` runs a step in the repository's own checkout, and a step
   refused('workspace: main\nworkspace: main', /^ship: `workspace` is set twice/);
 });
 
+test("REFUSED at load: a `resume:` on a step that runs in the repository's checkout — its session ran in another directory, and an ending starts cold", () => {
+  assert.throws(() => fm('ship', 'workspace: main\nresume: review'), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `resume: review` continues review's session, which ran in the worktree review worked in — the same conversation, in another directory, told none of what this step needs\. A step that ends a run starts cold, where the base branch is, and is told which branch to act on\. Delete one of the two lines\.$/.test(e.message));
+  assert.throws(() => fm('ship', 'resume: review\nworkspace: main'), /`workspace: main` runs the step in the repository's own checkout, and `resume: review`/, 'whichever order the two lines are written in');
+  // And each key on its own is read as it was: `resume:` implies `after:`, and an ending step waits on what it acts on.
+  assert.deepEqual([fm('ship', 'resume: review').resume, fm('ship', 'resume: review').after], ['review', ['review']]);
+  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main');
+});
+
 test("REFUSED at load: a `check:` on a step that runs in the repository's checkout — the run would execute it there, on whatever a person has in it", () => {
   assert.throws(() => fm('ship', 'workspace: main\ncheck: npm test'), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `check: npm test` is a command the run executes there after the step hands off — a verdict on whatever is in that checkout by then, not on this step's work\. A step that ends a run runs its check itself, in its prose, and says in its closeout what it found\. Delete one of the two lines\.$/.test(e.message));
   // Whichever order the two lines are written in, and with the check's own refusals still its own.

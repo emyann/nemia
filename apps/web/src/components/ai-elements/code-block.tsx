@@ -19,6 +19,8 @@ import type { HighlighterCore } from "shiki/core";
 // - the code as plain text until it is highlighted, and for `text` or code too long to be worth it, rather than
 //   nothing — a server render and a reader in a hurry both get the words;
 // - no line numbers, which nothing here asks for.
+// And its copy button is pressed with `onPress`: AI Elements has no React Aria variant, and the aria base's `Button` is
+// React Aria's.
 export type CodeLanguage = "json" | "bash" | "diff" | "typescript" | "tsx" | "markdown" | "text";
 
 /** Past this many characters a block is shown as it is: a long tool result is read, not admired. */
@@ -170,7 +172,7 @@ export const CodeBlockCopyButton = ({
   return (
     <Button
       className={cn("shrink-0", className)}
-      onClick={copyToClipboard}
+      onPress={copyToClipboard}
       size="icon"
       variant="ghost"
       {...props}

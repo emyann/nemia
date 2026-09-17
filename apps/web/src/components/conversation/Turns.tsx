@@ -118,7 +118,7 @@ const stateOf = (call: ToolCall, running: boolean): ToolState =>
 /** One call, folded to its line — its name, what it was about, how it went — and opened, its input and its result. */
 export function ToolCallView({ call, running, defaultOpen = false }: { call: ToolCall; running: boolean; defaultOpen?: boolean }) {
   return (
-    <Tool data-turn="tool" data-tool={call.name} defaultOpen={defaultOpen}>
+    <Tool data-turn="tool" data-tool={call.name} defaultExpanded={defaultOpen}>
       <ToolHeader title={call.name} detail={detailOf(call)} state={stateOf(call, running)} />
       <ToolContent>
         <ToolInput input={call.input} />
@@ -134,21 +134,30 @@ export function ToolCallView({ call, running, defaultOpen = false }: { call: Too
  */
 export function ToolRun({ turn, live, tail, defaultOpen = false }: { turn: ToolsTurn; live: boolean; tail: boolean; defaultOpen?: boolean }) {
   return (
-    <Collapsible data-turn="tools" className="group/tools" defaultOpen={defaultOpen}>
-      <CollapsibleTrigger className="flex w-full items-center gap-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground">
-        <ListTreeIcon className="size-4 shrink-0" />
-        {live && tail && turn.waiting > 0 ? <Shimmer as="span">{turn.summary}</Shimmer> : <span>{turn.summary}</span>}
-        {turn.failed > 0 && (
-          <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{turn.failed} failed</span>
-        )}
-        <ChevronDownIcon className="size-4 shrink-0 transition-transform group-data-[state=open]/tools:rotate-180" />
-      </CollapsibleTrigger>
-      <CollapsibleContent className="mt-2 space-y-2 border-l pl-4">
-        {turn.turns.map((inner) => (
-          // A thought in a fold is followed by a call, so it is never the one being had now.
-          <TurnView key={inner.key} turn={inner} live={live} last={false} tail={tail} />
-        ))}
-      </CollapsibleContent>
+    <Collapsible data-turn="tools" className="group/tools" defaultExpanded={defaultOpen}>
+      {({ isExpanded }) => (
+        <>
+          <CollapsibleTrigger className="flex w-full items-center gap-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <ListTreeIcon className="size-4 shrink-0" />
+            {live && tail && turn.waiting > 0 ? <Shimmer as="span">{turn.summary}</Shimmer> : <span>{turn.summary}</span>}
+            {turn.failed > 0 && (
+              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">{turn.failed} failed</span>
+            )}
+            <ChevronDownIcon className="size-4 shrink-0 transition-transform group-data-expanded/tools:rotate-180" />
+          </CollapsibleTrigger>
+          {/* Its calls drawn only while it is open, and spaced inside the panel: a closed panel is hidden, not taken out (`ToolContent`). */}
+          <CollapsibleContent>
+            {isExpanded && (
+              <div className="mt-2 space-y-2 border-l pl-4">
+                {turn.turns.map((inner) => (
+                  // A thought in a fold is followed by a call, so it is never the one being had now.
+                  <TurnView key={inner.key} turn={inner} live={live} last={false} tail={tail} />
+                ))}
+              </div>
+            )}
+          </CollapsibleContent>
+        </>
+      )}
     </Collapsible>
   );
 }

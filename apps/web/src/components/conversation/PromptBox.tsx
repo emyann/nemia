@@ -84,7 +84,7 @@ export function PromptBox({ runId, step, sayable, onSaid }: Props) {
               size="icon-sm"
               aria-label="Send"
               className="pointer-events-auto rounded-full"
-              disabled={closed || send.isPending || !text.trim()}
+              isDisabled={closed || send.isPending || !text.trim()}
             >
               <ArrowUpIcon />
             </Button>

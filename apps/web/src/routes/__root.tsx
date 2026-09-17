@@ -1,9 +1,11 @@
 import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { createRootRouteWithContext, Link, Outlet, useMatches, useRouterState } from '@tanstack/react-router';
+import { createRootRouteWithContext, Outlet, useMatches, useRouter, useRouterState } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 import { Workflow } from 'lucide-react';
+import { RouterProvider as AriaRouterProvider } from 'react-aria-components';
 import { NAV } from '@/components/nav';
+import { routeLink } from '@/components/routeLink';
 import {
   Sidebar,
   SidebarContent,
@@ -19,7 +21,6 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: Root,
@@ -29,9 +30,13 @@ function Root() {
   const path = useRouterState({ select: (state) => state.location.pathname });
   const fullBleed = useMatches({ select: (matches) => matches.some((match) => match.staticData?.fullBleed) });
   const section = NAV.find((item) => item.active(path))?.label;
+  const router = useRouter();
 
   return (
-    <TooltipProvider>
+    // React Aria's links navigate through this. Enter on a link makes the browser click it on keydown, and React Aria does not prevent that
+    // click: with no provider the browser follows it, and the whole page loads again. With one, React Aria takes the click and calls the
+    // router. A mouse click goes the same way, since `routeLink` leaves TanStack's own click handler off.
+    <AriaRouterProvider navigate={(href) => void router.navigate({ href })}>
       <SidebarProvider>
         <AppSidebar path={path} />
         <SidebarInset className="min-w-0">
@@ -51,9 +56,12 @@ function Root() {
       </SidebarProvider>
       <ReactQueryDevtools buttonPosition="bottom-left" />
       <TanStackRouterDevtools position="bottom-right" />
-    </TooltipProvider>
+    </AriaRouterProvider>
   );
 }
+
+/** A place in the menu: the sidebar's button, which is React Aria's link once it has an `href`, given the router's `to` and its preloading. */
+const NavLink = routeLink(SidebarMenuButton);
 
 function AppSidebar({ path }: { path: string }) {
   const { isMobile, setOpenMobile } = useSidebar();
@@ -67,14 +75,12 @@ function AppSidebar({ path }: { path: string }) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild tooltip="hkb">
-              <Link to="/" onClick={picked}>
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-foreground text-sidebar">
-                  <Workflow className="size-4" />
-                </span>
-                <span className="font-semibold tracking-tight">hkb</span>
-              </Link>
-            </SidebarMenuButton>
+            <NavLink to="/" size="lg" tooltip="hkb" onPress={picked}>
+              <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-sidebar-foreground text-sidebar">
+                <Workflow className="size-4" />
+              </span>
+              <span className="font-semibold tracking-tight">hkb</span>
+            </NavLink>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
@@ -84,12 +90,10 @@ function AppSidebar({ path }: { path: string }) {
             <SidebarMenu>
               {NAV.map((item) => (
                 <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton asChild isActive={item.active(path)} tooltip={item.label}>
-                    <Link to={item.to} onClick={picked}>
-                      <item.icon />
-                      <span>{item.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
+                  <NavLink to={item.to} isActive={item.active(path)} tooltip={item.label} onPress={picked}>
+                    <item.icon />
+                    <span>{item.label}</span>
+                  </NavLink>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

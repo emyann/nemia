@@ -396,7 +396,7 @@ test("a thought is drawn folded: a line that says it thought, and its text only 
   const [withText, without] = foldTranscript(thoughts).map((turn) => renderToStaticMarkup(createElement(TurnView, { turn, live: false, last: false, tail: false })));
   assert.match(withText!, /data-turn="thinking"/);
   assert.match(withText!, /aria-expanded="false"/);
-  assert.match(withText!, /data-state="closed"/);
+  assert.doesNotMatch(withText!, /data-expanded/, 'folded: its fold is not marked expanded');
   assert.match(withText!, /<p>Thought<\/p>/);
   assert.doesNotMatch(withText!, /The word goes in a file/, 'folded: its text is not drawn until it is opened');
   assert.match(without!, /<p>Thought, with no text kept<\/p>/, 'a thought the harness kept no text for says so');
@@ -416,7 +416,7 @@ test('a tool call is drawn with its result: folded, how its result says it went;
   assert.doesNotMatch(folded, /Permission denied/, 'folded: the result is behind its line');
 
   const opened = renderToStaticMarkup(createElement(ToolCallView, { call: turn.call, running: false, defaultOpen: true }));
-  assert.match(opened, /data-state="open"/);
+  assert.match(opened, /data-expanded="true"/);
   assert.match(opened, /command.{1,16}echo word &gt; WORD\.txt/, 'its input');
   assert.match(opened, />Error<\/h4>/);
   assert.match(opened, /WORD\.txt: Permission denied/, 'its result');
@@ -455,6 +455,27 @@ test('in a live fold with nothing said after it, every call still waiting is run
   // And refused: once the session is not live, or has said something since, a call with no result had none.
   assert.deepEqual(states(false, true), ['no-result', 'no-result']);
   assert.deepEqual(states(true, false), ['no-result', 'no-result']);
+});
+
+test("REFUSED: a closed fold draws none of its calls, and a closed call none of its input — React Aria's panel would keep them, hidden", () => {
+  const turns = foldTranscript([
+    { id: 'toolu_test', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Bash', input: { command: 'npm test' } } },
+    { id: 'toolu_test', at, role: 'user', kind: 'tool_result', result: { text: 'pass 233', isError: false } },
+    { id: 'toolu_types', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Read', input: { file_path: 'README.md' } } },
+  ]);
+  const fold = turns[0]!;
+  assert.ok(fold.kind === 'tools');
+  const closed = renderToStaticMarkup(createElement(ToolRun, { turn: fold, live: false, tail: false }));
+  assert.match(closed, /aria-expanded="false"/);
+  assert.doesNotMatch(closed, /data-turn="tool"/, 'closed: its calls are not drawn');
+  assert.doesNotMatch(closed, /border-l/, 'and nothing of what holds them, whose margin and border would show under the line');
+  const opened = renderToStaticMarkup(createElement(ToolRun, { turn: fold, live: false, tail: false, defaultOpen: true }));
+  assert.equal([...opened.matchAll(/data-turn="tool"/g)].length, 2, 'opened: both calls');
+
+  const call = fold.turns[0]!;
+  assert.ok(call.kind === 'tool');
+  const folded = renderToStaticMarkup(createElement(ToolCallView, { call: call.call, running: false }));
+  assert.doesNotMatch(folded, />Parameters<\/h4>|pass 233/, 'a closed call draws neither its input nor its result');
 });
 
 const { Markdown } = await import('../src/components/Markdown.tsx');

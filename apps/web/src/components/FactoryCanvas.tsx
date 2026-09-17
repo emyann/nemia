@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
 import {
   applyNodeChanges,
   Background,
@@ -16,7 +15,8 @@ import {
   type Edge,
   type NodeChange,
 } from '@xyflow/react';
-import { Button } from '@/components/ui/button';
+import { routeLink } from '@/components/routeLink';
+import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { ceilingsQuery, inboxQuery, type RunDetail, runQuery, type RunSummary } from '@/lib/api';
@@ -477,6 +477,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setOpen([]);
     setSelected(null);
   };
+  const finishedSwitch = useId();
   const toggleFinished = (on: boolean) => {
     setShowFinished(on);
     setFits((n) => n + 1);
@@ -517,10 +518,13 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
           </p>
           <CapLine queued={queued.length} queueError={queue.error} />
         </div>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <Switch checked={showFinished} onCheckedChange={toggleFinished} />
-          Show finished
-        </label>
+        {/* The aria switch is a label of its own, round its input, so its words are a label beside it that names that input. */}
+        <div className="flex items-center gap-2 text-sm">
+          <Switch id={finishedSwitch} isSelected={showFinished} onChange={toggleFinished} />
+          <label htmlFor={finishedSwitch} className="cursor-pointer">
+            Show finished
+          </label>
+        </div>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -567,13 +571,13 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
                   Click a run for its steps · drag a card or a step, and what waits on it follows · kept in this browser
                 </Panel>
                 <Panel position="top-right" className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={resetLayout}>
+                  <Button variant="outline" size="sm" onPress={resetLayout}>
                     Reset layout
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={collapseAll} disabled={!open.length}>
+                  <Button variant="outline" size="sm" onPress={collapseAll} isDisabled={!open.length}>
                     Collapse all
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={() => setFits((n) => n + 1)}>
+                  <Button variant="outline" size="sm" onPress={() => setFits((n) => n + 1)}>
                     Fit view
                   </Button>
                 </Panel>
@@ -630,6 +634,9 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
   );
 }
 
+/** A button that is a link to a route: React Aria's link in the button's look, given the router's `to` and its preloading. */
+const RouterLinkButton = routeLink(LinkButton);
+
 /** Nothing on the floor: say so, where the runs are, and that the queue beside it starts on its own. */
 function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
   return (
@@ -655,9 +662,9 @@ function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/runs">Go to Runs</Link>
-          </Button>
+          <RouterLinkButton to="/runs" variant="outline" size="sm">
+            Go to Runs
+          </RouterLinkButton>
         </CardContent>
       </Card>
     </div>

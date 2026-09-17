@@ -1027,7 +1027,11 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   folder only; `dev-build`) — three rounds, $55.91, **merged, `0f2fbc8`** (it ended its first try in prose; a continued try signed it
   off for 65 cents); **after B14:** B15 `the-web-app-s-components-on-3xq9` (apps: React Aria as the base, §7, the plan waiting
   for approval; `dev-planned-build`).
-Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The Factory's
+Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
+`each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
+the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,
+$31.02; the gap is registered as features.md §8 (a run *to decide*, and shipping as a task), and the watch now reads every run off
+`wf ls`. The Factory's
 ghosts for queued cards wait for W8, in its second round. Left: item 20 (settings, by hand). Items 27, 28, 30 and 31 are done.
 A line moves to *done* with the commit that landed it; the reasoning behind each stays in §4 and §4b.
 

@@ -102,7 +102,12 @@ export const inFlightFirst = <T extends Pick<RunSummary, 'id' | 'createdAt' | 's
 
 /** A cell on the Factory's grid: room for one card and the gap beside and below it. Cards are drawn to fit. */
 export const CELL_WIDTH = 320;
-export const CELL_HEIGHT = 220;
+/**
+ * A cell is as tall as the tallest card the board draws and the gap under it, as it is as wide as a card and the gap beside it: a card with
+ * four steps and a line of what one of them asks stands about 235 tall — the e2e's floor measures 233 and 234 — and at 220 the grid put the
+ * card beneath under its bottom edge on every layout. The card is capped to nothing: what a person has to act on is what would be cut.
+ */
+export const CELL_HEIGHT = 260;
 export const GRID_COLUMNS = 4;
 /** How wide a card is drawn (`w-72`): the rest of its cell is the gap to the next card. */
 export const CARD_WIDTH = 288;

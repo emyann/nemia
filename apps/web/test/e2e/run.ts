@@ -25,6 +25,7 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
+import { CELL_HEIGHT } from '../../src/lib/factory.ts';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, GATED, HELD, INBOX, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedQueue, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
@@ -140,6 +141,34 @@ async function dragBy(page: Page, grip: Locator, by: { x: number; y: number }, w
   await page.mouse.down();
   await page.mouse.move(x + by.x * zoom, y + by.y * zoom, { steps: 12 });
   await page.mouse.up();
+}
+
+/**
+ * Every card on the floor, in the canvas's own units whatever the zoom: where React Flow put it (`placeOf`), and how tall it is drawn.
+ * A card's node alone — a step's node is named `<run>/<step>`.
+ */
+const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: number; y: number; height: number }>> => {
+  const zoom = await zoomOf(page);
+  return page.locator('.react-flow__node[data-id]:not([data-id*="/"])').evaluateAll((nodes, z) => nodes.map((node) => {
+    const el = node as HTMLElement;
+    const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el.style.transform) ?? [];
+    return { id: el.getAttribute('data-id') ?? '', x: Number(m[1]), y: Number(m[2]), height: el.getBoundingClientRect().height / z };
+  }), zoom);
+};
+
+/**
+ * That no card on the floor reaches over the card beneath it: for each card, the nearest card down its own column starts below its bottom
+ * edge. The grid puts that card a cell's height below (`CELL_HEIGHT`), so a card drawn taller than its cell is over it wherever it is put.
+ */
+async function expectClearOfEachOther(page: Page): Promise<void> {
+  const cards = await cardsDrawn(page);
+  const over = cards.flatMap((card) => {
+    const beneath = cards.filter((other) => Math.abs(other.x - card.x) < 1 && other.y > card.y).sort((a, b) => a.y - b.y)[0];
+    return beneath && beneath.y < card.y + card.height
+      ? [`${card.id} is ${Math.round(card.height)} tall in a cell of ${CELL_HEIGHT}, and ${beneath.id} starts ${Math.round(beneath.y - card.y)} below it`]
+      : [];
+  });
+  if (over.length) throw new Refused(`no card on the floor reaches over the card beneath it — ${over.join('; ')}`);
 }
 
 const samePlace = (a: { x: number; y: number }, b: { x: number; y: number }): boolean => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
@@ -454,6 +483,14 @@ const PAGES: PageSpec[] = [
       await settled(page);
       await expectInside(card, floor, 'the card is on the floor');
       await expectCount(steps, 0, 'a closed card draws no step');
+      // And no card reaches over the card beneath it: the grid puts that one a cell's height below, so a card drawn taller than its cell —
+      // four steps and a line of what one of them asks is the tall card here — would be over it on every layout.
+      await expectClearOfEachOther(page);
+      // Photographed with the whole floor in view: every run there is, cards only, as the grid lays them out. No other picture has this one,
+      // and the tall cards are finished runs, off the floor until they are asked for.
+      await page.getByRole('button', { name: 'Fit view' }).click();
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `factory-laid-out-${await themeOf(page)}.png`), fullPage: true });
 
       // A click on the card, away from its title's link, unfolds the run's graph beside it — over the cell
       // the other run's card is in, which moves aside.

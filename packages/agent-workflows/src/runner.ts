@@ -1491,15 +1491,20 @@ export type Advanced = {
  * must not hold another run's for ever.
  */
 export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow[]): Promise<CheckoutHold | undefined> {
-  // Only a run whose folder ends in that checkout asks, and only one whose ending a person's word would file now (`mainClaim`): nothing
-  // else of a run works there. A run already in the checkout is not waiting for it.
-  if (!steps.some((s) => s.workspace === 'main')) return undefined;
-  const mine = await mainClaim(e, run);
+  const ending = steps.find((s) => s.workspace === 'main');
+  // Cheap, and first: a run reads the store only where a person's word would file its own ending (`endingAsked`) — the approval of one that
+  // has not run, or the ask for a try of one that has. A run with no such word is waiting for nothing, and one whose ending is in that
+  // checkout is not waiting for it either; neither needs anybody else's claim read.
+  if (!ending || run.cancelledAt || endingAsked(run, ending, readAsks(run.id).asks) === undefined) return undefined;
+  const runs = listRuns();
+  // The cap on runs in flight, read once for every claim here: a run it holds files nothing, so its ending claims nothing (`mainClaim`).
+  const slots = await runSlots(e, runs);
+  const mine = await mainClaim(e, run, slots.get(run.id));
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];
-  for (const other of listRuns()) {
+  for (const other of runs) {
     if (other.id === run.id || path.resolve(other.repo) !== mine.repo) continue;
-    const claim = await mainClaim(e, other);
+    const claim = await mainClaim(e, other, slots.get(other.id));
     if (claim) claims.push(claim);
   }
   return heldCheckouts(claims).get(run.id);
@@ -1515,10 +1520,13 @@ export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow
  * the engine to stop it and the engine settling it, because that session is still merging in that directory.
  *
  * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
- * that ended blocked (`endingAsked`) — and only where the pass would in fact file it: a send-back of the work un-holds the gate, and an ask
- * no tick honours files nothing, so an ending that will not be filed does not hold another run's.
+ * that ended blocked (`endingAsked`) — and only where the pass would in fact file it: a send-back of the work un-holds the gate, an ask no
+ * tick honours files nothing, a run waiting on runs that have not shipped files no root of its own (`runReady`), and neither does one the
+ * cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed does not hold another run's. Those last two are the
+ * questions `advance` asks before it files a ready step, and they bite only on a run with nothing filed: an ending is one when it is also
+ * its root, which a folder whose one step merges has. Neither touches a try, since a run with a try due has started.
  */
-async function mainClaim(e: Engine, run: Run): Promise<MainClaim | undefined> {
+async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promise<MainClaim | undefined> {
   let steps: Workflow[];
   try { steps = stepsOf(run); } catch { return undefined; }   // a record whose workflow no longer reads files nothing
   const ending = steps.find((s) => s.workspace === 'main');
@@ -1533,7 +1541,9 @@ async function mainClaim(e: Engine, run: Run): Promise<MainClaim | undefined> {
   const { views, phaseOf } = await taskPhases(e, run);
   const { asks, rounds } = readAsks(run.id);
   const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
-  return a.ready.includes(ending.name) || a.retry.some((r) => r.step === ending.name)
+  const parent = await parentsOf(e, run);
+  const files = runReady(run, (id) => parent(id).shipped) && runAdmitted(run, slot);
+  return (files && a.ready.includes(ending.name)) || a.retry.some((r) => r.step === ending.name)
     ? { id: run.id, repo, step: ending.name, holds: false, at }
     : undefined;
 }

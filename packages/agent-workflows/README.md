@@ -1150,7 +1150,10 @@ dropped. **Nothing in the packages knows what shipping means.**
   main` task of any run on the same repository is in flight, **nothing of another is filed** — not a first
   session, and not the try a person asks for after one ended blocked, which works in that same directory. It
   reads `waiting on the checkout (<run>'s ship has it)` on `wf ls`, on its own line or beside the try it is
-  waiting to take, and `wf decide` says which run's step has it. With nothing in the
+  waiting to take, and `wf decide` says which run's step has it. A claim on that checkout is a promise that the
+  pass would file the step, so a run whose ending it would not file claims nothing and holds nobody: one whose
+  work is being sent back, one waiting on a run that has not shipped, and one the cap on runs in flight holds —
+  the last two reachable where a folder's one step merges, which makes its ending its root. With nothing in the
   checkout, the oldest approval takes it. Level-triggered: the claims are read from the world on the pass that
   asks, including what that pass has already filed, so the order a pass reads the runs in decides nothing, and
   a restart changes nothing.

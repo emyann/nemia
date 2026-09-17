@@ -89,6 +89,18 @@ const loopingFolder = (): string => {
   return dir;
 };
 
+/**
+ * A folder whose ONE step merges: the shipped `workflows/dev/ship.md` with its `after:` dropped, which `validateMainWorkspace` allows —
+ * nothing waits on it, and nothing ends the workflow beside it. Its ending is also its root, which is the one way a run with nothing filed
+ * can be the run that wants the checkout.
+ */
+const mergeOnly = (): string => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-merge-'));
+  const shipped = fs.readFileSync(path.join(REPO_ROOT, 'workflows', 'dev', 'ship.md'), 'utf8');
+  fs.writeFileSync(path.join(dir, 'ship.md'), shipped.replace(/^after: review\n/m, ''));
+  return dir;
+};
+
 /** A folder of one step, for a run started `--after` another. */
 const oneStep = (): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-one-'));
@@ -286,6 +298,66 @@ test("a cancelled run holds the checkout while its ending's session is still in 
   assert.deepEqual((await advance(e, readRun(first.id))).filed, ['ship']);
   assert.equal(readRun(first.id).steps.ship!.workspace, repo);
 });
+
+test("a run whose ending the pass will not file claims no checkout: one waiting on a run that has not shipped, and one the cap on runs in flight holds, each hold nobody — however old their word", async () => {
+  // A merge-only run started `--after` one that is at its own gate, and so has not shipped: its ship is approved, and its word is the
+  // oldest — but `advance` files a root only once every run it waits on has shipped, so nothing of it will be filed.
+  const shared = board();
+  const repo = aRepo();
+  const waiting = await atTheGate({ repo, board: shared });
+  const child = start({ brief: 'ship the flag', repo, workflowDir: mergeOnly(), after: [waiting.id] });
+  const { file } = await approve(shared.e, child.id, 'ship');
+  fs.writeFileSync(file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+  assert.deepEqual((await advance(shared.e, readRun(child.id))).filed, [], 'it waits on a run that has not shipped');
+
+  await approve(shared.e, waiting.id, 'ship');
+  assert.deepEqual((await advance(shared.e, readRun(waiting.id))).filed, ['ship'], 'so the checkout goes to the run that would use it');
+  assert.equal((await list(shared.e, readRun(waiting.id))).steps.find((s) => s.name === 'ship')!.status, 'pending');
+
+  // And the same for a root the cap on runs in flight holds: it is not filed while a run is in flight, so its ending claims nothing.
+  const capped = board();
+  const other = aRepo();
+  const inFlight = await atTheGate({ repo: other, board: capped });
+  await approve(capped.e, inFlight.id, 'ship');
+  const queued = start({ brief: 'ship the flag', repo: other, workflowDir: mergeOnly() });
+  fs.writeFileSync((await approve(capped.e, queued.id, 'ship')).file, JSON.stringify({ at: '2026-09-17T05:00:00.000Z' }));
+  process.env.WF_MAX_RUNS = '1';
+  try {
+    assert.deepEqual((await advance(capped.e, readRun(queued.id), { inFlight: 1, cap: 1 })).filed, [], 'the cap holds its root');
+    assert.deepEqual((await advance(capped.e, readRun(inFlight.id))).filed, ['ship'], 'and its ending holds no other run\'s');
+  } finally { delete process.env.WF_MAX_RUNS; }
+});
+
+test("a run with nothing filed is held by the checkout like any other: its ending is its root, and a root is not filed into a directory another run's ship is in", async () => {
+  const shared = board();
+  const repo = aRepo();
+  const { e, settle } = shared;
+
+  // A run that ships, so the merge-only run's parent has shipped and nothing but the checkout is between it and being filed.
+  const parent = await atTheGate({ repo, board: shared });
+  await approve(e, parent.id, 'ship');
+  await advance(e, readRun(parent.id));
+  git(repo, 'merge', '--no-ff', '--no-commit', parent.branch);
+  git(repo, 'commit', '--no-edit');
+  settle(`${parent.id}-ship`, 'succeeded', SIGNED);
+  await advance(e, readRun(parent.id));
+  assert.equal(isShipped(readRun(parent.id), parent.branch), true);
+
+  // Another run at its ending's gate, its word the older, and the merge-only child of the shipped run.
+  const other = await atTheGate({ repo, board: shared });
+  fs.writeFileSync((await approve(e, other.id, 'ship')).file, JSON.stringify({ at: '2026-09-17T06:00:00.000Z' }));
+  const child = start({ brief: 'ship the flag', repo, workflowDir: mergeOnly(), after: [parent.id] });
+  fs.writeFileSync((await approve(e, child.id, 'ship')).file, JSON.stringify({ at: '2026-09-17T07:00:00.000Z' }));
+
+  assert.deepEqual((await advance(e, readRun(other.id))).filed, ['ship'], 'the older word takes the checkout');
+  assert.deepEqual((await advance(e, readRun(child.id))).filed, [], 'and the run with nothing filed waits for it');
+  assert.equal((await list(e, readRun(child.id))).steps[0]!.status, `waiting on the checkout (${other.id}'s ship has it)`);
+
+  settle(`${other.id}-ship`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(child.id))).filed, ['ship'], 'and is filed once that step settles');
+  assert.equal(readRun(child.id).steps.ship!.workspace, repo);
+});
+
 
 test("a `workspace: main` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever", async () => {
   const { first, second, e, tasks } = await twoApproved();

@@ -2882,6 +2882,11 @@ What was measured:
   and `wf decide` saying it on the screen of a run that is not running; a cancelled run holds the checkout until the engine has settled its
   session, which `ship.test.ts` reads between `wf cancel` and the stop; `run.test.ts` holds `heldCheckouts` to the oldest word, the id on a
   tie, a step already in it keeping it, and one repository at a time, and holds the word to the `waiting on …` prefix the board reads.
+- From its third round, one finding: a claim on the checkout is a promise the pass would file the step. `ship.test.ts` holds a merge-only
+  folder — one `workspace: main` step, which is its own root — to claiming nothing while it waits on a run that has not shipped and while
+  the cap on runs in flight holds it, with the oldest word of all; and to being held all the same, once its parent has shipped, by a step
+  that is in the checkout, and filed on the pass after that one settles. Each half fails without its gate, and the second fails on the
+  `hasStarted` shortcut that would have opened the reverse hole.
 - From its third: `run.test.ts` holds the ending to a loop going round — the round filed, the ending waiting, nothing to decide, and the
   gate held again once the loop hands on — and to a send-back between the ask and its filing; and holds a gate on a last step that merges
   nothing to its own words and to the branch still being a person's once approved. `decide.test.ts` refuses `--no-worktree` on a folder

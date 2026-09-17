@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, endingSteps, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -870,23 +870,22 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         for (const s of standings) console.log(`  branch    ${branchWord(run, s)}`);
       }
 
-      // What the folder's own ending step would do next, in its words, with the word that takes it. Its gate under its name says the
-      // same commands; this says what approving would run, which is the decision.
-      const ending = endingSteps(steps, run);
+      // What is left to decide: the step a person's word is waited on for. For an ending that has not run, what it would do, in the
+      // folder's own words, since approving is what runs it; for a gated step that has, nothing but the word — its closeout is above.
       if (toDecide?.kind === 'approve') {
         const step = steps.find((s) => s.name === toDecide.step)!;
-        const filed = Boolean(run.steps[toDecide.step]?.taskId);
-        console.log(`\n  to decide  ${step.name}${filed ? ' has signed off and waits for your word' : " has not run: this workflow's ending, and your approval is what runs it"}:`);
-        for (const line of step.body.split(/\n[ \t]*\n/)[0]!.split('\n')) console.log(`    ${line}`);
+        console.log(`\n  to decide  ${step.name}${toDecide.says === null ? ' has signed off and waits for your word' : " has not run: this workflow's ending, and your approval is what runs it"}:`);
+        if (toDecide.says !== null) for (const line of step.body.split(/\n[ \t]*\n/)[0]!.split('\n')) console.log(`    ${line}`);
         console.log(`\n  approve it    wf approve ${run.id} ${step.name} [--message "<words>"]`);
         for (const back of sendBackTo(step, run)) console.log(`  send it back  wf retry ${run.id} ${back} --message "<objection>"`);
         return;
       }
 
-      // And with no ending step, the commands a person runs by hand: this folder says nothing about what happens when the work is done.
+      // And where no step of the workflow merges (`merges`), the commands a person runs by hand: this folder says nothing about what
+      // happens when the work is done, whether its last step was gated or not, and its branch is still a person's to land or drop.
       // None for a run that worked on the base branch itself: there is nothing to merge, and its own lines are above.
       const first = decision.branches[0];
-      if (first && !ending.length && !decision.direct) {
+      if (first && !merges(steps) && !decision.direct) {
         console.log(`\n  ship it   git -C ${run.repo} merge --no-ff ${first}`);
         console.log(`  drop it   git -C ${run.repo} branch -D ${decision.branches.join(' ')}`);
       }

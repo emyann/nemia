@@ -682,8 +682,8 @@ another repository and change that line.
 `→ waiting on you` names every step that is blocked, unsigned, refused by its check, out of rounds, over
 budget, ended at its budget or awaiting approval — the last as `approve <step>` — and has no try or round due.
 `→ to decide` is the run's own end, said above it and never twice: the ending step's gate in the folder's words
-with the `wf approve` that runs it, or, in a folder with no ending step, the branch nobody has merged
-([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)).
+with the `wf approve` that runs it — or, once no gate holds, the branch nobody has merged, unless a step of
+the workflow merges it ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)).
 `wf decide` prints `FAILED CHECK:`, `CHECK DID NOT FINISH:`, `UNSIGNED:`, `UNVERIFIED:`, `ROUNDS EXHAUSTED`, `OVER
 BUDGET`, `BUDGET EXHAUSTED` and `AWAITING APPROVAL` first, then each check's command and exit code and, for a check
 that refused, the last 20 lines of stdout and of stderr.
@@ -1020,9 +1020,9 @@ which anything in this tool had ever shown anyone.
 
 `wf decide` is read-only. It reports facts and runs nothing. It ends with where each result branch stands
 against the base branch, as git says it now — `is on main`, `is ahead of main by 3 commits`, `is gone` — and
-then with what is left to decide: the folder's own ending step, if it has one, in its own prose, with the
-`wf approve` that runs it; or, in a folder with none, the exact `git merge --no-ff` and `git branch -D` a
-person types.
+then with what is left to decide: a last step waiting at its gate, with the `wf approve` that answers it — in
+its own prose where that step is an ending that has not run, since approving is what runs it — or, where no
+step of the workflow merges, the exact `git merge --no-ff` and `git branch -D` a person types.
 
 A run started with `--no-worktree` worked on the base branch itself, where git's answer to "has it
 landed" is always yes. `wf decide` never asks it for such a run: it says the run worked directly on its
@@ -1130,8 +1130,9 @@ dropped. **Nothing in the packages knows what shipping means.**
   where the work is instead of being told to read its workspace: the result branch, the base branch, and the
   `git log` and `git diff` between them. Refused by name on a step with a `check:` — the run would execute it
   in that checkout, which is a verdict on whatever is in it, not on the step's work, so an ending step runs
-  its check itself, in its prose — and, at load, on a step anything waits on or one that ends a workflow
-  beside another: a run has one ending.
+  its check itself, in its prose — on a step with a `resume:`, whose session ran in another directory — and, at
+  load, on a step anything waits on or one that ends a workflow beside another: a run has one ending. A run of
+  such a folder started `--no-worktree` is refused too: it has no result branch to merge.
 - **The gate is the decision, and it holds before the step is filed.** A gate holds what its approval decides.
   Where steps follow, that is the handoff, and the step runs first — a person reads what it produced. An
   ending step in the checkout produces nothing to read: it acts, where nothing can be taken back. So a gated
@@ -1144,10 +1145,17 @@ dropped. **Nothing in the packages knows what shipping means.**
   before it, so *has it shipped*, *what did it touch* and *what is there to decide* are asked of
   `wf/<run>/implement`, never of `main`, which would answer yes to everything.
 - **`→ to decide`**, the fifth reason a run waits on a person, beside blocked, unsigned, over budget and at a
-  gate. A run is one to decide when it is at its result and its last step's gate has nobody's approval — or,
-  in a folder with no ending step, when every step finished and a result branch is ahead of the base branch
-  and not gone. Level-triggered: the branches are read off git on the pass that asks and nothing is stored, so
-  a run whose branch a person merged by hand stops being one to decide without anybody telling the run.
+  gate. A run is one to decide when it is at its result and a last step's gate has nobody's approval — said in
+  that step's own prose where it is an ending that has not run, and by its name where it is a step that has
+  (approving that one accepts what it did) — or, where no step of the workflow merges, when every step
+  finished and a result branch is ahead of the base branch and not gone. Level-triggered: the branches are
+  read off git on the pass that asks and nothing is stored, so a run whose branch a person merged by hand
+  stops being one to decide without anybody telling the run. A run whose work is going round again, or whose
+  work a person has just sent back, has nothing to decide: the gate holds on what the work says, and the work
+  is being said again.
+- **`--no-worktree` is refused** on a workflow whose last step merges: such a run works on the base branch
+  itself, so it has no result branch for an ending to merge, and the refusal says so at `wf start`, before
+  anything is spent.
 
 ```text
 $ wf ls add-sub-8imz

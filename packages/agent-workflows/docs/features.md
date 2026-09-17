@@ -2776,9 +2776,11 @@ What was built, four commits:
   to the work, not to the ending, which has nothing of its own to object to (`sendBackTo`, `retryable`, `gateNote`, `gateLines`).
   `approvalRefusal` refuses approving one whose work is unfinished, and one whose work a send-back is asked for.
 - **`to decide`**, the fifth reason a run waits on a person, in `assess` and `listing` (`toDecide`, `ToDecide`, `toDecideWords`): the run is
-  at its result and its last step's gate has nobody's approval — `{ kind: 'approve', step, says }`, `says` being the first line of the
-  step's prose — or, in a folder with no gated ending, every step finished and a result branch is ahead of the base and not gone,
-  `{ kind: 'git', branches }`. Level-triggered: `branchStandings` asks git on the pass that asks and stores nothing, as `shipped` is asked
+  at its result and a last step's gate has nobody's approval — `{ kind: 'approve', step, says }`, `says` being the first line of the step's
+  prose for an ending that has not run and null for a gated step that has, whose closeout is what to read — or, where no step of the
+  workflow merges (`merges`), every step finished and a result branch is ahead of the base and not gone, `{ kind: 'git', branches }`. A
+  gate a run was started with, `--gate <the last step>`, is the second kind: approving accepts what that step did, and what becomes of the
+  branch is still a person's, so the git commands are printed for it. Level-triggered: `branchStandings` asks git on the pass that asks and stores nothing, as `shipped` is asked
   and not stored, so a branch a person merged by hand stops being one to decide with nobody telling the run. `wf ls` says
   `→ to decide: <the ending's first line> — wf approve <run> <step>`, above `→ waiting on you` and never the same step twice.
 - **`wf decide` reports facts**: `branch    wf/<id>/implement is ahead of main by 3 commits` (or `is on main`, or `is gone`), then
@@ -2792,11 +2794,19 @@ What was built, four commits:
   closeout. dev-planned's is dev's file for file; dev-planned-build's is dev-build's. CLAUDE.md's Git rule gained its one exception.
 - **`--after` is unchanged**, as §8 said: a child starts when git says the parent's result branch is on the base, which `ship.md` makes
   true when it merges; a run at any gate is not shipped, merged or not.
+- **What the gate holds on is the work, and work said again un-holds it.** A looping step that asked for another round signed off, so the
+  record alone reads it as handed on: an ending read off that word offered its merge in the pass that sent the work round again, and an
+  approval taken then named a try nothing spends, so the next round would have merged unread (`notHandedOn`, which `waitsAtGate` and
+  `approvalRefusal` share). The same for a person's send-back between the ask and the pass that files it, which `assess` and `listing`
+  take as waiting (`unheld`). Found by the review, round 3.
+- **`--no-worktree` is refused on a folder whose last step merges** (`stepsToStart`), before a run is written: such a run works on the base
+  branch itself, so there is no result branch for the ending to merge — it would be told the work is on the branch it is standing on, merge
+  a branch into itself, and pay for the folder's whole check to find nothing to commit. Found by the review, round 3.
 
 What was measured:
 
-- From the root, `npx turbo run test --force`, counted as this file counts them — tests, then passed and skipped: agent-workflows 569
-  (568 passed, 1 skipped), from 548; api 200, web 243 and agent-engine 326 (317 passed, 9 skipped) unchanged — the two api tests that
+- From the root, `npx turbo run test --force`, counted as this file counts them — tests, then passed and skipped: agent-workflows 575
+  (574 passed, 1 skipped), from 548; api 200, web 243 and agent-engine 326 (317 passed, 9 skipped) unchanged — the two api tests that
   changed are the rows below, and no api test was added. `npm run typecheck` clean in all four.
 - New tests. `workflow.test.ts`: `workspace: main` read; `worktree`, another word, no value and the line twice refused; a `check:` beside
   it refused, either order; a step anything waits on, and one beside another ending, refused at load; the key rendered back in
@@ -2816,8 +2826,13 @@ What was measured:
   review → ship`.
 - From the review's second round: `workflow.test.ts` refuses `resume:` beside `workspace: main`, either order, with each key on its own
   still read; `ship.test.ts` files a child `--after` a run whose ending merged and holds its brief to what the work said, never to the
-  ending's account of its own merge; `decide.test.ts` reads the whole screen of a `--no-worktree` run parked at the ending's gate, which
-  used to return before the decision was printed; `run.test.ts` holds `wf rm`'s words at both kinds of gate.
+  ending's account of its own merge; `decide.test.ts` reads the whole screen of a run parked at a gate that worked on the base branch
+  itself, which used to return before the decision was printed; `run.test.ts` holds `wf rm`'s words at both kinds of gate.
+- From its third: `run.test.ts` holds the ending to a loop going round — the round filed, the ending waiting, nothing to decide, and the
+  gate held again once the loop hands on — and to a send-back between the ask and its filing; and holds a gate on a last step that merges
+  nothing to its own words and to the branch still being a person's once approved. `decide.test.ts` refuses `--no-worktree` on a folder
+  whose last step merges, with nothing written, and reads both screens: the ending that has not run, in its prose, and the gated step that
+  has, by its name with its closeout above.
 
 What it leaves:
 

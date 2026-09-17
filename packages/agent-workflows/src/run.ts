@@ -231,6 +231,9 @@ export function assess(
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
   for (const name of roundSpans(steps, round)) if (status.get(name) === 'over budget') status.set(name, stood.get(name)!.own);
   for (const r of round) status.set(r.step, 'running');
+  // Nor is an ending held at its gate on work this pass files again (`unheld`): its gate holds on what the work says, and the work is
+  // being said again — a person's send-back, or a round.
+  for (const name of unheld(steps, run, retry, round)) status.set(name, 'waiting');
   const ready: string[] = [];
   const check: string[] = [];
   const blocked: string[] = [];
@@ -346,11 +349,10 @@ export function approvalRefusal(
         + `Approve ${name} once ${back.step} has signed off again — or, to take the result as it stands, take that ask back first: retry-${back.step}-${back.try}, in the run's .asks directory.`;
     }
     if (status !== 'awaiting approval') {
-      const unfinished = step.after.filter((a) => {
-        const dep = steps.find((x) => x.name === a);
-        return !dep || !satisfiesAfter(standing(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status);
-      });
-      return `${name} is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once ${andList(unfinished)} ${unfinished.length > 1 ? 'have' : 'has'} finished — `
+      // The same steps the gate itself waits on (`notHandedOn`), so the refusal cannot say one thing while the gate reads another: a
+      // looping step that asked for another round is one of them, though it signed off.
+      const unfinished = notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
+      return `${name} is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once ${andList(unfinished)} ${unfinished.length > 1 ? 'have' : 'has'} handed on — `
         + `your approval is then what files it, and nothing of it runs before that. See where the run stands: wf ls ${run.id}.`;
     }
   }
@@ -406,15 +408,47 @@ function waitsAtGate(
 ): boolean {
   // A cancelled run files nothing, so no gate of its holds anything: its unfiled steps read as the waiting steps they are.
   if (run.cancelledAt || !approvedFirst(step, run) || run.steps[step.name]?.taskId || approvalOf(run, step.name)) return false;
-  return step.after.every((name) => {
+  return notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).length === 0;
+}
+
+/**
+ * The steps an ending step waits on that have not handed their work on, in the workflow's order: one that has not satisfied `after`, and
+ * a looping step that asked for another round (`roundWanted`), whose work the run will file again. Pure.
+ *
+ * The round is the case a status alone does not tell: a looping step that says `again: true` below its cap reads `unverified` on its own
+ * work, since it signed off — and `assess` only calls it `running` when it sets the round due. An ending read off that word would hold its
+ * gate in the very pass that sends the work round again: `wf ls` would offer the merge while the reviewer was asking for a change, and an
+ * approval taken then names a try nothing spends, so the round's work would merge unread. `atGate` keeps the same rule for a gated step of
+ * its own loop; this is that rule for the step after one.
+ */
+function notHandedOn(
+  step: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf, verdictOf: (step: string) => Verdict | undefined,
+): string[] {
+  return step.after.filter((name) => {
     const dep = steps.find((s) => s.name === name);
-    if (!dep) return false;
+    if (!dep) return true;
+    if (dep.loop && roundWanted(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)) return true;
     // A predecessor that is approved first itself is read on its own work: `validate` refuses one that anything waits on, and reading it
     // so is what keeps this from asking itself where it stands.
-    return satisfiesAfter(approvedFirst(dep, run)
+    return !satisfiesAfter(approvedFirst(dep, run)
       ? ownStatus(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)
       : standing(dep, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status);
   });
+}
+
+/**
+ * The ending steps a pass is about to un-hold: those held at their gate, unfiled (`waitsAtGate`), that wait on a step this pass files
+ * again — a try due, or a step a round re-files (`roundSpans`). Pure.
+ *
+ * A person's `wf retry` of the work is the send-back at an ending's gate, and between the ask and the pass that files it the record alone
+ * still reads the work as handed on. Read off the record, such an ending would offer its merge in the very moment somebody objected to the
+ * work it would merge; so `assess` and `listing` take these steps as waiting, which is what the next pass will say anyway.
+ */
+export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Retry[], round: readonly Round[]): Set<string> {
+  const filing = new Set([...retry.map((r) => r.step), ...roundSpans(steps, round)]);
+  const held = steps.filter((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId && s.after.some((a) => filing.has(a)));
+  return new Set(held.map((s) => s.name));
 }
 
 /** The steps a send-back at a gate goes to: the gated step itself, once it has run — or, at a gate held before its step is filed, the steps it waits on, whose work the objection is about. Pure. */
@@ -437,10 +471,14 @@ export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding): string 
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
  * at a gate.
  *
- *   approve  the run is at its result and the gate on its last step has nobody's approval: that step is the folder's own ending, in prose,
- *            and approving it is what runs it — or, where the ending has already run, what accepts it
- *   git      the folder has no gated ending, every step of the run finished, and a result branch is ahead of the base branch and not gone:
- *            the branch is the product, and merging it or dropping it is a person's, by hand, as it always was
+ *   approve  the run is at its result and the gate on a last step has nobody's approval: `says` is what that step would do, in the folder's
+ *            own words, for an ending that has not run — and null for a gated step that has signed off, whose closeout is what to read,
+ *            since approving that one accepts what it did rather than letting it act
+ *   git      nothing waits at such a gate, every step of the run finished, no step of the workflow merges (`workspace: main`), and a result
+ *            branch is ahead of the base branch and not gone: the branch is the product, and merging or dropping it is a person's, by hand
+ *
+ * A folder whose ending merges answers for its own branch, so once that step has run there is nothing here to say; every other folder hands
+ * a person a branch, whether its last step was gated or not, and a gate approved is not a branch merged.
  *
  * Level-triggered: nothing is stored, the branches are read off git each pass, and a run whose branch a person merged stops being one to
  * decide without anybody telling the run. Nothing while the run is running, nor for a cancelled one.
@@ -453,28 +491,36 @@ export function toDecide(
   standings: readonly BranchStanding[] = [],
 ): ToDecide | undefined {
   if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined;
-  const ends = endingSteps(steps, run);
-  if (ends.length) {
-    const waiting = ends.find((s) => statusOf(s.name) === 'awaiting approval');
-    return waiting ? { kind: 'approve', step: waiting.name, says: firstLine(waiting.body) } : undefined;
-  }
+  const waiting = endingSteps(steps, run).find((s) => statusOf(s.name) === 'awaiting approval');
+  // What it would do, for an ending that has not run; its closeout, which the screen prints, for a gated step that has signed off.
+  if (waiting) return { kind: 'approve', step: waiting.name, says: run.steps[waiting.name]?.taskId ? null : firstLine(waiting.body) };
   // Only a run every step of which finished: one waiting on a person for a step that broke is waiting on them for that, and says so.
-  if (status !== 'succeeded') return undefined;
+  if (status !== 'succeeded' || merges(steps)) return undefined;
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
   return ahead.length ? { kind: 'git', branches: ahead } : undefined;
 }
 
 /**
+ * Whether the workflow has a step that acts on the base branch itself (`workspace: main`): the folder says what happens when the work is
+ * done, so nobody is handed its branch and told to type `git merge`. Pure.
+ */
+export const merges = (steps: readonly Workflow[]): boolean => steps.some((s) => s.workspace === 'main');
+
+/**
  * The workflow's ending steps: the steps nothing waits on that have a gate (`hasGate`). Pure.
  *
- * An ending is where the folder says, in prose, what happens when the work is done — merge it, open a pull request, publish the study —
- * and its gate is where a person decides. A folder with none ends by handing a branch to a person, and `wf decide` prints the git
- * commands for it, as it always did. Usually one; several only where a workflow deliberately ends wide.
+ * An ending is where a person's word ends the run. In a folder written for it, that step says in prose what happens when the work is done
+ * — merge it, open a pull request, publish the study — and where it acts on the base branch it says `workspace: main` and is held before it
+ * is filed. A gate a run was started with (`--gate <the last step>`) makes an ending of a step that was written as work: approving it is
+ * then acceptance, and what becomes of the branch is still a person's (`merges`). Usually one; several only where a workflow ends wide.
  */
 export const endingSteps = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): Workflow[] => terminalSteps(steps).filter((s) => hasGate(s, run));
 
-/** What a run waits on a person to decide (`toDecide`): its ending step, which approving runs — or its result branches, which git ships. */
-export type ToDecide = { kind: 'approve'; step: string; says: string } | { kind: 'git'; branches: string[] };
+/**
+ * What a run waits on a person to decide (`toDecide`): its ending step, which approving runs or accepts — or its result branches, which git
+ * ships. `says` is the ending's first line, what it would do, and null for a gated step that has already done it.
+ */
+export type ToDecide = { kind: 'approve'; step: string; says: string | null } | { kind: 'git'; branches: string[] };
 
 /** The first line of a step's prose, trimmed: what a folder says its ending step would do, on `wf ls` and `wf decide`. Pure. */
 export const firstLine = (body: string): string => body.split('\n').map((l) => l.trim()).find(Boolean) ?? '';
@@ -482,7 +528,7 @@ export const firstLine = (body: string): string => body.split('\n').map((l) => l
 /** What `wf ls` says after `→ to decide:`, and the board's banner: what is to be decided, and the command that decides it. Pure. */
 export const toDecideWords = (run: Pick<Run, 'id' | 'branch'>, t: ToDecide): string =>
   (t.kind === 'approve'
-    ? `${t.says} — wf approve ${run.id} ${t.step}`
+    ? `${t.says ?? `${t.step} has signed off at its gate`} — wf approve ${run.id} ${t.step}`
     : `${t.branches.join(', ')} ${t.branches.length > 1 ? 'are' : 'is'} ahead of ${run.branch}, and nothing has merged ${t.branches.length > 1 ? 'them' : 'it'} — wf decide ${run.id}`);
 
 /**
@@ -2943,6 +2989,8 @@ export function listing(
   const rounds = run.cancelledAt ? [] : roundsDue(steps, run, settledOf, readable, askedCloseout, roundAsks, spendOf);
   // And no step a round due files again reads held on its budget: a person raised the cap for the round (`roundSpans`).
   const refiled = roundSpans(steps, rounds);
+  // Nor does an ending step hold its gate while the work it would act on is filed again (`unheld`): it reads as the waiting step it is.
+  const waitingAgain = unheld(steps, run, due, rounds);
 
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
@@ -2979,7 +3027,7 @@ export function listing(
     // A root of a run waiting on runs names them, where the engine's `pending` would be once it is filed — and one the cap on runs in flight
     // holds says so, with the count: what waits on a root still says `waiting`. An ending step waiting at its gate says that instead: it is
     // not filed, and a person's approval is what files it.
-    if (!taskId && stands !== 'awaiting approval') {
+    if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       return { name, status: step.after.length ? 'waiting' : waiting.length ? waitWord(waiting) : held ? slotWord(held) : 'waiting', branch };
     }
 

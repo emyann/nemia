@@ -17,7 +17,7 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, endingSteps, firstLine, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
 import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
@@ -910,6 +910,16 @@ function stepsToStart(workflowDir: string, isolate: boolean): Workflow[] {
       'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
       'Either drop --no-worktree, or make the steps a chain.',
     );
+  }
+  // A run with no worktrees works on the base branch itself, so it has no result branch for an ending step to merge: that step would be
+  // told the work is on a branch it is already standing on, and its prose would merge a branch into itself. Refused before anything is
+  // spent, rather than after a session has paid for the folder's whole check to find there is nothing to commit.
+  const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
+  if (ending) {
+    throw Object.assign(new Error(
+      `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on ${'the base branch'} itself, where the work already is, so there would be nothing to merge.\n`
+      + `Either drop --no-worktree, or start a workflow whose last step is not an ending.`,
+    ), { exitCode: 2 });
   }
   // A check's task is its step's id plus `-check`, so a step named that would share an id with it and
   // the run would read one task as the other.

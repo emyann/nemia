@@ -1009,11 +1009,11 @@ const PAGES: PageSpec[] = [
         await expectVisible(rows.nth(i).getByText(`${LOOPING.id}-implement-${i + 1}`, { exact: true }), `row ${i + 1} names its own task`);
       }
       await expectVisible(target.locator('li[data-try="3"][aria-current="true"]'), 'the current round is the one selected');
-      // Round 2 selected: the Output tab shows its closeout, its reply as `finding → answer (why)`, and the other two rounds folded beneath.
+      // Round 2 selected: the Output tab shows its closeout, its reply as `finding → answer · why`, and the other two rounds folded beneath.
       await target.getByRole('button', { name: 'Show the closeout of round 2 · try 2 (round)' }).click();
       await expectVisible(target.locator('[data-shown-try="2"]'), "selecting round 2 opens its closeout in the Output tab");
       await expectVisible(target.getByText(LOOPING.earlier[1].implement, { exact: true }), `round 2's summary (${LOOPING.earlier[1].implement})`);
-      await expectVisible(target.locator('li[data-answer]', { hasText: LOOPING.replied }), `round 2's reply, as finding → answer (why)`);
+      await expectVisible(target.locator('li[data-answer]', { hasText: LOOPING.replied }), `round 2's reply, as finding → answer · why`);
       await expectCount(target.locator('section[aria-label="Other tries"] details:not([open])'), 2, 'the other two rounds are folded beneath it');
       await settled(page);
     },

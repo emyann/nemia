@@ -833,18 +833,21 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
   assert.match(once, />attempts<\/dt>/);
 });
 
-test("the Output tab shows the selected try's closeout — its declared output, and its replies as `finding → answer (why)` — and every other try's folded beneath it", () => {
+test("the Output tab shows the selected try's closeout — its declared output, and its replies as `finding → answer · why`, each text markdown — and every other try's folded beneath it", () => {
   const replies = [
-    { finding: 'src/cache.ts:12 — the cache never expires', answer: 'fixed', why: 'Entries expire after the TTL now.' },
+    { finding: '`src/cache.ts:12` — the cache never expires', answer: 'fixed', why: 'Entries expire after the **TTL** now.' },
     { finding: 'src/cache.ts:40 — a miss is counted twice', answer: "won't fix", why: 'Once per layer, on purpose.' },
   ];
   const tries = threeTries.map((t) => (t.current ? { ...t, closeout: closeoutSaying('Answered the review.', { replies, output: { again: false, risk: 'low' }, missing: ['notes'] }) } : t));
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
   assert.deepEqual(textsOf(/<p data-shown-try="3"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['round 2 · try 3 (round) · current']);
   assert.deepEqual([...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]!).join(' ')), [
-    'src/cache.ts:12 — the cache never expires → fixed (Entries expire after the TTL now.)',
-    "src/cache.ts:40 — a miss is counted twice → won't fix (Once per layer, on purpose.)",
+    'src/cache.ts:12 — the cache never expires → fixed · Entries expire after the TTL now.',
+    "src/cache.ts:40 — a miss is counted twice → won't fix · Once per layer, on purpose.",
   ]);
+  // The finding and why as markdown, the answer as the word it is.
+  assert.match(html, /<li data-answer="fixed"[^>]*><div data-markdown="true"[^>]*><p[^>]*><code[^>]*>src\/cache\.ts:12<\/code> — the cache never expires<\/p><\/div>/);
+  assert.match(html, /<span class="font-medium[^"]*">fixed<\/span><\/span> <span aria-hidden="true">·<\/span> <div data-markdown="true"[^>]*><p[^>]*>Entries expire after the <strong>TTL<\/strong> now\.<\/p>/);
   const declared = /<section aria-label="Declared output"[\s\S]*?<\/section>/.exec(html)![0];
   assert.deepEqual([...declared.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textsOf(m[2]!).join(' ')]), [['again', 'false'], ['risk', 'low']]);
   assert.match(declared, />declared and not given: notes</);
@@ -990,7 +993,8 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   assert.deepEqual([...rows].map(([name, { kind }]) => [name, kind]), [
     ['implement', 'answer'], ['theme', 'try-again'], ['lint', 'try-again'], ['docs', 'try-again'], ['plan', 'asked'],
   ]);
-  const said = (name: string) => textsOf(/<p [^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!.html)![1]!).join(' ');
+  // What the row says a step needs: a question as its markdown, under `asks:`, and any other need as a sentence.
+  const said = (name: string) => textsOf(/<(p|div) data-said="true"[^>]*>([\s\S]*?)<\/\1>/.exec(rows.get(name)!.html)![2]!).join(' ');
   const buttons = (name: string) => [...rows.get(name)!.html.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
   // A server render writes `checked` before `value`.
   const radios = (name: string) => [...rows.get(name)!.html.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
@@ -1035,7 +1039,7 @@ test('the Decide section puts the answers first, before what there is to decide,
   assert.ok(html.indexOf('aria-label="Answer"') < html.indexOf('data-lesson'), html);
   const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
   assert.deepEqual([...commands.matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])), [true]);
-  assert.match(html, />implement<\/strong> asks: Which database\?</);
+  assert.match(html, />implement<\/strong> asks:<\/p> <div data-markdown="true"[^>]*><p[^>]*>Which database\?<\/p><\/div>/);
 });
 
 test('the tries say `your answer` beside a try a person answered, and above its closeout in the Output tab, selected or folded', () => {
@@ -1334,7 +1338,8 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
 
   // Signed off blocked past its budget: its question, and the answer with the raise — the button waits for the answer, as an answer row's does.
   const palette = textsOf(rows.get('palette')!.html);
-  assert.ok(palette.includes('asks: Warm colours, or cool ones?'), palette.join(' | '));
+  assert.ok(palette.join(' ').includes('asks: Warm colours, or cool ones?'), palette.join(' | '));
+  assert.match(rows.get('palette')!.html, /<div data-asks="true"[^>]*><p>asks:<\/p> <div data-markdown="true" class="[^"]*max-h-72 overflow-y-auto[^"]*"><p[^>]*>Warm colours, or cool ones\?<\/p>/, 'the question as markdown, in a box that scrolls');
   assert.ok(palette.includes('wf retry r-1 palette --budget <amount> --message "<answer>"'), palette.join(' | '));
   assert.equal(box('palette'), '2');
   assert.deepEqual(said('palette'), ['Your answer to palette', false]);

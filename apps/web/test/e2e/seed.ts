@@ -216,9 +216,9 @@ export const LOOPING = {
     { implement: 'Implemented it.', review: 'Three findings.' },
     { implement: 'Answered the first review.', review: 'Two findings are still open.' },
   ],
-  /** What implement answered in round 2, and how the Output tab says it: `finding → answer (why)`. */
+  /** What implement answered in round 2, and how the Output tab says it: `finding → answer · why`. */
   replies: [{ finding: 'apps/web/src/lib/status.ts — an unknown word reads as working', answer: 'fixed', why: 'It reads as unknown now.' }],
-  replied: 'apps/web/src/lib/status.ts — an unknown word reads as working → fixed (It reads as unknown now.)',
+  replied: 'apps/web/src/lib/status.ts — an unknown word reads as working → fixed · It reads as unknown now.',
 } as const;
 
 /**

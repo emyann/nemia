@@ -14,8 +14,14 @@ what it reads is the store and the runs' own branches, and the little it writes 
 `check:`: there is nothing to verify, because it produces nothing but questions and approvals.
 
 `slot: none` keeps its run out of the cap on runs in flight (`WF_MAX_RUNS`). The cap holds the work this
-machine does at once; a supervisor behind it would be held by the very runs it exists to answer. It still
-takes a session slot, like every session (`WF_MAX_CONCURRENT`).
+machine does at once; a supervisor behind it would be held by the very runs it exists to answer.
+
+**It does take a session slot, and it holds one nearly all the time.** `WF_MAX_CONCURRENT` is 2 unless you
+set it, counted per harness pool, and this step is on `claude` — the same pool as every `dev` folder's
+implement, review and ship. A supervisor that is watching is a session at work, so at the default it leaves
+**one** slot for the work it is watching; it frees its own only in the gap between signing off and being
+answered. Raise the ceiling before you start it — `WF_MAX_CONCURRENT=3 wf up`, or higher — or accept that
+the board halves.
 
 `remote: true` bridges its sessions to claude.ai, so the person it asks can answer from a phone —
 which is the point of it: the moments it exists for are the ones where somebody is not at their desk.

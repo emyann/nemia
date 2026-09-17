@@ -924,7 +924,10 @@ it files the step.
 
 - **The step is told both ways**, on its brief, beside the closeout contract (`artifactsContract`): put a
   file in `<dir>` and name it by absolute path, or leave it in the workspace and name it by its path from
-  the workspace root. Mechanism, like the closeout: no workflow author has to remember to say it.
+  the workspace root. Mechanism, like the closeout: no workflow author has to remember to say it. **Except a
+  step that works in the repository's own checkout** (`workspace: main`), which is told the first way only:
+  the run hands nothing off there, so a file left in that workspace is neither collected nor committed — it
+  stays in a person's checkout, and `wf decide` reads it as `not collected`.
 - **A file named from the workspace root is collected.** On the pass that hands the step off, before its
   check is filed, the tick copies each such file into `<dir>` at the same path (`collectArtifacts`), and
   the run reads it from there. So a step that cannot write outside its worktree — Codex in
@@ -1295,9 +1298,14 @@ before it, with the words under `## Your answer` (*Trying again*, under the chec
 **`slot: none`** keeps its run out of the cap on runs in flight (`WF_MAX_RUNS`, below). The cap holds the
 work this machine does at once; a supervisor behind it would be held by the very runs it exists to answer.
 The key is refused at load on a step of a workflow that has another — a slot is a run's, not a step's, so
-the work beside it would run outside the cap too — and a run that says it still takes a session slot, like
-every session. Nothing else about such a run differs: it is started, cancelled, listed and answered as any
-other.
+the work beside it would run outside the cap too. Nothing else about such a run differs: it is started,
+cancelled, listed and answered as any other.
+
+**It still takes a session slot, and holds it nearly all the time.** `WF_MAX_CONCURRENT` is 2 unless set,
+counted per harness pool, and the supervisor is on `claude` — the pool `dev`'s implement, review and ship
+share. A session that is watching is a session at work, so at the default a supervisor leaves one slot for
+the work it watches, freeing its own only between signing off and being answered. Raise the ceiling before
+starting one: `WF_MAX_CONCURRENT=3 wf up`.
 
 ## A run that waits on a run: `wf start --after`
 

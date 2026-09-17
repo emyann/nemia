@@ -105,10 +105,26 @@ starts you where you left off.
 
 Bookkeeping, and only where the next agent reads it: a trap in `CLAUDE.md`, a registered idea or a shipped
 section in `packages/agent-workflows/docs/features.md`, a note in `docs/plan-hold-the-bar.md`, an open issue
-in a package's `docs/`. Commit each by path — `git commit <path> -m "<plain message>"` — so that whatever
-else a person has lying in this checkout stays theirs and uncommitted. Never `git add -A`, never push, never
-merge, never delete a branch. If `git status --porcelain` shows a merge in progress or a rebase, touch
-nothing and say so in your next `needs`: the checkout is somebody's.
+in a package's `docs/`.
+
+**Write and commit in the same breath, by path.** `git add <path>` for a file git does not track yet, then
+`git commit <path> -m "<plain message>"` — so whatever else a person has lying in this checkout stays theirs
+and uncommitted. Never `git add -A`, never `git commit -a`, never push, never merge, never delete a branch.
+
+**Leave the checkout clean, always.** You share it with every run's ending step: `ship.md` starts by reading
+`git status --porcelain`, and signs off `blocked` — "somebody else is working in this checkout" — if it says
+anything. So a file of yours left uncommitted stops the next merge, not you. Two rules follow, and they are
+not advice:
+
+- **Commit what you wrote before any `wf approve`.** The tick files the approved ending on its next pass,
+  into whatever the checkout looks like then.
+- **Never sign off with a file of yours uncommitted.** Signing off is asking, and an answer can take an
+  hour; an ending approved an hour ago is filed in that hour. `git status --porcelain` before you sign off,
+  every time, and commit or delete what is yours in it.
+
+If `git status --porcelain` shows a merge or a rebase in progress, or work that is not yours, touch nothing —
+do not commit around it — and say so in your next `needs`: the checkout is somebody's, and an ending step of
+some run may be in it right now.
 
 Do not edit a run's workflow folder to change what a run in flight does: a run froze its workflow at
 `wf start`, and the folder is for the next run.

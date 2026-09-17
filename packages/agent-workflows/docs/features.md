@@ -1126,7 +1126,8 @@ What was built:
   file is the branch's to answer, as before collection, so a run from before it reads as it did. `artifactLines` gives each reason its own line on `wf decide`'s screen: not in the
   workspace, a directory, not collected, not in the directory, outside the workspace, outside the directory.
 - `artifactsContract`, on every brief, says both ways. Put a file in the directory and name it by absolute path, or leave it in
-  the workspace and name it by its path from the root.
+  the workspace and name it by its path from the root. (Amended since, in *Shipped: the supervisor*: a `workspace: main` step is told
+  the first way alone, because the run hands nothing off in a person's checkout.)
 
 What was measured:
 

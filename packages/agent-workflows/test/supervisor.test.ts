@@ -117,7 +117,12 @@ test("the supervisor's brief is the loop: what it watches, how it reads a run to
     // What it does with a yes, and what it never does.
     '**`wf approve <run> <step> --message "<their words>"`**, and nothing more.',
     '**Never type git for a run.**',
-    'Never `git add -A`, never push, never merge, never delete a branch.',
+    'Never `git add -A`, never `git commit -a`, never push, never merge, never delete a branch.',
+    // It shares the checkout with every run's ending step, which stops at a dirty tree.
+    '**Leave the checkout clean, always.**',
+    '**Commit what you wrote before any `wf approve`.**',
+    '**Never sign off with a file of yours uncommitted.**',
+    '`git add <path>` for a file git does not track yet',
     // What it does when nothing needs a person, and the trap that cost the operator seventy-seven minutes.
     '**Never a background loop**', 'End anything you start before you sign off.',
     'Sign off only to ask a person something',

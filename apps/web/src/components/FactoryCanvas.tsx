@@ -523,7 +523,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
               fitView
               fitViewOptions={FIT}
             >
-              <Panel position="top-left" className="hidden text-[11px] text-muted-foreground sm:block">
+              {/* Wrapped short of the buttons, when the inspector narrows the floor. */}
+              <Panel position="top-left" className="hidden max-w-[calc(100%-20rem)] text-[11px] text-muted-foreground sm:block">
                 Click a run for its steps · drag to arrange, a step with what follows it · kept in this browser
               </Panel>
               <Panel position="top-right" className="flex gap-2">

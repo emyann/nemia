@@ -567,28 +567,39 @@ export type WorkflowStepSpec = {
   tools: string[] | null;
   /** What the session may not have (`disallow:`): empty where the step denies nothing. */
   disallow: string[];
+  /** `remote:` as written: null where the step has no line. */
+  remote: boolean | null;
   deadlineSeconds: number | null;
   maxAttempts: number | null;
+  /** The most the step's tries may cost together, in dollars (`budget:`). */
+  budget: number | null;
   check: string | null;
   retries: number | null;
+  /** `gate: true`, or null for a step without the line. */
+  gate: true | null;
   /** The schema file `output:` names. */
   output: string | null;
   loop: string | null;
   rounds: number | null;
 };
 
+/** Mirrors `ListedStep` in apps/api/src/workflows.ts: a step as a workflow's listing has it — and as the builder puts it back. */
+export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string };
+
 /**
  * Mirrors `WorkflowListing` in apps/api/src/workflows.ts: a folder of steps, where it is read from — the repository's
- * `workflows/`, or yours — its README's description, its steps and its graph; or, for a folder that does not read as a
- * workflow, the loader's refusal and no steps.
+ * `workflows/`, or yours — its README's description, its steps, its graph and the schemas beside its steps; or, for a folder
+ * that does not read as a workflow, the loader's refusal and no steps.
  */
 export type WorkflowListing = {
   name: string;
   from: 'repo' | 'yours';
   dir: string;
   description: string | null;
-  steps: Array<{ name: string; spec: WorkflowStepSpec }>;
+  steps: ListedStep[];
   graph: RunGraph;
+  /** The `.json` files beside the steps, which an `output:` may name. */
+  schemas: string[];
   error: string | null;
 };
 
@@ -616,6 +627,76 @@ export const stepQuery = (from: string, workflow: string, step: string) =>
     queryKey: ['workflows', from, workflow, step],
     queryFn: () => get<WorkflowStepPage>(`/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}`),
   });
+
+/** Mirrors `KeyKind` in apps/api/src/builder.ts: how a key is set on a step's form. */
+export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'flag' | 'schema';
+
+/** Mirrors `KeyField` in apps/api/src/builder.ts: one key of a step's form, its line of meaning, how it is set, and the words it may take. */
+export type KeyField = {
+  key: keyof WorkflowStepSpec;
+  meaning: string;
+  kind: KeyKind;
+  choices: string[] | null;
+  byHarness: Record<string, string[]> | null;
+};
+
+/** Mirrors `KeyForm` in apps/api/src/builder.ts: every key a step may set, in the package's order, and the harness a step runs on when it names none. */
+export type KeyForm = { keys: KeyField[]; defaultHarness: string };
+
+/** What a step's form is drawn from. It changes with the package, so once a visit. */
+export const keyFormQuery = queryOptions({
+  queryKey: ['step-keys'],
+  queryFn: () => get<KeyForm>('/api/workflows/keys'),
+  staleTime: Infinity,
+});
+
+/** Mirrors `WorkflowSaved` in apps/api/src/builder.ts: a folder written, read back from disk, and its files by name. */
+export type WorkflowSaved = { workflow: WorkflowListing; written: string[]; kept: string[]; removed: string[] };
+
+/**
+ * A write of the builder's the api refused: its sentence, and the steps it names — one, several for a cycle, or none for a refusal of the
+ * folder or the request — which the board shows it by.
+ */
+export class BuildRefusal extends Error {
+  readonly steps: string[];
+  constructor(message: string, steps: readonly string[]) {
+    super(message);
+    this.steps = [...steps];
+  }
+}
+
+/** A builder's write, sent as `application/json`, which the api requires of every write: resolved with what it answered, or its refusal. */
+async function build<T>(method: 'PUT' | 'POST', route: string, body: unknown, ok: (answer: Record<string, unknown>) => boolean): Promise<T> {
+  const res = await fetch(route, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
+  const answer = (await res.json().catch(() => undefined)) as Record<string, unknown> | undefined;
+  if (res.ok && answer && ok(answer)) return answer as T;
+  if (res.ok) {
+    throw new BuildRefusal(
+      `${method} ${route} answered ${res.status} ${res.statusText} without what it wrote, so the api and this board disagree about what a write answers. ` +
+        'The folder may be written: reload the Workflows page before writing it again, and restart the api (`npm run dev`).',
+      [],
+    );
+  }
+  const steps = Array.isArray(answer?.steps) ? answer.steps.filter((s): s is string => typeof s === 'string') : [];
+  throw new BuildRefusal(typeof answer?.error === 'string' ? answer.error : `${method} ${route} answered ${res.status} ${res.statusText}`, steps);
+}
+
+const isSaved = (answer: Record<string, unknown>): boolean => typeof answer.workflow === 'object' && answer.workflow !== null && Array.isArray(answer.written);
+
+/**
+ * Put a folder of yours back from its steps, as the builder saves it: the api calls the package's `writeWorkflow`, and answers the folder read
+ * back from disk. Rejects with a `BuildRefusal`: the package's sentence and the steps it names, or the api's own about the request.
+ */
+export const saveWorkflow = (name: string, steps: readonly ListedStep[]): Promise<WorkflowSaved> =>
+  build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}`, { steps }, isSaved);
+
+/** Make a folder of yours with its first step. Rejects with a `BuildRefusal`, as a save does: a name taken, or a step the package refuses. */
+export const createWorkflow = (name: string, step: ListedStep): Promise<WorkflowSaved> =>
+  build('POST', '/api/workflows/yours', { name, step }, isSaved);
+
+/** Write a schema beside a folder's steps, which a step's `output:` then names. Rejects with a `BuildRefusal`. */
+export const writeSchema = (name: string, file: string, text: string): Promise<{ file: string; schemas: string[] }> =>
+  build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}/schemas/${encodeURIComponent(file)}`, { text }, (answer) => typeof answer.file === 'string');
 
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
 export const workflowNameOf = (workflowDir: string): string => workflowDir.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || workflowDir;

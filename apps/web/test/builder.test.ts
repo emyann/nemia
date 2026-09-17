@@ -1,0 +1,144 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import type { ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
+import {
+  addStep, connect, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, setBody,
+  setKey, setSchema, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
+} from '../src/lib/builder.ts';
+import { COLUMN_WIDTH } from '../src/lib/layout.ts';
+
+const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({ ...UNSET, after: [], input: [], disallow: [], ...fields });
+const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${name} it.`): ListedStep => ({ name, spec: spec(fields), body });
+
+/** implement ⇄ review, as the listing has a folder of yours. */
+const folder: Pick<WorkflowListing, 'steps'> = {
+  steps: [listed('implement', { check: 'npm test' }), listed('review', { after: ['implement'], output: 'review.schema.json', loop: 'implement', rounds: 3 })],
+};
+
+const specOf = (steps: readonly DraftStep[], name: string) => steps.find((s) => s.name === name)!.spec;
+
+test('a folder as a draft is as it is listed, unsaved nowhere, and puts back as it was listed', () => {
+  const draft = draftOf(folder);
+  assert.deepEqual(draft.map((s) => s.schema), [null, null]);
+  assert.equal(unsaved(draft, folder), false);
+  assert.deepEqual(unsavedSteps(draft, folder), []);
+  assert.deepEqual(toPut(draft), folder.steps);
+  // A copy: the draft changes, and the listing does not.
+  setKey(draft, 'implement', 'model', 'opus');
+  draft[0]!.spec.after.push('x');
+  assert.deepEqual(folder.steps[0]!.spec.after, []);
+});
+
+test('an edge drawn from A to B writes `after: A` on B; drawn from the loop handle, `loop: B` on A with the default rounds; a second time, or to itself, nothing', () => {
+  const draft = addStep(draftOf(folder), 'ship', 'Ship it.');
+  const drawn = connect(draft, 'review', 'ship', false);
+  assert.deepEqual(specOf(drawn, 'ship').after, ['review']);
+  assert.deepEqual(unsavedSteps(drawn, folder), ['ship']);
+  assert.deepEqual(connect(drawn, 'review', 'ship', false), drawn, 'once');
+  assert.deepEqual(connect(drawn, 'ship', 'ship', false), drawn, 'not to itself');
+  assert.deepEqual(connect(drawn, 'ship', 'nope', false), drawn, 'not to a step the draft does not have');
+
+  const looped = connect(drawn, 'ship', 'implement', true);
+  assert.deepEqual([specOf(looped, 'ship').loop, specOf(looped, 'ship').rounds], ['implement', DEFAULT_ROUNDS]);
+  const kept = connect(setKey(drawn, 'ship', 'rounds', 5), 'ship', 'review', true);
+  assert.deepEqual([specOf(kept, 'ship').loop, specOf(kept, 'ship').rounds], ['review', 5], 'rounds it has are kept');
+  assert.deepEqual(draftGraph(looped).edges, [
+    { from: 'implement', to: 'review', kind: 'after' },
+    { from: 'review', to: 'implement', kind: 'loop', rounds: 3 },
+    { from: 'review', to: 'ship', kind: 'after' },
+    { from: 'ship', to: 'implement', kind: 'loop', rounds: 3 },
+  ]);
+});
+
+test('an edge taken away takes its key: `after` — and `resume`, which after lists — or `loop` with its rounds', () => {
+  const draft = draftOf(folder);
+  const cut = disconnect(draft, 'implement->review');
+  assert.deepEqual(specOf(cut, 'review').after, []);
+  assert.deepEqual(unsavedSteps(cut, folder), ['review']);
+  const unlooped = disconnect(draft, 'loop:review->implement');
+  assert.deepEqual([specOf(unlooped, 'review').loop, specOf(unlooped, 'review').rounds], [null, null]);
+  assert.deepEqual(draftGraph(unlooped).edges, [{ from: 'implement', to: 'review', kind: 'after' }]);
+
+  const resumed = setKey(draftOf({ steps: [listed('draft'), listed('respond')] }), 'respond', 'resume', 'draft');
+  assert.deepEqual(specOf(resumed, 'respond').after, ['draft'], 'resume waits on the step it names');
+  const unresumed = disconnect(resumed, 'draft->respond');
+  assert.deepEqual([specOf(unresumed, 'respond').after, specOf(unresumed, 'respond').resume], [[], null]);
+  assert.deepEqual(disconnect(draft, 'not an edge'), draft);
+});
+
+test('a step added has a name and a body and sets nothing; a name there is none of or one taken is refused and adds nothing', () => {
+  const draft = draftOf(folder);
+  const added = addStep(draft, 'ship', 'Ship it.');
+  assert.deepEqual(added.at(-1), { name: 'ship', spec: spec(), body: 'Ship it.', schema: null });
+  assert.equal(unsaved(added, folder), true);
+  assert.deepEqual(unsavedSteps(added, folder), ['ship']);
+  assert.equal(nameRefusal(draft, ''), 'A step needs a name: its file is <name>.md.');
+  assert.equal(nameRefusal(draft, '  '), 'A step needs a name: its file is <name>.md.');
+  assert.equal(nameRefusal(draft, 'review'), 'There is a step named review already.');
+  assert.deepEqual(addStep(draft, 'review', 'Again.'), draft);
+  assert.deepEqual(addStep(draft, '', 'Nothing.'), draft);
+});
+
+test("a step removed takes every key of another step that names it, and the draft is unsaved though no step left changed", () => {
+  const draft = setKey(setKey(addStep(draftOf(folder), 'ship', 'Ship it.'), 'ship', 'after', ['review']), 'ship', 'input', ['review']);
+  const gone = removeStep(draft, 'review');
+  assert.deepEqual(gone.map((s) => s.name), ['implement', 'ship']);
+  assert.deepEqual([specOf(gone, 'ship').after, specOf(gone, 'ship').input], [[], []]);
+  const loopGone = removeStep(draftOf(folder), 'implement');
+  assert.deepEqual([specOf(loopGone, 'review').after, specOf(loopGone, 'review').loop, specOf(loopGone, 'review').rounds], [[], null, null]);
+  assert.deepEqual(unsavedSteps(removeStep(draftOf(folder), 'review'), folder), []);
+  assert.equal(unsaved(removeStep(draftOf(folder), 'review'), folder), true);
+});
+
+test('a key set is set as given, a loop brings its rounds and takes them away, and a body set is a change', () => {
+  const draft = draftOf(folder);
+  const set = setKey(setKey(draft, 'implement', 'model', 'opus'), 'implement', 'deadlineSeconds', 900);
+  assert.deepEqual([specOf(set, 'implement').model, specOf(set, 'implement').deadlineSeconds], ['opus', 900]);
+  const looped = setKey(draft, 'implement', 'loop', 'review');
+  assert.equal(specOf(looped, 'implement').rounds, DEFAULT_ROUNDS);
+  assert.equal(specOf(setKey(draft, 'review', 'loop', null), 'review').rounds, null);
+  assert.deepEqual(unsavedSteps(setBody(draft, 'review', 'Review it twice.'), folder), ['review']);
+  // Set back to what it was listed as, it is not a change.
+  assert.equal(unsaved(setKey(setKey(draft, 'implement', 'model', 'opus'), 'implement', 'model', null), folder), false);
+});
+
+test("a schema pasted names its file in `output:`, is a change until saved, and taken back leaves `output:` as it is", () => {
+  const draft = draftOf(folder);
+  const pasted = setSchema(draft, 'implement', { file: 'implement.schema.json', text: '{}' });
+  assert.equal(specOf(pasted, 'implement').output, 'implement.schema.json');
+  assert.deepEqual(unsavedSteps(pasted, folder), ['implement']);
+  assert.equal(toPut(pasted)[0]!.spec.output, 'implement.schema.json');
+  assert.equal('schema' in toPut(pasted)[0]!, false, 'a put carries no paste: the schema is its own write');
+  const back = setSchema(pasted, 'implement', null);
+  assert.equal(specOf(back, 'implement').output, 'implement.schema.json');
+  assert.equal(setKey(back, 'implement', 'output', null)[0]!.spec.output, null);
+});
+
+test('the steps are placed left to right by after; steps that wait on each other, which the package refuses, in a row', () => {
+  const { at, cycle } = placesOf(draftOf(folder));
+  assert.equal(cycle, false);
+  assert.deepEqual(Object.fromEntries(at), { implement: { x: 0, y: 0 }, review: { x: COLUMN_WIDTH, y: 0 } });
+  const round = connect(draftOf(folder), 'review', 'implement', false);
+  const placed = placesOf(round);
+  assert.equal(placed.cycle, true);
+  assert.deepEqual(Object.fromEntries(placed.at), { implement: { x: 0, y: 0 }, review: { x: COLUMN_WIDTH, y: 0 } });
+  assert.deepEqual(orderOf(round), ['implement', 'review'], 'and ordered as given');
+  assert.deepEqual(orderOf(addStep(disconnect(draftOf(folder), 'implement->review'), 'plan', 'Plan it.').map((s) => (s.name === 'implement' ? { ...s, spec: { ...s.spec, after: ['plan'] } } : s))), ['review', 'plan', 'implement']);
+});
+
+test('what is typed into a list or a number field, as the listing has it', () => {
+  assert.deepEqual(listOf('Read, Grep,  Bash(npm test) ,'), ['Read', 'Grep', 'Bash(npm test)']);
+  assert.deepEqual(listOf('  '), []);
+  assert.equal(numberOf(''), null);
+  assert.equal(numberOf(' 900 '), 900);
+  assert.equal(numberOf('2.50'), 2.5);
+  assert.equal(numberOf('-1'), -1, 'the package refuses it on save, in its words');
+});
+
+test("a folder written goes into the page's listing in the listing's order: the repository's, then yours, each by name — once", () => {
+  const w = (name: string, from: 'repo' | 'yours'): WorkflowListing => ({ name, from, dir: `/${from}/${name}`, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], error: null });
+  const list = [w('dev', 'repo'), w('ui', 'repo'), w('mine', 'yours')];
+  assert.deepEqual(listedWith(list, w('built', 'yours')).map((x) => `${x.from}:${x.name}`), ['repo:dev', 'repo:ui', 'yours:built', 'yours:mine']);
+  assert.deepEqual(listedWith(list, { ...w('mine', 'yours'), description: 'Mine.' }).map((x) => x.description), [null, null, 'Mine.']);
+  assert.deepEqual(listedWith(undefined, w('built', 'yours')).map((x) => x.name), ['built']);
+});

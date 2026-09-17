@@ -828,7 +828,7 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
 }
 
 /** Every step `name` waits on, directly or through another. */
-function upstreamOf(steps: readonly Workflow[], name: string): Set<string> {
+export function upstreamOf(steps: readonly Workflow[], name: string): Set<string> {
   const found = new Set<string>();
   const queue = [name];
   while (queue.length) {

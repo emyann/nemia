@@ -351,3 +351,31 @@ test("REFUSED at shipped defaults: `wf cancel` calls a run waiting at its gate o
   assert.equal((await cancel(gate.e, gate.run.id)).plan.kind, 'already-cancelled');
   assert.equal((await forget(gate.e, gate.run.id)).kind, 'forgotten');
 });
+
+// ─── what the steps after a gate are told, and what the screens say ─────────
+
+test("`wf decide` at a gate says AWAITING APPROVAL and, under the step, the approval and the send-back to give; approved with words, the tick hands them to implement and to review after it under `## Approved`, as data, and `wf decide` prints the gate `approved <time> — \"<words>\"`", async (t) => {
+  const { run, e, tasks, settle } = await atItsGate();
+  const atGate = await printedBy(t, ['decide', run.id], e);
+  assert.ok(atGate.includes('  AWAITING APPROVAL, waiting on you: plan  — signed off at its gate; nothing after it is filed until you approve it, or send it back'), atGate.join('\n'));
+  const under = atGate.indexOf('  plan');
+  assert.ok(under > 0 && atGate[under + 1] === `    gate  awaiting approval:  wf approve ${run.id} plan [--message "<words>"]  — or send it back:  wf retry ${run.id} plan --message "<objection>"`, atGate.join('\n'));
+
+  const { approval } = await approve(e, run.id, 'plan', 'Ship the second reading.');
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['implement']);
+  const told = (id: string) => tasks.get(id)!.spec.brief as string;
+  const words = `plan, try 1, approved at ${approval.at}:\n\n\`\`\`text\nShip the second reading.\n\`\`\``;
+  assert.ok(told(`${run.id}-implement`).includes(`\n## Approved\n\n`) && told(`${run.id}-implement`).includes(words), told(`${run.id}-implement`));
+  assert.ok(!told(`${run.id}-plan`).includes('## Approved'), 'not the step before the gate');
+
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
+  assert.ok(told(`${run.id}-review`).includes(words), 'the reviewer after it reads the approval too');
+  settle(`${run.id}-review`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+
+  const decided = await printedBy(t, ['decide', run.id], e);
+  assert.ok(!decided.some((l) => l.startsWith('  AWAITING APPROVAL')), decided.join('\n'));
+  const plan = decided.indexOf('  plan');
+  assert.equal(decided[plan + 1], `    gate  approved ${approval.at.slice(11, 16)}Z — "Ship the second reading."`);
+});

@@ -90,17 +90,18 @@ A workflow is a folder of markdown files. One file is one step:
     Review the change in this workspace as a second engineer would.
 
 No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, \`retries\` counts the
-tries the run may re-file a step its check refused, \`output\` declares what a closeout says for a later
-step and \`input\` reads it, \`loop\` is the edge back and \`rounds\` counts it — whether to go round is the
-step's own \`again\` — and the rest (model, effort, permissionMode, tools, disallow, deadlineSeconds,
-maxAttempts, budget) say who does the work, with what, for how long and for how much. Everything else the
-agent is told is prose.
+tries the run may re-file a step its check refused, \`gate\` holds a step's handoff for a person's wf approve,
+\`output\` declares what a closeout says for a later step and \`input\` reads it, \`loop\` is the edge back
+and \`rounds\` counts it — whether to go round is the step's own \`again\` — and the rest (model, effort,
+permissionMode, tools, disallow, deadlineSeconds, maxAttempts, budget) say who does the work, with what,
+for how long and for how much. Everything else the agent is told is prose.
 
   wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
   · unverified (no check: declared) · unsigned (ended without its closeout, or without a field its
   output: declares) · BLOCKED · rounds exhausted (asked for another round on the last)
   · over budget $4.20 of $3 (its tries have cost their budget: or more, and nothing more is filed for
-  it on the run's word) · budget exhausted (its harness ended its session at its budget:).
+  it on the run's word) · budget exhausted (its harness ended its session at its budget:)
+  · awaiting approval (signed off at its gate: nothing after it is filed until wf approve).
 
   WF_ROOT            where runs and the engine's board live
   WF_MAX_CONCURRENT  sessions at work per pool at once (default 2): claude and claude-detached one pool,
@@ -189,6 +190,8 @@ and beside each step's check, what its session consumed — used, cost — or th
 its timeline: for each try's session and each try's check, when it was filed, spawned and ended (UTC), how
 long it queued for a slot and how long it ran; after the steps, each round's and the run's totals. Under
 each step, before its closeout, what a person said to its sessions while they ran (wf say), with when.
+Under a gated step's name, its gate: approved, when and with what words — or awaiting approval, with the
+wf approve that lets what follows be filed and the wf retry --message that sends it back.
 
   --sensitive <globs>  comma-separated globs whose changed files are printed in full instead, for this
                        screen; the touched lines still say which files are check-affecting
@@ -694,7 +697,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, waiting, said, timeline, held } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, waiting, said, timeline, held } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -733,6 +736,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
       if (overBudgetLine) console.log(`  ${overBudgetLine}`);
       if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED, waiting on you: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
+      // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the send-back.
+      if (decision.awaitingApproval.length) console.log(`  AWAITING APPROVAL, waiting on you: ${decision.awaitingApproval.join(', ')}  — signed off at its gate; nothing after it is filed until you approve it, or send it back`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
       // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.
       if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
@@ -769,6 +774,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         // The try — and the round — whose closeout and check these are, when it is not the first, and whether a person answered it.
         const tried = step ? tryNote(step, run.steps[name], steps, Boolean(answers[name])) : '';
         console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}${tried ? `  (${tried})` : ''}`);
+        // Its gate, under its name: approved, when and with what words — or awaiting approval, and the commands that answer it.
+        if (gates[name]) console.log(`    gate  ${gates[name].split('\n').join('\n          ')}`);
         if (check) {
           console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
           // For a check that refused, the last of each stream, labelled: which pipe a line came from

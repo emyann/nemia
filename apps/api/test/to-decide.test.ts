@@ -136,9 +136,12 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
 });
 
 test("the decision of a run at its ending's gate offers the approval and the send-back, and never `git merge` by hand: its ending is what merges", async () => {
-  const { commands } = await decisionOf('r-ending');
+  const { commands, standings } = await decisionOf('r-ending');
   assert.deepEqual(commands?.map((c) => c.label), ['approve', 'send back']);
   assert.deepEqual(commands?.map((c) => c.command), [`wf approve r-ending ship`, `wf retry r-ending implement --message "<objection>"`]);
+  // The result it would act on is the work's branch, not the ending step's own — which has none, working in the repository's checkout
+  // (`resultSteps`). Read for the facts under the run, whatever the list is spared.
+  assert.deepEqual(standings?.map((b) => [b.branch, b.where]), [['wf/r-ending/implement', 'ahead']]);
 });
 
 test('a finished run whose folder says nothing about shipping: `to decide` is its branch ahead of the base, and the command is `wf decide`', async () => {

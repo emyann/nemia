@@ -1245,7 +1245,9 @@ export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: 
 
 /**
  * `wf inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given; `off`
- * takes the mark back. The card's file is written whole, through a hidden file renamed over it, so a pass never reads half a card.
+ * takes the mark back. The card's file is written whole, through a hidden file renamed over it, so a pass never reads half a card — and the
+ * file keeps the time it was last written, since the rename would give it the time of the queue, and a card has no filing time of its own but
+ * its mtime: a board orders its cards by it, and a card queued or taken back would jump to the top of the list. A queue is no edit of the idea.
  *
  * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card — naming the cards
  * there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names, one already queued, and one with no
@@ -1272,9 +1274,18 @@ export function queueInInbox(name: string, how: { off?: boolean; workflow?: stri
     if (why) throw new WorkflowError(why);
   }
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
+  // When the card was last written, to set back over the rename below: the card's filing time, as a board reads it.
+  const filed = fs.statSync(file, { throwIfNoEntry: false })?.mtime;
   const hidden = path.join(inboxDir(), `.${name}.md.${process.pid}`);
   fs.writeFileSync(hidden, written);
   fs.renameSync(hidden, file);
+  if (filed) {
+    try {
+      fs.utimesSync(file, filed, filed);
+    } catch {
+      // The queue is written all the same: the card lists at the time of the queue, until it is written again.
+    }
+  }
   const now = parseInboxCard(`${name}.md`, written, exists);
   if (how.off) return { card: now, file, was: 'taken back' };
   const order = queueOrder(readInbox());

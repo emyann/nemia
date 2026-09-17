@@ -1582,7 +1582,8 @@ up — every 4000ms, ^C to stop
 - **`wf inbox queue <name>` marks a card to start on its own.** It writes `queued:` on the card, the ISO time it was queued,
   which orders the queue; `--workflow <w>` writes `workflow:` too. `wf inbox queue <name> --off` takes the mark back, and
   `wf inbox rm` drops the card. The card's file is written whole, through a hidden file renamed over it, so a pass never reads
-  half a card.
+  half a card — and its modified time is set back to what it was, since a card has no filing time of its own but that time, and a
+  board that orders its cards by it would put a card queued at the top of the list. A queue is no edit of the idea.
 - **Each pass, after every run has been advanced, the tick starts the oldest queued card** while a run slot is free — always,
   with no cap. By `queued:`, then by name (`queueOrder`), through `startFromInbox`, the start any card has: its `workflow:`,
   its `repo:` or else the repository `wf up` runs in, as `wf start` takes `.`. Its base is its base branch as it is at that

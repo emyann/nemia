@@ -371,6 +371,28 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
   assert.ok(printed.some((l) => new RegExp(`^\\d\\d:\\d\\d:\\d\\d  started ${again.card.name} as ${upRun!.id}$`).test(l)), printed.join('\n'));
 });
 
+test("`wf inbox queue` keeps the card file's time: a queue is no edit of the idea, and a card's filing time is its mtime — at the command line as through the board", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const repo = aRepoWith('dev');
+  const { card, file } = addToInbox({ text: 'Filed this morning', workflow: 'dev', repo });
+  // Filed long enough ago that a file written by the queue could not pass for it.
+  const filed = new Date('2026-09-16T08:00:00.000Z');
+  fs.utimesSync(file, filed, filed);
+
+  await printedBy(t, b.e, 'inbox', 'queue', card.name);
+  assert.match(fs.readFileSync(file, 'utf8'), /^queued: /m, 'the card is queued');
+  assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'and its file is as old as it was');
+
+  await printedBy(t, b.e, 'inbox', 'queue', card.name, '--off');
+  assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /^queued: /m, 'taken back');
+  assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'and as old still');
+
+  // A card filed is written now: it is the queue that keeps the time it found, not every write of the inbox.
+  const fresh = addToInbox({ text: 'Filed now', workflow: 'dev', repo });
+  assert.ok(Date.now() - fs.statSync(fresh.file).mtime.getTime() < 60_000, 'wf inbox add writes a card at the time it is filed');
+});
+
 test('a queued card that names no repository starts on the repository the daemon runs in, as `wf start` takes `.`', async (t) => {
   emptyStore(undefined);
   const b = board();

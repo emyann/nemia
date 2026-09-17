@@ -2161,7 +2161,8 @@ What it leaves:
 - **A ghost cuts a refused try's why to two lines.** It is whole on hover and on the Inbox page.
 - **`wf inbox queue` at the command line still moves a card to the top of the Inbox page.** `queueInInbox` writes the card through a file
   renamed over it, which gives it a new mtime, and the page orders cards by mtime. The api sets the mtime back after its own write; the package
-  could keep it in `queueInInbox` itself, which would cover both, and the api's `utimesSync` could then go.
+  could keep it in `queueInInbox` itself, which would cover both, and the api's `utimesSync` could then go. *Four leftovers from the reviews*,
+  below, kept it in `queueInInbox`; the api's `utimesSync` now sets the same time a second time, and was left where it is.
 ## Shipped: markdown on the board, and a card's page with its keys explained
 
 The board showed every piece of prose as preformatted text: a run's brief, a step's body, a closeout's summary and needs, each reply, a
@@ -2982,6 +2983,20 @@ What it leaves:
   command, and of a poll that was already reading the board. The record's `tries` array grows with them too, and the pass rewrites it.
   The lever for all three is engine-side: a view the engine caches, or a settled task's fold kept once (agent-engine's open issues).
   The tick, which is what runs every four seconds, no longer pays it.
+
+## Shipped: four leftovers from the reviews
+
+Four things earlier rounds found and left, one commit each, in `packages/agent-workflows` only. Nothing in `apps/`: where a fix makes an
+app's own workaround redundant, the workaround stays, and the bullet says so.
+
+- **`wf inbox queue` keeps the card file's time.** `queueInInbox` writes a card whole, through a hidden file renamed over it, so a pass never
+  reads half a card — and the rename gave the file the time of the queue. A card has no filing time of its own but its mtime (`filedAt`,
+  `apps/api/src/inbox.ts`), which the Inbox page orders the cards by, so a card queued or taken back at the command line jumped to the top of
+  the list with the queue's time as its own. A queue is no edit of the idea: `queueInInbox` reads the time before the rename and sets it back
+  after, and a failure to set it back is not a failure of the queue — the card is queued all the same, and lists at the queue's time until it
+  is written again. The api's own `utimesSync` around the call now sets the same time a second time; it is `apps/api`'s, and was left there.
+  Tested on the store (`test/queue-store.test.ts`): a card filed at 08:00, queued and taken back through `wf inbox queue` and its `--off`,
+  keeps 08:00 across both writes, while `wf inbox add` still writes a card at the time it is filed. Without the two lines, the test fails.
 
 ## 1. A run that grows steps from a plan
 

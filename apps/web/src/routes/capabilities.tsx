@@ -22,7 +22,7 @@ export const Route = createFileRoute('/capabilities')({
 /** What the repository offers a step, section by section, each thing with the file it was read from. */
 function CapabilitiesPage() {
   const { data } = useSuspenseQuery(capabilitiesQuery);
-  const { repo, skills, agents, mcp, denied, warnings, measured, readOnly, steps } = data;
+  const { repo, skills, agents, mcp, denied, asked, warnings, measured, readOnly, steps } = data;
 
   return (
     <article className="space-y-8">
@@ -54,7 +54,15 @@ function CapabilitiesPage() {
         count={denied.length}
         empty={<>Nothing denied: <Path path=".claude/settings.json" /> has no <code className="font-mono text-xs">permissions.deny</code>.</>}
       >
-        {denied.map(({ rule, source }) => <DeniedRow key={rule} rule={rule} source={source} refuses={refusedBy(mcp, rule)} />)}
+        {denied.map(({ rule, source }) => <RuleRow key={rule} rule={rule} source={source} refuses={refusedBy(mcp, rule)} />)}
+      </Section>
+
+      <Section
+        title="Asks"
+        count={asked.length}
+        empty={<>Nothing asks by a rule: <Path path=".claude/settings.json" /> has no <code className="font-mono text-xs">permissions.ask</code>.</>}
+      >
+        {asked.map(({ rule, source }) => <RuleRow key={rule} rule={rule} source={source} />)}
       </Section>
 
       <Section
@@ -182,7 +190,8 @@ function ServerRow({ server }: { server: McpServer }) {
 const refusedBy = (mcp: Capabilities['mcp'], rule: string): string[] =>
   mcp.flatMap((server) => (server.tools ?? []).filter((tool) => tool.denied === rule).map((tool) => `${server.name} · ${tool.name}`));
 
-function DeniedRow({ rule, source, refuses }: { rule: string; source: string; refuses: string[] }) {
+/** A rule of the settings — a deny, with the listed tools it refuses, or an ask rule — and where it was read. */
+function RuleRow({ rule, source, refuses = [] }: { rule: string; source: string; refuses?: string[] }) {
   return (
     <li className="flex flex-wrap items-baseline gap-x-4 gap-y-0.5 px-3 py-2">
       <span className="break-all font-mono text-xs">{rule}</span>

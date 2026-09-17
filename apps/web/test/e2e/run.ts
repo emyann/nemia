@@ -1716,9 +1716,9 @@ const PAGES: PageSpec[] = [
     expect: async (page) => {
       await sidebar(page);
       await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Capabilities' }), 'the sidebar lights Capabilities on its page');
-      const { skill, bareSkill, agent, server, missing, denied } = CHECKOUT;
+      const { skill, bareSkill, agent, server, missing, denied, asked } = CHECKOUT;
       const section = (title: string) => page.locator(`section[aria-label="${title}"]`);
-      for (const [title, count] of [['Skills', 2], ['Agents', 1], ['MCP servers', 2], ['Denied', denied.length]] as const) {
+      for (const [title, count] of [['Skills', 2], ['Agents', 1], ['MCP servers', 2], ['Denied', denied.length], ['Asks', asked.length]] as const) {
         await expectVisible(section(title).locator('h2 [data-count]', { hasText: new RegExp(`^${count}$`) }), `the ${title} section counts ${count}`);
       }
 
@@ -1748,6 +1748,10 @@ const PAGES: PageSpec[] = [
       const rules = section('Denied');
       for (const rule of denied) await expectVisible(rules.getByText(rule, { exact: true }), `the denied list has ${rule}`);
       await expectVisible(rules.getByText(`refuses ${server.name} · wipe`), `the denied list says which listed tool ${server.denied} refuses`);
+      // The settings' ask rules, listed for the repository as its deny rules are — whether or not a step reads them.
+      const asks = section('Asks');
+      for (const rule of asked) await expectVisible(asks.getByText(rule, { exact: true }), `the ask list has ${rule}`);
+      await expectVisible(asks.getByText('.claude/settings.json', { exact: true }), 'with where it was read from');
 
       // What each step gets: the checkout's dev — review fenced to its tools in dontAsk, implement on the harness's own set — and yours, on Codex.
       const { good, yours } = WORKFLOWS;

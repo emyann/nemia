@@ -2825,10 +2825,12 @@ What was built, four commits:
   honoured: `wf approve <run> ship` and `wf retry <run> review --message "<objection>"`. The test that pinned it used an alternation,
   `/^review is awaiting approval|--message/`, which passed whatever the sentence said; the sentence is pinned now, and refused again at the
   store on `err.message`. Found by the review, round 4.
-- **`decision` and `gateLines` take the same `unheld` adjustment `assess` and `listing` take.** Between `wf retry <run> <the work>
-  --message` and the pass that files it, `wf decide`'s `gates` offered `wf approve <run> ship` — the very approval `approvalRefusal` was
-  refusing in that moment, while `wf ls` showed ship waiting. `decision`'s `statusOf` and `gateLines` now read an un-held ending as the
-  waiting step it is, `gateLines` taking the asks as `listing` does, so one vocabulary reads the window one way. Found by the review, round 4.
+- **`gateLines` takes the same `unheld` adjustment `assess` and `listing` take.** Between `wf retry <run> <the work> --message` and the pass
+  that files it, `wf decide`'s `gates` offered `wf approve <run> ship` — the very approval `approvalRefusal` was refusing in that moment,
+  while `wf ls` showed ship waiting. `gateLines` now reads an un-held ending as the waiting step it is, taking the asks as `listing` does.
+  `decision` took the adjustment too at first and does not now: a try or a round due makes `assess` call the run `running`, and `decision`
+  returns on that before its `statusOf` is read, so nothing could reach it and no test could fail without it (round 5's review). Found by
+  the review, round 4.
 - **`wf retry <run> ship` at the ending's gate says what there is to say** (`retryRefusal`). The step `wf ls` names as awaiting approval
   answered `ship is awaiting approval, and there is nothing to try again` — the end of the road, in the one place a person who typed the
   step's own name would look. It now says nothing of it has run, so there is no try of it to replace, and names the two things there are:

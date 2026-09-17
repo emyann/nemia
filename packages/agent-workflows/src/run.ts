@@ -2965,12 +2965,12 @@ export function decision(
   const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf, [], checkout);
   const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   // A step a round due files again is held on no budget (`roundSpans`), as `assess` reads it.
+  //
+  // An ending un-held at its gate (`unheld`) takes no adjustment here, though `assess`, `listing` and `gateLines` each take one: this map
+  // is read in the branches below, and a try or a round due makes `assess` call the run `running`, which returns before them. The word a
+  // person would have seen in that window was `gateLines`'s, and that is where the adjustment is.
   const refiled = roundSpans(steps, round);
-  // Nor does an ending hold its gate while the work it would act on is filed again (`unheld`), as `assess` and `listing` read it: one
-  // vocabulary, so this screen cannot offer an approval `wf approve` refuses while `wf ls` calls the same step waiting.
-  const waitingAgain = unheld(steps, run, retry, round);
-  const statusOf = new Map<string, StepStatus>(steps.map((s) => [s.name,
-    waitingAgain.has(s.name) ? 'waiting' : refiled.has(s.name) ? standingOf.get(s.name)!.own : standingOf.get(s.name)!.status]));
+  const statusOf = new Map(steps.map((s) => [s.name, refiled.has(s.name) ? standingOf.get(s.name)!.own : standingOf.get(s.name)!.status]));
   if (status === 'running') {
     // Named so the answer to "why can I not decide yet" is on the screen rather than inferred. A step
     // whose check is still running is one of them: its agent has finished, its verdict has not.
@@ -2978,11 +2978,9 @@ export function decision(
       .filter((s) => statusOf.get(s.name) === 'checking'
         || (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name]!.taskId!))))
       .map((s) => s.name);
-    // An ending step waiting for the repository's own checkout is waited on too: its approval is given, and what holds it is another run's
-    // step in that directory (`heldCheckouts`). Never one whose own work is being said again, which is what it waits for first (`unheld`).
-    const waitsForCheckout = checkout
-      ? steps.filter((s) => s.workspace === 'main' && !run.steps[s.name]?.taskId && !waitingAgain.has(s.name)).map((s) => s.name)
-      : [];
+    // An ending step waiting for the repository's own checkout is waited on too: a person's word that files it is given, and what holds it
+    // is another run's step in that one directory. `checkoutHold` answers only for a step this pass would otherwise file (`mainClaim`).
+    const waitsForCheckout = checkout ? steps.filter((s) => heldByCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
     // A step the next tick tries again is waited on too: nothing is decided about it yet. So is a loop going round again. A step whose
     // blocked session the tick stops first is both live and due, and named once.
     return { kind: 'running', waiting: [...new Set([...live, ...ready, ...waitsForCheckout, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort() };

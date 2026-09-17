@@ -21,9 +21,12 @@ step of its workflow*), one commit each. Everything is in `packages/agent-workfl
    ship is at its gate, that the send-back goes to the work, and names the two commands that are honoured. The
    test that pinned it used an alternation that passed whatever the sentence said; the sentence is pinned now,
    and refused again at the store on `err.message`.
-4. **`decision` and `gateLines` take the same `unheld` adjustment `assess` and `listing` take.** Between a
-   send-back and the pass that files it, `wf decide`'s gate line offered the approval `wf approve` was refusing
-   at that same moment. A test reads `wf ls`, `wf decide`, `gateLines` and `wf approve` in that window.
+4. **`gateLines` takes the same `unheld` adjustment `assess` and `listing` take.** Between a send-back and the
+   pass that files it, `wf decide`'s gate line offered the approval `wf approve` was refusing at that same
+   moment. A test reads `wf ls`, `wf decide`, `gateLines` and `wf approve` in that window. `decision`'s
+   `statusOf` took the adjustment too at first; round 2 of the review showed nothing can reach it — a try due
+   makes the run `running`, and `decision` returns before that map is read — so it is gone rather than kept
+   untestable.
 5. **`wf retry <run> ship` at the gate** no longer ends at *there is nothing to try again*: nothing of it has
    run, so there is no try to replace — `wf approve <run> ship`, or the send-back `sendBackTo` computes.
 6. **`wf round <run> review` at an ending's gate** no longer says *What waits on it has been filed*: nothing

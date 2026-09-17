@@ -37,8 +37,10 @@ you`, a step `BLOCKED`, `unsigned`, `awaiting approval` or over budget. Four thi
    rounds and what it cost, and, for a folder whose ending has not run, that step's own prose with the
    `wf approve` that files it.
 3. the work itself: `git log --oneline <base>..<branch>` and `git diff <base>...<branch>`, which `wf decide`
-   names for you. For a change a person will see, look at the screenshots the run left — the look skill,
-   `.claude/skills/look/SKILL.md`, reads them and says what is cut off, overlapping or unreadable.
+   names for you. For a change a person will see, look at the screenshots the run left: `wf decide` prints
+   each step's artifacts, and a `ui` run's implement declares its `screenshots` by absolute path. The look
+   skill (`.claude/skills/look/SKILL.md`) reads them and says what is cut off, overlapping, or unreadable
+   in one of the themes.
 
 Then prepare the decision, and ask (below): what the run shipped, what the review left unresolved and what
 was resolved, how many rounds and how much it cost, and what you would do.
@@ -85,6 +87,19 @@ change>"`, which is what that folder's own screen offers.
 branch. A run's result is merged by its own workflow's ending step, which a person approves and which runs
 that folder's whole check first; a branch is dropped by a person. If a folder has no ending step, say so in
 your brief and leave the commands to them.
+
+## When nothing needs a person
+
+Wait, and read again. A foreground wait that ends by itself: `sleep 60`, then another `wf ls` — or a bounded
+one, `timeout 300 bash -c 'until wf ls | grep -q "waiting on you"; do sleep 20; done'`, which returns
+whatever happens. **Never a background loop**: one that outlived the command that started it held a session
+for seventy-seven minutes with nothing running in it, and nothing settled the step (CLAUDE.md;
+agent-engine's open issue 24). End anything you start before you sign off.
+
+Sign off only to ask a person something — ending your session is what asking *is*. If there is nothing to
+ask and nothing to do for a long stretch, that is worth a `needs` of its own: *"Nothing waits on you; two
+runs are in flight and neither is near its result. Answer when you want me looking again."* Their answer
+starts you where you left off.
 
 ## What you may write here
 

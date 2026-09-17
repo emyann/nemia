@@ -34,6 +34,10 @@ wf retry <run> supervise --message "Merge it."                          # the an
 There is no cap on the number of answers: each is a try, and each try continues the session before it. What
 ends the run is a person — `wf cancel <run>`.
 
+When nothing needs a person it waits and reads again — a foreground wait that ends by itself, never a
+background loop, which is how a session was once held for seventy-seven minutes with nothing running in it.
+Signing off is how it asks, so it signs off only when it has something to ask.
+
 **It never types git for a run.** A run's result is merged by that run's own ending step (`ship.md` in the
 `dev*` folders), which a person approves; the supervisor's yes is `wf approve <run> <step>`, and the folder
 does the rest.

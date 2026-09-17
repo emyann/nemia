@@ -105,7 +105,7 @@ test("the supervisor's brief is the loop: what it watches, how it reads a run to
     '`wf ls` is the pass.',
     'the run\'s workflow folder — its README, and its last step\'s file',
     '`wf decide <run>`',
-    'the look skill, `.claude/skills/look/SKILL.md`, reads them',
+    'The look skill (`.claude/skills/look/SKILL.md`) reads them',
     // The three moments §9 names, and the fourth.
     '**A run to decide.**', '**A plan waiting.**', '**A stall.**', '**An idea from the person.**',
     'wf retry <run> <step> --message "<their answer>"',
@@ -118,6 +118,9 @@ test("the supervisor's brief is the loop: what it watches, how it reads a run to
     '**`wf approve <run> <step> --message "<their words>"`**, and nothing more.',
     '**Never type git for a run.**',
     'Never `git add -A`, never push, never merge, never delete a branch.',
+    // What it does when nothing needs a person, and the trap that cost the operator seventy-seven minutes.
+    '**Never a background loop**', 'End anything you start before you sign off.',
+    'Sign off only to ask a person something',
     // Where the lessons go.
     'a trap in `CLAUDE.md`',
   ]) assert.ok(body.includes(sentence), `${sentence}\n\n${body}`);

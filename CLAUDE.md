@@ -48,6 +48,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **Something beside the Factory's floor that mounts after its first render narrows a floor already fitted.** The e2e still passes, and
   the picture shows the last card cut at the right. Load what it draws in the route's loader (`prefetchQuery`, which never throws), and fit
   again when it comes or goes (the queue's lane, learned by the run that drew queued cards on the Factory).
+- **An EventSource closed on the server's last event aborts a request the server has answered.** The api writes `settled` and ends the
+  response; closed the moment the event arrives, before the end does, Chromium reports `net::ERR_ABORTED`, and the e2e's watch fails the page
+  now and then. Close it on the `error` fired as the response ends, or after a grace (`follow`, learned by the run that drew the queue).
 - **The engine's task view carries no filing time; its feed does.** A slot wait is filed → first attempt, so the timeline
   reads filings off `e.feed` (`readFilings`). A store written by hand — the e2e's seed — writes `engine/feed.jsonl` too
   (`seedFeed`), or every queue time reads `not known` (learned by the run that added the timeline).

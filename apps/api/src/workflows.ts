@@ -9,11 +9,12 @@
  * The start is the package's `start()`, `wf start`'s own: it writes the run's record and files nothing — `wf tick` or
  * `wf up` files the first step, as it does for a run started at the command line. A start that names an inbox card (`card`) is the
  * package's `startFromInbox()` instead, `wf start <inbox>/<name>.md`'s own: the same record, with `from` on it, and the card removed.
- * Nothing else here writes; the inbox's own writes are inbox.ts's.
+ * Nothing else here writes; the inbox's own writes are inbox.ts's, and a folder the builder puts back is builder.ts's.
  *
  * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
  * the page itself has on the board..
  */
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
@@ -41,10 +42,16 @@ export type WorkflowStepSpec = {
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallow:`): empty where the step denies nothing. */
   disallow: string[];
+  /** `remote:` as written, `true` or `false`: null where the step has no line. */
+  remote: boolean | null;
   deadlineSeconds: number | null;
   maxAttempts: number | null;
+  /** The most the step's tries may cost together, in dollars (`budget:`). */
+  budget: number | null;
   check: string | null;
   retries: number | null;
+  /** `gate: true`: the step's closeout waits for a person. Null for a step without the line, which is the only other thing a step can say. */
+  gate: true | null;
   /** The schema file `output:` names, beside the step. */
   output: string | null;
   loop: string | null;
@@ -52,18 +59,29 @@ export type WorkflowStepSpec = {
 };
 
 /**
- * A workflow as the board lists it. `name` is its folder's. `graph` is `graphOf` its steps, as a run of it would be
- * drawn. `error` is the loader's refusal of a folder that does not read as a workflow, whose `steps` are then none.
+ * A workflow as the board lists it. `name` is its folder's. Each step is its name, its keys (`spec`) and its `body`, what its agent is told:
+ * the shape the builder puts a folder back in (builder.ts). `graph` is `graphOf` its steps, as a run of it would be drawn. `schemas` are the
+ * `.json` files beside the steps, which an `output:` may name. `error` is the loader's refusal of a folder that does not read as a workflow,
+ * whose `steps` are then none.
  */
 export type WorkflowListing = {
   name: string;
   from: WorkflowSource;
   dir: string;
   description: string | null;
-  steps: Array<{ name: string; spec: WorkflowStepSpec }>;
+  steps: ListedStep[];
   graph: RunGraph;
+  schemas: string[];
+  /**
+   * What the folder's files held when it was listed (`versionOf`): a builder's save carries it, and is refused when the folder no longer
+   * holds that, rather than written over what changed.
+   */
+  version: string;
   error: string | null;
 };
+
+/** A step as a workflow's listing has it, and as the builder takes it back. */
+export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string };
 
 /**
  * One key of a file, as a card's or a step's page lays them out: the key, its value as the package read it — null where the file does not
@@ -100,15 +118,51 @@ export function listWorkflows(repo: string, home: string = HOME): WorkflowListin
   return sourcesOf(repo, home).flatMap(({ from, dir }) => foldersIn(dir).map((name) => listed(name, from, path.join(dir, name))));
 }
 
-function listed(name: string, from: WorkflowSource, dir: string): WorkflowListing {
+/** One folder as the board lists it, read from disk now: what the listing has for it, and what the builder answers a write with. */
+export function listed(name: string, from: WorkflowSource, dir: string): WorkflowListing {
   const description = workflowDescription(dir);
+  const schemas = schemasIn(dir);
+  const version = versionOf(dir);
   let steps: Workflow[];
   try {
     steps = loadWorkflows(dir);
   } catch (err) {
-    return { name, from, dir, description, steps: [], graph: graphOf([]), error: messageOf(err) };
+    return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, version, error: messageOf(err) };
   }
-  return { name, from, dir, description, steps: steps.map((step) => ({ name: step.name, spec: specOf(step) })), graph: graphOf(steps), error: null };
+  return { name, from, dir, description, steps: steps.map((step) => ({ name: step.name, spec: specOf(step), body: step.body })), graph: graphOf(steps), schemas, version, error: null };
+}
+
+/**
+ * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what a
+ * save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and `writeWorkflow`
+ * removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or removed changes it,
+ * and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as what it says, so it
+ * changes the word too.
+ */
+export function versionOf(dir: string): string {
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.isDirectory() && /\.(md|json)$/.test(e.name)).map((e) => e.name).sort();
+  } catch {
+    names = [];
+  }
+  const files = names.map((name) => {
+    try {
+      return [name, fs.readFileSync(path.join(dir, name), 'utf8')];
+    } catch (err) {
+      return [name, { unreadable: messageOf(err) }];
+    }
+  });
+  return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
+}
+
+/** The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed. */
+function schemasIn(dir: string): string[] {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.isDirectory() && !e.name.startsWith('.') && e.name.endsWith('.json')).map((e) => e.name).sort();
+  } catch {
+    return [];
+  }
 }
 
 const specOf = (step: Workflow): WorkflowStepSpec => ({
@@ -121,10 +175,13 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,
   disallow: step.disallow ?? [],
+  remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
   maxAttempts: step.maxAttempts ?? null,
+  budget: step.budget ?? null,
   check: step.check ?? null,
   retries: step.retries ?? null,
+  gate: step.gate ?? null,
   output: step.output?.file ?? null,
   loop: step.loop ?? null,
   rounds: step.rounds ?? null,
@@ -135,7 +192,7 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
  * workflow — `.git`, where a person keeps their workflows in git, or an editor's `.vscode` — so it is not listed, and no start
  * can name it.
  */
-function foldersIn(dir: string): string[] {
+export function foldersIn(dir: string): string[] {
   let names: string[];
   try {
     names = fs.readdirSync(dir);

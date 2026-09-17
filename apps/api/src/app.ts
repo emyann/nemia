@@ -10,6 +10,7 @@ import { graphOf, type RunGraph } from './graph.ts';
 import { capabilitiesWithSteps } from './reach.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { inbox } from './inbox.ts';
+import { builder } from './builder.ts';
 import { workflows } from './workflows.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
@@ -1648,6 +1649,9 @@ export const app = new Hono()
   .get('/api/capabilities', async (c) => c.json(await capabilitiesWithSteps(repoOf())))
   // A repository's workflows, listed, and a run of one started — the board's first write — or of an inbox card (workflows.ts).
   .route('/', workflows)
+  // A folder of yours built on the board: made with a first step, and put back from its steps with the schemas pasted for them — two writes,
+  // guarded as a start is, each through the package's `writeWorkflow` (builder.ts).
+  .route('/', builder)
   // The inbox: its cards listed, one filed, one dropped — two writes, guarded as a start is (inbox.ts).
   .route('/', inbox)
   .get('/api/runs', async (c) => {

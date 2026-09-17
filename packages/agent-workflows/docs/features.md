@@ -24,7 +24,8 @@ cards that start themselves (`wf inbox queue`) — and markdown rendered on the 
 explains their keys — and a gate, a step's handoff that waits for a person (`gate: true`, `--gate`, `wf approve`), in the package — and
 the engine's `priority` and `remoteControl` put to use: a run in flight filed above a newer run's first step, and `remote:` on a step (§2,
 its package half) — and the workflow builder's package half: a step rendered back to markdown and a folder written from its steps
-(`renderStep`, `writeWorkflow`, §4) — have shipped.
+(`renderStep`, `writeWorkflow`, §4) — and the builder on the board, which writes a folder of yours from its blocks and edges (§4, its board
+half) — have shipped.
 
 ## Shipped: the check
 
@@ -2473,6 +2474,210 @@ What it leaves:
 - **A gated step not yet signed off** says `holds once it has signed off` in its facts, and nothing on the canvas.
 - **A phone.** The gate is a form on a page served on this machine, and Remote Control (§2) is what reaches it from elsewhere.
 
+## Shipped: the workflow builder — steps and their edges drawn on the board, written back as the folder
+
+§4 below, in full. The Workflows page drew each folder read-only, and nothing in the packages wrote a step back to markdown. Now a folder of
+yours is built on the board: blocks and the edges between them, a form per step, saved back as the folder's files. The package half came
+first (`renderStep`, `writeWorkflow`), then the api and the board in the apps run after it.
+
+### The package half
+
+
+- **`renderStep(step)`**, pure, in workflow.ts. It writes the frontmatter with only the keys the step sets, in `STEP_KEYS` order, each
+  as the parser reads it: a list as `a, b`, a count or a budget as its number, `output:` as the file it names. The body follows.
+  `undefined` and `null` are unset, and so is an empty `after`, `input` or `disallow` list, since no line says the same thing. An empty
+  `tools` list is written, and the parser refuses it: no tools reads as every tool to one person and as none to another. `rounds:` is
+  written wherever the step has it, the default included, and `after:` lists the step `resume:` names, as the parser read it. A file's
+  comments are not on the step, so a render has none. It judges nothing the parser judges. It refuses only what a file cannot hold: a
+  key no step has, in the parser's own sentence, since the key would otherwise be dropped; a line break in a value, which would turn
+  what follows into a line of its own (a `check` of `npm test`, a line break and `harness: codex` would change the harness); and a
+  comma inside a name in `after:` or `input:`. A test loads every shipped folder — the repository's `dev`, `dev-build`,
+  `dev-planned`, `dev-planned-build` and `ui`, the package's `workflows/` and `workflows/ui`, and the examples. It renders each step,
+  parses it again and gets the same step back, and a second render gives the same text. Another test does this for a step that sets
+  every key.
+- **`writeWorkflow(dir, steps, readme?, { anywhere? })`** in runner.ts. The whole folder is judged before a byte is written:
+  - where the folder is;
+  - each name as a file's name (`stepNameRefusal`: no slash, no leading dot, no comma, no spaces around it, no `.md`, not the
+    README's, a file name of at most 255 bytes);
+  - no name used twice, and at least one step;
+  - each step rendered;
+  - the rendered folder parsed in memory by `parseFolder`. `loadWorkflows` now reads a folder with the same function, and the
+    `output:` schemas are read from the folder as they are.
+
+  So every parser refusal comes out first, in its words and naming the step, and the folder is left as it was. Tests make it refuse a
+  key a step does not have, an `after:` naming no step, a cycle, a loop that is not a back edge, an `output:` whose schema is not there
+  or is outside the folder, and a name that is not a file name. Each asserts every file of the folder is unchanged. Then each
+  `<name>.md` is written, except a file that already reads as its step, which is left as it is. Saving a workflow on the board keeps
+  the comments of every step it did not change, and the shipped folders are full of them. The `.md` of a step no longer in the set is
+  removed. A `*.schema.json` is never written. The README is written only when `readme` is given, under the name the folder's README
+  already has. The result is the steps as the folder now reads (`steps`) and its files by name (`written`, `kept`, `removed`).
+- **Where it writes.** A workflow directly inside the store's `workflows/` or a repository's (`<repo>/workflows/<name>`, with a `.git`
+  next to that `workflows/`). Those are the two places the api lists workflows from. A write removes files, so any other folder is
+  refused, with the fix named, unless the call passes `{ anywhere: true }`. `workflows/` itself and a folder below a workflow are
+  refused too. The package's own `workflows/` is in neither place.
+- **One change to the parser.** An `output:` naming a file outside its folder, whether absolute or climbing out with `..`, is refused
+  at load, before the file is read. The folder is what a run freezes and what the builder writes back. Through the api, a file read
+  from outside would also put its first bytes into the refusal, in the JSON parse error. No shipped folder names one.
+- **Left to `wf start`, as for a folder written by hand:** what start refuses beyond the parser, which is a step named for another
+  step's check or try, and `remote: true` on a harness other than `claude`. A write changes no run, since each run froze its folder at
+  `wf start`.
+- **What the board's run should call.** From `agent-workflows`: `writeWorkflow(dir, steps, readme?, { anywhere? })` and its result
+  type, `WorkflowWritten`. From `agent-workflows/workflow`: `type StepDraft` (a `Workflow` whose `output` may be only `{ file }`),
+  `renderStep` (a step's file, to preview), `stepNameRefusal` (a name refused while it is typed), `parseFolder` (a folder checked
+  before Save, with the api's own `read`), and `WorkflowError`, whose `message` is the sentence for a 422. One trap: the api's
+  `WorkflowStepSpec` has no `remote`, `budget`, `gate` or body today. A draft built from the listing alone would drop
+  `budget: 20` from `dev`'s review, and the write would take that as a change. So the listing needs those keys first, or the draft
+  should start from the step as `loadWorkflows` read it. `null` and `[]` pass as they are.
+
+### The board half
+
+A person builds a workflow of theirs on the Workflows page, and Save writes the folder through `writeWorkflow`. Apps only: nothing in
+`packages/` changed but this file. Read first: the apps/web lines of CLAUDE.md, the package half above, `STEP_KEYS`, `STEP_KEY_MEANINGS`
+and `COUNTS` in workflow.ts, `listWorkflows` and `folderOf` in `apps/api/src/workflows.ts`, and `WorkflowCanvas.tsx`.
+
+**The decision made in the request: the builder writes yours only**, the store's `workflows/`. A write to the repository's is refused with a
+sentence that says to copy the folder into the repository by hand, and the api writes nothing into a checkout. `writeWorkflow` would take a
+repository's folder (`<repo>/workflows/<name>`); the api never passes it one.
+
+What was built:
+
+- **The listing carries what a save needs.** Each step is `{ name, spec, body }`, and `spec` gains `remote`, `budget` and `gate`, the
+  trap the package half named: without `budget`, a put of `dev`'s review would drop `budget: 20`. Each workflow gains `schemas`, the `.json`
+  files beside its steps, which an `output:` may name. A test puts a copy of the repository's `dev` back exactly as listed and asserts both
+  files are kept byte for byte, comments and budget included.
+- **`PUT /api/workflows/yours/:name`** takes `{ version, steps, schemas?, readme? }`: the steps in the listing's shape, a key unset as null
+  or left out, and any schema pasted for an `output:` as `{ file, text }`. It passes the guard first. The folder is found among yours by `folderOf`, never joined from the path, so a name not there is a 404 that says
+  how to make one. A body not in that shape is a 400 naming the step and the key: `after` not a list, `deadlineSeconds: "5m"` not a number,
+  `remote: "yes"` not a boolean. Whether a value is one a step may have is the package's to say. A key no step has is passed through, so
+  `renderStep` refuses it in the parser's words. Every `WorkflowError` is a 422 `{ error, steps }`: the sentence as thrown, and the steps it
+  names (`stepsNamed`), both for a cycle, the name itself for a name refused or given twice, and the step a refusal opens on otherwise, the
+  longest name first. The answer is `{ workflow, written, kept, removed }`, with `workflow` read back from disk by the listing's own
+  `listed`, not echoed from the request.
+- **`POST /api/workflows/yours`** takes `{ name, step, readme? }` and makes the folder with its first step through `writeWorkflow`. A
+  name that is not one folder's name is a 400 (`workflowNameRefusal`: a slash, a leading dot, which the listing hides, spaces around it, a
+  control character, over 255 bytes). A folder or a file of that name in yours is a 409. A step the package refuses is a 422 naming it, and
+  no folder is made. A name the repository has too may be made: the board starts either with `from`.
+- **A pasted schema travels in the same PUT** (`schemas`), since `writeWorkflow` never writes one. The request sketched it as a second
+  PUT, and the first round built it so, written before the folder: review found that it was judged only against the steps on disk, so a
+  schema for a new `output:` was written whatever it held, and stayed when the folder was then refused under "nothing written". Now each
+  schema's file must be a `.json` directly in the folder, not hidden, given once (400, `schemaNameRefusal`), and then the schemas and the
+  steps are judged together before a byte of either is written (`judgedWith`): each text a JSON object (422, naming the steps whose
+  `output:` names it), then every step rendered and the folder parsed in memory with the schemas read as given and every other file as on
+  disk, so any parser refusal comes out in its words — a schema not strict for a new output, a loop's schema without `again`, a cycle beside
+  a good schema. A step name `writeWorkflow` refuses is left to it, first, as it refuses one before anything else. Then the schemas are
+  written and the folder after them; should `writeWorkflow` refuse all the same, or the disk fail, each schema is put back as it was. The
+  answer's `written` and `kept` name the schemas too.
+- **A save carries the version it was read at.** The listing gives each folder a `version`, a digest of its `.md` and `.json` files
+  (`versionOf`): a step, the README or a schema edited, added or removed changes it, a hidden one included — the package reads `.draft.md`
+  as a step, and a save without it removes it, which review found in round 3 when the version still skipped hidden files; a note beside
+  the steps, hidden or not, or a folder inside, does not. A PUT without one is a 400. One that no longer matches is a 409, nothing written, that says the folder changed since it
+  was read at that version, gives the version it is at, and says to read it again. Review found it: with the builder open, a step file added
+  by hand was deleted by the next Save, and one edited was written over from the stale draft — the lost update of two writers doing
+  read-modify-write.
+- **A write to the repository's** is a 403, whether asked by the path (`/api/workflows/repo/…`) or by a body's `from: "repo"`, on both
+  writes: `… refuses to write the repository's workflows (<repo>/workflows): the builder writes only yours, in <store>/workflows,
+  and the api writes nothing into a checkout. Build the workflow in yours — cp -r <repo>/workflows/<name> <store>/workflows/ starts from
+  this one — then copy the folder into <repo>/workflows by hand, where git shows it as a change to commit.` Any other source is a 400.
+- **`GET /api/workflows/keys`**, what a step's form is drawn from. It lists every key in `STEP_KEYS` order with its `STEP_KEY_MEANINGS`
+  line and a kind (`steps`, `step`, `choice`, `harness-word`, `text`, `list`, `count`, `dollars`, `flag`, `schema`). It gives the words a key
+  may take: `HARNESSES`, `EFFORTS` and `PERMISSION_MODES` by harness, `remote`'s true and false, `gate`'s true. And it gives the default
+  harness. `COUNTS` and the default harness are not exported, so the api keeps copies, and a test holds each to the parser. The parser
+  refuses exactly the `count` keys as "not a count". It takes each flag word, and refuses `gate: false`. With no harness named, it takes
+  every mode of the default harness and none only codex takes. `KINDS` is a `Record<StepKey, …>`, so a key added to the package does not
+  typecheck until the api says how it is set.
+- **`guard.ts`** counts nine writes.
+- **The board.** A card of yours has **Build**, which puts the builder where the graph, the step links and the start were
+  (`WorkflowBuilder`):
+  - **Blocks.** The spec node in a building mode, with handles a person drags: out on the right, in on the left, and underneath a violet
+    loop dot to drag from, apart from the dot a loop comes into, so the one is never under the other. A drag from A's right dot to B writes
+    `after: A` on B. A drag from B's violet dot to A writes `loop: A` on B, with `rounds: 3` where it had none.
+  - **Edges.** Each edge has a button at its middle that takes its key away: `after`, and `resume` where it named the same step, since
+    `after` lists it; or `loop` with its rounds.
+  - **Layout.** Steps are laid out by `after` as a folder's graph is. Steps that wait on each other have no such order, so they go in a row,
+    and an edge drawn backwards dips beneath the row, as a loop's does. The canvas refits whenever a step moves: a drawn edge moves its
+    target a column right, and the second drag of the e2e's cycle panned the pane until it did.
+  - **Adding a step.** A block is added with a name and what its agent is told. A name there is none of, or one taken, is refused on the
+    board, since the draft is keyed by name; every other name is the package's to refuse on save. Removing a step takes every key that
+    names it.
+  - **The form.** A block clicked opens its form (`StepForm`): the body, then a field per key the api's form has, each with its line of
+    meaning. `after` and `input` are checkboxes of the other steps, `resume` and `loop` a select of them, the harness words a select, lists
+    and counts typed. `output` is a select of the folder's schemas, or *Paste a schema…*, with the file it is written to. A word the
+    harness does not take, or a schema file not in the folder, is kept and said, never hidden.
+  - **Unsaved changes** are marked on the card (`Unsaved changes`, and `Saved` once saved, with what was written, kept and removed) and
+    on each block that changed.
+  - **Save** puts the folder in one PUT, with the schemas pasted in the draft and the version the draft was read from. A refusal is shown
+    above the canvas, verbatim, with the steps it names. Each of those blocks is drawn in red, and the first one's form opens with the
+    sentence above its fields. A 409 offers **Read the folder again**, which starts the draft from what the folder holds now and lets go of
+    what was drawn. Discard changes, and Discard and close, go back to the folder as last read.
+  - **New workflow**, beside the page's introduction, takes a name, a first step and its body, and opens the new card in its builder.
+  - **The repository's cards** have no Build, and say why in one line. A folder of yours that does not read has none either, and says so.
+
+What was measured:
+
+- From the root, `npx turbo run test --force` before the change: api 173, web 212, agent-workflows 543 (1 skipped), agent-engine 326
+  (9 skipped). After it: api 186, web 223; after round 2, api 190 and web 225; the packages unchanged. `npm run typecheck` and `npm run build` clean.
+- `apps/api/test/builder.test.ts`, new, 13 tests, over a scratch store and repository:
+  - the key form held to the parser;
+  - a copy of `dev` put back as listed, with everything kept;
+  - a folder drawn, then cut back: a step added, an edge, a key, the README, a step gone. Each file is asserted as written, and the answer
+    is compared with `listWorkflows`;
+  - twelve package refusals — a cycle, an `after` naming no step, a key no step has, a loop with no output, a schema not there or outside
+    the folder, a name that is not a file's, a name twice, no tools, a line break in a check, an empty body, no steps. Each is a 422
+    compared with `writeWorkflow`'s own sentence, with its steps named and the folder unchanged;
+  - the 403 for the repository's on each write, by path and by body, and the 400 for another source;
+  - the guard's three refusals on all three writes;
+  - sixteen shapes refused (400), and the 404 for a folder yours does not have, `..%2F` included;
+  - `POST`'s 201, and its 400s, 409s and 422s, with nothing made;
+  - a schema written and then named, and its refusals: a name, not JSON, not an object, a loop's `again` taken away, no folder;
+  - `stepsNamed`.
+  Eight guards broken on purpose, one at a time: the repository's 403, the guard on the put, the body's type check, the schema's
+  judgement, the steps a refusal names, a new folder's name, the 409, and a schema's file name. Each failed at least one test.
+- **Round 2, from review.** Three findings, each fixed. The pasted schema and the stale save above. And `builder.ts`'s two
+  control-character classes were raw NUL and DEL bytes, which a heredoc had turned from escapes into characters: ripgrep took the file for
+  binary, and a search of `apps/api/src` did not find it. They are escapes now, and each app has `test/source.test.ts`, which refuses a raw
+  control character anywhere in its `src` and `test` and names where. `apps/api/test/builder.test.ts` is now 15 tests: the schema
+  route's two gave way to a schema saved with the folder (new and replaced, kept when the same), six schema refusals with the folder
+  unchanged, hand edits each refused with a 409 and kept (seven since round 3: a hidden step and a hidden schema added among them), and a disk failure that puts both schemas back. Nine guards broken on purpose,
+  one at a time — the version check, the version required, the schemas' judgement, their JSON object check, putting them back, leaving a
+  refused name to the package, a schema's file name, one given twice, and the source scan (a NUL planted in `src`) — each failed a test.
+  The first run of those left one unnoticed: schemas written beside a refused name were put back, so no file told; the case gained a cycle,
+  which the package refuses after the name, and it failed.
+- Web: `test/builder.test.ts`, new, 10 tests of the draft (edges drawn and taken away, steps added and removed, keys, a pasted schema,
+  what is unsaved, placement with a cycle, typed lists and numbers, the listing's order). Its first run found the draft sharing its lists
+  with the listing, so a change could reach the page's cache: `draftOf` copies them now. And one markup test of the building node's
+  handles, and of the spec node having no connectable handle off the builder.
+- `npm run e2e`, a new `builder` page, in both themes:
+  - the repository's card has no Build and says why;
+  - then, in a page of its own, a step added to `mine`, a schema pasted for its output, a cycle drawn and saved. The 422's sentence is shown
+    verbatim above the canvas and in build's form, both blocks are marked, nothing is written — no schema either — and that page's watch
+    sees that one 422 and nothing else. The same page
+    takes an edge away by its button, draws a loop from the violet dot (the form reads `loop: plan`, rounds 3), and takes it away;
+  - then, in another page of its own, `mine` open in its builder, plan's body changed, and plan.md given a check by hand before Save. The
+    409's sentence is shown verbatim, plan.md keeps the hand edit, and Read the folder again shows the check on plan's block and the body as
+    on disk, with nothing unsaved. That page's watch sees that one 409;
+  - then `New workflow`: `built` made (201) and opened in its builder, `implement` added and marked unsaved, an edge dragged from plan,
+    effort and check set in the form and shown on the block, a schema pasted for its output, and Save (200), which says it wrote
+    implement.md and implement.schema.json. The folder is read back through `GET /api/workflows` and
+    the step page, and on disk as `---\nafter: plan\neffort: high\ncheck: npm test\noutput: implement.schema.json\n---\n…`, the schema beside it, with plan.md
+    left as written. The folder
+    is removed before the page ends.
+  The screenshots were read: `builder-refused`, `builder-changed` and `builder-saved` in both themes, and the page's own. Before the backward edge was drawn
+  beneath the row, the refused picture showed it crossing both blocks, with its button on the forward edge's.
+
+What it leaves:
+
+- **Renaming a step.** A step is removed and added again; its keys go with it.
+- **The README** is written by the api (`readme`), and the board has no field for it.
+- **What `wf start` refuses beyond the parser** — a step named for another's check, `remote: true` off `claude` — is refused at a start,
+  not at a save, as for a folder written by hand.
+- **The two edge cases review found in `writeWorkflow`** (a rename on a case-insensitive filesystem, a symlinked step file) are the
+  package's, and unchanged.
+- **A folder the builder cannot open**: one of yours that does not read. Its files are fixed by hand.
+- **The version is checked, not held.** Between the api reading the folder's version and `writeWorkflow` writing, a hand edit can still
+  land, in the milliseconds a save takes. Nothing locks a folder, as nothing locks one against an editor.
+- **Read the folder again lets go of the draft.** Nothing merges what was drawn into what the folder holds now; the refusal says to copy
+  what is needed first.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
@@ -2542,54 +2747,8 @@ session is the engine's (Engine-side work, below: filing order and `priority`). 
 
 ## 4. The workflow builder: steps and their edges drawn on the board, written back as the folder
 
-**The package half is built** (2026-09-17). The api, the board and the e2e are still to build. What was registered is kept below as it
-was asked.
-
-- **`renderStep(step)`**, pure, in workflow.ts. It writes the frontmatter with only the keys the step sets, in `STEP_KEYS` order, each
-  as the parser reads it: a list as `a, b`, a count or a budget as its number, `output:` as the file it names. The body follows.
-  `undefined` and `null` are unset, and so is an empty `after`, `input` or `disallow` list, since no line says the same thing. An empty
-  `tools` list is written, and the parser refuses it: no tools reads as every tool to one person and as none to another. `rounds:` is
-  written wherever the step has it, the default included, and `after:` lists the step `resume:` names, as the parser read it. A file's
-  comments are not on the step, so a render has none. It judges nothing the parser judges. It refuses only what a file cannot hold: a
-  key no step has, in the parser's own sentence, since the key would otherwise be dropped; a line break in a value, which would turn
-  what follows into a line of its own (a `check` of `npm test`, a line break and `harness: codex` would change the harness); and a
-  comma inside a name in `after:` or `input:`. A test loads every shipped folder — the repository's `dev`, `dev-build`,
-  `dev-planned`, `dev-planned-build` and `ui`, the package's `workflows/` and `workflows/ui`, and the examples. It renders each step,
-  parses it again and gets the same step back, and a second render gives the same text. Another test does this for a step that sets
-  every key.
-- **`writeWorkflow(dir, steps, readme?, { anywhere? })`** in runner.ts. The whole folder is judged before a byte is written:
-  - where the folder is;
-  - each name as a file's name (`stepNameRefusal`: no slash, no leading dot, no comma, no spaces around it, no `.md`, not the
-    README's, a file name of at most 255 bytes);
-  - no name used twice, and at least one step;
-  - each step rendered;
-  - the rendered folder parsed in memory by `parseFolder`. `loadWorkflows` now reads a folder with the same function, and the
-    `output:` schemas are read from the folder as they are.
-
-  So every parser refusal comes out first, in its words and naming the step, and the folder is left as it was. Tests make it refuse a
-  key a step does not have, an `after:` naming no step, a cycle, a loop that is not a back edge, an `output:` whose schema is not there
-  or is outside the folder, and a name that is not a file name. Each asserts every file of the folder is unchanged. Then each
-  `<name>.md` is written, except a file that already reads as its step, which is left as it is. Saving a workflow on the board keeps
-  the comments of every step it did not change, and the shipped folders are full of them. The `.md` of a step no longer in the set is
-  removed. A `*.schema.json` is never written. The README is written only when `readme` is given, under the name the folder's README
-  already has. The result is the steps as the folder now reads (`steps`) and its files by name (`written`, `kept`, `removed`).
-- **Where it writes.** A workflow directly inside the store's `workflows/` or a repository's (`<repo>/workflows/<name>`, with a `.git`
-  next to that `workflows/`). Those are the two places the api lists workflows from. A write removes files, so any other folder is
-  refused, with the fix named, unless the call passes `{ anywhere: true }`. `workflows/` itself and a folder below a workflow are
-  refused too. The package's own `workflows/` is in neither place.
-- **One change to the parser.** An `output:` naming a file outside its folder, whether absolute or climbing out with `..`, is refused
-  at load, before the file is read. The folder is what a run freezes and what the builder writes back. Through the api, a file read
-  from outside would also put its first bytes into the refusal, in the JSON parse error. No shipped folder names one.
-- **Left to `wf start`, as for a folder written by hand:** what start refuses beyond the parser, which is a step named for another
-  step's check or try, and `remote: true` on a harness other than `claude`. A write changes no run, since each run froze its folder at
-  `wf start`.
-- **What the board's run should call.** From `agent-workflows`: `writeWorkflow(dir, steps, readme?, { anywhere? })` and its result
-  type, `WorkflowWritten`. From `agent-workflows/workflow`: `type StepDraft` (a `Workflow` whose `output` may be only `{ file }`),
-  `renderStep` (a step's file, to preview), `stepNameRefusal` (a name refused while it is typed), `parseFolder` (a folder checked
-  before Save, with the api's own `read`), and `WorkflowError`, whose `message` is the sentence for a 422. One trap: the api's
-  `WorkflowStepSpec` has no `remote`, `budget`, `gate` or body today. A draft built from the listing alone would drop
-  `budget: 20` from `dev`'s review, and the write would take that as a change. So the listing needs those keys first, or the draft
-  should start from the step as `loadWorkflows` read it. `null` and `[]` pass as they are.
+Shipped 2026-09-17 as *Shipped: the workflow builder — steps and their edges drawn on the board, written back as the folder*, above:
+the package first, then the api and the board under *The board half* there. What was registered is kept as it was asked.
 
 **Registered** 2026-09-16, by the operator: define a step on the board, draw the workflow by dragging arrows between
 blocks, and have the builder amend the folder's files to match. To be written as an inbox card.

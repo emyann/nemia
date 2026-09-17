@@ -543,19 +543,19 @@ test("two texts with footnotes on one page name theirs apart — no id twice, ea
 
 type WorkflowStepSpec = import('../src/lib/api.ts').WorkflowStepSpec;
 
-/** A step of a workflow no run has started, as the Workflows page draws it: in the step node's spec mode. */
-async function specMarkup(spec: WorkflowStepSpec): Promise<string> {
+/** A step of a workflow no run has started, as the Workflows page draws it: in the step node's spec mode — on the builder, with `build`. */
+async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; refused: boolean; selected: boolean }): Promise<string> {
   const { SpecNode } = await import('../src/components/StepNode.tsx');
   const props = {
-    id: 'review', type: 'spec' as const, data: { name: 'review', index: 1, spec }, selected: false, dragging: false, zIndex: 0,
+    id: 'review', type: 'spec' as const, data: { name: 'review', index: 1, spec, ...(build ? { build } : {}) }, selected: false, dragging: false, zIndex: 0,
     isConnectable: false, positionAbsoluteX: 0, positionAbsoluteY: 0, selectable: false, deletable: false, draggable: false,
   };
   return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(SpecNode, props)));
 }
 
 const unset: WorkflowStepSpec = {
-  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [],
-  deadlineSeconds: null, maxAttempts: null, check: null, retries: null, output: null, loop: null, rounds: null,
+  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [], remote: null,
+  deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 
 const unescaped = (text: string) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
@@ -598,6 +598,33 @@ test("a step that sets nothing is drawn on the defaults: its harness's own effor
 
   const { specLines } = await import('../src/components/StepNode.tsx');
   assert.deepEqual(specLines({ ...unset, loop: 'implement', rounds: 1 }).at(-1), ['loop', 'implement · 1 round']);
+});
+
+test("a step on the builder has handles a person draws with — out on the right, in on the left, and a loop's out and in underneath, apart — and says it is unsaved or refused", async () => {
+  const html = await specMarkup({ ...unset, harness: 'claude', check: 'npm test' }, { unsaved: true, refused: true, selected: true });
+  const handles = [...html.matchAll(/<div (?:data-handleid="([^"]*)" )?data-handlepos="(\w+)"[^>]*class="([^"]*)"[^>]*>/g)].map((m) => {
+    const classes = m[3]!.split(' ');
+    const type = classes.includes('source') ? 'source' : 'target';
+    return [type, m[2], m[1] ?? null, classes.includes('connectable'), classes.includes('connectablestart')];
+  });
+  assert.deepEqual(handles, [
+    ['target', 'left', null, true, false],
+    ['source', 'right', null, true, true],
+    ['source', 'bottom', LOOP_SOURCE, true, true],
+    ['target', 'bottom', LOOP_TARGET, true, false],
+  ], html);
+  // Underneath, a loop's two dots are apart, so the one a person drags from is not under the one a loop comes into.
+  assert.match(html, new RegExp(`data-handleid="${LOOP_SOURCE}"[^>]*style="left:70%"`), html);
+  assert.match(html, new RegExp(`data-handleid="${LOOP_TARGET}"[^>]*style="left:30%"`), html);
+  assert.match(html, /data-unsaved-step="true"/);
+  assert.match(html, /data-refused-step="true"/);
+  assert.match(html, />unsaved</);
+  assert.match(html, />npm test</, 'and its lines, as on the Workflows page');
+
+  const plain = await specMarkup(unset, { unsaved: false, refused: false, selected: false });
+  assert.doesNotMatch(plain, /data-unsaved-step|data-refused-step|>unsaved</, plain);
+  // Off the builder, nobody draws: no handle is connectable.
+  assert.doesNotMatch(await specMarkup(unset), /\bconnectable\b/);
 });
 
 test('a step with more than three tools counts them on its node, named in the title; three or fewer are written out', async () => {

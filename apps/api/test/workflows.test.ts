@@ -20,7 +20,7 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { listWorkflows } = await import('../src/workflows.ts');
+const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { HOME_REPO } = await import('../src/capabilities.ts');
 const { parentRecord, readRun } = await import('agent-workflows');
 const { afterRefusal } = await import('agent-workflows/run');
@@ -61,8 +61,8 @@ write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields`. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [],
-  deadlineSeconds: null, maxAttempts: null, check: null, retries: null, output: null, loop: null, rounds: null, ...fields,
+  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [], remote: null,
+  deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
 /** What the loader refuses `dir` with. */
@@ -84,29 +84,36 @@ const runFiles = (): string[] => (fs.existsSync(path.join(root, 'runs')) ? fs.re
 /** The tasks filed with the engine: a journal each. */
 const filedTasks = (): string[] => (fs.existsSync(path.join(root, 'engine', 'tasks')) ? fs.readdirSync(path.join(root, 'engine', 'tasks')) : []);
 
-test("GET /api/workflows lists each folder, the repository's then yours: its description, its steps' specs and its graph — and a folder the loader refuses, with the refusal and no steps", async () => {
+test("GET /api/workflows lists each folder, the repository's then yours: its description, its steps' specs and bodies, its graph and the schemas beside its steps — and a folder the loader refuses, with the refusal and no steps", async () => {
   const res = await app.request('/api/workflows');
   assert.equal(res.status, 200);
   const refused = loaderRefusal(broken);
   assert.match(refused, /review: `afer` is not a key a step has/);
 
-  assert.deepEqual(await res.json(), [
-    { name: 'broken', from: 'repo', dir: broken, description: 'A reviewer with a misspelt key.', steps: [], graph: { roots: [], edges: [] }, error: refused },
+  const listing = await res.json();
+  // Each at the version its files are at: what a save from the board carries.
+  for (const w of listing) assert.equal(w.version, versionOf(w.dir), w.name);
+  assert.deepEqual(listing, [
+    { name: 'broken', from: 'repo', dir: broken, description: 'A reviewer with a misspelt key.', steps: [], graph: { roots: [], edges: [] }, schemas: [], version: versionOf(broken), error: refused },
     {
       name: 'good', from: 'repo', dir: good, description: 'Implement it, then review it, two rounds at most.',
       // The README is not among the steps.
       steps: [
-        { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check: 'npm test' }) },
-        { name: 'review', spec: spec({ harness: 'claude', after: ['implement'], tools: ['Read', 'Grep'], permissionMode: 'dontAsk', output: 'review.json', loop: 'implement', rounds: 2 }) },
+        { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check: 'npm test' }), body: 'Implement it.' },
+        { name: 'review', spec: spec({ harness: 'claude', after: ['implement'], tools: ['Read', 'Grep'], permissionMode: 'dontAsk', output: 'review.json', loop: 'implement', rounds: 2 }), body: 'Review it.' },
       ],
       // `graphOf` the steps, as a run of it is drawn.
       graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 2 }] },
+      schemas: ['review.json'],
+      version: versionOf(good),
       error: null,
     },
     {
       name: 'mine', from: 'yours', dir: mine, description: null,
-      steps: [{ name: 'plan', spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }) }],
+      steps: [{ name: 'plan', spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }), body: 'Write PLAN.md.' }],
       graph: { roots: ['plan'], edges: [] },
+      schemas: [],
+      version: versionOf(mine),
       error: null,
     },
   ]);
@@ -331,12 +338,14 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
   const reviewer = loadWorkflows(shipped).find((s) => s.name === 'review')!;
   for (const [name, check] of [['dev', 'npm test && npm run typecheck'], ['dev-build', 'npm test && npm run typecheck && npm run build && npm run e2e']] as const) {
     const w = listed.find((x) => x.name === name)!;
-    assert.deepEqual(w.steps, [
+    // Each step with its body as the loader read it, which the builder puts back.
+    assert.deepEqual(w.steps.map((s) => s.body), loadWorkflows(w.dir).map((s) => s.body), name);
+    assert.deepEqual(w.steps.map(({ name: step, spec: keys }) => ({ name: step, spec: keys })), [
       // Denied by name what no step needs and an unattended session otherwise has.
       { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
       {
         name: 'review',
-        spec: spec({ harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', output: 'review.schema.json', loop: 'implement', rounds: 3 }),
+        spec: spec({ harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
       },
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;

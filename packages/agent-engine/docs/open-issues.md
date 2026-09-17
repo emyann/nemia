@@ -271,7 +271,10 @@ engine's `claudeDetached`, which names that pool, so no caller has to: agent-wor
 `check`, and names none. Before, both ran Claude Code on one subscription and were counted apart, so a ceiling of 2 let
 four Claude Code sessions run. `test/pool.test.ts`, with fake `claude` and `codex`, at `createEngine()`'s own harnesses and
 at agent-workflows' map: a `claude-detached` session counts against `claude`'s ceiling, and `codex` and a `check` keep
-their own.
+their own. From 2026-09-17 it also configures that runner under another name — `{ cc: 'claude-bg', 'claude-detached':
+claudeDetached }` — because at the engine's own harnesses the runner is configured as `claude` and its pool is `claude`,
+so no test there could tell `poolsOf`'s mapping from a harness falling back to its own name; with the mapping taken out,
+the new test runs two Claude Code sessions at a ceiling of one and fails.
 
 **What is left.**
 

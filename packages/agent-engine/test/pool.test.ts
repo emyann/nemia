@@ -113,6 +113,30 @@ test("a claude-detached session counts against claude's ceiling, and codex keeps
   });
 });
 
+test("the claude-bg runner is counted in Claude Code's pool whatever name it is configured under", async () => {
+  // `poolsOf` maps the RUNNER, not the name. At `createEngine()`'s own harnesses that runner is configured as
+  // `claude` and its pool is `claude`, so nothing there can tell the mapping from a harness falling back to its
+  // own name — the test above passes either way. Configured as `cc`, it cannot: without the mapping `cc` is a
+  // pool of its own, and two Claude Code sessions run at a ceiling of one.
+  await atDefaults(async () => {
+    const engine = createEngine({
+      root: tmp('root'), maxConcurrent: 1,
+      harnesses: { cc: 'claude-bg', 'claude-detached': claudeDetached },
+    });
+    const cwd = tmp('cwd');
+    await engine.file({ brief: 'a1', cwd, harness: 'cc', id: 'a1' });
+    await sleep(5); // filed first, so the one slot is a1's
+    await engine.file({ brief: 'a2', cwd, harness: 'claude-detached', id: 'a2' });
+
+    await engine.tick();
+    assert.equal(await attempts(engine, 'a1'), 1, 'the cc session took the slot');
+    assert.equal(await attempts(engine, 'a2'), 0, 'and a claude-detached task waits behind it: one subscription, one pool');
+    await until(engine, ['a1'], 'running (working)');
+    assert.deepEqual((await engine.tick()).running, { claude: 1 }, 'counted under `claude`, not under `cc`');
+    assert.equal(await attempts(engine, 'a2'), 0, 'still waiting, pass after pass');
+  });
+});
+
 test('a check keeps its own pool beside a full Claude Code one — declared as agent-workflows declares it, with no pool', async () => {
   await atDefaults(async (fake) => {
     const engine = createEngine({

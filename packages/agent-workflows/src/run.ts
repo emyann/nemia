@@ -471,8 +471,8 @@ export type CheckoutHold = { run: string; step: string };
 
 /**
  * A run's claim on a repository's own checkout on a pass (`checkoutHold` in runner.ts): the `workspace: main` step that works there, the
- * repository, and either `holds` — its task is filed and not settled, so the step is in that checkout now — or `at`, the time of the
- * approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
+ * repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`, the
+ * time of the approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
  */
 export type MainClaim = { id: string; repo: string; step: string; holds: boolean; at?: string };
 
@@ -481,7 +481,7 @@ export type MainClaim = { id: string; repo: string; step: string; holds: boolean
  *
  * An ending step works in the repository's own checkout, which is one directory on the base branch: two of them at once read the same
  * `git status`, trial merge over each other, and the loser's `git merge --abort` throws away the winner's staged merge. Prose in a
- * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: main` task is unsettled has the checkout, and
+ * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: main` task is in flight has the checkout, and
  * every other run of the same repository waiting to file one is held until it settles. With none in it, the oldest approval takes it —
  * then by id — so which pass reads which run first decides nothing.
  *

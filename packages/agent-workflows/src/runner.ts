@@ -26,7 +26,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, resultSteps, slotFree, afterRefusal, approvalOf, type BranchStanding, type CheckoutHold, type MainClaim, checkoutWord, heldCheckouts, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, resultSteps, slotFree, afterRefusal, approvalOf, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -1485,8 +1485,8 @@ export type Advanced = {
  * when nothing does and this run's may be filed.
  *
  * Asked of the store on the pass that asks, never stored: only of a run whose ending step is approved and not filed, since nothing else of
- * a run works in that checkout, and then of every run of the same repository. A run is in the checkout while its `workspace: main` task is
- * unsettled — the engine's word, as everything here reads it, so a step filed earlier in this very pass is read as being in it. One waiting
+ * a run works in that checkout, and then of every run of the same repository. A run is in the checkout while the engine holds its
+ * `workspace: main` task in flight, as `inFlight` counts one, so a step filed earlier in this very pass is read as being in it. One waiting
  * to be filed counts only if the pass would in fact file it: a send-back of the work un-holds its gate, and an ending that will not be filed
  * must not hold another run's for ever.
  */
@@ -1504,7 +1504,10 @@ export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow
     if (!step) continue;
     const taskId = other.steps[step.name]?.taskId;
     if (taskId) {
-      if (!['succeeded', 'failed', 'stopped'].includes(phaseOfView(await e.view(taskId)))) claims.push({ id: other.id, repo, step: step.name, holds: true });
+      // In the checkout while the engine holds its task in flight, as `inFlight` counts one: a task the engine has lost (`unknown`) holds
+      // nothing, since a run nobody can stop must not hold every other run's ending for ever.
+      const phase = phaseOfView(await e.view(taskId));
+      if (phase === 'pending' || phase === 'running') claims.push({ id: other.id, repo, step: step.name, holds: true });
       continue;
     }
     const approval = approvalOf(other, step.name);

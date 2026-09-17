@@ -234,6 +234,15 @@ test('a run whose ending waits for the checkout is filed once the step in it set
   assert.equal((await list(e, readRun(first.id))).steps.find((s) => s.name === 'ship')!.status, 'pending');
 });
 
+test("a `workspace: main` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever", async () => {
+  const { first, second, e, tasks } = await twoApproved();
+  await advance(e, readRun(second.id));
+  assert.deepEqual((await advance(e, readRun(first.id))).filed, [], 'held while the engine has that step in flight');
+
+  tasks.delete(`${second.id}-ship`);
+  assert.deepEqual((await advance(e, readRun(first.id))).filed, ['ship'], 'and filed once the engine no longer holds it');
+});
+
 test("a run another waited on hands forward what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing", async () => {
   const { repo, id, branch, e, settle, tasks } = await atTheGate();
   await approve(e, id, 'ship');

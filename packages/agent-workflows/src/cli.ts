@@ -152,6 +152,7 @@ is said at start:
     workflow: dev              # what runs it, chosen at start when the card does not say
     repo: /home/me/code/app    # the repository it is about, as an absolute path
     queued: 2026-09-16T10:00:00.000Z   # when it was queued to start on its own: wf inbox queue writes it
+    gate: plan                 # the step whose closeout waits for wf approve in the run it starts
     ---
     Cache the engine's views between passes.
 
@@ -170,8 +171,9 @@ is said at start:
   wf inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
 
 Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
-directory, a queued: that is not a time or is on a card with no workflow:, an add with no idea, and a name that
-would leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
+directory, a queued: that is not a time or is on a card with no workflow:, a gate: naming more than one step or
+saying true — and, at start, one naming no step of the workflow — an add with no idea, and a name that would
+leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
 already queued, and of one a run was started from.`;
 
 const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]

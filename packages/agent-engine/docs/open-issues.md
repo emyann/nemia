@@ -376,10 +376,35 @@ the bash) let the session go idle within seconds.
 review — the run waits for a person to notice, and the closeout on the transcript is worth nothing until then. A budget does
 not help; nothing is spent. Only a `deadlineSeconds` would end it, and no shipped step sets one.
 
-**Possible fix.** The runner's observe could read a session `shell`-with-a-closeout-already-given as quiet: the transcript's
-last entry is the closeout's tool result and it has not advanced for the quiescence floor. That is a reading of Claude Code's
-registration status (`shell`, undocumented) beside the transcript, so it belongs with issue 13's caveats. The upper layer's
-courtesy, meanwhile, is a line in CLAUDE.md: a background loop must time out.
+**Fixed** (2026-09-17). The runner's observe reads a busy session as quiet when the last word in its conversation is its
+own closeout's tool result and it has not advanced for the quiescence floor (`claudeOps` in `agent-engine/src/runner.ts`;
+`lastWord` from `lastStructuredOutput`). The attempt then ends on that statement and the task settles, and releasing the
+session is what ends the shell. Three conditions, each with a test that makes it refuse (`test/completion.test.ts`, at
+an injected clock and transcript; `test/shell.test.ts`, end to end with a fake registry and a transcript file):
+
+- **the floor**, so a session mid-turn — which writes nothing for minutes at a time — is not read as quiet;
+- **the last word**: a session that has spoken since its closeout is still going. The check is over the last `user` or
+  `assistant` line, because Claude Code writes an `attachment` and a `system` line (`turn_duration`) after the closing
+  turn's result — measured on the transcript above — and a check over the very last line would never fire;
+- **its own**: a resumed session inherits its parent's closing turn, so a continuation that has written nothing of its
+  own yet would otherwise be read as finished before it began. Judged against the session's own start in the registry,
+  as usage is; no start, no reading.
+
+**What it rests on**, with issue 13's caveats. `claude agents --json` prints each row's `status` from the session's
+registration; 2.1.274's own vocabulary is `busy`, `shell`, `idle`, `waiting`, and its view renders `busy` and `shell`
+alike as working. The engine reads only `busy` as busy — `shell` is not a turn, and the ordinary floor already ends such
+a session, which `test/shell.test.ts` pins. Which word the measured session was listed under was not recorded: the
+person read the view, which shows both as working, and its registration read `shell`. What is certain is that the engine
+read it busy, because that is the only gate that fits — its transcript was cold for seventy minutes, `getSessionInfo`
+reads that transcript's mtime today, and no end was written. A release that renames the field, or changes the shape of a
+closing turn, makes this rule silent again; only `AE_LIVE=1` would notice. The upper layer's courtesy remains a line in
+CLAUDE.md: a background loop must time out.
+
+**Not measured.** No live session has been read quiet this way; the rule is held by fake registries and transcript files
+only. A session that gives its closeout and then runs a long turn that writes nothing for ninety seconds would be read
+as finished — the harness's own `[structured-output-enforce]` retry could be such a turn — and what that costs is the
+end being written on a statement the session might have revised, which is the same trade the `busy` rule makes
+elsewhere, with the floor and the last word in front of it.
 
 ### 25. A session that ends in prose is nudged once for its closeout, and the nudge did not get it
 
@@ -608,6 +633,7 @@ known.
 | a session waiting on a permission prompt held a concurrency slot until a person answered or its deadline came, though it makes no API calls | the ceiling counts sessions observed `working`; `LIVE`, which still has `blocked`, keeps what else it guards (issue 19) | engine, 2026-09-16 |
 | two `claude` and two `claude-detached` sessions ran at a ceiling of 2 — four Claude Code sessions on one subscription, counted as two pools | a harness declares the pool it is counted in, its own name by default; `'claude-bg'` and the engine's `claudeDetached` are both counted in `claude`, with no caller saying so (issue 20) | engine, 2026-09-16 |
 | the nudge sent to a session that ended in prose asked for "your closing statement" and named no tool: twice it got no sign-off, and a person's sentence naming `StructuredOutput` got one in thirty seconds | the nudge names the tool and says the work stands, with its words pinned by a test (issue 25) | engine, 2026-09-17 |
+| a session held busy by a background shell it left running was never read: its closeout sat unread for seventy-seven minutes, and only a person killing the shell let the run go on | a busy session whose own closeout is the last word in its conversation, and whose transcript has been cold for the quiescence floor, is read as quiet: the attempt ends on that statement (issue 24) | engine, 2026-09-17 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 

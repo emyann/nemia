@@ -540,9 +540,30 @@ So `claudeOps` answers the half of the question that is its harness's vocabulary
 done   ⟸  state = done
 quiet  ⟸  state = working AND not busy AND nothing written for 90 seconds,
           counted from its last write or its own start, whichever is later
+quiet  ⟸  state = working AND busy AND the last word in its conversation is its OWN
+          closeout's tool result, with nothing written since for those 90 seconds
 ```
 
 and reports quiet as a fact, `quietMs`, with the state left `working`. What quiet means is `decide`'s (below).
+
+**The second quiet rule is for a session held by something that is not the work.** A step signed off with
+`StructuredOutput`, every commit in, and left a `run_in_background` loop running; its registration read `status: shell`,
+the registry listed it busy, and seventy-seven minutes later nothing had read its closeout — no end, no check, no
+review — until a person killed the shell by hand (issue 24, measured 2026-09-17; its journal shows the gap, and its
+transcript not one line in it). `busy` is what held it: it stops the runner reading a statement at all, and stops the
+engine acting on one. So `busy` no longer answers the question by itself. When a busy session's transcript has been
+cold for the floor, the runner reads it: if the conversation ends with the result of that session's own
+`StructuredOutput` call, the work is over, whatever its process is still doing, and the attempt ends on the statement.
+Three things have to hold, and each has a test that makes it refuse — the floor (a session mid-turn writes something),
+the last word (a session that spoke after its closeout is still going), and *its own* (a resumed session inherits its
+parent's closing turn, and has said nothing of its own until it writes). Everything else about a busy session is
+unchanged: with no statement it is left to the deadline exactly as before.
+
+**What the registry's words are.** `status` is one of `busy`, `shell`, `idle` and `waiting` (2.1.274's own list), and
+Claude Code's view renders `busy` and `shell` alike as working. The engine reads only `busy` as busy: `shell` is not a
+turn, so the first quiet rule already ends such a session. The reading rests on a registry field and a transcript's
+shape, which is [issue 13's caveat](docs/open-issues.md) — a release that renames either makes the rule silent, and
+`AE_LIVE=1` is what would notice. A background loop with a bound is the courtesy that keeps it from mattering.
 
 **The clock is the transcript's, not the observer's.** A session that speaks pushes its own
 deadline out, which is what keeps a pause between self-driven steps from being mistaken for an
@@ -1050,6 +1071,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/engine.test.ts` | the crash cases, the ceiling, what it counts and which waiting task a free slot goes to, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
 | `test/unsigned.test.ts` | a session gone quiet without the closing statement its task asked for: unsigned, continued with a nudge, then failed saying why; quiet with none asked for still succeeds — a fake `claude` that keeps a registry, at shipped defaults |
+| `test/shell.test.ts` | a session held busy by a background shell it left running: its own closeout as the last word in a cold transcript ends the attempt, an advancing one or no statement does not — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |

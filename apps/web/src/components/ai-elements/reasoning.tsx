@@ -1,7 +1,7 @@
 "use client";
 
-// From AI Elements (registry.ai-sdk.dev/reasoning.json). One change: `ReasoningContent` spread its collapsible's props
-// onto Streamdown as well, which types refuse (`dir`); the text is given to Streamdown alone, static, as it is written.
+// From AI Elements (registry.ai-sdk.dev/reasoning.json). One change: `ReasoningContent` spread its collapsible's props onto
+// its markdown renderer as well; the text is given to the board's `Markdown` alone, as it is written.
 
 import { useControllableState } from "@radix-ui/react-use-controllable-state";
 import {
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
-import { Streamdown } from "streamdown";
+import { Markdown } from "@/components/Markdown";
 import { Shimmer } from "./shimmer";
 
 type ReasoningContextValue = {
@@ -173,7 +173,7 @@ export const ReasoningContent = memo(
       )}
       {...props}
     >
-      <Streamdown mode="static">{children}</Streamdown>
+      <Markdown>{children}</Markdown>
     </CollapsibleContent>
   )
 );

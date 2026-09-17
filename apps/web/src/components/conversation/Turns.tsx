@@ -1,11 +1,11 @@
 import { ChevronDownIcon, FlagIcon, InfoIcon, ListTreeIcon, SendIcon } from 'lucide-react';
 import { CodeBlock } from '@/components/ai-elements/code-block';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-elements/reasoning';
-import { Response } from '@/components/ai-elements/response';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput, type ToolState } from '@/components/ai-elements/tool';
 import { Bubble, BubbleContent } from '@/components/ui/bubble';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Markdown } from '@/components/Markdown';
 import { Marker, MarkerContent, MarkerIcon } from '@/components/ui/marker';
 import { Message, MessageContent } from '@/components/ui/message';
 import { closeoutOf, CLOSEOUT_TOOL, detailOf, type CloseoutTurn, type ThinkingTurn, type ToldTurn, type ToolCall, type ToolsTurn, type Turn } from '@/lib/transcript';
@@ -24,7 +24,7 @@ export function TurnView({ turn, live, last, tail }: { turn: Turn; live: boolean
           <MessageContent>
             <Bubble variant="secondary" align="end">
               <BubbleContent className="max-h-72 overflow-y-auto scroll-fade-b">
-                <Response>{turn.text}</Response>
+                <Markdown>{turn.text}</Markdown>
               </BubbleContent>
             </Bubble>
           </MessageContent>
@@ -34,7 +34,7 @@ export function TurnView({ turn, live, last, tail }: { turn: Turn; live: boolean
           <MessageContent>
             <Bubble variant="ghost" className="w-full">
               <BubbleContent>
-                <Response>{turn.text}</Response>
+                <Markdown>{turn.text}</Markdown>
               </BubbleContent>
             </Bubble>
           </MessageContent>
@@ -177,11 +177,12 @@ function Closeout({ turn }: { turn: CloseoutTurn }) {
       </header>
       {closeout ? (
         <>
-          <Response>{closeout.summary}</Response>
+          <Markdown>{closeout.summary}</Markdown>
           {closeout.needs && (
-            <p className="whitespace-pre-wrap text-amber-700 dark:text-amber-400">
-              <span className="font-medium">Needs:</span> {closeout.needs}
-            </p>
+            <div data-needs className="text-amber-700 dark:text-amber-400">
+              <p className="font-medium">Needs:</p>
+              <Markdown>{closeout.needs}</Markdown>
+            </div>
           )}
           {closeout.artifacts.length > 0 && (
             <p className="text-xs text-muted-foreground">

@@ -1004,7 +1004,8 @@ rounds, $49.68, **merged, `00d4c06`**; items 28 and 31 done; the ceiling reworde
 `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=4` since 2026-09-17 00:47Z; B11
 `three-small-items-on-the-boa-bmq6` (apps: item 30, the run page naming a run's inbox card, the inbox reloading after a refusal)
 from `./workflows/dev-build` — one round, $21.16, **merged, `452a772`**; item 30 done; its review left two findings, filed 2026-09-17
-00:20Z as `two-findings-the-apps-lane-s-1qur` (`dev-build`). The operator's first two inbox cards, started from the board, both
+00:20Z as `two-findings-the-apps-lane-s-1qur` (`dev-build`) — two rounds, $20.25, **merged, `ba8dbd8`**: ask rules read and shown, the
+read-only list held to its date. The operator's first two inbox cards, started from the board, both
 merged the same night: the Inbox first in the menu (`make-the-inbox-be-the-first-7vms`, $2.40, `a622309`) and the Runs page in
 two groups (`the-runs-page-should-sort-th-zdoe`, $6.05, `6886203`). The markdown study (features.md §5) is filed as
 `markdown-rendered-on-the-boa-699m` on the new `./workflows/dev-planned-build`, its plan waiting for approval. The Factory's

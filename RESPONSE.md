@@ -38,6 +38,28 @@ step of its workflow*), one commit each. Everything is in `packages/agent-workfl
 for a folder with no ending step (`merges`) — a folder that says what shipping is does not also tell a person to
 type it. Recorded under *What it leaves* in features.md.
 
-Measured from the root, three times, with `npx turbo run test --force`: agent-workflows 583 (582 passed, 1
-skipped), from 575; api 202, web 248, agent-engine 340 (331 passed, 9 skipped), untouched. `npm run typecheck`
-clean in all four.
+## What the review's second round changed
+
+Four findings, one commit each, all in `packages/agent-workflows`.
+
+1. **A try of an ending step waits for the checkout too** — the finding was right, and it is the collision item
+   1 exists to stop. `checkoutHold` gave up as soon as the run's own ending had a task, and `assess` held only
+   `ready`, so `wf retry <run> ship` on an ending that ended blocked filed a second session into a checkout
+   another run's ship was merging in. Every run is now read the same way — `mainClaim` — which answers *in the
+   checkout* while the engine holds its task in flight, and *waiting for it* on the word that would file it: the
+   approval of an ending that has not run, or the ask for a try (`endingAsked`). `assess` holds `retry` as well
+   as `ready` (`heldByCheckout`), `wf ls` says it beside the try, and `wf decide` says it on either screen.
+2. **A cancelled run holds the checkout until its session has stopped** — also right: `wf cancel` only asks the
+   engine to stop, and the agent is still mid merge until it has. `mainClaim` reads the task's phase before it
+   gives up on a cancelled run.
+3. **The word is one the board can name** — `waiting on the checkout (…)`, not `waiting for …`: `stepState`
+   takes `waiting`, `waiting on …` and `pending` for a step with nothing filed, so the old word drew a working
+   chip for a step with no session. A test pins the prefix and says why.
+4. **The `decision` half of the `unheld` adjustment is gone** — the finding is right that nothing can reach it:
+   a try or a round due makes `assess` call the run `running`, and `decision` returns before that map is read.
+   Kept untestable it would be a claim the suite does not hold, so it is deleted; `gateLines`'s half, which is
+   where the window actually showed, stays and is pinned.
+
+Measured from the root with `npx turbo run test --force`: agent-workflows 586 (585 passed, 1 skipped), from
+575; api 202, web 248, agent-engine 340 (331 passed, 9 skipped), untouched. `npm run typecheck` clean in all
+four.

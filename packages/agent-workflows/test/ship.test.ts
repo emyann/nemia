@@ -234,7 +234,7 @@ test('a run whose ending waits for the checkout is filed once the step in it set
   assert.equal((await list(e, readRun(first.id))).steps.find((s) => s.name === 'ship')!.status, 'pending');
 });
 
-test("a try of an ending step waits for the checkout as its first filing does: a person's send-back of a ship that ended blocked files nothing while another run's ship is merging", async () => {
+test("a try of an ending step waits for the checkout as its first filing does: a person's send-back of a ship that ended blocked files nothing while another run's ship is merging", async (t) => {
   const { repo, first, second, e, settle } = await twoApproved();
   // The older approval takes the checkout, and its ship signs off blocked — its check refused, and its prose aborted the trial merge.
   await advance(e, readRun(second.id));
@@ -254,6 +254,14 @@ test("a try of an ending step waits for the checkout as its first filing does: a
   const listed = await list(e, readRun(second.id));
   assert.deepEqual([listed.steps[1]!.status, listed.steps[1]!.note],
     ['succeeded · BLOCKED', `try 2 asked (--nudge) — waiting on the checkout (${first.id}'s ship has it)`]);
+
+  // And `wf decide` says it on the screen of a run whose ending ended blocked, where the try due would have said the next tick files it.
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
+  try { await main(['decide', second.id], e); } finally { log.mock.restore(); }
+  assert.ok(printed.includes(`  ship: waiting on the checkout (${first.id}'s ship has it) — it works in the repository's own checkout, `
+    + `and two endings never do at once; the next tick files ship once ${first.id}'s ship has settled`), printed.join('\n'));
+  assert.ok(!printed.some((l) => l.includes('the next tick files it')), 'and not that the next tick files the try');
 
   // Once the step in the checkout settles, the try is filed there, as any try of it would be.
   settle(`${first.id}-ship`, 'succeeded', SIGNED);

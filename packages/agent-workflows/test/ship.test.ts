@@ -259,6 +259,21 @@ test('a sent-back ending merges nothing: the work is filed again, the checkout i
   assert.equal(isShipped(readRun(id), branch), false);
 });
 
+test("REFUSED at the ending's gate, at shipped defaults: a send-back with no words names the step at the gate — ship, not the work — and the two commands it names are honoured", async () => {
+  const { id, e } = await atTheGate();
+  await assert.rejects(retry(e, id, 'implement', { mode: 'nudge' }), (err: Error & { exitCode?: number }) => {
+    assert.equal(err.exitCode, 2);
+    assert.equal(err.message, "ship is at its gate, not implement: ship ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to implement, the work it would act on. "
+      + `A try with no words tells its session nothing to change, so it would sign off as it did. Say what to change: wf retry ${id} implement --message "<objection>" — or approve the ending, which is what files it: wf approve ${id} ship.`);
+    return true;
+  });
+  // The send-back it names is honoured, and so is the approval — on a run of its own, since one takes the other back.
+  const { ask } = await retry(e, id, 'implement', { mode: 'nudge', message: 'sub subtracts the wrong way round' });
+  assert.deepEqual([ask.step, ask.try], ['implement', 2]);
+  const other = await atTheGate();
+  assert.equal((await approve(other.e, other.id, 'ship')).approval.step, 'ship');
+});
+
 test("a check that refuses leaves the checkout clean: the abort the ending's prose names takes the trial merge back, and the run says what happened", async () => {
   const { repo, id, branch, e, settle, base } = await atTheGate();
   await approve(e, id, 'ship');

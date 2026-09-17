@@ -1542,8 +1542,17 @@ export function retryRefusal(
   }
   // A send-back is an objection: a try of a step at its gate with nothing to change would sign off as it did, and wait there again.
   if (sendsBack && how.message === undefined) {
+    const say = `Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
+    // The gate may be another step's: an ending step is held before it is filed (`waitsAtGate`), and the send-back from it goes to the work
+    // it would act on, which is this step. Then the step at the gate is the one to name, and the approval to offer is the ending's — this
+    // step has no gate of its own, so `wf approve` of it would be refused, and a refusal never names a command that is itself refused.
+    const ending = steps.find((s) => s.after.includes(name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf));
+    if (ending) {
+      return `${ending.name} is at its gate, not ${name}: ${ending.name} ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to ${name}, the work it would act on. `
+        + `A try with no words tells its session nothing to change, so it would sign off as it did. ${say} — or approve the ending, which is what files it: wf approve ${run.id} ${ending.name}.`;
+    }
     const given = approvalOf(run, name);
-    return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
+    return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. ${say} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
   }
   if (raise && how.mode !== 'recheck' && how.budget === undefined) {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;

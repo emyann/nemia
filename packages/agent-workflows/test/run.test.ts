@@ -3317,7 +3317,13 @@ test("a send-back at an ending step's gate goes to the work: the step before it 
   const review = ENDS[1]!;
   const at = retryable(review, atEnd(), DONE, signedDone, asked, ENDS);
   assert.deepEqual([at.status, at.modes, at.sendsBack], ['unverified', ['nudge', 'fresh'], true]);
-  assert.match(String(retryRefusal(ENDS, atEnd(), 'review', { mode: 'nudge' }, DONE, signedDone, asked)), /^review is awaiting approval|--message/);
+  // REFUSED without them, in the sentence it says: the step at the gate is ship, not review, and both commands it names are ones that are
+  // themselves honoured — `wf approve r-1 review` would be refused, since review has no gate of its own.
+  assert.equal(retryRefusal(ENDS, atEnd(), 'review', { mode: 'nudge' }, DONE, signedDone, asked),
+    "ship is at its gate, not review: ship ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to review, the work it would act on. "
+    + 'A try with no words tells its session nothing to change, so it would sign off as it did. Say what to change: wf retry r-1 review --message "<objection>" — or approve the ending, which is what files it: wf approve r-1 ship.');
+  assert.equal(retryRefusal(ENDS, atEnd(), 'review', { mode: 'fresh' }, DONE, signedDone, asked)?.includes('wf retry r-1 review --message "<objection>" --fresh'), true, 'the way asked for is kept in the command it names');
+  assert.equal(approvalRefusal(ENDS, atEnd(), 'review', undefined, DONE, signedDone, asked)?.startsWith('review has no gate:'), true, 'the command it does not name');
   assert.equal(retryRefusal(ENDS, atEnd(), 'review', { mode: 'nudge', message: 'the flag is not stored' }, DONE, signedDone, asked), null);
   // Not once the ending is approved and filed: the run has acted, and there is nothing to hold back.
   const filed = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });

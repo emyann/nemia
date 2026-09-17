@@ -2812,6 +2812,12 @@ What was built, four commits:
   `git status --porcelain` as dirty and sign off blocked. It is told the artifacts directory and nothing else — no *leave it in this
   workspace* bullet, no `WF_ARTIFACTS` (it runs no check of the run's), and that what it leaves in the checkout reaches nobody, reads
   `not collected` where it is named from the workspace root, and is to be left as it was found. Found by the review, round 4.
+- **A send-back at an ending's gate with no words names the step at the gate** (`retryRefusal`). `wf retry <run> review` said `review is
+  awaiting approval` — review is not, ship is — and offered `wf approve <run> review`, which `wf approve` refuses, since review has no gate
+  of its own. It now says which step is at its gate, that the send-back from it goes to the work, and names the two commands that are
+  honoured: `wf approve <run> ship` and `wf retry <run> review --message "<objection>"`. The test that pinned it used an alternation,
+  `/^review is awaiting approval|--message/`, which passed whatever the sentence said; the sentence is pinned now, and refused again at the
+  store on `err.message`. Found by the review, round 4.
 - **`--no-worktree` is refused on a folder whose last step merges** (`stepsToStart`), before a run is written: such a run works on the base
   branch itself, so there is no result branch for the ending to merge — it would be told the work is on the branch it is standing on, merge
   a branch into itself, and pay for the folder's whole check to find nothing to commit. Found by the review, round 3.

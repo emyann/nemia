@@ -295,6 +295,38 @@ export const ceilings = (): { sessions: number; runs: number } => ({
   runs: runCapOf(process.env.WF_MAX_RUNS),
 });
 
+/**
+ * What the last pass ran with: `$WF_ROOT/tick.json`, the tick's to write — the ceilings of the process that ran it, `wf up`'s or `wf tick`'s.
+ * `wf ls` and `wf decide` run in a shell of their own, whose environment is not the daemon's: `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up` sets
+ * the cap on the daemon alone, and read from the shell, a run the daemon holds read as plain `waiting`.
+ */
+const tickFile = (): string => path.join(HOME, 'tick.json');
+
+/** The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them. */
+export function lastCeilings(): { sessions: number; runs: number } | undefined {
+  try {
+    const c = JSON.parse(fs.readFileSync(tickFile(), 'utf8')) as { sessions?: unknown; runs?: unknown };
+    const count = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+    return typeof c.sessions === 'number' && count(c.runs) ? { sessions: c.sessions, runs: c.runs } : undefined;
+  } catch { return undefined; }
+}
+
+/**
+ * The ceilings a pass runs with, written down for `wf ls` and `wf decide` — only when they differ from what is there, and through a hidden file
+ * renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to its own
+ * environment, and the pass goes on.
+ */
+function recordCeilings(c: { sessions: number; runs: number }): void {
+  const last = lastCeilings();
+  if (last && last.sessions === c.sessions && last.runs === c.runs) return;
+  const hidden = path.join(HOME, `.tick.json.${process.pid}`);
+  try {
+    fs.mkdirSync(HOME, { recursive: true });
+    fs.writeFileSync(hidden, JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
+    fs.renameSync(hidden, tickFile());
+  } catch { /* read from the reader's own environment instead */ }
+}
+
 export const engine = (): Engine => createEngine({
   root: path.join(HOME, 'engine'),
   maxConcurrent: Number(process.env.WF_MAX_CONCURRENT) || 2,
@@ -1809,7 +1841,10 @@ export type Pass = { runs: Advanced[]; queue?: QueueStarted };
  */
 export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string } = {}): Promise<Pass> {
   await e.tick();
-  const { runs: cap } = ceilings();
+  const ran = ceilings();
+  // What `wf ls` and `wf decide` judge the cap by, from a shell of their own.
+  recordCeilings(ran);
+  const cap = ran.runs;
   const runs = listRuns();
   const done = new Map<string, Advanced>();
   // A finished run still gets assessed — it costs one read and it is how `ls` stays honest.
@@ -1828,9 +1863,12 @@ export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string 
  * The runs the cap on runs in flight holds now, each with the count it is held at (`heldRuns`): every run read as a pass reads it, between
  * passes — what `wf ls` and `wf decide` say. None, and nothing read, with no cap or no run that has nothing filed. A record whose workflow
  * no longer reads is left out, as nothing of it could be filed.
+ *
+ * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
+ * any pass has written it, the caller's own (`WF_MAX_RUNS`, refused by name when it is not a count).
  */
 export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Promise<Map<string, RunSlot>> {
-  const { runs: cap } = ceilings();
+  const cap = lastCeilings()?.runs ?? runCapOf(process.env.WF_MAX_RUNS);
   if (cap <= 0 || !runs.some((r) => !hasStarted(r) && !r.cancelledAt)) return new Map();
   const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
   for (const run of runs) {

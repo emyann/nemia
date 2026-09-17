@@ -1286,6 +1286,9 @@ up — every 4000ms, ^C to stop
 - **`wf ls` says it on the roots**, where `waiting` would be: `waiting for a run slot (2 of 2 in flight)`, judged over the whole store as the
   next pass would judge it (`heldRuns`). `wf tick` puts it on the run's line, `wf decide` says it and nothing else, and the first pass that
   holds a run writes when on its record (`slotHeldAt`) and says so once.
+- **`wf ls` and `wf decide` judge by the cap the last pass ran with, not their own shell's.** `WF_MAX_RUNS=2 wf up` sets the cap on the daemon
+  alone, so every pass writes the ceilings it ran with to `$WF_ROOT/tick.json`, when they change, and `wf ls` and `wf decide` read the cap
+  there. Only before any pass has written it do they read their own `WF_MAX_RUNS`.
 - **The wait is on the timeline.** A run the cap held counts `createdAt` → its first filing as queued — from the pass that first held it, on a
   run that waited on runs — on a `run slot` row of its own, and in the run's `queued`: `still waiting` while nothing is filed, `not known`
   where the engine's feed does not say when its first task was filed. A run the cap never held has no such row.
@@ -1559,6 +1562,7 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 | `runs/<id>/` | the run's own files, outside every workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's start the package refused, `<name>.json`, the tick's to write: the card's text and why |
+| `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `worktrees/<id>/<step>/` | each step's workspace |
 | `checks/` | each check's stderr |
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |

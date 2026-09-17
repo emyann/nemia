@@ -1880,8 +1880,8 @@ What was built, the cap:
   when read, or it filed something). Then each run with nothing filed, oldest first, is advanced with the slot as counted so far (`advance(e,
   run, slot)`), and counted once it filed. Results come back in the store's order. Nothing is carried between passes.
 - **The words.** `wf ls` says `waiting for a run slot (2 of 2 in flight)` on a held run's roots (`listing`'s `slot`, `slotWord`), judged over
-  the store by `runSlots`; `wf tick` on the run's line; `wf decide` in place of `still running`. `wf up` prints both ceilings in words when it
-  starts (`ceilingLines`).
+  the store by `runSlots` with the cap the last pass ran with (`$WF_ROOT/tick.json`, `lastCeilings`); `wf tick` on the run's line; `wf decide`
+  in place of `still running`. `wf up` prints both ceilings in words when it starts (`ceilingLines`).
 - **The wait on the timeline.** The first pass that holds a run writes `slotHeldAt` on its record, and says so once in its notes. `timeline`
   then counts `createdAt` → first filing as the run's `slot` (`SlotWait`) and in its total's `queued`, on a `run slot` row of `wf decide`'s
   timeline: `still waiting` while nothing is filed, `not known` where the feed has no filing.
@@ -1959,6 +1959,15 @@ What was measured:
   on every pass, 1. For the cards: a refused card not passed over, 2; a card started with no slot asked, 1; the queue by name, 3; a started
   card kept in line, 2; `queued:` with no `workflow:` parsed, 2; a refusal matched whatever the text, 2; a queued card queued again, 2; any
   `queued:` value taken, 1.
+
+Round 2's review found three things, each fixed:
+
+- **`wf ls` and `wf decide` read the cap from their own shell.** The README's own example sets `WF_MAX_RUNS` on `wf up` alone, and from
+  another shell a run the daemon held read plain `waiting`, and `wf decide` said still running; a shell with another value printed a wrong
+  count. Each pass now writes the ceilings it ran with to `$WF_ROOT/tick.json` when they change (`recordCeilings`), the tick its one writer,
+  and `runSlots` reads the cap there, falling back to the shell's own only before any pass has written it. Tested in
+  `test/queue-store.test.ts` through `wf ls` and `wf decide`, run with no `WF_MAX_RUNS`, with `5`, `1` and `two`; with the file removed, the
+  shell's own; and a pass with no cap writing `0`, which a shell setting `1` reads. Reading the shell again, and a pass not writing, fail it.
 
 What it leaves:
 

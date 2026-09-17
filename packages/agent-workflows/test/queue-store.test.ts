@@ -76,9 +76,9 @@ const board = () => {
   return { e, tasks, filings, settle, later };
 };
 
-/** A store with no runs, no cards and no refusals in it, and the cap as given: `undefined` unsets it. */
+/** A store with no runs, no cards, no tries of the queue and no ceilings of a last pass in it, and the cap as given: `undefined` unsets it. */
 const emptyStore = (cap: string | undefined) => {
-  for (const dir of [RUNS, INBOX, path.join(ROOT, 'queue')]) fs.rmSync(dir, { recursive: true, force: true });
+  for (const dir of [RUNS, INBOX, path.join(ROOT, 'queue'), path.join(ROOT, 'tick.json')]) fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(RUNS, { recursive: true });
   if (cap === undefined) delete process.env.WF_MAX_RUNS;
   else process.env.WF_MAX_RUNS = cap;
@@ -145,6 +145,49 @@ test("REFUSED at a cap of 2 at shipped defaults: a third run is not filed — `w
   assert.ok((await printedBy(t, b.e, 'ls', three.id)).some((l) => /^ {3}implement +waiting for a run slot \(2 of 2 in flight\)/.test(l)), 'judged over the store for one run too');
   assert.deepEqual((await printedBy(t, b.e, 'decide', three.id)).slice(2), ['  waiting for a run slot (2 of 2 in flight)', `  nothing of ${three.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`]);
   assert.equal((await decide(b.e, one.id)).held, undefined);
+});
+
+test("`wf ls` and `wf decide` judge by the cap the last pass ran with, not their own shell's: WF_MAX_RUNS set on the daemon alone still reads a held run as waiting for a run slot, and a shell's own value does not change the count — before any pass, the shell's own", async (t) => {
+  emptyStore('2');
+  const b = board();
+  const [one, two, three] = [started('first', at(1)), started('second', at(2)), started('third', at(3))];
+  const recorded = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'tick.json'), 'utf8')) as { sessions: number; runs: number };
+  // The daemon's pass, with its own environment.
+  await tick(b.e);
+  assert.deepEqual([b.filings, recorded().runs], [[`${one.id}-implement`, `${two.id}-implement`], 2]);
+
+  /** What a person's shell says of the store: `wf ls`'s lines that wait for a slot, and `wf decide` on the third run. */
+  const seen = async () => ({
+    listed: (await printedBy(t, b.e, 'ls')).filter((l) => l.includes('waiting for a run slot')).map((l) => l.trim()),
+    decided: (await printedBy(t, b.e, 'decide', three.id)).slice(2),
+  });
+  const held = {
+    listed: ['implement      waiting for a run slot (2 of 2 in flight)'],
+    decided: ['  waiting for a run slot (2 of 2 in flight)', `  nothing of ${three.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`],
+  };
+  // A shell with no WF_MAX_RUNS, and shells with other values, one that is not a count among them: each says what the daemon holds.
+  for (const shell of [undefined, '5', '1', 'two']) {
+    if (shell === undefined) delete process.env.WF_MAX_RUNS;
+    else process.env.WF_MAX_RUNS = shell;
+    assert.deepEqual(await seen(), held, `WF_MAX_RUNS=${shell}`);
+  }
+
+  // Before any pass has written its ceilings, the shell's own: with none, nothing is held, and a value that is not a count is refused.
+  fs.rmSync(path.join(ROOT, 'tick.json'));
+  delete process.env.WF_MAX_RUNS;
+  assert.deepEqual((await seen()).listed, []);
+  process.env.WF_MAX_RUNS = 'two';
+  await assert.rejects(main(['ls'], b.e), refusedWith(/^WF_MAX_RUNS=two is not a count\./));
+
+  // A pass that runs with no cap writes that down, and files the third: a shell that sets a cap reads none.
+  delete process.env.WF_MAX_RUNS;
+  await tick(b.e);
+  assert.deepEqual([recorded().runs, b.filings.length], [0, 3]);
+  started('fourth', at(4));
+  process.env.WF_MAX_RUNS = '1';
+  try {
+    assert.deepEqual((await seen()).listed, [], 'not held by a cap the daemon does not run with');
+  } finally { delete process.env.WF_MAX_RUNS; }
 });
 
 test('a run that finishes frees its slot on the next pass, and so does one called off — the run held longest takes it, and its timeline counts the wait as queued', async (t) => {

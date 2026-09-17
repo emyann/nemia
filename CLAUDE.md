@@ -115,6 +115,14 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **`execFileSync` with no `stdio` writes the child's stderr on yours.** It captures stderr for the error's message *and*
+  copies it to `process.stderr`, so a command that fails on every pass of a loop prints git's words on every pass, beside
+  the line the loop says itself. Pass `stdio: ['ignore', 'pipe', 'pipe']`: the error's message keeps them (`git` in
+  `agent-workflows/src/runner.ts`, learned by the run that took up the queue's leftovers).
+- **A `readdirSync` entry for a symlink is not `isFile()`, and every read and write follows it.** So code that writes each
+  file it lists and removes the rest writes *through* a link — into whatever it points at, outside the folder — and leaves
+  it behind when it should have removed it, with nothing said either way. Where a folder's files are meant to be its own,
+  refuse a link by name (`writeWorkflow`, same run).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

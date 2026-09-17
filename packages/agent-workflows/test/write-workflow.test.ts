@@ -207,3 +207,71 @@ test("REFUSED, with the folder as it was: a step name that is not a file name, o
   assert.equal(refusal(STORE, () => writeWorkflow(file, [implement])), `${file} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
   assert.equal(fs.readFileSync(file, 'utf8'), 'not a folder\n');
 });
+
+/** Whether this filesystem tells `plan.md` from `Plan.md` apart. Where it does not, they are one file, and a step renamed by case is that file renamed. */
+const caseSensitive = (() => {
+  const probe = fs.mkdtempSync(path.join(ROOT, 'case-'));
+  fs.writeFileSync(path.join(probe, 'a.md'), '');
+  const apart = !fs.existsSync(path.join(probe, 'A.md'));
+  fs.rmSync(probe, { recursive: true, force: true });
+  return apart;
+})();
+
+test('the files of the steps the folder no longer has go before a byte of the new ones is written', (t) => {
+  const dir = devIn('order');
+  const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
+  // The order the write made them in, which is what a filesystem that does not tell case apart turns on, and the only way to read it on one
+  // that does: there `review.md` and `REVIEW.md` are one file, and a removal after the write would remove what was written.
+  const order: string[] = [];
+  const { rmSync, writeFileSync } = fs;
+  const removals = t.mock.method(fs, 'rmSync', (at: fs.PathLike, opts?: fs.RmOptions) => { order.push(`removed ${path.basename(String(at))}`); return rmSync(at, opts); });
+  const writes = t.mock.method(fs, 'writeFileSync', (at: fs.PathOrFileDescriptor, data: string | NodeJS.ArrayBufferView, opts?: fs.WriteFileOptions) => {
+    order.push(`wrote ${path.basename(String(at))}`);
+    return writeFileSync(at, data, opts);
+  });
+  try {
+    writeWorkflow(dir, [implement, { ...review, name: 'REVIEW', rounds: 2 }]);
+  } finally { removals.mock.restore(); writes.mock.restore(); }
+  // Which removal came first is `readdirSync`'s order, which is the filesystem's and not sorted; what the rule says is that every one of
+  // them came before the write.
+  const wrote = order.indexOf('wrote REVIEW.md');
+  assert.ok(wrote >= 0, order.join(', '));
+  assert.deepEqual([...order.slice(0, wrote)].sort(), ['removed review.md', 'removed ship.md'], 'both removals come before the write');
+  assert.deepEqual(order.slice(wrote), ['wrote REVIEW.md'], 'and nothing is removed after it — implement.md is left as it is');
+});
+
+test('a step renamed by case keeps its file where the filesystem does not tell case apart', { skip: caseSensitive && 'this filesystem tells implement.md from Implement.md apart, where a rename by case is an ordinary rename' }, () => {
+  const dir = devIn('case');
+  const [implement] = loadWorkflows(dir) as [Workflow];
+  const done = writeWorkflow(dir, [{ ...implement, name: 'Implement' }]);
+  assert.deepEqual([done.written, done.removed], [['Implement.md'], ['implement.md', 'review.md', 'ship.md']]);
+  assert.deepEqual(Object.keys(snapshot(dir)), ['Implement.md', 'README.md', 'review.schema.json'], 'the step it was given is there, under its new name');
+  assert.deepEqual(loadWorkflows(dir).map((s) => s.name), ['Implement'], 'and the folder reads as that step');
+});
+
+test("REFUSED at shipped defaults, with the folder as it was: a step's file that is a link, and a README that is one when a README is given", () => {
+  const dir = devIn('linked');
+  const [implement, review, ship] = loadWorkflows(dir) as [Workflow, Workflow, Workflow];
+  const away = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-write-linked-'));
+  /** A file of the folder moved out of it and linked back in, as a person keeping a step beside another workflow would. */
+  const link = (file: string): string => {
+    const to = path.join(away, file);
+    fs.renameSync(path.join(dir, file), to);
+    fs.symlinkSync(to, path.join(dir, file));
+    return to;
+  };
+  const fix = (file: string) => `${path.join(dir, file)} is a link, and a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes. Replace the link with a file of its own — remove the link and copy what it pointed at into its place, rm <file> && cp <target> <file> — or take it out of the folder.`;
+
+  const was = fs.readFileSync(link('review.md'), 'utf8');
+  assert.equal(refusal(dir, () => writeWorkflow(dir, [implement, { ...review, rounds: 2 }, ship])), fix('review.md'), 'a step the write would render through it');
+  assert.equal(refusal(dir, () => writeWorkflow(dir, [implement])), fix('review.md'), 'and a step gone, whose link the write would not remove');
+  assert.equal(fs.readFileSync(path.join(away, 'review.md'), 'utf8'), was, 'what it points at is untouched');
+
+  // A linked README is refused when a README is given, since that is when it is written — and not otherwise, since then nothing touches it.
+  fs.rmSync(path.join(dir, 'review.md'));
+  fs.renameSync(path.join(away, 'review.md'), path.join(dir, 'review.md'));
+  const readme = fs.readFileSync(link('README.md'), 'utf8');
+  assert.equal(refusal(dir, () => writeWorkflow(dir, [implement, review, ship], '# theirs\n')), fix('README.md'));
+  assert.equal(fs.readFileSync(path.join(away, 'README.md'), 'utf8'), readme, 'and what it points at is untouched');
+  assert.deepEqual(writeWorkflow(dir, [implement, review, ship]).kept, ['implement.md', 'review.md', 'ship.md'], 'with no README given, the link is nothing the write touches');
+});

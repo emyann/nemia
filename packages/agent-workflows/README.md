@@ -97,9 +97,12 @@ the order listed below, each written as the parser reads it (a list as `a, b`, a
 names), then the body. Before a byte is written, the folder as it would be is parsed in memory by `parseFolder`, the same reading
 `loadWorkflows` uses, with the schemas read from the folder as they are. So anything the parser would refuse is refused first, in
 its words and naming the step: a key a step does not have, an `after` naming no step, a cycle, a loop that is not a back edge, a
-schema that is not in the folder. A step name that is not a file name is refused too, and the folder is left as it was. Then each
-step's `<name>.md` is written; a file that already reads as its step is left alone, with its comments, since a render has none. The
-file of a step no longer in the set is removed. Schemas are never written, and the README only when one is given. The write goes
+schema that is not in the folder. A step name that is not a file name is refused too, and so is a `.md` in the folder that is a
+link — a write would follow it out of the folder, and would not remove it when its step went — and the folder is left as it was.
+Then the file of each step no longer in the set is removed, before a byte of the new ones is written: where the filesystem does
+not tell case apart, `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed
+under its old name. After that each step's `<name>.md` is written; a file that already reads as its step is left alone, with its
+comments, since a render has none. Schemas are never written, and the README only when one is given. The write goes
 to a workflow in the store's `workflows/` or a repository's, and anywhere else only with `{ anywhere: true }`, since it removes
 files. A run is not changed by it: a run froze its folder at `wf start`.
 
@@ -1598,7 +1601,8 @@ up — every 4000ms, ^C to stop
 - **`wf inbox queue <name>` marks a card to start on its own.** It writes `queued:` on the card, the ISO time it was queued,
   which orders the queue; `--workflow <w>` writes `workflow:` too. `wf inbox queue <name> --off` takes the mark back, and
   `wf inbox rm` drops the card. The card's file is written whole, through a hidden file renamed over it, so a pass never reads
-  half a card.
+  half a card — and its modified time is set back to what it was, since a card has no filing time of its own but that time, and a
+  board that orders its cards by it would put a card queued at the top of the list. A queue is no edit of the idea.
 - **Each pass, after every run has been advanced, the tick starts the oldest queued card** while a run slot is free — always,
   with no cap. By `queued:`, then by name (`queueOrder`), through `startFromInbox`, the start any card has: its `workflow:`,
   its `repo:` or else the repository `wf up` runs in, as `wf start` takes `.`. Its base is its base branch as it is at that
@@ -1614,7 +1618,9 @@ up — every 4000ms, ^C to stop
   in another repository — and the next pass tries it again.
 - **A start that fails otherwise is tried again.** Git failing on the repository, a file that cannot be read: no verdict on the
   card, so the next pass tries it again, where it keeps its place and the card behind it waits. `wf up` says it once, and again
-  only if it fails differently; `wf inbox` says `failed at <time>: <why>`. A card whose `repo:` folder was deleted after it was queued no
+  only if it fails differently — once by each `wf up`, which goes by what it has said itself rather than by what the pass before it
+  wrote down, since that pass may have been another daemon, on a terminal that is gone; `wf inbox` says `failed at <time>: <why>`. Git's own stderr is not the daemon's: it is read off the
+  failure and said in that one line, so a `repo:` with no git in it does not print `fatal: not a git repository` on every pass. A card whose `repo:` folder was deleted after it was queued no
   longer reads as a card, and keeps its place all the same: `wf inbox` lists why beside `queued 1 of 2`, the tick tries it and
   names the refusal, and `--off` takes it back.
 - **Refused by name**, exit 2, before anything is written: a name with no card, naming the cards there are; a card with no

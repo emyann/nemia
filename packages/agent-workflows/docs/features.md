@@ -2018,7 +2018,8 @@ What it leaves:
   about the world is written down.
 - **A failure that persists holds the queue behind it.** A card whose start keeps failing without a refusal — a `repo:` that is a directory
   with no git — is tried on every pass and keeps its place, so the cards behind it wait until a person fixes the repository, or takes the
-  card back. It is said once on `wf up`, and in `wf inbox`.
+  card back. It is said once on `wf up`, and in `wf inbox`. *Four leftovers from the reviews*, below, made each `wf up` say it once of its
+  own, rather than once in the store.
 - **A card with no `repo:` starts on wherever `wf up` runs.** `wf inbox` cannot know that directory, so a refusal that turns on it is seen
   only once the tick has tried.
 - **`wf inbox queue --off` in the moment the tick starts the card** can write the card back after the start removed it. The record names it,
@@ -2161,7 +2162,8 @@ What it leaves:
 - **A ghost cuts a refused try's why to two lines.** It is whole on hover and on the Inbox page.
 - **`wf inbox queue` at the command line still moves a card to the top of the Inbox page.** `queueInInbox` writes the card through a file
   renamed over it, which gives it a new mtime, and the page orders cards by mtime. The api sets the mtime back after its own write; the package
-  could keep it in `queueInInbox` itself, which would cover both, and the api's `utimesSync` could then go.
+  could keep it in `queueInInbox` itself, which would cover both, and the api's `utimesSync` could then go. *Four leftovers from the reviews*,
+  below, kept it in `queueInInbox`; the api's `utimesSync` now sets the same time a second time, and was left where it is.
 ## Shipped: markdown on the board, and a card's page with its keys explained
 
 The board showed every piece of prose as preformatted text: a run's brief, a step's body, a closeout's summary and needs, each reply, a
@@ -2673,7 +2675,7 @@ What it leaves:
 - **What `wf start` refuses beyond the parser** — a step named for another's check, `remote: true` off `claude` — is refused at a start,
   not at a save, as for a folder written by hand.
 - **The two edge cases review found in `writeWorkflow`** (a rename on a case-insensitive filesystem, a symlinked step file) are the
-  package's, and unchanged.
+  package's, and unchanged. *Four leftovers from the reviews*, below, took both up.
 - **A folder the builder cannot open**: one of yours that does not read. Its files are fixed by hand.
 - **The version is checked, not held.** Between the api reading the folder's version and `writeWorkflow` writing, a hand edit can still
   land, in the milliseconds a save takes. Nothing locks a folder, as nothing locks one against an editor.
@@ -3046,6 +3048,69 @@ What it leaves:
   command, and of a poll that was already reading the board. The record's `tries` array grows with them too, and the pass rewrites it.
   The lever for all three is engine-side: a view the engine caches, or a settled task's fold kept once (agent-engine's open issues).
   The tick, which is what runs every four seconds, no longer pays it.
+
+## Shipped: four leftovers from the reviews
+
+Four things earlier rounds found and left, one commit each, in `packages/agent-workflows` only. Nothing in `apps/`: where a fix makes an
+app's own workaround redundant, the workaround stays, and the bullet says so.
+
+- **`wf inbox queue` keeps the card file's time.** `queueInInbox` writes a card whole, through a hidden file renamed over it, so a pass never
+  reads half a card — and the rename gave the file the time of the queue. A card has no filing time of its own but its mtime (`filedAt`,
+  `apps/api/src/inbox.ts`), which the Inbox page orders the cards by, so a card queued or taken back at the command line jumped to the top of
+  the list with the queue's time as its own. A queue is no edit of the idea: `queueInInbox` reads the time before the rename and sets it back
+  after, and a failure to set it back is not a failure of the queue — the card is queued all the same, and lists at the queue's time until it
+  is written again. The api's own `utimesSync` around the call now sets the same time a second time; it is `apps/api`'s, and was left there.
+  Tested on the store (`test/queue-store.test.ts`): a card filed at 08:00, queued and taken back through `wf inbox queue` and its `--off`,
+  keeps 08:00 across both writes, while `wf inbox add` still writes a card at the time it is filed. Without the two lines, the test fails.
+- **Git's stderr is no longer the daemon's.** `runner.ts`'s `git` helper ran `execFileSync` with no `stdio`, which captures git's stderr
+  *and* writes it to this process's own. A queued card whose `repo:` is a directory with no git in it is tried on every pass — that is the
+  rule, since a failure is no verdict on the card — so `wf up` printed git's `fatal: not a git repository` every four seconds, beside the one
+  line it says about the card. The helper now passes `['ignore', 'pipe', 'pipe']`, which changes nothing else: the words are still on the
+  error `execFileSync` throws, which is where every failure is read from (`failedWords`, `startQueued`). Tested on the store
+  (`test/queue-store.test.ts`): a pass over such a card writes nothing at all to `process.stderr`, while `queueLine` still says
+  `no-git-a1b2 not started: Command failed: git rev-parse HEAD / fatal: not a git repository…`. Without the `stdio`, the test fails.
+- **A `wf up` says what the queue is stuck on, once, and it is the daemon that counts.** A start that fails without a refusal is tried on
+  every pass and said once: the tick writes the failure down, and `wf up` held its tongue while the next pass failed the same way on the
+  same repository (`QueueTry`, `again`). But `again` is a fact about the store, not about this daemon: the pass that said it may have been
+  another `wf up`, or a `wf tick`, and its line is on a terminal that is gone. A person restarting the daemon to find out why cards stopped
+  starting was met with the runs advancing and nothing about the card. The `up` loop now keeps the last failure it printed itself — the
+  card, the repository it was tried on, and why — and says anything else; `again` is no longer read there. Round 2 of review is what settled
+  the shape: a flag for the first pass was not enough, because a pass at a full cap reads no queue at all (`tick` calls `startQueued` only
+  while a slot is free), so a daemon restarted under a cap spent its one free pass in silence and never named the card. `wf tick` is
+  unchanged: it says every pass it is asked for. Tested on the store, twice over. With no cap, the test that pinned the silence reads
+  exactly one line over two passes, matched whole, naming the card and why — said on every pass fails it. At a cap of 1, with the failure
+  already written down, a daemon whose first pass files a run and reads no queue names the card on its second, when the run finishes and
+  the slot frees — the first-pass flag fails that one.
+- **`writeWorkflow`: a step renamed by case, and a step's file that is a link.** Two edge cases an earlier review found and left. The write
+  put each step's `<name>.md` down and then removed the `.md` of every step the folder no longer has; where the filesystem does not tell
+  case apart — macOS's, Windows's — `Plan.md` and `plan.md` are one file, so a step renamed by case was written, and then removed under its
+  old name, and the folder lost the step. The removals now go first, before a byte of the new files is written, which is right on either
+  kind of filesystem (case-folding the comparison instead would leave a stray `Plan.md` on a case-sensitive one, where `loadWorkflows`
+  would read it as a second step). And a `.md` in the folder that is a link was written *through*, into whatever it points at, outside the
+  folder — a rendered step landing on a file no workflow owns — while a stale one was left behind, since `readdirSync`'s entry for a link
+  is no file and the removal takes only files. Such a link is now refused by name, with the folder as it was, before anything is written; a
+  linked README is refused only when a `readme` is given, which is when it would be written. Tested in `test/write-workflow.test.ts`: the
+  order of the removals and the writes, read off `fs` on any filesystem, so the rule holds where this repository's tests run — as a
+  partition, every removal before the write, since which removal comes first is `readdirSync`'s order and so the filesystem's; the rename by
+  case itself, skipped where the filesystem tells the two names apart and saying so (it skips on Linux, and the folder it asserts —
+  `Implement.md` alone beside the README and the schema, read back as one step — is what a case-insensitive filesystem gives); and the
+  refusal, in its words, for a link a step would be written through, for a link whose step is gone, and for a linked README with a README
+  given, each with what the link points at untouched — and, beside them, that a linked README with no README given is nothing the write
+  touches. Writing before removing fails the first; the refusal dropped fails the third.
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 593 (591 passed, 2 skipped), from 587 —
+  five new tests, one of them the case rename, which skips where the filesystem tells `implement.md` from `Implement.md` apart, and one
+  changed test, the `wf up` silence. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged: nothing outside the package
+  changed. `npm run typecheck` clean in all four.
+
+What it leaves:
+
+- **Two steps whose names differ only by case** — `Plan` and `plan` in one folder — are two files on a case-sensitive filesystem and one
+  on any other, where the second write silently wins and the result names both. `writeWorkflow` refuses neither, since on the filesystem
+  this repository's tests run on they are two ordinary steps. A refusal that fires on one machine and not another is worse than the hole.
+- **A `*.schema.json` that is a link** is read through, as any file the parser reads is, so a schema could come from outside the folder
+  though `output:` may not name a path outside it. The write never writes one; only the read walks it.
+- **The api's own refusal for a link is the package's sentence**, at 422, since `apps/api` passes `writeWorkflow`'s message through. Nothing
+  in `apps/` changed here.
 
 ## 1. A run that grows steps from a plan
 

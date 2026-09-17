@@ -371,6 +371,28 @@ test('`wf inbox queue` marks a card, and the next pass starts it with no cap —
   assert.ok(printed.some((l) => new RegExp(`^\\d\\d:\\d\\d:\\d\\d  started ${again.card.name} as ${upRun!.id}$`).test(l)), printed.join('\n'));
 });
 
+test("`wf inbox queue` keeps the card file's time: a queue is no edit of the idea, and a card's filing time is its mtime — at the command line as through the board", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const repo = aRepoWith('dev');
+  const { card, file } = addToInbox({ text: 'Filed this morning', workflow: 'dev', repo });
+  // Filed long enough ago that a file written by the queue could not pass for it.
+  const filed = new Date('2026-09-16T08:00:00.000Z');
+  fs.utimesSync(file, filed, filed);
+
+  await printedBy(t, b.e, 'inbox', 'queue', card.name);
+  assert.match(fs.readFileSync(file, 'utf8'), /^queued: /m, 'the card is queued');
+  assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'and its file is as old as it was');
+
+  await printedBy(t, b.e, 'inbox', 'queue', card.name, '--off');
+  assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /^queued: /m, 'taken back');
+  assert.equal(fs.statSync(file).mtime.toISOString(), filed.toISOString(), 'and as old still');
+
+  // A card filed is written now: it is the queue that keeps the time it found, not every write of the inbox.
+  const fresh = addToInbox({ text: 'Filed now', workflow: 'dev', repo });
+  assert.ok(Date.now() - fs.statSync(fresh.file).mtime.getTime() < 60_000, 'wf inbox add writes a card at the time it is filed');
+});
+
 test('a queued card that names no repository starts on the repository the daemon runs in, as `wf start` takes `.`', async (t) => {
   emptyStore(undefined);
   const b = board();
@@ -560,7 +582,7 @@ test("a queued card whose start fails without a refusal — its repository no gi
   const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('no-git-a1b2'))!;
   assert.match(listed, / {2}queued 1 of 2 — failed at \S+: Command failed: git rev-parse HEAD .* — not a refusal: the tick tries it again on every pass, where it keeps its place$/);
 
-  // `wf up` over two passes: the failure said once, the card tried on both, and the card behind it not started.
+  // `wf up` over two passes: the failure said on the first, the card tried on both, and the card behind it not started.
   const up = board();
   let passes = 0;
   const stop = new Error('the test stops the daemon');
@@ -571,7 +593,11 @@ test("a queued card whose start fails without a refusal — its repository no gi
   try {
     await assert.rejects(main(['up', '1'], up.e), (err) => err === stop);
   } finally { log.mock.restore(); }
-  assert.deepEqual(printed.filter((l) => l.includes('no-git-a1b2')), [], 'the same failure as the pass before, twice: not said again');
+  // Said on the daemon's first pass though the failure is `again`: it was written down by the `tick` above, whose line this daemon never
+  // printed, and a person restarting `wf up` to see why cards stopped starting is told by it. Then not again, however many passes follow.
+  const named = printed.filter((l) => l.includes('no-git-a1b2'));
+  assert.equal(named.length, 1, printed.join('\n'));
+  assert.match(named[0]!, /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/);
   const again = await tick(b.e);
   assert.deepEqual([again.queue && 'failed' in again.queue && again.queue.again, listRuns()], [true, []], 'tried again, and nothing started behind it');
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'no-git-a1b2.json'), 'utf8')).at, written.at, 'not written again');
@@ -585,6 +611,61 @@ test("a queued card whose start fails without a refusal — its repository no gi
   assert.deepEqual(cleared.queue, { card: 'no-git-a1b2', run: run!.id, removed: true });
   const behind = await tick(b.e);
   assert.deepEqual([behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))], ['behind-c3d4', []]);
+});
+
+test("a queued card whose `repo:` is no git repository leaves the daemon's own stderr alone: git's words are read off the failure, not passed through", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  // A directory with a workflow in it and no git, as above: the start's `git rev-parse` fails, and git writes `fatal:` on its stderr.
+  const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
+  fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
+  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
+  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
+
+  const said: string[] = [];
+  const stderr = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => { said.push(String(chunk)); return true; });
+  let pass: Awaited<ReturnType<typeof tick>>;
+  try { pass = await tick(b.e); } finally { stderr.mock.restore(); }
+  assert.deepEqual(said, [], "git's stderr is not the daemon's: a pass every four seconds would print it every four seconds");
+
+  // Read all the same, and said once, with the card's name on it.
+  assert.ok(pass.queue && 'failed' in pass.queue, JSON.stringify(pass.queue));
+  assert.match(queueLine(pass.queue), /^no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ fatal: not a git repository/);
+});
+
+test("a `wf up` at a cap of 1 names the card its queue is stuck on once a slot frees, though its first pass read no queue at all: a daemon says what it has not said, not what the store has not written", async (t) => {
+  emptyStore('1');
+  const b = board();
+  // A card whose start fails without a refusal, tried and written down by a pass of its own — the daemon that is gone.
+  const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
+  fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
+  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
+  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
+  const before = await tick(b.e);
+  assert.ok(before.queue && 'failed' in before.queue && !before.queue.again, JSON.stringify(before.queue));
+
+  // A run to hold the one slot, so the daemon's first pass files it and reads no queue at all — and finishes before the second pass,
+  // which tries the card and fails as the pass above did: `again`, and never said by this daemon.
+  const busy = started('holds the slot', at(1));
+  let passes = 0;
+  const stop = new Error('the test stops the daemon');
+  const inner = b.e.tick.bind(b.e);
+  (b.e as { tick: () => Promise<void> }).tick = async () => {
+    if (++passes > 2) throw stop;
+    if (passes === 2) b.settle(`${busy.id}-implement`, 'succeeded', SIGNED);
+    await inner();
+  };
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  try {
+    await assert.rejects(main(['up', '1'], b.e), (err) => err === stop);
+  } finally { log.mock.restore(); }
+
+  const named = printed.filter((l) => l.includes('no-git-a1b2'));
+  assert.equal(named.length, 1, printed.join('\n'));
+  assert.match(named[0]!, /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository/);
+  const filed = printed.findIndex((l) => l.includes(`${busy.id}  filed implement`));
+  assert.ok(filed >= 0 && filed < printed.indexOf(named[0]!), `the pass that held the slot came first: ${printed.join('\n')}`);
 });
 
 test("REFUSED at shipped defaults, on the repository it was tried on: a queued card that names no repository, refused on the daemon's — no such workflow there — is passed over by every pass there, and started by a pass in a repository that has its workflow", async (t) => {

@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { execFile, execFileSync } from 'node:child_process';
-import { promisify } from 'node:util';
+import { isDeepStrictEqual, promisify } from 'node:util';
 import { claudeDetached, codex, createEngine, type Engine, type TaskView, type Usage } from 'agent-engine';
 import { CHECK, CHECK_DEADLINE_SECONDS, checkBrief, lastLines, readVerdict, stdoutTail, type CheckRefusal, type Verdict } from './check.ts';
 import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refusalLines, worktreeInclude, type DepEntry, type DepsListing, type Installed, type Provisioned, type WorktreeInclude } from './deps.ts';
@@ -19,7 +19,7 @@ export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, doll
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, artifactLines, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
-import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, workflowsIn, type Workflow } from './workflow.ts';
+import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, stepNameRefusal, terminalSteps, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
@@ -1003,6 +1003,79 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
   }
   writeRun(run);
   return run;
+}
+
+/** What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already read so, and removed. */
+export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[]; kept: string[]; removed: string[] };
+
+/**
+ * A workflow folder written from its steps: what the board's builder saves, and the inverse of `loadWorkflows`.
+ *
+ * Judged whole before a byte is written, so a folder refused is the folder it was: where it is (`workflowPlaceRefusal`), each step's name as
+ * a file's (`stepNameRefusal`), no name twice, each step rendered (`renderStep`), and then the folder as it would be, parsed in memory as
+ * `loadWorkflows` parses one on disk (`parseFolder`), with the schemas its `output:` lines name read from the folder as they are. So every
+ * refusal the parser has surfaces here, in its words and naming the step: a key a step does not have, `after:` naming no step, a cycle, a
+ * `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `wf start` refuses beyond the parser — a
+ * step named for another's check, `remote: true` off `claude` — is still `wf start`'s to refuse, as for a folder written by hand.
+ *
+ * Then each step's `<name>.md` is written — but for one whose file already reads as the step, which is left as it is, comments and all,
+ * since a render has none — and the `.md` of each step no longer in the set is removed. A `*.schema.json` is left as it is: a step names
+ * one, and the builder writes none. The README is written only when `readme` is given, to the name the folder's README already has.
+ *
+ * Where: a workflow in the store's `workflows/` or in a repository's, the two places the board lists workflows from. Anywhere else only
+ * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. A run
+ * is not changed by any of it: it froze its folder at `wf start`.
+ */
+export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?: string, { anywhere = false }: { anywhere?: boolean } = {}): WorkflowWritten {
+  const at = path.resolve(dir);
+  const refuse = (why: string | undefined) => { if (why) throw new WorkflowError(why); };
+  if (!anywhere) refuse(workflowPlaceRefusal(at));
+  if (fs.existsSync(at) && !isDirectory(at)) refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
+  if (!steps.length) refuse(`no steps to write to ${at}, and a workflow has at least one. To remove the workflow, remove its folder.`);
+  for (const step of steps) refuse(stepNameRefusal(step?.name));
+  const twice = steps.find((step, i) => steps.findIndex((other) => other.name === step.name) !== i);
+  if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
+  const texts = steps.map((step) => [step.name, renderStep(step)] as const);
+  const read = (file: string): string | undefined => {
+    try { return fs.readFileSync(path.resolve(at, file), 'utf8'); } catch { return undefined; }
+  };
+  const parsed = parseFolder(texts, read);
+
+  fs.mkdirSync(at, { recursive: true });
+  const entries = fs.readdirSync(at, { withFileTypes: true });
+  const written: string[] = [];
+  const kept: string[] = [];
+  /** Write `text` to `file`, unless what is there already reads as `same` does. */
+  const put = (file: string, text: string, same: (there: string) => boolean) => {
+    const there = read(file);
+    if (there !== undefined && same(there)) return kept.push(file);
+    fs.writeFileSync(path.join(at, file), text);
+    return written.push(file);
+  };
+  for (const [name, text] of texts) {
+    const step = parsed.find((s) => s.name === name);
+    put(`${name}.md`, text, (there) => {
+      try { return isDeepStrictEqual(parseWorkflow(name, there, read), step); } catch { return false; }
+    });
+  }
+  const names = new Set(texts.map(([name]) => `${name}.md`));
+  const removed = entries.filter((e) => e.isFile() && e.name.endsWith('.md') && !isReadme(e.name) && !names.has(e.name)).map((e) => e.name);
+  for (const file of removed) fs.rmSync(path.join(at, file));
+  if (readme !== undefined) put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
+  return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
+}
+
+/**
+ * Why `writeWorkflow` does not write `at` unless told it may write anywhere, or `undefined` for a folder it writes: a workflow in the store's
+ * `workflows/`, or in a repository's — `<repo>/workflows/<name>`, beside the repository's `.git`. The folder itself, not one below it, nor
+ * the `workflows/` that holds it: those are the folders the board lists as workflows.
+ */
+function workflowPlaceRefusal(at: string): string | undefined {
+  const holder = path.dirname(at);
+  const store = path.resolve(HOME, 'workflows');
+  if (holder === store) return undefined;
+  if (path.basename(holder) === 'workflows' && fs.existsSync(path.join(path.dirname(holder), '.git'))) return undefined;
+  return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's (<repo>/workflows/<name>, beside its .git), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, or pass { anywhere: true } to write ${at} all the same.`;
 }
 
 /**

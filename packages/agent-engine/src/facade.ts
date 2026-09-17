@@ -168,6 +168,13 @@ export type TaskSpec = {
    * sessions spend past one (measured), and `codex`. Carried on the task; `decide` never reads it.
    */
   budgetUsd?: number;
+  /**
+   * Which waiting task a free slot goes to first, when a pool is at its ceiling — `1`, `-1`, `0.5`. Higher first, and
+   * filing order within one; absent is 0. Read by a pass when it orders the board, and nowhere else: no runner is told it,
+   * `decide` never reads it, and nothing running is stopped for a higher one. Kubernetes' `priorityClassName`, without the
+   * preemption. Refused unless a finite number.
+   */
+  priority?: number;
   /** Choose the id yourself, to keep it in step with a row in your own database. */
   id?: string;
 };
@@ -186,7 +193,8 @@ export type Engine = {
    * `disallowedTools` that is not a list of permission rules; an
    * `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
    * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists); a
-   * `budgetUsd` that is not dollars above 0, or one its harness would not keep (`claude`, `codex`).
+   * `budgetUsd` that is not dollars above 0, or one its harness would not keep (`claude`, `codex`); a `priority` that
+   * is not a finite number.
    * A harness brought as a `PromiseRunner` is asked nothing.
    */
   file(spec: TaskSpec): Promise<string>;
@@ -379,6 +387,9 @@ const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
   if (mcp) return mcp;
   if (spec.budgetUsd !== undefined && !(typeof spec.budgetUsd === 'number' && Number.isFinite(spec.budgetUsd) && spec.budgetUsd > 0)) {
     return `\`budgetUsd: ${typeof spec.budgetUsd === 'number' ? spec.budgetUsd : JSON.stringify(spec.budgetUsd)}\` is not an amount of dollars. Give dollars above 0, like 5 or 0.25, or leave it out for no cap.`;
+  }
+  if (spec.priority !== undefined && !(typeof spec.priority === 'number' && Number.isFinite(spec.priority))) {
+    return `\`priority: ${typeof spec.priority === 'number' ? spec.priority : JSON.stringify(spec.priority)}\` is not a number. Give a finite number — a higher one is admitted first, and 0 is what no priority means — or leave it out.`;
   }
   const h = harnesses[spec.harness]!;
   return (h === 'claude-bg' ? claudeBgRefuses : isSpec(h) ? h.refuses : undefined)?.(spec);

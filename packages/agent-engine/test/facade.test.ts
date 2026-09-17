@@ -421,6 +421,24 @@ test('file() refuses a budgetUsd that is not dollars above 0, and one on a harne
   assert.equal((await engine.view(id)).state.budgetUsd, 0.25);
 });
 
+test('file() refuses a priority that is not a finite number, on every harness — and journals one that is, below 0 or between whole numbers too', async () => {
+  const { journal, engine } = shipped();
+  for (const harness of ['claude', 'codex', 'claude-detached']) {
+    await refused(engine, { brief: 'b', cwd: '/r', harness, priority: Number.NaN }, /`priority: NaN` is not a number\. Give a finite number/);
+  }
+  await refused(engine, { brief: 'b', cwd: '/r', priority: 'high' as unknown as number }, /`priority: "high"` is not a number\. Give a finite number — a higher one is admitted first/);
+  await refused(engine, { brief: 'b', cwd: '/r', priority: Infinity }, /`priority: Infinity` is not a number/);
+  await refused(engine, { brief: 'b', cwd: '/r', priority: null as unknown as number }, /`priority: null` is not a number/);
+  assert.deepEqual(await journal.list(), [], 'nothing was journalled');
+
+  for (const priority of [2, -1, 0.5, 0]) {
+    const id = await engine.file({ brief: 'b', cwd: '/r', priority });
+    const [filed] = await journal.read(id);
+    assert.equal((filed as { priority?: number }).priority, priority, 'on the record, for the pass');
+    assert.equal((await engine.view(id)).state.priority, priority);
+  }
+});
+
 test('a usage whose key has no value is not something new to write down — measured is written once a value arrives, not on every pass', async () => {
   // Found in review: `{ costUsd: undefined }` type-checks, the files journal drops the key as it writes, and the key was
   // then missing from the record on every pass — a `measured` entry each tick, for as long as the session was listed.

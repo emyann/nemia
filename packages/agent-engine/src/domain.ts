@@ -207,6 +207,12 @@ export type Event =
        * `decide` learns only that a harness ended a session on it (`Sighting.budgetSpent`).
        */
       budgetUsd?: number;
+      /**
+       * Which waiting task a free slot goes to first: higher first, and filing order within one; absent is 0. Read by the
+       * pass when it orders the board (`admissionOrder` in `engine.ts`), and nowhere else — not by `decide`, which is
+       * handed one task, and not by a runner, which is never told it. A pod's `priorityClassName`, without preemption.
+       */
+      priority?: number;
     }
   /**
    * INTENT: we are about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is told instead of
@@ -302,6 +308,8 @@ export type State = {
   mcp?: Record<string, McpServer>;
   /** The spend cap, per attempt. See the `filed` event. `decide` never reads it. */
   budgetUsd?: number;
+  /** Which waiting task a free slot goes to first. See the `filed` event. `decide` never reads it. */
+  priority?: number;
   attempts: Attempt[];
   /** What a person said to the task's sessions while they ran, in the order it was said. Carried, never read. */
   said: Said[];
@@ -325,6 +333,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.resumeFrom = e.resumeFrom;
         s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
         s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.effort = e.effort; s.mcp = e.mcp; s.budgetUsd = e.budgetUsd;
+        s.priority = e.priority;
         break;
       case 'starting':
         s.attempts.push({ n: e.attempt, startedAt: e.at, spawnedAt: null, ended: null, endedAt: null, reason: null, nativeId: null, resumeFrom: e.resumeFrom, ...(e.nudge ? { nudge: e.nudge } : {}), usage: null, exitCode: null });

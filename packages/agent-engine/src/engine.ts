@@ -41,7 +41,7 @@ export const file = Effect.fn('file')(function* (spec: {
   brief: string; cwd: string; maxAttempts?: number; model?: string; permissionMode?: string;
   harness?: string; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
   worktree?: string | boolean; closeoutSchema?: object; tools?: string[]; disallowedTools?: string[];
-  effort?: string; mcp?: Record<string, McpServer>; budgetUsd?: number; id?: string;
+  effort?: string; mcp?: Record<string, McpServer>; budgetUsd?: number; priority?: number; id?: string;
 }) {
   const journal = yield* Journal;
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.
@@ -52,6 +52,7 @@ export const file = Effect.fn('file')(function* (spec: {
     harness: spec.harness, deadlineSeconds: spec.deadlineSeconds, resume: spec.resume,
     resumeFrom: spec.resumeFrom, worktree: spec.worktree, closeoutSchema: spec.closeoutSchema,
     tools: spec.tools, disallowedTools: spec.disallowedTools, effort: spec.effort, mcp: spec.mcp, budgetUsd: spec.budgetUsd,
+    priority: spec.priority,
   });
   return id;
 });
@@ -267,12 +268,18 @@ const filedMs = (state: State) => {
 };
 
 /**
- * The order a pass walks the board in, and so which waiting task a free slot goes to: the oldest filing first, and
- * between two filed at the same instant, the ids' order, as `journal.list` sorts them. A retry is ordered by its task's
- * filing, not by when its last attempt ended: older work goes first.
+ * A task's priority, 0 when it has none. One that is not a finite number — which only the Effect door, refusing nothing,
+ * can journal, and a file journal writes back as `null` — is read as none, never as above or below every other.
+ */
+const priorityOf = (state: State) => (Number.isFinite(state.priority) ? state.priority! : 0);
+
+/**
+ * The order a pass walks the board in, and so which waiting task a free slot goes to: the highest `priority` first; within
+ * one, the oldest filing; and between two filed at the same instant, the ids' order, as `journal.list` sorts them. A retry
+ * is ordered by its task's filing, not by when its last attempt ended: older work goes first.
  */
 const admissionOrder = (a: State, b: State) =>
-  filedMs(a) - filedMs(b) || (a.taskId < b.taskId ? -1 : a.taskId > b.taskId ? 1 : 0);
+  priorityOf(b) - priorityOf(a) || filedMs(a) - filedMs(b) || (a.taskId < b.taskId ? -1 : a.taskId > b.taskId ? 1 : 0);
 
 /**
  * One pass over every task on the board. This is the whole daemon.
@@ -295,10 +302,11 @@ const admissionOrder = (a: State, b: State) =>
  * name is a pool of its own, under its own name. `createEngine` passes the pools its harnesses
  * declare; a caller of this door passes its own.
  *
- * **Which waiting task a free slot goes to is the order of this walk** (`admissionOrder`): the oldest filing first,
- * and the ids' order only between two filed at the same instant. It was the ids' order alone — `journal.list` sorts
- * them — so which of two waiting tasks started was the alphabet of their names. `decide` sees one task and two
- * numbers, and never learns there is an order.
+ * **Which waiting task a free slot goes to is the order of this walk** (`admissionOrder`): the highest `priority`
+ * first, then the oldest filing, and the ids' order only between two filed at the same instant. It was the ids' order
+ * alone — `journal.list` sorts them — so which of two waiting tasks started was the alphabet of their names. `decide`
+ * sees one task and two numbers, and never learns there is an order. Nothing running is stopped for a higher priority:
+ * it is read when a slot is free, and only then.
  */
 export const tick = Effect.fn('tick')(function* (
   maxConcurrent = DEFAULT_MAX_CONCURRENT,

@@ -12,7 +12,7 @@ record (§6 item 3, the engine half), `find`, one session by its name without `c
 bug 1, a quiet session with no closeout recorded a success (§6 item 18), and what a session cost, read from its harness,
 with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small items: a view that observes its task's own
 harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
-admission in filing order (issue 21); agent-workflows `0e7b02a`.
+admission in filing order (issue 21) and a task's `priority` (issue 22); agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -299,7 +299,8 @@ the first with the times `file()` writes.
 - **Filing order does not give a run its momentum.** A run's next step is filed a check and a pass after its last ended,
   so a task filed in that gap is older and still goes first. Measured 2026-09-16 (agent-workflows `docs/features.md`,
   Engine-side work): a card's run filed at 23:53:07Z took the slot a lane's implement released at 23:53:18Z, and that
-  lane's review, filed 23:54:44Z, then waited behind four sessions. Filing order admits the card's run first all the same.
+  lane's review, filed 23:54:44Z, then waited behind four sessions. Filing order admits the card's run first all the same:
+  a `priority` the upper layer files is what keeps the slot with the run (issue 22).
 - **The time is the filer's clock.** `file()` stamps `new Date()` in the process that files, so two processes with skewed
   clocks filing onto one board are ordered by their clocks. One machine, one clock, today.
 - **A retry keeps its task's place.** A task between attempts is ordered by its filing, not by when its last attempt
@@ -307,6 +308,28 @@ the first with the times `file()` writes.
 - **A time that does not parse** — a `PromiseJournal` that stores `at` in another shape — orders its task after every task
   whose time does, and by id among such tasks: admitted last, never refused.
 - **`ae ls` and `list()` are still in id order.** Only the pass's walk changed.
+
+### 22. A task's `priority` is read when a slot is free, and only then
+
+**What changed** (2026-09-16). `priority` is a number on the filing, 0 when absent, carried on the `filed` event and
+`State`. A pass orders the board by it before filing order: higher first, the oldest filing within one, the id between
+equal times (`admissionOrder` in `agent-engine/src/engine.ts`). Nothing else reads it: no runner is told it (`SpawnRequest`
+has no such field), and `decide` does not — `test/engine.test.ts` reads `decide`'s body for `.priority` and `.filedAt`, and
+failed with a read planted there. `createEngine().file()` refuses one that is not a finite number (`NaN`, `Infinity`,
+`"high"`, `null`) on every harness, naming the fix, and `ae ls` prints `priority N` beside a task filed with one.
+`test/engine.test.ts`: a higher priority filed after a lower one takes a ceiling of one, and six tasks drain in the order
+priority, then filing, a negative one last; `test/facade.test.ts`: every refusal, and what is journalled.
+
+**What is left.**
+
+- **No preemption.** A higher priority waits for a slot like any task: a running session is never stopped for one.
+  Kubernetes' scheduler preempts; this does not, and nothing has asked it to.
+- **No aging.** A steady stream of higher-priority work keeps a lower one waiting for as long as the stream lasts.
+- **agent-workflows files none yet.** The run's momentum — every filing after a run's first step above a new run's
+  first — is the upper layer's, and a run of its own (agent-workflows `docs/features.md`, Engine-side work).
+- **Not a brief key.** `ae start` cannot file one; a task filed through the API shows it in `ae ls` all the same.
+- **The Effect door** journals any value (issue 6). One that is not a finite number — a file journal writes `NaN` back as
+  `null` — is read as 0 when the board is ordered, never as above or below every other.
 
 ## Verified live, once
 

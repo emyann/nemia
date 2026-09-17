@@ -221,6 +221,15 @@ test('ae show and ae ls print what an attempt cost to the cent — never $0.00 f
   assert.match(shown(fold('t-1', base.slice(0, 1))), /  0\/1  read the notes$/, 'no attempt, nothing to cost');
 });
 
+test('ae ls shows a task\'s priority when it was filed with one, and nothing when it was not', () => {
+  const filed = (priority?: number): Event => ({ kind: 'filed', at: '2026-09-16T09:00:00Z', brief: 'review it', cwd: '/r', maxAttempts: 1, ...(priority !== undefined ? { priority } : {}) });
+  const shown = (priority?: number) => taskLine({ id: 't-1', state: fold('t-1', [filed(priority)]), phase: 'pending', sessionId: null });
+  assert.match(shown(3), /  0\/1  priority 3  review it$/);
+  assert.match(shown(-1), /  0\/1  priority -1  review it$/);
+  assert.match(shown(0), /  0\/1  priority 0  review it$/, 'set, though 0 is what none means');
+  assert.match(shown(), /  0\/1  review it$/, 'not set, not shown');
+});
+
 test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {
   assert.equal(
     usageLine({ toolCalls: 12, inputTokens: 373_710, outputTokens: 1_082 }),

@@ -39,7 +39,7 @@ Definition of done — a closed list, and it is closed:
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
 change seems to belong in here, check it against the boundary above first: it almost certainly
 knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp`, `budgetUsd` — is a field
-carried on the task and read by a runner, never a callback into `decide`.
+carried on the task and read by a runner, never a callback into `decide`; so is `priority`, read by the pass that orders the board.
 
 ### The one real decision in here: resume policy
 
@@ -248,7 +248,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `priority` that is not a finite number (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -405,6 +405,23 @@ the harness's verdict, or lost — is retried under the same cap, so `maxAttempt
 before one is reached.
 
 `ae start` takes `budgetUsd: 0.25` in a brief, digits only.
+
+## Which waiting task starts first: `priority`
+
+`priority: 1` says which waiting task a free slot goes to first when its pool is at its ceiling: higher first; within one
+priority, the oldest filing; and between two filed at the same instant, the ids' order. Absent is 0, and a negative number
+is below that. A field on the task, carried on the `filed` event and `State`, and read by the pass when it orders the board
+(`admissionOrder` in `src/engine.ts`) and nowhere else: no runner is told it, and `decide`, which is handed one task, never
+reads it — a test reads `decide` to keep it so. Kubernetes' `priorityClassName`, without the preemption: nothing running is
+stopped for a higher priority, which waits for a slot like any task.
+
+**What it is for: a run in flight keeping its momentum.** A run's next step is filed a check and a pass after its last
+ended, so in filing order any task filed in that gap goes first, and the run waits behind work that arrived after it
+started. A workflow layer that files every step after a run's first above a new run's first keeps that slot with the run.
+
+`file()` refuses a `priority` that is not a finite number — `NaN`, `Infinity`, `"high"` — naming the fix. The Effect door
+refuses nothing (open issue 6), and a value it journalled that is not a finite number is read as 0. `ae ls` shows
+`priority 2` beside a task filed with one. It is not a key a brief has, so `ae start` files at 0.
 
 ## What "done" means, and who decides it
 
@@ -1074,11 +1091,12 @@ not. A session on a permission prompt makes no API calls, so it costs nothing ag
 ceiling exists for — reasoning, not a measurement. It is counted again on the pass after it moves again, so
 blocked sessions that all move at once can put a board past its ceiling for a while; nothing is stopped for
 that, and nothing more is admitted until the count is back under. Admission is serial within a pass, so the
-count is true rather than approximately true — and a pass walks the board **in filing order**, so a free slot goes
-to the task that has waited longest: the oldest `filed` entry first, and the ids' order only between two filed at
-the same instant. A retry keeps its task's place, since its task was filed when it was. It used to be the ids' order
-alone, so which of two waiting tasks started was the alphabet of their names. `decide` does not know there is an
-order: it is handed one task and two numbers.
+count is true rather than approximately true. **Which waiting task a free slot goes to** is the order the pass walks
+the board in: the highest `priority` first (a field on the task, 0 when absent — *Which waiting task starts first*,
+above), then the oldest `filed` entry, and the ids' order only between two filed at the same instant. A retry keeps
+its task's place, since its task was filed when it was. It used to be the ids' order alone, so which of two waiting
+tasks started was the alphabet of their names. `decide` does not know there is an order: it is handed one task and
+two numbers.
 
 ```
 $ ae tick

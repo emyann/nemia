@@ -187,13 +187,15 @@ export const attemptLine = (a: Attempt): string => {
 };
 
 /**
- * One task, for `ae ls`: its latest attempt's cost beside its turns — `$3.01 · 12t`, or `cost not measured` — once it has
- * an attempt. An attempt still running has none yet: Claude Code writes a session's cost as its process exits.
+ * One task, for `ae ls`: its priority when it was filed with one — `priority 2` — and its latest attempt's cost beside its
+ * turns — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
+ * Code writes a session's cost as its process exits.
  */
 export const taskLine = (v: TaskView) => {
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
+  const priority = v.state.priority !== undefined ? `  priority ${v.state.priority}` : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${v.state.attempts.length}/${v.state.maxAttempts}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)} ${v.state.attempts.length}/${v.state.maxAttempts}${priority}${meter}  ${v.state.brief.split('\n')[0]!.slice(0, 44)}`;
 };
 
 /**

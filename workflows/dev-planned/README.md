@@ -5,7 +5,7 @@ dev. The plan is a step of its own, on tools that cannot write, and its closeout
 record, in `wf decide`, and handed to implement as data.
 
 ```
-plan → implement ⇄ review
+plan → implement ⇄ review → ship
 ```
 
 `plan` runs on Claude (opus), fenced as `dev`'s review is, by machinery rather than by its brief:
@@ -31,7 +31,9 @@ The answer reaches `plan` in its try's brief as `## Your answer`, under `## Try 
 `implement` is `dev`'s, with `after: plan` and `input: plan`: the plan reaches it under `## From plan`,
 as data — the declared fields, never plan's summary — and it is told to say in its commit message where
 it departs from the plan. `review` and `review.schema.json` are `dev`'s, and the loop is `dev`'s: a round
-goes back to implement, not to planning.
+goes back to implement, not to planning. `ship` is `dev`'s too, file for file: the run's ending, gated,
+which merges the result onto the base branch in the repository's checkout once a person approves it —
+`dev`'s README says what the step does.
 
 ## When to use it
 

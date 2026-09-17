@@ -143,9 +143,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - Commit on your branch, in small coherent commits with plain, human messages: a short
   imperative subject, an optional body saying why. **No attribution trailers**, no session URLs.
 - **Never push, never merge, never `git branch -D`.** `.claude/settings.json` refuses the first
-  and the last; a person merges after a trial merge runs the suite. If you are a workflow step,
-  commit as you go all the same: the run commits only what you leave uncommitted, in one commit
-  under your step's name, and a person decides what ships. (F's two steps read the old wording as
+  and the last; a person merges after a trial merge runs the suite. The one exception is a run's
+  ending step — `workflows/*/ship.md`, which runs in this checkout and is filed only once a person
+  approves it at its gate — and it merges the run's own result branch, aborting on any failure.
+  If you are a workflow step, commit as you go all the same: the run commits only what you leave
+  uncommitted, in one commit under your step's name, and a person decides what ships. (F's two steps read the old wording as
   "do not commit" and handed off 1,300 lines in one commit each.)
 
 ## When you miss

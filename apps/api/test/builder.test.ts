@@ -138,10 +138,11 @@ test("PUT /api/workflows/yours/:name with a folder's steps as the listing has th
   const before = snapshot(dir);
   const steps = await listedSteps('as-listed');
   assert.equal(steps.find((s) => s.name === 'review')?.spec.budget, 20, "the listing carries review's budget, so a put does not drop it");
+  assert.equal(steps.find((s) => s.name === 'ship')?.spec.workspace, 'main', "and ship's workspace, so a put does not drop that either");
   const res = await put('as-listed', { steps });
   assert.equal(res.status, 200, await res.clone().text());
   const saved: WorkflowSaved = await res.json();
-  assert.deepEqual([saved.written, saved.kept, saved.removed], [[], ['implement.md', 'review.md'], []]);
+  assert.deepEqual([saved.written, saved.kept, saved.removed], [[], ['implement.md', 'review.md', 'ship.md'], []]);
   assert.deepEqual(snapshot(dir), before, 'byte for byte');
   assert.deepEqual(saved.workflow, listWorkflows(repo, root).find((w) => w.name === 'as-listed' && w.from === 'yours'), 'answered as the listing reads it');
 });

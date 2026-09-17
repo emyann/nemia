@@ -5,7 +5,7 @@ something worth another round, three rounds at most. Implement is verified by np
 typecheck.
 
 ```
-implement ⇄ review
+implement ⇄ review → ship
 ```
 
 `implement` runs on Claude (opus), and its `check:` — `npm test && npm run typecheck` — is what makes
@@ -21,6 +21,13 @@ from, and narrowing those allows is the settings' to do. `implement` is denied `
 `CronCreate`, `CronDelete` and `RemoteTrigger`, which no step needs. `review`'s findings are its closeout
 (`review.schema.json`), and its `again: true` sends the change round again: implement's own session is
 continued with the findings, then a new review. After the third round, a person decides.
+
+`ship` is the run's ending, and the run stops at it: `gate: true`, so nothing of it is filed until a person
+says `wf approve <run> ship`. It runs in the repository's own checkout (`workspace: main`) rather than a
+worktree, since the base branch is checked out there, and it does by machinery what a person did by hand —
+trial merge `git merge --no-ff --no-commit`, this folder's check, `git commit`, and `git merge --abort` on any
+failure, with what happened in its closeout. It carries implement's denies and no `check:` of its own: the run
+would execute one in a person's checkout, and what this step is judged by is the check it runs itself.
 
 `review.md` is the package's reviewer (`packages/agent-workflows/workflows/review.md`) moved onto
 Claude, with the paragraph saying which commands it may run; `review.schema.json` is the package's.

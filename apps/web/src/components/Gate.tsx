@@ -247,8 +247,9 @@ function useApprove(runId: string, step: string, onApproved: () => void) {
     mutationFn: (how: { message?: string }) => approveStep(runId, step, how),
     onSuccess: () => {
       onApproved();
-      // The run as the api has it now: the step's approval under it, and the step waiting on nobody.
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+      // The run as the api has it now: the step's approval under it, and the step waiting on nobody. Its record alone (`exact`): a decision
+      // is keyed by the state it was read for, and refetching the key the page is on would fill it with the answer for the state after this.
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },
   });
 }

@@ -33,8 +33,9 @@ export function PromptBox({ runId, step, sayable, onSaid }: Props) {
       // Emptied only if it still holds what was sent: what a person wrote while the words were being said is kept.
       setText((now) => textAfterSaid(now, words));
       onSaid(said);
-      // The run as the api has it now: what was said to the step, and its note.
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+      // The run as the api has it now: what was said to the step, and its note. Its record alone (`exact`): nothing said to a session
+      // changes what there is to decide, and a decision is keyed by the state it was read for.
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },
   });
   const closed = !sayable.open;

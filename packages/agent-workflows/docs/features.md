@@ -2858,7 +2858,10 @@ What the board does with it, six commits — §8's apps half, the run after this
   own: beside Approve and Send back, the panel shows what it would act on — each result branch's standing and diff stat, then each step it
   waits on with the closeout it handed on, rendered, and the files it named. And its Send back goes to the work, since `wf retry <run>
   <the ending>` is refused: the button asks for a try of the steps `sendBackTo` names, and where an ending waits on several a person picks
-  which. A gate on a step that has run is unchanged, to the markup.
+  which. A gate on a step that has run is unchanged, to the markup. Found by the panel: **a write invalidated the decision key the page was
+  on**, and the refetch filled that key — which stands for the state the decision was read for (`decisionStamp`) — with the answer for the
+  state after the write. A run whose state then went back to one already read showed a blank Decide section and a panel still reading, until
+  a reload. A write now invalidates the run's record alone (`exact`), which is the key that means "the run as it is".
 - **The e2e's seed gains three runs** (`ENDING`, `SHIPPED`, `UNMERGED` in `apps/web/test/e2e/seed.ts`), with real branches in FAKE's
   repository: one at its ending's gate, two commits ahead of main; one whose ending was approved, ran and merged, which leaves nothing to
   decide; and one finished run whose branch nobody took, which is the git kind. A `decide` page reads the banner and the panel, sends the

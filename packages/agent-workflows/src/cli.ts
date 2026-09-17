@@ -772,7 +772,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // whether among them are the files an agent reads as instructions or those that decide what its
       // check means. Then the lesson — CLAUDE.md's "When you miss", held to — and those check files in
       // full, because a check that passed says nothing about a check that was changed to pass.
-      const touched = branchesToRead(decision.branches, namesInOrder(run, steps).map((name) => run.steps[name]!.branch))
+      // Never the run's own base branch on a run that cut worktrees: a step that recorded it worked in the repository's checkout, and
+      // what that branch holds against the run's frozen base is every other run's merge since, not this run's work (`branchesToRead`).
+      const touched = branchesToRead(decision.branches, namesInOrder(run, steps).map((name) => run.steps[name]!.branch), run.isolate ? run.branch : undefined)
         .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
       if (touched.length) {
         console.log();

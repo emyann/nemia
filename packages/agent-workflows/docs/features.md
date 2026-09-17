@@ -2913,6 +2913,15 @@ What was built, four commits:
   as somebody keeps answering would have added one journal read per answer to every pass, every four seconds, for ever. So `advance`
   asks for them only while a cap is in force (`underBudget`, read off the record with nothing asked of the engine), and a screen still
   reads them all — `wf decide` prints what a run cost and its timeline over every try. Found by the review, round 2.
+- **What `wf decide` reads of a run whose work is not on a branch.** The screen reads the run's result branches, or — when no terminal
+  step has one — every branch a step worked on. A workflow of one step in the repository's own checkout has neither: `resultSteps` is
+  empty, and the branch its step recorded is the base branch itself. So the screen diffed the run's frozen base against a branch every
+  other run's merge moves, and printed it as this run's work — the radius, a `lesson` line crediting it with what somebody else wrote,
+  and the whole diff of every check-affecting file merged since — above the question the person opened the screen to answer. It grows
+  with each merge; on day one it reads `nothing`, which is how this section first recorded it. `branchesToRead` now takes the base
+  branch of a run that cut worktrees and drops it from that fallback, as `tipBranches` already refuses it: such a run's work is never
+  on it. A run that worked on its base branch itself (`--no-worktree`) gives none, since there that branch is exactly where its work
+  is. Found by the review, round 3.
 - **The README's section** — what the supervisor is, how to start it, how to answer it — beside the two bullets the key needed: the
   keys' closed list, and the cap's own section. With, from round 2: what a supervisor costs in sessions (`WF_MAX_CONCURRENT` is 2
   unless set, per harness pool, and a session that is watching is a session at work — so at the default it leaves one slot for the work
@@ -2927,7 +2936,7 @@ What was measured:
   — blocked, answered, blocked again, five times over, each try resuming the session before it and carrying `## Your answer` — and
   probed by hand to twelve, which files the twelfth as it files the second. What a step with `output:` would hit is not a cap but its
   own schema: it would have to declare its fields on every one of those sign-offs. The supervisor declares none.
-- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 586 (585 passed, 1 skipped), from
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 587 (586 passed, 1 skipped), from
   575. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged — no test was added outside the package, and the two
   pinned `spec()` fixtures in the api's tests each gained a `slot: null` row, which is the fourth and fifth obligation a new key has
   outside the package beside CLAUDE.md's three. `npm run typecheck` clean in all four.
@@ -2943,6 +2952,12 @@ What was measured:
   switched (1), the empty fence back (1). Each failed.
 - The screens were printed and read on a supervisor run that had asked its first question: `wf ls` says `supervise succeeded · BLOCKED`
   and `→ waiting on you: supervise`; `wf decide` prints the brief, the `needs` and the `wf retry --message` that answers it.
+- **The screen of a run whose one step works in the checkout** (round 3, `decide.test.ts`, on a real repository): the base advanced by
+  another run's merge — a test and a CLAUDE.md, which `touchedBy` reads as two changes — and the screen shows no `touched`, no `lesson`
+  and no check-affecting diff, with the closeout, the `needs` and the `wf retry` that answers it where they were. Beside it, a
+  `--no-worktree` run on the same fallback — its implement failed, so no terminal step has a branch — still reads `touched main` with
+  its radius. Broken three ways: the base read as the work (the old behaviour), the rule ignored in `branchesToRead`, and the base
+  dropped for every run rather than one with worktrees. Each failed.
 - **What a pass reads, counted** (round 2, `supervisor.test.ts`, over a board that records every `view`): one read, the try the step is
   on, after one answer and again after six — the same number, so it does not grow with the answers. With a cap in force the pass reads
   every try, and two tries of $0.60 against `budget: 1` still read `over budget $1.20 of $1`. Both directions were broken on purpose:
@@ -2962,8 +2977,6 @@ What it leaves:
 - **`--no-worktree` is refused for it**, because its step says `workspace: main` and `stepsToStart` reads that as a folder that merges.
   The words are about merging, which this folder does not do; the default start is what it wants, and the run's worktree costs nothing
   since its one step works in the checkout.
-- **`wf decide` on a supervisor run says `touched master — nothing`**: the run has no result branch, so what it reports against the base
-  is the base. Honest, and not useful.
 - **A screen of a long-lived run still reads every try.** `wf decide` prints what the run cost and its timeline over all of them, and
   the api reads the whole engine board for the Factory, so at five hundred answers those are five hundred reads — of a person's
   command, and of a poll that was already reading the board. The record's `tries` array grows with them too, and the pass rewrites it.

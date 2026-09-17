@@ -23,7 +23,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Observed, Sighting, Usage } from './domain.ts';
 import {
-  checkoutMcpConfig, claudeMcpArgs, claudeRefuses, claudeTranscriptEvents, claudeTranscriptFile, isoTime, readTranscript, RunnerError,
+  CLAUDE_POOL, checkoutMcpConfig, claudeMcpArgs, claudeRefuses, claudeTranscriptEvents, claudeTranscriptFile, isoTime, readTranscript, RunnerError,
   worktreeName, writeMcpConfig, type McpServer, type RunnerOps, type SpawnRequest, type TranscriptEvent,
 } from './runner.ts';
 
@@ -51,6 +51,12 @@ export type HarnessSpec = {
    * without one is asked nothing.
    */
   refuses?: (task: Omit<SpawnRequest, 'name'>) => string | undefined;
+  /**
+   * The pool this harness's sessions are counted in under the concurrency ceiling: what one rate limit covers, a
+   * subscription. Harnesses that name the same pool share one ceiling. Absent: the name the harness is configured
+   * under, a pool of its own.
+   */
+  pool?: string;
   /**
    * What the harness says in its own output, for one that prints its final answer rather than
    * writing it where the runner chose. Handed the worker's capture of the harness's stdout and
@@ -727,4 +733,6 @@ export const claudeDetached: HarnessSpec = {
     return found ? { checkoutMcpConfig: found } : {};
   },
   refuses: claudeRefuses,
+  // Claude Code, as `claude --bg` is: one subscription, one ceiling, whatever either harness is called.
+  pool: CLAUDE_POOL,
 };

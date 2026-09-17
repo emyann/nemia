@@ -29,11 +29,11 @@ Definition of done — a closed list, and it is closed:
 - [x] any harness, chosen per task (`claude`, `codex`, `claude-detached`)
 - [x] attempts, stop, logs — as text, and as the conversation to follow (`transcript`)
 - [x] a person's words into a session while it runs, on the record (`say`)
-- [x] concurrency ceiling, per harness — two subscriptions are two pools
+- [x] concurrency ceiling, per pool — one subscription is one pool, however many harnesses run on it
 - [x] the feed — a cursored stream of everything that happened
 - [x] resume — an attempt continues the one before it, by policy
-- [x] deadline — wall clock across attempts; also the only thing that frees a slot a `blocked`
-      session would hold forever
+- [x] deadline — wall clock across attempts; also the only thing that ends a `blocked` session,
+      which waits on a person forever — and holds no slot while it waits
 - [x] isolation — `--worktree`, declared per task, cut by the harness
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
@@ -199,7 +199,8 @@ price of running more than one harness. It is a handful of lines, because the en
 journal and a seam.
 
 **Adding a harness is a value, not code** — `HarnessSpec` is a command, an optional regex, and
-optionally the words it refuses, a reader of what it prints, and where it keeps its conversation:
+optionally the words it refuses, a reader of what it prints, where it keeps its conversation, and
+the pool it is counted in under the ceiling:
 
 ```ts
 export const codex: HarnessSpec = {
@@ -859,9 +860,12 @@ a loop of twenty reads each against that machine's board (236 tasks), before and
 | `view` of a running task | 323 ms | about the same: it observes |
 | `list()` | 339 ms | about the same: it observes |
 
-So the open stream on a running step makes one `claude agents` call a second, not two, and a list of runs asks the
-registry only for the steps still running. `find` itself took about 2 ms to find a session and 6 ms to find none among
-the 21 registrations there.
+So the open stream on a running step makes one `claude agents` call a second, not two, and a list of runs asks
+`claude agents` only for the Claude Code steps still running. Every read asks the task's own harness and no other —
+`view` as `transcript` and `logs` do — so a view of a `check` or a Codex task, whose harnesses cannot `find`, observes
+that harness's run files and never runs `claude agents`. Until plan §6 item 27 such a view observed every harness, and
+so cost a `claude agents` call and a Codex listing on every read, settled or not. `find` itself took about 2 ms to find
+a session and 6 ms to find none among the 21 registrations there.
 
 **A registration outlives its process** — 18 of those 21 had none — so one is taken only when it is a file this user
 owns, named for the pid it holds, of a `bg` session (an interactive one is never the engine's); a process this user may
@@ -872,8 +876,9 @@ not made. A registration refused, or not there, refuses nothing: the read observ
 **Where a registration and the registry disagree, every read that observes takes the registry's word** — a view's phase
 and session, `say`, and the pass, which never uses `find`. `transcript` of an attempt in flight is the one read that
 takes a registration's, and only for which session to read: every live registration on that machine named the session
-`claude agents` listed for its pid, under the same name. A `PromiseRunner` without `find` is observed as it always was
-(`test/find.test.ts`).
+`claude agents` listed for its pid, under the same name. A `PromiseRunner` without `find` is observed as it always was,
+on its own and no other harness; a task whose harness the engine no longer has is viewed on the fallback, where its
+`logs` are read (`test/find.test.ts`).
 
 ## Letting a sandboxed Codex step commit
 
@@ -988,7 +993,7 @@ selector, and it is why no attempt can ever run twice.
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
-| `test/engine.test.ts` | the crash cases, the ceiling, the fields carried, against a fake harness |
+| `test/engine.test.ts` | the crash cases, the ceiling and what it counts, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
 | `test/unsigned.test.ts` | a session gone quiet without the closing statement its task asked for: unsigned, continued with a nudge, then failed saying why; quiet with none asked for still succeeds — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
@@ -997,12 +1002,13 @@ selector, and it is why no attempt can ever run twice.
 | `test/facade.test.ts` | the Promise API, and every refusal at `file()` at shipped defaults |
 | `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
 | `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `budget` and settles its task, with attempts left; the flag reaches both Claude runners on every attempt |
+| `test/pool.test.ts` | pools by subscription, at shipped defaults — fake `claude` and `codex` whose sessions run until the test lets them go: a `claude-detached` session counted against `claude`'s ceiling, `codex` and a `check` each in their own |
 | `test/journal.test.ts` | the store and the feed's cursor |
 | `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2 |
 | `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
-| `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree |
+| `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/readme.test.ts` | this file, held to the code |
 | `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, and a `--bg` session spending past one, its cost read once let go, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
@@ -1057,8 +1063,17 @@ The cursor is a byte offset into `feed.jsonl` and never expires: a consumer that
 week replays rather than being told to start over.
 
 `AE_ROOT` points at a different board, the way a kubeconfig points at a different cluster.
-`AE_MAX_CONCURRENT` (default 3) is how many sessions of **each** harness may run at once — the
-ceiling is per harness because your rate limits are. Admission is serial within a pass, so the
+`AE_MAX_CONCURRENT` (default 3) is how many sessions may be at work at once in **each pool** — the
+ceiling is per pool because your rate limits are, and a rate limit is a subscription's, however many harnesses
+run on it. A harness declares the pool it is counted in — `pool` on a `HarnessSpec` or a `PromiseRunner` — and
+is a pool of its own, under its own name, when it declares none. `claude` and `claude-detached` both run Claude
+Code on one subscription, so the engine counts both in `claude`'s pool without being told: a ceiling of 2 is
+two Claude Code sessions, not four. `codex` keeps its own, and so does a harness you add, such as
+agent-workflows' `check`, unless it names another. Only a session at work is counted: a `blocked` one is
+not. A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the
+ceiling exists for — reasoning, not a measurement. It is counted again on the pass after it moves again, so
+blocked sessions that all move at once can put a board past its ceiling for a while; nothing is stopped for
+that, and nothing more is admitted until the count is back under. Admission is serial within a pass, so the
 count is true rather than approximately true:
 
 ```

@@ -16,7 +16,7 @@ import os from 'node:os';
 import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  claudeBgRefuses, claudeOps, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
+  CLAUDE_POOL, claudeBgRefuses, claudeOps, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
   type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
@@ -76,6 +76,12 @@ export type PromiseRunner = {
    * did not, and nothing is journalled. Without it, `say` refuses this harness's tasks.
    */
   say?(session: { name: string; sessionId: string }, text: string): Promise<void>;
+  /**
+   * Optional. The pool this harness's sessions are counted in under the concurrency ceiling: what one rate limit covers,
+   * a subscription. Harnesses that name the same pool share one ceiling — a runner that drives Claude Code says `claude`.
+   * Absent: the name the harness is configured under, a pool of its own.
+   */
+  pool?: string;
 };
 
 /**
@@ -83,6 +89,9 @@ export type PromiseRunner = {
  *   `'claude-bg'`   Claude Code's own background sessions — it keeps the registry
  *   a `HarnessSpec` any CLI that runs a prompt and exits — we keep the registry
  *   a `PromiseRunner` anything else at all
+ *
+ * Each is counted in a pool under the ceiling: `'claude-bg'` in Claude Code's, `claude`, as the engine's `claudeDetached`
+ * is, whatever either is called; any other in the `pool` it names, or in its own name's.
  */
 export type HarnessConfig = 'claude-bg' | HarnessSpec | PromiseRunner;
 
@@ -92,7 +101,11 @@ export type EngineOptions = {
   journal?: PromiseJournal;
   harnesses?: Record<string, HarnessConfig>;
   defaultHarness?: string;
-  /** Sessions of EACH harness that may run at once. Your rate limit, mostly. */
+  /**
+   * Sessions that may be at work at once in EACH pool — `claude`, which both of the engine's Claude Code harnesses are
+   * counted in, and each other harness's own unless it names one (`pool`). Your rate limit, mostly. A `blocked` session
+   * is not counted: it makes no API calls.
+   */
   maxConcurrent?: number;
 };
 
@@ -159,6 +172,7 @@ export type TaskSpec = {
   id?: string;
 };
 
+/** One pass: how many tasks it read, how many actions it took, and the sessions at work in each pool as it left them. */
 export type TickReport = { tasks: number; actions: number; running: Record<string, number> };
 
 export type Engine = {
@@ -183,6 +197,7 @@ export type Engine = {
    * registry has that. Any other task is read off its record — its phase is there, and so is its session's id once an
    * attempt has ended — and the registry is not asked. A session whose id the record lacks is found by name when its
    * harness can `find` one, and observed when it cannot or finds none; a harness without `find` is observed as ever.
+   * Whatever is observed is observed on the task's own harness — the one `logs` and `transcript` ask — and no other.
    * `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
   view(taskId: string): Promise<TaskView>;
@@ -298,6 +313,13 @@ const runnersOf = (harnesses: Record<string, HarnessConfig>, root: string): Reco
         },
   ]));
 
+/**
+ * The pool each configured harness is counted in under the ceiling: Claude Code's for `'claude-bg'` — the pool the
+ * engine's `claudeDetached` names — whatever it is configured as; the one a spec or a runner names; or its own name.
+ */
+const poolsOf = (harnesses: Record<string, HarnessConfig>): Record<string, string> =>
+  Object.fromEntries(Object.entries(harnesses).map(([name, h]) => [name, h === 'claude-bg' ? CLAUDE_POOL : h.pool ?? name]));
+
 /** A Promise the consumer wrote becomes an Effect with the engine's error type on it. */
 const wrap = <A, E>(f: () => Promise<A>, onError: (message: string) => E) =>
   Effect.tryPromise({ try: f, catch: (cause) => onError(cause instanceof Error ? cause.message : String(cause)) });
@@ -377,6 +399,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
   // Kept beside the Layer so `watch` can use an optional `subscribe` when the store has one.
   const journalOps = options.journal ? undefined : Journal.filesOps(root);
   const runners = runnersOf(harnesses, root);
+  const pools = poolsOf(harnesses);
   const layer = Layer.mergeAll(
     options.journal ? journalOf(options.journal) : Journal.layer(journalOps!),
     Runner.layer(composite(runners, fallback)),
@@ -399,12 +422,19 @@ export function createEngine(options: EngineOptions = {}): Engine {
    * a detached runner's handle for a session is not the id on the record. Otherwise the record holds the phase and,
    * once an attempt has ended, its session's id, which a registry could only confirm. A session whose id the record
    * lacks — a task settled with its attempt open, before `settled` carried one — is found by name, or observed.
+   *
+   * Observed on the task's own harness alone, as `transcript` and `logs` reach it: no other registry can name its
+   * session, and asking every one made a view of a `check` or a Codex task a `claude agents` call. A registry that
+   * cannot be read this time is nothing observed, as `composite` reads it for a pass.
    */
   const viewOf = (taskId: string) => Effect.gen(function* () {
-    const observed = Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => view(taskId, o)));
     const state = fold(taskId, yield* Effect.flatMap(Journal, (j) => j.read(taskId)));
     const last = state.attempts.at(-1);
-    const { find } = runners[harnessOf(state)]!;
+    const { find, observe } = runners[harnessOf(state)]!;
+    const observed = observe.pipe(
+      Effect.catchCause(() => Effect.succeed(new Map<string, Sighting>())),
+      Effect.flatMap((o) => view(taskId, o)),
+    );
     if (!find || (!state.settled && last?.ended === null)) return yield* observed;
     if (!last || last.nativeId) return yield* view(taskId, new Map());
     const found = yield* find(nameFor(taskId, last.n)).pipe(Effect.catchCause(() => Effect.succeed(undefined)));
@@ -421,7 +451,7 @@ export function createEngine(options: EngineOptions = {}): Engine {
       if (refused) throw Object.assign(new Error(`file: ${refused}`), { exitCode: 2 });
       return go(file(task));
     },
-    tick: () => go(tick(max)),
+    tick: () => go(tick(max, pools)),
     view: (taskId) => go(viewOf(taskId)),
     list: () => go(Effect.gen(function* () {
       const observed = yield* (yield* Runner).observe;

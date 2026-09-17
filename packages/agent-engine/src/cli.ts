@@ -245,7 +245,8 @@ const HELP = `ae — an engine for agent sessions
   a key not listed here, or a value the harness cannot take, is refused (exit 2)
 
   AE_ROOT            a different board, the way a kubeconfig points at a different cluster
-  AE_MAX_CONCURRENT  sessions per harness at once (default 3)`;
+  AE_MAX_CONCURRENT  sessions at work at once per pool: claude and claude-detached
+                     share one, codex has its own (default 3)`;
 
 export async function main(argv: string[]): Promise<void> {
   const [verb, arg] = argv;

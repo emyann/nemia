@@ -249,3 +249,44 @@ test("a PromiseRunner without find is observed as before; one with find is asked
     assert.equal(h.counts.find.length, withFind ? 1 : 0, `${at}: its id is on the record, and nobody is asked for it`);
   }
 });
+
+test("a view asks its task's own harness and no other — and a task whose harness the engine no longer has is viewed on the fallback, as its logs are", async () => {
+  /** A harness that cannot `find`, as a `check` or Codex cannot, and counts every observe. */
+  const harness = (label: string) => {
+    const sessions = new Map<string, Sighting>();
+    const counts = { observe: 0 };
+    const runner = {
+      async spawn(r: { name: string }) { const s = `${label}-${sessions.size + 1}`; sessions.set(r.name, { sessionId: s, state: 'working', nativeId: s }); },
+      async observe() { counts.observe++; return new Map(sessions); },
+      async stop() {},
+      async logs(sessionId: string) { return `${label} logs of ${sessionId}`; },
+    };
+    return { sessions, counts, runner };
+  };
+  const a = harness('a');
+  const b = harness('b');
+  const root = tmp('root');
+  const engine = createEngine({ root, harnesses: { a: a.runner, b: b.runner } });
+  const running = await engine.file({ brief: 'runs on b', cwd: tmp('cwd'), harness: 'b', id: 'running' });
+  const settled = await engine.file({ brief: 'ends on b', cwd: tmp('cwd'), harness: 'b', id: 'settled' });
+  await engine.tick();
+  b.sessions.set(`ae/${settled}/1`, { ...b.sessions.get(`ae/${settled}/1`)!, state: 'done' });
+  await engine.tick();
+
+  const before = { a: a.counts.observe, b: b.counts.observe };
+  assert.equal((await engine.view(running)).phase, 'running (working)', 'an attempt in flight, observed');
+  assert.equal((await engine.view(settled)).phase, 'succeeded', 'a settled task on a harness that cannot find');
+  assert.equal(await engine.logs(running), 'b logs of b-1');
+  assert.equal(a.counts.observe, before.a, "no view of a task on b asks a's registry");
+  assert.equal(b.counts.observe, before.b + 3, "each asks b's, once");
+
+  // The same board, without b. `harnessOf` falls back to `defaultHarness`, not to the first harness named.
+  const c = harness('c');
+  for (const [name, s] of b.sessions) c.sessions.set(name, s);
+  const reopened = createEngine({ root, harnesses: { a: a.runner, c: c.runner }, defaultHarness: 'c' });
+  const at = { a: a.counts.observe, c: c.counts.observe };
+  assert.equal((await reopened.view(running)).phase, 'running (working)', "viewed on the fallback's registry");
+  assert.equal(await reopened.logs(running), 'c logs of b-1', 'where its logs are read');
+  assert.equal(a.counts.observe, at.a, 'never on the first harness named');
+  assert.equal(c.counts.observe, at.c + 2);
+});

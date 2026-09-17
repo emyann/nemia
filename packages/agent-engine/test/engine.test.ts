@@ -7,18 +7,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect, Layer } from 'effect';
-import { Journal } from '../src/journal.ts';
+import { Journal, type FeedEntry } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
 import { file, GRACE_MS, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
 import { decide, fold, nameFor, type Event, type Observed, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 
 /** One board: a journal and a fake harness whose session states a test moves by hand. */
-const board = () => {
+const board = (journal = Journal.test()) => {
   const sessions = new Map<string, Sighting>();
   /** Every spawn the engine asked for, so a test can assert what the harness was TOLD. */
   const spawned: SpawnRequest[] = [];
-  const journal = Journal.test();
   // The layers are values, so "restarting the engine" is just running a new program against the
   // same two — which is exactly what a new process would see.
   const layer = Layer.mergeAll(journal, Runner.test({ sessions, spawned }));
@@ -424,12 +423,36 @@ test('tasks are admitted oldest filing first, pass after pass — a time with or
   assert.deepEqual(await admitted(b, 3), ['b', 'c', 'a']);
 });
 
-test('two tasks filed at the same instant are admitted in the order of their ids', async () => {
-  const b = board();
-  await fileAt(b, 'b', '2026-09-16T10:00:00.000Z');
-  await fileAt(b, 'a', '2026-09-16T10:00:00.000Z');
-  await fileAt(b, 'c', '2026-09-16T09:59:59.000Z');
-  assert.deepEqual(await admitted(b, 3), ['c', 'a', 'b'], 'the time first, and the id only between equal times');
+/**
+ * A store like `Journal.test()`, listing its tasks in the order `order` gives rather than sorted.
+ *
+ * A pass sorts what `list` answers, and a sort is stable, so through a listing that is already sorted a tie
+ * broken by id and a tie broken by nothing at all give the same answer: the test below passed with
+ * `admissionOrder`'s id comparison taken out. Listed in reverse, the two differ.
+ */
+const journalListing = (order: (ids: string[]) => string[]) => {
+  const store = new Map<string, Event[]>();
+  const feed: FeedEntry[] = [];
+  return Journal.layer({
+    append: (taskId, event) => Effect.sync(() => {
+      store.set(taskId, [...(store.get(taskId) ?? []), event]);
+      feed.push({ taskId, event });
+    }),
+    read: (taskId) => Effect.sync(() => [...(store.get(taskId) ?? [])]),
+    list: Effect.sync(() => order([...store.keys()])),
+    feed: (after) => Effect.sync(() => ({ entries: feed.slice(after), cursor: feed.length })),
+  });
+};
+
+test('two tasks filed at the same instant are admitted in the order of their ids, whichever order the store lists them in', async () => {
+  const sorted = (ids: string[]) => [...ids].sort();
+  for (const [listing, order] of [['sorted', sorted], ['reversed', (ids: string[]) => sorted(ids).reverse()]] as const) {
+    const b = board(journalListing(order));
+    await fileAt(b, 'b', '2026-09-16T10:00:00.000Z');
+    await fileAt(b, 'a', '2026-09-16T10:00:00.000Z');
+    await fileAt(b, 'c', '2026-09-16T09:59:59.000Z');
+    assert.deepEqual(await admitted(b, 3), ['c', 'a', 'b'], `the time first, and the id only between equal times — listed ${listing}`);
+  }
 });
 
 test('a higher priority is admitted before an older, lower one — and the priority reaches no harness', async () => {

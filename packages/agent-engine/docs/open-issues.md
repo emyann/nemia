@@ -295,6 +295,11 @@ tasks took a free slot was the alphabet of their ids. `test/engine.test.ts` make
 earlier one, drains three tasks at a ceiling of one in filing order, and breaks a tie by id; `test/facade.test.ts` does
 the first with the times `file()` writes.
 
+**The tiebreak is proven from 2026-09-17.** The equal-times test ran against a store whose `list` sorts, and a sort is
+stable, so it passed with the id comparison taken out of `admissionOrder` — it was reading the store's order, not the
+rule's. It now runs twice, over a store that lists sorted and one that lists in reverse (`journalListing` in
+`test/engine.test.ts`), and fails without the comparison.
+
 **What is left.**
 
 - **Filing order does not give a run its momentum.** A run's next step is filed a check and a pass after its last ended,

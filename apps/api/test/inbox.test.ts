@@ -19,8 +19,9 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { addToInbox, fromNote, inboxDir, inboxNameRefusal, noCardLine, readRun, startFromInbox } = await import('agent-workflows');
+const { addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, inboxNameRefusal, noCardLine, readRun, startFromInbox } = await import('agent-workflows');
 type InboxEntry = import('../src/inbox.ts').InboxEntry;
+type InboxCardPage = import('../src/inbox.ts').InboxCardPage;
 
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -134,6 +135,71 @@ test('GET /api/inbox lists an entry that does not read as a card with its refusa
   // Dropped at the command line: gone on the next request.
   fs.rmSync(path.join(inbox, 'broken.md'));
   assert.equal((await listed()).some((e) => e.name === 'broken'), false);
+});
+
+/** The inbox folder as it is: each file's name and text, to show a read wrote nothing. */
+const inboxFiles = (): Array<[string, string]> => cards().map((name) => [name, fs.readFileSync(path.join(inbox, name), 'utf8')]);
+const cardPage = (name: string) => app.request(`/api/inbox/${name}`);
+
+test("GET /api/inbox/:name is a card's page: the card as the inbox lists it, its file as written, and each key a card may set with its value and the package's line of what it means", async () => {
+  clear();
+  const text = `---\nworkflow: dev\nrepo: ${repo}\n---\n# Cache the views\n\n- between passes\n- per task\n`;
+  write(path.join(inbox, 'cache-the-views-k2q9.md'), text);
+  write(path.join(inbox, 'bare-idea-a1b2.md'), 'A bare idea\n');
+  const before = inboxFiles();
+
+  const res = await cardPage('cache-the-views-k2q9');
+  assert.equal(res.status, 200, await res.clone().text());
+  const page: InboxCardPage = await res.json();
+  const listedAs = (await listed()).find((e) => e.name === 'cache-the-views-k2q9')!;
+  assert.deepEqual({ ...page, source: undefined, keys: undefined }, { ...listedAs, source: undefined, keys: undefined }, 'the card as GET /api/inbox lists it');
+  assert.equal(page.body, '# Cache the views\n\n- between passes\n- per task');
+  assert.equal(page.source, text, 'the file byte for byte, frontmatter included');
+  assert.deepEqual(page.keys, [
+    { key: 'workflow', value: 'dev', meaning: INBOX_KEY_MEANINGS.workflow },
+    { key: 'repo', value: repo, meaning: INBOX_KEY_MEANINGS.repo },
+  ]);
+
+  // A card that sets no key: every key, none set.
+  const bare: InboxCardPage = await (await cardPage('bare-idea-a1b2')).json();
+  assert.deepEqual([bare.body, bare.source], ['A bare idea', 'A bare idea\n']);
+  assert.deepEqual(bare.keys, [
+    { key: 'workflow', value: null, meaning: INBOX_KEY_MEANINGS.workflow },
+    { key: 'repo', value: null, meaning: INBOX_KEY_MEANINGS.repo },
+  ]);
+
+  // An entry that does not read as a card: its refusal and its file, and no keys to lay out.
+  write(path.join(inbox, 'broken.md'), '---\ncolour: red\n---\nPaint it.\n');
+  const broken: InboxCardPage = await (await cardPage('broken')).json();
+  assert.match(broken.error!, /^broken\.md: `colour` is not a key an inbox card has/);
+  assert.deepEqual([broken.body, broken.source, broken.keys], [null, '---\ncolour: red\n---\nPaint it.\n', null]);
+
+  fs.rmSync(path.join(inbox, 'broken.md'));
+  assert.deepEqual(inboxFiles(), before, 'read, and nothing written');
+});
+
+test("REFUSED at shipped defaults: a card's page for a name that is not a card's is a 400, and for a card that is not there a 404, each in the package's words — and nothing is read outside the inbox or written", async () => {
+  clear();
+  const { card } = addToInbox({ text: 'Keep this one' });
+  write(path.join(root, 'runs', 'r-1.json'), '{"id":"r-1"}');
+  const before = inboxFiles();
+
+  for (const [sent, name] of [['.hidden', '.hidden'], ['..%2Fruns%2Fr-1', '../runs/r-1'], ['a%2Fb', 'a/b'], ['a%5Cb', 'a\\b']] as const) {
+    const res = await cardPage(sent);
+    assert.equal(res.status, 400, sent);
+    const { error } = await res.json();
+    assert.equal(error, inboxNameRefusal(name), sent);
+    assert.ok(!JSON.stringify(error).includes('"id":"r-1"'), `${sent}: nothing of the file it names`);
+  }
+  const missing = await cardPage('no-such-card');
+  assert.equal(missing.status, 404);
+  assert.equal((await missing.json()).error, noCardLine('no-such-card', [card.name]));
+  const withMd = await cardPage(`${card.name}.md`);
+  assert.equal(withMd.status, 404);
+  assert.equal((await withMd.json()).error, noCardLine(`${card.name}.md`, [card.name]), 'a card is named without its .md, and the sentence says so');
+
+  assert.deepEqual(inboxFiles(), before);
+  fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
 });
 
 test('REFUSED at shipped defaults: a filing of the wrong shape is a 400 in the api\'s words, a workflow nobody has a 404, one both have a 409 — before anything is written', async () => {

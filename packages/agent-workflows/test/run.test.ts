@@ -292,6 +292,36 @@ test("an ending step is told where the work is — the branches, not the workspa
   assert.doesNotMatch(brief, /This workspace has already been worked in by/, 'the work is not here');
 });
 
+test("a step in the checkout whose run cut no branch — the whole workflow is that step — is told so, and is given no empty fence to read", () => {
+  const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'main', slot: 'none' };
+  const r = run({ supervise: 't1' }, { steps: { supervise: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
+  const brief = composeBrief(watcher, r, [watcher], () => undefined, FILES);
+  assert.match(brief, /You are in \/repo, the repository's own checkout, on main — not in a worktree of this run's\./);
+  assert.match(brief, /This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read/);
+  assert.doesNotMatch(brief, /result branch/);
+  assert.doesNotMatch(brief, /```\n```/, 'no fence with nothing in it');
+  assert.match(brief, /the run commits nothing here for you/);
+});
+
+test("a step in the checkout is told the one place its files go: the run hands nothing off there, so nothing it leaves is collected or committed", () => {
+  const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'main', gate: true };
+  const dev = [step('implement'), step('review', ['implement']), ending];
+  const r = run({ implement: 't1', review: 't2', ship: null }, {
+    steps: { implement: { taskId: 't1', workspace: '/wt/implement', branch: 'wf/r-1/implement' }, review: { taskId: 't2', workspace: '/wt/implement', branch: 'wf/r-1/implement' }, ship: { taskId: null } },
+  });
+  const brief = composeBrief(ending, r, dev, () => undefined, FILES);
+  assert.match(brief, /\n## Files for the person who decides\n/);
+  assert.doesNotMatch(brief, /## Files for the steps after you/, 'nothing follows it, and this is not a workspace it hands off');
+  assert.doesNotMatch(brief, /Or leave it in this workspace/, 'the second way is false here: it would be left in a person\'s checkout for ever');
+  assert.doesNotMatch(brief, /WF_ARTIFACTS/, 'and `workspace: main` refuses a check, so there is none to be given it');
+  assert.ok(brief.includes(FILES), 'the directory the run made, by absolute path');
+  assert.match(artifactsContract(FILES, true), /a file you leave here is\nnot collected and not committed/);
+  assert.match(artifactsContract(FILES, true), /`wf decide` reads a path named from\nthe workspace root as `not collected`/);
+  // Every other step is told both ways, as it was.
+  assert.match(composeBrief(dev[1]!, r, dev, () => undefined, FILES), /\n## Files for the steps after you\n/);
+  assert.match(artifactsContract(FILES), /Or leave it in this workspace/);
+});
+
 test('a fan-in step is told it is holding merged work, and that conflicts are its job', () => {
   const merge: Workflow = { name: 'integrate', after: ['a', 'b'], body: 'combine them' };
   const brief = composeBrief(merge, run({ a: 't1', b: 't2', integrate: null }), [step('a'), step('b'), merge]);

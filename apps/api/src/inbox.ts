@@ -285,6 +285,10 @@ export const inbox = new Hono()
 /**
  * A queue, or its taking back: the guard, then the name in the package's words (400) and the body (400), before the card is read; then
  * `queueInInbox`, whose refusals are its sentences with the status of what is on disk (`queueRefusalStatus`).
+ *
+ * The card's file keeps the time it was last written. The package writes a queued card whole, through a hidden file renamed over it, so its
+ * mtime would become the time of the queue — and the mtime is `filedAt`, what the Inbox page orders the cards by: a card queued or taken back
+ * would jump to the top of the list and show the queue's time as its own. A queue is not an edit of the idea, so the time is set back.
  */
 async function queueRoute(c: Context, off: boolean) {
   const name = c.req.param('name')!;
@@ -295,8 +299,17 @@ async function queueRoute(c: Context, off: boolean) {
   if (wrong) return c.json({ error: wrong }, 400);
   const shaped = queueBodyRefusal(guard.route, await c.req.text());
   if (shaped) return c.json({ error: shaped.error }, shaped.status);
+  const file = path.join(inboxDir(), `${name}.md`);
+  const filed = fs.statSync(file, { throwIfNoEntry: false })?.mtime;
   try {
     const done = queueInInbox(name, { off });
+    if (filed && done.was !== 'not queued') {
+      try {
+        fs.utimesSync(file, filed, filed);
+      } catch {
+        // The queue is written all the same: the card lists at the time of the queue, until it is written again.
+      }
+    }
     return c.json({ name: done.card.name, file: done.file, was: done.was, queued: done.card.queued ?? null, place: done.place ?? null, of: done.of ?? null } satisfies InboxQueueAnswer);
   } catch (err) {
     if ((err as { exitCode?: unknown }).exitCode !== 2) return c.json({ error: messageOf(err) }, 500);

@@ -125,6 +125,33 @@ test('POST /api/inbox/:name/queue queues a card as `wf inbox queue` does, with i
   assert.deepEqual(inboxAsIs(), before);
 });
 
+test("POST and DELETE /api/inbox/:name/queue leave a card's filing time as it was: a queue is no edit of the idea, and the Inbox page orders the cards by it", async () => {
+  clear();
+  const older = addToInbox({ text: 'Filed an hour ago', workflow: 'dev' });
+  const newer = addToInbox({ text: 'Filed a minute ago', workflow: 'dev' });
+  const [hourAgo, minuteAgo] = [new Date('2026-09-16T09:00:00.000Z'), new Date('2026-09-16T09:59:00.000Z')];
+  fs.utimesSync(older.file, hourAgo, hourAgo);
+  fs.utimesSync(newer.file, minuteAgo, minuteAgo);
+  const filedAt = async () => new Map((await listed()).map((e) => [e.name, e.filedAt]));
+  const before = await filedAt();
+  assert.deepEqual([before.get(older.card.name), before.get(newer.card.name)], [hourAgo.toISOString(), minuteAgo.toISOString()]);
+
+  const queued = await queue(older.card.name);
+  assert.equal(queued.status, 200, await queued.clone().text());
+  assert.match(cardText(older.card.name), /\nqueued: /, 'the card is queued');
+  assert.deepEqual(await filedAt(), before, 'queued, the older card keeps its filing time, and stays behind the newer one');
+
+  const off = await unqueue(older.card.name);
+  assert.equal((await off.json()).was, 'taken back');
+  assert.doesNotMatch(cardText(older.card.name), /\nqueued: /, 'the card is taken off the queue');
+  assert.deepEqual(await filedAt(), before, 'taken back, it keeps it too');
+
+  // Refused, nothing is written, and nothing is set.
+  assert.equal((await queue(newer.card.name, JSON_TYPE, '{"workflow":"dev"}')).status, 400);
+  assert.equal((await unqueue(newer.card.name)).status, 200);
+  assert.deepEqual(await filedAt(), before, 'a refusal, and a card taken off a queue it was not in, leave it as it was');
+});
+
 test("DELETE /api/inbox/:name/queue takes back a queued card whose repository is gone, as `--off` does without the check — and the listing keeps its place until then", async () => {
   clear();
   const about = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-queue-gone-'));

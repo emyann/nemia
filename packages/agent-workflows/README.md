@@ -110,7 +110,7 @@ The run's record is keyed in that order, and `wf ls`, `wf decide` and the board 
 keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf decide`; one whose order already runs forward
 reads as it was written.
 
-A step's keys are a closed list — `after`, `resume`, `input`, `harness`, `model`, `effort`,
+A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `harness`, `model`, `effort`,
 `permissionMode`, `tools`, `disallow`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`, `gate`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
@@ -122,8 +122,8 @@ The interesting decisions in this kind of work — *is this good enough*, *did i
 — are not predicates a workflow language could evaluate. They are judgements, and a judgement
 belongs to a step with an agent in it. **The workflow is a team, not a program.** The prose is the
 logic: `after` orders, `resume` continues, `check` measures, `retries` counts, `gate` waits for a person,
-`output` declares and `input` reads, `loop` is the edge back and `rounds` counts it, and the rest say who
-does the work and for how long. Whether the work goes round again is still a judgement: the looping step's own `again`
+`output` declares and `input` reads, `loop` is the edge back and `rounds` counts it, `workspace` says which
+directory a step works in, and the rest say who does the work and for how long. Whether the work goes round again is still a judgement: the looping step's own `again`
 (*Going round again*, under the check).
 
 `permissionMode` is the harness's word, checked against the harness the step runs on. On codex,
@@ -672,7 +672,7 @@ another repository and change that line.
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
 | `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
-| `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)) | **never runs** — until a person approves it: `wf approve`; or sends it back: `wf retry --message` |
+| `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)); or an ending step (`workspace: main`) whose work is done, held before it is filed ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)) | **never runs** — until a person approves it: `wf approve`; or sends the work back: `wf retry --message` |
 | `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, below |
 | `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `wf round --budget` |
 | `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (`claude-detached`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
@@ -681,6 +681,9 @@ another repository and change that line.
 
 `→ waiting on you` names every step that is blocked, unsigned, refused by its check, out of rounds, over
 budget, ended at its budget or awaiting approval — the last as `approve <step>` — and has no try or round due.
+`→ to decide` is the run's own end, said above it and never twice: the ending step's gate in the folder's words
+with the `wf approve` that runs it, or, in a folder with no ending step, the branch nobody has merged
+([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)).
 `wf decide` prints `FAILED CHECK:`, `CHECK DID NOT FINISH:`, `UNSIGNED:`, `UNVERIFIED:`, `ROUNDS EXHAUSTED`, `OVER
 BUDGET`, `BUDGET EXHAUSTED` and `AWAITING APPROVAL` first, then each check's command and exit code and, for a check
 that refused, the last 20 lines of stdout and of stderr.
@@ -1015,8 +1018,11 @@ A failed run is decided too. The first run this was pointed at had been sitting 
 `failed`, and its branch held a real fix plus a design question addressed to a person — none of
 which anything in this tool had ever shown anyone.
 
-`wf decide` is read-only. It prints the material and the exact `git merge` / `git branch -D`
-commands, and does not decide anything itself.
+`wf decide` is read-only. It reports facts and runs nothing. It ends with where each result branch stands
+against the base branch, as git says it now — `is on main`, `is ahead of main by 3 commits`, `is gone` — and
+then with what is left to decide: the folder's own ending step, if it has one, in its own prose, with the
+`wf approve` that runs it; or, in a folder with none, the exact `git merge --no-ff` and `git branch -D` a
+person types.
 
 A run started with `--no-worktree` worked on the base branch itself, where git's answer to "has it
 landed" is always yes. `wf decide` never asks it for such a run: it says the run worked directly on its
@@ -1093,6 +1099,71 @@ The three lists are globs, written once in `src/radius.ts` and printed by `wf de
 git cannot diff says it was not read, and the lesson line says it does not know. Neither reads it as a
 branch that changed nothing.
 
+## The end of a run is a step: `workspace: main`, and the ending's gate
+
+A run that finished used to go quiet. Its branch sat there, `wf decide` printed two git commands, and
+nothing counted it as anything: a card started from the Inbox finished and seemed to vanish. The fix is not a
+policy in code — what a person does with a run's product varies, and merging is only one of them — so **the
+end of a run is the last step of its workflow, in prose**, like every other step.
+
+`workflows/dev/ship.md` is one:
+
+```md
+---
+after: review
+workspace: main
+gate: true
+disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger
+---
+Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why.
+…
+```
+
+Another repository's says "open a pull request with the closeout as its body". A research workflow's last
+step is the study itself, gated, and approving it is the acceptance: nothing is merged, and nothing is
+dropped. **Nothing in the packages knows what shipping means.**
+
+- **`workspace: main`** runs the step in the repository's own checkout rather than a worktree of the run's.
+  It is the one thing a worktree cannot do: the base branch is checked out there. No worktree is cut, nothing
+  is merged into it, no `node_modules` is provisioned, and **the run commits nothing there** — what a person
+  leaves lying in their checkout is theirs, and the step commits its own work as they would. The step is told
+  where the work is instead of being told to read its workspace: the result branch, the base branch, and the
+  `git log` and `git diff` between them. Refused by name on a step with a `check:` — the run would execute it
+  in that checkout, which is a verdict on whatever is in it, not on the step's work, so an ending step runs
+  its check itself, in its prose — and, at load, on a step anything waits on or one that ends a workflow
+  beside another: a run has one ending.
+- **The gate is the decision, and it holds before the step is filed.** A gate holds what its approval decides.
+  Where steps follow, that is the handoff, and the step runs first — a person reads what it produced. An
+  ending step in the checkout produces nothing to read: it acts, where nothing can be taken back. So a gated
+  `workspace: main` step reads `awaiting approval` while it waits *unfiled*, once every step it waits on has
+  finished, and `wf approve <run> <step>` is what files it. The words given with the approval are on its brief
+  under `## Approved`: they are the terms it acts on. **Send back** there is `wf retry <run> <the work>
+  --message "<objection>"` — the work's step, since the ending has nothing of its own to object to — and it
+  un-holds the gate until the work signs off again.
+- **A run's result is the work the ending acts on**, not the ending's own branch: `resultSteps` reads the steps
+  before it, so *has it shipped*, *what did it touch* and *what is there to decide* are asked of
+  `wf/<run>/implement`, never of `main`, which would answer yes to everything.
+- **`→ to decide`**, the fifth reason a run waits on a person, beside blocked, unsigned, over budget and at a
+  gate. A run is one to decide when it is at its result and its last step's gate has nobody's approval — or,
+  in a folder with no ending step, when every step finished and a result branch is ahead of the base branch
+  and not gone. Level-triggered: the branches are read off git on the pass that asks and nothing is stored, so
+  a run whose branch a person merged by hand stops being one to decide without anybody telling the run.
+
+```text
+$ wf ls add-sub-8imz
+add-sub-8imz  add sub
+   implement      verified ✓            wf/add-sub-8imz/implement
+   review         unverified · done     wf/add-sub-8imz/implement
+   ship           awaiting approval                                 · approve it: wf approve add-sub-8imz ship — or send it back: wf retry add-sub-8imz review --message "<objection>"
+   → to decide: Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why. — wf approve add-sub-8imz ship
+   → result: wf/add-sub-8imz/implement  —  wf decide add-sub-8imz
+```
+
+**`--after` is unchanged.** A child run starts when its parent has shipped as git sees it — the result branch
+on the base branch, or nothing committed on it — which a run's `ship.md` makes true when it merges, and a run
+with no ending makes true when a person merges. A run waiting at any gate has not shipped, merged or not: the
+gate is a person's word on the record, and a merge is not that word.
+
 ## A gate: a handoff that waits for a person — `gate:`, `--gate` and `wf approve`
 
 A plan read before anyone implements it was held by prose. `dev-planned`'s plan signs off `blocked` when its brief says to wait,
@@ -1120,13 +1191,17 @@ parse-the-flag-option-in-cli-idk2  Parse the --flag option in cli.ts
 would need a runner whose session is a file that fills when someone answers, and a body nobody writes. The handoff already has
 what a gate needs — a closeout to read, and a run that files nothing until it may.
 
+- **Where the gate holds.** On a step with steps after it, the handoff: the step runs, and what follows waits for the approval. On an
+  ending step in the repository's checkout (`workspace: main`), the step itself: nothing of it is filed until a person approves it —
+  [above](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate), which is the whole of what the `dev*` folders' `ship` is.
 - **Where a gate is set.** On a step, `gate: true`, for every run of its workflow; `gate: false` and any other word are refused,
   with the fix. At start, `wf start --gate <step>`, once per step, for this run. On an inbox card, `gate: <step>`, one step, for
   the run the card starts, beside any `--gate` its start gives. The last two freeze into `gates` on the run's record, as the
   workflow does. A step named that the workflow does not have is refused at start, naming the steps it has, with nothing written —
   in the card's words for a card's gate — and so is a `--gate` given twice; `wf plan --gate` is refused by name. `dev-planned` and
-  `dev-planned-build` gate nothing: a folder decides for every run of it, and a plan that reads one way should start implement at
-  once. Say `--gate plan`, or `gate: plan` on the card, for the run that should wait.
+  `dev-planned-build` gate their plan at nothing: a folder decides for every run of it, and a plan that reads one way should start
+  implement at once. Say `--gate plan`, or `gate: plan` on the card, for the run that should wait. Their `ship` is gated, as every
+  `dev*` folder's is: the run's end is a person's every time.
 - **What it holds, on every pass.** A gated step that signs off — verified by its check first, where it has one — reads `awaiting
   approval`, and nothing after it is filed, whatever its closeout says, until an approval of the try it is on is on disk. It stops
   what follows as a step signed off `blocked` does: the run's outcome is `blocked`; `wf ls` names it waiting on you as `approve

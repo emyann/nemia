@@ -784,8 +784,8 @@ function judge(
   folder: readonly Workflow[] | null,
   views: Views,
   waits: readonly Wait[],
-  /** Where each result branch stands, asked once the run's status is known; left out, no branch is read, and a to-decide branch says nothing. */
-  standingsOf: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[] = () => [],
+  /** Where each result branch stands, asked once the run's status is known (`standingsOf`); left out, no branch is read, and a to-decide branch says nothing. */
+  readStandings: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[] = () => [],
 ): Judged {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
@@ -810,7 +810,7 @@ function judge(
   const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
   // The one thing read off git here, and only where it can decide anything: `listing` reads what is left to decide off it, on the same
   // inputs as `assess`, so the words and the judgement are the package's single reading.
-  const standings = standingsOf(status, steps);
+  const standings = readStandings(status, steps);
   const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf, undefined, standings);
   const waiting = waitingOf(run, said.waiting);
   // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed

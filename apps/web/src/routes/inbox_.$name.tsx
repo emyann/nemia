@@ -31,7 +31,7 @@ function CardPage() {
       <header className="space-y-1">
         <h1 className="font-mono text-sm text-neutral-500">{card.name}</h1>
         <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
-          <span>inbox card</span>
+          <span>{card.error === null ? 'inbox card' : 'in the inbox, not a card'}</span>
           {card.workflow && (
             <span data-workflow={card.workflow} title={card.workflow}>
               workflow <span className="font-mono text-neutral-700 dark:text-neutral-300">{workflowNameOf(card.workflow)}</span>

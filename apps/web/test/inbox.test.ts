@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dropCard, fileCard, startRun, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
-import { cardLines, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
+import { cardLines, hasPage, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
 
 const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}): InboxEntry => ({
   name, file: `${name}.md`, title: name, workflow: null, repo: null, startedAs: [], error: null, body: name, filedAt, ...extra,
@@ -70,6 +70,14 @@ const WORKFLOWS = [
 
 /** The api's repository, whose workflows WORKFLOWS lists as the repository's. */
 const HERE = '/code/app';
+
+test("an entry of the inbox has a page by the name the inbox lists it under: a card, one that does not read, and a stray file", () => {
+  for (const name of ['cache-the-views-k2q9', 'broken', 'notes.txt', 'notes', 'with space']) assert.equal(hasPage({ name }), true, name);
+});
+
+test("REFUSED: no page for an entry whose name the api refuses — a folder, which the inbox lists as `sub/`, a name with a backslash, a hidden one or none", () => {
+  for (const name of ['sub/', 'a.md/', 'a\\b', '.hidden', '', ' ']) assert.equal(hasPage({ name }), false, JSON.stringify(name));
+});
 
 test("a card's start is preset to the workflow it names, found as a start finds it: a name is the repository's, a path that folder", () => {
   assert.equal(presetOf('dev', null, HERE, WORKFLOWS), WORKFLOWS[0], "a name is the repository's workflow, though yours has one of that name too");

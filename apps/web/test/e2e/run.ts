@@ -1610,6 +1610,41 @@ const PAGES: PageSpec[] = [
         fs.rmSync(elsewhereFile, { force: true });
       }
 
+      // What is in the inbox besides cards, in a page of its own: a stray file and a folder, each listed with why it is not a card. The file's
+      // name opens its page — its refusal and the file as written — and the folder, whose name `sub/` the api refuses, has no page to open.
+      // Both taken back.
+      const strayFile = path.join(inbox, 'notes.txt');
+      const strayText = 'Not a card: notes kept beside the cards.\n';
+      const folder = path.join(inbox, 'sub');
+      const strays = await page.context().newPage();
+      try {
+        fs.writeFileSync(strayFile, strayText);
+        fs.mkdirSync(folder);
+        const { problems } = watch(strays);
+        await strays.goto(page.url(), { waitUntil: 'networkidle' });
+        const sub = cardIn(strays, 'sub/');
+        await expectVisible(sub.getByText(/^sub\/: not a card/), 'a folder in the inbox is listed with why it is not a card');
+        await expectCount(sub.getByRole('link'), 0, "and has no page: the api refuses the name sub/, so a link would open a refusal of what is listed");
+        const notes = cardIn(strays, 'notes.txt');
+        await expectVisible(notes.getByText(/^notes\.txt: not a card/), 'a stray file is listed with why it is not a card');
+        await notes.getByRole('link', { name: 'notes.txt' }).click();
+        await strays.waitForURL('**/inbox/notes.txt', { timeout: WAIT_MS });
+        await expectVisible(strays.getByText(/^notes\.txt: not a card/), "the stray file's page says why it is not a card");
+        await expectCount(strays.locator('section[aria-label="Keys"]'), 0, 'and lays out no keys');
+        await strays.getByRole('button', { name: 'Source' }).click();
+        const shown = await strays.locator('pre[data-source]').textContent();
+        if (shown !== strayText) throw new Refused(`the stray file's Source is the file as written — it shows ${JSON.stringify(shown)}`);
+        await settled(strays);
+        await strays.screenshot({ path: path.join(OUT, `inbox-strays-${await themeOf(strays)}.png`), fullPage: true });
+        await strays.waitForLoadState('networkidle');
+        const seen = problems();
+        if (seen.length) throw new Refused(`no console error and no failed request with a stray file and a folder in the inbox — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await strays.close();
+        fs.rmSync(strayFile, { force: true });
+        fs.rmSync(folder, { recursive: true, force: true });
+      }
+
       // An empty inbox, in a page of its own: every card set aside, and put back.
       const aside = path.join(store!, 'inbox-aside');
       const empty = await page.context().newPage();

@@ -1,9 +1,9 @@
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { StartRun } from '../components/StartRun';
 import { dropCard, fileCard, inboxQuery, repositoryQuery, workflowNameOf, workflowsQuery, type InboxEntry, type WorkflowListing } from '../lib/api';
-import { cardLines, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../lib/inbox';
+import { cardLines, hasPage, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
@@ -212,18 +212,15 @@ function CardItem({ entry, refusal, onRefused }: {
     >
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
-          {/* Its title opens its page: the body rendered and its keys explained — for an entry that does not read too, with its file as written. */}
+          {/* Its title opens its page: the body rendered and its keys explained — for a file that does not read too, with the file as written. A
+              folder, or a name the api refuses, has no page (`hasPage`), and is its name alone. */}
           {entry.error === null ? (
             <p data-title className="font-medium break-words">
-              <Link to="/inbox/$name" params={{ name: entry.name }} className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600">
-                {entry.title}
-              </Link>
+              <PageLink entry={entry}>{entry.title}</PageLink>
             </p>
           ) : (
             <p className="font-mono text-sm break-all">
-              <Link to="/inbox/$name" params={{ name: entry.name }} className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600">
-                {entry.file}
-              </Link>
+              <PageLink entry={entry}>{entry.file}</PageLink>
             </p>
           )}
           <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
@@ -289,6 +286,16 @@ function CardItem({ entry, refusal, onRefused }: {
       )}
       {refusal && <Refused refusal={refusal} />}
     </li>
+  );
+}
+
+/** An entry's words, linked to its page where it has one (`hasPage`). */
+function PageLink({ entry, children }: { entry: InboxEntry; children: ReactNode }) {
+  if (!hasPage(entry)) return <>{children}</>;
+  return (
+    <Link to="/inbox/$name" params={{ name: entry.name }} className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600">
+      {children}
+    </Link>
   );
 }
 

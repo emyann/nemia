@@ -381,6 +381,24 @@ last entry is the closeout's tool result and it has not advanced for the quiesce
 registration status (`shell`, undocumented) beside the transcript, so it belongs with issue 13's caveats. The upper layer's
 courtesy, meanwhile, is a line in CLAUDE.md: a background loop must time out.
 
+### 25. A session that ends in prose is nudged once for its closeout, and the nudge did not get it
+
+**Measured** (2026-09-17, twice: runs `the-workflow-builder-on-the-4ifo` and `the-web-app-s-components-on-3xq9`, both
+`dev-build` implement steps with no `output:` schema). Each finished its work — every commit in, the full check green, a
+clean tree — and ended its turn with a prose summary ("The workflow builder is done: …") instead of calling
+`StructuredOutput`. The engine ended the attempt `unsigned`, and the step read *waiting on you* in the workflow layer. A
+`wf retry --message` saying, in so many words, "you ended in prose instead of calling the StructuredOutput closeout tool;
+change nothing; sign off now" made each sign off within thirty seconds, for under a dollar. Whatever the engine's own
+unsigned nudge says, it did not get either session to sign off; a person's sentence naming the tool did.
+
+**Effect.** A finished step costs a person's attention and a try to be read as done, on a path that is the common one
+for a long implement: the model summarises and stops.
+
+**Possible fix.** The nudge names the tool and says the work stands: "you ended without calling StructuredOutput; change
+nothing; call it now with your closeout". Measure on the next such session whether the wording alone closes it. The
+harness's `[structured-output-enforce]` message, seen on a step with an `output:` schema (run `the-queue-on-the-board-queue-ppu1`),
+did get a call; whether a step without a schema is given that enforcement is not known.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

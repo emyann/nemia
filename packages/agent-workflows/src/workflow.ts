@@ -19,7 +19,7 @@
  * judgement belongs to a step with an agent in it, not to a keyword. The workflow is a team, not a
  * program: `after` orders, `resume` continues, `check` measures, `retries` counts, `output` declares
  * what a step's closeout says for the steps after it and `input` reads it, `loop` is the edge back and
- * `rounds` counts it, and the rest say who does the work, for how long and for how much.
+ * `rounds` counts it, `gate` waits for a person, and the rest say who does the work, for how long and for how much.
  *
  * `loop` is the one edge that points backwards, and it is still not a condition: whether the work goes
  * round again is the looping step's agent's word — `again`, in its closeout, the way `blocked` is — and
@@ -89,6 +89,12 @@ export type Workflow = {
   /** How many times the run re-files the step after its check refuses it. Absent means none. */
   retries?: number;
   /**
+   * `gate: true`: the step's closeout waits for a person before anything after it is filed. Verified first, where it has a `check:`, then
+   * held — `awaiting approval` — until `wf approve` is on disk for the try it is on. Not control flow: the run files nothing on a condition,
+   * it waits for a person's word, as it does at the run boundary. Absent: no gate, as `wf start --gate <step>` can still set one for a run.
+   */
+  gate?: true;
+  /**
    * The steps whose declared output this step is handed, in its brief under `## From <step>`, as data.
    *
    * Only what the producer's `output:` declares travels — never its summary, needs or artifacts — and
@@ -142,7 +148,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -174,6 +180,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
   retries: COUNTS.retries.counts,
+  gate: "`true`: the step's closeout waits for a person — `wf approve` — before anything after it is filed, verified first where it has a check",
   output: "a JSON Schema file beside the step: what its closeout declares, for a step that reads it with `input:`",
   loop: "the step to run again when this one's closeout says `again: true`: one it waits on",
   rounds: COUNTS.rounds.counts,
@@ -302,6 +309,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     budget: budgetOf(name, meta.budget, harness),
     check: checkOf(name, meta.check),
     retries: countOf(name, 'retries', meta.retries),
+    gate: gateOf(name, meta.gate),
     input: meta.input?.split(',').map((s) => s.trim()).filter(Boolean),
     output,
     loop: loopOf(name, meta.loop, output),
@@ -522,6 +530,19 @@ function budgetOf(step: string, budget: string | undefined, harness: string | un
   const bare = budget.replace(/^\$\s*/, '').replace(/\s*(?:usd|dollars?)$/i, '');
   const unit = dollarsOf(bare) !== undefined;
   return refuse(`${named} is not an amount. \`budget\` is the most the step's tries may cost together, in dollars: a number above zero, in digits${unit ? ` with no unit — \`budget: ${bare}\`` : ` — for example ${BUDGET_EXAMPLE}`}.`);
+}
+
+/**
+ * `gate:` as written: `true`, or refused. `false` is what a step without the line already is, and anything else — `yes`, a step's name — is
+ * a word the run would have to interpret. A gate at a step the folder does not gate is said at start: `wf start --gate <step>`.
+ */
+function gateOf(step: string, gate: string | undefined): true | undefined {
+  if (gate === undefined) return undefined;
+  if (gate === 'true') return true;
+  if (gate === 'false') {
+    refuse(`${step}: \`gate: false\` is what a step without the line already is. Delete the line: a step has no gate unless it says \`gate: true\`, or a run is started with --gate ${step}.`);
+  }
+  return refuse(`${step}: \`gate: ${gate}\` is not \`true\`. \`gate: true\` holds the step's closeout for a person — wf approve — before anything after it is filed; without the line the step has no gate. To gate one run of the workflow and not every run, delete the line and start it with --gate ${step}.`);
 }
 
 function checkOf(step: string, check: string | undefined): string | undefined {
@@ -807,7 +828,7 @@ export function orderSteps<S extends Pick<Workflow, 'name' | 'after'>>(steps: re
 }
 
 /** Every step `name` waits on, directly or through another. */
-function upstreamOf(steps: readonly Workflow[], name: string): Set<string> {
+export function upstreamOf(steps: readonly Workflow[], name: string): Set<string> {
   const found = new Set<string>();
   const queue = [name];
   while (queue.length) {

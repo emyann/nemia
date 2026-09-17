@@ -309,7 +309,7 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 test('every key a step has is read — none is accepted and then dropped', () => {
   const values: Record<StepKey, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
-    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', output: 'review.schema.json',
+    tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
@@ -320,6 +320,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.deepEqual(w.input, ['implement']);
   assert.deepEqual(w.output, { file: 'review.schema.json', schema: LOOPING });
   assert.deepEqual([w.loop, w.rounds], ['implement', 2]);
+  assert.equal(w.gate, true);
   assert.deepEqual([w.effort, w.tools, w.disallow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage']]);
 });
 
@@ -350,7 +351,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, disallow, deadlineSeconds, maxAttempts, budget, check, retries, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, disallow, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -750,6 +751,18 @@ test('REFUSED at load: a step with `loop:` whose output does not declare `again`
     const schema = { ...LOOPING, properties: { ...LOOPING.properties, again: { type } } };
     assert.match(refusal(loopFiles('loop: implement', { 'review.schema.json': schema })), /declares `again` as .*It is `"type": "boolean"`: true or false, and nothing the run would have to interpret\./, JSON.stringify(type));
   }
+});
+
+test("`gate: true` gates a step — its closeout waits for a person — and a step without the line has none; REFUSED at load: `gate: false`, a word that is not `true`, no value, and the line twice", () => {
+  assert.equal(fm('plan', 'gate: true').gate, true);
+  assert.equal(fm('plan', 'check: npm test').gate, undefined, 'no gate unless it says so');
+  const refused = (lines: string, pattern: RegExp) => assert.throws(() => fm('plan', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
+  refused('gate: false', /^plan: `gate: false` is what a step without the line already is\. Delete the line: a step has no gate unless it says `gate: true`, or a run is started with --gate plan\.$/);
+  for (const word of ['yes', 'True', 'plan', '1']) {
+    refused(`gate: ${word}`, new RegExp(`^plan: \`gate: ${word}\` is not \`true\`\\. \`gate: true\` holds the step's closeout for a person — wf approve — .* start it with --gate plan\\.$`));
+  }
+  refused('gate:', /^plan: `gate` has no value\. Delete the line rather than leaving it blank/);
+  refused('gate: true\ngate: true', /^plan: `gate` is set twice/);
 });
 
 test('REFUSED at load: `rounds:` on a step with no `loop:`, and rounds that are not a count above zero', () => {

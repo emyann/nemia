@@ -21,7 +21,8 @@ settling it `failed` — and a step's `budget:`, with what a step and a run cost
 workflow half), forgetting a run that is over (`wf rm`) — and an inbox of cards parked before they are started (`wf inbox`,
 and its page on the board) — two small items from the plan's queue (§6 items 28 and 31), a cap on runs in flight (`WF_MAX_RUNS`) and
 cards that start themselves (`wf inbox queue`) — and markdown rendered on the board, with a page for a card and for a step that
-explains their keys — have shipped.
+explains their keys — and a gate, a step's handoff that waits for a person (`gate: true`, `--gate`, `wf approve`), in the package — have
+shipped.
 
 ## Shipped: the check
 
@@ -2150,6 +2151,116 @@ What it leaves:
   keyboard.
 - **Neither page starts, drops or edits anything.** Starting a card is the Inbox page's; editing a step is §4's builder.
 
+## Shipped: a gate — a step's handoff that waits for a person
+
+§6 below, in full. `dev-planned`'s plan paused by prose: a brief that said to wait made it sign off `blocked`, a person answered with
+`wf retry --message`, which cost a try, and a plan that signed off `done` started implement at once. The shape §6 chose held: the
+handoff is the gate, not a step of its own. Package only; the board's Approve is the apps run after this one. Read first: the README's
+*A gate*, `hasGate`, `atGate`, `approvalRefusal` and `approvedSection` in `run.ts`, `approve` and `readApprovals` in `runner.ts`.
+
+What was built, four commits:
+
+- **`gate: true` on a step**, in `STEP_KEYS` after `retries` with its line in `STEP_KEY_MEANINGS`; `gate: false` and any other word
+  refused with the fix. **`wf start --gate <step>`**, once per step, and **`gate: <step>` on an inbox card**, in `INBOX_KEYS` (last) with
+  its line, one step — a list and a step's `true` refused — carried by the listing, `wf inbox`'s line, `wf inbox queue` and
+  `wf inbox add <file>`. Both freeze into `gates` on the record (`start({ gates })`, `startFromInbox({ gates })` with the card's first);
+  the step's own `gate: true` is frozen with the workflow, and `hasGate` reads both. A step the workflow does not have, and a `--gate`
+  given twice, are refused at start with nothing written (`gateRefusal`), in the card's words for a card's gate. `wf plan --gate` is
+  refused by name. `workflows/dev-planned*` are unchanged, as §6 says.
+- **Held by the tick.** In `standing`, after `held`: a gated step whose own work reads verified or unverified, with no approval of the
+  try it is on (`approvalOf`), reads `awaiting approval` (`atGate`). It is in `stopsFollowers`, so what follows is `blocked` on every
+  pass and `assess` reads the run `failed`, as a step signed off blocked does; `decision` gives it `awaitingApproval`, outcome `blocked`,
+  and never `shipped` while one holds — not on work a person merged either — so `runReady` treats such a parent as not shipped. A
+  looping step that asks for another round is not held. `listing` says the word, a note with `wf approve` and the send-back, and
+  `onYouWords` makes `wf ls` say `waiting on you: approve plan`. Nothing is in flight while it waits (`slotNeed`).
+- **An approval is a person's file**, `runs/<id>.asks/approve-<step>-<try>`, JSON `{ step, try, at, message? }`. §6 wrote
+  `approve-<step>`; the number is the try it approves, as a retry ask's is, which is what lets a send-back spend it. `readRun` composes
+  the live ones onto `run.approvals`, as it composes `cancelledAt`, and `rewriteRun` strips them, so the record keeps none and
+  everything handed a run — `assess`, `listing`, `decision`, `composeBrief`, and the api, which reads runs through `listRuns` — sees
+  them with no new parameter. An approval is never consumed while it opens the gate; one a later try spent (`spentApprovals`) moves
+  into `done/` with the spent asks. A file named as one that does not read as one opens nothing, and the pass notes it.
+- **`wf approve <run> <step> [--message "<words>"]`** (`approve` in runner.ts): writes the file whole and exclusively (`writeAsk`) and
+  nothing else. Refused by name, exit 2, nothing written (`approvalRefusal`, pure): a run not there, a step the run does not have, a
+  cancelled run, a step not gated, one not signed off yet — waiting, running, checking, blocked, unsigned, its check refused, failed,
+  stopped, out of rounds, or asking for a round — the try already approved, empty words (`approvalWordsRefusal`, which the CLI asks
+  before a run is read), and one §6 did not list: a send-back already asked for, which would spend the approval at once. A stray file at
+  the name is named, with `rm`.
+- **Sending back** is `wf retry --message`: `retryable` gives `nudge` and `fresh` to a step at its gate, or approved with steps after
+  it and none of them filed (`sendsBack`) — not to an approved step nothing waits on, whose run is over (found in review, round 2), and `retryRefusal` refuses one without words, and `--recheck`. The try's brief says its handoff waited at its
+  gate and was sent back (`triedFrom`, `retrySection`). `retryLines` offers a gated step nothing: `gateLines` does. `cancelPlan` calls
+  a run at its gate off rather than finished; `forgetRefusal` holds it, naming the `wf approve`; `roundAsk` on a loop at its gate says
+  to approve or send back, with `--budget` or without it (review, round 2). From review, round 3: the tick files no wordless ask at a
+  gate (`heard` in `retriesDue`) — one taken while the harness blocked the session that then signed off would have sent the step back
+  with nothing to change, before anyone read it — and `wf approve` and `wf retry` name such an ask and say to delete it; `wf approve` on
+  a step already approved and handed on says so, rather than offer a send-back that is refused.
+- **What the next steps are told**: `## Approved` (`approvedSection`), in every brief composed for a step after an approved gate,
+  directly or through another (`upstreamOf`, now exported) — which step, which try, when, and the words, fenced — beside `## From run
+  <id>` under what was asked for, and in a resumed step's brief. **`wf decide`** prints `AWAITING APPROVAL` among the verdicts and, under
+  a gated step's name, `gate  approved 23:10Z — "<words>"` or `gate  awaiting approval:` with both commands (`gateLines`, on `decide`'s
+  `gates`). `wf ls`'s vocabulary in the help, the keys line, `wf decide --help` and the README (*A gate*, the table, the closeout's part)
+  say it.
+- **One line outside the package**: `apps/api/test/inbox.test.ts` pinned three key rows, and the api lays out one per `INBOX_KEYS` entry;
+  it gains the `gate` row. Nothing in `apps/*/src`.
+
+What was measured:
+
+- From the root, `npx turbo run test --force`: agent-workflows 517 (516 passed, 1 skipped), from 490; api 166 and web 203, unchanged;
+  agent-engine 313 (305 passed, 8 skipped), unchanged. `npm run typecheck` clean in all four.
+- New tests. `workflow.test.ts`: `gate: true` read, and `false`, other words, no value and twice refused. `inbox.test.ts`: a card's
+  `gate:` through the listing, its line, `queuedText` and `ideaCard`; a list, `true`, no value and twice refused. `run.test.ts`: the
+  hold over three passes, whatever the closeout; no approval but the try's own opens it; check first; the round not held; `wf ls`'s
+  word, note and `approve plan`; `decision` blocked and not shipped, merged or not, and `runReady` on such a parent; no slot held;
+  `gateRefusal`; every `approvalRefusal`; the send-back allowed with words and refused without or with `--recheck`, and refused once
+  what follows is filed; `triedFrom` and the brief; `spentApprovals`; `cancelPlan`, `forgetRefusal` and `roundAsk` at a gate; `## Approved`
+  to the next step and the one after, not before the gate or its approval, fenced, two gates, a resumed step; `gateLines`.
+  `gate.test.ts`, new, on disk with a settled board: `--gate` and the card's gate frozen, and refused with nothing written; the hold
+  across passes with `wf ls`'s line, another try's approval, another step's and a stray file opening nothing, and the approval never in
+  the record; check then hold; a merged parent at its gate not shipped for `--after` until approved; `wf approve`'s file and every
+  refusal, CLI flags included; approve, then send back before the tick — the approval spent into `done/`, the gate holding again for
+  three passes, the approval copied back by hand opening nothing, and a new `wf approve` of try 2 filing implement; `wf cancel` and
+  `wf rm` at a gate; `wf decide`'s lines and `## Approved` reaching implement and review.
+- Each guard broken on purpose and the two gate test files rerun, each failing at least one test: no gate at all (9), an approval of any
+  try (3), a merged gated run shipped (2), approvals written into the record (1), a round held (1), a gate before the check (2), no
+  start refusal (2); in `approvalRefusal` no gate check, no already-approved, no pending send-back, no status check, no cancelled check
+  (2 each); a send-back with no words (1); cancel at a gate called finished (2); `wf rm` at a gate (2); spent approvals not consumed (1);
+  an approved step not sendable back (2); the round refusal (1); no `## Approved`, only direct dependents given it, the words unfenced (2
+  each).
+- The screens were printed and read at a gate: `wf ls`, `wf decide`, `wf approve`, and implement's brief. The `## Approved` paragraph was
+  reflowed from them.
+
+What it leaves:
+
+- **The board.** The Factory's card saying `approve plan`, the run page's Approve with a box for the words beside the answer box that
+  sends back, and `POST …/approve`. The api's words should already say `awaiting approval` for a gated step, waiting on you, since it
+  reads runs through `listRuns` — reasoned from the code, not looked at; its `commandsOf` offers no approve line.
+- **Approving costs a pass, not a try.** Nothing is filed until the tick after `wf approve`; the approval is read on every pass after,
+  so a long-lived gated run reads one more small file per pass.
+- **A gate on every round.** A gated step inside a loop — `--gate implement` on `implement ⇄ review` — is on a new try each round, so it
+  waits for an approval each round. That follows from an approval naming its try; nobody has run a loop so.
+- **An approval of a future try** written by hand opens that try's gate when it comes; the verb writes only the try the step is on.
+- **The time on `wf decide`'s gate line** is `HH:MMZ`, with no day, as §6 wrote it.
+- **Plan cards** (`wf plan`) take no `gate:`; a card's run is gated by its workflow's own `gate: true`, or by starting that card by hand
+  with `--gate`.
+
+What the board's run should call:
+
+- **`approve(e, runId, step, message?)`** from `agent-workflows` (runner.ts): resolves `{ run, approval: { step, try, at, message? },
+  file }`, or rejects with `exitCode: 2` and the refusal's words — `no such run: <id>. …`, and every `approvalRefusal` sentence: a step
+  the run does not have, a cancelled run, `<step> has no gate: …`, `<step> has not signed off yet: …` (and its siblings, one per status),
+  `try <n> of <step> is already approved, at …`, `try <n+1> of <step> is already asked for …`, `--message is empty, …`. A rejection
+  without `exitCode` is not a refusal. Ask `approvalRefusal(steps, run, step, message, phaseOf, closeoutOf, askedCloseout, verdictOf,
+  asks, spendOf)` from `agent-workflows/run` to grey the button out, with the same words.
+- **Send back** is `retry(e, runId, step, { mode: 'nudge', message })`, as the answer box already calls it; without a message it is
+  refused for a step at its gate.
+- **A record carries** `gates?: string[]` (start-time gates; a step's own `gate: true` is on `run.workflow`), and, as read by `readRun`
+  and `listRuns`, `approvals?: Approval[]` — `{ step, try, at, message? }`, composed from `runs/<id>.asks/approve-<step>-<try>`, never
+  in the JSON. `hasGate(step, run)`, `gatesOf(steps, run)` and `approvalOf(run, step)` say what gates a step and whether its current try
+  is approved.
+- **What to show**: `stepStatus` and `listing`'s word `awaiting approval`; `listing(...).waitingOnYou` names the step, and `onYouWords`
+  says it `approve <step>`; `decision(...)`'s `awaitingApproval` on an `awaiting` run, whose outcome is `blocked`; `gateLines(steps, run,
+  phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf)` for the line under the step. The closeout to render beside Approve is the
+  gated step's own, as `closeoutOf` reads it.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
@@ -2241,6 +2352,10 @@ Shipped 2026-09-17 as *Shipped: markdown on the board, and a card's page with it
 and its sources. The number kept so §6 and §7 keep theirs.
 
 ## 6. A gate: a step's handoff that waits for a person
+
+Shipped 2026-09-17 in the package as *Shipped: a gate — a step's handoff that waits for a person*, above, which says what was built,
+measured and left, and what the board's run should call. The board half below — the Factory's card, Approve on the run page,
+`POST …/approve` — is still to build. What was registered is kept as it was asked.
 
 **Registered** 2026-09-16, by the operator: a card, then a plan, then a person reads the plan before anyone implements
 it — and the same pause placeable in any workflow. Asked as a design question: is the gate the handoff, or a step of

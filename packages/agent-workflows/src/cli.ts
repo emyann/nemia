@@ -3,15 +3,18 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
 
-  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--brief "<brief>"]
+  wf start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--input <file> ...] [--gate <step> ...] [--brief "<brief>"]
                                --after <runId>: file nothing of this run until wf decide says that
                                run has shipped — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
+                               --gate <step>: that step's closeout waits for wf approve before
+                               anything after it is filed, as a step's own gate: true does; once
+                               per step. An inbox card's gate: <step> is one more
                                --workflows takes a folder, or a name under <repo>/workflows/: dev
                                a card of a plan (wf plan --help) starts its body: --workflows is its
                                workflow: unless given, and its after: needs an --after for each
@@ -58,6 +61,11 @@ const HELP = `wf — run a workflow of agent steps
                                that is only one of these flags' names goes as --message=<answer>;
                                --budget <amount>: for a step over budget or budget exhausted, its
                                cap raised to that many dollars, above what its tries have cost
+  wf approve <runId> <step> [--message "<words>"]
+                               let a step waiting at its gate hand on: what waits on it is filed on
+                               the next tick, and every step after the gate is handed your words
+                               under ## Approved. To send it back instead, with what to change:
+                               wf retry <runId> <step> --message "<objection>"
   wf round <runId> [<step>] [--budget <amount>]
                                once more: a loop out of rounds goes round again, once, on the
                                next tick — the step it loops to continued, then a new reviewer;
@@ -82,17 +90,18 @@ A workflow is a folder of markdown files. One file is one step:
     Review the change in this workspace as a second engineer would.
 
 No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measures, \`retries\` counts the
-tries the run may re-file a step its check refused, \`output\` declares what a closeout says for a later
-step and \`input\` reads it, \`loop\` is the edge back and \`rounds\` counts it — whether to go round is the
-step's own \`again\` — and the rest (model, effort, permissionMode, tools, disallow, deadlineSeconds,
-maxAttempts, budget) say who does the work, with what, for how long and for how much. Everything else the
-agent is told is prose.
+tries the run may re-file a step its check refused, \`gate\` holds a step's handoff for a person's wf approve,
+\`output\` declares what a closeout says for a later step and \`input\` reads it, \`loop\` is the edge back
+and \`rounds\` counts it — whether to go round is the step's own \`again\` — and the rest (model, effort,
+permissionMode, tools, disallow, deadlineSeconds, maxAttempts, budget) say who does the work, with what,
+for how long and for how much. Everything else the agent is told is prose.
 
   wf ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
   · unverified (no check: declared) · unsigned (ended without its closeout, or without a field its
   output: declares) · BLOCKED · rounds exhausted (asked for another round on the last)
   · over budget $4.20 of $3 (its tries have cost their budget: or more, and nothing more is filed for
-  it on the run's word) · budget exhausted (its harness ended its session at its budget:).
+  it on the run's word) · budget exhausted (its harness ended its session at its budget:)
+  · awaiting approval (signed off at its gate: nothing after it is filed until wf approve).
 
   WF_ROOT            where runs and the engine's board live
   WF_MAX_CONCURRENT  sessions at work per pool at once (default 2): claude and claude-detached one pool,
@@ -143,6 +152,7 @@ is said at start:
     workflow: dev              # what runs it, chosen at start when the card does not say
     repo: /home/me/code/app    # the repository it is about, as an absolute path
     queued: 2026-09-16T10:00:00.000Z   # when it was queued to start on its own: wf inbox queue writes it
+    gate: plan                 # the step whose closeout waits for wf approve in the run it starts
     ---
     Cache the engine's views between passes.
 
@@ -161,8 +171,9 @@ is said at start:
   wf inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
 
 Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
-directory, a queued: that is not a time or is on a card with no workflow:, an add with no idea, and a name that
-would leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
+directory, a queued: that is not a time or is on a card with no workflow:, a gate: naming more than one step or
+saying true — and, at start, one naming no step of the workflow — an add with no idea, and a name that would
+leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
 already queued, and of one a run was started from.`;
 
 const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
@@ -181,6 +192,8 @@ and beside each step's check, what its session consumed — used, cost — or th
 its timeline: for each try's session and each try's check, when it was filed, spawned and ended (UTC), how
 long it queued for a slot and how long it ran; after the steps, each round's and the run's totals. Under
 each step, before its closeout, what a person said to its sessions while they ran (wf say), with when.
+Under a gated step's name, its gate: approved, when and with what words — or awaiting approval, with the
+wf approve that lets what follows be filed and the wf retry --message that sends it back.
 
   --sensitive <globs>  comma-separated globs whose changed files are printed in full instead, for this
                        screen; the touched lines still say which files are check-affecting
@@ -247,7 +260,7 @@ function readFlags(argv: string[], rules: FlagRules): { values: Record<string, s
   return { values, switches };
 }
 
-type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[]; inputs: string[]; brief?: string };
+type StartHow = { workflows?: string; repo?: string; isolate: boolean; after: string[]; inputs: string[]; gates: string[]; brief?: string };
 
 /** What each of `wf start`'s value flags takes, as its refusal says it. */
 const START_TAKES = {
@@ -255,25 +268,26 @@ const START_TAKES = {
   '--repo': 'the repository the run works on: wf start <brief> --repo <r>',
   '--after': 'the run this one waits on, by its id: wf start <brief> --after <runId> [--after <runId> ...]',
   '--input': "a file to hand the run's steps: wf start <brief> --input <file> [--input <file> ...]",
+  '--gate': 'the step whose closeout waits for a person before anything after it is filed: wf start <brief> --gate <step> [--gate <step> ...]',
   '--brief': "what the run is asked to do in place of an inbox card's body, as text or a file: wf start <inbox>/<name>.md --brief \"<brief>\"",
 } as const;
 
 /**
  * `wf start`'s flags, after the brief: `--workflows <dir>`, `--repo <r>`, `--after <runId>` as often as there are runs to wait on, `--input <file>`
- * as often as there are files to hand its steps, and `--no-worktree`.
+ * as often as there are files to hand its steps, `--gate <step>` as often as there are steps to gate, and `--no-worktree`.
  */
 function startHow(argv: string[]): StartHow {
   const { values, switches } = readFlags(argv, {
     takes: START_TAKES,
     switches: ['--no-worktree'],
-    repeats: ['--after', '--input'],
+    repeats: ['--after', '--input', '--gate'],
     unknown: (arg) => (arg.startsWith('-')
-      ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; and, for an inbox card, --brief "<brief>".`
+      ? `wf start does not take ${arg}. It takes the brief, then --workflows <dir>, --repo <r>, --no-worktree, and --after <runId> once per run to wait on; --input <file> once per file to hand its steps; --gate <step> once per step to gate; and, for an inbox card, --brief "<brief>".`
       : `wf start takes one brief, and ${arg} is a second. Quote a brief with spaces — wf start "<brief>" — or give it as a file: wf start ./brief.md.`),
     twice: (flag) => `wf start takes ${flag} once: a run ${flag === '--brief' ? 'is asked one thing' : `works on one ${flag === '--repo' ? 'repository' : 'workflow'}`}.`,
   });
   return {
-    workflows: values['--workflows']?.[0], repo: values['--repo']?.[0], isolate: !switches.length, after: values['--after'] ?? [], inputs: values['--input'] ?? [],
+    workflows: values['--workflows']?.[0], repo: values['--repo']?.[0], isolate: !switches.length, after: values['--after'] ?? [], inputs: values['--input'] ?? [], gates: values['--gate'] ?? [],
     ...(values['--brief'] ? { brief: values['--brief'][0] } : {}),
   };
 }
@@ -289,6 +303,7 @@ function planHow(argv: string[]): { repo?: string } {
       '--after': 'wf plan does not take --after: each card says what it waits on, in its after:, and the folder is the whole plan. To wait on a run already started, start the card by hand: wf start <card.md> --workflows <dir> --after <runId>.',
       '--workflows': 'wf plan does not take --workflows: each card names its own, in its workflow: — a folder under <repo>/workflows/, or a path from the plan folder.',
       '--input': "wf plan does not take --input: a card's inputs are not a thing yet. Start that card by hand with its files: wf start <card.md> --workflows <dir> --input <file>.",
+      '--gate': "wf plan does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: wf start <card.md> --workflows <dir> --gate <step>.",
     '--no-worktree': 'wf plan does not take --no-worktree: a card another waits on ships a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
     },
     unknown: (arg) => (arg.startsWith('-')
@@ -389,6 +404,28 @@ function retryHow(argv: string[]): RetryHow {
   return how;
 }
 
+/**
+ * `wf approve`'s one flag, after the run and the step: `--message "<words>"`, or `--message=<words>`, once — the next argument is the words
+ * whatever it starts with, as `wf retry`'s is — refused before a run is read when it is missing or empty (`approvalWordsRefusal`). Anything
+ * else is refused.
+ */
+function approveHow(argv: string[]): string | undefined {
+  let message: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg !== '--message' && !arg.startsWith('--message=')) {
+      usage(`wf approve does not take ${arg}. It takes the run, the step, and --message "<words>": wf approve <runId> <step> [--message "<words>"].`);
+    }
+    if (message !== undefined) usage('wf approve takes --message once: put all your words in it, quoted — wf approve <runId> <step> --message "<words>".');
+    const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
+    if (text === undefined) usage('--message takes the words that go with your approval, quoted: wf approve <runId> <step> --message "<words>".');
+    message = text;
+  }
+  const wrong = approvalWordsRefusal(message);
+  if (wrong) usage(wrong);
+  return message;
+}
+
 /** A `--budget`'s value as dollars (`dollarsOf`), or refused, saying what it takes: an amount above zero, in digits. */
 function amountOf(text: string | undefined, takes: string, form: string): number {
   const amount = text === undefined ? undefined : dollarsOf(text);
@@ -428,6 +465,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         console.log(`workspace: ${run.workspace}`);
         if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
         if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
+        const gates = gatesOf(steps, run);
+        if (gates.length) console.log(`gated at: ${gates.join(', ')} — nothing after ${gates.length > 1 ? 'each' : 'it'} is filed until wf approve ${run.id} <step>, once it has signed off`);
         console.log(`run 'wf tick' (or 'wf up') to start it`);
       };
       // A card of the inbox starts out of it, and leaves it. Its brief is its body, or --brief; its workflow and repository are the flags', else its own.
@@ -443,6 +482,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           isolate: how.isolate,
           after: how.after,
           inputs: how.inputs,
+          gates: how.gates,
         });
         printStarted(started.run, started.removed
           ? `${fromNote(started.run)} — removed from the inbox`
@@ -465,6 +505,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         isolate: how.isolate,
         after: how.after,
         inputs: how.inputs,
+        gates: how.gates,
       });
       printStarted(run);
       return;
@@ -597,8 +638,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           console.log(`   ${s.name.padEnd(14)} ${said[i]!.padEnd(width)} ${s.branch ?? ''}${s.note ? `  · ${s.note}` : ''}`);
         }
         // The step a person has to act on, and where to act. Said here and not left to the result
-        // line, because a run blocked on its first step has no result branch yet.
-        if (waitingOnYou.length) console.log(`   → waiting on you: ${waitingOnYou.join(', ')}  —  wf decide ${run.id}`);
+        // line, because a run blocked on its first step has no result branch yet. A step at its gate is named with what is asked: approve plan.
+        if (waitingOnYou.length) console.log(`   → waiting on you: ${onYouWords({ steps, waitingOnYou }).join(', ')}  —  wf decide ${run.id}`);
         // A run it waits on that will never ship without a person — cancelled, say — is a person's to resolve, and the line says how.
         if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
         // Where to go and look. A run whose result nobody can find is a run that did not happen.
@@ -658,7 +699,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, waiting, said, timeline, held } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, waiting, said, timeline, held } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -697,6 +738,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
       if (overBudgetLine) console.log(`  ${overBudgetLine}`);
       if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED, waiting on you: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
+      // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the send-back.
+      if (decision.awaitingApproval.length) console.log(`  AWAITING APPROVAL, waiting on you: ${decision.awaitingApproval.join(', ')}  — signed off at its gate; nothing after it is filed until you approve it, or send it back`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
       // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.
       if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
@@ -733,6 +776,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         // The try — and the round — whose closeout and check these are, when it is not the first, and whether a person answered it.
         const tried = step ? tryNote(step, run.steps[name], steps, Boolean(answers[name])) : '';
         console.log(`\n  ${name}${blocked ? '  BLOCKED' : ''}${tried ? `  (${tried})` : ''}`);
+        // Its gate, under its name: approved, when and with what words — or awaiting approval, and the commands that answer it.
+        if (gates[name]) console.log(`    gate  ${gates[name].split('\n').join('\n          ')}`);
         if (check) {
           console.log(`    check  ${check.command}  →  ${verdictWord(check.verdict)} ${check.passed ? '✓' : '✗'}`);
           // For a check that refused, the last of each stream, labelled: which pipe a line came from
@@ -816,6 +861,16 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
       const then = stopFirst ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped' : 'the next tick files it, once';
       console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`);
+      console.log(`   ${file}`);
+      return;
+    }
+
+    // A person's word at a gate. Like `wf retry`, it writes the approval and nothing else: the tick reads it on every pass, and files what waits.
+    case 'approve': {
+      const [runId, stepName, ...more] = rest;
+      if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
+      const { approval, file } = await approve(e, runId, stepName, approveHow(more));
+      console.log(`${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — the next tick files what waits on it`);
       console.log(`   ${file}`);
       return;
     }

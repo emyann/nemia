@@ -2314,7 +2314,7 @@ Not agent-workflows features, listed so nothing is lost:
 
 - waking the tick loop on harness registry changes instead of a timer (agent-engine README);
 - the hkb migration ([agent-engine/docs/hkb-migration.md](../../agent-engine/docs/hkb-migration.md));
-- a task field for Remote Control (§2 above);
+- ~~a task field for Remote Control~~ *done, engine `92d6783`: `remoteControl: true` on the task* (§2 above; the step key is W10's);
 - ~~a `blocked` session holding a concurrency slot~~ *done, engine `912d537`*: count `working` only toward the ceiling and keep the wider
   set for what else `LIVE` guards; the README's sentence that a deadline is the only thing that frees such a slot, and the
   comment in `decide`, change with it; a test that refuses — two blocked sessions at a cap of two, and a third task starts.
@@ -2322,7 +2322,7 @@ Not agent-workflows features, listed so nothing is lost:
   reasoning, not a measurement;
 - ~~pools by subscription~~ *done, engine `912d537`*: `claude` and `claude-detached` counted as one pool, a harness declaring its
   pool with its own name as the default. The workflow layer's README, banner and `wf --help` say pools since `00d4c06`'s follow-up;
-- **admission in filing order, and a task's priority.** The tick walks tasks in `journal.list`'s order, which is the ids
+- ~~**admission in filing order, and a task's priority.**~~ *done, engine `92d6783`; the workflow layer's `priority: 1` on later filings is W10's.* The tick walks tasks in `journal.list`'s order, which is the ids
   sorted (`readdirSync(...).sort()`), and admits each pending one while `used < max`: so which of two pending tasks gets a
   slot is decided by the alphabet of their run ids, and a run never keeps its slot across its own steps — its next step is
   filed a check and a pass after the last ended, and any task pending in that gap takes the slot (measured 2026-09-16:

@@ -1013,7 +1013,8 @@ stopped for approval; the operator chose react-markdown; two rounds after, $52.6
 remark-gfm replacing streamdown, a card's page and a step's page with their keys explained, `npm install` run on main for the lockfile.
 On 2026-09-17 02:10Z the operator said to file everything that can run in parallel; eight runs went in, three lanes, the
 dependent ones `--after` the runs they need so each is cut from a main that has them and merges clean:
-- **now:** E10 `three-small-items-in-agent-e-0uqf` (engine: admission in filing order, `priority`, `remoteControl`; `dev`); W9
+- **now:** E10 `three-small-items-in-agent-e-0uqf` (engine: admission in filing order, `priority`, `remoteControl`; `dev`) — one round,
+  $12.53, **merged, `92d6783`**; W9
   `a-gate-a-step-s-handoff-that-18iy` (agent-workflows: the gate, features.md §6; `dev`); B12 `the-queue-on-the-board-queue-ppu1`
   (apps: queued cards as Factory ghosts, Queue from the Inbox page, the ceilings on the board; `dev-build`);
 - **after E10 and W9:** W10 `two-small-items-in-agent-wor-5l9e` (agent-workflows: `priority: 1` on every filing after a run's first,

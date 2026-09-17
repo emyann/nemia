@@ -35,6 +35,9 @@ export function QueueLane({ cards }: { cards: readonly InboxEntry[] }) {
   );
 }
 
+/** How long a card has been queued, to the minute: `just now`, `12m ago`, `3h 12m ago`, `2d 4h ago`. */
+const waited = (ms: number): string => (ms < 60_000 ? 'just now' : `${duration(ms).replace(/ \d+s$/, '')} ago`);
+
 function Ghost({ card, now }: { card: InboxEntry; now: number }) {
   const { queued, tried } = card;
   const place = queued!.place!;
@@ -53,7 +56,7 @@ function Ghost({ card, now }: { card: InboxEntry; now: number }) {
           {ordinal(place)}
         </span>
         <time dateTime={queued!.at} title={`Queued at ${new Date(queued!.at).toLocaleString()}`} className="font-mono">
-          queued {duration(now - Date.parse(queued!.at))} ago
+          queued {waited(now - Date.parse(queued!.at))}
         </time>
       </span>
       <span data-ghost-title title={title} className="mt-1 line-clamp-2 text-sm font-medium break-words text-foreground/80">

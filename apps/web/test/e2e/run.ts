@@ -392,6 +392,9 @@ const PAGES: PageSpec[] = [
       await step('review').click();
       const inspector = page.locator('aside[aria-label="Step review"]');
       await expectVisible(inspector, 'the step inspector opens on a click on review');
+      // Beside the inspector, the queue's lane gives the floor its width back; the header still counts the queue.
+      await expectCount(page.locator('aside[aria-label="Queued cards"]'), 0, "the queue's lane is off while a step's inspector is open beside the floor");
+      await expectTexts(page.locator('[data-cap]'), [`${IN_FLIGHT_BY_CAP} of ${QUEUE.cap} runs in flight · ${QUEUED.length} queued`], 'and the header still counts the queue');
       await expectVisible(inspector.getByText(FAKE.title), 'the inspector names the run the step is in');
       // The floor narrows for the inspector and brings the run back into view; judged once it has.
       await settled(page);
@@ -405,6 +408,10 @@ const PAGES: PageSpec[] = [
       await expectVisible(check.getByText(FAKE.said), `the inspector of ${FAKE.refused} shows the last lines of its check's output`);
       await settled(page);
       await expectInside(run, floor, `the run is on the floor beside ${FAKE.refused}'s inspector`);
+      // Closed, the queue's lane is back beside the floor.
+      await page.getByRole('button', { name: "Close the step's panel" }).click();
+      await expectCount(page.locator(`aside[aria-label="Step ${FAKE.refused}"]`), 0, "the step's panel closes");
+      await expectCount(ghosts, QUEUED.length, "and the queue's lane is back beside the floor");
 
       // The run beside it opened too: a dot travels the one edge into a step at work, and no other edge on the floor moves.
       await beside.locator('time').click();

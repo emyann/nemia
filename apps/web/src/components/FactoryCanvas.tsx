@@ -415,6 +415,14 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   const waiting = runs.filter(waitsOnYou).length;
   const queue = useQuery({ ...inboxQuery, refetchInterval: 5_000 });
   const queued = queue.data ? queueOf(queue.data) : [];
+  // The lane beside the floor comes or goes with the first card queued or the last one started: the floor is fitted again to its new width.
+  const laned = queued.length > 0;
+  const wasLaned = useRef(laned);
+  useEffect(() => {
+    if (wasLaned.current === laned) return;
+    wasLaned.current = laned;
+    setFits((n) => n + 1);
+  }, [laned]);
   const cells = placed.reduce((sum, node) => {
     const { columns, rows } = spans.get(node.id) ?? ONE_CELL;
     return sum + columns * rows;
@@ -444,10 +452,11 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
-        {queued.length > 0 && <QueueLane cards={queued} />}
+        {/* Off while a step's inspector is open beside the floor, which the two together would leave too narrow to read: the header still counts the queue. */}
+        {laned && !(inspectedRun && inspected) && <QueueLane cards={queued} />}
         {shown.length ? (
           <div className="flex min-h-0 min-w-0 flex-1 flex-col md:flex-row">
-            <div ref={frame} className="min-h-0 min-w-0 flex-1">
+            <div ref={frame} className="@container min-h-0 min-w-0 flex-1">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -481,7 +490,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
                 fitView
                 fitViewOptions={FIT}
               >
-                <Panel position="top-left" className="hidden text-[11px] text-muted-foreground sm:block">
+                {/* Only where the floor is wide enough for it beside the buttons: a step's inspector narrows it. */}
+                <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @2xl:block">
                   Click a run for its steps · drag to arrange · kept in this browser
                 </Panel>
                 <Panel position="top-right" className="flex gap-2">
@@ -513,7 +523,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
             )}
           </div>
         ) : (
-          <Empty anyRuns={runs.length > 0} />
+          <Empty anyRuns={runs.length > 0} queued={queued.length} />
         )}
       </div>
     </div>
@@ -542,14 +552,14 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
     ? `Runs in flight against the cap, ${by}. A run counts while a task of it is filed and not settled, or, once started, while it has something due; a run waiting on runs counts once it starts. ${data.held.length ? `Held for a slot: ${data.held.map((h) => h.run).join(', ')}.` : ''}`
     : `No cap on runs in flight, ${by}: every run is filed as soon as it is ready.`;
   return (
-    <p data-cap={data.cap} title={title.trim()} className="text-sm text-muted-foreground">
+    <p data-cap={data.cap} title={title.trim()} className="border-l pl-4 text-sm text-muted-foreground">
       {capLine(data, queued)}
     </p>
   );
 }
 
-/** Nothing on the floor: say so, and where the runs are. */
-function Empty({ anyRuns }: { anyRuns: boolean }) {
+/** Nothing on the floor: say so, where the runs are, and that the queue beside it starts on its own. */
+function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {
   return (
     <div className="flex flex-1 items-center justify-center p-6">
       <Card className="w-full max-w-sm">
@@ -561,6 +571,13 @@ function Empty({ anyRuns }: { anyRuns: boolean }) {
             ) : (
               <>
                 No runs yet. Start one with <code>npx wf start</code>.
+              </>
+            )}
+            {queued > 0 && (
+              <>
+                {' '}
+                {queued === 1 ? 'The card queued beside it starts on its own' : `The ${queued} cards queued beside it start on their own`} while{' '}
+                <code>npx wf up</code> runs.
               </>
             )}
           </CardDescription>

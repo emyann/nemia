@@ -1046,6 +1046,16 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   contract's "leave it in this workspace". **Until W15 lands, approve one `ship` at a time.** The seventh is the board's:
   `commandsOf` (`apps/api/src/app.ts`) offers `git merge` for a run whose ending merges — for the board run after B17. Seen on
   B16's pictures and not from it: at 1280px the Factory's hint text runs under *Reset layout*.
+  Later that evening: W13, three rounds, $57.50, **merged, `2ea2128`** — `workflows/supervisor/` and `slot: none`; nothing starts a
+  supervisor, which stays the operator's act, and its review left three findings (a stale sha in its brief, "never type git" held
+  by prose only, its waiting state drawn as a failed run on the board). W15, three rounds, $53.01, **merged by hand, `2713a02`**:
+  W13 had fixed one of the same findings, so the branch conflicted with main at `ship`'s gate (`artifactsContract`, one import);
+  main's wording kept, the run's brief test reads it, and the run was cancelled afterwards since a run whose branch landed by hand
+  still read *to decide: Ship it*. The checkout hold is in, so more than one `ship` may be approved. Both reviews' leftovers, and
+  that gap, are filed as W16 `five-leftovers-from-the-revi-c0tl` (`dev`, after W14 — the first run that should reach a live
+  `ship`). Open as design, not filed: ship.md calls a conflict "the work's job", and a run with its rounds spent has no step to
+  give it to. One flake seen under load during a trial merge, gone on the rerun: `agent-engine/test/say.test.ts` and
+  `apps/api/test/transcript.test.ts` each failed as a file at about 10.8s.
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
 `each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
 the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,

@@ -83,6 +83,16 @@ export const repoName = (repo: string): string => repo.split(/[\\/]+/).filter(Bo
 export const byAge = <T extends Pick<RunSummary, 'id' | 'createdAt'>>(runs: readonly T[]): T[] =>
   [...runs].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 
+/**
+ * The Runs page's order: the runs in flight first (`inFlight`, as the Factory counts them), then every other run; each newest first,
+ * so the run just started heads the list, and a run that stops moving drops below the ones still going. A run waiting on you that
+ * nothing of moves is not in flight, and is found by its date among the finished, where its row says it waits on you.
+ */
+export const inFlightFirst = <T extends Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving'> & { waiting?: RunSummary['waiting'] }>(
+  runs: readonly T[],
+): T[] =>
+  [...runs].sort((a, b) => Number(inFlight(b)) - Number(inFlight(a)) || b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id));
+
 /** A cell on the Factory's grid: room for one card and the gap beside and below it. Cards are drawn to fit. */
 export const CELL_WIDTH = 320;
 export const CELL_HEIGHT = 220;

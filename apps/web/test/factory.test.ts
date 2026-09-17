@@ -11,6 +11,7 @@ import {
   GRID_COLUMNS,
   floorRuns,
   inFlight,
+  inFlightFirst,
   keepLayout,
   movedOpen,
   ONE_CELL,
@@ -399,6 +400,38 @@ test('the floor is every run in flight, and each finished run one of them waits 
     run([], { id: 'k', moving: true, after: ['p'], createdAt: at(2) }),
   ];
   assert.deepEqual(floorRuns(chain, false).map((r) => r.id), ['p', 'k']);
+});
+
+test('the Runs page lists the runs in flight first, then the rest, each newest first', () => {
+  const runs = [
+    run([], { id: 'old-done', status: 'succeeded', createdAt: at(0) }),
+    run([], { id: 'old-going', moving: true, createdAt: at(1) }),
+    run([], { id: 'new-done', status: 'succeeded', createdAt: at(5) }),
+    // A fan-out `assess` calls failed while a sibling session still works: in flight, so on top.
+    run([], { id: 'failed-moving', status: 'failed', moving: true, createdAt: at(3) }),
+    // Running by `assess`, waiting on a run that never ships: nothing of it moves, so among the rest, by its date.
+    run([], { id: 'gated', after: ['p'], waiting: waitingOn(true), createdAt: at(6) }),
+    run([], { id: 'cancelled', status: 'cancelled', cancelledAt, createdAt: at(4) }),
+    // Running with nothing held — a task the engine has lost: in flight, as on the Factory.
+    run([], { id: 'lost', createdAt: at(2) }),
+  ];
+  assert.deepEqual(inFlightFirst(runs).map((r) => r.id), ['failed-moving', 'lost', 'old-going', 'gated', 'new-done', 'cancelled', 'old-done']);
+  // Newest first all the same when nothing is in flight, and when all is.
+  const done = runs.filter((r) => !inFlight(r));
+  assert.deepEqual(inFlightFirst(done).map((r) => r.id), ['gated', 'new-done', 'cancelled', 'old-done']);
+  assert.deepEqual(inFlightFirst(runs.filter(inFlight)).map((r) => r.id), ['failed-moving', 'lost', 'old-going']);
+  // The same instant: by id, so a refetch moves no row; and the list given is left as it was.
+  const twins = [run([], { id: 'b', createdAt: at(0) }), run([], { id: 'a', createdAt: at(0) })];
+  assert.deepEqual(inFlightFirst(twins).map((r) => r.id), ['a', 'b']);
+  assert.deepEqual(twins.map((r) => r.id), ['b', 'a']);
+});
+
+test('a run that stops moving drops below the runs still going, whenever it started', () => {
+  const going = run([], { id: 'going', moving: true, createdAt: at(0) });
+  const started = run([], { id: 'started', moving: true, createdAt: at(9) });
+  assert.deepEqual(inFlightFirst([going, started]).map((r) => r.id), ['started', 'going']);
+  const finished = { ...started, status: 'succeeded' as const, moving: false };
+  assert.deepEqual(inFlightFirst([going, finished]).map((r) => r.id), ['going', 'started']);
 });
 
 test('an edge from each run a card waits on to its card, both on the floor: to come until the child starts, and done once it has', () => {

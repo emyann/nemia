@@ -42,6 +42,10 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **The engine's `transcript` of an attempt still in flight observes its harness** — one `claude agents`
   call per read, since the session's id is on no record yet. Read it on a run's detail, never on the list
   the Factory polls (learned by the run that put a blocked session's last line on the board).
+- **Playwright's `dragTo` onto a React Flow handle waits for ever.** A handle a connection cannot start from has `pointer-events: none`
+  until a drag is under way, so `dragTo`'s check of what the pointer would hit finds the node over the handle. Drag with `page.mouse`
+  (down, move in steps, up), and keep both ends in the frame: a drag that starts off a handle pans the pane (`drawEdge` in
+  `apps/web/test/e2e/run.ts`, learned by the run that built the workflow builder).
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).

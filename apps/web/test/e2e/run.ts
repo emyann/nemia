@@ -119,6 +119,55 @@ const STARTED_AS = 'show-what-a-step-cost-on-the-e2e0';
 /** What the `answer` page answers FAKE's blocked step with. */
 const ANSWER = 'Keep it off the floor: a finished run is under Show finished.';
 
+/** A folder's files, each name with its text: what a page that writes nothing leaves as it found. */
+const filesIn = (dir: string): Array<[string, string]> =>
+  fs.readdirSync(dir).sort().map((name) => [name, fs.statSync(path.join(dir, name)).isFile() ? fs.readFileSync(path.join(dir, name), 'utf8') : '(a folder)']);
+
+/** A text's markdown, rendered: its `##` a heading two levels down, an h4 — the page's own are h1 and h2 — and its list, a list. */
+async function expectRendered(body: Locator, text: { heading: string; items: readonly string[]; cells?: readonly string[]; code?: string }): Promise<void> {
+  await expectVisible(body.getByRole('heading', { level: 4, name: text.heading }), `its ## is a heading, an h4 (${text.heading})`);
+  await expectTexts(body.locator('ul > li'), text.items, `its list is a list (${text.items.join(' · ')})`);
+  for (const cell of text.cells ?? []) await expectVisible(body.getByRole('cell', { name: cell, exact: true }), `its table is a table, with a cell ${cell}`);
+  if (text.code) await expectVisible(body.locator('[data-language="bash"]', { hasText: text.code }), `its fenced block is the board's code block, in bash (${text.code})`);
+}
+
+/**
+ * A page's key table: a row per key the api answers, in its order, each with its value — or `not set` — and what it means, as the api says it.
+ * `set` is what the file sets, by key, as the seed wrote it: every other key reads `not set`.
+ */
+async function expectKeys(page: Page, file: Locator, api: string, set: Readonly<Record<string, string>>): Promise<void> {
+  const answered = await page.request.get(new URL(api, page.url()).href);
+  if (!answered.ok()) throw new Refused(`GET ${api} answers the page's keys — it answered ${answered.status()}`);
+  const { keys } = (await answered.json()) as { keys: Array<{ key: string; value: string | null; meaning: string }> };
+  const rows = file.locator('section[aria-label="Keys"] tr[data-key]');
+  await expectCount(rows, keys.length, `a row per key (${keys.map((k) => k.key).join(', ')})`);
+  const order = await rows.evaluateAll((trs) => trs.map((tr) => tr.getAttribute('data-key')));
+  if (JSON.stringify(order) !== JSON.stringify(keys.map((k) => k.key))) throw new Refused(`the rows are in the package's order — ${order.join(', ')}`);
+  for (const { key, value, meaning } of keys) {
+    if (value !== (set[key] ?? null)) throw new Refused(`GET ${api} reads ${key} as the file sets it (${set[key] ?? 'not set'}) — it answered ${JSON.stringify(value)}`);
+    const row = rows.filter({ has: page.locator(`th[scope="row"]`, { hasText: new RegExp(`^${key}$`) }) });
+    await expectTexts(row.locator('[data-value]'), [value ?? 'not set'], `${key}'s value reads ${value ?? 'not set'}`);
+    // The meaning is markdown: its code spans are drawn as code, so the text read has no backticks.
+    await expectTexts(row.locator('[data-meaning]'), [meaning.replaceAll('`', '')], `${key}'s row says what it means, as the package does`);
+  }
+}
+
+/** Source: the file as written, frontmatter included, in place of what the page renders of it — and back. */
+async function expectSource(file: Locator, body: Locator, onDisk: string): Promise<void> {
+  const toggle = file.getByRole('button', { name: 'Source' });
+  await toggle.click();
+  const source = file.locator('pre[data-source]');
+  await expectVisible(source, 'Source shows the file as written');
+  const shown = await source.textContent();
+  const written = fs.readFileSync(onDisk, 'utf8');
+  if (shown !== written) throw new Refused(`Source is the file byte for byte, frontmatter included — it shows ${JSON.stringify(shown)}, and ${onDisk} holds ${JSON.stringify(written)}`);
+  if ((await toggle.getAttribute('aria-pressed')) !== 'true') throw new Refused('Source says it is pressed while the file is shown');
+  await expectCount(file.locator('section[aria-label="Keys"]'), 0, 'in place of the rendered body and the keys');
+  await toggle.click();
+  await expectCount(source, 0, 'pressed again, Source gives the rendered page back');
+  await expectVisible(body, 'the body rendered again');
+}
+
 /** The pages, and what each must have. A new page gets a line here, or the check never looks at it. */
 const PAGES: PageSpec[] = [
   {
@@ -1303,6 +1352,26 @@ const PAGES: PageSpec[] = [
       const mine = card(yours.name);
       await expectVisible(mine.getByText('yours', { exact: true }), `${yours.name}, under workflows/ in the store, is marked as yours`);
       await expectCount(mine.locator('.react-flow__node'), yours.steps.length, `${yours.name}'s graph has its one step`);
+
+      // Each step's page, from a link under the graph — in the order a run runs them — and from its block on the graph.
+      const links = (card: Locator, name: string) => card.getByRole('navigation', { name: `Steps of ${name}` }).getByRole('link');
+      await expectTexts(links(dev, good.name), good.steps, `under ${good.name}'s graph, a link to each step's page, in the order they run`);
+      await expectTexts(links(mine, yours.name), yours.steps, `and under ${yours.name}'s`);
+      for (const step of good.steps) {
+        const href = await links(dev, good.name).filter({ hasText: step }).getAttribute('href');
+        if (href !== `/workflows/repo/${good.name}/steps/${step}`) throw new Refused(`${step}'s link opens its page, /workflows/repo/${good.name}/steps/${step} — it goes to ${href}`);
+      }
+      await nextVisit(page, async (again) => {
+        await links(again.locator(`section[aria-label="Workflow ${good.name}"]`), good.name).filter({ hasText: 'review' }).click();
+        await again.waitForURL(`**/workflows/repo/${good.name}/steps/review`, { timeout: WAIT_MS });
+        await expectVisible(again.locator('h1', { hasText: /^review$/ }), "a step's link opens the step's page");
+        await again.goBack({ waitUntil: 'networkidle' });
+        const block = again.locator(`section[aria-label="Workflow ${good.name}"] .react-flow__node[data-id="implement"]`);
+        await expectVisible(block, 'back on the Workflows page, the graph');
+        await block.click();
+        await again.waitForURL(`**/workflows/repo/${good.name}/steps/implement`, { timeout: WAIT_MS });
+        await expectVisible(again.locator('h1', { hasText: /^implement$/ }), "a block on the graph opens its step's page");
+      });
     },
   },
   {
@@ -1314,20 +1383,21 @@ const PAGES: PageSpec[] = [
     expect: async (page) => {
       await sidebar(page);
       await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }), 'the sidebar lights Inbox on its page');
-      const { planned, bare } = CARDS;
+      const { planned, bare, rich } = CARDS;
       const inbox = path.join(store!, 'inbox');
       const checkout = path.join(store!, 'checkout');
       const runsDir = path.join(store!, 'runs');
       const listed = (p: Page) => p.locator('section[aria-label="Cards"] li[data-card]');
       const order = (p: Page) => listed(p).evaluateAll((items) => items.map((item) => item.getAttribute('data-card')));
 
-      await expectCount(listed(page), 2, 'a card per file in the inbox: the two the store has');
-      if (JSON.stringify(await order(page)) !== JSON.stringify([bare.name, planned.name])) {
-        throw new Refused(`the cards are listed newest first — ${bare.name}, filed ${bare.filedMinutesAgo} minutes ago, then ${planned.name} — and they were listed ${(await order(page)).join(', ')}`);
+      await expectCount(listed(page), 3, 'a card per file in the inbox: the three the store has');
+      if (JSON.stringify(await order(page)) !== JSON.stringify([bare.name, rich.name, planned.name])) {
+        throw new Refused(`the cards are listed newest first — ${bare.name}, filed ${bare.filedMinutesAgo} minutes ago, then ${rich.name}, then ${planned.name} — and they were listed ${(await order(page)).join(', ')}`);
       }
-      for (const card of [planned, bare]) {
+      for (const card of [planned, bare, rich]) {
         const item = cardIn(page, card.name);
         await expectVisible(item.locator('[data-title]', { hasText: card.title }), `${card.name} is listed by its first line (${card.title})`);
+        await expectVisible(item.locator(`[data-title] a[href="/inbox/${card.name}"]`, { hasText: card.title }), `and its first line opens its page (/inbox/${card.name})`);
         await expectCount(item.getByText(card.body.split('\n\n')[1]!), 0, `and its first line alone: the rest of its body is the brief its start is prefilled with`);
         await expectVisible(item.getByRole('button', { name: 'Start' }), `${card.name} offers Start`);
         await expectVisible(item.getByRole('button', { name: 'Remove' }), `${card.name} offers Remove`);
@@ -1356,7 +1426,7 @@ const PAGES: PageSpec[] = [
         const text = fs.existsSync(written) ? fs.readFileSync(written, 'utf8') : undefined;
         const card = `---\nworkflow: ${WORKFLOWS.good.name}\nrepo: ${checkout}\n---\n${FILED}\n`;
         if (text !== card) throw new Refused(`the card is written as wf inbox add writes it, with its workflow and repository — ${written} holds ${JSON.stringify(text)}`);
-        await expectCount(listed(page), 3, 'the card filed is listed');
+        await expectCount(listed(page), 4, 'the card filed is listed');
         if ((await order(page))[0] !== name) throw new Refused(`the card filed is listed first, the newest — the list is ${(await order(page)).join(', ')}`);
         await expectVisible(cardIn(page, name).locator('[data-title]', { hasText: FILED.split('\n')[0]! }), 'by its first line');
         if ((await idea.inputValue()) !== '') throw new Refused('the box is emptied once the card is filed');
@@ -1540,7 +1610,7 @@ const PAGES: PageSpec[] = [
         fs.rmSync(elsewhereFile, { force: true });
       }
 
-      // An empty inbox, in a page of its own: both cards set aside, and put back.
+      // An empty inbox, in a page of its own: every card set aside, and put back.
       const aside = path.join(store!, 'inbox-aside');
       const empty = await page.context().newPage();
       try {
@@ -1603,7 +1673,7 @@ const PAGES: PageSpec[] = [
           form.getByRole('button', { name: 'Start' }).click(),
         ]);
         const { error } = (await answered.json()) as { error?: string };
-        const sentence = `no card ${bare.name} in the inbox. Its cards are: ${planned.name}. Start one of those — wf start ${path.join(inbox, '<name>.md')} — or park the idea first: wf inbox add "<idea>".`;
+        const sentence = `no card ${bare.name} in the inbox. Its cards are: ${[planned.name, rich.name].sort().join(', ')}. Start one of those — wf start ${path.join(inbox, '<name>.md')} — or park the idea first: wf inbox add "<idea>".`;
         if (answered.status() !== 404 || error !== sentence) {
           throw new Refused(`the api refuses to start a card that is not there, in the package's words — it answered ${answered.status()}: ${JSON.stringify(error)}`);
         }
@@ -1611,12 +1681,12 @@ const PAGES: PageSpec[] = [
         if (listing.some((e) => e.name === bare.name)) throw new Refused(`the inbox read again after the refusal no longer lists ${bare.name} — it listed ${JSON.stringify(listing.map((e) => e.name))}`);
         await refused.waitForLoadState('networkidle');
         await expectCount(item, 0, 'the card leaves the list once the inbox is read again after the refusal');
-        await expectCount(listed(refused), 1, `and only ${planned.name} is listed`);
+        await expectCount(listed(refused), 2, `and only ${rich.name} and ${planned.name} are listed`);
         const gone = refused.locator(`section[aria-label="Cards"] li[data-gone="${bare.name}"]`);
         await expectVisible(gone.locator('[data-refused="start"]', { hasText: 'Not started. The api refused it:' }), 'the refusal stays, where the card was listed, not swallowed with the form');
         const shown = await gone.locator('[data-refused] p.font-mono').textContent();
         if (shown !== error) throw new Refused(`the refusal in the card's place is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
-        if (JSON.stringify(await order(refused)) !== JSON.stringify([planned.name])) throw new Refused(`the cards listed are the inbox's — ${(await order(refused)).join(', ')}`);
+        if (JSON.stringify(await order(refused)) !== JSON.stringify([rich.name, planned.name])) throw new Refused(`the cards listed are the inbox's — ${(await order(refused)).join(', ')}`);
         const after = fs.readdirSync(runsDir).sort();
         if (JSON.stringify(after) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${runsDir} went from ${before.length} files to ${after.length}`);
         await settled(refused);
@@ -1708,6 +1778,63 @@ const PAGES: PageSpec[] = [
         fs.rmSync(startedRecord, { force: true });
       }
       await settled(page);
+    },
+  },
+  {
+    // A card's page: its body rendered — a heading, a list, a table, a code block, a line of raw HTML shown as text, a link that opens in a
+    // new tab and a `javascript:` one that is only its words — then its keys, each with what it means as the api says it, and Source: the
+    // file as written, frontmatter included. It writes nothing: the inbox is as it was.
+    name: 'card',
+    route: `/inbox/${CARDS.rich.name}`,
+    expect: async (page) => {
+      await sidebar(page);
+      await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }), "the sidebar lights Inbox on a card's page");
+      const { rich } = CARDS;
+      const inbox = path.join(store!, 'inbox');
+      const before = filesIn(inbox);
+      await expectVisible(page.locator('h1', { hasText: rich.name }), `the page names the card (${rich.name})`);
+      await expectVisible(page.getByRole('link', { name: '← Inbox' }), 'and leads back to the Inbox');
+
+      const file = page.locator('section[aria-label="The file"]');
+      const body = file.locator('[data-markdown]').first();
+      await expectRendered(body, rich);
+      await expectVisible(body.getByText(rich.html, { exact: true }), 'the line of raw HTML, shown as the text it is');
+      await expectCount(body.locator('b, img, script'), 0, 'and no element made of it');
+      await expectVisible(body.getByText(rich.unsafe, { exact: true }), 'a javascript: link, shown as its words');
+      await expectCount(page.locator('a[href^="javascript:" i]'), 0, 'and no link on the page runs script');
+      const link = body.getByRole('link', { name: rich.link.text });
+      await expectVisible(link, `a link, as a link (${rich.link.text})`);
+      const [href, target, rel] = await Promise.all([link.getAttribute('href'), link.getAttribute('target'), link.getAttribute('rel')]);
+      if (href !== rich.link.href || target !== '_blank' || !rel?.split(' ').includes('noreferrer')) {
+        throw new Refused(`a link opens in a new tab and gives the page it opens nothing of this one — href ${href}, target ${target}, rel ${rel}`);
+      }
+
+      await expectKeys(page, file, `/api/inbox/${rich.name}`, { workflow: rich.workflow });
+      await expectSource(file, body, path.join(inbox, `${rich.name}.md`));
+      if (JSON.stringify(filesIn(inbox)) !== JSON.stringify(before)) throw new Refused(`a card's page writes nothing — ${inbox} changed while it was open`);
+    },
+  },
+  {
+    // A step's page, from its block on the Workflows page: what its agent is told, rendered, then every key a step may set — set or not — with
+    // its value as the loader reads it and what it means, and Source: the file as written. It writes nothing: the checkout's folder is as it was.
+    name: 'workflow-step',
+    route: `/workflows/repo/${WORKFLOWS.good.name}/steps/review`,
+    expect: async (page) => {
+      await sidebar(page);
+      await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Workflows' }), "the sidebar lights Workflows on a step's page");
+      const { good } = WORKFLOWS;
+      const folder = path.join(store!, 'checkout', 'workflows', good.name);
+      const before = filesIn(folder);
+      await expectVisible(page.locator('h1', { hasText: /^review$/ }), "the page names the step");
+      await expectVisible(page.getByText(good.name, { exact: true }), `and the workflow it is a step of (${good.name})`);
+      await expectVisible(page.getByText('this repository', { exact: true }), "marked as the repository's");
+
+      const file = page.locator('section[aria-label="The file"]');
+      const body = file.locator('[data-markdown]').first();
+      await expectRendered(body, good.review);
+      await expectKeys(page, file, `/api/workflows/repo/${good.name}/steps/review`, good.review.keys);
+      await expectSource(file, body, path.join(folder, 'review.md'));
+      if (JSON.stringify(filesIn(folder)) !== JSON.stringify(before)) throw new Refused(`a step's page writes nothing — ${folder} changed while it was open`);
     },
   },
   {

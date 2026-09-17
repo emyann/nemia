@@ -15,6 +15,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-engine';
 import type { Run, TaskPhase } from '../src/run.ts';
+import { queueLine } from '../src/inbox.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-queue-'));
 const RUNS = path.join(ROOT, 'runs');
@@ -537,4 +538,71 @@ test("REFUSED at shipped defaults: a queued card whose `repo:` folder was delete
   assert.equal(fs.readFileSync(gone, 'utf8'), `---\nworkflow: dev\nrepo: ${doomed}\n---\nIts repository is gone\n`);
   assert.equal(readInbox().find((l) => l.name === 'gone-a1b2')!.queued, undefined);
   await assert.rejects(main(['inbox', 'queue', 'gone-a1b2'], b.e), refusedWith(/^gone-a1b2\.md: `repo: .*` names no directory\./), 'and queued again only once it reads');
+});
+
+test("a queued card whose start fails without a refusal — its repository no git repository, say — is not written off: tried again on every pass, where it keeps its place and the card behind it waits, said once on `wf up`, and started once the failure clears", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const repo = aRepoWith('dev');
+  // A directory with a workflow in it, and no git: the start's `git rev-parse` fails, with no exit code of the package's.
+  const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
+  fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
+  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
+  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
+  aCard('behind-c3d4', { workflow: 'dev', repo, queued: '2026-09-16T09:05:00.000Z' }, 'Behind it');
+
+  const first = await tick(b.e);
+  assert.ok(first.queue && 'failed' in first.queue, JSON.stringify(first.queue));
+  assert.deepEqual([first.queue.card, first.queue.again], ['no-git-a1b2', false]);
+  assert.match(first.queue.failed, /^Command failed: git rev-parse HEAD \/ .*not a git repository/);
+  const written = JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'no-git-a1b2.json'), 'utf8'));
+  assert.deepEqual([written.refused, written.repo, written.why], [false, bare, first.queue.failed]);
+  const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('no-git-a1b2'))!;
+  assert.match(listed, / {2}queued 1 of 2 — failed at \S+: Command failed: git rev-parse HEAD .* — not a refusal: the tick tries it again on every pass, where it keeps its place$/);
+
+  // `wf up` over two passes: the failure said once, the card tried on both, and the card behind it not started.
+  const up = board();
+  let passes = 0;
+  const stop = new Error('the test stops the daemon');
+  const inner = up.e.tick.bind(up.e);
+  (up.e as { tick: () => Promise<void> }).tick = async () => { if (++passes > 2) throw stop; await inner(); };
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.join(' ')); });
+  try {
+    await assert.rejects(main(['up', '1'], up.e), (err) => err === stop);
+  } finally { log.mock.restore(); }
+  assert.deepEqual(printed.filter((l) => l.includes('no-git-a1b2')), [], 'the same failure as the pass before, twice: not said again');
+  const again = await tick(b.e);
+  assert.deepEqual([again.queue && 'failed' in again.queue && again.queue.again, listRuns()], [true, []], 'tried again, and nothing started behind it');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'no-git-a1b2.json'), 'utf8')).at, written.at, 'not written again');
+
+  // Git put there: the next pass starts it, and the pass after removes its try, then starts the card behind it.
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: bare, stdio: 'ignore' });
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'base');
+  const cleared = await tick(b.e);
+  const [run] = fromCard('no-git-a1b2');
+  assert.deepEqual(cleared.queue, { card: 'no-git-a1b2', run: run!.id, removed: true });
+  const behind = await tick(b.e);
+  assert.deepEqual([behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))], ['behind-c3d4', []]);
+});
+
+test("REFUSED at shipped defaults, on the repository it was tried on: a queued card that names no repository, refused on the daemon's — no such workflow there — is passed over by every pass there, and started by a pass in a repository that has its workflow", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  const none = aRepoWith();
+  const dev = aRepoWith('dev');
+  const { card } = addToInbox({ text: 'Wherever the daemon is', workflow: 'dev' });
+  await printedBy(t, b.e, 'inbox', 'queue', card.name);
+
+  const refused = await tick(b.e, { repo: none });
+  assert.ok(refused.queue && 'refused' in refused.queue, JSON.stringify(refused.queue));
+  assert.equal(refused.queue.on, none);
+  assert.match(queueLine(refused.queue), new RegExp(`^${card.name} not started on ${none.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}: ${card.name}\\.md: \`workflow: dev\` — no workflow folder at .*, or run wf up in the repository it is about$`));
+  assert.deepEqual([(await tick(b.e, { repo: none })).queue, listRuns()], [undefined, []], 'passed over on the same repository');
+  assert.match((await printedBy(t, b.e, 'inbox'))[0]!, new RegExp(` — not started at \\S+ on ${none.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}: `));
+
+  const started = await tick(b.e, { repo: dev });
+  const [run] = fromCard(card.name);
+  assert.deepEqual([started.queue, run?.repo], [{ card: card.name, run: run!.id, removed: true }, dev]);
 });

@@ -154,7 +154,9 @@ is said at start:
                  free (WF_MAX_RUNS; always, with no cap), the tick starts the oldest queued card, one per pass, on its
                  workflow: and its repo: or the directory wf up runs in. --workflow writes the key too; --off, or
                  wf inbox rm, takes the card back. wf inbox says queued and its place; a start the package refused
-                 is said there and on wf up's line, and the card is not tried again until it is edited or queued again.
+                 is said there and on wf up's line, and the card is not tried again until it is edited or queued again
+                 (or, naming no repo:, wf up runs in another repository); a start that failed otherwise is said once,
+                 and tried again on the next pass.
   wf inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
 
 Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
@@ -562,7 +564,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       for (;;) {
         // A queued card that names no repository starts on the one `wf up` runs in, as `wf start` takes `.`.
         const { runs: passed, queue } = await tick(e, { repo: path.resolve('.') });
-        if (queue) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
+        // A failure the same as the last pass's is not said again: it is tried again on every pass, and said once.
+        if (queue && !('again' in queue && queue.again)) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
         for (const r of passed) {
           for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
           if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);

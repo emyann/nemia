@@ -145,23 +145,35 @@ export type InboxListing = {
    * record says was started, which the tick never starts again.
    */
   queued?: { at: string; place: number | null };
-  /** On a queued card only, whose start the tick tried and the package refused, as the card stands (`QueueRefusal`): when, and why. */
-  refused?: { at: string; why: string };
+  /**
+   * On a queued card only, whose start the tick tried and did not make, as the card stands (`QueueTry`): when, on which repository, why, and
+   * whether the package refused it or something else failed.
+   */
+  tried?: { at: string; repo: string; why: string; refused: boolean };
 };
 
 /**
- * A queued card's start the package refused, as the tick writes it down: when, the card's text as it was, and why. The tick does not try that
- * card again while its text is the same — an edit, or a queue taken back and given again, is a new card to try.
+ * A queued card's start the tick tried and did not make, as it writes it down: when, the card's text as it was, the repository it was tried on —
+ * the card's `repo:`, or the daemon's for a card that names none — why, and whether it was a refusal.
+ *
+ * `refused` is the package's own refusal, by name, exit 2 — the workflow gone, the repository gone, a card that does not read: it lasts. The tick
+ * does not try that card again while its text is the same and it would be tried on the same repository (`nextQueued`) — an edit, a queue taken
+ * back and given again, or a daemon in another repository for a card that names none, is a new try. Anything else — git failing while the
+ * start reads the repository, a file that cannot be read — is a failure, not a verdict on the card: it is tried again on the next pass.
  */
-export type QueueRefusal = { at: string; text: string; why: string };
+export type QueueTry = { at: string; text: string; repo: string; why: string; refused: boolean };
 
 /**
  * The inbox as `wf inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each card
  * with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a README are
  * not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the order; and, when the
- * tick's refusal of its start is of the card as it stands (`refusals`, by name), that refusal.
+ * tick's last try of its start is of the card as it stands (`tries`, by name), that try.
  */
-export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run, 'id' | 'from'>[], isDirectory: (at: string) => boolean, refusals: ReadonlyMap<string, QueueRefusal> = new Map()): InboxListing[] {
+export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run, 'id' | 'from'>[], isDirectory: (at: string) => boolean, tries: ReadonlyMap<string, QueueTry> = new Map()): InboxListing[] {
+  const triedOf = (name: string, text: string): Pick<InboxListing, 'tried'> => {
+    const t = tries.get(name);
+    return t && t.text === text ? { tried: { at: t.at, repo: t.repo, why: t.why, refused: t.refused } } : {};
+  };
   const listed = files
     .filter((f) => !f.file.startsWith('.') && !isReadme(f.file))
     .sort((a, b) => a.file.localeCompare(b.file))
@@ -176,22 +188,20 @@ export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run
       const startedAs = runs.filter((r) => r.from?.inbox === name).map((r) => r.id);
       try {
         const card = parseInboxCard(file, text, isDirectory);
-        const refusal = card.queued !== undefined ? refusals.get(name) : undefined;
         return {
           name, file, title: card.body.split('\n')[0]!, workflow: card.workflow ?? null, repo: card.repo ?? null, startedAs, error: null,
-          ...(card.queued !== undefined ? { queued: { at: card.queued, place: null } } : {}),
-          ...(refusal && refusal.text === text ? { refused: { at: refusal.at, why: refusal.why } } : {}),
+          ...(card.queued !== undefined ? { queued: { at: card.queued, place: null }, ...triedOf(name, text) } : {}),
         };
       } catch (err) {
         // A queued card whose `repo:` is gone reads as a card but for that, and keeps its place in the queue: the tick tries it, and the start
         // refuses it by name, as it refuses a workflow gone — never a card that leaves the queue with nothing said.
-        let queued: string | undefined;
-        try { queued = parseInboxCard(file, text, () => true).queued; } catch { /* not a card for another reason: not in the queue */ }
-        const refusal = queued !== undefined ? refusals.get(name) : undefined;
+        // Its workflow and repository as it writes them, too: the repository its start is tried on, which keys the try.
+        let lenient: InboxCard | undefined;
+        try { lenient = parseInboxCard(file, text, () => true); } catch { /* not a card for another reason: not in the queue */ }
+        const queued = lenient?.queued;
         return {
-          name, file, title: null, workflow: null, repo: null, startedAs, error: (err as Error).message,
-          ...(queued !== undefined ? { queued: { at: queued, place: null } } : {}),
-          ...(refusal && refusal.text === text ? { refused: { at: refusal.at, why: refusal.why } } : {}),
+          name, file, title: null, workflow: queued !== undefined ? lenient!.workflow ?? null : null, repo: queued !== undefined ? lenient!.repo ?? null : null, startedAs, error: (err as Error).message,
+          ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
         };
       }
     });
@@ -206,19 +216,36 @@ export function inboxListing(files: readonly PlanFile[], runs: readonly Pick<Run
 export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
   listing.filter((l) => l.queued && !l.startedAs.length).sort((a, b) => a.queued!.at.localeCompare(b.queued!.at) || a.name.localeCompare(b.name));
 
-/** The card the tick starts next, when a run slot is free: the first in the queue's order whose start was not refused as it stands. Pure. */
-export const nextQueued = (listing: readonly InboxListing[]): InboxListing | undefined => queueOrder(listing).find((l) => !l.refused);
+/**
+ * The card the tick starts next, when a run slot is free, on a daemon in `repo`: the first in the queue's order whose start was not refused as it
+ * stands — its text the same, and tried on the repository it would be tried on now, its `repo:` or else `repo`. A card whose start failed for
+ * any other reason keeps its place, and is tried again. Pure.
+ */
+export const nextQueued = (listing: readonly InboxListing[], repo: string): InboxListing | undefined =>
+  queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === (l.repo ?? repo)));
 
 /**
  * What the tick did with the queue on a pass (`startQueued` in runner.ts): started the next card as a run — and whether the card left the inbox,
- * and why not — or tried to, and was refused, in the package's words.
+ * and why not — or tried to, and was refused, in the package's words, or failed for another reason: `again` when it failed as it did on the pass
+ * before, on the same repository. `on` is the repository it was tried on, for a card that names none.
  */
-export type QueueStarted = { card: string; run: string; removed: true } | { card: string; run: string; removed: false; why: string } | { card: string; refused: string };
+export type QueueStarted =
+  | { card: string; run: string; removed: true }
+  | { card: string; run: string; removed: false; why: string }
+  | { card: string; refused: string; on?: string }
+  | { card: string; failed: string; again: boolean; on?: string };
 
-/** A pass's start of a queued card, as `wf up` and `wf tick` log it: `started <card> as <runId>`, or why it was not started, and what then. */
+/**
+ * A pass's start of a queued card, as `wf up` and `wf tick` log it: `started <card> as <runId>`, or why it was not started, and what then. `wf up`
+ * says a failure `again` no more.
+ */
 export function queueLine(q: QueueStarted): string {
   if ('refused' in q) {
-    return `${q.card} not started: ${q.refused} — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (wf inbox queue ${q.card} --off, then wf inbox queue ${q.card})`;
+    const elsewhere = q.on ? `, or run wf up in the repository it is about` : '';
+    return `${q.card} not started${q.on ? ` on ${q.on}` : ''}: ${q.refused} — left queued as it is, and not tried again while it reads the same: edit the card, or take it back and queue it again (wf inbox queue ${q.card} --off, then wf inbox queue ${q.card})${elsewhere}`;
+  }
+  if ('failed' in q) {
+    return `${q.card} not started${q.on ? ` on ${q.on}` : ''}: ${q.failed} — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise`;
   }
   return q.removed
     ? `started ${q.card} as ${q.run}`
@@ -234,13 +261,17 @@ export function inboxLines(listing: readonly InboxListing[]): string[] {
   const inLine = listing.filter((l) => l.queued?.place).length;
   return listing.map((l) => {
     const started = l.startedAs.length ? `  started as ${l.startedAs.join(', ')}` : '';
-    // Its place in the queue, and, when the tick's start of it was refused as it stands, why: it waits for a person, not for a slot. A card
-    // that does not read says why beside its name already, and is not told it twice.
+    // Its place in the queue, and, when the tick's start of it did not start it as it stands, why: refused, it waits for a person, not for a
+    // slot; failed otherwise, the tick tries it again. A card that does not read says why beside its name already, and is not told it twice.
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
-    const why = l.refused && l.refused.why !== l.error ? `: ${l.refused.why}` : '';
-    const refused = l.refused ? ` — not started at ${l.refused.at}${why} Edit the card, or take it back and queue it again, and the tick tries it again` : '';
-    if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${refused}${started}`;
-    return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${queued}${refused}${started}`;
+    const t = l.tried;
+    const on = t && l.error === null && !l.repo ? ` on ${t.repo}` : '';
+    const why = t && t.why !== l.error ? `: ${t.why}` : '';
+    const tried = !t ? ''
+      : t.refused ? ` — not started at ${t.at}${on}${why} Edit the card, or take it back and queue it again${on ? ', or run wf up in the repository it is about' : ''}, and the tick tries it again`
+      : ` — failed at ${t.at}${on}${why} — not a refusal: the tick tries it again on every pass, where it keeps its place`;
+    if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}`;
+    return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${queued}${tried}${started}`;
   });
 }
 

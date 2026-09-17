@@ -1900,10 +1900,13 @@ What was built, the cards:
   `workflow:` and its `repo:` or else the daemon's repository (`tick(e, { repo })`; `wf up` and `wf tick` hand it `.`). One card a pass, so
   the next pass counts its run before another starts. `tick` now answers with a `Pass`: the runs, and what it did with the queue
   (`QueueStarted`), which `wf up` and `wf tick` log (`queueLine`): `started <card> as <runId>`.
-- **A refused start is written down** (`startQueued`): `$WF_ROOT/queue/<name>.json`, the tick's own file, holds when, the card's text and
-  why. `nextQueued` passes over a card whose refusal is of its text as it stands, so the card behind it has its turn; an edit, or `--off` then
-  a new queue, makes it a card to try again, and the pass removes the refusal that no longer reads. `wf inbox` shows `queued 2 of 3`, and
-  `not started at <time>: <why>` beside a refused card (`inboxListing`, `inboxLines`).
+- **A start that did not happen is written down** (`startQueued`, `QueueTry`): `$WF_ROOT/queue/<name>.json`, the tick's own file, holds when,
+  the card's text, the repository it was tried on, why, and whether the package refused it (exit 2). `nextQueued` passes over a card refused
+  as it stands — its text, and the repository it would be tried on — so the card behind it has its turn; an edit, `--off` then a new queue,
+  or a daemon in another repository for a card that names none makes it a card to try again, and the pass removes the try that no longer
+  reads. A failure that is not a refusal is tried again on the next pass, where the card keeps its place, and `wf up` says it once
+  (`again`). `wf inbox` shows `queued 2 of 3`, and `not started at <time>: <why>` or `failed at <time>: <why>` beside the card (`inboxListing`,
+  `inboxLines`).
 
 What was decided, and why:
 
@@ -1918,10 +1921,14 @@ What was decided, and why:
 - **The record, and nothing else, says the cap held a run.** One field, written once by the tick, the record's one writer. A run the cap never
   held has no `slot` on its timeline at all, rather than `not known` on every run from before the cap.
 - **No new field on a shape the board compares whole.** `TimelineTotal` keeps its keys (the slot wait goes into its `queued`), and `Listing`'s
-  `slot` is there only on a held run, since `apps/api`'s tests compare those objects whole. So is an `InboxListing`'s `queued` and `refused`.
-- **A refused card is written down and passed over, not tried every pass.** Tried again on each pass, a card whose workflow is gone logged a
-  refusal every four seconds and held every card behind it. Nothing in memory could say it was tried, so the tick writes it down, in a file of
-  its own outside the inbox, which is a person's; the card itself is left as it is. Keyed on the card's text, so no verb has to clear it.
+  `slot` is there only on a held run, since `apps/api`'s tests compare those objects whole. So is an `InboxListing`'s `queued` and `tried`.
+- **A refused card is written down and passed over, not tried every pass.** The brief's *one try per pass, no hot loop* read literally is a
+  refused card tried again on every pass: it logged a refusal every four seconds and, one card a pass, held every card behind it for good.
+  Nothing in memory could say it was tried, so the tick writes it down, in a file of its own outside the inbox, which is a person's; the card
+  itself is left as it is. Keyed on the card's text and the repository it was tried on, so no verb has to clear it. This is a reading, and
+  round 2's review asked a person to confirm it: a queue that stops at a refused card instead is one line in `nextQueued`.
+- **Only the package's refusal lasts.** A start can also fail for reasons that say nothing of the card — git on the repository, a file
+  that cannot be read — and those pass; so such a card is tried again on the next pass and keeps its place, and is said once.
 - **The queue is in the order a person queued, and a refused card loses nothing but its turn.** Order by name would start `a-…` before a card
   queued an hour earlier. A card queued again is at the back.
 - **`queued:` with no `workflow:` is refused by the parser, not only by the verb.** A card hand-edited into the queue with nothing to say
@@ -1975,14 +1982,26 @@ Round 2's review found three things, each fixed:
   the check. Tested pure in `test/inbox.test.ts` — a card with another fault is in no queue — and in `test/queue-store.test.ts`, deleting a
   queued card's repository: named on `wf tick` and in `wf inbox`, the card behind it started on the next pass, and taken back. Leaving it out
   of the queue fails two; `--off` with the check, one.
+- **Every failure of a start stuck as a refusal**, and a refusal stuck wherever the daemon ran. The catch wrote down any error — git failing
+  once while `start()` read the repository — and a card with no `repo:` refused because `wf up` ran in the wrong repository stayed refused
+  from the right one. Now only an error with exit code 2 is a refusal (`QueueTry.refused`), and it is keyed on the repository it was tried on
+  as well as the card's text; any other failure is tried again on the next pass, in its place, said once. Tested pure — a card refused on
+  one repository tried on another, a failed card not passed over, both on `wf inbox` — and in `test/queue-store.test.ts`: a queued card on a
+  directory with no git failing with git's words, tried on every pass while the card behind it waits, said once over two passes of `wf up`,
+  and started once git is there; and a card with no `repo:` refused on a repository with no such workflow, passed over there, and started in
+  one that has it. Every error lasting fails one; a try not keyed on the repository, two; failures passed over, three; a failure said, or
+  written, on every pass, one each.
 
 What it leaves:
 
 - **The board.** `apps/api` passes no slot to `listing`, so the Factory and the run page say `waiting` on a held run; its inbox page has no
   queue button and shows no place; and the Factory draws no ghost for a queued card. Left for the board.
-- **A refused card stays refused when the world changes and the card does not.** Put the workflow back, or run `wf up` from another
-  repository, and the tick still passes over it until a person edits it or queues it again: the refusal is keyed on the card's text, and
-  nothing else about the world is written down.
+- **A refused card stays refused when the world changes and the card does not.** Put the workflow back, and the tick still passes over it
+  until a person edits it or queues it again: the refusal is keyed on the card's text and the repository it was tried on, and nothing else
+  about the world is written down.
+- **A failure that persists holds the queue behind it.** A card whose start keeps failing without a refusal — a `repo:` that is a directory
+  with no git — is tried on every pass and keeps its place, so the cards behind it wait until a person fixes the repository, or takes the
+  card back. It is said once on `wf up`, and in `wf inbox`.
 - **A card with no `repo:` starts on wherever `wf up` runs.** `wf inbox` cannot know that directory, so a refusal that turns on it is seen
   only once the tick has tried.
 - **`wf inbox queue --off` in the moment the tick starts the card** can write the card back after the start removed it. The record names it,

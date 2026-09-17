@@ -1319,10 +1319,14 @@ up — every 4000ms, ^C to stop
 - **Started, the card leaves the inbox** as any start removes it, and `wf up` and `wf tick` log `started <card> as <runId>`. A
   removal that fails leaves a card `wf inbox` lists as `started as <runId>`, which neither a pass nor a person starts again.
 - **A start the package refuses is written down, not tried again.** The workflow gone, the repository gone, whatever
-  `startFromInbox` refuses: `wf up`'s line names it, `wf inbox` says `not started at <time>: <why>` beside the card's place,
-  and the card is left as it is. The tick keeps the refusal in `$WF_ROOT/queue/<name>.json` with the card's text, and passes
-  over the card while its text is the same: one try, no hot loop, and the card behind it has its turn. Edit the card, or take
-  it back and queue it again, and the next pass tries it again. A card whose `repo:` folder was deleted after it was queued no
+  `startFromInbox` refuses by name (exit 2): `wf up`'s line names it, `wf inbox` says `not started at <time>: <why>` beside
+  the card's place, and the card is left as it is. The tick keeps the refusal in `$WF_ROOT/queue/<name>.json` with the card's
+  text and the repository it was tried on, and passes over the card while both are the same: one try, no hot loop, and the card
+  behind it has its turn. Edit the card, or take it back and queue it again — or, for a card that names no `repo:`, run `wf up`
+  in another repository — and the next pass tries it again.
+- **A start that fails otherwise is tried again.** Git failing on the repository, a file that cannot be read: no verdict on the
+  card, so the next pass tries it again, where it keeps its place and the card behind it waits. `wf up` says it once, and again
+  only if it fails differently; `wf inbox` says `failed at <time>: <why>`. A card whose `repo:` folder was deleted after it was queued no
   longer reads as a card, and keeps its place all the same: `wf inbox` lists why beside `queued 1 of 2`, the tick tries it and
   names the refusal, and `--off` takes it back.
 - **Refused by name**, exit 2, before anything is written: a name with no card, naming the cards there are; a card with no
@@ -1563,7 +1567,7 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 | `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` |
 | `runs/<id>/` | the run's own files, outside every workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
-| `queue/` | a queued card's start the package refused, `<name>.json`, the tick's to write: the card's text and why |
+| `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `worktrees/<id>/<step>/` | each step's workspace |
 | `checks/` | each check's stderr |

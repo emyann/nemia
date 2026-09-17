@@ -23,8 +23,8 @@ import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workf
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
-export type { InboxCard, InboxListing, QueueRefusal, QueueStarted } from './inbox.ts';
-import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueRefusal, type QueueStarted } from './inbox.ts';
+export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
+import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { admissionOrder, slotFree, afterRefusal, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
@@ -1009,31 +1009,34 @@ function inboxFiles(): Array<{ file: string; text: string }> {
 const inboxCards = (): string[] => inboxListing(inboxFiles(), [], () => true).filter((l) => l.file.endsWith('.md')).map((l) => l.name);
 
 /**
- * Where the tick writes down a queued card's start the package refused (`QueueRefusal`): `$WF_ROOT/queue/<name>.json`, outside the inbox, which
- * is a person's. The tick is its one writer: it writes one on a refusal, and removes it once the card no longer reads as refused.
+ * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox, which
+ * is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is no longer queued as it
+ * was — started, taken back, dropped or edited.
  */
 const queueDir = (): string => path.join(HOME, 'queue');
 
-/** The refusals the tick has written down, by card name. A file that does not read as one is none: the card is tried, and written again. */
-function queueRefusals(): Map<string, QueueRefusal> {
-  const refusals = new Map<string, QueueRefusal>();
+/** The tries the tick has written down, by card name. A file that does not read as one is none: the card is tried, and written again. */
+function queueTries(): Map<string, QueueTry> {
+  const tries = new Map<string, QueueTry>();
   let names: string[];
-  try { names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json')); } catch { return refusals; }
+  try { names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json')); } catch { return tries; }
   for (const file of names) {
     try {
-      const r = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8')) as Partial<QueueRefusal>;
-      if (typeof r.at === 'string' && typeof r.text === 'string' && typeof r.why === 'string') refusals.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, why: r.why });
+      const r = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8')) as Partial<QueueTry>;
+      if (typeof r.at === 'string' && typeof r.text === 'string' && typeof r.repo === 'string' && typeof r.why === 'string' && typeof r.refused === 'boolean') {
+        tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
+      }
     } catch { /* torn, or removed since the listing */ }
   }
-  return refusals;
+  return tries;
 }
 
 /**
  * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does not
  * read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as started; and
- * the tick's refusals, so a queued card whose start was refused says why.
+ * the tick's tries, so a queued card whose start was refused, or failed, says why.
  */
-export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory, queueRefusals());
+export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory, queueTries());
 
 /**
  * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
@@ -1218,31 +1221,40 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and its `repo:` or else `repo`,
  * the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start.
  *
- * A start the package refuses — the workflow gone, the repository gone, whatever `startFromInbox` refuses — is written down (`QueueRefusal`),
- * the card left as it is, and not tried again while it reads the same: no pass after it tries it, and the next card has its turn. The inbox
- * and the refusals are read once. A refusal written for a card that is no longer queued as it was is removed on the way.
+ * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name: the
+ * workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
+ * repository, and the next card has its turn. Any other failure — git failing on the repository, say — is no verdict on the card: the next
+ * pass tries it again, where it keeps its place, and a failure the same as the last pass's is said as `again`, and not written again. The inbox
+ * and the tries are read once. A try written for a card that is no longer queued as it was is removed on the way.
  */
 export function startQueued(repo: string, runs: readonly Run[] = listRuns()): QueueStarted | undefined {
   const files = inboxFiles();
-  const refusals = queueRefusals();
-  const listing = inboxListing(files, runs, isDirectory, refusals);
-  for (const name of refusals.keys()) {
-    if (listing.some((l) => l.name === name && l.refused)) continue;
+  const tries = queueTries();
+  const listing = inboxListing(files, runs, isDirectory, tries);
+  for (const name of tries.keys()) {
+    if (listing.some((l) => l.name === name && l.tried)) continue;
     try { fs.rmSync(path.join(queueDir(), `${name}.json`), { force: true }); } catch { /* removed on a pass that can */ }
   }
-  const next = nextQueued(listing);
+  const next = nextQueued(listing, repo);
   if (!next) return undefined;
+  const on = next.repo ?? repo;
+  // Named on the line only for a card that names no repository: whose start turns on where the daemon runs.
+  const where = next.repo ? {} : { on };
   try {
     const started = startFromInbox({ name: next.name, callerRepo: repo });
     return started.removed ? { card: next.name, run: started.run.id, removed: true } : { card: next.name, run: started.run.id, removed: false, why: started.why };
   } catch (err) {
-    const why = (err as Error).message;
-    const refusal: QueueRefusal = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, why };
+    const refused = (err as { exitCode?: number }).exitCode === 2;
+    // On one line: git's words come with its command and its stderr, a line each.
+    const why = (err instanceof Error ? err.message : String(err)).split('\n').map((line) => line.trim()).filter(Boolean).join(' / ');
+    const last = next.tried;
+    if (!refused && last && !last.refused && last.why === why && last.repo === on) return { card: next.name, failed: why, again: true, ...where };
+    const tried: QueueTry = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
     try {
       fs.mkdirSync(queueDir(), { recursive: true });
-      fs.writeFileSync(path.join(queueDir(), `${next.name}.json`), JSON.stringify(refusal, null, 2));
+      fs.writeFileSync(path.join(queueDir(), `${next.name}.json`), JSON.stringify(tried, null, 2));
     } catch { /* said all the same; not written down, the next pass tries the card again, rather than a daemon dying on it */ }
-    return { card: next.name, refused: why };
+    return refused ? { card: next.name, refused: why, ...where } : { card: next.name, failed: why, again: false, ...where };
   }
 }
 

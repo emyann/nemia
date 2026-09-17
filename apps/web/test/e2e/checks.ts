@@ -236,14 +236,18 @@ export async function expectBeneath(these: Locator, row: Locator, assertion: str
 
 /**
  * While `move` runs, `leader` moves, and every element of `followers` moves by as much: an open run's steps
- * dragged with its card. A pixel of slack for positions that round differently.
+ * dragged with its card. And every element of `still`, when it is given, stays where it was: the steps a dragged
+ * step waits on. Nothing matched in `still` is refused too. A pixel of slack for positions that round differently.
  */
-export async function expectMovedWith(followers: Locator, leader: Locator, move: () => Promise<void>, assertion: string): Promise<void> {
+export async function expectMovedWith(followers: Locator, leader: Locator, move: () => Promise<void>, assertion: string, still?: Locator): Promise<void> {
   const [lead] = await boxesOf(leader);
   const before = await boxesOf(followers);
+  const staying = still ? await boxesOf(still) : [];
+  if (still && !staying.length) throw new Refused(`${assertion} — nothing to stay put: 0 found`);
   await move();
   const [led] = await boxesOf(leader);
   const after = new Map((await boxesOf(followers)).map(({ name, box }) => [name, box]));
+  const stayed = new Map(still ? (await boxesOf(still)).map(({ name, box }) => [name, box]) : []);
   if (!lead?.box || !led?.box) throw new Refused(`${assertion} — the element to follow is not on the page`);
   if (!before.length) throw new Refused(`${assertion} — nothing follows ${lead.name}`);
   const dx = led.box.x - lead.box.x;
@@ -254,4 +258,9 @@ export async function expectMovedWith(followers: Locator, leader: Locator, move:
     return !box || !now || Math.abs(now.x - box.x - dx) > 1 || Math.abs(now.y - box.y - dy) > 1;
   });
   if (behind.length) throw new Refused(`${assertion} — ${behind.map((f) => f.name).join(', ')} did not move with ${lead.name}`);
+  const strayed = staying.filter(({ name, box }) => {
+    const now = stayed.get(name);
+    return !box || !now || Math.abs(now.x - box.x) > 1 || Math.abs(now.y - box.y) > 1;
+  });
+  if (strayed.length) throw new Refused(`${assertion} — ${strayed.map((s) => s.name).join(', ')} moved too`);
 }

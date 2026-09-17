@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { approve, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, messageRefusal, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, readFilings, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, round, runCostLines, runSpend, type Said, saidCount, say, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
-import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gateLines, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
-import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
+import { approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, readFilings, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
+import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gateLines, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
+import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -57,7 +57,30 @@ export type RunSummary = {
    * step at its gate, what is asked of you, `approve plan`.
    */
   onYou: string[];
+  /** What a person has to decide about the run's result, when the run is at it and nobody has (`RunToDecide`); null while there is nothing. */
+  toDecide: RunToDecide | null;
 };
+
+/**
+ * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or at
+ * a gate — as the package decides it (`toDecide`) and words it (`toDecideWords`):
+ *
+ *   approve  the run is at its result and the gate on a last step has nobody's approval. `step` is that step, and `says` what it would do,
+ *            the first line of the folder's own prose — null for a gated step that has signed off, whose closeout is what to read
+ *   git      nothing waits at such a gate, every step finished, no step of the workflow merges, and `branches` are ahead of the base branch:
+ *            merging or dropping them is a person's, by hand
+ *
+ * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it — `wf approve <run> <step>`,
+ * or `wf decide <run>` for the branches, which the board runs no more than `wf ls` does.
+ */
+export type RunToDecide = ToDecide & { said: string; command: string };
+
+/**
+ * What a person has to decide, as the board is given it: the package's own reading, with its words and the command that ends them. Null
+ * where the package leaves it — a run still going, one called off, one whose ending has run, and a branch already on the base.
+ */
+const toDecideOf = (run: Run, t: ToDecide | undefined): RunToDecide | null =>
+  t ? { ...t, said: toDecideWords(run, t), command: t.kind === 'approve' ? `wf approve ${run.id} ${t.step}` : `wf decide ${run.id}` } : null;
 
 /**
  * What sessions cost, as the package adds it up off the engine's `usage.costUsd` (`Spend`: `stepSpend`, `runSpend`): the dollars of the
@@ -294,6 +317,8 @@ export type RunDetail = {
   waitingOnYou: string[];
   /** As on `RunSummary`. */
   onYou: string[];
+  /** As on `RunSummary` (`RunToDecide`). */
+  toDecide: RunToDecide | null;
   /** The steps the run is gated at, in the order they run (`gatesOf`): those its workflow gates, and those it was started with. */
   gates: string[];
   /** Set when the workflow folder cannot be read, or no longer has the steps the run started with. */
@@ -387,6 +412,14 @@ export type StepUsed = { usage: Usage | null; used: string; cost: string; costUs
 /** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
 export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
 
+/**
+ * Where one result branch stands against the base branch, as git says it now (`BranchStanding`) — on it, ahead of it by N commits, or gone
+ * — with the fact in the package's words (`branchWord`) and how much it changed, as `wf decide` prints beside the branch (`diffStat`, git's
+ * `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch it no
+ * longer has, or one with nothing on it past the run's base.
+ */
+export type Standing = BranchStanding & { said: string; stat: string | null };
+
 /** One file of a branch's check-affecting diff: its unified diff, at most `DIFF_LINES` lines, and how many more it had. */
 export type DiffFile = { path: string; lines: string[]; cut: number };
 
@@ -411,6 +444,12 @@ export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once m
  * diffs in full, what each step consumed and the run's total, and the commands.
  */
 export type Decidable = {
+  /**
+   * Where each result branch stands against the base branch, and how much it changed (`Standing`): the facts under the run's result, as
+   * `wf decide` prints them before anything to do about it. Empty for a run that worked on its base branch itself, which has no result
+   * branch of its own, and for one whose steps recorded none.
+   */
+  standings: Standing[];
   touched: Touched[];
   lesson: Lesson;
   sensitive: SensitiveDiff[];
@@ -673,6 +712,8 @@ type Judged = {
   waitingOnYou: string[];
   /** `waitingOnYou` in `wf ls`'s words (`onYouWords`): `approve plan` for a step at its gate. */
   onYou: string[];
+  /** What a person has to decide about the result (`toDecide`), as `listing` reads it off the branch standings it was given; null while there is nothing. */
+  toDecide: RunToDecide | null;
   status: RunStatus;
   moving: boolean;
   /** The runs its roots wait on (`waitingOf`). */
@@ -686,6 +727,35 @@ type Judged = {
   /** What the run has cost, every step's tries (`runSpend`); null until a cost was measured. */
   cost: Spent | null;
 };
+
+/**
+ * The result branches whose standing against the base branch decides anything, for this run: none unless it finished with every step
+ * satisfied, it was not called off, it cut worktrees of its own, and no step of its workflow merges (`merges`) — a folder whose ending
+ * merges answers for its own branch. Pure, and off the record alone: what `standingsOf` asks git about, and nothing more.
+ */
+const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatus): string[] =>
+  (run.cancelledAt || status !== 'succeeded' || !run.isolate || merges(steps)
+    ? []
+    : [...new Set(resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b)))]);
+
+/**
+ * Where each of a run's result branches stands against the base branch, as git says it now (`branchStandings`): what says a finished run
+ * whose folder has no ending step is one nobody has decided (`toDecide`'s git kind).
+ *
+ * Asked of the runs where the answer can decide anything and of no other (`toDecideBranches`), because it is a few `git` calls a branch and
+ * the list is polled every five seconds: a gate says a run is one to decide without git being asked at all. Level-triggered, as the package
+ * is: read on the request that asks, stored nowhere, so a branch a person merged by hand stops being one to decide with nobody telling the
+ * run. A record whose branches cannot be read is no branch: git said nothing, and only a gate says there is something to decide.
+ */
+function standingsOf(run: Run, steps: readonly Workflow[], status: RunStatus): BranchStanding[] {
+  const branches = toDecideBranches(run, steps, status);
+  if (!branches.length) return [];
+  try {
+    return branchStandings(run, branches);
+  } catch {
+    return [];
+  }
+}
 
 /**
  * What `wf ls` says about each step, what `assess` says about the run, and whether the run still moves.
@@ -703,8 +773,20 @@ type Judged = {
  *
  * Given the runs its roots wait on, read once (`waitsIn`): a root of a run waiting on runs says `waiting on <run>`, as `list` words it, and
  * the run moves while each may still ship — the tick files the roots when they do — and not once one never will without a person.
+ *
+ * And given where the run's result branches stand, asked of git for the runs where the answer can decide anything (`standingsOf`), which is
+ * why the status is read first: without them only a gate says a run is one nobody has decided, and a finished run whose branch nobody merged
+ * would say there is nothing to decide.
  */
-function judge(run: Run, names: readonly string[], folder: readonly Workflow[] | null, views: Views, waits: readonly Wait[]): Judged {
+function judge(
+  run: Run,
+  names: readonly string[],
+  folder: readonly Workflow[] | null,
+  views: Views,
+  waits: readonly Wait[],
+  /** Where each result branch stands, asked once the run's status is known; left out, no branch is read, and a to-decide branch says nothing. */
+  standingsOf: (status: RunStatus, steps: readonly Workflow[]) => readonly BranchStanding[] = () => [],
+): Judged {
   const steps = judgedSteps(run, folder);
   const shown = [...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)];
   const asked = closeoutAsked(views);
@@ -719,8 +801,6 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   // And what each task's sessions cost, as `list` reads it (`spendReader`), off views that hold every try's task: a step whose tries have
   // cost its cap says `over budget $4.25 of $3`, waits on you, and is filed nothing more — without it, it read as one with no cap.
   const spendOf = spendReader(views);
-  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf);
-  const waiting = waitingOf(run, said.waiting);
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
   // Given the verdict, as the tick is: without it `assess` cannot tell a check that refused, which `retries:` tries
   // again, from one that did not finish, which waits on a person — and the status and `listing`'s words would disagree.
@@ -728,6 +808,11 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   // session stopped first. Without it that try is in `listing`'s note, which reads the engine's word, and neither `asked` nor `moving`.
   // And the cost, as the tick has it: a step over its budget is not tried, nor its loop sent round, on the run's word, so it does not move.
   const { status, ready, check, retry, round } = assess(steps, run, phase, closeoutReader(views, run), asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
+  // The one thing read off git here, and only where it can decide anything: `listing` reads what is left to decide off it, on the same
+  // inputs as `assess`, so the words and the judgement are the package's single reading.
+  const standings = standingsOf(status, steps);
+  const said = listing(shown, run, wordOf(views), (name) => closeoutOf(views, run, name), asked, verdicts, asks, rounds, answers, waits, saidCount(views, run), spendOf, undefined, standings);
+  const waiting = waitingOf(run, said.waiting);
   // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
   // for it, whatever its bare steps would make ready: the tick fails on it.
   const tickReads = Boolean(run.workflow ?? folder);
@@ -738,6 +823,7 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
     waitingOnYou,
     // In the page's order, as `waitingOnYou` is: the words `wf ls` prints after `→ waiting on you:`.
     onYou: onYouWords({ steps: said.steps, waitingOnYou }),
+    toDecide: toDecideOf(run, said.toDecide),
     status,
     // The line `cancelPlan` draws for a finished run, which `status` does not: nothing in flight, and nothing a
     // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
@@ -817,7 +903,7 @@ function toldOf(run: Run, name: string, workflows: readonly Workflow[] | null, v
 async function summarize(run: Run, views: Views): Promise<RunSummary> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
-  const judged = judge(run, names, folder, views, await waitsIn(run, seenBy(views)));
+  const judged = judge(run, names, folder, views, await waitsIn(run, seenBy(views)), (status, steps) => standingsOf(run, steps, status));
   return {
     id: run.id,
     repo: run.repo,
@@ -840,6 +926,7 @@ async function summarize(run: Run, views: Views): Promise<RunSummary> {
     })),
     waitingOnYou: judged.waitingOnYou,
     onYou: judged.onYou,
+    toDecide: judged.toDecide,
   };
 }
 
@@ -955,7 +1042,7 @@ async function detail(run: Run): Promise<RunDetail> {
   // One more observation for each refused check's output (`checksOf`) and each blocked session's last line (`lastLineOf`), which only a
   // run's own detail reads.
   const views = await everyView();
-  const judged = judge(run, names, workflows, views, await waitsIn(run, seenBy(views)));
+  const judged = judge(run, names, workflows, views, await waitsIn(run, seenBy(views)), (status, steps) => standingsOf(run, steps, status));
   const steps = judgedSteps(run, workflows);
   const checks = await checksOf(run, steps, views);
   const source = shownWorkflow(run, workflows);
@@ -982,6 +1069,7 @@ async function detail(run: Run): Promise<RunDetail> {
     cost: judged.cost,
     waitingOnYou: judged.waitingOnYou,
     onYou: judged.onYou,
+    toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
     // The steps `judge` words: the judged workflow, then a `bare` step for each one the page shows beside it.
@@ -1256,8 +1344,13 @@ const AT_GATE = /^awaiting approval:\s{2}(wf approve \S+ \S+)(?: \[--message "<w
  * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and the send-back for
  * each step waiting at its gate on you (`gates`, `gateLines`' lines), then ship it and drop it for the branches, or read it for a run
  * worked on its base branch — which has nothing to merge, nor a branch to delete.
+ *
+ * `merges` is whether a step of the workflow acts on the base branch itself (`workspace: main`): ship it and drop it are for the folder
+ * that says nothing about what happens when the work is done, and a folder that says it in prose does not also tell a person to type
+ * `git merge` — its ending step is what merges, and a run parked at that step's gate is one approval away from doing it. As `wf decide`
+ * decides it (cli.ts, `!merges(steps)`).
  */
-function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Readonly<Record<string, string>> = {}): DecideCommand[] {
+function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Readonly<Record<string, string>> = {}, merges = false): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
   const once = [
     ...offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said })),
@@ -1272,7 +1365,7 @@ function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Rea
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
     return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
   }
-  const first = d.branches[0];
+  const first = merges ? undefined : d.branches[0];
   return [
     ...once,
     ...(first
@@ -1303,6 +1396,8 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   const folder = workflowsOf(run).steps;
   const names = stepNames(run, folder);
   const views = await viewsOf(run);
+  // Judged without the branch standings, which this answer does not carry: a run still running is answered `running` below without one
+  // `git` being run for it, and what there is to decide is on the run's own detail, off its own read.
   const judged = judge(run, names, folder, views, waits);
   if (judged.status === 'cancelled') return { nothing: `cancelled at ${run.cancelledAt} — nothing to decide` };
   if (judged.status === 'running' && !judged.waitingOnYou.length) return { running: true };
@@ -1320,18 +1415,24 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   if (d.kind === 'cancelled') return { nothing: `cancelled at ${d.at} — nothing to decide` };
   if (d.kind === 'shipped') return { nothing: `shipped — ${d.branches.join(', ')} is already on ${run.branch}` };
 
-  // Still running with a step waiting on you: the terminal steps' branches, as `decision` reads them once it is not.
-  const result = d.kind === 'awaiting'
-    ? d.branches
-    : terminalSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+  // Still running with a step waiting on you: the result steps' branches, as `decision` reads them once it is not (`resultSteps`) —
+  // the terminal steps, and for a terminal step that works in the repository's own checkout, the steps it waits on, whose work it acts on.
+  const results = [...new Set(resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b)))];
+  const result = d.kind === 'awaiting' ? d.branches : results;
   const touched: Touched[] = branchesToRead(result, Object.values(run.steps).map((s) => s.branch))
     .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
+  // Where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run — none for a run
+  // that worked on its base branch itself, whose standing would read `main is on main` and whose own line says so instead.
+  const standings: Standing[] = run.isolate
+    ? branchStandings(run, results).map((s) => ({ ...s, said: branchWord(run, s), stat: diffStat(run, s.branch).trim() || null }))
+    : [];
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
   const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
   // Each step waiting at its gate on you — not one a person has sent back already, which waits on nobody — as `wf decide` prints its gate.
   const gates = Object.fromEntries(Object.entries(gateLines(steps, run, phase, reader, asked, verdicts, spendOf)).filter(([name]) => judged.waitingOnYou.includes(name)));
   return {
+    standings,
     touched,
     lesson: lessonOf(touched),
     sensitive: touched.map((t) => sensitiveOf(run, t)),
@@ -1339,7 +1440,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     total: usedOf(sumUsages(filed.map((name) => consumed[name]))),
     cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
     overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
-    commands: commandsOf(run, d, offers, gates),
+    commands: commandsOf(run, d, offers, gates, merges(steps)),
   };
 }
 

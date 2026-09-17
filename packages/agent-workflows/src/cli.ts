@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, branchWord, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -626,7 +626,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const held = await runSlots(e);
       for (const run of runs) {
         const calledOff = run.cancelledAt ? '  (cancelled)' : '';
-        const { steps, waitingOnYou, waiting, cost } = await list(e, run, held.get(run.id));
+        const { steps, waitingOnYou, waiting, cost, toDecide } = await list(e, run, held.get(run.id));
         // What the run has cost so far, on its line, where the engine measured it.
         console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
         // Each step's word, and what its tries have cost beside it: `verified ✓  $3.01`.
@@ -637,9 +637,14 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           // The try a step is on, or the try due, beside its line: `try 2 asked (--nudge)`, `try 2, by retries: 1`.
           console.log(`   ${s.name.padEnd(14)} ${said[i]!.padEnd(width)} ${s.branch ?? ''}${s.note ? `  · ${s.note}` : ''}`);
         }
+        // What is left to decide about the result: the ending step's gate, in the folder's own words, with the approval that runs it — or,
+        // in a folder with no ending step, the branch nobody has merged. Said before who else the run waits on, since it is the run's end.
+        if (toDecide) console.log(`   → to decide: ${toDecideWords(run, toDecide)}`);
         // The step a person has to act on, and where to act. Said here and not left to the result
         // line, because a run blocked on its first step has no result branch yet. A step at its gate is named with what is asked: approve plan.
-        if (waitingOnYou.length) console.log(`   → waiting on you: ${onYouWords({ steps, waitingOnYou }).join(', ')}  —  wf decide ${run.id}`);
+        // The ending step's own gate is the line above, and is not said twice.
+        const onYou = onYouWords({ steps, waitingOnYou }).filter((said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`));
+        if (onYou.length) console.log(`   → waiting on you: ${onYou.join(', ')}  —  wf decide ${run.id}`);
         // A run it waits on that will never ship without a person — cancelled, say — is a person's to resolve, and the line says how.
         if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
         // Where to go and look. A run whose result nobody can find is a run that did not happen.
@@ -870,9 +875,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const [runId, stepName, ...more] = rest;
       if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
       const { approval, file } = await approve(e, runId, stepName, approveHow(more));
-      // What the approval lets happen: a step something waits on is filed by the next tick; a last step hands its run on to be decided.
-      const waited = stepsOf(readRun(runId)).some((s) => s.after.includes(stepName));
-      console.log(`${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`);
+      // What the approval lets happen: an ending step is filed by the next tick, since its approval is what files it; a step something
+      // waits on hands on to what waits; a last step that has run hands its run on to be decided.
+      const after = readRun(runId);
+      const waited = stepsOf(after).some((s) => s.after.includes(stepName));
+      const files = !after.steps[stepName]?.taskId;
+      console.log(`${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — ${files ? `the next tick files ${stepName}` : waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`);
       console.log(`   ${file}`);
       return;
     }

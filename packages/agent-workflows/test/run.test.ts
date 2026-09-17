@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, resultSteps, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, branchWord, firstLine, resultSteps, toDecideWords, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -3251,4 +3251,154 @@ test("REFUSED as already approved, in words that hold: while it may still be sen
   const one: Workflow[] = [step('implement')];
   assert.equal(approved(run({ implement: 't1' }, { gates: ['implement'], approvals: [approval('implement', 1)] }), phases({ t1: 'succeeded' }), one),
     'try 1 of implement is already approved, at 2026-09-16T23:10:00.000Z, and it has handed on: nothing waits on it, and its run goes on without it, so there is nothing to approve, nor to send back. See where the run stands: wf ls r-1.');
+});
+
+// ─── the end of a run is a step of its workflow ─────────────────────────────
+
+/** `implement → review → ship`, as the dev folders are: the ending step works in the repository's checkout, and is gated. */
+const SHIP: Workflow = {
+  name: 'ship', after: ['review'], workspace: 'main', gate: true,
+  body: 'Ship it: trial merge this run\'s result branch onto the base branch, run the check, and commit.\n\nAbort on any failure.',
+};
+const ENDS: Workflow[] = [step('implement'), step('review', ['implement']), SHIP];
+/** implement and review done on the run's branch, ship never filed. */
+const atEnd = (extra: Partial<Run> = {}) => run({}, {
+  ...extra,
+  steps: {
+    implement: { taskId: 't1', workspace: '/wt', branch: 'wf/r-1/implement' },
+    review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' },
+    ship: { taskId: null },
+    ...extra.steps,
+  },
+});
+const AHEAD = [{ branch: 'wf/r-1/implement', where: 'ahead' as const, commits: 3 }];
+
+test("an ending step's gate holds it BEFORE it is filed: at its result the run reads `awaiting approval` and files nothing, pass after pass, and `to decide` says what the step would do", () => {
+  const r = atEnd();
+  for (const pass of [1, 2, 3]) {
+    const a = assess(ENDS, r, DONE, signedDone, asked);
+    assert.deepEqual([a.ready, a.check, a.retry, a.round], [[], [], [], []], `pass ${pass}: nothing is filed`);
+    assert.equal(stepStatus(SHIP, r, DONE, signedDone, asked, ENDS), 'awaiting approval');
+    assert.deepEqual(a.toDecide, { kind: 'approve', step: 'ship', says: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit." });
+  }
+  // A person's word is what files it, and it is the step's own approval that does: nothing else changed.
+  const approved = assess(ENDS, atEnd({ approvals: [approval('ship', 1)] }), DONE, signedDone, asked);
+  assert.deepEqual([approved.ready, approved.toDecide], [['ship'], undefined]);
+  // And once it has run, its gate holds nothing more: it was approved before it was filed.
+  const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
+  assert.equal(stepStatus(SHIP, ran, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedDone, asked, ENDS), 'unverified');
+});
+
+test("REFUSED before the work is done: an ending step's gate does not hold while what it acts on is still running, and `wf approve` says so at shipped defaults", () => {
+  const running = atEnd({ steps: { review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' } } });
+  const p = phases({ t1: 'succeeded', t2: 'running' });
+  assert.equal(stepStatus(SHIP, running, p, signedDone, asked, ENDS), 'waiting');
+  assert.deepEqual(assess(ENDS, running, p, signedDone, asked).toDecide, undefined, 'nothing to decide while it runs');
+  assert.equal(approvalRefusal(ENDS, running, 'ship', undefined, p, signedDone, asked),
+    'ship is not at its gate yet: it ends the run in the repository\'s own checkout, and its gate holds once review has finished — '
+    + 'your approval is then what files it, and nothing of it runs before that. See where the run stands: wf ls r-1.');
+  // And a step that broke leaves no gate to approve either: the run waits on you for that step, not for its ending.
+  const broke = phases({ t1: 'succeeded', t2: 'failed' });
+  assert.equal(stepStatus(SHIP, atEnd(), broke, signedDone, asked, ENDS), 'waiting');
+  assert.deepEqual(assess(ENDS, atEnd(), broke, signedDone, asked).toDecide, undefined);
+  assert.match(String(approvalRefusal(ENDS, atEnd(), 'ship', undefined, broke, signedDone, asked)), /^ship is not at its gate yet/);
+  // At its gate, it may be approved.
+  assert.equal(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked), null);
+});
+
+test("REFUSED while the work is being sent back: approving an ending would take a result the objection is about", () => {
+  const ask: RetryAsk = { step: 'review', try: 2, mode: 'nudge', message: 'the flag is not stored', at: '2026-09-17T09:00:00.000Z' };
+  assert.equal(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [ask]),
+    'try 2 of review is asked for (--nudge, at 2026-09-17T09:00:00.000Z), and ship acts on what it changes: approving now would take the result that ask objects to. '
+    + "Approve ship once review has signed off again — or, to take the result as it stands, take that ask back first: retry-review-2, in the run's .asks directory.");
+});
+
+test("a send-back at an ending step's gate goes to the work: the step before it may be tried again with words, and is REFUSED without them", () => {
+  const review = ENDS[1]!;
+  const at = retryable(review, atEnd(), DONE, signedDone, asked, ENDS);
+  assert.deepEqual([at.status, at.modes, at.sendsBack], ['unverified', ['nudge', 'fresh'], true]);
+  assert.match(String(retryRefusal(ENDS, atEnd(), 'review', { mode: 'nudge' }, DONE, signedDone, asked)), /^review is awaiting approval|--message/);
+  assert.equal(retryRefusal(ENDS, atEnd(), 'review', { mode: 'nudge', message: 'the flag is not stored' }, DONE, signedDone, asked), null);
+  // Not once the ending is approved and filed: the run has acted, and there is nothing to hold back.
+  const filed = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
+  assert.equal(retryable(review, filed, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'running' }), signedDone, asked, ENDS).sendsBack, undefined);
+  // Nor on a folder whose last step has no gate: a finished step nothing waits at is not sendable back.
+  const ungated: Workflow[] = [step('implement'), step('review', ['implement']), { ...SHIP, gate: undefined }];
+  assert.equal(retryable(review, atEnd(), DONE, signedDone, asked, ungated).sendsBack, undefined);
+});
+
+test("`wf ls` at an ending step's gate: the step reads `awaiting approval` unfiled, with the approval and the send-back to the work beside it, and the run's line says what is to be decided", () => {
+  const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
+  const l = listing(ENDS, atEnd(), shownAs({ t1: 'succeeded', t2: 'succeeded' }), signedDone, asked);
+  assert.deepEqual(l.steps[2], {
+    name: 'ship', status: 'awaiting approval', branch: null,
+    note: 'approve it: wf approve r-1 ship — or send it back: wf retry r-1 review --message "<objection>"',
+  });
+  assert.deepEqual([l.waitingOnYou, onYouWords(l)], [['ship'], ['approve ship']]);
+  assert.deepEqual(l.toDecide, { kind: 'approve', step: 'ship', says: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit." });
+  assert.equal(toDecideWords(atEnd(), l.toDecide!), "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit. — wf approve r-1 ship");
+  // Approved and filed, it is a step like any other and waits on nobody.
+  const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1, 'merge it')] });
+  const after = listing(ENDS, ran, shownAs({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedDone, asked);
+  assert.deepEqual([after.steps[2]!.status, after.waitingOnYou, after.toDecide], ['unverified · done', [], undefined]);
+});
+
+test("a run at its ending step's gate is never shipped, and nothing that waits on it starts — whatever git says of its branch", () => {
+  const merged = () => true as const;
+  const d = decision(ENDS, atEnd(), DONE, merged, signedDone, asked);
+  assert.equal(d.kind, 'awaiting');
+  if (d.kind !== 'awaiting') return;
+  assert.deepEqual([d.outcome, d.awaitingApproval, d.branches, d.direct], ['blocked', ['ship'], ['wf/r-1/implement'], false]);
+  assert.equal(runReady(run({}, { after: ['r-1'] }), () => false), false, 'a run waiting on it is not ready');
+  // Approved, filed and done, it ships as any run does — on the branch the ending step merged, never on `main`.
+  const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
+  const shipped = decision(ENDS, ran, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), merged, signedDone, asked);
+  assert.deepEqual([shipped.kind, shipped.kind === 'shipped' ? shipped.branches : []], ['shipped', ['wf/r-1/implement']]);
+});
+
+test("`to decide` in a folder with no ending step: a finished run whose branch is ahead of the base and not gone, read off git each pass — and nothing once it is merged", () => {
+  const ahead = assess(STEPS, finished(), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, AHEAD);
+  assert.deepEqual([ahead.status, ahead.toDecide], ['succeeded', { kind: 'git', branches: ['wf/r-1/implement'] }]);
+  assert.equal(toDecideWords(finished(), ahead.toDecide!), 'wf/r-1/implement is ahead of main, and nothing has merged it — wf decide r-1');
+  const standing = (where: 'on' | 'gone') => [{ branch: 'wf/r-1/implement', where }];
+  for (const where of ['on', 'gone'] as const) {
+    assert.equal(assess(STEPS, finished(), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, standing(where)).toDecide, undefined, where);
+  }
+  assert.equal(assess(STEPS, finished(), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined).toDecide, undefined, 'nothing read off git says nothing');
+  // Only a run every step of which finished, and only one nobody called off: a broken step is what its run waits on.
+  const broke = assess(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), signedDone, asked, () => undefined, [], [], () => false, () => undefined, AHEAD);
+  assert.deepEqual([broke.status, broke.toDecide], ['failed', undefined]);
+  assert.equal(assess(STEPS, finished(CANCELLED), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, AHEAD).toDecide, undefined);
+  assert.equal(assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'running' }), signedDone, asked, () => undefined, [], [], () => false, () => undefined, AHEAD).toDecide, undefined, 'still running');
+  // And a gated ending is the decision, not git: its branch ahead says nothing more than its gate does.
+  assert.deepEqual(assess(ENDS, atEnd(), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, AHEAD).toDecide,
+    { kind: 'approve', step: 'ship', says: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit." });
+});
+
+test('`branchWord`: where a result branch stands against the base branch, for a person', () => {
+  const r = finished();
+  assert.equal(branchWord(r, { branch: 'wf/r-1/implement', where: 'on' }), 'wf/r-1/implement is on main');
+  assert.equal(branchWord(r, { branch: 'wf/r-1/implement', where: 'ahead', commits: 3 }), 'wf/r-1/implement is ahead of main by 3 commits');
+  assert.equal(branchWord(r, { branch: 'wf/r-1/implement', where: 'ahead', commits: 1 }), 'wf/r-1/implement is ahead of main by 1 commit');
+  assert.equal(branchWord(r, { branch: 'wf/r-1/implement', where: 'gone' }), 'wf/r-1/implement is gone: git no longer has it');
+  assert.equal(firstLine('\n\n  Ship it.\nThen the check.\n'), 'Ship it.');
+  assert.equal(firstLine(''), '');
+});
+
+test("an ending step is handed its own approval and the words given with it — `## Approved`, since that approval is what files it — and `gateLines` says its gate", () => {
+  const r = atEnd({ approvals: [approval('ship', 1, 'Merge it, and do not touch the changelog.')] });
+  const brief = composeBrief(SHIP, r, ENDS);
+  assert.match(brief, /\n## Approved\n\nA person approved this step before it was filed: nothing of it has run, and their word is what files it\./);
+  assert.match(brief, /ship, try 1, approved at 2026-09-16T23:10:00\.000Z:/);
+  assert.match(brief, /Merge it, and do not touch the changelog\./);
+  assert.doesNotMatch(composeBrief(SHIP, atEnd(), ENDS), /## Approved/, 'nothing before a person says it');
+  assert.deepEqual(gateLines(ENDS, atEnd(), DONE, signedDone, asked), {
+    ship: 'awaiting approval:  wf approve r-1 ship [--message "<words>"]  — or send it back:  wf retry r-1 review --message "<objection>"',
+  });
+  assert.deepEqual(gateLines(ENDS, r, DONE, signedDone, asked), { ship: 'approved 23:10Z — "Merge it, and do not touch the changelog."' });
+});
+
+test('REFUSED at an ending gate: `wf rm` holds the run and `wf cancel` calls it off — an approval would file the step that acts', () => {
+  assert.match(String(forgetRefusal(ENDS, atEnd(), DONE, [], signedDone, asked)), /ship waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve r-1 ship/);
+  assert.deepEqual(cancelPlan(ENDS, atEnd(), DONE, signedDone, asked), { kind: 'cancel', stop: [] });
 });

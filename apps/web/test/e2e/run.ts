@@ -48,6 +48,24 @@ async function sidebar(page: Page): Promise<void> {
 }
 
 /**
+ * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after a
+ * click. The browser clicks a link on Enter's keydown, and React Aria lets that click through: only the root's `RouterProvider` keeps it from
+ * loading the whole page. Nothing else in the e2e presses a link from the keyboard.
+ */
+async function enterOnPlace(page: Page, place: (typeof PLACES)[number], route: string): Promise<void> {
+  const before = await page.evaluate(() => {
+    (window as unknown as { e2eNotReloaded?: true }).e2eNotReloaded = true;
+    return history.length;
+  });
+  await page.locator('[data-sidebar="content"] [data-sidebar="menu-button"]', { hasText: place }).focus();
+  await page.keyboard.press('Enter');
+  await page.waitForURL((url) => url.pathname === route, { timeout: WAIT_MS });
+  const [kept, after] = await page.evaluate(() => [(window as unknown as { e2eNotReloaded?: true }).e2eNotReloaded === true, history.length] as const);
+  if (!kept) throw new Refused(`Enter on ${place} in the menu goes to ${route} in the page — the whole page was loaded again`);
+  if (after !== before + 1) throw new Refused(`Enter on ${place} in the menu adds one entry to the history, as a click does — it went from ${before} to ${after}`);
+}
+
+/**
  * Finished runs on the Factory's floor too. Off by default, on every visit. Pressed where a person presses it, on its track: React Aria's
  * switch is a label drawn round an input hidden to the eye, so a click aimed at the input lands on the label, and Playwright waits for ever.
  */
@@ -562,6 +580,12 @@ const PAGES: PageSpec[] = [
         loop.locator(`[data-state="exhausted"][title$="${LOOPING.notes.review}"]`, { hasText: 'rounds exhausted' }),
         `the row shows ${LOOPING.exhausted} as an amber chip, its note after what that means on hover`,
       );
+
+      // From the keyboard, to the Inbox and back: each place reached in the page, and the runs list drawn again for its photograph.
+      await enterOnPlace(page, 'Inbox', '/inbox');
+      await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }), 'reached with Enter, the Inbox is lit in the menu');
+      await enterOnPlace(page, 'Runs', '/runs');
+      await expectCount(rows, 12, 'back on Runs with Enter, the list has its twelve rows again');
     },
   },
   {

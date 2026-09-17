@@ -114,7 +114,9 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       setRefusal(null);
       setSaved(null);
     },
-    onError: (err) => setRefusal(new BuildRefusal(`Could not read the folder again: ${err.message}`, [])),
+    // The read failed, and the save's answer still says what the folder may hold: its status is kept, so a 409's "nothing written" is not
+    // turned into "it may have been written" by a read that wrote nothing either (`SaveRefused`).
+    onError: (err) => setRefusal((was) => new BuildRefusal(`Could not read the folder again: ${err.message}`, [], was?.status ?? null)),
   });
 
   const dirty = unsaved(steps, base);

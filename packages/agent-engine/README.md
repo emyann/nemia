@@ -38,7 +38,7 @@ Definition of done — a closed list, and it is closed:
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
 change seems to belong in here, check it against the boundary above first: it almost certainly
-knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp`, `budgetUsd` — is a field
+knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp`, `budgetUsd`, `remoteControl` — is a field
 carried on the task and read by a runner, never a callback into `decide`; so is `priority`, read by the pass that orders the board.
 
 ### The one real decision in here: resume policy
@@ -248,7 +248,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `priority` that is not a finite number (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `priority` that is not a finite number (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -405,6 +405,35 @@ the harness's verdict, or lost — is retried under the same cap, so `maxAttempt
 before one is reached.
 
 `ae start` takes `budgetUsd: 0.25` in a brief, digits only.
+
+## Reachable from a phone: `remoteControl`
+
+`remoteControl: true` bridges a task's Claude Code session to claude.ai: `claude --bg` is given `--remote-control`, and
+the session is listed in the web's agents view, where it can be **driven** — typed into, its prompts answered, stopped —
+from a browser or a phone, by anyone signed in to the account, and not only seen. That is why it is never a default. A
+field on the task, carried on the `filed` event and `State`, read only by the Claude runner, on every attempt's spawn;
+`decide` never reads it. The Kubernetes neighbour is a container's `stdin` and `tty`: whether anything may attach to the
+workload, declared on the workload.
+
+| harness | `remoteControl: true` |
+|---|---|
+| `claude` | `--remote-control`, on every attempt |
+| `claude-detached` | refused at `file()`: `claude -p` runs a prompt and exits, and its help offers Remote Control only to an interactive session |
+| `codex`, and any other `HarnessSpec` — agent-workflows' `check` | refused at `file()`, naming the harness and the one to file on |
+| a `PromiseRunner` | asked nothing: handed `remoteControl` on the spawn, to honour or not |
+
+**Measured before it was built** (2026-09-16, Claude Code 2.1.273, three throwaway haiku sessions): a `claude --bg`
+session is listed in the agents view only when its registration under `~/.claude/sessions/` carries a
+`bridgeSessionId`, and it gets one only when started with `--remote-control`. Without the flag none appeared, from a
+clean environment or from a daemon's. A worker of 2.1.266 carried one unasked, so Claude Code used to bridge background
+sessions on its own. **Measured again under the engine** by `test/live.test.ts` (2.1.274): a session filed with
+`remoteControl: true` registered with a `bridgeSessionId`, and an identical one filed without it registered with none.
+
+**`--remote-control [name]` takes an optional value** — the `--worktree` trap: directly before the prompt, it would take
+the prompt as the session's name. So it goes before `--permission-mode`, which always follows, and no name is given;
+Claude Code names the session itself. `remoteControl: false` asks for nothing and is filed on any harness; a value that
+is not true or false is refused. It is not a key a brief has. What it leaves open — nothing reads whether a session was
+bridged, and what a person types into it from the web is not journalled — is open issue 23.
 
 ## Which waiting task starts first: `priority`
 
@@ -1027,7 +1056,7 @@ selector, and it is why no attempt can ever run twice.
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, and a `--bg` session spending past one, its cost read once let go, against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, a `--bg` session spending past one, its cost read once let go, and a session bridged by `remoteControl` beside one that is not, against real Claude Code — `AE_LIVE=1` only |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 

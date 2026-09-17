@@ -34,6 +34,11 @@
  * never be recorded `succeeded` with none. Whether Claude Code nudges such a session itself, or ends it on its own, is
  * what the diagnostic says.
  *
+ * And `remoteControl` is measured under the engine, because what shows it worked is a file Claude Code writes and the
+ * engine never reads: a session filed with it must be registered under `sessions/` with a `bridgeSessionId`, beside a
+ * control identical but for the field, which must have none — or the flag is not what bridged it. Both have no tools,
+ * so a session anyone on the account can drive from claude.ai for the minute it lives can do nothing.
+ *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
 import { test } from 'node:test';
@@ -44,7 +49,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { createEngine, type Engine, type Said, type TaskView } from '../src/facade.ts';
+import { createEngine, nameFor, type Engine, type Said, type TaskView } from '../src/facade.ts';
 import { file, tick, view } from '../src/engine.ts';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
@@ -440,4 +445,59 @@ test('a --bg session asked for a closing statement that ends its turn without on
     assert.ok(!(v.state.settled === 'succeeded' && a?.closeout === undefined),
       `recorded succeeded with nothing said, ended ${a?.ended} (${a?.reason}). A harness end means Claude Code ended the session itself: a way to bug 1 that quiet does not cover (docs/open-issues.md)`);
   });
+});
+
+/** The registration Claude Code wrote for the background session named `name`, under `sessions/` — or `undefined` while there is none. */
+const registrationOf = (name: string): Record<string, unknown> | undefined => {
+  const dir = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
+  for (const f of fs.readdirSync(dir).filter((f) => /^\d+\.json$/.test(f))) {
+    try {
+      const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as Record<string, unknown> | null;
+      if (r?.name === name && r.kind === 'bg') return r;
+    } catch { /* gone since the directory was read, or read mid-write */ }
+  }
+  return undefined;
+};
+
+test('a --bg session filed with remoteControl: true is bridged — its registration carries a bridgeSessionId — and the same session filed without it is not', {
+  skip,
+  timeout: 6 * 60_000,
+}, async (t) => {
+  const engine = createEngine({ root: tmp('remote-board') });
+  const common = { brief: 'Reply with the single word ok, and nothing else.', model: 'haiku', tools: [] };
+  const ids = {
+    bridged: await engine.file({ ...common, cwd: tmp('remote'), remoteControl: true }),
+    control: await engine.file({ ...common, cwd: tmp('remote-none') }),
+  };
+  const found: Record<string, Record<string, unknown> | undefined> = {};
+  const read = () => { for (const [k, id] of Object.entries(ids)) found[k] = registrationOf(nameFor(id, 1)); };
+  try {
+    await engine.tick();
+    const until = Date.now() + 2 * 60_000;
+    while (!(found.bridged?.bridgeSessionId && found.control) && Date.now() < until) {
+      await new Promise((r) => setTimeout(r, 2_000));
+      read();
+    }
+    // A bridge the control got a moment after it registered would not be seen yet: look again, as long after.
+    await new Promise((r) => setTimeout(r, 15_000));
+    read();
+    const shown = (r: Record<string, unknown> | undefined) => (r ? `${r.version} ${r.sessionId}, bridgeSessionId ${r.bridgeSessionId ?? 'none'}` : 'not registered');
+    t.diagnostic(`bridged: ${shown(found.bridged)}; control: ${shown(found.control)}`);
+    assert.ok(found.bridged, 'the session filed with remoteControl registered');
+    assert.equal(typeof found.bridged.bridgeSessionId, 'string', 'and is bridged: the agents view lists it');
+    assert.ok(found.control, 'the control registered');
+    assert.equal(found.control.bridgeSessionId, undefined,
+      'the control is bridged too: Claude Code bridges background sessions on its own again, so the flag is not what did it. Measure it, and say so in the README');
+  } finally {
+    const sessions = new Set<string>();
+    for (const r of Object.values(found)) if (typeof r?.sessionId === 'string') sessions.add(r.sessionId);
+    for (const id of Object.values(ids)) {
+      try { const v = await engine.view(id); if (v.sessionId) sessions.add(v.sessionId); } catch { /* nothing known to clean */ }
+    }
+    for (const s of sessions) {
+      for (const verb of ['stop', 'rm']) {
+        try { execFileSync('claude', [verb, s.split('-')[0]!], { stdio: 'ignore', timeout: 30_000 }); } catch { /* best effort */ }
+      }
+    }
+  }
 });

@@ -60,6 +60,8 @@ export type SpawnRequest = {
   mcp?: Record<string, McpServer>;
   /** The most the session may spend, in dollars. Absent: no cap. */
   budgetUsd?: number;
+  /** Bridge the session to claude.ai, where it can be seen and driven. Absent or false: not bridged. */
+  remoteControl?: boolean;
 };
 
 /**
@@ -955,6 +957,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       // beats every allow. Variadic as `--tools` is, and ended the same way. Claude Code splits it on commas and
       // spaces outside a rule's parentheses (its help's own example is "Bash(git *) Edit"), so one argument holds them.
       ...(r.disallowedTools?.length ? ['--disallowedTools', r.disallowedTools.join(',')] : []),
+      // Remote Control, only when the task asks: the session bridged to claude.ai and listed in its agents view, where it
+      // can be driven from a browser or a phone, not only seen. A `--bg` session gets a `bridgeSessionId` only with this
+      // flag (measured on 2.1.273). `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap, the prompt
+      // taken as its name — so it goes here, where the `--permission-mode` that always follows cannot be taken for one.
+      ...(r.remoteControl ? ['--remote-control'] : []),
       // `auto` rather than `acceptEdits`, and the difference decides whether a fleet works.
       // `acceptEdits` approves edits and `mkdir`/`mv`/`cp` — but NOT `npm test`, so the first
       // session that wants to run its own tests stops and waits for a person who is not there.

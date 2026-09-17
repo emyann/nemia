@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import { claudeOps, lastStructuredOutput, QUIESCENT_AFTER_MS } from '../src/runner.ts';
+import { createEngine } from '../src/facade.ts';
 
 /**
  * `observe` shells out, so these tests drive the predicate through a stub of that call. A tiny
@@ -266,6 +267,58 @@ test('at shipped defaults Claude Code is given neither --tools nor --effort', as
   assert.equal(args.includes('--disallowedTools'), false, 'no deny list: nothing denied beyond the settings');
   assert.equal(args.includes('--effort'), false, "no effort: the harness's own");
   assert.equal(args.includes('--max-budget-usd'), false, 'no budget: no cap');
+  assert.equal(args.includes('--remote-control'), false, 'no Remote Control: never a default');
+});
+
+test('remoteControl reaches Claude Code as --remote-control, and a flag follows it so it cannot take the prompt as its name', async () => {
+  // `--remote-control [name]` takes an OPTIONAL value — the `--worktree` trap: directly before the prompt it would take the
+  // prompt as the session's name, and the session would run with nothing to do. `--permission-mode` always follows it.
+  const args = await argvOf({ remoteControl: true, tools: ['Read'], disallowedTools: ['SendMessage'] });
+  const i = args.indexOf('--remote-control');
+  assert.notEqual(i, -1, args.join(' '));
+  assert.equal(args[i + 1], '--permission-mode', 'a flag, not a value, comes next');
+  assert.equal(args.filter((a) => a === '--remote-control').length, 1);
+  assert.equal(args[args.indexOf('--tools') + 1], 'Read', 'the variadic lists before it keep their values');
+  assert.equal(args[args.indexOf('--disallowedTools') + 1], 'SendMessage');
+  assert.equal(args.at(-1), 'the prompt');
+  assert.equal((await argvOf({ remoteControl: false })).includes('--remote-control'), false, 'false asks for nothing');
+});
+
+test('at shipped defaults, a task filed with remoteControl: true is spawned with --remote-control, on every attempt, and one filed without it never is', async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-claude-'));
+  const registry = path.join(dir, 'registry.json');
+  const runs = path.join(dir, 'runs.jsonl');
+  fs.writeFileSync(registry, '[]');
+  // A registry, as `claude agents` keeps one: `--bg` adds a session, busy, so nothing reads a transcript.
+  fs.writeFileSync(path.join(dir, 'claude'), `#!${process.execPath}
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
+if (args[0] === 'agents') { process.stdout.write(JSON.stringify(rows)); process.exit(0); }
+if (args[0] === '--bg') {
+  fs.appendFileSync(${JSON.stringify(runs)}, JSON.stringify(args) + '\\n');
+  rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now() });
+  fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows));
+}
+`, { mode: 0o755 });
+  const prev = process.env.PATH;
+  process.env.PATH = `${dir}:${prev}`;
+  try {
+    const engine = createEngine({ root: fs.mkdtempSync(path.join(os.tmpdir(), 'ae-remote-')) });
+    await engine.file({ brief: 'bridged', cwd: dir, remoteControl: true, maxAttempts: 2 });
+    await engine.file({ brief: 'plain', cwd: dir, maxAttempts: 2 });
+    await engine.tick();
+    // Both fail: each is retried, and the retry is spawned from the record as the first attempt was.
+    fs.writeFileSync(registry, JSON.stringify(JSON.parse(fs.readFileSync(registry, 'utf8')).map((r: object) => ({ ...r, state: 'failed' }))));
+    await engine.tick();
+
+    const argvs = fs.readFileSync(runs, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as string[]);
+    const of = (brief: string) => argvs.filter((a) => a.at(-1) === brief);
+    assert.equal(of('bridged').length, 2, 'the first attempt and its retry');
+    for (const args of of('bridged')) assert.ok(args.includes('--remote-control'), args.join(' '));
+    assert.equal(of('plain').length, 2);
+    for (const args of of('plain')) assert.equal(args.includes('--remote-control'), false, args.join(' '));
+  } finally { process.env.PATH = prev; }
 });
 
 test('a budget reaches Claude Code as --max-budget-usd, and the prompt still comes last', async () => {

@@ -12,7 +12,8 @@ record (§6 item 3, the engine half), `find`, one session by its name without `c
 bug 1, a quiet session with no closeout recorded a success (§6 item 18), and what a session cost, read from its harness,
 with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small items: a view that observes its task's own
 harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
-admission in filing order (issue 21) and a task's `priority` (issue 22); agent-workflows `0e7b02a`.
+admission in filing order (issue 21), a task's `priority` (issue 22) and `remoteControl` (issue 23); agent-workflows
+`0e7b02a`.
 
 ## Bugs
 
@@ -331,6 +332,36 @@ priority, then filing, a negative one last; `test/facade.test.ts`: every refusal
 - **The Effect door** journals any value (issue 6). One that is not a finite number — a file journal writes `NaN` back as
   `null` — is read as 0 when the board is ordered, never as above or below every other.
 
+### 23. `remoteControl` bridges a session, and nothing reads whether it was bridged
+
+**What changed** (2026-09-16). `remoteControl: true` on a task gives every attempt's `claude --bg` spawn `--remote-control`
+(`claudeOps` in `agent-engine/src/runner.ts`), so the session is listed in claude.ai's agents view — measured 2026-09-16 on
+2.1.273 (agent-workflows `docs/features.md` §2): a `--bg` session gets a `bridgeSessionId` only with the flag. The flag takes
+an optional name, so it goes before `--permission-mode` and never before the prompt. `createEngine().file()` refuses a value
+that is not true or false, and `true` on any `HarnessSpec` — `codex`, `claude-detached`, agent-workflows' `check` — naming the
+harness and the `'claude-bg'` one to file on; a `PromiseRunner` is handed it and asked nothing. `test/completion.test.ts`:
+the flag's place in the argv, and at `createEngine()`'s own harnesses a fake `claude` given it on a first attempt and a
+retry, and never for a task without it; `test/engine.test.ts`: carried to every attempt, and not read by `decide`;
+`test/facade.test.ts`: every refusal, by name. Measured under the engine (Verified live, below).
+
+**What is left.**
+
+- **Nothing reads whether a session was bridged.** The runner passes the flag, and the `bridgeSessionId` is in the session's
+  registration, which `find` reads for its id alone. A session that could not be bridged — an account signed out of
+  claude.ai, Remote Control off for the organisation — runs unbridged and says so to nobody; `view` and `ae ls` do not say
+  whether a session is reachable. The board's "reachable from the phone" (features.md §2) needs that read first.
+- **Driven outside the record.** Whatever a person types into a bridged session from the web, and every prompt they answer
+  there, reaches it without `say`, so none of it is journalled: `state.said` is not the whole of what such a session was
+  told.
+- **A session let go.** The engine stops and removes a session once its end is written (`release`); whether the agents view
+  drops a released session at once was not looked at.
+- **The Effect door refuses nothing** (issue 6): a `remoteControl: true` that reaches `codex` or `claude-detached` through it
+  is dropped without a word.
+- **Not a brief key**, and agent-workflows files none yet: a step key (`remote:`, features.md §2) is a run of its own.
+- **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
+  that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`
+  fails the day the control is bridged without it, or the flagged session is not.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
@@ -369,6 +400,13 @@ priority, then filing, a negative one last; `test/facade.test.ts`: every refusal
   the Effect door) made 40 tool calls, ended `done` and settled `succeeded`, and its attempt recorded $0.3439, 125.6 s of API
   time and 247 ms of tool time, read once its release had stopped it (issues 17, 18). The first version of this brief —
   read one short file forty times — was declined by haiku as a waste, which Claude Code listed `blocked`.
+
+- **`remoteControl` under `--bg`** (issue 23). `test/live.test.ts` on Claude Code 2.1.274, 2026-09-16, `--model haiku`, no
+  tools, run once by the implementing step: a session filed with `remoteControl: true` registered under
+  `~/.claude/sessions/` with a `bridgeSessionId` (`session_012gj9r5…`), and an identical session filed without it registered
+  with none, looked at again fifteen seconds after both had registered. Both were stopped and removed by the test, and were
+  gone from `claude agents` afterwards. Whether the agents view listed the bridged one was not looked at: the registration's
+  `bridgeSessionId` is what the 2.1.273 measurement found the view follows.
 
 ## Verified by tests, not by a live run
 

@@ -13,6 +13,7 @@ import {
   graphAt,
   GRID_COLUMNS,
   floorRuns,
+  followingCards,
   inFlight,
   inFlightFirst,
   keepDragged,
@@ -288,6 +289,22 @@ test('a step dragged takes the steps that wait on it, directly or through others
   // A cycle, which only a record edited by hand could have: walked once, and the dragged step not among its own followers.
   const cycle: StepEdges[] = [{ name: 'a', after: ['c'] }, { name: 'b', after: ['a'] }, { name: 'c', after: ['b'] }];
   assert.deepEqual(followersOf(cycle, 'a'), ['b', 'c']);
+});
+
+test('a card dragged takes the cards on the floor that wait on it, directly or through others, and not the cards it waits on', () => {
+  const card = (id: string, after: string[] = []) => ({ id, after });
+  // The e2e's diamond, and a card beside it that waits on nothing.
+  const floor = [card('top'), card('shipped', ['top']), card('running', ['top']), card('bottom', ['shipped', 'running']), card('beside')];
+  assert.deepEqual(followingCards(floor, 'top'), ['shipped', 'running', 'bottom'], 'the top takes both sides and the bottom, once each');
+  assert.deepEqual(followingCards(floor, 'running'), ['bottom'], 'a side takes the bottom, and not the top nor the other side');
+  assert.deepEqual(followingCards(floor, 'bottom'), [], 'the bottom takes nothing: nothing waits on it');
+  assert.deepEqual(followingCards(floor, 'beside'), [], 'a card no run waits on moves alone');
+  assert.deepEqual(followingCards(floor, 'gone'), [], 'a run not on the floor');
+  // A run waited on through one that is off the floor — finished, and hidden — draws no edge, and nothing follows through it.
+  const hidden = [card('top'), card('bottom', ['middle'])];
+  assert.deepEqual(followingCards(hidden, 'top'), []);
+  // A run that names itself, and runs that go round, as only a record edited by hand could: walked once.
+  assert.deepEqual(followingCards([card('a', ['a', 'b']), card('b', ['a'])], 'a'), ['b']);
 });
 
 test("a drag moves the dragged step and its followers by as far as the pointer went, from wherever each already was, and no other step", () => {

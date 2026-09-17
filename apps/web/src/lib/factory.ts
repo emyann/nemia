@@ -176,6 +176,15 @@ export function followersOf(steps: readonly StepEdges[], name: string): string[]
 }
 
 /**
+ * The cards that move with `id` when a person drags its card on the Factory, as a step's followers move with it: every card on
+ * the floor that waits on it, directly or through others on the floor — the cards to its right, down the `after` edges the floor
+ * draws (`runEdges`) — oldest first, and not `id` itself. The cards it waits on stay where they are. A run in an `after` that is
+ * off the floor draws no edge, and nothing follows through it. Each card's steps go with it, as its children.
+ */
+export const followingCards = (runs: ReadonlyArray<Pick<RunSummary, 'id' | 'after'>>, id: string): string[] =>
+  followersOf(runs.map((run) => ({ name: run.id, after: run.after })), id);
+
+/**
  * How far each step was dragged, after `moving` are dragged `by` further: each of them moved by as much from where it was —
  * from where the layering put it, for one not dragged before — and every other step as it was.
  */

@@ -68,6 +68,19 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **Playwright's `hasText` reads `textContent`, which puts no space between two elements.** A label beside a rendered
   `Markdown` block — `<p>asks:</p><div data-markdown>…` — reads `asks:Warm colours…`, and a locator for `asks: Warm colours…`
   waits for ever. Put `{' '}` between them (`Asks` in `Decide.tsx`, learned by the run that rendered markdown on the board).
+- **React Aria's `DisclosurePanel` keeps what it holds, and a closed panel is still laid out.** It hides the panel `until-found`, which is
+  `content-visibility: hidden`, not `display: none`: a folded result is rendered for nobody, and a margin or a border on the panel shows under
+  a closed fold. The board's folds draw their content only while open (the `Disclosure`'s render function, or `DisclosureStateContext`) and
+  put their spacing on what they draw (`ToolRun`, `ToolContent`, `ReasoningContent`; learned by the run that put the app on React Aria).
+- **A React Aria link follows Enter with a click that never reaches the router's `onClick`.** `createLink` hands a mouse click to the
+  router, and Enter on the same link loaded the whole page until the root mounted React Aria's `RouterProvider` on `router.navigate`
+  (`__root.tsx`). No test presses Enter on a link; try one by hand after touching the root (learned by the same run).
+- **Playwright's click on a React Aria switch waits for ever.** Its role and name are on an input hidden to the eye inside the switch's own
+  `<label>`, which intercepts the click. Press the label, `page.locator('label', { has: toggle })`, then check it is `checked`
+  (`showFinished` in `run.ts`). A checkbox or radio from React Aria is built the same way (learned by the same run).
+- **`browser_take_screenshot` resolves a relative `filename` against the workspace, not `--output-dir`.** With `@playwright/mcp` 0.0.80 a
+  relative name failed as a path under the worktree, and would have written there had the folder existed. Give it an absolute path under
+  `/tmp/playwright-mcp`, in a folder made first (learned by the same run; the `look` skill still says relative).
 - **An encoded `..` never reaches a Hono route in a test.** `app.request` parses its URL, and a URL resolves `%2E%2E` as `..`
   before the router sees it: the answer is the router's 404, not the route's refusal. Send `..%2F…` — a slash encoded — to reach
   a name refusal (learned by the run that added a card's page).
@@ -145,8 +158,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - `.codex/rules/git-commit.rules` — lets a Codex step commit its own work in a worktree.
 - `.claude/skills/` — the repository's skills, which every step whose tools include `Skill` can use: `look` (ours)
   and `shadcn` (third-party, installed with `npx skills add shadcn/ui --agent claude-code --copy`, pinned by hash in
-  `skills-lock.json`; the `migrate-radix-to-base` skill it ships was dropped: it targets Base UI, and the app is on Radix today with
-  React Aria wanted as its base, features.md §7). The shadcn skill
+  `skills-lock.json`; the `migrate-radix-to-base` skill it ships was dropped: it targets Base UI, and the app is on shadcn's React Aria
+  base, `aria-nova`, features.md's *Shipped: the web app's components on React Aria*). The shadcn skill
   reads `components.json` from the session's cwd when it loads, and this repository's is `apps/web/components.json`,
-  so its CLI runs from `apps/web`. Its Bash commands (`npx shadcn@latest …`) are denied without a prompt in a
-  `dontAsk` step unless `.claude/settings.json` allows them; implement steps run in the harness's own mode.
+  so its CLI runs from `apps/web`. From the root the skill does not load at all: its `info` refuses a monorepo root and the `Skill`
+  tool reports the error, so read `.claude/skills/shadcn/SKILL.md` by hand. Its rules know two bases, radix and base; on aria the
+  reference is what `npx shadcn@latest add <component> --view <file>` prints, and `add` installs no `react-aria-components`.
+  Its Bash commands (`npx shadcn@latest …`) are denied without a prompt in a `dontAsk` step unless `.claude/settings.json`
+  allows them; implement steps run in the harness's own mode.

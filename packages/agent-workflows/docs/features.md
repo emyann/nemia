@@ -2875,7 +2875,7 @@ What was measured:
   the ending itself, and `wf round` at the ending's gate, each naming the gate and the commands that are honoured. `run.test.ts` pins those
   three sentences where it had an alternation that passed whatever they said, holds the brief of both kinds of step to its own artifacts
   contract, and reads `wf ls`, `wf decide`, `gateLines` and `wf approve` in the window between a send-back and the pass that files it,
-  finding them agreed. Measured from the root three times with `npx turbo run test --force`: agent-workflows 586 (585 passed, 1 skipped),
+  finding them agreed. Measured from the root three times with `npx turbo run test --force`: agent-workflows 588 (587 passed, 1 skipped),
   from 575; api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) untouched. `npm run typecheck` clean in all four.
 - From its second round, four findings: a try of an ending step is held by the checkout as its first filing is — `ship.test.ts` sends back a
   ship that ended blocked while another run's is merging, and holds it for two passes, with nothing merged, `wf ls` saying it beside the try

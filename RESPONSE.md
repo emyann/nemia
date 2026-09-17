@@ -60,6 +60,20 @@ Four findings, one commit each, all in `packages/agent-workflows`.
    Kept untestable it would be a claim the suite does not hold, so it is deleted; `gateLines`'s half, which is
    where the window actually showed, stays and is pinned.
 
-Measured from the root with `npx turbo run test --force`: agent-workflows 586 (585 passed, 1 skipped), from
+## What the review's third round changed
+
+One finding, one commit. **A claim on the checkout is a promise the pass would file the step.** `mainClaim`
+counted a claim on `assess`'s `ready` alone, but `advance` files a ready step only when the runs it waits on
+have shipped and the cap on runs in flight leaves a slot — two gates that bite exactly on a run with nothing
+filed, which an ending is when it is also its root: a folder whose one step merges (`validateMainWorkspace`
+allows it). Such a run, started `--after` work that has not shipped and approved, took the checkout with the
+oldest word and held every other run's ending behind a session that does not exist — the rule `mainClaim`'s own
+docstring stated. It asks both questions now. `hasStarted` alone would not do, as the finding says: it is false
+exactly while such an ending waits to be filed, so the run would then be filed into a checkout another run's
+ship is merging in. Two store tests: one that declines to claim on each gate, one that is held all the same
+once its parent has shipped and filed on the pass after the step in the checkout settles. Each half fails
+without its gate, and the second fails on the `hasStarted` shortcut.
+
+Measured from the root with `npx turbo run test --force`: agent-workflows 588 (587 passed, 1 skipped), from
 575; api 202, web 248, agent-engine 340 (331 passed, 9 skipped), untouched. `npm run typecheck` clean in all
 four.

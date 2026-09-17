@@ -1536,10 +1536,10 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
   const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
   if (taskId && (phase === 'pending' || phase === 'running')) return { id: run.id, repo, step: ending.name, holds: true };
   if (run.cancelledAt) return undefined;
-  const at = endingAsked(run, ending, readAsks(run.id).asks);
+  const { asks, rounds } = readAsks(run.id);
+  const at = endingAsked(run, ending, asks);
   if (at === undefined) return undefined;
   const { views, phaseOf } = await taskPhases(e, run);
-  const { asks, rounds } = readAsks(run.id);
   const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
   const parent = await parentsOf(e, run);
   const files = runReady(run, (id) => parent(id).shipped) && runAdmitted(run, slot);

@@ -1212,7 +1212,8 @@ run 'wf tick' (or 'wf up') to start it
 
   `workflow:` is optional, since an idea often does not know its workflow. `repo:` is a key of its own. An inbox card has no
   `after:`: what it waits on is said at start, with `--after`, once the runs it could wait on are known. A plan's card keeps
-  its rules, and refuses `repo:`: a plan's repository is `wf plan --repo`.
+  its rules, and refuses `repo:`: a plan's repository is `wf plan --repo`. A third key, `queued:`, marks a card to start on its
+  own, and `wf inbox queue` writes it ([below](#cards-that-start-themselves-wf-inbox-queue)).
 - **`repo:` is what makes one inbox serve several repositories.** A card that names its repository starts on it from
   wherever `wf start` is typed, and a board that one day serves more than one repository can group its inbox by it. A card
   without one is about the repository its start names: `--repo`, else `.`.
@@ -1223,8 +1224,8 @@ run 'wf tick' (or 'wf up') to start it
   where `wf inbox add` is typed, and a file's own `workflow:` from the file's folder, as a plan card's is read from its plan
   folder. Left relative, `../workflows/dev` in `~/code/myapp/plans/idea.md` would be read from the inbox at start, and name
   the store's `workflows/dev`.
-- **`wf inbox` lists the cards**: name, first line, workflow and repo when set, and `started as <runId>` for a card whose
-  name a run's record carries in its `from`, composed on read. An entry that does not read as a card is listed with its
+- **`wf inbox` lists the cards**: name, first line, workflow and repo when set, `queued 2 of 3` for a queued card, and
+  `started as <runId>` for a card whose name a run's record carries in its `from`, composed on read. An entry that does not read as a card is listed with its
   refusal, never hidden. A hidden file and a README are not listed.
 - **`wf inbox rm <name>` drops a card** without starting it. A name with no card is normal: it says so, names the cards
   there are, and exits 0.
@@ -1246,7 +1247,8 @@ run 'wf tick' (or 'wf up') to start it
 - **Refused by name**, exit 2, with the fix, before anything is written:
   - a key an inbox card does not have, `after:` among them, with where what it waits on is said instead: for a file
     `wf inbox add` is given, delete the line, file the idea, and give `--after` when starting the card;
-  - `workflow:` or `repo:` set to nothing or twice, a `repo:` that is not an absolute path to a directory, and an empty body;
+  - `workflow:` or `repo:` set to nothing or twice, a `repo:` that is not an absolute path to a directory, a `queued:` that is
+    not an ISO time or is on a card with no `workflow:`, and an empty body; and a `queued:` in a file given to `wf inbox add`;
   - `wf inbox add` with no idea, or one with nothing in it;
   - a name that would leave the folder — a slash, `..` — or a hidden one, given to `wf inbox rm` or a start;
   - a start naming a card that is not there, with the cards that are: any path under the inbox, a file there that is not a
@@ -1287,6 +1289,40 @@ up — every 4000ms, ^C to stop
 - **The wait is on the timeline.** A run the cap held counts `createdAt` → its first filing as queued — from the pass that first held it, on a
   run that waited on runs — on a `run slot` row of its own, and in the run's `queued`: `still waiting` while nothing is filed, `not known`
   where the engine's feed does not say when its first task was filed. A run the cap never held has no such row.
+
+### Cards that start themselves: `wf inbox queue`
+
+```text
+$ wf inbox queue cache-the-engine-s-views-bet-9prl
+cache-the-engine-s-views-bet-9prl  queued at 2026-09-16T10:00:00.000Z, 1 of 1  workflow: dev  repo: /home/me/code/myapp
+the tick starts it on its own once its turn comes and a run slot is free — take it back with wf inbox queue cache-the-engine-s-views-bet-9prl --off
+$ wf up
+up — every 4000ms, ^C to stop
+   sessions per harness: at most 2 at once, checks in a pool of their own (WF_MAX_CONCURRENT)
+   runs in flight: no cap (WF_MAX_RUNS)
+10:00:04  started cache-the-engine-s-views-bet-9prl as cache-the-engine-s-views-bet-k2q9
+10:00:09  cache-the-engine-s-views-bet-k2q9  filed implement
+```
+
+- **`wf inbox queue <name>` marks a card to start on its own.** It writes `queued:` on the card, the ISO time it was queued,
+  which orders the queue; `--workflow <w>` writes `workflow:` too. `wf inbox queue <name> --off` takes the mark back, and
+  `wf inbox rm` drops the card. The card's file is written whole, through a hidden file renamed over it, so a pass never reads
+  half a card.
+- **Each pass, after every run has been advanced, the tick starts the oldest queued card** while a run slot is free — always,
+  with no cap. By `queued:`, then by name (`queueOrder`), through `startFromInbox`, the start any card has: its `workflow:`,
+  its `repo:` or else the repository `wf up` runs in, as `wf start` takes `.`. Its base is its base branch as it is at that
+  moment, and its brief is frozen then. One card a pass: its run has nothing filed, and the next pass counts it against the cap
+  before another card is started. `--after` stays for cards that depend on one another.
+- **Started, the card leaves the inbox** as any start removes it, and `wf up` and `wf tick` log `started <card> as <runId>`. A
+  removal that fails leaves a card `wf inbox` lists as `started as <runId>`, which neither a pass nor a person starts again.
+- **A start the package refuses is written down, not tried again.** The workflow gone, the repository gone, whatever
+  `startFromInbox` refuses: `wf up`'s line names it, `wf inbox` says `not started at <time>: <why>` beside the card's place,
+  and the card is left as it is. The tick keeps the refusal in `$WF_ROOT/queue/<name>.json` with the card's text, and passes
+  over the card while its text is the same: one try, no hot loop, and the card behind it has its turn. Edit the card, or take
+  it back and queue it again, and the next pass tries it again.
+- **Refused by name**, exit 2, before anything is written: a name with no card, naming the cards there are; a card with no
+  `workflow:` and no `--workflow` — `--workflow <w>` writes both; a card already queued, with its place, and `--off` to take it
+  back first; a card a run was started from; and `--off` beside `--workflow`. `--off` on a card not queued says so, exit 0.
 
 ## Calling a run off
 
@@ -1507,21 +1543,22 @@ holding a concurrency slot forever.
 |---|---|
 | `src/workflow.ts` | the format: parse a folder of markdown; refuse an unknown key, a word the step's harness does not take, a cycle, a dangling `after`, a loose `output:` schema, an `input:` on work that has not finished, or a loop a round could not run; find a workflow folder by a path or by its name under `<repo>/workflows/` |
 | `src/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
-| `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing and a `repo:` that is not an absolute directory; the card `wf inbox add` writes; a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records; and which path is a card of the inbox |
+| `src/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/run.ts` | **`assess`** and **`stepStatus`** — pure: which steps are ready, due a check, another try or another round, blocked, done — **`runReady`**, whether a run's roots may be filed yet (`--after`), **`runAdmitted`**, whether the cap on runs in flight leaves them a slot, and which runs it holds (`heldRuns`), **`forgetRefusal`**, whether `wf rm` may forget a run and which worktrees, branches and check logs are its own, and what a step is told, `## From <step>`, `## From run <id>`, `## Try <n>` and `## Round <n> of <N>` included |
 | `src/check.ts` | the check — pure: the harness the run hands the engine, the verdict, the contract |
 | `src/deps.ts` | what a worktree is given — pure: the `node_modules` plan, `.worktreeinclude`, and the line a step is told |
 | `src/radius.ts` | what `wf decide` shows of a branch — pure: the numstat grouped by blast radius, the agent-facing, check-affecting and lesson lists, the lesson line, and what a step consumed |
-| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine and the two ceilings (`ceilings`), a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, dropped and started from (`readInbox`, `addToInbox`, `dropFromInbox`, `startFromInbox`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
+| `src/runner.ts` | the I/O: run store, git worktree and what it is given, the engine and the two ceilings (`ceilings`), a pass over every run, started runs first and the rest admitted oldest first (`tick`), a run forgotten (`forget`), a plan's cards started (`startPlan`) with their parents' closeouts gathered for the first steps (`parentCloseouts`), and the inbox read, filed, queued, dropped and started from (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`, `startFromInbox`), a queued card started by the tick (`startQueued`) — and, for a consumer that words a step as `wf ls` does off the views it already has, with no `logs` call: `phaseOfView`, `closeoutAsked`, `exitVerdicts` |
 | `src/cli.ts` | the verbs |
 
 The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 
 | path | |
 |---|---|
-| `runs/<id>.json` | a run's record, the tick's to write; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` |
+| `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` |
 | `runs/<id>/` | the run's own files, outside every workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
+| `queue/` | a queued card's start the package refused, `<name>.json`, the tick's to write: the card's text and why |
 | `worktrees/<id>/<step>/` | each step's workspace |
 | `checks/` | each check's stderr |
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |

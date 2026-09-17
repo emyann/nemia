@@ -301,7 +301,10 @@ export function slotNeed(run: Run, phaseOf: (taskId: string) => TaskPhase, a: Pi
  * Whether the tick may file the roots of this run on this pass: fewer runs in flight than the cap, or no cap. Pure. Always, for a run that has
  * started — the cap holds only a run with nothing filed — and for one judged with no slot, which is `advance` called outside a tick.
  */
-export const runAdmitted = (run: Run, slot: RunSlot | undefined): boolean => hasStarted(run) || !slot || slot.cap <= 0 || slot.inFlight < slot.cap;
+export const runAdmitted = (run: Run, slot: RunSlot | undefined): boolean => hasStarted(run) || !slot || slotFree(slot);
+
+/** Whether a run slot is free: fewer runs in flight than the cap, or no cap. Pure. What a queued card is started on, after every run has been advanced. */
+export const slotFree = (slot: RunSlot): boolean => slot.cap <= 0 || slot.inFlight < slot.cap;
 
 /** Runs in the order a pass admits them: oldest by `createdAt`, then by id. Pure. */
 export const admissionOrder = <R extends Pick<Run, 'id' | 'createdAt'>>(runs: readonly R[]): R[] =>

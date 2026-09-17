@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -718,7 +718,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, waiting, said, timeline, held, standings, toDecide } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, gates, waiting, said, timeline, held, checkout, standings, toDecide } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -737,6 +737,9 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         for (const r of retrying) console.log(`  ${r.step}: ${dueNote(steps.find((s) => s.name === r.step)!, run, r)}`);
         // So is a loop going round again.
         for (const r of rounding) console.log(`  ${r.step}: ${roundDueNote(steps, r)}`);
+        // And an ending a person has approved, waiting for the repository's own checkout: which run's step is in it, and what frees this one.
+        const ending = steps.find((s) => s.workspace === 'main');
+        if (checkout && ending) console.log(`  ${checkoutLine(ending.name, checkout)}`);
         return console.log('  nothing to decide yet');
       }
       if (decision.kind === 'shipped') return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}`);

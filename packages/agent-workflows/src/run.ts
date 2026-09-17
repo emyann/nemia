@@ -214,6 +214,11 @@ export function assess(
    * whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
    */
   standings: readonly BranchStanding[] = [],
+  /**
+   * The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts),
+   * if one is: such a step is not filed while another is working there, whatever else is ready. Left out, nothing holds the checkout.
+   */
+  checkout?: CheckoutHold,
 ): Assessment {
   // A cancelled run outranks anything its tasks say. Nothing more is filed for it however
   // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
@@ -248,7 +253,9 @@ export function assess(
     // A predecessor that is final without satisfying `after` is final for its followers too. Said
     // plainly rather than left to hang, because a run that waits forever looks like a bug.
     if (deps.some(stopsFollowers)) blocked.push(step.name);
-    else if (deps.every(satisfiesAfter)) ready.push(step.name);
+    // An ending step works in the repository's own checkout, and another run's is in it (`heldCheckouts`): it waits, and is filed once
+    // that one settles. Everything else it needs is here, so nothing but the checkout is between it and being filed.
+    else if (deps.every(satisfiesAfter) && !(checkout && step.workspace === 'main')) ready.push(step.name);
   }
 
   const all = [...status.values()];
@@ -453,6 +460,60 @@ export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Ret
 
 /** The steps a send-back at a gate goes to: the gated step itself, once it has run — or, at a gate held before its step is filed, the steps it waits on, whose work the objection is about. Pure. */
 export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
+
+// ─── one checkout, one ending step ──────────────────────────────────────────
+
+/**
+ * Which run's `workspace: main` step is working in a repository's own checkout while another run's waits for it (`heldCheckouts`): the run,
+ * and its step.
+ */
+export type CheckoutHold = { run: string; step: string };
+
+/**
+ * A run's claim on a repository's own checkout on a pass (`checkoutHold` in runner.ts): the `workspace: main` step that works there, the
+ * repository, and either `holds` — its task is filed and not settled, so the step is in that checkout now — or `at`, the time of the
+ * approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
+ */
+export type MainClaim = { id: string; repo: string; step: string; holds: boolean; at?: string };
+
+/**
+ * The runs whose ending step waits for a checkout another run's step has, each with the run and step holding it. Pure.
+ *
+ * An ending step works in the repository's own checkout, which is one directory on the base branch: two of them at once read the same
+ * `git status`, trial merge over each other, and the loser's `git merge --abort` throws away the winner's staged merge. Prose in a
+ * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: main` task is unsettled has the checkout, and
+ * every other run of the same repository waiting to file one is held until it settles. With none in it, the oldest approval takes it —
+ * then by id — so which pass reads which run first decides nothing.
+ *
+ * Level-triggered, like the rest: the claims are read from the world on the pass that asks, including what that pass has already filed,
+ * and a run held on one pass is asked again on the next.
+ */
+export function heldCheckouts(claims: readonly MainClaim[]): Map<string, CheckoutHold> {
+  const held = new Map<string, CheckoutHold>();
+  const repos = new Map<string, MainClaim[]>();
+  for (const c of claims) repos.set(c.repo, [...(repos.get(c.repo) ?? []), c]);
+  for (const group of repos.values()) {
+    // A step already in the checkout keeps it; a run that is in it is not waiting for it, whatever else the group says.
+    let taken = group.find((c) => c.holds);
+    const waiting = group.filter((c) => !c.holds && c.at !== undefined)
+      .sort((a, b) => a.at!.localeCompare(b.at!) || a.id.localeCompare(b.id));
+    for (const c of waiting) {
+      if (!taken) taken = c;
+      else if (taken.id !== c.id) held.set(c.id, { run: taken.id, step: taken.step });
+    }
+  }
+  return held;
+}
+
+/** A run whose ending step waits for the repository's own checkout, as `wf ls` says it on that step's line: `waiting for the checkout (r-1's ship has it)`. Pure. */
+export const checkoutWord = (hold: CheckoutHold): string => `waiting for the checkout (${hold.run}'s ${hold.step} has it)`;
+
+/**
+ * What `wf decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees this
+ * one. Pure.
+ */
+export const checkoutLine = (step: string, hold: CheckoutHold): string =>
+  `${step}: ${checkoutWord(hold)} — it works in the repository's own checkout, and two endings never do at once; the next tick files ${step} once ${hold.run}'s ${hold.step} has settled`;
 
 /**
  * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in runner.ts):
@@ -2827,10 +2888,12 @@ export function decision(
   harnessBlocked: (taskId: string) => boolean = () => false,
   /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person. */
   spendOf: SpendOf = () => undefined,
+  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts): what this run is still running for. */
+  checkout?: CheckoutHold,
 ): Decision {
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
-  const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf);
+  const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf, [], checkout);
   const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   // A step a round due files again is held on no budget (`roundSpans`), as `assess` reads it.
   const refiled = roundSpans(steps, round);
@@ -2842,9 +2905,14 @@ export function decision(
       .filter((s) => statusOf.get(s.name) === 'checking'
         || (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name]!.taskId!))))
       .map((s) => s.name);
+    // An ending step waiting for the repository's own checkout is waited on too: its approval is given, and what holds it is another run's
+    // step in that directory (`heldCheckouts`). Never one whose own work is being said again, which is what it waits for first (`unheld`).
+    const waitsForCheckout = checkout
+      ? steps.filter((s) => s.workspace === 'main' && !run.steps[s.name]?.taskId && !unheld(steps, run, retry, round).has(s.name)).map((s) => s.name)
+      : [];
     // A step the next tick tries again is waited on too: nothing is decided about it yet. So is a loop going round again. A step whose
     // blocked session the tick stops first is both live and due, and named once.
-    return { kind: 'running', waiting: [...new Set([...live, ...ready, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort() };
+    return { kind: 'running', waiting: [...new Set([...live, ...ready, ...waitsForCheckout, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort() };
   }
 
   const branches = resultSteps(steps)
@@ -2969,6 +3037,8 @@ export function listing(
   slot?: RunSlot,
   /** Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in runner.ts): what says a finished run is one nobody has decided. */
   standings: readonly BranchStanding[] = [],
+  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts): what this run's ending says where `waiting` would be. */
+  checkout?: CheckoutHold,
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run — or for a run slot.
   const waiting = gated(run) ? [...waits] : [];
@@ -3028,6 +3098,9 @@ export function listing(
     // holds says so, with the count: what waits on a root still says `waiting`. An ending step waiting at its gate says that instead: it is
     // not filed, and a person's approval is what files it.
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
+      // An ending step approved and not filed says which run's step has the checkout it works in, where `waiting` would be — unless its own
+      // work is being said again (`unheld`), which is what it waits for first.
+      if (checkout && step.workspace === 'main' && !waitingAgain.has(name)) return { name, status: checkoutWord(checkout), branch };
       return { name, status: step.after.length ? 'waiting' : waiting.length ? waitWord(waiting) : held ? slotWord(held) : 'waiting', branch };
     }
 
@@ -3084,7 +3157,7 @@ export function listing(
   const total = runSpend(run, spendOf);
   // What is left for a person to decide about the result, as `assess` judges it on these same inputs: `wf ls` says it where it says who
   // a run waits on, and the board reads it there.
-  const { toDecide: decide } = assess(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, roundAsks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf, standings);
+  const { toDecide: decide } = assess(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, roundAsks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf, standings, checkout);
   return {
     steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting,
     ...(held ? { slot: held } : {}), ...(total.measured ? { cost: spentWord(total) } : {}), ...(decide ? { toDecide: decide } : {}),

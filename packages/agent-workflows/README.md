@@ -1141,6 +1141,15 @@ dropped. **Nothing in the packages knows what shipping means.**
   under `## Approved`: they are the terms it acts on. **Send back** there is `wf retry <run> <the work>
   --message "<objection>"` — the work's step, since the ending has nothing of its own to object to — and it
   un-holds the gate until the work signs off again.
+- **Two runs' ending steps never work in one checkout at once.** That checkout is one directory, on the base
+  branch: two approved `ship` steps filed in one pass would both read `git status --porcelain` clean, both
+  trial merge, and the loser's `git merge --abort` would throw away the winner's staged merge while its check
+  ran. The prose of a `ship.md` is not a constraint, so the machinery holds the second: while a `workspace:
+  main` task of any run on the same repository is unsettled, another is not filed — it reads `waiting for the
+  checkout (<run>'s ship has it)` on `wf ls`, and `wf decide` says which run's step has it. With nothing in the
+  checkout, the oldest approval takes it. Level-triggered: the claims are read from the world on the pass that
+  asks, including what that pass has already filed, so the order a pass reads the runs in decides nothing, and
+  a restart changes nothing.
 - **A run's result is the work the ending acts on**, not the ending's own branch: `resultSteps` reads the steps
   before it, so *has it shipped*, *what did it touch* and *what is there to decide* are asked of
   `wf/<run>/implement`, never of `main`, which would answer yes to everything.

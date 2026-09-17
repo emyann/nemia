@@ -2799,6 +2799,14 @@ What was built, four commits:
   approval taken then named a try nothing spends, so the next round would have merged unread (`notHandedOn`, which `waitsAtGate` and
   `approvalRefusal` share). The same for a person's send-back between the ask and the pass that files it, which `assess` and `listing`
   take as waiting (`unheld`). Found by the review, round 3.
+- **Two runs' ending steps never work in one checkout at once** (`heldCheckouts`, `checkoutHold`). `workspaceFor` hands `run.repo` to any
+  approved `workspace: main` step, so two approved `ship` steps filed in one pass both read `git status --porcelain` clean, both trial
+  merge, and the loser's `git merge --abort` throws away the winner's staged merge while its check runs; ship.md's prose was the only thing
+  in the way. Now, while a `workspace: main` task of any run on the same repository is unsettled, another is not filed: it reads as waiting,
+  `wf ls` says `waiting for the checkout (<run>'s ship has it)` on its line and `wf decide` names the step in it (`checkoutWord`,
+  `checkoutLine`). Oldest approval first, then by id. Level-triggered: the claims are read from the store and the engine on the pass that
+  asks — including what that pass has already filed — so the order a pass takes the runs in decides nothing, and a restart changes nothing.
+  `assess`, `listing` and `decision` take the hold as they take a run slot. Found by the review, round 4.
 - **`--no-worktree` is refused on a folder whose last step merges** (`stepsToStart`), before a run is written: such a run works on the base
   branch itself, so there is no result branch for the ending to merge — it would be told the work is on the branch it is standing on, merge
   a branch into itself, and pay for the folder's whole check to find nothing to commit. Found by the review, round 3.

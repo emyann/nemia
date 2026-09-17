@@ -84,11 +84,15 @@ const oneStep = (): string => {
 const SIGNED = { outcome: 'done', summary: 'did the work', artifacts: [], needs: null };
 const BLOCKED = { outcome: 'blocked', summary: 'the check refused', artifacts: [], needs: 'read the suite' };
 
-/** A run of `implement → ship` with implement done and committed on its branch: the run at its result, waiting at the ending's gate. */
-async function atTheGate() {
-  const repo = aRepo();
+/**
+ * A run of `implement → ship` with implement done and committed on its branch: the run at its result, waiting at the ending's gate.
+ *
+ * A repository and a board of its own, unless it is given them: two runs of one repository, on one board, are two endings for one checkout.
+ */
+async function atTheGate(given: { repo?: string; board?: ReturnType<typeof board> } = {}) {
+  const repo = given.repo ?? aRepo();
   const run = start({ brief: 'add sub', repo, workflowDir: folder() });
-  const { e, tasks, filings, settle } = board();
+  const { e, tasks, filings, settle } = given.board ?? board();
   await advance(e, readRun(run.id));
   const work = readRun(run.id).steps.implement!;
   fs.appendFileSync(path.join(work.workspace!, 'add.ts'), 'export const sub = (a, b) => a - b;\n');
@@ -160,6 +164,59 @@ test('an approved ending is filed, in the repository\'s own checkout, and the me
   assert.deepEqual([decision.kind, toDecide, standings], ['shipped', undefined, [{ branch, where: 'on' }]]);
   // The run committed nothing of its own in that checkout: the merge commit is the step's, and the only one.
   assert.equal(git(repo, 'log', '-1', '--format=%s'), `Merge branch '${branch}'`);
+});
+
+/**
+ * Two runs of one repository, each at its ending's gate and each approved — and the SECOND's approval written older than the first's, since
+ * a rule about order that a fixture already has proves nothing.
+ */
+async function twoApproved() {
+  const shared = board();
+  const repo = aRepo();
+  const first = await atTheGate({ repo, board: shared });
+  const second = await atTheGate({ repo, board: shared });
+  await approve(shared.e, first.id, 'ship');
+  const { file } = await approve(shared.e, second.id, 'ship');
+  fs.writeFileSync(file, JSON.stringify({ at: '2026-09-17T08:00:00.000Z' }));
+  return { repo, first, second, ...shared };
+}
+
+test("two runs' ending steps never work in one checkout at once: the oldest approval takes it, and the other reads as waiting for it", async (t) => {
+  const { repo, first, second, e } = await twoApproved();
+
+  // A pass over both, the first run first: the order a pass reads the runs in decides nothing — the older approval is filed, and the other
+  // is not, though its own approval is on the record and everything it waits on has handed on.
+  const one = await advance(e, readRun(first.id));
+  const two = await advance(e, readRun(second.id));
+  assert.deepEqual([one.filed, two.filed], [[], ['ship']], 'one ending, in one checkout');
+  assert.equal(readRun(first.id).steps.ship!.taskId, null);
+  assert.equal(readRun(second.id).steps.ship!.workspace, repo, "and the one that was filed is in the repository's own checkout");
+
+  // Pass after pass, while that step is in the checkout: read from the world each time.
+  assert.deepEqual((await advance(e, readRun(first.id))).filed, []);
+  // And both screens say which run's step has it.
+  const listed = await list(e, readRun(first.id));
+  assert.equal(listed.steps.find((s) => s.name === 'ship')!.status, `waiting for the checkout (${second.id}'s ship has it)`);
+  const { decision, checkout } = await decide(e, first.id);
+  assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
+  assert.deepEqual(checkout, { run: second.id, step: 'ship' });
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
+  try { await main(['decide', first.id], e); } finally { log.mock.restore(); }
+  assert.ok(printed.includes(`  ship: waiting for the checkout (${second.id}'s ship has it) — it works in the repository's own checkout, `
+    + `and two endings never do at once; the next tick files ship once ${second.id}'s ship has settled`), printed.join('\n'));
+});
+
+test('a run whose ending waits for the checkout is filed once the step in it settles', async () => {
+  const { repo, first, second, e, settle } = await twoApproved();
+  await advance(e, readRun(second.id));
+  assert.deepEqual((await advance(e, readRun(first.id))).filed, [], 'held while the other run works in the checkout');
+
+  settle(`${second.id}-ship`, 'succeeded', SIGNED);
+  const now = await advance(e, readRun(first.id));
+  assert.deepEqual(now.filed, ['ship'], 'and filed on the first pass after it settles');
+  assert.equal(readRun(first.id).steps.ship!.workspace, repo);
+  assert.equal((await list(e, readRun(first.id))).steps.find((s) => s.name === 'ship')!.status, 'pending');
 });
 
 test("a run another waited on hands forward what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing", async () => {

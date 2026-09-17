@@ -69,6 +69,13 @@ export type Workflow = {
    * machinery, not by its brief. Refused on codex, which has no tool list: its fence is the sandbox `permissionMode` names.
    */
   disallow?: string[];
+  /**
+   * `remote: true`: every session of the step is bridged to claude.ai — the engine's `remoteControl`, Claude Code's `--remote-control` — and
+   * listed in the web's agents view, where anyone signed in to the account can drive it from a browser or a phone: type into it, answer its
+   * prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what a step without the line is. Refused at
+   * `wf start` on a harness the engine has no such flag for: only Claude Code's background sessions, `claude`, are bridged.
+   */
+  remote?: boolean;
   deadlineSeconds?: number;
   maxAttempts?: number;
   /**
@@ -148,7 +155,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -175,6 +182,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   permissionMode: "the harness's permission mode — on codex, its sandbox — checked against the harness the step runs on",
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
   disallow: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
+  remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` only",
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
   maxAttempts: COUNTS.maxAttempts.counts,
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
@@ -304,6 +312,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     permissionMode: wordOf(name, 'permissionMode', meta.permissionMode, harness),
     tools: toolsOf(name, meta.tools, harness),
     disallow: disallowOf(name, meta.disallow, harness),
+    remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
     maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
     budget: budgetOf(name, meta.budget, harness),
@@ -483,6 +492,18 @@ function disallowOf(step: string, disallow: string | undefined, harness: string 
       : 'a rule is a bare name, without quotes or brackets'}. ${written}`);
   }
   return rules;
+}
+
+/**
+ * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading it
+ * either way is wrong: as true it lets a session be driven from a phone nobody meant to reach it, as false it drops a setting without a word.
+ * Which harnesses bridge a session is the engine's to say, so `remote: true` on another is refused at `wf start` (`remoteRefusal` in runner.ts).
+ */
+function remoteOf(step: string, remote: string | undefined): boolean | undefined {
+  if (remote === undefined) return undefined;
+  if (remote === 'true') return true;
+  if (remote === 'false') return false;
+  return refuse(`${step}: \`remote: ${remote}\` is not \`true\` or \`false\`. \`remote: true\` bridges every session of the step to claude.ai, where anyone signed in to the account can drive it from a browser or a phone; \`remote: false\`, or no line, does not. Write one of the two, or delete the line.`);
 }
 
 function countOf(step: string, key: keyof typeof COUNTS, value: string | undefined): number | undefined {

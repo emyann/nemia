@@ -27,7 +27,7 @@ export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { admissionOrder, slotFree, afterRefusal, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -332,6 +332,25 @@ export const HARNESSES = {
   'claude-detached': claudeDetached,
   check: CHECK,
 } as const;
+
+/**
+ * Why the engine refuses `remoteControl: true` on a harness that runs a prompt and exits, in its words (agent-engine's `file()`), which
+ * `test/store.test.ts` holds this copy to by asking the engine. A copy, because `start` is synchronous and the engine's door is not; and
+ * asked only at filing, the refusal would come after the run was written, on its first pass.
+ */
+const NOT_BRIDGED = 'has no such flag: it runs a prompt and exits, and only a Claude Code background session (`claude --bg --remote-control`) is bridged';
+
+/**
+ * The first step that says `remote: true` on a harness the engine refuses `remoteControl` for — every one of `HARNESSES` but Claude Code's
+ * background sessions, as the engine's own door judges — refused by name in the engine's words (`NOT_BRIDGED`), or undefined. A step without
+ * a `harness:` runs on `claude`, the engine's first.
+ */
+function remoteRefusal(steps: readonly Workflow[]): string | undefined {
+  const bridged = Object.entries(HARNESSES).filter(([, h]) => h === 'claude-bg').map(([name]) => name);
+  const step = steps.find((s) => s.remote && !bridged.includes(s.harness ?? 'claude'));
+  if (!step) return undefined;
+  return `${step.name}: \`remote: true\` asks for a session bridged to claude.ai, and the \`${step.harness}\` harness ${NOT_BRIDGED}. Run the step on ${bridged.join(' or ')} — delete \`harness: ${step.harness}\` — or delete \`remote: true\`.`;
+}
 
 /**
  * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, 2 unless set) is the engine's: sessions
@@ -903,6 +922,9 @@ function stepsToStart(workflowDir: string, isolate: boolean): Workflow[] {
       `${s.name}: a step may not be named for another step's try. The run files ${of} tried again as ${of}-try2, its check as ${of}-try2-check, and on. Rename ${s.name}.md.`,
     ), { exitCode: 2 });
   }
+  // Refused here, before anything is written, and not by the engine when the step is filed: by then the run is on the record.
+  const unbridged = remoteRefusal(steps);
+  if (unbridged) throw Object.assign(new Error(unbridged), { exitCode: 2 });
   return steps;
 }
 
@@ -1527,11 +1549,15 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
         tools: step.tools,
         disallowedTools: step.disallow,
+        // And the bridge to claude.ai, as the step asked for it: a try is a session of the step.
+        remoteControl: step.remote,
         deadlineSeconds: step.deadlineSeconds,
         maxAttempts: step.maxAttempts,
         // What is left of the cap a person raised with the try, or of the one in force, once the step's tries are taken off: handed to a harness
         // that keeps a cap (`budgetUsdFor`), so it holds the tries together to it.
         budgetUsd: budgetUsdFor(step, r.budget ?? budgetOf(step, record), stepSpend(run, r.step, spendOf)),
+        // A try is never a run's first filing: it goes before a newer run's first step (`MOMENTUM`).
+        priority: MOMENTUM,
         resumeFrom,
         // A loop's target tried again within a round still owes its answers to the findings it was handed.
         closeoutSchema: closeoutSchemaOf(step, owesReplies(steps, run, r.step)),
@@ -1572,9 +1598,11 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         permissionMode: target.permissionMode,
         tools: target.tools,
         disallowedTools: target.disallow,
+        remoteControl: target.remote,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
         budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
+        priority: MOMENTUM,
         resumeFrom,
         closeoutSchema: closeoutSchemaOf(target, true),
       });
@@ -1613,6 +1641,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // suite until it passes would let a flaky suite decide what ships.
         maxAttempts: 1,
         resume: 'never',
+        // In its own pool, before a newer run's check: what follows the step waits on it.
+        priority: MOMENTUM,
       });
     }
     run.steps[name] = { ...run.steps[name]!, check: { taskId } };
@@ -1667,11 +1697,15 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       tools: step.tools,
       // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
       disallowedTools: step.disallow,
+      // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
+      remoteControl: step.remote,
       deadlineSeconds: step.deadlineSeconds,
       maxAttempts: step.maxAttempts,
       // What is left of the cap for this session, where its harness keeps one: `claude-detached`. A step on a later round has spent some of it.
       // On `claude` the run holds the cap between tries.
       budgetUsd: budgetUsdFor(step, budgetOf(step, run.steps[name]), stepSpend(run, name, spendOf)),
+      // None on a run's first steps, and `MOMENTUM` on a step after another: a run in flight goes before a newer run's first step.
+      priority: priorityOf(step),
       resumeFrom: step.resume ? sessionOf(step.resume) : undefined,
       // The shape of the step's closing statement, with the fields its `output:` declares — from the
       // workflow this run froze, never the folder. The engine hands it to the harness and records the

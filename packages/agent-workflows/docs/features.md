@@ -21,8 +21,9 @@ settling it `failed` — and a step's `budget:`, with what a step and a run cost
 workflow half), forgetting a run that is over (`wf rm`) — and an inbox of cards parked before they are started (`wf inbox`,
 and its page on the board) — two small items from the plan's queue (§6 items 28 and 31), a cap on runs in flight (`WF_MAX_RUNS`) and
 cards that start themselves (`wf inbox queue`) — and markdown rendered on the board, with a page for a card and for a step that
-explains their keys — and a gate, a step's handoff that waits for a person (`gate: true`, `--gate`, `wf approve`), in the package — have
-shipped.
+explains their keys — and a gate, a step's handoff that waits for a person (`gate: true`, `--gate`, `wf approve`), in the package — and
+the engine's `priority` and `remoteControl` put to use: a run in flight filed above a newer run's first step, and `remote:` on a step (§2,
+its package half) — have shipped.
 
 ## Shipped: the check
 
@@ -2282,6 +2283,22 @@ What the board's run should call:
 
 ## 2. Remote Control on a step, and a supervisor session
 
+**The package half is built**, on the engine's `remoteControl` (`92d6783`). What was registered is kept below as it was asked.
+
+- **`remote: true` on a step**, in `STEP_KEYS` after `disallow`, with its line in `STEP_KEY_MEANINGS`. It is carried as `remoteControl`
+  on every filing of the step's session — the first, each try `retries:` or `wf retry` files, each round, the looping step's and its
+  target's — and never on its check, which is the run's own. `remote: false` is kept as written and filed as it is: the engine takes
+  false on any harness. Any other word is refused at load by name (`remote: yes`), as are an empty value and the line twice.
+- **Refused at `wf start`, with nothing written, in the engine's words**: `remote: true` on `codex` or `claude-detached`, which run a
+  prompt and exit. `wf plan` refuses the card before its first run is started. `remoteRefusal` in runner.ts judges by `HARNESSES` as the
+  engine's `file()` does (only `'claude-bg'` bridges). Its sentence is a copy, since `start` is synchronous and `file()` is not; a store
+  test asks an engine built on the same `HARNESSES` and fails when the two differ. Not at load, as a codex `budget:` is: the request put it at
+  start, and runner.ts is where the engine's harness map is.
+- **Nothing new on a screen.** `wf ls` and `wf decide` print the same lines whether the engine's record carries `remoteControl` or not,
+  and a test holds them so. `wf --help`'s sentence on the keys names `remote` among the rest.
+- **Left**: the board's word for it on the run page; the supervisor; and whether a session was in fact bridged, which nothing reads
+  (engine open issue 23).
+
 **Registered** 2026-09-16, by the operator: not now, but the ability has to exist. The aim is a session supervising the
 whole workload — an orchestrator — that the operator can reach from a phone whenever something waits on a person: a
 merge to accept, an answer to give.
@@ -2429,7 +2446,8 @@ Not agent-workflows features, listed so nothing is lost:
 
 - waking the tick loop on harness registry changes instead of a timer (agent-engine README);
 - the hkb migration ([agent-engine/docs/hkb-migration.md](../../agent-engine/docs/hkb-migration.md));
-- ~~a task field for Remote Control~~ *done, engine `92d6783`: `remoteControl: true` on the task* (§2 above; the step key is W10's);
+- ~~a task field for Remote Control~~ *done, engine `92d6783`: `remoteControl: true` on the task; and in the workflow layer, `remote: true`
+  on a step, carried on every filing of its session and refused at start on a harness the engine refuses it for* (§2 above);
 - ~~a `blocked` session holding a concurrency slot~~ *done, engine `912d537`*: count `working` only toward the ceiling and keep the wider
   set for what else `LIVE` guards; the README's sentence that a deadline is the only thing that frees such a slot, and the
   comment in `decide`, change with it; a test that refuses — two blocked sessions at a cap of two, and a third task starts.
@@ -2437,7 +2455,9 @@ Not agent-workflows features, listed so nothing is lost:
   reasoning, not a measurement;
 - ~~pools by subscription~~ *done, engine `912d537`*: `claude` and `claude-detached` counted as one pool, a harness declaring its
   pool with its own name as the default. The workflow layer's README, banner and `wf --help` say pools since `00d4c06`'s follow-up;
-- ~~**admission in filing order, and a task's priority.**~~ *done, engine `92d6783`; the workflow layer's `priority: 1` on later filings is W10's.* The tick walks tasks in `journal.list`'s order, which is the ids
+- ~~**admission in filing order, and a task's priority.**~~ *done, engine `92d6783`; and in the workflow layer: every filing after a run's
+  first steps — a step after another, a try, a round, a check — carries `priority: 1` (`MOMENTUM`, `priorityOf` in `run.ts`), its first
+  steps none, and the run cap unchanged.* The tick walks tasks in `journal.list`'s order, which is the ids
   sorted (`readdirSync(...).sort()`), and admits each pending one while `used < max`: so which of two pending tasks gets a
   slot is decided by the alphabet of their run ids, and a run never keeps its slot across its own steps — its next step is
   filed a check and a pass after the last ended, and any task pending in that gap takes the slot (measured 2026-09-16:

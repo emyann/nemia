@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
+import { Markdown } from '../components/Markdown';
 import { StartRun } from '../components/StartRun';
 import { WorkflowCanvas } from '../components/WorkflowCanvas';
 import { workflowsQuery, type WorkflowListing } from '../lib/api';
@@ -70,7 +71,7 @@ function WorkflowCard({ workflow }: { workflow: WorkflowListing }) {
       </header>
 
       {description ? (
-        <p className="text-sm leading-relaxed">{description}</p>
+        <Markdown className="text-sm">{description}</Markdown>
       ) : (
         <p className="text-sm text-neutral-500">
           No description: the first paragraph of a <code className="font-mono text-xs">README.md</code> in the folder is one.
@@ -85,9 +86,29 @@ function WorkflowCard({ workflow }: { workflow: WorkflowListing }) {
       ) : (
         <>
           <WorkflowCanvas workflow={workflow} />
+          <StepLinks workflow={workflow} />
           <StartRun workflow={workflow} />
         </>
       )}
     </section>
+  );
+}
+
+/** Each step's page — what its agent is told, and its keys explained — in the order a run runs them: as a block on the graph opens it, by keyboard. */
+function StepLinks({ workflow }: { workflow: WorkflowListing }) {
+  return (
+    <nav aria-label={`Steps of ${workflow.name}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+      <span className="text-neutral-500">Read a step:</span>
+      {workflow.steps.map(({ name }) => (
+        <Link
+          key={name}
+          to="/workflows/$from/$workflow/steps/$step"
+          params={{ from: workflow.from, workflow: workflow.name, step: name }}
+          className="font-mono font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-900 dark:text-neutral-100 dark:decoration-neutral-600 dark:hover:decoration-neutral-100"
+        >
+          {name}
+        </Link>
+      ))}
+    </nav>
   );
 }

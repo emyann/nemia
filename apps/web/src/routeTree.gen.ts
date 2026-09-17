@@ -13,9 +13,11 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CapabilitiesRouteImport } from './routes/capabilities'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
+import { Route as InboxNameRouteImport } from './routes/inbox_.$name'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
 import { Route as RunsRunIdStepsStepRouteImport } from './routes/runs.$runId_.steps.$step'
+import { Route as WorkflowsFromWorkflowStepsStepRouteImport } from './routes/workflows_.$from.$workflow.steps.$step'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -37,6 +39,11 @@ const WorkflowsRoute = WorkflowsRouteImport.update({
   path: '/workflows',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InboxNameRoute = InboxNameRouteImport.update({
+  id: '/inbox_/$name',
+  path: '/inbox/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RunsIndexRoute = RunsIndexRouteImport.update({
   id: '/runs/',
   path: '/runs/',
@@ -52,24 +59,34 @@ const RunsRunIdStepsStepRoute = RunsRunIdStepsStepRouteImport.update({
   path: '/runs/$runId/steps/$step',
   getParentRoute: () => rootRouteImport,
 } as any)
+const WorkflowsFromWorkflowStepsStepRoute =
+  WorkflowsFromWorkflowStepsStepRouteImport.update({
+    id: '/workflows_/$from/$workflow/steps/$step',
+    path: '/workflows/$from/$workflow/steps/$step',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/workflows': typeof WorkflowsRoute
+  '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs/': typeof RunsIndexRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
+  '/workflows/$from/$workflow/steps/$step': typeof WorkflowsFromWorkflowStepsStepRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/workflows': typeof WorkflowsRoute
+  '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs': typeof RunsIndexRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
+  '/workflows/$from/$workflow/steps/$step': typeof WorkflowsFromWorkflowStepsStepRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,9 +94,11 @@ export interface FileRoutesById {
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/workflows': typeof WorkflowsRoute
+  '/inbox_/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs/': typeof RunsIndexRoute
   '/runs/$runId_/steps/$step': typeof RunsRunIdStepsStepRoute
+  '/workflows_/$from/$workflow/steps/$step': typeof WorkflowsFromWorkflowStepsStepRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -88,27 +107,33 @@ export interface FileRouteTypes {
     | '/capabilities'
     | '/inbox'
     | '/workflows'
+    | '/inbox/$name'
     | '/runs/$runId'
     | '/runs/'
     | '/runs/$runId/steps/$step'
+    | '/workflows/$from/$workflow/steps/$step'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/capabilities'
     | '/inbox'
     | '/workflows'
+    | '/inbox/$name'
     | '/runs/$runId'
     | '/runs'
     | '/runs/$runId/steps/$step'
+    | '/workflows/$from/$workflow/steps/$step'
   id:
     | '__root__'
     | '/'
     | '/capabilities'
     | '/inbox'
     | '/workflows'
+    | '/inbox_/$name'
     | '/runs/$runId'
     | '/runs/'
     | '/runs/$runId_/steps/$step'
+    | '/workflows_/$from/$workflow/steps/$step'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -116,9 +141,11 @@ export interface RootRouteChildren {
   CapabilitiesRoute: typeof CapabilitiesRoute
   InboxRoute: typeof InboxRoute
   WorkflowsRoute: typeof WorkflowsRoute
+  InboxNameRoute: typeof InboxNameRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
   RunsIndexRoute: typeof RunsIndexRoute
   RunsRunIdStepsStepRoute: typeof RunsRunIdStepsStepRoute
+  WorkflowsFromWorkflowStepsStepRoute: typeof WorkflowsFromWorkflowStepsStepRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -151,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkflowsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/inbox_/$name': {
+      id: '/inbox_/$name'
+      path: '/inbox/$name'
+      fullPath: '/inbox/$name'
+      preLoaderRoute: typeof InboxNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/runs/': {
       id: '/runs/'
       path: '/runs'
@@ -172,6 +206,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunsRunIdStepsStepRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/workflows_/$from/$workflow/steps/$step': {
+      id: '/workflows_/$from/$workflow/steps/$step'
+      path: '/workflows/$from/$workflow/steps/$step'
+      fullPath: '/workflows/$from/$workflow/steps/$step'
+      preLoaderRoute: typeof WorkflowsFromWorkflowStepsStepRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -180,9 +221,11 @@ const rootRouteChildren: RootRouteChildren = {
   CapabilitiesRoute: CapabilitiesRoute,
   InboxRoute: InboxRoute,
   WorkflowsRoute: WorkflowsRoute,
+  InboxNameRoute: InboxNameRoute,
   RunsRunIdRoute: RunsRunIdRoute,
   RunsIndexRoute: RunsIndexRoute,
   RunsRunIdStepsStepRoute: RunsRunIdStepsStepRoute,
+  WorkflowsFromWorkflowStepsStepRoute: WorkflowsFromWorkflowStepsStepRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

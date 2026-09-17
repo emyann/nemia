@@ -172,7 +172,8 @@ function FileCard() {
 }
 
 /**
- * A card: its first line, its workflow and repository when it names them, and when it was filed; Start, which opens its start form, and Remove.
+ * A card: its first line, linked to its page, its workflow and repository when it names them, and when it was filed; Start, which opens its
+ * start form, and Remove.
  * A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a card
  * shows why, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
  *
@@ -211,12 +212,19 @@ function CardItem({ entry, refusal, onRefused }: {
     >
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
+          {/* Its title opens its page: the body rendered and its keys explained — for an entry that does not read too, with its file as written. */}
           {entry.error === null ? (
             <p data-title className="font-medium break-words">
-              {entry.title}
+              <Link to="/inbox/$name" params={{ name: entry.name }} className="underline-offset-2 hover:underline">
+                {entry.title}
+              </Link>
             </p>
           ) : (
-            <p className="font-mono text-sm break-all">{entry.file}</p>
+            <p className="font-mono text-sm break-all">
+              <Link to="/inbox/$name" params={{ name: entry.name }} className="underline-offset-2 hover:underline">
+                {entry.file}
+              </Link>
+            </p>
           )}
           <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
             <span className="font-mono">{entry.name}</span>

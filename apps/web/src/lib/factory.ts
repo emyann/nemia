@@ -31,6 +31,13 @@ export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou'> & { waiting?: R
   run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou);
 
 /**
+ * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and for
+ * a list from an api started before it carried `onYou`, the steps by name, as the board said them then. The list is read tolerantly, not
+ * refused as a run's detail is (`withGraph`): the Factory polls it, and a refusal would take the whole floor down for a word.
+ */
+export const onYouOf = (run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readonly string[] }): readonly string[] => run.onYou ?? run.waitingOnYou;
+
+/**
  * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
  * a run that never ships is one, though it has filed nothing and is not in flight; in flight; or finished.
  */

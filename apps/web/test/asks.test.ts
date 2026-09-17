@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answersOf, askedSaid, needLine, needOf, needsOf, needText, offersOf, raiseTo, type Need } from '../src/lib/asks.ts';
+import { answersOf, askedSaid, gateOffered, needLine, needOf, needsOf, needText, offersOf, raiseTo, stepAnchor, type Need } from '../src/lib/asks.ts';
 import type { RetryMode, RunDetail } from '../src/lib/api.ts';
 
 const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
@@ -13,7 +13,7 @@ type Step = RunDetail['steps'][number];
 
 /** A step as a run's detail gives it, cut to what these read. */
 const step = (name: string, status: string, over: Partial<Step> = {}): Step =>
-  ({ name, status, note: null, needs: null, blockedByHarness: false, lastLine: null, asked: null, check: null, ...over }) as Step;
+  ({ name, status, note: null, needs: null, blockedByHarness: false, approve: null, lastLine: null, asked: null, check: null, ...over }) as Step;
 
 /** A run of these steps, waiting on `waitingOnYou`. */
 const run = (steps: Step[], waitingOnYou: string[], cancelledAt: string | null = null) => ({ steps, waitingOnYou, cancelledAt });
@@ -49,6 +49,27 @@ test("a step's need is its question while it waits on you, or that the harness b
   const listed = needOf({ name: 'held', needs: null, blockedByHarness: true }, false, false);
   assert.deepEqual(listed, { step: 'held', kind: 'harness', lastLine: null });
   assert.equal(needLine(listed!), 'held is blocked by the harness');
+});
+
+test("a step at its gate needs its approval, in `wf ls`'s words, while it waits on you — none once approved or sent back, and none on a run called off; the Decide section offers it nothing, since Approve is in its section", () => {
+  const plan = step('plan', 'awaiting approval', { approve: 'approve plan' });
+  const steps = [plan, step('implement', 'waiting'), step('theme', 'failed ✗ check (exit 1)')];
+  const needs = needsOf(run(steps, ['plan', 'theme']));
+  assert.deepEqual(needs, [{ step: 'plan', kind: 'approve', said: 'approve plan' }]);
+  // The words name the step already: the card and the node say them as they are.
+  assert.equal(needLine(needs[0]!), 'approve plan');
+  assert.equal(needText(needs[0]!), 'approve plan');
+  // Sent back, the api waits on nobody for it and carries no `approve`; approved, it reads as it stands and carries none either.
+  assert.equal(needOf(plan, false, false), null, 'not waiting on you: nothing to approve');
+  assert.equal(needOf({ ...plan, approve: null }, true, false), null, 'no need the api does not carry');
+  assert.deepEqual(needsOf(run(steps, ['plan'], '2026-09-16T22:00:00.000Z')), [], 'nothing on a run called off');
+  // A gate's step is answered where its closeout is, not among the answers.
+  assert.deepEqual(offersOf(run(steps, ['plan', 'theme'])), [{ step: 'theme', kind: 'try-again', recheck: true, unfinished: false }]);
+  // Sent back: its try asked, which the Decide section says, as for any try asked.
+  const note = 'try 2 asked (--nudge, with your answer) — the next tick files it';
+  const sent = step('plan', 'awaiting approval', { note, asked: { try: 2, mode: 'nudge', model: null, message: 'Store it first.', stopFirst: false } });
+  assert.deepEqual(answersOf(run([sent], [])), [{ step: 'plan', kind: 'asked', try: 2, note }]);
+  assert.equal(stepAnchor('plan'), 'step-plan');
 });
 
 test('what the Decide section offers: an answer to a step that asks, Try again for a refused check — recheck first where it did not finish — or an unsigned step, and the note of a try asked', () => {
@@ -155,4 +176,13 @@ test('REFUSED: no raise for a step past its budget the package takes none of, no
   // A check that did not finish within its budget: the api carries no raise, and the board offers a try again, its recheck first.
   const lint = step('lint', 'failed ✗ check (unfinished)', { raise: null, check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null } });
   assert.deepEqual(offersOf(run([lint], ['lint'])), [{ step: 'lint', kind: 'try-again', recheck: true, unfinished: true }]);
+});
+
+test('REFUSED: a step\'s section offers its gate only for the words `wf ls` asks with — not for a step with none, not for a detail that carries no `approve` at all, and not on a run called off', () => {
+  assert.equal(gateOffered({ approve: 'approve plan' }, false), true);
+  assert.equal(gateOffered({ approve: null }, false), false, 'approved, sent back, or never gated');
+  // An api started before it carried `approve`: nothing there is no approval to ask for, and its approve route would answer 404.
+  assert.equal(gateOffered({} as Pick<Step, 'approve'>, false), false, 'a field the api did not send');
+  assert.equal(gateOffered({ approve: '' }, false), false);
+  assert.equal(gateOffered({ approve: 'approve plan' }, true), false, 'nobody waits for an approval on a run called off');
 });

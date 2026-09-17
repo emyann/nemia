@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, round, runCostLines, runSpend, saidCount, say, sensitiveDiff, spendReader, spentWord, stepSpend, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Spend, type SpendOf, type Timeline, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
-import { addSpend, answerOf, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, loopOver, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
+import { approve, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, round, runCostLines, runSpend, saidCount, say, sensitiveDiff, spendReader, spentWord, stepSpend, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Spend, type SpendOf, type Timeline, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
+import { addSpend, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, gateLines, gatesOf, hasGate, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
@@ -46,8 +46,16 @@ export type RunSummary = {
    * `round 2 of 3`, `round 3 asked (wf round) — …` — and null where it prints nothing.
    */
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
-  /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds — on a run nobody has called off. */
+  /**
+   * Steps a person has to act on — blocked, unsigned, refused by their check, awaiting approval at their gate, out of rounds or past their
+   * budget — on a run nobody has called off.
+   */
   waitingOnYou: string[];
+  /**
+   * `waitingOnYou` as `wf ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and for a
+   * step at its gate, what is asked of you, `approve plan`.
+   */
+  onYou: string[];
 };
 
 /**
@@ -111,8 +119,24 @@ export type RunWaiting = {
  * `needs-human` — which is no question of the step's: measured on "Could not refresh your login because another Claude Code
  * process is refreshing it". What the session said last is on the run's detail alone (`lastLine`): reading it observes the
  * harness again, and the list is read on every poll of the Factory for one observation.
+ *
+ * `approve` is what `wf ls` asks of you for a step waiting at its gate, on a run nobody called off and with no send-back asked for: `approve
+ * plan` (`onYouWords`). Null for any other step — one not gated, not signed off yet, approved, or sent back.
  */
-export type StepNeeds = { needs: string | null; blockedByHarness: boolean };
+export type StepNeeds = { needs: string | null; blockedByHarness: boolean; approve: string | null };
+
+/**
+ * A person's approval of the try a gated step is on (`approvalOf`), off their file (`wf approve`): the try, when, and the words given with it
+ * — handed to every step after the gate under `## Approved` — null where none were.
+ */
+export type StepApproval = { try: number; at: string; message: string | null };
+
+/**
+ * A gated step's gate: its own `gate: true`, or one the run was started with (`hasGate`). `awaiting` while it waits at it — signed off,
+ * verified first where it has a check, and the try it is on not approved: `wf ls`'s `awaiting approval`, whatever else is asked of it. And
+ * `approval`, once a person approved that try. Neither, for a gated step not signed off yet.
+ */
+export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
 /**
  * A try a person asked for — with `wf retry`, or the board's answer box or Continue — that the next tick files: `assess`'s, off their
@@ -267,6 +291,10 @@ export type RunDetail = {
   /** As on `RunSummary`. */
   cost: Spent | null;
   waitingOnYou: string[];
+  /** As on `RunSummary`. */
+  onYou: string[];
+  /** The steps the run is gated at, in the order they run (`gatesOf`): those its workflow gates, and those it was started with. */
+  gates: string[];
   /** Set when the workflow folder cannot be read, or no longer has the steps the run started with. */
   warning: string | null;
   /**
@@ -293,6 +321,9 @@ export type RunDetail = {
     /** As on `RunSummary` (`StepNeeds`). */
     needs: string | null;
     blockedByHarness: boolean;
+    approve: string | null;
+    /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
+    gate: StepGate | null;
     /**
      * For a step the harness blocked, what its session said last, as the engine's `transcript` reads it: its last `text` or `system`
      * event, trimmed. Null for any other step, and for one whose session said none or whose conversation cannot be read.
@@ -368,10 +399,11 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /**
- * A command `wf decide` prints, and runs none of: ship it, drop it, read it for a run worked on its base branch, and each
- * once-more (`wf retry`, `wf round`) with the line it prints it in. `said` is null where the label is all it says.
+ * A command `wf decide` prints, and runs none of: ship it, drop it, read it for a run worked on its base branch, each
+ * once-more (`wf retry`, `wf round`) with the line it prints it in, and for a step waiting at its gate on you, the two its gate line
+ * prints under the step — approve (`wf approve`) and send back (`wf retry --message`). `said` is null where the label is all it says.
  */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more'; command: string; said: string | null };
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back'; command: string; said: string | null };
 
 /**
  * What `wf decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
@@ -583,6 +615,8 @@ type Judged = {
   words: ReadonlyMap<string, string>;
   notes: ReadonlyMap<string, string | null>;
   waitingOnYou: string[];
+  /** `waitingOnYou` in `wf ls`'s words (`onYouWords`): `approve plan` for a step at its gate. */
+  onYou: string[];
   status: RunStatus;
   moving: boolean;
   /** The runs its roots wait on (`waitingOf`). */
@@ -641,10 +675,13 @@ function judge(run: Run, names: readonly string[], folder: readonly Workflow[] |
   // A record the tick cannot read — from before runs froze their workflow, its folder gone — has nothing filed
   // for it, whatever its bare steps would make ready: the tick fails on it.
   const tickReads = Boolean(run.workflow ?? folder);
+  const waitingOnYou = names.filter((name) => said.waitingOnYou.includes(name));
   return {
     words: new Map(said.steps.map((s) => [s.name, s.status])),
     notes: new Map(said.steps.map((s) => [s.name, s.note ?? null])),
-    waitingOnYou: names.filter((name) => said.waitingOnYou.includes(name)),
+    waitingOnYou,
+    // In the page's order, as `waitingOnYou` is: the words `wf ls` prints after `→ waiting on you:`.
+    onYou: onYouWords({ steps: said.steps, waitingOnYou }),
     status,
     // The line `cancelPlan` draws for a finished run, which `status` does not: nothing in flight, and nothing a
     // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
@@ -743,22 +780,40 @@ async function summarize(run: Run, views: Views): Promise<RunSummary> {
       branch: run.steps[name]?.branch ?? null,
       status: judged.words.get(name)!,
       note: judged.notes.get(name) ?? null,
-      ...needsOf(run, name, views),
+      ...needsOf(run, name, views, judged),
     })),
     waitingOnYou: judged.waitingOnYou,
+    onYou: judged.onYou,
   };
 }
 
 /**
  * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its
- * current try's closeout, and the engine's word for its task.
+ * current try's closeout, the engine's word for its task, and what the run established of it (`judge`) — for a step at its gate that waits
+ * on you, what `wf ls` asks of you, in its words (`onYouWords`).
  */
-function needsOf(run: Run, name: string, views: Views): StepNeeds {
+function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'words' | 'waitingOnYou'>): StepNeeds {
   const view = run.steps[name]?.taskId ? views.get(run.steps[name]!.taskId!) : undefined;
   const said = view ? closeoutOf(views, run, name) : undefined;
+  const status = judged.words.get(name)!;
+  const atGate = status === 'awaiting approval' && judged.waitingOnYou.includes(name);
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
     blockedByHarness: view?.phase === 'needs-human' && said === undefined,
+    approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0]! : null,
+  };
+}
+
+/**
+ * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, in `wf ls`'s word, and the approval of the try it is on.
+ * Off the record as `listRuns` composes it, with each approval its file holds (`approvalOf`): no read of its own.
+ */
+function gateOf(run: Run, step: Workflow, status: string): StepGate | null {
+  if (!hasGate(step, run)) return null;
+  const given = approvalOf(run, step.name);
+  return {
+    awaiting: status === 'awaiting approval',
+    approval: given ? { try: given.try, at: given.at, message: given.message ?? null } : null,
   };
 }
 
@@ -870,13 +925,15 @@ async function detail(run: Run): Promise<RunDetail> {
     moving: judged.moving,
     cost: judged.cost,
     waitingOnYou: judged.waitingOnYou,
+    onYou: judged.onYou,
+    gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
     // The steps `judge` words: the judged workflow, then a `bare` step for each one the page shows beside it.
     graph: graphOf([...steps, ...names.filter((name) => !steps.some((s) => s.name === name)).map(bare)]),
     steps: await Promise.all(names.map(async (name) => {
       const step = source?.find((s) => s.name === name);
       const taskId = run.steps[name]?.taskId ?? null;
-      const needs = needsOf(run, name, views);
+      const needs = needsOf(run, name, views, judged);
       const current = {
         status: judged.words.get(name)!,
         check: checks.get(name) ?? null,
@@ -896,6 +953,8 @@ async function detail(run: Run): Promise<RunDetail> {
         note: judged.notes.get(name) ?? null,
         ...needs,
         lastLine: needs.blockedByHarness ? await lastLineOf(views.get(taskId!)!) : null,
+        // Judged by the workflow the run is: a step it does not have is gated only where the run was started with its gate.
+        gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
         said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
         asked: askedOf(judged.asked.get(name)),
         ...current,
@@ -1134,13 +1193,25 @@ function lessonOf(touched: readonly Touched[]): Lesson {
  */
 const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck| --budget <amount>)?)/;
 
+/** A gate line's two commands, as `gateLines` prints them for a step awaiting approval: the approval, without its words, and the send-back. */
+const AT_GATE = /^awaiting approval:\s{2}(wf approve \S+ \S+)(?: \[--message "<words>"\])?\s{2}— or send it back:\s{2}(wf retry \S+ \S+ --message "<objection>")$/;
+
 /**
- * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, then ship it and drop it
- * for the branches, or read it for a run worked on its base branch — which has nothing to merge, nor a branch to delete.
+ * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and the send-back for
+ * each step waiting at its gate on you (`gates`, `gateLines`' lines), then ship it and drop it for the branches, or read it for a run
+ * worked on its base branch — which has nothing to merge, nor a branch to delete.
  */
-function commandsOf(run: Run, d: Decision, offers: readonly string[]): DecideCommand[] {
+function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Readonly<Record<string, string>> = {}): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
-  const once = offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said }));
+  const once = [
+    ...offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said })),
+    ...Object.entries(gates).flatMap(([name, line]): DecideCommand[] => {
+      const [, approve, sendBack] = AT_GATE.exec(line) ?? [];
+      return approve && sendBack
+        ? [{ label: 'approve', command: approve, said: `${name} waits at its gate — with words: ${approve} --message "<words>"` }, { label: 'send back', command: sendBack, said: null }]
+        : [];
+    }),
+  ];
   if (d.direct) {
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
     return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
@@ -1202,6 +1273,8 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
   const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
+  // Each step waiting at its gate on you — not one a person has sent back already, which waits on nobody — as `wf decide` prints its gate.
+  const gates = Object.fromEntries(Object.entries(gateLines(steps, run, phase, reader, asked, verdicts, spendOf)).filter(([name]) => judged.waitingOnYou.includes(name)));
   return {
     touched,
     lesson: lessonOf(touched),
@@ -1210,7 +1283,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     total: usedOf(sumUsages(filed.map((name) => consumed[name]))),
     cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
     overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
-    commands: commandsOf(run, d, offers),
+    commands: commandsOf(run, d, offers, gates),
   };
 }
 
@@ -1422,6 +1495,20 @@ const retryGuard = (id: string, step: string): Guarded => ({
   reach: "answer the step from the run's page on the board",
   instead: `Answer it from the run's page on the board, or with \`wf retry ${id} ${step}\``,
   shape: RETRY_SHAPE,
+});
+
+/** The body `POST …/approve` takes: `wf approve`'s `--message`, as JSON. */
+const APPROVE_SHAPE = '`{ "message"?: "<words>" }`';
+
+/** An approval of a step waiting at its gate, as the guard's refusals word it (guard.ts). */
+const approveGuard = (id: string, step: string): Guarded => ({
+  route: `POST /api/runs/${id}/steps/${step}/approve`,
+  does: 'approves a step waiting at its gate',
+  forAnother: 'approve one',
+  why: "the next tick files what waits on a step a person approves, and the words given with it go into the brief of every step after the gate, which an agent acts on in this repository",
+  reach: "approve it from the run's page on the board",
+  instead: `Approve it from the run's page on the board, or with \`wf approve ${id} ${step}\``,
+  shape: APPROVE_SHAPE,
 });
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -1636,6 +1723,43 @@ export const app = new Hono()
     } catch (err) {
       const words = err instanceof Error ? err.message : String(err);
       return c.json({ error: words }, (err as { exitCode?: unknown }).exitCode === 2 ? 409 : 502);
+    }
+  })
+  // The board's fourth write: a person's approval of a step waiting at its gate, through the package's `approve()` — `wf approve`'s own — which
+  // writes the approval file and nothing else; the next tick files what waits on the step. Guarded as a try is (guard.ts). Refused in the
+  // package's words, verbatim: words that are empty (`approvalWordsRefusal`, 422) before the run is read, and a step that may not be approved
+  // (`approvalRefusal`, 409) after — not gated, not signed off yet, already approved, sent back, or of a run called off. Sending it back is
+  // `POST …/retry` with a message, as `wf retry --message` is.
+  .post('/api/runs/:id/steps/:step/approve', async (c) => {
+    const id = c.req.param('id');
+    const step = c.req.param('step');
+    const refused = refusedBeforeReading(approveGuard(id, step), c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+    if (refused) return c.json({ error: refused.error }, refused.status);
+    const found = taskOfStep(id, step);
+    if ('error' in found) return c.json({ error: found.error }, 404);
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: `POST …/approve takes a JSON body: ${APPROVE_SHAPE}.` }, 400);
+    }
+    if (!isObject(body)) return c.json({ error: `POST …/approve takes a JSON object: ${APPROVE_SHAPE}.` }, 400);
+    const { message } = body;
+    if (message !== undefined && typeof message !== 'string') {
+      return c.json({
+        error: `\`message\` is the words to approve with, which every step after the gate is handed, as \`wf approve ${id} ${step} --message "<words>"\` takes them: text, or left out. This request's was ${JSON.stringify(message)}: ${APPROVE_SHAPE}.`,
+      }, 400);
+    }
+    const empty = approvalWordsRefusal(message, `wf approve ${id} ${step}`);
+    if (empty) return c.json({ error: empty }, 422);
+    try {
+      const { approval, file } = await approve(e, id, step, message);
+      // Accepted, and not yet done: what waits on the step is filed by the next tick, as it is for an approval given at the command line.
+      return c.json({ try: approval.try, at: approval.at, message: approval.message ?? null, file }, 202);
+    } catch (err) {
+      const said = err instanceof Error ? err.message : String(err);
+      if ((err as { exitCode?: unknown }).exitCode === 2) return c.json({ error: said }, 409);
+      return c.json({ error: `Could not approve step '${step}': ${said}. \`wf approve ${id} ${step}\` approves the same way from the command line.` }, 502);
     }
   })
   // A step's session output as text, for `wf logs` parity. The board reads the conversation from the transcript routes below.

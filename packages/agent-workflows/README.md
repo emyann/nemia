@@ -1158,9 +1158,9 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
 - **`wf cancel` calls a run at its gate off**, as any run: it is not finished, since an approval would file what follows.
   **`wf rm` refuses a run at its gate**, naming the `wf approve` it waits for, and forgets it once it is called off. `wf round` on a
   loop whose step waits at its gate says to approve it or send it back.
-- **The board has no Approve yet.** The run page's button, the Factory card's `approve plan` and `POST …/approve` are the apps run
-  after this one. The api reads runs through `listRuns`, which composes approvals, and words steps with `listing`, so a gated step
-  should read `awaiting approval` there, waiting on you — reasoned from the code, not looked at on the board.
+- **On the board**, a gated step's section on the run page shows what it handed on, with Approve — a box for the words — and Send back,
+  the answer box, beside it. The banner and the Factory's card say `approve plan`, and `POST /api/runs/:id/steps/:step/approve` calls
+  `approve()`, refused in its words.
 
 ## A run that waits on a run: `wf start --after`
 

@@ -29,8 +29,13 @@ export type RunSummary = {
    * `needs` and `blockedByHarness` are what a person has to know to act on it (`StepNeeds`).
    */
   steps: Array<{ name: string; taskId: string | null; branch: string | null; status: string; note: string | null } & StepNeeds>;
-  /** Steps a person has to act on — blocked, unsigned, refused by their check, or a loop out of rounds. Empty on a cancelled run. */
+  /**
+   * Steps a person has to act on — blocked, unsigned, refused by their check, awaiting approval at their gate, out of rounds or past their
+   * budget. Empty on a cancelled run.
+   */
   waitingOnYou: string[];
+  /** `waitingOnYou` as `wf ls` names it after `→ waiting on you:`, one entry a step: its name, or for a step at its gate, `approve plan`. */
+  onYou: string[];
 };
 
 /**
@@ -68,9 +73,19 @@ export type RunWaiting = {
 /**
  * Mirrors `StepNeeds` in apps/api/src/app.ts. `needs`: the closeout's, for a step whose current try signed off blocked. `blockedByHarness`:
  * whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. What that session said last is
- * on a run's detail alone (`lastLine`): the list reads no conversation.
+ * on a run's detail alone (`lastLine`): the list reads no conversation. `approve`: what `wf ls` asks of you for a step waiting at its gate,
+ * `approve plan`; null for any other step, and for one already sent back.
  */
-export type StepNeeds = { needs: string | null; blockedByHarness: boolean };
+export type StepNeeds = { needs: string | null; blockedByHarness: boolean; approve: string | null };
+
+/** Mirrors `StepApproval` in apps/api/src/app.ts: a person's approval of the try a gated step is on — when, and the words given with it. */
+export type StepApproval = { try: number; at: string; message: string | null };
+
+/**
+ * Mirrors `StepGate` in apps/api/src/app.ts: a gated step's gate. `awaiting` while it waits at it — `wf ls`'s `awaiting approval` — and
+ * `approval` once a person approved the try it is on. Neither, for a gated step not signed off yet.
+ */
+export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
 /**
  * Mirrors `StepAsked` in apps/api/src/app.ts: a try a person asked for, which the next tick files — once it has stopped the step's session
@@ -202,6 +217,10 @@ export type RunDetail = {
   /** As on `RunSummary`. */
   cost: Spent | null;
   waitingOnYou: string[];
+  /** As on `RunSummary`. */
+  onYou: string[];
+  /** The steps the run is gated at, in the order they run: those its workflow gates, and those it was started with. */
+  gates: string[];
   warning: string | null;
   /** The steps as a graph, from the workflow the run froze: what the canvases draw, so none derives it from `after`. */
   graph: RunGraph;
@@ -220,6 +239,9 @@ export type RunDetail = {
     note: string | null;
     needs: string | null;
     blockedByHarness: boolean;
+    approve: string | null;
+    /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
+    gate: StepGate | null;
     /** For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read. */
     lastLine: string | null;
     /** What a person said to its current try's session while it ran (`wf say`, or the session page's prompt box), in the order said. */
@@ -321,7 +343,7 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints and runs none of. */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more'; command: string; said: string | null };
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back'; command: string; said: string | null };
 
 /** Mirrors `Decidable` in apps/api/src/app.ts. */
 export type Decidable = {
@@ -753,6 +775,31 @@ export async function askRound(runId: string, how: { step?: string; budget?: num
 }
 
 /**
+ * Approve a step waiting at its gate, as `wf approve` does — with `message`, `--message`, the words every step after the gate is handed: the
+ * api calls the package's `approve()`, which writes the approval and nothing else, and the next tick files what waits on the step. Resolves
+ * with the try approved, when, the words and the approval's file; rejects with the api's refusal in full — the package's words for a step
+ * that may not be approved, or for empty words — or the api's own about the request.
+ *
+ * Sent as `application/json`, which the api requires of it, as of an ask. Sending the step back is an ask for a try with words (`askTry`).
+ */
+export async function approveStep(runId: string, step: string, how: { message?: string }): Promise<{ try: number; at: string; message: string | null; file: string }> {
+  const route = `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/approve`;
+  const res = await fetch(route, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(how) });
+  const body = (await res.json().catch(() => undefined)) as { try?: unknown; at?: unknown; message?: unknown; file?: unknown; error?: unknown } | undefined;
+  if (res.ok && typeof body?.try === 'number' && typeof body.at === 'string') {
+    return { try: body.try, at: body.at, message: typeof body.message === 'string' ? body.message : null, file: String(body.file) };
+  }
+  if (res.ok) {
+    // Written, it may well be: look before approving again.
+    throw new Error(
+      `POST ${route} answered ${res.status} ${res.statusText} without the approval it wrote, so the api and this board disagree about what approving answers. ` +
+        `The approval may be written: look at the step (\`wf decide ${runId}\`) before approving again, and restart the api (\`npm run dev\`).`,
+    );
+  }
+  throw new Error(typeof body?.error === 'string' ? body.error : `POST ${route} answered ${res.status} ${res.statusText}`);
+}
+
+/**
  * Tell a step's running session something, as `wf say` does: the api calls the package's `say()`, which hands the words to the session through
  * the engine, and the engine journals them on the step's task. Resolves with that entry; rejects with the api's refusal in full — the package's
  * words or the engine's, verbatim — or the api's own about the request.
@@ -812,6 +859,13 @@ export function withGraph(id: string, detail: RunDetail): RunDetail {
   if (untimed || !totals || !Array.isArray(totals.rounds) || !totals.run) {
     const what = untimed ? `the timeline of its step '${untimed.name}'` : 'the timeline of the run';
     throw new Error(`The api answered run '${id}' without ${what}, so it is older than this board, whose run page shows where a run's time went. ${restart}`);
+  }
+  // And a gate: who the run waits on in `wf ls`'s words, and each step's need and gate. Without them the banner cannot say `approve plan`, and a
+  // step's `approve` read as anything but null would offer Approve on a route that api does not have.
+  const ungated = detail.steps.find((step) => !Object.hasOwn(step, 'approve') || !Object.hasOwn(step, 'gate'));
+  if (ungated || !Array.isArray((detail as { onYou?: unknown }).onYou)) {
+    const what = ungated ? `the gate of its step '${ungated.name}'` : 'who it waits on in wf ls\'s words';
+    throw new Error(`The api answered run '${id}' without ${what}, so it is older than this board, whose run page approves a step at its gate. ${restart}`);
   }
   return detail;
 }

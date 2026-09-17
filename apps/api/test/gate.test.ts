@@ -1,0 +1,296 @@
+/**
+ * A gate on the board: a step's handoff that waits for a person, as the api carries it — `gates` and each step's `gate` on a run's detail, the
+ * need `approve <step>` on the list and the detail — and POST /api/runs/:id/steps/:step/approve, which approves the step as `wf approve` does,
+ * through the package's `approve()`, refused in the package's words. Sending a step back from its gate is POST …/retry with words, as
+ * `wf retry --message` is.
+ *
+ * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
+ */
+import { stops } from './harness.ts';
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+
+const tmp = (label: string) => fs.mkdtempSync(path.join(os.tmpdir(), `hkb-api-gate-${label}-`));
+
+// agent-workflows locates its store as its modules load: set first.
+const root = tmp('root');
+process.env.WF_ROOT = root;
+
+const { app } = await import('../src/app.ts');
+const { approvalFile, approve, askFile, engine, list, readRun, retry } = await import('agent-workflows');
+const { approvalWordsRefusal, onYouWords } = await import('agent-workflows/run');
+
+const T0 = Date.parse('2026-09-16T21:00:00.000Z');
+const at = (s: number) => new Date(T0 + s * 1000).toISOString();
+const jsonl = (lines: object[]) => lines.map((line) => `${JSON.stringify(line)}\n`).join('');
+const write = (file: string, text: string) => {
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, text);
+};
+
+/** A step's task that ran once on Codex and signed off with `closeout`. */
+const signedOff = (taskId: string, closeout: object) => write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), jsonl([
+  { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
+  { kind: 'starting', at: at(1), attempt: 1 },
+  { kind: 'spawned', at: at(1), attempt: 1 },
+  { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
+  { kind: 'settled', at: at(9), outcome: 'succeeded' },
+]));
+
+const PLAN = { outcome: 'done', summary: '## The plan\n\n- parse the flag\n- store it', needs: null, artifacts: [] };
+
+/**
+ * A run of `plan → implement → review`, started `--gate plan`, whose plan signed off: it waits at its gate. Beside them `tokens`, signed off
+ * and not gated, and `sketch`, gated by its own `gate: true` and not filed.
+ */
+const gatedRun = (id: string) => {
+  write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
+    id, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Parse the --flag option',
+    workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0), gates: ['plan'],
+    workflow: [
+      { name: 'plan', after: [], body: 'Plan it.' },
+      { name: 'implement', after: ['plan'], body: 'Implement it.' },
+      { name: 'review', after: ['implement'], body: 'Review it.' },
+      { name: 'tokens', after: [], body: 'Pick the tokens.' },
+      { name: 'sketch', after: [], body: 'Sketch it.', gate: true },
+    ],
+    steps: {
+      plan: { taskId: `${id}-plan`, branch: `wf/${id}/plan` },
+      implement: { taskId: null },
+      review: { taskId: null },
+      tokens: { taskId: `${id}-tokens` },
+      sketch: { taskId: null },
+    },
+  }));
+  signedOff(`${id}-plan`, PLAN);
+  signedOff(`${id}-tokens`, { outcome: 'done', summary: 'Picked them.', needs: null, artifacts: [] });
+  return fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8');
+};
+
+const R = 'r-gate';
+const record = gatedRun(R);
+/** The same run, called off while its plan waited at its gate. */
+const CANCELLED = 'r-gate-cancelled';
+gatedRun(CANCELLED);
+write(path.join(root, 'runs', `${CANCELLED}.cancelled`), at(20));
+
+/** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
+const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', origin: 'http://localhost:5173', host: '127.0.0.1:8787' };
+
+const approveOver = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
+  app.request(`/api/runs/${run}/steps/${step}/approve`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+const ask = (step: string, body: unknown, run = R) =>
+  app.request(`/api/runs/${run}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
+
+/** Every file under a run's asks directory, waiting or consumed. */
+const asked = (run = R): string[] => {
+  const dir = path.join(root, 'runs', `${run}.asks`);
+  return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
+};
+
+/** Nothing was written: no ask nor approval, and the run's record as it was. */
+const nothingWritten = (why: string, run = R) => {
+  assert.deepEqual(asked(run), [], `no file beside the run: ${why}`);
+  assert.equal(fs.readFileSync(path.join(root, 'runs', `${run}.json`), 'utf8'), record.replaceAll(R, run), `the run's record untouched: ${why}`);
+};
+
+/** What the package's `approve()` refuses, word for word: what `wf approve` prints. */
+const approveRefuses = async (step: string, message?: string, run = R): Promise<string> => {
+  try {
+    await approve(engine(), run, step, message);
+  } catch (err) {
+    return (err as Error).message;
+  }
+  return assert.fail(`approve() approved ${step} of ${run}, and should have refused`);
+};
+
+type Step = { name: string; status: string; approve: string | null; gate: unknown; asked: unknown; closeout: { summary: string } | null };
+const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json();
+const commandsOf = async (id = R): Promise<Array<{ label: string; command: string; said: string | null }>> => (await (await app.request(`/api/runs/${id}/decision`)).json()).commands;
+const summary = async (id = R) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
+
+test("a run's detail carries its gates and each gated step's gate — awaiting approval, or not signed off yet — and the list and the detail carry the need `approve plan`, in `wf ls`'s words", async () => {
+  const run = await detail();
+  assert.deepEqual(run.gates, ['plan', 'sketch'], "the start's gate and the step's own, in the order they run");
+  assert.deepEqual(run.steps.map(({ name, status, approve, gate }: Step) => ({ name, status, approve, gate })), [
+    { name: 'plan', status: 'awaiting approval', approve: 'approve plan', gate: { awaiting: true, approval: null } },
+    { name: 'implement', status: 'waiting', approve: null, gate: null },
+    { name: 'review', status: 'waiting', approve: null, gate: null },
+    { name: 'tokens', status: 'unverified · done', approve: null, gate: null },
+    // Gated, and not signed off: nothing to approve yet.
+    { name: 'sketch', status: 'waiting', approve: null, gate: { awaiting: false, approval: null } },
+  ]);
+  assert.equal(run.steps[0].closeout.summary, PLAN.summary, 'the closeout a person approves is the step\'s own');
+  assert.deepEqual(run.waitingOnYou, ['plan']);
+  assert.deepEqual(run.onYou, ['approve plan']);
+
+  // As `wf ls` has it: the words after `→ waiting on you:` are the package's.
+  const words = await list(engine(), readRun(R));
+  assert.deepEqual(run.onYou, onYouWords(words));
+  const listed = await summary();
+  assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
+  assert.deepEqual(listed.onYou, ['approve plan']);
+  assert.deepEqual(listed.steps.map((s: Step) => [s.name, s.approve]), [['plan', 'approve plan'], ['implement', null], ['review', null], ['tokens', null], ['sketch', null]]);
+  assert.equal(listed.steps.some((s: object) => Object.hasOwn(s, 'gate')), false, 'the list carries the need, and no gate: the Factory needs no more');
+
+  // The decision offers the gate's two commands, as `wf decide` prints them under the step: nothing else is offered on a run with no branch to
+  // ship — which read `None yet: the run is still moving` on the board.
+  assert.deepEqual(await commandsOf(), [
+    { label: 'approve', command: `wf approve ${R} plan`, said: `plan waits at its gate — with words: wf approve ${R} plan --message "<words>"` },
+    { label: 'send back', command: `wf retry ${R} plan --message "<objection>"`, said: null },
+  ]);
+
+  // A run called off waits on nobody: no need, though its step still reads as it stands.
+  const cancelled = await summary(CANCELLED);
+  assert.deepEqual([cancelled.waitingOnYou, cancelled.onYou, cancelled.steps[0].approve], [[], [], null]);
+});
+
+test('REFUSED at shipped defaults: an approval another site could make — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and nothing is written', async () => {
+  const body = { message: 'Ship it.' };
+  for (const site of ['cross-site', 'same-site', 'none']) {
+    const res = await approveOver('plan', body, { ...BOARD, 'sec-fetch-site': site });
+    assert.equal(res.status, 403, site);
+    const { error } = await res.json();
+    assert.ok(error.startsWith(`POST /api/runs/${R}/steps/plan/approve refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the next tick files what waits on a step a person approves`), error);
+    assert.ok(error.endsWith(`Approve it from the run's page on the board, or with \`wf approve ${R} plan\`.`), error);
+  }
+  for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
+    const res = await approveOver('plan', body, { ...BOARD, host });
+    assert.equal(res.status, 403, host);
+    assert.ok((await res.json()).error.startsWith(`POST /api/runs/${R}/steps/plan/approve refuses a request addressed to ${host}: the api approves a step waiting at its gate only for a request to this machine`));
+  }
+  for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
+    const res = await approveOver('plan', body, { ...BOARD, 'content-type': type });
+    assert.equal(res.status, 415, type);
+    const { error } = await res.json();
+    assert.ok(error.startsWith(`POST /api/runs/${R}/steps/plan/approve takes its body as \`content-type: application/json\``), error);
+    assert.ok(error.endsWith('Send `{ "message"?: "<words>" }`, with that header.'), error);
+  }
+  nothingWritten('a request another site could make');
+});
+
+test("REFUSED: a body that is not an approval (400), a run or a step that does not exist (404), and empty words (422, in `approvalWordsRefusal`'s words) — and nothing is written", async () => {
+  const bodies: Array<[unknown, RegExp]> = [
+    ['not json', /^POST …\/approve takes a JSON body/],
+    [['Ship it.'], /^POST …\/approve takes a JSON object/],
+    [null, /^POST …\/approve takes a JSON object/],
+    [{ message: 42 }, /^`message` is the words to approve with, which every step after the gate is handed[\s\S]*This request's was 42/],
+    [{ message: null }, /^`message` is the words to approve with[\s\S]*This request's was null/],
+  ];
+  for (const [body, words] of bodies) {
+    const res = await approveOver('plan', body);
+    assert.equal(res.status, 400, JSON.stringify(body));
+    assert.match((await res.json()).error, words);
+  }
+  const noRun = await approveOver('plan', {}, BOARD, 'r-nope');
+  assert.equal(noRun.status, 404);
+  assert.match((await noRun.json()).error, /^No run 'r-nope' in this store/);
+  const noStep = await approveOver('deploy', {});
+  assert.equal(noStep.status, 404);
+  assert.match((await noStep.json()).error, new RegExp(`^Run '${R}' has no step 'deploy'`));
+  for (const message of ['', '  \n ']) {
+    const res = await approveOver('plan', { message });
+    assert.equal(res.status, 422, JSON.stringify(message));
+    const { error } = await res.json();
+    assert.equal(error, approvalWordsRefusal(message, `wf approve ${R} plan`));
+    // The package's own sentence, and the one `approve()` refuses with.
+    assert.equal(error, await approveRefuses('plan', message));
+    assert.match(error, /^--message is empty, and an approval's words are handed to every step after the gate/);
+  }
+  nothingWritten('a body that is not an approval');
+});
+
+test("REFUSED at shipped defaults: a step not gated, a gated step not signed off yet, and a step of a run called off are 409s in `approvalRefusal`'s words — and nothing is written", async () => {
+  const cases: Array<[string, string, RegExp]> = [
+    [R, 'tokens', new RegExp(`^tokens has no gate: what waits on it is filed once it has signed off, with nobody's approval, so there is nothing to approve\\. ${R} is gated at plan, sketch\\.`)],
+    [R, 'implement', /^implement has no gate: /],
+    [R, 'sketch', /^sketch has not signed off yet: it has not been filed\. Its gate holds once it has signed off/],
+    [CANCELLED, 'plan', new RegExp(`^${CANCELLED} was cancelled at ${at(20).replace(/\./g, '\\.')}, and a cancelled run files nothing`)],
+  ];
+  for (const [run, step, words] of cases) {
+    const res = await approveOver(step, { message: 'Ship it.' }, BOARD, run);
+    assert.equal(res.status, 409, `${run} ${step}`);
+    const { error } = await res.json();
+    assert.equal(error, await approveRefuses(step, 'Ship it.', run));
+    assert.match(error, words);
+  }
+  nothingWritten('a step the package will not approve');
+  nothingWritten('a step of a run called off', CANCELLED);
+});
+
+test("an approval as the board sends it is the package's: 202 with the try, when, the words and its file — the file as `wf approve` writes it, the record untouched — and the detail reads the approval under the step, which waits on nobody; a second approval refused", async () => {
+  const res = await approveOver('plan', { message: 'Ship the second reading.' });
+  assert.equal(res.status, 202, await res.clone().text());
+  const took = await res.json();
+  assert.deepEqual({ ...took, at: undefined }, { try: 1, at: undefined, message: 'Ship the second reading.', file: approvalFile(R, 'plan', 1) });
+  assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
+  assert.deepEqual(JSON.parse(fs.readFileSync(approvalFile(R, 'plan', 1), 'utf8')), { step: 'plan', try: 1, at: took.at, message: 'Ship the second reading.' });
+  assert.deepEqual(asked(), ['approve-plan-1']);
+  assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
+  assert.equal(stops(), 0, 'and stopped nothing');
+
+  const run = await detail();
+  const plan = run.steps.find((s: Step) => s.name === 'plan');
+  assert.deepEqual(plan.gate, { awaiting: false, approval: { try: 1, at: took.at, message: 'Ship the second reading.' } });
+  assert.equal(plan.approve, null);
+  assert.deepEqual([run.waitingOnYou, run.onYou], [[], []]);
+  // As `wf ls` has it until the tick files what waits: the plan on its own word, and nobody waited on.
+  const words = await list(engine(), readRun(R));
+  assert.equal(plan.status, words.steps.find((s) => s.name === 'plan')?.status);
+  assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou);
+
+  const again = await approveOver('plan', { message: 'Ship the first reading.' });
+  assert.equal(again.status, 409);
+  const { error } = await again.json();
+  assert.ok(error.startsWith(`try 1 of plan is already approved, at ${took.at}, with words: what waits on it is filed on the next tick, once.`), error);
+  assert.equal(error, await approveRefuses('plan', 'Ship the first reading.'));
+  assert.deepEqual(asked(), ['approve-plan-1']);
+});
+
+test('an approval with no words is written with none, and the detail reads its words as null', async () => {
+  const id = 'r-gate-wordless';
+  gatedRun(id);
+  const res = await approveOver('plan', {}, BOARD, id);
+  assert.equal(res.status, 202, await res.clone().text());
+  const took = await res.json();
+  assert.equal(took.message, null);
+  const { at: when, ...written } = JSON.parse(fs.readFileSync(approvalFile(id, 'plan', 1), 'utf8'));
+  assert.deepEqual([written, when], [{ step: 'plan', try: 1 }, took.at]);
+  assert.deepEqual((await detail(id)).steps[0].gate, { awaiting: false, approval: { try: 1, at: took.at, message: null } });
+});
+
+test("REFUSED at shipped defaults: sending a step back from its gate without words is a 409 in `retryRefusal`'s words; with words it is the answer box's ask — and then the step waits on nobody, and its approval is refused while the send-back is asked for", async () => {
+  const id = 'r-gate-back';
+  gatedRun(id);
+  for (const how of [{ mode: 'nudge' }, { mode: 'fresh' }] as const) {
+    const res = await ask('plan', how, id);
+    assert.equal(res.status, 409, JSON.stringify(how));
+    const { error } = await res.json();
+    let refused = '';
+    await retry(engine(), id, 'plan', how, { stopBlocked: true }).catch((err: Error) => { refused = err.message; });
+    assert.equal(error, refused);
+    assert.match(error, /^plan is awaiting approval: a try of it sends it back from its gate, and one with no words tells its session nothing to change/);
+  }
+  assert.deepEqual(asked(id), [], 'nothing written on a send-back with no words');
+
+  const back = await ask('plan', { mode: 'nudge', message: 'Store the flag before you parse it.' }, id);
+  assert.equal(back.status, 202, await back.clone().text());
+  assert.deepEqual(await back.json(), { try: 2, file: askFile(id, 'plan', 2), stopFirst: false });
+  const plan = (await detail(id)).steps[0];
+  assert.deepEqual(plan.asked, { try: 2, mode: 'nudge', model: null, message: 'Store the flag before you parse it.', stopFirst: false });
+  // Still at its gate until the tick files the try, and no longer waiting on you: what is asked of you, you asked.
+  assert.deepEqual([plan.status, plan.gate, plan.approve], ['awaiting approval', { awaiting: true, approval: null }, null]);
+  assert.deepEqual((await detail(id)).onYou, []);
+  // The send-back is due, so the run moves and waits on nobody: nothing to decide, as `wf decide` says, and so no gate offered.
+  assert.deepEqual(await (await app.request(`/api/runs/${id}/decision`)).json(), { running: true });
+
+  const res = await approveOver('plan', { message: 'Ship it.' }, BOARD, id);
+  assert.equal(res.status, 409);
+  const { error } = await res.json();
+  assert.ok(error.startsWith('try 2 of plan is already asked for (--nudge, at '), error);
+  assert.equal(error, await approveRefuses('plan', 'Ship it.', id));
+  assert.deepEqual(asked(id), ['retry-plan-2']);
+});

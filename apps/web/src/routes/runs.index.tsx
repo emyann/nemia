@@ -4,7 +4,7 @@ import { StatusChip } from '../components/StatusChip';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { spentTitle } from '../lib/cost';
-import { inFlight, inFlightFirst, titleOf, waitsOnYou } from '../lib/factory';
+import { inFlight, inFlightFirst, onYouOf, titleOf, waitsOnYou } from '../lib/factory';
 
 export const Route = createFileRoute('/runs/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),
@@ -80,10 +80,10 @@ function RunRow({ run }: { run: RunSummary }) {
           <span className="font-mono">{run.id}</span>
           <span>{run.repo}</span>
           {run.cancelledAt && <span className="text-amber-600">cancelled</span>}
-          {/* As `wf ls` prints `→ waiting on you:` — the steps, or for a run waiting on a run that never ships, what is yours to resolve. */}
+          {/* As `wf ls` prints `→ waiting on you:` — the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships, what is yours to resolve. */}
           {waitsOnYou(run) && (
             <span data-waiting-on-you className="font-medium text-amber-600">
-              waiting on you: {run.waitingOnYou.length ? run.waitingOnYou.join(', ') : run.waiting?.advice}
+              waiting on you: {onYouOf(run).length ? onYouOf(run).join(', ') : run.waiting?.advice}
             </span>
           )}
         </p>

@@ -1,5 +1,5 @@
 /**
- * The store `npm run e2e` serves: five fake runs and the diamond's, written the way `wf` and the engine write theirs.
+ * The store `npm run e2e` serves: six fake runs and the diamond's, written the way `wf` and the engine write theirs.
  *
  * FAKE has five steps in two lanes, frozen on the record as `wf start` freezes them, with the folder beside
  * it. `implement` signed off blocked, with its session's conversation on disk for the engine to read (SESSION),
@@ -265,6 +265,25 @@ export const COSTLY = {
   sessions: { implement: ['$1.20', '$0.90'], review: ['not measured', 'not measured'], tokens: ['$1.75', '$2.50'], palette: ['$1.50'] },
   /** What each round of review's loop cost: implement's session and review's, which has no cost on it. */
   rounds: ['≥$1.20', '≥$0.90'],
+} as const;
+
+/**
+ * A sixth run, gated: `plan → implement`, started `--gate plan`, the gate frozen on its record as `wf start` freezes it (`gates`). plan signed
+ * off done with a plan in markdown, and nothing after it is filed: it reads `awaiting approval` and waits on you — `approve plan` — and nothing
+ * of the run moves, so it is finished, off the Factory's floor until finished runs are shown. Newest of every run, so its card takes the
+ * last cell and moves none of the others. The `gate` page approves plan and sends it back from its page, taking each file back, and makes
+ * its refusal — an approval of a step that is not gated — in a page of its own.
+ */
+export const GATED = {
+  id: 'read-the-plan-first-e2e11',
+  title: 'Read the plan first',
+  steps: ['plan', 'implement'],
+  gated: 'plan',
+  /** What plan handed on, which a person approves: its summary, as the markdown it is. */
+  plan: { heading: 'The plan', items: ['Parse the --flag option in cli.ts', 'Store it on the run record'] },
+  /** What the `gate` page approves plan with, and what it sends plan back with. */
+  words: 'Ship the second reading.\nStore the flag before you parse it.',
+  objection: 'Say where the flag is stored, and for how long.',
 } as const;
 
 /**
@@ -881,6 +900,36 @@ export function seed(root: string, now = Date.now()): void {
     { name: `ae/${SAYING.run}-${SAYING.step}/1`, sessionId: SAYING.sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: now - 2.5 * 60_000, pid: SAYING.pid },
   ]));
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${HELD.sessionId}.jsonl`), lines(heldConversation(ago)));
+
+  // GATED: plan signed off at its gate, the gate the run was started with; implement waits on it, not filed.
+  const gateDir = path.join(root, 'workflow-gate');
+  write(path.join(gateDir, 'plan.md'), '---\nharness: claude\n---\nPlan it.\n');
+  write(path.join(gateDir, 'implement.md'), '---\nharness: claude\nafter: plan\n---\nImplement the plan.\n');
+  const gatedPlan = `${GATED.id}-plan`;
+  const gatedLane = path.join(root, 'worktrees', GATED.id, 'plan');
+  write(path.join(root, 'runs', `${GATED.id}.json`), JSON.stringify({
+    id: GATED.id, repo: '/code/hkb-v2', workspace: '/code/hkb-v2', baseRef: '19c9365', branch: 'main', isolate: true,
+    brief: `${GATED.title}\n\nA sixth run seeded by npm run e2e, started --gate plan: plan signed off, and nothing after it is filed until a person approves it.`,
+    workflowDir: gateDir,
+    workflow: [
+      { name: 'plan', after: [], body: 'Plan it.', harness: 'claude' },
+      { name: 'implement', after: ['plan'], body: 'Implement the plan.', harness: 'claude' },
+    ],
+    gates: [GATED.gated],
+    createdAt: ago(1.2),
+    steps: { plan: { taskId: gatedPlan, workspace: gatedLane, branch: `wf/${GATED.id}/plan` }, implement: { taskId: null } },
+  }, null, 2));
+  // Filed as the run started, and signed off a few seconds later: `signedOff` spawns a minute after filing, which this run is younger than.
+  write(path.join(root, 'engine', 'tasks', `${gatedPlan}.jsonl`), lines([
+    { kind: 'filed', at: ago(1.2), brief: 'Plan it.', cwd: gatedLane, maxAttempts: 1, harness: 'claude' },
+    { kind: 'starting', at: ago(1.19), attempt: 1 },
+    { kind: 'spawned', at: ago(1.19), attempt: 1 },
+    {
+      kind: 'ended', at: ago(1.1), attempt: 1, sessionId: `ae/${gatedPlan}/1`, observed: 'done', reason: 'harness',
+      closeout: { outcome: 'done', summary: `## ${GATED.plan.heading}\n\n${GATED.plan.items.map((item) => `- ${item}`).join('\n')}`, needs: null, artifacts: [] },
+    },
+    { kind: 'settled', at: ago(1.1), outcome: 'succeeded' },
+  ]));
 
   // COSTLY: tokens over its own budget, and review's loop held on implement's. Each session's attempt carries what the engine read of it —
   // its cost, and the time its harness counted waiting on the model and running tools — except review's, on Codex, which prices nothing.

@@ -2157,8 +2157,9 @@ What it leaves:
 
 §6 below, in full. `dev-planned`'s plan paused by prose: a brief that said to wait made it sign off `blocked`, a person answered with
 `wf retry --message`, which cost a try, and a plan that signed off `done` started implement at once. The shape §6 chose held: the
-handoff is the gate, not a step of its own. Package only; the board's Approve is the apps run after this one. Read first: the README's
-*A gate*, `hasGate`, `atGate`, `approvalRefusal` and `approvedSection` in `run.ts`, `approve` and `readApprovals` in `runner.ts`.
+handoff is the gate, not a step of its own. The package first; the board's half — Approve on the run page, the card's need,
+`POST …/approve` — shipped in the apps run after it, under *The board half* below. Read first: the README's *A gate*, `hasGate`, `atGate`,
+`approvalRefusal` and `approvedSection` in `run.ts`, `approve` and `readApprovals` in `runner.ts`.
 
 What was built, four commits:
 
@@ -2232,9 +2233,8 @@ What was measured:
 
 What it leaves:
 
-- **The board.** The Factory's card saying `approve plan`, the run page's Approve with a box for the words beside the answer box that
-  sends back, and `POST …/approve`. The api's words should already say `awaiting approval` for a gated step, waiting on you, since it
-  reads runs through `listRuns` — reasoned from the code, not looked at; its `commandsOf` offers no approve line.
+- **The board.** Shipped after this, in *The board half* below. The api's words did say `awaiting approval` for a gated step, waiting on
+  you, as reasoned here; the board read that word as `working`, with a spinner, until it was taught it.
 - **Approving costs a pass, not a try.** Nothing is filed until the tick after `wf approve`; the approval is read on every pass after,
   so a long-lived gated run reads one more small file per pass.
 - **A gate on every round.** A gated step inside a loop — `--gate implement` on `implement ⇄ review` — is on a new try each round, so it
@@ -2262,6 +2262,83 @@ What the board's run should call:
   says it `approve <step>`; `decision(...)`'s `awaitingApproval` on an `awaiting` run, whose outcome is `blocked`; `gateLines(steps, run,
   phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf)` for the line under the step. The closeout to render beside Approve is the
   gated step's own, as `closeoutOf` reads it.
+
+### The board half
+
+A person approves or sends back from the run page, as `wf approve` and `wf retry --message` do. Apps only: nothing in `packages/` changed
+but this file and the README's last *A gate* bullet. Read first: the apps/web lines of CLAUDE.md, the calls listed above, and
+`POST …/retry` in apps/api.
+
+What was built:
+
+- **`POST /api/runs/:id/steps/:step/approve`** takes `{ "message"?: "<words>" }` and calls the package's `approve()`. It passes the guard
+  (`approveGuard`), and `guard.ts` now counts seven writes. A run or a step the page does not have is a 404 (`taskOfStep`), as for a retry.
+  A body that is not an object, and a `message` that is not text, are 400s in the api's words. Empty words are a 422 in
+  `approvalWordsRefusal`'s words, before the run is read. Every other refusal is the package's sentence as a 409: a step not gated, one not
+  signed off yet, one already approved, one already sent back, a cancelled run. The answer is `{ try, at, message, file }`, 202: the next
+  tick files what waits on the step.
+- **Sending back** needed no new route: it is `POST …/retry` with `{ mode, message }`, and the package refuses one with no words.
+- **A run's detail** carries `gates` (`gatesOf`), and each step a `gate`, null for a step with none: `{ awaiting, approval }`. `awaiting` is
+  `wf ls`'s word `awaiting approval`. `approval` is `approvalOf`'s `{ try, at, message }` for the try the step is on.
+- **The list and the detail** carry the need: `approve` on each step (`StepNeeds`), `approve plan` in `onYouWords`' words, for a step at
+  its gate that waits on you. It is null once the step is approved or sent back, and on a run called off. Each run also carries `onYou`:
+  `waitingOnYou` as `wf ls` names it after `→ waiting on you:`.
+- **The decision's commands** offer `approve` and `send back` for a step waiting at its gate, parsed from `gateLines`. Without them a gated
+  run with no result branch yet said `None yet: the run is still moving` while it waited on you. The e2e's first screenshot showed it.
+- **The run page.** The held step's section shows its closeout rendered as markdown. Beside it, on a wide screen, is the gate
+  (`components/Gate.tsx`): Approve, with an optional box for the words, and Send back, the answer box. Send back takes an objection, which
+  it needs, and continues the session or starts a new one. Each refusal shows beside its button, word for word (`Not approved.` for an
+  approval), and the words stay in the box. Once approved, the section says `Approved`, the try, when, and the words as written, as text.
+  The step's facts gain a `gate` row. The banner says `Waiting on you: approve plan — …, waiting at its gate, … — wf decide <run>` in its
+  one line, and `approve plan` links to the step's section (`#step-plan`). The approval is not listed again under that line.
+- **The word.** `awaiting approval` is a state of its own on the board (`awaiting-approval`): amber, and a human gate on the canvas, whose
+  node says `waiting on you · approve plan`. Before, it fell through to `working`, and the node drew a spinner on a step nobody runs.
+- **The Factory and Runs.** The card lists the need `approve plan` (`Need` kind `approve`, amber). The Runs row says
+  `waiting on you: approve plan`, off `onYou`. Both counts of runs waiting on you include it, since `waitingOnYou` already named the step.
+- **An api started before this change.** From review, round 2: its detail has no `onYou`, and its steps no `approve` or `gate`. The run
+  page drew Approve on every step (`undefined !== null`), aimed at a route that api does not have, and the banner and the Runs row threw.
+  `withGraph` now refuses such a detail with its restart words. The gate is offered only when `approve` has words (`gateOffered`). The list
+  is read tolerantly instead (`onYouOf`: the step names, as the board said them before), because the Factory polls it and a refusal
+  there would take the whole floor down.
+
+What was measured:
+
+- From the root, `npx turbo run test --force`: api 173, from 166; web 212, from 203; agent-workflows 520 (519 passed, 1 skipped) and
+  agent-engine 326 (317 passed, 9 skipped), unchanged by this run. `npm run typecheck` and `npm run build` clean.
+- `apps/api/test/gate.test.ts`, new, 7 tests, at shipped defaults over a seeded store:
+  - the detail's `gates` and every step's `gate`, including a gated step not signed off;
+  - `approve` and `onYou` on both endpoints, compared with `onYouWords` over `list`, and none on a run called off;
+  - the decision's two commands;
+  - the guard refusing three sites, three hosts and three content types;
+  - bodies refused (400), a run and a step not there (404), and empty or blank words (422), each compared with `approve()`'s own sentence;
+  - a step not gated, a gated step not signed off, and a cancelled run (409), with nothing written each time;
+  - an approval with words, as `wf approve` writes it, read back under the step, with a second approval refused;
+  - an approval with no words;
+  - a send-back with no words refused in `retry()`'s words, one with words taken, and the approval then refused as already asked for.
+  Four guards broken on purpose: no guard, no 422, no type check on `message`, and a need on every step. Each failed at least one test.
+- Web unit tests: `awaiting approval` → `awaiting-approval`, amber, a gate, and not on a run called off. The `approve` need and its lines,
+  and nothing offered in the Decide section. A detail without the gate refused by `withGraph`; `gateOffered` refusing no words, a
+  missing field and a run called off; `onYouOf` falling back to the step names. Each of these four guards was broken on purpose, and a test
+  failed each time. The node at a gate, and the banner's line with its link and no list under it: the first run of
+  that test found the need listed twice. The Gate's two forms, buttons and modes, and the approval with and without words.
+- `npm run e2e`: the seed gains `GATED`, a run started `--gate plan` with plan signed off, and the Factory's and Runs' counts move by one.
+  The Factory's card says `approve plan`, and the Runs row says `waiting on you: approve plan`. The new `gate` page reads:
+  - the banner's one line and its link, the node, the closeout rendered beside the gate, the facts, and the two commands;
+  - then, in a page of its own, a refusal made on purpose. The page's read of the run is held, and the record's `gates` taken away. The
+    approval is refused, `plan has no gate: …`, beside Approve, verbatim, with the words kept and nothing written. That page's watch sees
+    that one 409 and nothing else;
+  - then an approval with words: the file as `wf approve` writes it, the approval read under the step, and the gate and banner gone;
+  - taken back, then a send-back: the ask as `wf retry --message` writes it, and the note `try 2 asked (--nudge, with your answer)`;
+  - taken back again, and the page ends as it began.
+  Both themes passed. The screenshots were read: `gate-awaiting`, `gate-refused`, `gate-approved`, `gate-sent-back`, the Factory and Runs.
+
+What it leaves:
+
+- **Approve on the Factory's card.** The card says `approve plan` and links to the run. Approving takes the run page, where the closeout is.
+- **Send back after approving.** The package takes a send-back of a step approved with nothing after it filed yet (`sendsBack`). The page
+  offers none once approved: that window lasts until the next tick.
+- **A gated step not yet signed off** says `holds once it has signed off` in its facts, and nothing on the canvas.
+- **A phone.** The gate is a form on a page served on this machine, and Remote Control (§2) is what reaches it from elsewhere.
 
 ## 1. A run that grows steps from a plan
 
@@ -2420,9 +2497,8 @@ and its sources. The number kept so §6 and §7 keep theirs.
 
 ## 6. A gate: a step's handoff that waits for a person
 
-Shipped 2026-09-17 in the package as *Shipped: a gate — a step's handoff that waits for a person*, above, which says what was built,
-measured and left, and what the board's run should call. The board half below — the Factory's card, Approve on the run page,
-`POST …/approve` — is still to build. What was registered is kept as it was asked.
+Shipped 2026-09-17 as *Shipped: a gate — a step's handoff that waits for a person*, above: the package first, then the board half — the
+Factory's card, Approve on the run page, `POST …/approve` — under *The board half* there. What was registered is kept as it was asked.
 
 **Registered** 2026-09-16, by the operator: a card, then a plan, then a person reads the plan before anyone implements
 it — and the same pause placeable in any workflow. Asked as a design question: is the gate the handoff, or a step of

@@ -1912,8 +1912,9 @@ What was built:
   `wf decide`'s screen; a person's own words (`Told`, `your answer`); declared output values; refusals.
 - **Streamdown is gone.** `ai-elements/response.tsx` is deleted, `reasoning.tsx` renders `Markdown`, and `styles.css` loses its `@source`.
 - **A card's page, `/inbox/<name>`**, from the card's title on the Inbox page: the body rendered, then a row per key an inbox card may
-  set — its value or `not set`, and one line of what it means — and **Source**, a toggle to the file as written, frontmatter included. An
-  entry that does not read as a card shows its refusal and its file. **A step's page, `/workflows/<repo|yours>/<workflow>/<step>`**, the
+  set — its value or `not set`, and one line of what it means — and **Source**, a toggle to the file as written, frontmatter included. A file in
+  the inbox that is not a card has a page too, its refusal and its text; a folder, whose name `sub/` the api refuses, has none (`hasPage`).
+  **A step's page, `/workflows/<repo|yours>/<workflow>/<step>`**, the
   address the operator gave in approving the plan, from its block on the Workflows canvas and from a line of step links under each graph:
   the same, for every key a step may set, its value as the loader reads it, which the page says (`after` names the step `resume:` names; a
   loop that sets no `rounds` runs 3). Neither page writes. The menu lights the Inbox and Workflows on them.
@@ -1922,31 +1923,42 @@ What was built:
   re-exported from runner.ts. A key without a line does not typecheck.
 - **The api**, a route per page, each finding what it reads among what the package lists and never by a path joined from the request.
   `GET /api/inbox/:name`: the card as the inbox lists it, `source`, and `keys` (null for an entry that does not read); a name that is not a
-  card's is 400 in `inboxNameRefusal`'s words, a card not there 404 in `noCardLine`'s. `GET /api/workflows/:from/:name/:step`, the page's own address: the
-  step's body, `source`, and `keys` (`keyRows`); a `from` other than `repo` or `yours` is 400, a workflow `folderOf` does not find its
-  404, a folder the loader refuses 422 in its words, and a step it did not load 404, naming the steps.
+  card's is 400 in `inboxNameRefusal`'s words, a card not there 404 in `noCardLine`'s, naming the `.md` files as `wf inbox rm` does; a card is found before a
+  stray file of its name. `GET /api/workflows/:from/:name/:step`, the page's own address: the step's body, `source`, and `keys`
+  (`keyRows`); a `from` other than `repo` or `yours` is 400, a workflow `folderOf` does not find its 404, a folder the loader refuses 422
+  in its words, and a step it did not load 404, naming the steps.
+- **From review, round 2**, three findings, each fixed:
+  - The step's page was first built under `steps/`, as a run's step is, against the operator's answer, which named
+    `/workflows/<repo|yours>/<workflow>/<step>`. It moved there, its api route with it.
+  - A folder in the inbox linked to a page that refused its name, `sub/`. Only an entry whose name the api takes is linked now.
+  - A card's page refused for a name not there named every entry, a stray file and a folder among them. It names the cards, as the
+    package does.
 
 What was measured:
 
-- From the root, `npx turbo run test --force`: agent-engine 313 (305 passed, 8 skipped), agent-workflows 458 (457 passed, 1 skipped), api 160
-  and web 199, from 313, 455, 156 and 189. `npm run typecheck` clean in all four.
+- From the root, `npx turbo run test --force`: agent-engine 313 (305 passed, 8 skipped), agent-workflows 458 (457 passed, 1 skipped), api 161
+  and web 201, from 313, 455, 156 and 189. `npm run typecheck` clean in all four.
 - New tests. agent-workflows: each table's keys in order with one line each, the count lines as `countOf` refuses in, and the check
   refusing a key missing, out of order, extra, empty or on two lines. web: `languageOf`, `fencedCode` and `labelFootnotes`; `Markdown`
   rendered to markup for GFM, links, fences, and two texts' footnotes on one page; raw HTML inline and as a block (`<b>`, `<img onerror>`,
   `<script>`, `<div onclick>`, `<a>`) shown as text, `javascript:`, `vbscript:` and `data:` links refused, and an image never an `<img>`;
-  the menu lighting a card's and a step's page, and not `/inboxes`. api: both routes' answers, a card with keys, with none and one that
+  the menu lighting a card's and a step's page, and not `/inboxes`; `hasPage` refusing a folder, a backslash, a hidden name and
+  none. api: both routes' answers, a card with keys, with none and one that
   does not read; a step setting seven keys, one setting counts and one setting none; and every refusal above, `..%2F` in a name and a
-  step, `README` and `review.md` as a step.
+  step, `README` and `review.md` as a step; a 404 in an inbox holding a
+  stray file and a folder, held to DELETE's sentence for the same name; `notes.md` beside a stray `notes`.
 - Each guard broken on purpose and the tests rerun: `rehype-raw` added, the raw HTML test failing; `urlTransform` passing every address,
   the link test; no image rule and no `target`, two; no footnote label prefix, one; the api's name refusal skipped, a missing card answered
-  200, any `from` taken, a step found by a path joined from the request, a loader refusal answered 500, one each; a meaning deleted and one
+  200, any `from` taken, a step found by a path joined from the request, a loader refusal answered 500, the 404 naming every entry, no card found before a stray file, and `hasPage` taking a slash, one
+  each; a meaning deleted and one
   on two lines, the package's tests. In the e2e, `urlTransform` passing every address failed the card page: "no link on the page runs
-  script — expected 0, found 1".
+  script — expected 0, found 1"; every inbox entry linked failed the inbox page: "has no page … expected 0, found 1".
 - `npm run e2e`: a third seeded card in markdown (a heading, a list, a table, a bash block, a line of raw HTML, a link and a `javascript:`
   one) and review.md with a heading and a list. The card page and the step page, in both themes: each renders; the raw HTML is text with
   no `b`, `img` or `script` made of it; no link runs script; the link opens in a new tab; a row per key in the api's order with the api's
   value and meaning; Source equal to the file on disk, and back; the inbox and the checkout's `workflows/dev` unchanged. The Workflows page:
-  the step links, and a link and a block each opening the step's page. The PNGs were read. From them, markdown tables were narrowed to
+  the step links, and a link and a block each opening the step's page. The Inbox page with a stray file and a folder in it: the folder
+  unlinked, and the file's link opening its refusal and Source. The PNGs were read. From them, markdown tables were narrowed to
   their content, the key table's value column narrowed, inline code kept whole across a line break, and card titles underlined.
 - `vite build`: the lazy Conversation chunk went from 529.8 kB (160.8 kB gzipped) to 41.7 kB (12.8 kB), and a shared `Markdown` chunk of
   160.1 kB (48.2 kB) is loaded by the run page, the Workflows page, both new pages and the conversation. The run page's own chunk is

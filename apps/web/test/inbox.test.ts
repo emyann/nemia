@@ -71,12 +71,30 @@ const WORKFLOWS = [
 /** The api's repository, whose workflows WORKFLOWS lists as the repository's. */
 const HERE = '/code/app';
 
-test("an entry of the inbox has a page by the name the inbox lists it under: a card, one that does not read, and a stray file", () => {
-  for (const name of ['cache-the-views-k2q9', 'broken', 'notes.txt', 'notes', 'with space']) assert.equal(hasPage({ name }), true, name);
+/** An entry as the inbox lists it: a card by its name, a stray file by its own, which is its name too. */
+const entryOf = (name: string, card = true) => ({ name, file: card ? `${name}.md` : name });
+
+test("an entry of the inbox has a page by the name the inbox lists it under: a card, one that does not read, and a stray file nothing else answers for", () => {
+  const listing = ['cache-the-views-k2q9', 'broken', 'with space'].map((name) => entryOf(name));
+  const strays = ['notes.txt', 'notes'].map((name) => entryOf(name, false));
+  const all = [...listing, ...strays];
+  for (const entry of all) assert.equal(hasPage(entry, all), true, entry.file);
 });
 
 test("REFUSED: no page for an entry whose name the api refuses — a folder, which the inbox lists as `sub/`, a name with a backslash, a hidden one or none", () => {
-  for (const name of ['sub/', 'a.md/', 'a\\b', '.hidden', '', ' ']) assert.equal(hasPage({ name }), false, JSON.stringify(name));
+  const refused = [{ name: 'sub/', file: 'sub' }, { name: 'a.md/', file: 'a.md' }, ...['a\\b', '.hidden', '', ' '].map((name) => entryOf(name, false))];
+  for (const entry of refused) assert.equal(hasPage(entry, refused), false, JSON.stringify(entry.name));
+});
+
+test("REFUSED: no page for a stray file a card of the same name answers for — `/inbox/notes` is notes.md, and the stray would open another file's page", () => {
+  const card = entryOf('notes');
+  const stray = entryOf('notes', false);
+  assert.equal(hasPage(stray, [card, stray]), false, 'notes, beside notes.md');
+  assert.equal(hasPage(card, [card, stray]), true, 'and the card keeps the page, which is the one the api reads');
+  // The stray alone is its own page: the api finds no card of that name, and answers with the file.
+  assert.equal(hasPage(stray, [stray]), true, 'notes, with no card beside it');
+  // Two strays of one name cannot both be listed — one file, one name — and a card's name is its file's: nothing else takes a card's page away.
+  assert.equal(hasPage(card, [card, entryOf('notes.txt', false)]), true);
 });
 
 test("a card's start is preset to the workflow it names, found as a start finds it: a name is the repository's, a path that folder", () => {

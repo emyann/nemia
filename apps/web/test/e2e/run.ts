@@ -2282,19 +2282,32 @@ const PAGES: PageSpec[] = [
 
       // What is in the inbox besides cards, in a page of its own: a stray file and a folder, each listed with why it is not a card. The file's
       // name opens its page — its refusal and the file as written — and the folder, whose name `sub/` the api refuses, has no page to open.
-      // Both taken back.
+      // Beside them a card and a stray file of one name, `notes.md` and `notes`: /inbox/notes is the card's, so the stray opens nothing.
+      // All taken back.
       const strayFile = path.join(inbox, 'notes.txt');
       const strayText = 'Not a card: notes kept beside the cards.\n';
       const folder = path.join(inbox, 'sub');
+      const namedFile = path.join(inbox, 'notes');
+      const namedCard = path.join(inbox, 'notes.md');
       const strays = await page.context().newPage();
       try {
         fs.writeFileSync(strayFile, strayText);
         fs.mkdirSync(folder);
+        fs.writeFileSync(namedFile, 'Not a card: notes beside the card of that name.\n');
+        fs.writeFileSync(namedCard, 'Notes, as a card\n');
         const { problems } = watch(strays);
         await strays.goto(page.url(), { waitUntil: 'networkidle' });
         const sub = cardIn(strays, 'sub/');
         await expectVisible(sub.getByText(/^sub\/: not a card/), 'a folder in the inbox is listed with why it is not a card');
         await expectCount(sub.getByRole('link'), 0, "and has no page: the api refuses the name sub/, so a link would open a refusal of what is listed");
+        // A stray file and a card of one name: both listed as `notes`, and the page the name opens is the card's, so only the card is linked.
+        const named = cardIn(strays, 'notes');
+        await expectCount(named, 2, 'a card and a stray file of one name are both listed, under that name');
+        const namedStray = named.filter({ hasText: 'notes: not a card' });
+        await expectVisible(namedStray, 'the stray is listed with why it is not a card');
+        await expectCount(namedStray.getByRole('link'), 0, 'and has no page: /inbox/notes is notes.md, so a link would open the card\'s page under the stray\'s name');
+        await expectVisible(named.filter({ has: strays.locator('[data-title]') }).locator('a[href="/inbox/notes"]', { hasText: 'Notes, as a card' }), 'and the card of that name keeps the page, which is the one the api reads');
+
         const notes = cardIn(strays, 'notes.txt');
         await expectVisible(notes.getByText(/^notes\.txt: not a card/), 'a stray file is listed with why it is not a card');
         await notes.getByRole('link', { name: 'notes.txt' }).click();
@@ -2313,6 +2326,8 @@ const PAGES: PageSpec[] = [
         await strays.close();
         fs.rmSync(strayFile, { force: true });
         fs.rmSync(folder, { recursive: true, force: true });
+        fs.rmSync(namedFile, { force: true });
+        fs.rmSync(namedCard, { force: true });
       }
 
       // An empty inbox, in a page of its own: every card set aside, and put back.

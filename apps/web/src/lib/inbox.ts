@@ -7,13 +7,21 @@ import type { Ceilings, InboxEntry, WorkflowListing } from './api';
 export const newestCardsFirst = (entries: readonly InboxEntry[]): InboxEntry[] =>
   [...entries].sort((a, b) => (b.filedAt ?? '').localeCompare(a.filedAt ?? '') || a.name.localeCompare(b.name));
 
+/** Whether an entry of the inbox is a card's file, `<name>.md`, and not a stray file the listing shows with why it is not a card. */
+const isCard = (entry: Pick<InboxEntry, 'file'>): boolean => entry.file.endsWith('.md');
+
 /**
- * Whether an entry of the inbox has a page, `/inbox/<name>`: whether its name is one the api takes (the package's `inboxNameRefusal`). Every
- * card's and every stray file's is, but a folder's, which the listing names `sub/`, and a file's with a backslash in it: the api would refuse
- * the name the page asks for, and a link would open a refusal of what the Inbox page has just listed.
+ * Whether an entry of the inbox has a page, `/inbox/<name>`, among the entries listed with it: whether its name is one the api takes (the
+ * package's `inboxNameRefusal`). Every card's is, and a stray file's where nothing else answers to its name, but a folder's, which the listing
+ * names `sub/`, and a file's with a backslash in it: the api would refuse the name the page asks for, and a link would open a refusal of what
+ * the Inbox page has just listed.
+ *
+ * And not a stray file's where a card of that name is listed beside it: `/inbox/notes` is `notes.md`, which the api's card page reads before a
+ * stray `notes`, so the stray's link would open the card's page — another file's — under its own name.
  */
-export const hasPage = (entry: Pick<InboxEntry, 'name'>): boolean =>
-  entry.name.trim() !== '' && !/[\\/\0]/.test(entry.name) && !entry.name.startsWith('.');
+export const hasPage = (entry: Pick<InboxEntry, 'name' | 'file'>, entries: readonly Pick<InboxEntry, 'name' | 'file'>[]): boolean =>
+  entry.name.trim() !== '' && !/[\\/\0]/.test(entry.name) && !entry.name.startsWith('.')
+  && (isCard(entry) || !entries.some((other) => other.name === entry.name && isCard(other)));
 
 /** A start, a drop, a queue or its taking back the api refused: the card as the page listed it, what was asked, and the api's words. */
 export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue'; message: string };

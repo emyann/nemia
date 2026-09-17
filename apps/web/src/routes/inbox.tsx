@@ -62,7 +62,7 @@ function InboxPage() {
               gone ? (
                 <GoneItem key={`gone:${entry.file}`} entry={entry} refusal={refusal!} onDismiss={() => refusalFor(entry)(null)} />
               ) : (
-                <CardItem key={entry.file} entry={entry} refusal={refusal} onRefused={refusalFor(entry)} />
+                <CardItem key={entry.file} entry={entry} entries={entries} refusal={refusal} onRefused={refusalFor(entry)} />
               ),
             )}
           </ul>
@@ -192,8 +192,10 @@ function FileCard() {
  * What its start or its drop was last refused with is the page's (`refusal`, told through `onRefused`), shown at its foot: the inbox is read
  * again after any answer, and a card refused because it is gone leaves the list, its refusal kept in its place (`GoneItem`).
  */
-function CardItem({ entry, refusal, onRefused }: {
+function CardItem({ entry, entries, refusal, onRefused }: {
   entry: InboxEntry;
+  /** The inbox as the page listed it, which says whether this entry has a page of its own (`hasPage`). */
+  entries: readonly InboxEntry[];
   refusal: CardRefusal | null;
   onRefused: (refusal: Omit<CardRefusal, 'entry'> | null) => void;
 }) {
@@ -228,14 +230,14 @@ function CardItem({ entry, refusal, onRefused }: {
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <div className="min-w-0 flex-1 space-y-1">
           {/* Its title opens its page: the body rendered and its keys explained — for a file that does not read too, with the file as written. A
-              folder, or a name the api refuses, has no page (`hasPage`), and is its name alone. */}
+              folder, a name the api refuses, or a stray file a card of the same name answers for has no page (`hasPage`), and is its name alone. */}
           {entry.error === null ? (
             <p data-title className="font-medium break-words">
-              <PageLink entry={entry}>{entry.title}</PageLink>
+              <PageLink entry={entry} entries={entries}>{entry.title}</PageLink>
             </p>
           ) : (
             <p className="font-mono text-sm break-all">
-              <PageLink entry={entry}>{entry.file}</PageLink>
+              <PageLink entry={entry} entries={entries}>{entry.file}</PageLink>
             </p>
           )}
           <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
@@ -331,9 +333,9 @@ function CardItem({ entry, refusal, onRefused }: {
   );
 }
 
-/** An entry's words, linked to its page where it has one (`hasPage`). */
-function PageLink({ entry, children }: { entry: InboxEntry; children: ReactNode }) {
-  if (!hasPage(entry)) return <>{children}</>;
+/** An entry's words, linked to its page where it has one among the entries listed with it (`hasPage`). */
+function PageLink({ entry, entries, children }: { entry: InboxEntry; entries: readonly InboxEntry[]; children: ReactNode }) {
+  if (!hasPage(entry, entries)) return <>{children}</>;
   return (
     <Link to="/inbox/$name" params={{ name: entry.name }} className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600">
       {children}

@@ -33,13 +33,17 @@ export type CardLine = { entry: InboxEntry; refusal: CardRefusal | null; gone: b
  * The inbox page's lines, newest first (`newestCardsFirst`): each card listed, with its refusal; and each card refused that the inbox, read again
  * after the refusal, no longer lists — dropped or started behind the page's back — in the place it was listed, so the refusal's sentence stays
  * where the person asked. A refusal of a card still listed is on that card, and on no line of its own.
+ *
+ * By the file, not the name: two entries may answer to one name — a card and a stray file beside it, `notes.md` and `notes` (`hasPage`) — and
+ * a refusal is of the one the page asked about. Matched by name, a refused Remove of the card drew its sentence under the stray file too,
+ * which has no Remove to be refused.
  */
 export function cardLines(entries: readonly InboxEntry[], refusals: readonly CardRefusal[]): CardLine[] {
-  const listed = new Set(entries.map((entry) => entry.name));
-  const gone = refusals.filter((r) => !listed.has(r.entry.name));
+  const listed = new Set(entries.map((entry) => entry.file));
+  const gone = refusals.filter((r) => !listed.has(r.entry.file));
   return newestCardsFirst([...entries, ...gone.map((r) => r.entry)]).map((entry) => {
-    const refusal = refusals.find((r) => r.entry.name === entry.name) ?? null;
-    return { entry, refusal, gone: !listed.has(entry.name) };
+    const refusal = refusals.find((r) => r.entry.file === entry.file) ?? null;
+    return { entry, refusal, gone: !listed.has(entry.file) };
   });
 }
 

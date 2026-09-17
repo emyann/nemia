@@ -36,8 +36,9 @@ function InboxPage() {
   const cards = newestCardsFirst(entries);
   const queue = queueOf(entries).length;
   const lines = cardLines(entries, refusals);
+  // Kept by the entry's file, as `cardLines` matches them: a card and a stray file beside it answer to one name, and a refusal is of one of them.
   const refusalFor = (entry: InboxEntry) => (refusal: Omit<CardRefusal, 'entry'> | null) =>
-    setRefusals((kept) => [...kept.filter((r) => r.entry.name !== entry.name), ...(refusal ? [{ ...refusal, entry }] : [])]);
+    setRefusals((kept) => [...kept.filter((r) => r.entry.file !== entry.file), ...(refusal ? [{ ...refusal, entry }] : [])]);
 
   return (
     <article className="space-y-6">

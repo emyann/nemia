@@ -57,6 +57,18 @@ test("a refused start or drop stays on the page after the inbox is read again: o
   assert.deepEqual(cardLines([newest, kept], []).map(line), [['newest-c3d4', 'listed', null], ['started-e5f6', 'listed', null]]);
 });
 
+test("REFUSED: a refusal is on the entry it is of, not on another of the same name — a card and a stray file beside it, notes.md and notes", () => {
+  const card = entry('notes', '2026-09-16T09:00:00.000Z');
+  const stray = entry('notes', '2026-09-16T08:00:00.000Z', { file: 'notes', title: null, error: 'notes: not a card.' });
+  const refused: CardRefusal = { entry: card, action: 'remove', message: 'notes.md could not be removed.' };
+  const lines = cardLines([card, stray], [refused]);
+  assert.deepEqual(lines.map((l) => [l.entry.file, l.gone, l.refusal?.action ?? null]), [['notes.md', false, 'remove'], ['notes', false, null]]);
+
+  // And the card gone since — dropped behind the page's back — leaves its refusal in its place, with the stray still listed and clear of it.
+  const after = cardLines([stray], [refused]);
+  assert.deepEqual(after.map((l) => [l.entry.file, l.gone, l.refusal?.action ?? null]), [['notes.md', true, 'remove'], ['notes', false, null]]);
+});
+
 const listing = (name: string, from: 'repo' | 'yours', dir: string, error: string | null = null): WorkflowListing => ({
   name, from, dir, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], version: '0', error,
 });

@@ -58,7 +58,7 @@ test("a refused start or drop stays on the page after the inbox is read again: o
 });
 
 const listing = (name: string, from: 'repo' | 'yours', dir: string, error: string | null = null): WorkflowListing => ({
-  name, from, dir, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], error,
+  name, from, dir, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], version: '0', error,
 });
 
 const WORKFLOWS = [

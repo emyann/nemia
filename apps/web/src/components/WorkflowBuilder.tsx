@@ -6,7 +6,6 @@ import {
   keyFormQuery,
   saveWorkflow,
   workflowsQuery,
-  writeSchema,
   type WorkflowListing,
   type WorkflowSaved,
 } from '../lib/api';
@@ -20,6 +19,7 @@ import {
   nameRefusal,
   orderOf,
   placesOf,
+  schemasOf,
   toPut,
   unsaved,
   unsavedSteps,
@@ -52,9 +52,10 @@ const INPUT =
  * to another's left-hand dot and that one waits on it; from the violet dot underneath, and the block runs the other again (`loop:`, with its
  * rounds). An edge's button takes its key away. A block is added with a name and what its agent is told, and a block clicked opens its form.
  *
- * Nothing is written until Save, which puts the whole folder (`PUT /api/workflows/yours/:name`), after writing any schema pasted for an
- * `output:`. The api answers the folder read back from disk, which the draft starts again from; or the package's refusal, shown above the
- * canvas and on each step it names. Changes not saved are marked on the card and on each step.
+ * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (`PUT /api/workflows/yours/:name`), at
+ * the version the draft was read from. The api answers the folder read back from disk, which the draft starts again from; or the package's
+ * refusal, shown above the canvas and on each step it names; or, for a folder changed on disk since, a 409 with Read the folder again. Changes
+ * not saved are marked on the card and on each step.
  */
 export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListing; onClose: () => void }) {
   const queryClient = useQueryClient();
@@ -74,27 +75,23 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
     setSaved(null);
   }, []);
 
+  /** The draft started again from `listing`, the folder as the api read it: after a save, or once the folder is read again. */
+  const startFrom = (listing: WorkflowListing) => {
+    setBase(listing);
+    setSteps(draftOf(listing));
+    setVersion((v) => v + 1);
+  };
+
+  // One write: the steps and the schemas pasted for them, judged together by the api before either is written, at the version the draft
+  // was read from, so a folder changed on disk since is refused rather than written over.
   const save = useMutation({
-    mutationFn: async (draft: DraftStep[]) => {
-      for (const step of draft) {
-        if (!step.schema) continue;
-        try {
-          await writeSchema(base.name, step.schema.file, step.schema.text);
-        } catch (err) {
-          // Refused for the step that pasted it, whether or not the api named a step.
-          throw new BuildRefusal(err instanceof Error ? err.message : String(err), err instanceof BuildRefusal && err.steps.length ? err.steps : [step.name]);
-        }
-      }
-      return saveWorkflow(base.name, toPut(draft));
-    },
+    mutationFn: (draft: DraftStep[]) => saveWorkflow(base.name, { version: base.version, steps: toPut(draft), schemas: schemasOf(draft) }),
     onMutate: () => {
       setRefusal(null);
       setSaved(null);
     },
     onSuccess: (answer) => {
-      setBase(answer.workflow);
-      setSteps(draftOf(answer.workflow));
-      setVersion((v) => v + 1);
+      startFrom(answer.workflow);
       setSaved(answer);
       queryClient.setQueryData(workflowsQuery.queryKey, (list) => listedWith(list, answer.workflow));
       void queryClient.invalidateQueries({ queryKey: workflowsQuery.queryKey, exact: true });
@@ -104,6 +101,20 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
       setRefusal(refused);
       if (refused.steps[0]) setSelected(refused.steps[0]);
     },
+  });
+
+  // The folder read again after a save refused because it changed on disk: the draft starts from what it holds now, and what was drawn is
+  // let go — the refusal said so. A folder gone, or one that no longer reads, has no builder: the card says why.
+  const reread = useMutation({
+    mutationFn: () => queryClient.fetchQuery({ ...workflowsQuery, staleTime: 0 }),
+    onSuccess: (list) => {
+      const now = list.find((w) => w.from === 'yours' && w.name === base.name);
+      if (!now || now.error) return onClose();
+      startFrom(now);
+      setRefusal(null);
+      setSaved(null);
+    },
+    onError: (err) => setRefusal(new BuildRefusal(`Could not read the folder again: ${err.message}`, [])),
   });
 
   const dirty = unsaved(steps, base);
@@ -188,6 +199,14 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
             {refusal.steps.length > 0 && <>, for {refusal.steps.join(' and ')}</>}:
           </p>
           <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
+          {refusal.status === 409 && (
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <button type="button" disabled={reread.isPending} onClick={() => reread.mutate()} className={BUTTON}>
+                {reread.isPending ? 'Reading…' : 'Read the folder again'}
+              </button>
+              <span className="text-xs text-red-800 dark:text-red-300">The changes drawn here are let go; copy what you need first.</span>
+            </div>
+          )}
         </div>
       )}
       {saved && !dirty && (

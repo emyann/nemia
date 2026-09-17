@@ -109,6 +109,21 @@ const themeOf = (page: Page): Promise<string> => page.evaluate(() => (matchMedia
 /** The workflow the `builder` page makes, and what its two steps' agents are told. */
 const BUILT = { name: 'built', plan: 'Write PLAN.md.', implement: 'Implement what PLAN.md says.' };
 
+/** The schema the `builder` page pastes for an `output:`: strict, as the parser takes one. */
+const PASTED = JSON.stringify({ type: 'object', properties: { risks: { type: 'array', items: { type: 'string' } } }, required: ['risks'], additionalProperties: false });
+
+/** A schema pasted for `step`'s `output:` in its form, which is open: written beside the steps by the save, under `<step>.schema.json`. */
+async function pasteSchema(builder: Locator, step: string, text: string): Promise<void> {
+  const keys = builder.locator(`[data-step-form="${step}"]`);
+  await expectVisible(keys, `${step}'s form, to paste a schema in`);
+  await keys.locator('[data-field="output"] select').selectOption({ label: 'Paste a schema…' });
+  const box = keys.getByRole('textbox', { name: 'The JSON Schema' });
+  await expectVisible(box, `${step}'s output offers a box for the schema`);
+  await box.fill(text);
+  const file = await keys.getByRole('textbox', { name: 'Written on save as' }).inputValue();
+  if (file !== `${step}.schema.json`) throw new Refused(`a schema pasted for ${step} is written beside it as ${step}.schema.json — the form says ${file}`);
+}
+
 /** A step added on a builder: its name and what its agent is told. */
 async function addStep(builder: Locator, name: string, body: string): Promise<void> {
   await builder.getByRole('button', { name: 'Add a step' }).click();
@@ -1573,9 +1588,10 @@ const PAGES: PageSpec[] = [
   },
   {
     // The builder, on the store's workflows: a workflow of yours made with a first step, a step added, an edge drawn from one block to the
-    // other, two keys set in the step's form, saved — and the folder read back through the api and on disk — then taken back, so every page
-    // after this one, in either theme, reads the store as seeded. A cycle drawn and saved is refused in a page of its own, whose one refusal is
-    // the point. The repository's workflow has no builder, and says why.
+    // other, two keys set in the step's form, a schema pasted, saved — and the folder read back through the api and on disk — then taken back, so
+    // every page after this one, in either theme, reads the store as seeded. A cycle drawn and saved, with a schema pasted beside it, is refused in a page of its own, whose one
+    // refusal is the point, and nothing is written; a save of the folder changed by hand since is refused in another. The repository's workflow
+    // has no builder, and says why.
     name: 'builder',
     route: '/workflows',
     expect: async (page) => {
@@ -1600,6 +1616,8 @@ const PAGES: PageSpec[] = [
         const builder = mine.locator(`section[data-builder="${yours.name}"]`);
         await expectVisible(builder, `Build opens ${yours.name}'s builder`);
         await addStep(builder, 'build', 'Build what PLAN.md says.');
+        // A good schema pasted for build's output, beside the cycle: the save is judged whole, so the refusal writes no schema either.
+        await pasteSchema(builder, 'build', PASTED);
         await drawEdge(refused, builder, 'plan', 'build');
         await drawEdge(refused, builder, 'build', 'plan');
         await expectCount(builder.locator('.react-flow__edge'), 2, 'two edges drawn, each way: build waits on plan, and plan on build');
@@ -1619,7 +1637,7 @@ const PAGES: PageSpec[] = [
         }
         await expectVisible(builder.locator('[data-step-form] [data-refused-here]', { hasText: error }), "and in the form of the step it names, which it opens");
         await expectVisible(builder.locator('[data-unsaved]', { hasText: 'Unsaved changes' }), 'the draft is still unsaved');
-        if (JSON.stringify(filesIn(mineDir)) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal — ${mineDir} holds ${filesIn(mineDir).map(([f]) => f).join(', ')}`);
+        if (JSON.stringify(filesIn(mineDir)) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal, the pasted schema included — ${mineDir} holds ${filesIn(mineDir).map(([f]) => f).join(', ')}`);
         await settled(refused);
         await refused.screenshot({ path: path.join(OUT, `builder-refused-${await themeOf(refused)}.png`), fullPage: true });
 
@@ -1647,6 +1665,54 @@ const PAGES: PageSpec[] = [
         await refused.close();
       }
       if (JSON.stringify(filesIn(mineDir)) !== JSON.stringify(before)) throw new Refused(`${mineDir} is as seeded after the refused page`);
+
+      // The folder changed by hand while the builder has it open: the save is refused (409) rather than written over the change, which is kept,
+      // and Read the folder again starts the draft from what the folder holds now. In a page of its own, whose one refusal is the point.
+      const planFile = path.join(mineDir, 'plan.md');
+      const seeded = fs.readFileSync(planFile, 'utf8');
+      const byHand = seeded.replace('harness: codex\n', 'harness: codex\ncheck: test -f PLAN.md\n');
+      if (byHand === seeded) throw new Refused(`${planFile} is seeded with harness: codex, for the edit by hand to add a check under`);
+      const stale = await page.context().newPage();
+      try {
+        const { problems } = watch(stale);
+        await stale.goto(page.url(), { waitUntil: 'networkidle' });
+        const mine = card(stale, yours.name);
+        await mine.getByRole('button', { name: 'Build', exact: true }).click();
+        const builder = mine.locator(`section[data-builder="${yours.name}"]`);
+        const keys = builder.locator('[data-step-form="plan"]');
+        await expectVisible(keys, "plan's form, open as the builder opens");
+        await keys.getByRole('textbox', { name: 'What its agent is told' }).fill('Write PLAN.md, briefly.');
+        fs.writeFileSync(planFile, byHand);
+        const [answered] = await Promise.all([
+          stale.waitForResponse(puts(yours.name), { timeout: WAIT_MS }),
+          builder.getByRole('button', { name: 'Save', exact: true }).click(),
+        ]);
+        const { error } = (await answered.json()) as { error?: string };
+        if (answered.status() !== 409 || !error?.startsWith(`${mineDir} has changed since it was read at version `) || !error.includes('Nothing was written. Read the folder again')) {
+          throw new Refused(`the api refuses a save of a folder changed by hand since it was read — it answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        const shown = await builder.locator('[data-refused] p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal is the api's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        if (fs.readFileSync(planFile, 'utf8') !== byHand) throw new Refused(`the change by hand is kept, not written over — ${planFile} holds ${JSON.stringify(fs.readFileSync(planFile, 'utf8'))}`);
+        const again = builder.getByRole('button', { name: 'Read the folder again' });
+        await expectVisible(again, 'the refusal offers to read the folder again');
+        await settled(stale);
+        await stale.screenshot({ path: path.join(OUT, `builder-changed-${await themeOf(stale)}.png`), fullPage: true });
+        await again.click();
+        await expectCount(builder.locator('[data-refused]'), 0, 'read again, the refusal goes');
+        await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'and the draft is the folder as it is now: nothing unsaved');
+        await expectVisible(builder.locator('.react-flow__node[data-id="plan"] dd', { hasText: /^test -f PLAN\.md$/ }), "plan's block shows the check written by hand");
+        const body = await builder.locator('[data-step-form="plan"]').getByRole('textbox', { name: 'What its agent is told' }).inputValue();
+        if (body !== 'Write PLAN.md.') throw new Refused(`plan's form reads the body on disk, and the change drawn is let go — it shows ${JSON.stringify(body)}`);
+        await stale.waitForLoadState('networkidle');
+        const expected = `request answered 409: PUT ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the changed page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await stale.close();
+        fs.writeFileSync(planFile, seeded);
+      }
 
       // A workflow made, built and saved.
       const { name, plan, implement } = BUILT;
@@ -1683,6 +1749,7 @@ const PAGES: PageSpec[] = [
         await keys.locator('[data-field="effort"] select').selectOption('high');
         await keys.locator('[data-field="check"] input').fill('npm test');
         await expectVisible(builder.locator('.react-flow__node[data-id="implement"] dd', { hasText: /^npm test$/ }), 'the block shows the check set in its form');
+        await pasteSchema(builder, 'implement', PASTED);
 
         const [saved] = await Promise.all([
           page.waitForResponse(puts(name), { timeout: WAIT_MS }),
@@ -1691,16 +1758,17 @@ const PAGES: PageSpec[] = [
         if (saved.status() !== 200) throw new Refused(`the api saves the folder — it answered ${saved.status()}: ${await saved.text()}`);
         await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'once saved, nothing is unsaved');
         await expectCount(builder.locator('[data-unsaved-step]'), 0, 'on any block');
-        await expectVisible(builder.locator('[data-saved]', { hasText: 'wrote implement.md; left plan.md as it was' }), 'and the card says what was written');
+        await expectVisible(builder.locator('[data-saved]', { hasText: 'wrote implement.md, implement.schema.json; left plan.md as it was' }), 'and the card says what was written, the pasted schema with it');
+        if ((await keys.locator('[data-field="output"] select').inputValue()) !== 'implement.schema.json') throw new Refused("once saved, implement's output names the schema beside it, as the folder lists it");
 
         // Read back through the api, as a start would read it, and on disk.
         const answered = await page.request.get(new URL('/api/workflows', page.url()).href);
         const listing = ((await answered.json()) as Array<{ name: string; from: string; steps: Array<{ name: string; spec: Record<string, unknown>; body: string }>; graph: { edges: unknown[] }; error: string | null }>)
           .find((w) => w.name === name && w.from === 'yours');
-        const read = listing && { error: listing.error, steps: listing.steps.map((s) => [s.name, s.spec.after, s.spec.effort, s.spec.check, s.body]), edges: listing.graph.edges };
-        const want = { error: null, steps: [['plan', [], null, null, plan], ['implement', ['plan'], 'high', 'npm test', implement]], edges: [{ from: 'plan', to: 'implement', kind: 'after' }] };
+        const read = listing && { error: listing.error, steps: listing.steps.map((s) => [s.name, s.spec.after, s.spec.effort, s.spec.check, s.spec.output, s.body]), edges: listing.graph.edges };
+        const want = { error: null, steps: [['plan', [], null, null, null, plan], ['implement', ['plan'], 'high', 'npm test', 'implement.schema.json', implement]], edges: [{ from: 'plan', to: 'implement', kind: 'after' }] };
         if (JSON.stringify(read) !== JSON.stringify(want)) throw new Refused(`GET /api/workflows reads the folder as it was built — it read ${JSON.stringify(read)}`);
-        const files = [['implement.md', `---\nafter: plan\neffort: high\ncheck: npm test\n---\n${implement}\n`], ['plan.md', `${plan}\n`]];
+        const files = [['implement.md', `---\nafter: plan\neffort: high\ncheck: npm test\noutput: implement.schema.json\n---\n${implement}\n`], ['implement.schema.json', `${PASTED}\n`], ['plan.md', `${plan}\n`]];
         if (JSON.stringify(filesIn(made)) !== JSON.stringify(files)) throw new Refused(`the folder's files are the steps as built — ${made} holds ${JSON.stringify(filesIn(made))}`);
         const stepPage = await page.request.get(new URL(`/api/workflows/yours/${name}/implement`, page.url()).href);
         const { source } = (await stepPage.json()) as { source?: string };

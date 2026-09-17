@@ -3,7 +3,7 @@
  * added or removed, a value set — and put back in the listing's shape. Pure. What a step may say is the package's to judge when the draft is
  * saved; the draft judges only what it needs to stay a draft: one step per name, and a name to call it by.
  */
-import type { GraphEdge, ListedStep, RunGraph, WorkflowListing, WorkflowStepSpec } from './api';
+import type { GraphEdge, ListedStep, RunGraph, SchemaFile, WorkflowListing, WorkflowStepSpec } from './api';
 import { COLUMN_WIDTH, layout, stepsOf, type Point } from './layout.ts';
 
 /** A step being built: as the listing has it, and a schema pasted for its `output:`, written beside it on save — null for none. */
@@ -175,6 +175,9 @@ export const unsaved = (steps: readonly DraftStep[], workflow: Pick<WorkflowList
 /** The draft as a save puts it: each step in the listing's shape, a pasted schema's file named by its `output:`. */
 export const toPut = (steps: readonly DraftStep[]): ListedStep[] =>
   steps.map(({ name, spec, body, schema }) => ({ name, spec: schema ? { ...spec, output: schema.file } : spec, body }));
+
+/** The schemas pasted in the draft, as a save carries them: written beside the steps with them, judged with them first. */
+export const schemasOf = (steps: readonly DraftStep[]): SchemaFile[] => steps.flatMap(({ schema }) => (schema ? [{ file: schema.file, text: schema.text }] : []));
 
 /** A list typed as the form's list fields take one — `Read, Grep` — as the listing has it: its names, or none for nothing typed. */
 export const listOf = (typed: string): string[] => typed.split(',').map((s) => s.trim()).filter(Boolean);

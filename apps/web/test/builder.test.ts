@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
 import {
-  addStep, connect, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, setBody,
+  addStep, connect, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, schemasOf, setBody,
   setKey, setSchema, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
 } from '../src/lib/builder.ts';
 import { COLUMN_WIDTH } from '../src/lib/layout.ts';
@@ -108,7 +108,9 @@ test("a schema pasted names its file in `output:`, is a change until saved, and 
   assert.equal(specOf(pasted, 'implement').output, 'implement.schema.json');
   assert.deepEqual(unsavedSteps(pasted, folder), ['implement']);
   assert.equal(toPut(pasted)[0]!.spec.output, 'implement.schema.json');
-  assert.equal('schema' in toPut(pasted)[0]!, false, 'a put carries no paste: the schema is its own write');
+  assert.equal('schema' in toPut(pasted)[0]!, false, 'a step put carries no paste: the save carries the schemas beside the steps');
+  assert.deepEqual(schemasOf(pasted), [{ file: 'implement.schema.json', text: '{}' }], 'and here they are, to be judged with the steps and written with them');
+  assert.deepEqual(schemasOf(draft), [], 'none pasted, none carried');
   const back = setSchema(pasted, 'implement', null);
   assert.equal(specOf(back, 'implement').output, 'implement.schema.json');
   assert.equal(setKey(back, 'implement', 'output', null)[0]!.spec.output, null);
@@ -136,7 +138,7 @@ test('what is typed into a list or a number field, as the listing has it', () =>
 });
 
 test("a folder written goes into the page's listing in the listing's order: the repository's, then yours, each by name — once", () => {
-  const w = (name: string, from: 'repo' | 'yours'): WorkflowListing => ({ name, from, dir: `/${from}/${name}`, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], error: null });
+  const w = (name: string, from: 'repo' | 'yours'): WorkflowListing => ({ name, from, dir: `/${from}/${name}`, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], version: '0', error: null });
   const list = [w('dev', 'repo'), w('ui', 'repo'), w('mine', 'yours')];
   assert.deepEqual(listedWith(list, w('built', 'yours')).map((x) => `${x.from}:${x.name}`), ['repo:dev', 'repo:ui', 'yours:built', 'yours:mine']);
   assert.deepEqual(listedWith(list, { ...w('mine', 'yours'), description: 'Mine.' }).map((x) => x.description), [null, null, 'Mine.']);

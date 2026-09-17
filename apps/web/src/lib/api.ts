@@ -600,6 +600,8 @@ export type WorkflowListing = {
   graph: RunGraph;
   /** The `.json` files beside the steps, which an `output:` may name. */
   schemas: string[];
+  /** What the folder's files held when it was listed: a save carries it, and the api refuses one of a folder changed since (409). */
+  version: string;
   error: string | null;
 };
 
@@ -655,13 +657,16 @@ export type WorkflowSaved = { workflow: WorkflowListing; written: string[]; kept
 
 /**
  * A write of the builder's the api refused: its sentence, and the steps it names — one, several for a cycle, or none for a refusal of the
- * folder or the request — which the board shows it by.
+ * folder or the request — which the board shows it by. `status` is the api's: 409 for a folder changed since the board read it. Null for a
+ * write refused before an answer said why.
  */
 export class BuildRefusal extends Error {
   readonly steps: string[];
-  constructor(message: string, steps: readonly string[]) {
+  readonly status: number | null;
+  constructor(message: string, steps: readonly string[], status: number | null = null) {
     super(message);
     this.steps = [...steps];
+    this.status = status;
   }
 }
 
@@ -678,25 +683,25 @@ async function build<T>(method: 'PUT' | 'POST', route: string, body: unknown, ok
     );
   }
   const steps = Array.isArray(answer?.steps) ? answer.steps.filter((s): s is string => typeof s === 'string') : [];
-  throw new BuildRefusal(typeof answer?.error === 'string' ? answer.error : `${method} ${route} answered ${res.status} ${res.statusText}`, steps);
+  throw new BuildRefusal(typeof answer?.error === 'string' ? answer.error : `${method} ${route} answered ${res.status} ${res.statusText}`, steps, res.status);
 }
 
 const isSaved = (answer: Record<string, unknown>): boolean => typeof answer.workflow === 'object' && answer.workflow !== null && Array.isArray(answer.written);
 
+/** A schema pasted for a step's `output:`, written beside the steps by the save that carries it. */
+export type SchemaFile = { file: string; text: string };
+
 /**
- * Put a folder of yours back from its steps, as the builder saves it: the api calls the package's `writeWorkflow`, and answers the folder read
- * back from disk. Rejects with a `BuildRefusal`: the package's sentence and the steps it names, or the api's own about the request.
+ * Put a folder of yours back from its steps and the schemas pasted for them, as the builder saves it: the api judges the two together, calls the
+ * package's `writeWorkflow`, and answers the folder read back from disk. `version` is the one the folder was listed at. Rejects with a
+ * `BuildRefusal`: the package's sentence and the steps it names, a folder changed since it was read (409), or the api's own about the request.
  */
-export const saveWorkflow = (name: string, steps: readonly ListedStep[]): Promise<WorkflowSaved> =>
-  build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}`, { steps }, isSaved);
+export const saveWorkflow = (name: string, save: { version: string; steps: readonly ListedStep[]; schemas: readonly SchemaFile[] }): Promise<WorkflowSaved> =>
+  build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}`, { version: save.version, steps: save.steps, ...(save.schemas.length ? { schemas: save.schemas } : {}) }, isSaved);
 
 /** Make a folder of yours with its first step. Rejects with a `BuildRefusal`, as a save does: a name taken, or a step the package refuses. */
 export const createWorkflow = (name: string, step: ListedStep): Promise<WorkflowSaved> =>
   build('POST', '/api/workflows/yours', { name, step }, isSaved);
-
-/** Write a schema beside a folder's steps, which a step's `output:` then names. Rejects with a `BuildRefusal`. */
-export const writeSchema = (name: string, file: string, text: string): Promise<{ file: string; schemas: string[] }> =>
-  build('PUT', `/api/workflows/yours/${encodeURIComponent(name)}/schemas/${encodeURIComponent(file)}`, { text }, (answer) => typeof answer.file === 'string');
 
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */
 export const workflowNameOf = (workflowDir: string): string => workflowDir.replace(/[\\/]+$/, '').split(/[\\/]/).at(-1) || workflowDir;

@@ -177,6 +177,12 @@ export type StepSpec = {
   /** How hard the harness is told to think, in its own words. */
   effort: string | null;
   after: string[];
+  /**
+   * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's (`workspace: main`): the step that
+   * ends the run, whose gate holds before it is filed and whose approval is what files it. Null for every other step, which works in a
+   * worktree. What tells such a gate from §6's on the board, where the two read the same off the record: unfiled and awaiting approval.
+   */
+  workspace: string | null;
   resume: string | null;
   permissionMode: string | null;
   /** The only tools the session may have: null for the harness's own set, empty for none. */
@@ -739,19 +745,50 @@ const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatu
     : [...new Set(resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b)))]);
 
 /**
+ * Result branches this process has seen on their base branch, as `<run>/<branch>` — a run id has no slash, so the pair is unambiguous —
+ * against the work the run had filed when git said so (`workFiled`).
+ *
+ * A branch merged into the base does not come off it again short of a history rewrite, and it is the answer that says there is nothing left
+ * to decide: remembering it can only forget a decision, never invent one, which is the safe direction of the level-triggered rule (the
+ * dangerous answer, `ahead`, is asked every time). A read's cache, as the feed's filing times are: a fresh api asks git again.
+ *
+ * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:
+ * a run whose branch had nothing on it past its base reads `on` too (`isShipped`'s `unchanged`), and its next try may commit. A try or a
+ * round files a task, which the record carries, so the memo is dropped and git is asked afresh. What is left is a person committing to a
+ * finished run's branch by hand, which nothing on the board is told of either: `wf decide` reads git every time, and so does a fresh api.
+ *
+ * What it is for is the store's long tail. Of the author's 69 runs with a result branch on 2026-09-17, 66 were already on main — two `git`
+ * calls each, on every poll of the list — and after the first poll they are three.
+ */
+const onTheBase = new Map<string, string>();
+
+/**
+ * The work a run has filed, for the memo above: each result step's current task and how many tries are behind it. A try a person asked for,
+ * or a round, files a task of its own, so this changes exactly when the work that could grow a result branch has been done again.
+ */
+const workFiled = (run: Run, steps: readonly Workflow[]): string =>
+  resultSteps(steps).map((s) => `${s.name}:${run.steps[s.name]?.taskId ?? ''}:${run.steps[s.name]?.tries?.length ?? 0}`).join(' ');
+
+/**
  * Where each of a run's result branches stands against the base branch, as git says it now (`branchStandings`): what says a finished run
  * whose folder has no ending step is one nobody has decided (`toDecide`'s git kind).
  *
  * Asked of the runs where the answer can decide anything and of no other (`toDecideBranches`), because it is a few `git` calls a branch and
  * the list is polled every five seconds: a gate says a run is one to decide without git being asked at all. Level-triggered, as the package
- * is: read on the request that asks, stored nowhere, so a branch a person merged by hand stops being one to decide with nobody telling the
- * run. A record whose branches cannot be read is no branch: git said nothing, and only a gate says there is something to decide.
+ * is: read on the request that asks, stored nowhere but the memo of branches already on the base (`onTheBase`), so a branch a person merged
+ * by hand stops being one to decide with nobody telling the run. A record whose branches cannot be read is no branch: git said nothing, and
+ * only a gate says there is something to decide.
+ *
+ * The branches left out of the answer are the ones known to be on the base, which say nothing: `toDecide` reads the ones ahead of it.
  */
 function standingsOf(run: Run, steps: readonly Workflow[], status: RunStatus): BranchStanding[] {
-  const branches = toDecideBranches(run, steps, status);
+  const filed = workFiled(run, steps);
+  const branches = toDecideBranches(run, steps, status).filter((branch) => onTheBase.get(`${run.id}/${branch}`) !== filed);
   if (!branches.length) return [];
   try {
-    return branchStandings(run, branches);
+    const read = branchStandings(run, branches);
+    for (const stood of read) if (stood.where === 'on') onTheBase.set(`${run.id}/${stood.branch}`, filed);
+    return read;
   } catch {
     return [];
   }
@@ -1017,6 +1054,7 @@ const specOf = (step: Workflow): StepSpec => ({
   model: step.model ?? null,
   effort: step.effort ?? null,
   after: step.after,
+  workspace: step.workspace ?? null,
   resume: step.resume ?? null,
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,

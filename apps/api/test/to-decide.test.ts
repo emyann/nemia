@@ -97,7 +97,7 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
 
 const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as {
   status: string; waitingOnYou: string[]; onYou: string[]; toDecide: { kind: string; step?: string; says?: string | null; branches?: string[]; said: string; command: string } | null;
-  steps: Array<{ name: string; status: string }>;
+  steps: Array<{ name: string; status: string; spec: { workspace: string | null } | null }>;
 };
 const listedOf = async (id: string) => ((await (await app.request('/api/runs')).json()) as Array<{ id: string }>).find((r) => r.id === id) as Awaited<ReturnType<typeof detailOf>>;
 const decisionOf = async (id: string) => (await (await app.request(`/api/runs/${id}/decision`)).json()) as {
@@ -122,6 +122,8 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
   const detail = await detailOf(id);
   assert.deepEqual(detail.steps.map((s) => [s.name, s.status]), [['implement', 'unverified · done'], ['ship', 'awaiting approval']]);
   assert.deepEqual([detail.waitingOnYou, detail.onYou], [['ship'], ['approve ship']]);
+  // And the key the board tells this gate from §6's by: the step runs in the repository's own checkout, and the work does not.
+  assert.deepEqual(detail.steps.map((s) => [s.name, s.spec?.workspace ?? null]), [['implement', null], ['ship', 'main']]);
   // The ending has not run, so what there is to decide is what it would do, in the folder's own first line — and the command that runs it.
   assert.deepEqual(detail.toDecide, {
     kind: 'approve', step: 'ship', says: SHIPS,
@@ -205,6 +207,46 @@ test('an approved ending that has run leaves nothing to decide: the folder answe
   assert.deepEqual([detail.status, detail.waitingOnYou], ['succeeded', []]);
   assert.equal(detail.toDecide, null, 'its ending merged it: nobody is handed the branch');
   assert.equal((await listedOf(id)).toDecide, null);
+});
+
+test("a branch already on the base is asked about once: the list's later polls run no `git` for it, and a branch ahead is asked every time", async () => {
+  // A run whose ending merged nothing — a folder with no ending step — whose branch a person merged before the board first read it.
+  const id = 'r-memo';
+  const branch = `wf/${id}/implement`;
+  branchOff(repo, branch, 'src/memo.ts', 'export const memo = 1;\n');
+  signedOff(`${id}-implement`, repo);
+  writeRun({ id, repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: `${id}-implement`, branch } } });
+  git(repo, 'merge', '-q', '--no-ff', '-m', `Merge ${id}`, branch);
+
+  const first = gitCount();
+  assert.equal((await listedOf(id)).toDecide, null, 'on the base: nothing to decide');
+  const asked = gitCount() - first;
+  assert.ok(asked > 0, `the first read asks git about it — it ran ${asked} calls`);
+
+  const again = gitCount();
+  assert.equal((await listedOf(id)).toDecide, null, 'and it still says nothing to decide');
+  assert.equal(gitCount(), again, 'with no git call at all: a branch on the base does not come off it');
+
+  // And it is remembered against the work the run had filed: a try of a finished step can commit to that branch, so the next read asks git
+  // again. A run whose branch had nothing on it past its base reads `on` too, and this is the way that one grows.
+  const tried = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as { steps: Record<string, { taskId: string; tries?: unknown[] }> };
+  tried.steps.implement = { taskId: `${id}-implement-2`, branch, tries: [{ taskId: `${id}-implement`, then: 'nudge' }] } as never;
+  signedOff(`${id}-implement-2`, repo);
+  write(path.join(root, 'runs', `${id}.json`), JSON.stringify(tried, null, 2));
+  const retried = gitCount();
+  assert.equal((await listedOf(id)).toDecide, null, 'still on the base, as git says');
+  assert.ok(gitCount() > retried, 'and git was asked again: the work was filed again, so the branch may have grown');
+
+  // The answer that holds a person up is asked every time, however often the list is polled.
+  const ahead = 'wf/r-memo-ahead/implement';
+  branchOff(repo, ahead, 'src/ahead.ts', 'export const ahead = 2;\n');
+  signedOff('r-memo-ahead-implement', repo);
+  writeRun({ id: 'r-memo-ahead', repo, baseRef: base, workflow: PLAIN, steps: { implement: { taskId: 'r-memo-ahead-implement', branch: ahead } } });
+  for (const poll of [1, 2]) {
+    const before = gitCount();
+    assert.equal((await listedOf('r-memo-ahead')).toDecide?.kind, 'git', `poll ${poll} says the branch is there to decide`);
+    assert.ok(gitCount() > before, `poll ${poll} asks git: a branch ahead of the base is one a person may merge at any moment`);
+  }
 });
 
 test('nothing to decide, and no `git` asked, for a run still running, one still going at a step that waits on you, and one called off', async () => {

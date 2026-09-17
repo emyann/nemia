@@ -102,7 +102,7 @@ function StepLinks({ workflow }: { workflow: WorkflowListing }) {
       {workflow.steps.map(({ name }) => (
         <Link
           key={name}
-          to="/workflows/$from/$workflow/steps/$step"
+          to="/workflows/$from/$workflow/$step"
           params={{ from: workflow.from, workflow: workflow.name, step: name }}
           className="font-mono font-medium text-neutral-900 underline decoration-neutral-300 underline-offset-2 hover:decoration-neutral-900 dark:text-neutral-100 dark:decoration-neutral-600 dark:hover:decoration-neutral-100"
         >

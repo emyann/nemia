@@ -13,7 +13,7 @@ test("each page lights one place in the menu — a run and its steps lighting Ru
   assert.deepEqual(lit('/runs/r-1'), ['Runs']);
   assert.deepEqual(lit('/runs/r-1/steps/implement'), ['Runs']);
   assert.deepEqual(lit('/inbox/card'), ['Inbox']);
-  assert.deepEqual(lit('/workflows/repo/dev/steps/review'), ['Workflows']);
+  assert.deepEqual(lit('/workflows/repo/dev/review'), ['Workflows']);
   assert.deepEqual(lit('/nowhere'), []);
   // Refused: a path that only begins with a place's name is not under it.
   assert.deepEqual(lit('/inboxes'), []);

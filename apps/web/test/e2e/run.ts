@@ -1359,17 +1359,17 @@ const PAGES: PageSpec[] = [
       await expectTexts(links(mine, yours.name), yours.steps, `and under ${yours.name}'s`);
       for (const step of good.steps) {
         const href = await links(dev, good.name).filter({ hasText: step }).getAttribute('href');
-        if (href !== `/workflows/repo/${good.name}/steps/${step}`) throw new Refused(`${step}'s link opens its page, /workflows/repo/${good.name}/steps/${step} — it goes to ${href}`);
+        if (href !== `/workflows/repo/${good.name}/${step}`) throw new Refused(`${step}'s link opens its page, /workflows/repo/${good.name}/${step} — it goes to ${href}`);
       }
       await nextVisit(page, async (again) => {
         await links(again.locator(`section[aria-label="Workflow ${good.name}"]`), good.name).filter({ hasText: 'review' }).click();
-        await again.waitForURL(`**/workflows/repo/${good.name}/steps/review`, { timeout: WAIT_MS });
+        await again.waitForURL(`**/workflows/repo/${good.name}/review`, { timeout: WAIT_MS });
         await expectVisible(again.locator('h1', { hasText: /^review$/ }), "a step's link opens the step's page");
         await again.goBack({ waitUntil: 'networkidle' });
         const block = again.locator(`section[aria-label="Workflow ${good.name}"] .react-flow__node[data-id="implement"]`);
         await expectVisible(block, 'back on the Workflows page, the graph');
         await block.click();
-        await again.waitForURL(`**/workflows/repo/${good.name}/steps/implement`, { timeout: WAIT_MS });
+        await again.waitForURL(`**/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
         await expectVisible(again.locator('h1', { hasText: /^implement$/ }), "a block on the graph opens its step's page");
       });
     },
@@ -1818,7 +1818,7 @@ const PAGES: PageSpec[] = [
     // A step's page, from its block on the Workflows page: what its agent is told, rendered, then every key a step may set — set or not — with
     // its value as the loader reads it and what it means, and Source: the file as written. It writes nothing: the checkout's folder is as it was.
     name: 'workflow-step',
-    route: `/workflows/repo/${WORKFLOWS.good.name}/steps/review`,
+    route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
     expect: async (page) => {
       await sidebar(page);
       await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Workflows' }), "the sidebar lights Workflows on a step's page");
@@ -1832,7 +1832,7 @@ const PAGES: PageSpec[] = [
       const file = page.locator('section[aria-label="The file"]');
       const body = file.locator('[data-markdown]').first();
       await expectRendered(body, good.review);
-      await expectKeys(page, file, `/api/workflows/repo/${good.name}/steps/review`, good.review.keys);
+      await expectKeys(page, file, `/api/workflows/repo/${good.name}/review`, good.review.keys);
       await expectSource(file, body, path.join(folder, 'review.md'));
       if (JSON.stringify(filesIn(folder)) !== JSON.stringify(before)) throw new Refused(`a step's page writes nothing — ${folder} changed while it was open`);
     },

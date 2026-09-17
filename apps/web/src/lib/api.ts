@@ -582,7 +582,7 @@ export type WorkflowStepPage = { workflow: string; from: WorkflowListing['from']
 export const stepQuery = (from: string, workflow: string, step: string) =>
   queryOptions({
     queryKey: ['workflows', from, workflow, step],
-    queryFn: () => get<WorkflowStepPage>(`/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/steps/${encodeURIComponent(step)}`),
+    queryFn: () => get<WorkflowStepPage>(`/api/workflows/${encodeURIComponent(from)}/${encodeURIComponent(workflow)}/${encodeURIComponent(step)}`),
   });
 
 /** A workflow by name, as the Workflows page lists it: the last segment of its folder. */

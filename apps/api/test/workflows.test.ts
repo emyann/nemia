@@ -113,7 +113,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
 });
 
 /** A step's page, as the board asks for it. */
-const stepPage = (from: string, name: string, step: string) => app.request(`/api/workflows/${from}/${name}/steps/${step}`);
+const stepPage = (from: string, name: string, step: string) => app.request(`/api/workflows/${from}/${name}/${step}`);
 
 /** Every key a step may set, in the package's order, with the values `set` gives and the package's line of meaning. */
 const rows = (set: Record<string, string>) => STEP_KEYS.map((key) => ({ key, value: set[key] ?? null, meaning: STEP_KEY_MEANINGS[key] }));
@@ -121,7 +121,7 @@ const rows = (set: Record<string, string>) => STEP_KEYS.map((key) => ({ key, val
 /** A folder as it is: each file's name and text, to show a read wrote nothing. */
 const filesOf = (dir: string): Array<[string, string]> => fs.readdirSync(dir).sort().map((f) => [f, fs.readFileSync(path.join(dir, f), 'utf8')]);
 
-test("GET /api/workflows/:from/:name/steps/:step is a step's page: which workflow and step, its body, its file as written, and every key a step may set with its value as the loader read it and what it means", async () => {
+test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and step, its body, its file as written, and every key a step may set with its value as the loader read it and what it means", async () => {
   const before = [filesOf(good), filesOf(mine)];
 
   const res = await stepPage('repo', 'good', 'review');

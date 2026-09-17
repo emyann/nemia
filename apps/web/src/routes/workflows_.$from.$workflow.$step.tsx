@@ -4,8 +4,8 @@ import { AsWritten, KeyTable } from '../components/FilePage';
 import { Markdown } from '../components/Markdown';
 import { stepQuery } from '../lib/api';
 
-// `workflows_`: at /workflows/$from/$workflow/steps/$step, and not drawn inside the Workflows page, which has no outlet for it.
-export const Route = createFileRoute('/workflows_/$from/$workflow/steps/$step')({
+// `workflows_`: at /workflows/$from/$workflow/$step, and not drawn inside the Workflows page, which has no outlet for it.
+export const Route = createFileRoute('/workflows_/$from/$workflow/$step')({
   loader: ({ context, params }) => context.queryClient.ensureQueryData(stepQuery(params.from, params.workflow, params.step)),
   component: StepPage,
   errorComponent: ({ error }) => (

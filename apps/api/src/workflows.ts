@@ -11,7 +11,8 @@
  * package's `startFromInbox()` instead, `wf start <inbox>/<name>.md`'s own: the same record, with `from` on it, and the card removed.
  * Nothing else here writes; the inbox's own writes are inbox.ts's.
  *
- * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/steps/:step`).
+ * A step's page reads one step of one folder, as written and as the loader read it (`GET /api/workflows/:from/:name/:step`), at the address
+ * the page itself has on the board..
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -262,10 +263,10 @@ export const workflows = new Hono()
   })
   // One step of one folder, for its page: found among the folders the sources have and the steps the loader read, never joined from what
   // was sent — so no name in the path reaches a file outside the folder — or why not, in the words a start would use.
-  .get('/api/workflows/:from/:name/steps/:step', (c) => {
+  .get('/api/workflows/:from/:name/:step', (c) => {
     const { from, name, step } = c.req.param();
     if (from !== 'repo' && from !== 'yours') {
-      return c.json({ error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/steps/${step}, say. This request's was '${from}'.` }, 400);
+      return c.json({ error: `A step's page names where its workflow is read from: \`repo\` or \`yours\`, as GET /api/workflows lists each workflow's \`from\` — /api/workflows/repo/${name}/${step}, say. This request's was '${from}'.` }, 400);
     }
     try {
       const folder = folderOf(name, from, repoOf(), HOME);

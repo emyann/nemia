@@ -1913,16 +1913,16 @@ What was built:
 - **Streamdown is gone.** `ai-elements/response.tsx` is deleted, `reasoning.tsx` renders `Markdown`, and `styles.css` loses its `@source`.
 - **A card's page, `/inbox/<name>`**, from the card's title on the Inbox page: the body rendered, then a row per key an inbox card may
   set — its value or `not set`, and one line of what it means — and **Source**, a toggle to the file as written, frontmatter included. An
-  entry that does not read as a card shows its refusal and its file. **A step's page, `/workflows/<from>/<workflow>/steps/<step>`**, from
-  its block on the Workflows canvas and from a line of step links under each graph: the same, for every key a step may set, its value as
-  the loader reads it, which the page says (`after` names the step `resume:` names; a loop that sets no `rounds` runs 3). Under `steps/`,
-  as a run's step is at `/runs/<id>/steps/<step>`. Neither page writes. The menu lights the Inbox and Workflows on them.
+  entry that does not read as a card shows its refusal and its file. **A step's page, `/workflows/<repo|yours>/<workflow>/<step>`**, the
+  address the operator gave in approving the plan, from its block on the Workflows canvas and from a line of step links under each graph:
+  the same, for every key a step may set, its value as the loader reads it, which the page says (`after` names the step `resume:` names; a
+  loop that sets no `rounds` runs 3). Neither page writes. The menu lights the Inbox and Workflows on them.
 - **The package's lines of meaning**, the one thing added to the package: `STEP_KEY_MEANINGS` beside `STEP_KEYS` in `workflow.ts`, a
   count's line being `COUNTS`' own (so `COUNTS` moved up beside the keys), and `INBOX_KEY_MEANINGS` beside `INBOX_KEYS` in `inbox.ts`,
   re-exported from runner.ts. A key without a line does not typecheck.
 - **The api**, a route per page, each finding what it reads among what the package lists and never by a path joined from the request.
   `GET /api/inbox/:name`: the card as the inbox lists it, `source`, and `keys` (null for an entry that does not read); a name that is not a
-  card's is 400 in `inboxNameRefusal`'s words, a card not there 404 in `noCardLine`'s. `GET /api/workflows/:from/:name/steps/:step`: the
+  card's is 400 in `inboxNameRefusal`'s words, a card not there 404 in `noCardLine`'s. `GET /api/workflows/:from/:name/:step`, the page's own address: the
   step's body, `source`, and `keys` (`keyRows`); a `from` other than `repo` or `yours` is 400, a workflow `folderOf` does not find its
   404, a folder the loader refuses 422 in its words, and a step it did not load 404, naming the steps.
 

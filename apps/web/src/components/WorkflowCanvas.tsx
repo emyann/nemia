@@ -99,7 +99,7 @@ export function WorkflowCanvas({ workflow }: { workflow: WorkflowListing }) {
         preventScrolling={false}
         deleteKeyCode={null}
         onNodeClick={(_, node) =>
-          void navigate({ to: '/workflows/$from/$workflow/steps/$step', params: { from: workflow.from, workflow: workflow.name, step: node.id } })
+          void navigate({ to: '/workflows/$from/$workflow/$step', params: { from: workflow.from, workflow: workflow.name, step: node.id } })
         }
         colorMode="system"
         // Null, so arrowheads take `--xy-edge-stroke` like their edges instead of one grey for both themes.

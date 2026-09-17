@@ -2834,7 +2834,7 @@ What was measured:
   whose last step merges, with nothing written, and reads both screens: the ending that has not run, in its prose, and the gated step that
   has, by its name with its closeout above.
 
-What the board does with it, six commits — §8's apps half, the run after this one:
+What the board does with it, an item a commit — §8's apps half, the run after this one:
 
 - **`to decide` on the list and on a run's detail** (`RunSummary.toDecide`, `RunDetail.toDecide`), as the package decides it and words it:
   `{ kind, step, says, branches }` with `said`, the whole of what `wf ls` prints after `→ to decide:`, and `command`, the command at the

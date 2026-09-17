@@ -362,6 +362,25 @@ retry, and never for a task without it; `test/engine.test.ts`: carried to every 
   that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`
   fails the day the control is bridged without it, or the flagged session is not.
 
+### 24. A session held by its own background shell never ends, and its closeout is never read
+
+**Measured** (2026-09-17, Claude Code 2.1.274, run `the-queue-on-the-board-queue-ppu1`). The implement step signed off with
+`StructuredOutput` at 02:53Z, all its work committed. A shell it had started with `run_in_background` —
+`until grep -q "Local:" …/lookweb.log; do sleep 0.5; done`, waiting for a dev server it had already stopped — kept looping. The
+registration under `~/.claude/sessions/` read `status: shell` from then on, `claude agents` listed the session `busy`, the engine
+read the attempt as working, and seventy-seven minutes later nothing had been read. Three Monitor tasks it had armed expired
+in the meantime, each waking the session for one turn, which did not change the status. Ending the shell by hand (`kill` on
+the bash) let the session go idle within seconds.
+
+**Effect.** A step whose agent leaves a background shell running is never settled: no `unsigned`, no nudge, no check, no
+review — the run waits for a person to notice, and the closeout on the transcript is worth nothing until then. A budget does
+not help; nothing is spent. Only a `deadlineSeconds` would end it, and no shipped step sets one.
+
+**Possible fix.** The runner's observe could read a session `shell`-with-a-closeout-already-given as quiet: the transcript's
+last entry is the closeout's tool result and it has not advanced for the quiescence floor. That is a reading of Claude Code's
+registration status (`shell`, undocumented) beside the transcript, so it belongs with issue 13's caveats. The upper layer's
+courtesy, meanwhile, is a line in CLAUDE.md: a background loop must time out.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

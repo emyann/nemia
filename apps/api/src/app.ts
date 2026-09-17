@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, round, runCostLines, runSpend, saidCount, say, sensitiveDiff, spendReader, spentWord, stepSpend, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Spend, type SpendOf, type Timeline, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
+import { branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, round, runCostLines, runSpend, saidCount, say, sensitiveDiff, spendReader, spentWord, stepSpend, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Spend, type SpendOf, type Timeline, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
 import { addSpend, answerOf, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, inFlight, listing, loopOver, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
@@ -256,6 +256,10 @@ export type RunDetail = {
   cancelledAt: string | null;
   /** As on `RunSummary`. */
   after: string[];
+  /** The inbox card the run was started from, as its record carries it (`Run.from`); absent for a run started without one. */
+  from?: { inbox: string };
+  /** Where it came from, as `wf decide` says it under the run's line (`fromNote`): absent with `from`. */
+  fromNote?: string;
   waiting: RunWaiting | null;
   status: RunStatus;
   /** As on `RunSummary`. */
@@ -860,6 +864,7 @@ async function detail(run: Run): Promise<RunDetail> {
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     after: run.after ?? [],
+    ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
     status: judged.status,
     moving: judged.moving,

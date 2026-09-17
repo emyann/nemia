@@ -422,7 +422,8 @@ export const CHECKOUT = {
   /** apps/api's fixture server: what it lists, the first line of `echo`'s description, and the line after it. */
   server: { name: 'fixture', tools: ['echo', 'wipe'], said: 'Say it back.', secondLine: 'A second line', denied: 'mcp__fixture__wipe' },
   missing: { name: 'missing', command: 'hkb-e2e-no-such-mcp-server' },
-  denied: ['Bash(git push:*)', 'mcp__fixture__wipe'],
+  /** `Bash(find:*)` refuses one of Claude Code's read-only commands, which the page strikes on a step with Bash. */
+  denied: ['Bash(git push:*)', 'mcp__fixture__wipe', 'Bash(find:*)'],
   /** What its settings allow: two Bash commands, which WORKFLOWS' review, in dontAsk, may run. */
   allowed: ['Bash(npm test)', 'Bash(git diff:*)'],
 } as const;

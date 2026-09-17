@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tansta
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { StartRun } from '../components/StartRun';
 import { dropCard, fileCard, inboxQuery, repositoryQuery, workflowNameOf, workflowsQuery, type InboxEntry, type WorkflowListing } from '../lib/api';
-import { namedElsewhere, newestCardsFirst, presetOf, workflowKey } from '../lib/inbox';
+import { cardLines, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
@@ -25,10 +25,18 @@ const PRIMARY =
 const SECONDARY =
   'rounded border border-neutral-300 px-3 py-1.5 text-sm font-medium hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-40 dark:border-neutral-700 dark:hover:bg-neutral-900';
 
-/** The inbox: a box that files a card, and the cards, newest first, each startable and removable. */
+/**
+ * The inbox: a box that files a card, and the cards, newest first, each startable and removable. The page keeps what a start or a drop was
+ * refused with, by card, since the inbox is read again after each answer: a card gone behind the page's back leaves the list, and its refusal
+ * stays where it was listed until dismissed.
+ */
 function InboxPage() {
   const { data: entries } = useSuspenseQuery(inboxQuery);
+  const [refusals, setRefusals] = useState<CardRefusal[]>([]);
   const cards = newestCardsFirst(entries);
+  const lines = cardLines(entries, refusals);
+  const refusalFor = (entry: InboxEntry) => (refusal: Omit<CardRefusal, 'entry'> | null) =>
+    setRefusals((kept) => [...kept.filter((r) => r.entry.name !== entry.name), ...(refusal ? [{ ...refusal, entry }] : [])]);
 
   return (
     <article className="space-y-6">
@@ -41,13 +49,18 @@ function InboxPage() {
         <h2 className="flex items-baseline gap-2 text-sm font-semibold">
           Cards <span data-count className="text-xs font-normal text-neutral-500">{cards.length}</span>
         </h2>
-        {cards.length ? (
+        {lines.length > 0 && (
           <ul className="space-y-3">
-            {cards.map((entry) => (
-              <CardItem key={entry.file} entry={entry} />
-            ))}
+            {lines.map(({ entry, refusal, gone }) =>
+              gone ? (
+                <GoneItem key={`gone:${entry.file}`} entry={entry} refusal={refusal!} onDismiss={() => refusalFor(entry)(null)} />
+              ) : (
+                <CardItem key={entry.file} entry={entry} refusal={refusal} onRefused={refusalFor(entry)} />
+              ),
+            )}
           </ul>
-        ) : (
+        )}
+        {cards.length === 0 && (
           <p data-empty className="text-sm text-neutral-500">
             The inbox is empty. File an idea in the box above, or from the command line: {code('wf inbox add "<idea>"')}.
           </p>
@@ -166,14 +179,24 @@ function FileCard() {
  * A start from this page whose card could not be removed is kept (`kept`): the start form goes, since the card may not start again, and the
  * card says it was started as that run, with why its removal failed, in the api's words — which only the start's answer carries, so a later
  * visit says it was started, and not why.
+ *
+ * What its start or its drop was last refused with is the page's (`refusal`, told through `onRefused`), shown at its foot: the inbox is read
+ * again after any answer, and a card refused because it is gone leaves the list, its refusal kept in its place (`GoneItem`).
  */
-function CardItem({ entry }: { entry: InboxEntry }) {
+function CardItem({ entry, refusal, onRefused }: {
+  entry: InboxEntry;
+  refusal: CardRefusal | null;
+  onRefused: (refusal: Omit<CardRefusal, 'entry'> | null) => void;
+}) {
   const queryClient = useQueryClient();
   const [starting, setStarting] = useState(false);
   const [kept, setKept] = useState<{ id: string; why: string } | null>(null);
   const remove = useMutation({
     mutationFn: () => dropCard(entry.name),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
+    onMutate: () => onRefused(null),
+    onError: (error) => onRefused({ action: 'remove', message: error.message }),
+    // Whatever the answer: a card dropped behind the page's back — a 404 — leaves the list too.
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
   });
   // The run a start just wrote, before the inbox is read again and names it.
   const startedAs = kept && !entry.startedAs.includes(kept.id) ? [...entry.startedAs, kept.id] : entry.startedAs;
@@ -253,22 +276,64 @@ function CardItem({ entry }: { entry: InboxEntry }) {
           <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{entry.error}</p>
         </div>
       )}
-      {remove.isError && (
-        <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">Not removed. The api refused it:</p>
-          <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{remove.error.message}</p>
-        </div>
+      {starting && startable && (
+        <StartCard entry={entry} onKept={setKept} onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })} />
       )}
-      {starting && startable && <StartCard entry={entry} onKept={setKept} />}
+      {refusal && <Refused refusal={refusal} />}
     </li>
   );
 }
 
 /**
- * A card's start: the workflow, preset from the card and changeable, and `StartRun` with the brief prefilled from its body. A start the api
- * took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and the page stays.
+ * A card the inbox no longer lists, kept in its place for what its start or its drop was refused with: dropped or started behind the page's
+ * back. Its first line and name, that it is gone, the refusal, and Dismiss, which takes the line away.
  */
-function StartCard({ entry, onKept }: { entry: InboxEntry; onKept: (kept: { id: string; why: string }) => void }) {
+function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; refusal: CardRefusal; onDismiss: () => void }) {
+  return (
+    <li
+      aria-label={`Card ${entry.name}, no longer in the inbox`}
+      data-gone={entry.name}
+      className="space-y-3 rounded-lg border border-dashed border-neutral-300 p-4 dark:border-neutral-700"
+    >
+      <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
+        <div className="min-w-0 flex-1 space-y-1">
+          <p data-title className="font-medium break-words text-neutral-500">
+            {entry.title ?? entry.file}
+          </p>
+          <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-neutral-500">
+            <span className="font-mono">{entry.name}</span>
+            <span>Gone from the inbox since this page listed it.</span>
+          </p>
+        </div>
+        <button type="button" onClick={onDismiss} className={`${SECONDARY} shrink-0`}>
+          Dismiss
+        </button>
+      </div>
+      <Refused refusal={refusal} />
+    </li>
+  );
+}
+
+/** What a start or a drop of a card was refused with, in the api's words. */
+function Refused({ refusal }: { refusal: CardRefusal }) {
+  return (
+    <div data-refused={refusal.action} className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">{refusal.action === 'start' ? 'Not started' : 'Not removed'}. The api refused it:</p>
+      <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
+    </div>
+  );
+}
+
+/**
+ * A card's start: the workflow, preset from the card and changeable, and `StartRun` with the brief prefilled from its body. A start the api
+ * took opens the run's page — unless the card stayed in the inbox, which `onKept` is told of, with why, and the page stays. A refusal is
+ * `onRefused`'s to show, since the form may not outlive it.
+ */
+function StartCard({ entry, onKept, onRefused }: {
+  entry: InboxEntry;
+  onKept: (kept: { id: string; why: string }) => void;
+  onRefused: (message: string | null) => void;
+}) {
   const navigate = useNavigate();
   const workflows = useQuery(workflowsQuery);
   // The api's repository, whose workflows are listed: a name on a card about another is that one's, and presets none of these.
@@ -320,6 +385,7 @@ function StartCard({ entry, onKept }: { entry: InboxEntry; onKept: (kept: { id: 
             if (started.removed === false) onKept({ id: started.id, why: started.why ?? 'the api did not say why' });
             else void navigate({ to: '/runs/$runId', params: { runId: started.id } });
           }}
+          onRefused={onRefused}
         />
       )}
     </div>

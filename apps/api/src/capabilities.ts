@@ -48,7 +48,10 @@ export type Capabilities = {
   agents: Described[];
   mcp: McpServer[];
   denied: DeniedRule[];
-  /** `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking — in `dontAsk`, all it runs of what asks. */
+  /**
+   * `permissions.allow` in `.claude/settings.json`, in its order: what a session runs without asking, beside what asks for no rule — Claude Code's
+   * read-only commands (`READ_ONLY_COMMANDS`) among it. In `dontAsk`, all it runs of what asks.
+   */
   allowed: DeniedRule[];
   /** A file that is there and does not read: what was left out because of it, and the fix. */
   warnings: string[];
@@ -150,6 +153,25 @@ export const MEASURED_TOOLS = {
     { name: 'Write', why: EDITS_WITH },
   ],
   lacks: ['Artifact', 'AskUserQuestion'],
+} as const;
+
+/**
+ * The Bash commands Claude Code runs without a prompt in every mode, `dontAsk` among them, with no rule allowing them — unless a deny names
+ * them. Data with its date and version, as `MEASURED_TOOLS` is: nothing here asks the harness again, and the page never says it is current.
+ *
+ * `measured` ran in B9's last review (docs/plan-hold-the-bar.md §6 item 30): its session, `c342ce08`, in `dontAsk` under this repository's
+ * settings, which allow none of them, ran `cat`, `ls` and `grep` alone and `head` and `tail` in a pipe, while `node -e` was denied. The api's
+ * test refuses a measured command those settings allow. `documented` are the rest of what Claude Code's docs name, which say the set includes
+ * them, not that it is all of it; `git` is its read-only forms, which they do not list.
+ */
+export const READ_ONLY_COMMANDS = {
+  harness: 'Claude Code',
+  version: '2.1.272',
+  measuredAt: '2026-09-15',
+  source: "B9's last review (docs/plan-hold-the-bar.md §6 item 30)",
+  measured: ['cat', 'grep', 'head', 'ls', 'tail'],
+  documented: ['cd', 'diff', 'du', 'echo', 'find', 'git', 'pwd', 'stat', 'wc', 'which'],
+  docs: 'code.claude.com/docs/en/permissions, "Read-only commands", read 2026-09-16',
 } as const;
 
 /**

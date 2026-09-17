@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dropCard, fileCard, startRun, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
-import { namedElsewhere, newestCardsFirst, presetOf, workflowKey } from '../src/lib/inbox.ts';
+import { cardLines, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
 
 const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}): InboxEntry => ({
   name, file: `${name}.md`, title: name, workflow: null, repo: null, startedAs: [], error: null, body: name, filedAt, ...extra,
@@ -21,6 +21,40 @@ test('the cards are listed newest first, by when each was filed, then by name; o
   ];
   assert.deepEqual(newestCardsFirst(cards).map((c) => c.name), ['newest-c3d4', 'same-a-g7h8', 'same-b-e5f6', 'older-k2q9', 'unknown-a1b2']);
   assert.deepEqual(cards.map((c) => c.name)[0], 'older-k2q9', 'the listing it was given is left as it was');
+});
+
+test("a refused start or drop stays on the page after the inbox is read again: on its card while the card is listed, and in the card's place once it is gone", () => {
+  const newest = entry('newest-c3d4', '2026-09-16T09:00:00.000Z');
+  const middle = entry('dropped-k2q9', '2026-09-15T12:00:00.000Z');
+  const oldest = entry('oldest-a1b2', '2026-09-15T10:00:00.000Z');
+  const kept = entry('started-e5f6', '2026-09-14T10:00:00.000Z', { startedAs: ['started-run-e5f6'] });
+  const refusals: CardRefusal[] = [
+    { entry: middle, action: 'start', message: 'no card dropped-k2q9 in the inbox.' },
+    { entry: oldest, action: 'remove', message: 'no card oldest-a1b2 in the inbox.' },
+    { entry: { ...kept, startedAs: [] }, action: 'start', message: 'this card was started as started-run-e5f6.' },
+  ];
+  const line = (l: ReturnType<typeof cardLines>[number]) => [l.entry.name, l.gone ? 'gone' : 'listed', l.refusal?.action ?? null];
+
+  // Read again after the answers: dropped-k2q9 and oldest-a1b2 are gone, started-e5f6 is still listed, as started.
+  const lines = cardLines([newest, kept], refusals);
+  assert.deepEqual(lines.map(line), [
+    ['newest-c3d4', 'listed', null],
+    ['dropped-k2q9', 'gone', 'start'],
+    ['oldest-a1b2', 'gone', 'remove'],
+    ['started-e5f6', 'listed', 'start'],
+  ]);
+  assert.equal(lines[3]!.entry, kept, 'a card still listed is drawn as the inbox now lists it, not as it was refused');
+  assert.equal(lines[1]!.refusal!.message, 'no card dropped-k2q9 in the inbox.', "with the api's words");
+
+  // Before the inbox is read again, each refused card is still listed: its refusal on it, and no line of its own.
+  assert.deepEqual(cardLines([newest, middle, oldest, kept], refusals).map(line), [
+    ['newest-c3d4', 'listed', null],
+    ['dropped-k2q9', 'listed', 'start'],
+    ['oldest-a1b2', 'listed', 'remove'],
+    ['started-e5f6', 'listed', 'start'],
+  ]);
+  // With no refusal, only what the inbox lists.
+  assert.deepEqual(cardLines([newest, kept], []).map(line), [['newest-c3d4', 'listed', null], ['started-e5f6', 'listed', null]]);
 });
 
 const listing = (name: string, from: 'repo' | 'yours', dir: string, error: string | null = null): WorkflowListing => ({

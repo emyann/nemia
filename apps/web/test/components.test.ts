@@ -52,8 +52,11 @@ const { CanvasLegend } = await import('../src/components/CanvasLegend.tsx');
 const { edgeStroke, LOOP_SOURCE, LOOP_TARGET, TRAVEL_SECONDS } = await import('../src/lib/canvas.ts');
 const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch } = await import('../src/components/Decide.tsx');
 const { ReactFlowProvider } = await import('@xyflow/react');
+const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { stateMeaning } = await import('../src/lib/status.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
+type StepReach = import('../src/lib/api.ts').StepReach;
+type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
 type GraphEdge = import('../src/lib/api.ts').GraphEdge;
 type StateFlowEdge = import('../src/components/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
@@ -1269,4 +1272,61 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
   assert.equal(said('review'), null, 'and nothing to tell: a round carries no message');
   // The package refuses a cap not above what was spent, in its words: the board sets no floor of its own that would keep that from it.
   assert.doesNotMatch(html, /\bmin="|\brequired=""/);
+});
+
+// ─── the Capabilities page: what a step runs without asking ─────────────────
+
+/** `READ_ONLY_COMMANDS` as the api serves it, cut to a few. */
+const READ_ONLY: ReadOnlyCommands = {
+  harness: 'Claude Code', version: '2.1.272', measuredAt: '2026-09-15', source: "B9's last review", measured: ['cat', 'grep'], documented: ['find', 'git'],
+  docs: 'code.claude.com/docs/en/permissions, "Read-only commands", read 2026-09-16',
+};
+/** What a Claude Code step allowed `npm test` gets, in `dontAsk` or not. */
+const allowedTo = (dontAsk: boolean): StepReach['allowed'] => ({
+  rules: ['Bash(npm test)'], takenBack: [], unused: [], bash: [{ rule: 'Bash(npm test)', command: 'npm test', except: [] }], exceptions: [], dontAsk, why: null,
+});
+const readOnlyReach = (denied: Record<string, string> = {}): NonNullable<StepReach['readOnly']> => [
+  ...READ_ONLY.measured.map((command) => ({ command, measured: true })),
+  ...READ_ONLY.documented.map((command) => ({ command, measured: false })),
+].map((c) => ({ ...c, denied: denied[c.command] ? { rule: denied[c.command]!, source: '.claude/settings.json' } : null }));
+const allowedMarkup = (allowed: StepReach['allowed'], readOnly: StepReach['readOnly']) =>
+  renderToStaticMarkup(createElement(AllowedReach, { allowed, readOnly, commands: READ_ONLY }));
+/** Each read-only command drawn, as `command[:documented][:denied rule]`. */
+const readOnlyChips = (html: string) =>
+  [...html.matchAll(/<code data-read-only="([^"]+)"( data-documented="true")?(?: data-denied="([^"]+)")?/g)].map(([, c, documented, denied]) => [c, documented ? ':documented' : '', denied ? `:${unescaped(denied)}` : ''].join(''));
+
+test("in dontAsk, a step with Bash is not told that every command no rule allows is denied: Claude Code's read-only commands ask for none, measured apart from documented, dated — then what the settings allow of what asks", () => {
+  const html = allowedMarkup(allowedTo(true), readOnlyReach());
+  const texts = textsOf(html);
+  assert.ok(texts.includes('Bash it may run'), texts.join(' | '));
+  assert.doesNotMatch(html, /a command no rule allows is denied/, 'the sentence B9 left, which a read-only command makes false');
+  assert.ok(texts.includes("In dontAsk, a command that asks is denied without a prompt unless a rule allows it. Claude Code's read-only commands do not ask:"), texts.join(' | '));
+  assert.deepEqual(readOnlyChips(html), ['cat', 'grep', 'find:documented', 'git:documented']);
+  assert.match(html, /data-read-only-measured="2026-09-15"[^>]*>The solid ones ran with no rule allowing them on 2026-09-15 with 2\.1\.272 \(B9&#x27;s last review\)\. The dashed ones are named by its docs/);
+  assert.ok(texts.includes('Of the commands that ask, the settings allow it:'), texts.join(' | '));
+  assert.match(html, /<code data-bash="npm test"/);
+  assert.doesNotMatch(html, /No Bash command at all/, 'a step whose settings allow no command still runs the read-only ones');
+  const none = allowedMarkup({ ...allowedTo(true), rules: [], bash: [] }, readOnlyReach());
+  assert.ok(textsOf(none).includes('None.') && readOnlyChips(none).length === 4, textsOf(none).join(' | '));
+});
+
+test('REFUSED: a read-only command a deny covers is drawn struck, with the deny — and a step with no Bash, or in no Claude Code, is drawn none', () => {
+  const html = allowedMarkup(allowedTo(true), readOnlyReach({ cat: 'Bash(cat:*)', git: 'Bash(git:*)' }));
+  assert.deepEqual(readOnlyChips(html), ['cat:Bash(cat:*)', 'grep', 'find:documented', 'git:documented:Bash(git:*)']);
+  assert.match(html, /<code data-read-only="cat" data-denied="Bash\(cat:\*\)" title="Denied by Bash\(cat:\*\) \(.claude\/settings.json\)[^"]*" class="[^"]*line-through/);
+  const why = 'Its tools have no `Bash`, so it runs no command, whatever the settings allow.';
+  const shut = allowedMarkup({ ...allowedTo(true), rules: [], bash: [], why }, []);
+  assert.deepEqual(readOnlyChips(shut), []);
+  assert.deepEqual(textsOf(shut), ['Bash it may run', why]);
+  assert.deepEqual(readOnlyChips(allowedMarkup({ ...allowedTo(false), why }, null)), []);
+});
+
+test("outside dontAsk the settings' allow rules are listed, and the read-only commands after them, in every mode", () => {
+  const html = allowedMarkup(allowedTo(false), readOnlyReach());
+  const texts = textsOf(html);
+  assert.ok(texts.includes('Allowed without asking'), texts.join(' | '));
+  assert.match(html, /<code data-allowed="Bash\(npm test\)"/);
+  assert.ok(texts.includes("And, in every mode, Claude Code's read-only commands, which ask for no rule:"), texts.join(' | '));
+  assert.deepEqual(readOnlyChips(html), ['cat', 'grep', 'find:documented', 'git:documented']);
+  assert.doesNotMatch(html, /denied without a prompt/, 'nothing is denied without a prompt outside dontAsk');
 });

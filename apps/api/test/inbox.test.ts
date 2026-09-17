@@ -19,7 +19,7 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 execFileSync('git', ['-c', 'user.email=t@local', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init'], { cwd: repo });
 
 const { app } = await import('../src/app.ts');
-const { addToInbox, inboxDir, inboxNameRefusal, noCardLine, readRun, startFromInbox } = await import('agent-workflows');
+const { addToInbox, fromNote, inboxDir, inboxNameRefusal, noCardLine, readRun, startFromInbox } = await import('agent-workflows');
 type InboxEntry = import('../src/inbox.ts').InboxEntry;
 
 const write = (file: string, text: string): void => {
@@ -340,6 +340,28 @@ test("POST /api/runs with `card` whose removal fails still starts: 201 with `rem
   }
   assert.equal((await drop(card.name)).status, 200);
   assert.deepEqual(cards(), []);
+});
+
+test("GET /api/runs/:id says a run came from a card — the record's `from`, and `wf decide`'s sentence for it — and a run started without one carries neither", async () => {
+  clear();
+  const { card } = addToInbox({ text: 'Say where a run came from' });
+  const started = await startCard({ workflow: 'dev', card: card.name });
+  assert.equal(started.status, 201, await started.clone().text());
+  const { id } = await started.json();
+  const res = await app.request(`/api/runs/${id}`);
+  assert.equal(res.status, 200, await res.clone().text());
+  const detail = await res.json();
+  assert.deepEqual(detail.from, { inbox: card.name });
+  assert.equal(detail.fromNote, fromNote(readRun(id)));
+  assert.equal(detail.fromNote, `from inbox card ${card.name}`);
+
+  // Typed at the board's start, as at `wf start`: no card, so no `from` — absent, not null — and no sentence.
+  const typed = await startCard({ workflow: 'dev', brief: 'Typed, not parked' });
+  assert.equal(typed.status, 201, await typed.clone().text());
+  const typedId = (await typed.json()).id;
+  const plain = await (await app.request(`/api/runs/${typedId}`)).json();
+  assert.equal(plain.id, typedId);
+  assert.deepEqual(['from' in plain, 'fromNote' in plain], [false, false]);
 });
 
 /** What `startFromInbox` refuses `name` with, asked as the route asks it. */

@@ -991,7 +991,8 @@ test("the spec says what a step runs with: the workflow's word where it sets one
 // ─── what a step needs, and the answer ──────────────────────────────────────
 
 const Answering = await import('../src/components/Decide.tsx');
-const { NeedsBanner } = await import('../src/components/Needs.tsx');
+const { NeedsBanner, ToDecideBanner } = await import('../src/components/Needs.tsx');
+const { decisionStamp } = await import('../src/lib/decide.ts');
 const Closeouts = await import('../src/components/Closeout.tsx');
 const { QueryClient, QueryClientProvider } = await import('@tanstack/react-query');
 type Offer = import('../src/lib/asks.ts').Offer;
@@ -1215,6 +1216,122 @@ test('the approval under a step: the try, when, and the words as they were writt
     [Gates.gateWord({ awaiting: true, approval: null }), Gates.gateWord({ awaiting: false, approval: { try: 1, at, message: null } }), Gates.gateWord({ awaiting: false, approval: null })],
     ['awaiting approval', 'approved, try 1', 'holds once it has signed off'],
   );
+});
+
+// ─── an ending step's gate, and what there is to decide ─────────────────────
+
+/** What `wf ls` says of a run at its ending's gate, as the api gives it (`RunToDecide`). */
+const SHIPS = 'Merge this run onto the base branch, or abort on any failure.';
+const toShip = { kind: 'approve' as const, step: 'ship', says: SHIPS, said: `${SHIPS} — wf approve r-1 ship`, command: 'wf approve r-1 ship' };
+
+/**
+ * A run of implement → ship whose ship is the workflow's ending, at its gate: implement signed off with a summary and a file, ship is
+ * unfiled and `awaiting approval`, and the run carries what there is to decide.
+ */
+function endingRun(over: Partial<RunDetail> = {}): RunDetail {
+  const run = runWith(null);
+  const base = run.steps[0]!;
+  const implement = {
+    ...base, name: 'implement', taskId: 't-1', status: 'unverified · done', branch: 'wf/r-1/implement', gate: null, approve: null,
+    closeout: closeoutSaying('## What changed\n\n- the cap on runs in flight', { artifacts: [{ path: 'RESPONSE.md' }] }),
+  };
+  const ship = {
+    ...base, name: 'ship', taskId: null, status: 'awaiting approval', branch: null, body: `${SHIPS}\n\nLook at the checkout first.`,
+    closeout: null, approve: 'approve ship', gate: { awaiting: true, approval: null },
+  };
+  return {
+    ...run, status: 'failed', waitingOnYou: ['ship'], onYou: ['approve ship'], toDecide: toShip, gates: ['ship'],
+    graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'ship', kind: 'after' }] },
+    steps: [implement, ship], ...over,
+  };
+}
+
+/** The run's decision as the api gives it, cut to what the panel reads: where the result branch stands, and how much it changed. */
+const decidedAs = (standings: unknown[]) => ({ standings, touched: [], lesson: { said: '', state: 'nothing' }, sensitive: [], used: {}, total: {}, cost: null, overBudget: null, commands: [] });
+
+/** A component rendered with the run's decision already read, as the Decide section on the same page has read it for this state of the run. */
+function withDecision(run: RunDetail, decision: unknown, element: ReturnType<typeof createElement>): string {
+  const client = new QueryClient();
+  client.setQueryData(['runs', run.id, 'decision', decisionStamp(run)], decision);
+  return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element));
+}
+
+test("the to-decide banner says what `wf ls` says after `→ to decide:`, and links an ending step's gate to its section — and nothing where there is nothing to decide", () => {
+  const run = endingRun();
+  const html = withClient(createElement(ToDecideBanner, { run }));
+  assert.match(html, /^<section aria-label="To decide" data-to-decide="approve"/);
+  assert.deepEqual(textsOf(html), ['To decide:', toShip.said]);
+  assert.match(html, /<a href="#step-ship" data-approve="ship" class="underline underline-offset-2">/);
+
+  // A branch nobody merged names no step to link to: the words, and the command in them.
+  const branch = { kind: 'git' as const, branches: ['wf/r-1/implement'], said: 'wf/r-1/implement is ahead of main, and nothing has merged it — wf decide r-1', command: 'wf decide r-1' };
+  const ahead = withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: branch } }));
+  assert.match(ahead, /data-to-decide="git"/);
+  assert.deepEqual(textsOf(ahead), ['To decide:', branch.said]);
+  assert.doesNotMatch(ahead, /<a /);
+
+  assert.equal(withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: null } })), '', 'nothing to decide: no banner');
+  assert.equal(withClient(createElement(ToDecideBanner, { run: { ...run, toDecide: undefined as unknown as null } })), '', 'and none from an api that carries none');
+});
+
+test("the ending step's own gate is not asked for twice: the to-decide banner says it, and the banner below has nothing left to say", () => {
+  const run = endingRun();
+  assert.equal(bannerMarkup(run), '', 'the whole of what it waits on is the decision');
+  // Another step waiting on you is still said, beside the decision.
+  const theme = { ...run.steps[0]!, name: 'theme', status: 'failed ✗ check (exit 1)', closeout: null, approve: null, gate: null };
+  const both = bannerMarkup({ ...run, steps: [...run.steps, theme], waitingOnYou: ['ship', 'theme'], onYou: ['approve ship', 'theme'] });
+  assert.match(both, /^<section aria-label="Waiting on you"/);
+  const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1]!;
+  assert.equal(textsOf(line).join(''), 'Waiting on you:theme— signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget —wf decide r-1');
+});
+
+test("a gate held before its step is filed is an ending's (`actsOnly`), and one held after it has run is not", async () => {
+  const [implement, ship] = endingRun().steps;
+  assert.equal(Gates.actsOnly(ship!), true, 'unfiled, and waiting at its gate');
+  assert.equal(Gates.actsOnly({ ...ship!, taskId: 't-2' }), false, 'it has run: its own closeout is what to read');
+  assert.equal(Gates.actsOnly({ ...ship!, gate: { awaiting: false, approval: { try: 1, at, message: null } } }), false, 'approved already');
+  assert.equal(Gates.actsOnly(implement!), false, 'no gate at all');
+});
+
+test("what an ending step would act on, beside its gate: the branch's standing and diff stat, and each work step's closeout with its files", () => {
+  const run = endingRun();
+  const standing = { branch: 'wf/r-1/implement', where: 'ahead', commits: 3, said: 'wf/r-1/implement is ahead of main by 3 commits', stat: '4 files changed, 456 insertions(+), 2 deletions(-)' };
+  const html = withDecision(run, decidedAs([standing]), createElement(Gates.ActsOn, { run, step: run.steps[1]! }));
+  assert.match(html, /^<section aria-label="What ship would act on"/);
+  assert.match(html, /data-standing="ahead"/);
+  const texts = textsOf(html);
+  assert.ok(texts.includes(standing.said), html);
+  assert.ok(texts.includes(standing.stat), 'git\'s own --shortstat, as `wf decide` prints it');
+  // The work it waits on, off the graph: its closeout rendered as the markdown it is, and the files it named.
+  assert.ok(texts.includes('implement'), html);
+  assert.match(html, /<h4[^>]*>What changed<\/h4>/);
+  assert.ok(texts.includes('the cap on runs in flight'), html);
+  assert.match(html, /aria-label="Artifacts of implement"/);
+  assert.ok(texts.includes('RESPONSE.md'), html);
+
+  // A run with no result branch of its own, and one whose decision could not be read: said, not left blank.
+  const none = withDecision(run, decidedAs([]), createElement(Gates.ActsOn, { run, step: run.steps[1]! }));
+  assert.ok(textsOf(none).includes('No result branch of its own: the work is on the base branch.'), none);
+});
+
+test("the gate of an ending step says approving is what files it, and its send-back goes to the work — never to the step at the gate, which `wf retry` refuses", () => {
+  const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['implement'], acts: true }));
+  const texts = textsOf(html).join(' ');
+  assert.match(texts, /ship waits at its gate: nothing of it runs until you approve it — your approval is what files it — or you send implement back\./);
+  assert.ok(texts.includes('wf approve r-1 ship'), html);
+  assert.match(texts, /the next tick files it(?! what)/);
+  const forms = [...html.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(forms, ['Approve ship', 'Send implement back'], 'the send-back names the step it goes to');
+  assert.match(html, /What to change, sent back to implement<\/label>/);
+  // Several work steps: the objection picks one, since one is enough to hold the gate again.
+  const wide = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'ship', back: ['implement', 'docs'], acts: true }));
+  assert.deepEqual([...wide.matchAll(/<form aria-label="([^"]+)"/g)].map((m) => m[1]), ['Approve ship', 'Send the work back']);
+  const to = [...wide.matchAll(/<input type="radio" name="[^"]*-to"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  assert.deepEqual(to, [['implement', true], ['docs', false]]);
+  // §6's gate is unchanged: it holds what its step handed on, and the send-back is the step's own.
+  const held = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
+  assert.match(textsOf(held).join(' '), /plan waits at its gate: nothing after it is filed until you approve what it handed on, or send it back\./);
+  assert.doesNotMatch(held, /name="[^"]*-to"/);
 });
 
 test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits on a run — and a run's page's legend does not", () => {

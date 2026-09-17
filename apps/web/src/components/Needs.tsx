@@ -1,7 +1,35 @@
 import { Fragment } from 'react';
 import type { RunDetail } from '../lib/api';
 import { needsOf, needText, offersOf, stepAnchor } from '../lib/asks';
+import { onYouOf, toDecideOf } from '../lib/factory';
 import { Continue } from './Decide';
+
+/**
+ * What a person has to decide about the run's result, above the banner and the page, as `wf ls` prints `→ to decide:` above
+ * `→ waiting on you`: the ending step's gate, in the folder's own words, with the command that approves it — linked to that step's
+ * section, where Approve and Send back are — or the result branch nobody has merged. Nothing while there is nothing to decide.
+ */
+export function ToDecideBanner({ run }: { run: RunDetail }) {
+  const decide = toDecideOf(run);
+  if (!decide) return null;
+  return (
+    <section
+      aria-label="To decide"
+      data-to-decide={decide.kind}
+      className="rounded bg-emerald-100 px-3 py-2 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200"
+    >
+      <strong>To decide:</strong>{' '}
+      {decide.kind === 'approve' ? (
+        // To the ending step's section, where its gate is: a hash the browser scrolls to, and no navigation.
+        <a href={`#${stepAnchor(decide.step)}`} data-approve={decide.step} className="underline underline-offset-2">
+          {decide.said}
+        </a>
+      ) : (
+        decide.said
+      )}
+    </section>
+  );
+}
 
 /**
  * The banner at the top of a run's page: who the run waits on, in the package's words, and what each step needs — its question, or that
@@ -9,35 +37,37 @@ import { Continue } from './Decide';
  * continues it (`Continue`); once that try is asked, the banner says what the tick does with it, in `wf ls`'s words: the step's note.
  *
  * Who it waits on is said as `wf ls` says it after `→ waiting on you:` (`onYou`): a step's name, and for a step at its gate, `approve plan`,
- * linked to the step's section, where Approve and Send back are.
+ * linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide banner says (`onYouOf`),
+ * which is above this one and names it: `wf ls` does not ask for the same step twice. A run whose whole `waiting on you` was that step has
+ * no banner here at all.
  */
 export function NeedsBanner({ run }: { run: RunDetail }) {
   // A step at its gate is said in the line, as `wf ls` says it (`approve plan`): its approval is no question to list under it.
   const needs = needsOf(run).filter((need) => need.kind !== 'approve');
-  if (!run.waitingOnYou.length && !needs.length) return null;
+  // Each step waited on with `wf ls`'s words for it, the ending step's own gate left to the banner above.
+  const said = onYouOf(run);
+  const asks = run.waitingOnYou.map((step, i) => ({ step, said: run.onYou[i] ?? step })).filter((one) => said.includes(one.said));
+  if (!asks.length && !needs.length) return null;
   const offers = offersOf(run);
   return (
     <section aria-label="Waiting on you" className="space-y-1.5 rounded bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
-      {run.waitingOnYou.length > 0 && (
+      {asks.length > 0 && (
         <p>
           Waiting on you:{' '}
           <strong>
-            {run.onYou.map((said, i) => {
-              const step = run.waitingOnYou[i]!;
-              return (
-                <Fragment key={step}>
-                  {i > 0 && ', '}
-                  {said === step ? (
-                    said
-                  ) : (
-                    // To the step's section on this page, where Approve is: a hash the browser scrolls to, and no navigation.
-                    <a href={`#${stepAnchor(step)}`} data-approve={step} className="underline underline-offset-2">
-                      {said}
-                    </a>
-                  )}
-                </Fragment>
-              );
-            })}
+            {asks.map(({ step, said }, i) => (
+              <Fragment key={step}>
+                {i > 0 && ', '}
+                {said === step ? (
+                  said
+                ) : (
+                  // To the step's section on this page, where Approve is: a hash the browser scrolls to, and no navigation.
+                  <a href={`#${stepAnchor(step)}`} data-approve={step} className="underline underline-offset-2">
+                    {said}
+                  </a>
+                )}
+              </Fragment>
+            ))}
           </strong>{' '}
           — signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget —{' '}
           <code>wf decide {run.id}</code>

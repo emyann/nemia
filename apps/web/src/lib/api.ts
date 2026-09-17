@@ -672,6 +672,16 @@ export type InboxEntry = {
   error: string | null;
   body: string | null;
   filedAt: string | null;
+  /**
+   * On a queued card only (`wf inbox queue`): when it was queued, and its place in the order the tick starts cards in, from 1 — null for a card a
+   * record says was started, which the tick never starts again.
+   */
+  queued?: { at: string; place: number | null };
+  /**
+   * On a queued card only, whose start the tick tried and did not make, as the card stands: when, on which repository, why, and whether the
+   * package refused it — which lasts until the card is edited or queued again — or something else failed, which the tick tries again.
+   */
+  tried?: { at: string; repo: string; why: string; refused: boolean };
 };
 
 /** The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit. */
@@ -726,6 +736,49 @@ export async function dropCard(name: string): Promise<void> {
   const body = (await res.json().catch(() => undefined)) as { error?: unknown } | undefined;
   throw new Error(typeof body?.error === 'string' ? body.error : `DELETE ${route} answered ${res.status} ${res.statusText}`);
 }
+
+/** Mirrors `InboxQueueAnswer` in apps/api/src/inbox.ts: what `wf inbox queue` did, the card's `queued:` as it now reads, and its place once queued. */
+export type Queued = { name: string; file: string; was: 'queued' | 'taken back' | 'not queued'; queued: string | null; place: number | null; of: number | null };
+
+/**
+ * Queue a card to start on its own, as `wf inbox queue <name>` does — or, `off`, take it off the queue, as `--off` does. The tick starts the next
+ * card in the queue when a run slot frees, on the workflow the card names. Resolves with what was done; rejects with the api's refusal in full —
+ * the package's words for a card that is not there, names no workflow, is queued already or was started — or the api's own about the request.
+ *
+ * Sent as `application/json`, with no body, which the api requires of it, as of every write.
+ */
+export async function queueCard(name: string, { off = false }: { off?: boolean } = {}): Promise<Queued> {
+  const route = `/api/inbox/${encodeURIComponent(name)}/queue`;
+  const method = off ? 'DELETE' : 'POST';
+  const res = await fetch(route, { method, headers: { 'content-type': 'application/json' } });
+  const body = (await res.json().catch(() => undefined)) as Partial<Queued> & { error?: unknown } | undefined;
+  if (res.ok && typeof body?.was === 'string') return body as Queued;
+  if (res.ok) {
+    throw new Error(
+      `${method} ${route} answered ${res.status} ${res.statusText} without what it did, so the api and this board disagree about what a queue answers. ` +
+        'The card may be queued, or not: look in the inbox (`wf inbox`) before asking again, and restart the api (`npm run dev`).',
+    );
+  }
+  throw new Error(typeof body?.error === 'string' ? body.error : `${method} ${route} answered ${res.status} ${res.statusText}`);
+}
+
+/**
+ * Mirrors `Ceilings` in apps/api/src/app.ts: the cap on runs in flight the daemon's last pass ran with (`last`, null before any pass wrote it),
+ * the cap a run is judged by (0 for none), the runs that count against it — null with no cap, when the api reads none — and the runs it holds.
+ */
+export type Ceilings = {
+  last: { sessions: number; runs: number } | null;
+  cap: number;
+  inFlight: string[] | null;
+  held: Array<{ run: string; inFlight: number; cap: number; word: string }>;
+};
+
+/** The cap on runs in flight, read again every 5 s beside the runs: what the Factory says over its floor. */
+export const ceilingsQuery = queryOptions({
+  queryKey: ['ceilings'],
+  queryFn: () => get<Ceilings>('/api/ceilings'),
+  refetchInterval: 5_000,
+});
 
 /**
  * Ask for another try of a step, as `wf retry` does: the api calls the package's `retry()`, which writes the ask and nothing else, and the

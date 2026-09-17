@@ -19,7 +19,7 @@
  *
  * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
  * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS. And the cards the Inbox page
- * lists, in the store's `inbox/`: CARDS.
+ * lists, in the store's `inbox/`: CARDS, and the queued ones the Factory draws as ghosts, with the cap the daemon last ran with: QUEUE.
  *
  * Written by hand rather than through agent-workflows: the web app imports no package, and a record
  * format that moves under the pages should fail here, where a person would see it.
@@ -585,6 +585,75 @@ export function seedInbox(root: string, repo: string, now = Date.now()): void {
     const filed = new Date(now - card.filedMinutesAgo * 60_000);
     fs.utimesSync(file, filed, filed);
   }
+}
+
+/**
+ * The queue the Factory draws and the Inbox page places: three cards in the store's `inbox/` queued to start on their own, as `wf inbox queue`
+ * writes one, each filed before CARDS so the Inbox page lists them after those. `first` names `dev` and the checkout, and was queued first;
+ * `refused` names a workflow nobody has, and the tick's try of its start is written down as refused (`queue/<name>.json`, of the card as it
+ * stands), so it keeps its place and says why; `third` names `dev` and no repository. And the ceilings the daemon's last pass ran with
+ * (`tick.json`): a cap of `cap` runs in flight.
+ */
+export const QUEUE = {
+  first: {
+    name: 'draw-the-queue-on-the-fac-q1a1',
+    title: 'Draw the queue on the Factory',
+    body: 'Draw the queue on the Factory\n\nGhost cards at the left edge, in queue order.',
+    workflow: 'dev',
+    filedMinutesAgo: 120,
+    queuedMinutesAgo: 50,
+  },
+  refused: {
+    name: 'run-a-workflow-nobody-ha-q2b2',
+    title: 'Run a workflow nobody has',
+    body: 'Run a workflow nobody has\n\nIts start is refused, and it keeps its place.',
+    workflow: 'gone',
+    filedMinutesAgo: 110,
+    queuedMinutesAgo: 40,
+    triedMinutesAgo: 39,
+  },
+  third: {
+    name: 'say-the-cap-over-the-flo-q3c3',
+    title: 'Say the cap over the floor',
+    body: 'Say the cap over the floor\n\nHow many runs are in flight against it.',
+    workflow: 'dev',
+    filedMinutesAgo: 100,
+    queuedMinutesAgo: 20,
+  },
+  /** WF_MAX_RUNS as the daemon's last pass wrote it. */
+  cap: 4,
+  sessions: 2,
+} as const;
+
+/** The three queued cards, in the queue's order. */
+export const QUEUED = [QUEUE.first, QUEUE.refused, QUEUE.third] as const;
+
+/** Why the tick's start of QUEUE.refused was refused, in the package's words for a card whose workflow is not there. */
+export const refusedWhy = (root: string, repo: string): string =>
+  `no workflow folder at ${path.join(root, 'inbox', QUEUE.refused.workflow)}, nor a workflow named ${QUEUE.refused.workflow} in ${path.join(repo, 'workflows')}. The repository's workflows are: broken, dev — name one, or give the path to a workflow folder.`;
+
+/** A queued card's text, as `wf inbox queue` writes it: its keys in their order, `queued:` last. */
+export const queuedCardText = (card: { workflow: string; body: string }, queued: string, repo?: string): string =>
+  `---\nworkflow: ${card.workflow}\n${repo ? `repo: ${repo}\n` : ''}queued: ${queued}\n---\n${card.body}\n`;
+
+/** Write QUEUE into the store at `root`, `first` and `refused` about the checkout at `repo`: the cards, the refused try, and `tick.json`. */
+export function seedQueue(root: string, repo: string, now = Date.now()): void {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const { first, refused, third } = QUEUE;
+  const cards = [
+    { card: first, text: queuedCardText(first, ago(first.queuedMinutesAgo), repo) },
+    { card: refused, text: queuedCardText(refused, ago(refused.queuedMinutesAgo), repo) },
+    { card: third, text: queuedCardText(third, ago(third.queuedMinutesAgo)) },
+  ];
+  for (const { card, text } of cards) {
+    const file = path.join(root, 'inbox', `${card.name}.md`);
+    write(file, text);
+    const filed = new Date(now - card.filedMinutesAgo * 60_000);
+    fs.utimesSync(file, filed, filed);
+  }
+  const tried = { at: ago(refused.triedMinutesAgo), text: cards[1]!.text, repo, why: refusedWhy(root, repo), refused: true };
+  write(path.join(root, 'queue', `${refused.name}.json`), JSON.stringify(tried, null, 2));
+  write(path.join(root, 'tick.json'), JSON.stringify({ sessions: QUEUE.sessions, runs: QUEUE.cap }, null, 2));
 }
 
 const write = (file: string, text: string | Buffer): void => {

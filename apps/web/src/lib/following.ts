@@ -27,14 +27,31 @@ export const animationFrames: Frames = {
 const CLOSED = 2;
 
 /**
+ * How long a stream that has said it is over — `settled`, or a read that will not work again — is given to end its response, before the page
+ * closes it all the same. The api ends it right after that last event.
+ */
+export const END_GRACE_MS = 2_000;
+
+/**
  * What each of a step's stream events does to what a page holds of its conversation (`update`), apart from React, so it is tested without a
  * browser: `useStepTranscript` opens the stream and hands it here. Each `transcript` event is merged in, a frame's worth at once; `settled`
  * ends it; a read that failed and is tried again every second is said, and one that will not be is the end; and a dropped connection is the
  * EventSource's to resume. Returns what stops following.
+ *
+ * A stream that said it is over is closed once the api has ended its response — the `error` an EventSource fires then, before it would
+ * reconnect — or after `END_GRACE_MS`, and not the moment its last event arrives. Closed then, while the rest of the response is still on its
+ * way, the browser aborts a request that was answered in full (`net::ERR_ABORTED`), which the e2e's watch rightly counts as a failed request:
+ * the say page failed on it two runs in five. The page stops following at once all the same.
  */
 export function follow(stream: StreamLike, update: (change: (s: Following) => Following) => void, frames: Frames): () => void {
   let arrived: TranscriptEvent[] = [];
   let frame = 0;
+  // Set once the stream said it is over: its response is closed when the api has ended it, or when the grace runs out.
+  let grace: ReturnType<typeof setTimeout> | undefined;
+  const close = () => {
+    if (grace !== undefined) clearTimeout(grace);
+    stream.close();
+  };
   const flush = () => {
     frame = 0;
     const merged = arrived;
@@ -42,7 +59,7 @@ export function follow(stream: StreamLike, update: (change: (s: Following) => Fo
     update((s) => ({ ...s, events: mergeEvents(s.events, merged) }));
   };
   const end = (error: string | null) => {
-    stream.close();
+    grace ??= setTimeout(close, END_GRACE_MS);
     if (frame) {
       frames.cancel(frame);
       flush();
@@ -68,11 +85,19 @@ export function follow(stream: StreamLike, update: (change: (s: Following) => Fo
   // A read that fails on the new stream says so again.
   stream.addEventListener('open', () => update((s) => (s.error === null ? s : { ...s, error: null })));
   stream.addEventListener('error', () => {
+    // The api ended the response after saying the stream is over: closed now, answered in full, before the EventSource reconnects.
+    if (grace !== undefined) {
+      close();
+      return;
+    }
     // A dropped connection is retried by the EventSource itself; it closes only when the api answered with a refusal.
-    if (stream.readyState === CLOSED) end('The api refused to follow this conversation any further. Reload the page to read it again.');
+    if (stream.readyState === CLOSED) {
+      end('The api refused to follow this conversation any further. Reload the page to read it again.');
+      close();
+    }
   });
   return () => {
-    stream.close();
+    close();
     if (frame) frames.cancel(frame);
   };
 }

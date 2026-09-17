@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { animationFrames, follow, type Following } from '../src/lib/following.ts';
+import { animationFrames, END_GRACE_MS, follow, type Following } from '../src/lib/following.ts';
 import type { TranscriptEvent } from '../src/lib/api.ts';
 
 /** An EventSource as far as `follow` uses it: its state, its events, and `close`. */
@@ -20,6 +20,12 @@ class Stream extends EventTarget {
 
 const said = (id: string, second: number, text: string): TranscriptEvent =>
   ({ id, at: new Date(Date.UTC(2026, 8, 14, 9, 0, second)).toISOString(), role: 'assistant', kind: 'text', text });
+
+/** The api ends a stream's response: the EventSource fires `error` as it would before reconnecting. */
+const endsResponse = (stream: Stream): void => {
+  stream.readyState = 0;
+  stream.dispatchEvent(new Event('error'));
+};
 
 /** A live conversation followed on a fresh stream, and what the page holds of it after each event. */
 function followed() {
@@ -61,11 +67,15 @@ test('the rest of the stream keeps its meaning: `readable` clears the error, `se
   retrying.stream.send('readable');
   assert.deepEqual([retrying.now().live, retrying.now().error], [true, null]);
   retrying.stream.send('settled', { cursor: 'c' });
-  assert.deepEqual([retrying.now().live, retrying.now().error, retrying.stream.readyState], [false, null, 2]);
+  assert.deepEqual([retrying.now().live, retrying.now().error], [false, null]);
+  endsResponse(retrying.stream);
+  assert.equal(retrying.stream.readyState, 2, 'closed once the api has ended the response');
 
   const lost = followed();
   lost.stream.send('unreadable', { error: 'Its task is gone from the engine.', retrying: false });
-  assert.deepEqual([lost.now().live, lost.now().error, lost.stream.readyState], [false, 'Its task is gone from the engine.', 2]);
+  assert.deepEqual([lost.now().live, lost.now().error], [false, 'Its task is gone from the engine.']);
+  endsResponse(lost.stream);
+  assert.equal(lost.stream.readyState, 2);
 
   // The api refused to go on: the EventSource closes, and the page says so. It never opens again, so nothing clears it.
   const refused = followed();
@@ -106,4 +116,40 @@ test("REFUSED: the page's frames are the browser's own functions, called as the 
   assert.equal(flushes.length, 1, 'the two events wait for one frame');
   flushes[0]!();
   assert.deepEqual(state.events.map((e) => e.id), ['e1', 'e2']);
+});
+
+test("REFUSED: a stream that said it is over is not closed while the rest of its response is on its way — which the browser reports as a request aborted — but once the api has ended it, before the EventSource reconnects; and after the grace, all the same", (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+
+  // Settled: the page stops following at once, and the stream is left to end.
+  const settled = followed();
+  settled.stream.send('settled', { cursor: 'c' });
+  assert.equal(settled.now().live, false);
+  assert.equal(settled.stream.readyState, 1, 'not closed while its response may still be arriving');
+  // The api ends the response: closed then, so the EventSource does not reconnect, and nothing is said of a refusal.
+  endsResponse(settled.stream);
+  assert.deepEqual([settled.stream.readyState, settled.now().error], [2, null]);
+  // Its grace is cleared: closed once.
+  let closes = 0;
+  settled.stream.close = () => void closes++;
+  t.mock.timers.tick(END_GRACE_MS);
+  assert.equal(closes, 0, 'the grace was cleared when it closed');
+
+  // An api that never ends it: closed after the grace.
+  const hanging = followed();
+  hanging.stream.send('unreadable', { error: 'Its task is gone from the engine.', retrying: false });
+  t.mock.timers.tick(END_GRACE_MS - 1);
+  assert.equal(hanging.stream.readyState, 1);
+  t.mock.timers.tick(1);
+  assert.deepEqual([hanging.stream.readyState, hanging.now().error], [2, 'Its task is gone from the engine.']);
+
+  // Stopped by the page before the api ended it: closed, and its grace cleared.
+  const left = followed();
+  left.stream.send('settled', { cursor: 'c' });
+  left.stop();
+  assert.equal(left.stream.readyState, 2);
+  let again = 0;
+  left.stream.close = () => void again++;
+  t.mock.timers.tick(END_GRACE_MS);
+  assert.equal(again, 0);
 });

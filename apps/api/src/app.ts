@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { approve, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, round, runCostLines, runSpend, saidCount, say, sensitiveDiff, spendReader, spentWord, stepSpend, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Spend, type SpendOf, type Timeline, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
-import { addSpend, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, gateLines, gatesOf, hasGate, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
+import { approve, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, messageRefusal, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, readFilings, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, round, runCostLines, runSpend, type Said, saidCount, say, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
+import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gateLines, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
@@ -503,6 +503,61 @@ async function everyView(): Promise<Views> {
  * list is what the Factory polls. A task the read did not see, filed since, is viewed.
  */
 const seenBy = (views: Views): typeof e => ({ ...e, view: async (taskId) => views.get(taskId) ?? e.view(taskId) });
+
+/**
+ * The cap on runs in flight, as the board says it over the Factory: `2 of 4 run slots taken`, or `no cap`.
+ *
+ * `last` is what the daemon's last pass ran with (`lastCeilings`, `$WF_ROOT/tick.json`): sessions at work per pool (`WF_MAX_CONCURRENT`) and
+ * runs in flight (`WF_MAX_RUNS`, 0 for no cap) — null before any pass has written them. `cap` is the cap a run is judged by, as `wf ls` and
+ * `wf decide` judge it (`runSlots`): the last pass's, and before any, the api's own `WF_MAX_RUNS`; 0 for none.
+ *
+ * `inFlight` names the runs that count against it, oldest first, as a pass counts them (`slotNeed`): a task of the run filed and not settled,
+ * or a started run nobody called off with something due. Not the Factory's own count of runs in flight, which also has a run waiting on runs,
+ * or held for a slot, whose roots the tick will file. Null with no cap, when nothing is read, as `runSlots` reads nothing. `held` are the runs
+ * the cap holds, in the order a pass admits them, each with the count it is held at and `wf ls`'s words on its roots (`heldRuns`, `slotWord`).
+ */
+export type Ceilings = {
+  last: { sessions: number; runs: number } | null;
+  cap: number;
+  inFlight: string[] | null;
+  held: Array<{ run: string; inFlight: number; cap: number; word: string }>;
+};
+
+/**
+ * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), judged as `runSlots` judges them — every run read as a pass reads it,
+ * a record whose workflow no longer reads left out — off one observation of the harnesses (`everyView`), which the package's `runSlots` would
+ * make once per task. `runSlots` answers the held runs alone, and the count in flight is what the board says; so its judgement is made here
+ * with the package's own pure parts (`slotNeed`, `heldRuns`), and the api's test holds `held` to what `runSlots` answers on the same store.
+ */
+async function ceilingsOf(): Promise<Ceilings> {
+  const last = lastCeilings() ?? null;
+  const cap = last?.runs ?? runCapOf(process.env.WF_MAX_RUNS);
+  if (cap <= 0) return { last, cap: 0, inFlight: null, held: [] };
+  const runs = listRuns();
+  const views = await everyView();
+  const reader = seenBy(views);
+  const phase = (taskId: string) => phaseOfView(views.get(taskId));
+  const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
+  for (const run of runs) {
+    let steps: Workflow[];
+    try {
+      steps = stepsOf(run);
+    } catch {
+      continue;
+    }
+    const { asks, rounds } = readAsks(run.id);
+    const a = assess(steps, run, phase, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+    const parents = new Map<string, ParentRun>();
+    if (gated(run)) for (const id of new Set(run.after)) parents.set(id, await parentOf(reader, id));
+    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phase, a, (id) => parents.get(id)?.shipped ?? false) });
+  }
+  return {
+    last,
+    cap,
+    inFlight: admissionOrder(needs.filter((n) => n.inFlight)).map((n) => n.id),
+    held: [...heldRuns(needs, cap)].map(([run, slot]) => ({ run, ...slot, word: slotWord(slot) })),
+  };
+}
 
 /**
  * The runs a run's roots wait on (`waitsOf`), each read once with the package's `parentOf` — as `wf ls` and `wf decide` read them — and
@@ -1611,6 +1666,15 @@ export const app = new Hono()
     const summaries: RunSummary[] = [];
     for (const run of runs) summaries.push(await summarize(run, views));
     return c.json(summaries);
+  })
+  // The cap on runs in flight the daemon's last pass ran with, and the runs it counts and holds: what the Factory says over its floor.
+  .get('/api/ceilings', async (c) => {
+    try {
+      return c.json(await ceilingsOf());
+    } catch (err) {
+      // `WF_MAX_RUNS` in the api's environment that is not a count, before any pass wrote the daemon's (`runCapOf`), or a record that does not parse.
+      return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
+    }
   })
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');

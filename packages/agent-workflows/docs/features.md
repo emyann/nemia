@@ -2008,7 +2008,8 @@ Round 2's review found three things, each fixed:
 What it leaves:
 
 - **The board.** `apps/api` passes no slot to `listing`, so the Factory and the run page say `waiting` on a held run; its inbox page has no
-  queue button and shows no place; and the Factory draws no ghost for a queued card. Left for the board.
+  queue button and shows no place; and the Factory draws no ghost for a queued card. Left for the board. The board half, below, built the
+  queue button, the place and the ghosts, and the cap over the floor; a held run still reads `waiting` there.
 - **A refused card stays refused when the world changes and the card does not.** Put the workflow back, and the tick still passes over it
   until a person edits it or queues it again: the refusal is keyed on the card's text and the repository it was tried on, and nothing else
   about the world is written down.
@@ -2026,6 +2027,138 @@ What it leaves:
   `WF_MAX_CONCURRENT`.
 - **The ceiling that matters over a week is still the merge.** A child waits on its parent's merge, and every later run is cut from a main
   missing unmerged results: the operator merges daily, or a workflow's last step merges on a green trial merge. Not decided here.
+
+### The board half
+
+The queue was the package's, and the board showed none of it: a card's place, a start the tick refused, the cap. Read first: the apps/web lines
+of CLAUDE.md, the section above, `InboxListing`, `queueInInbox`, `runSlots` and `lastCeilings`, and `apps/api/src/inbox.ts` and `guard.ts`.
+
+What was built:
+
+- **`GET /api/inbox` already carried `queued` and `tried`.** Each entry is the package's `InboxListing` spread, with `body` and `filedAt` beside
+  it, so a queued card's time and place and the tick's last try of its start reached the board untouched. A test now says so.
+- **`POST /api/inbox/:name/queue`** and **`DELETE /api/inbox/:name/queue`** (`apps/api/src/inbox.ts`) are `wf inbox queue <name>` and its
+  `--off`, through `queueInInbox`. They are the seventh and eighth guarded writes. The name is refused first, in the package's words (400,
+  `inboxNameRefusal`), and so is a body that is not empty or `{}` (400). A `workflow` sent is refused by name, not ignored: the board queues a
+  card on the workflow it names, and `--workflow` stays the command line's. The package's refusals keep its sentence, with a status for what is
+  on disk once refused (`queueRefusalStatus`): 404 for no card, 422 for a card that does not read or names no workflow, and 409 for one queued
+  already or named by a record. The answer is `{ name, file, was, queued, place, of }`: `was` is `queued`, `taken back`, or `not queued` for
+  a DELETE of a card not in the queue, which writes nothing. The card's file keeps its mtime across the write: the package renames a new file
+  over the card, and the mtime is the `filedAt` the Inbox page orders the cards by, so a card queued or taken back from the board would have
+  jumped to the top of the list with the queue's time as its own. From review, round 2.
+- **`GET /api/ceilings`** (`apps/api/src/app.ts`, `Ceilings`) is `{ last, cap, inFlight, held }`. `last` is `lastCeilings()`, or null
+  before any pass has written them. `cap` is what `runSlots` judges by: the last pass's cap, or before any pass, the api's own `WF_MAX_RUNS`,
+  whose non-count is a 500 in `runCapOf`'s sentence. `inFlight` lists the runs counted against the cap, oldest first. `held` lists the runs
+  it holds, each with its count and `slotWord`'s words. With no cap nothing is read, as `runSlots` reads nothing. With a cap there is one
+  observation (`everyView`), and each run is judged as `runSlots` judges it, with the package's `slotNeed` and `heldRuns`.
+- **The Inbox page** (`routes/inbox.tsx`): a queued card says `queued · 2nd` and since when, and offers Unqueue. A card that names a workflow,
+  reads, is not queued and was not started offers Queue (`queueable`). The tick's last try of its start is shown in `wf inbox`'s words
+  (`triedLine`). Refused, it is amber and says the card stays queued until it is edited or queued again. Failed otherwise, it says the tick
+  tries it again. A refused Queue or Unqueue is kept on the card, or in its place once the card is gone, as a start's or a drop's is
+  (`Not queued`, `Not taken off the queue`). The Cards heading counts the queue.
+- **The Factory** (`components/QueueLane.tsx`, `FactoryCanvas.tsx`): queued cards wait at the floor's left edge as dashed ghosts, in the
+  order the tick starts them (`queueOf`). Each shows its place (`1st`), how long it has been queued, its first line, its workflow and its
+  repository (`wf up's repository` for a card that names none). A refused try is marked in amber, a failed one muted, with why in two lines
+  and in full on hover. A ghost opens the card's page. The header says the run slots taken of the cap, `3 of 4 run slots taken · 3
+  queued`, or `no cap` (`capLine`), and the hover says what the cap counts and which runs it holds. The Factory reads the inbox and the cap
+  every 5 s, as it reads the runs, and its loader prefetches the inbox, so the floor is fitted beside the lane; the floor is fitted again
+  when the lane comes or goes. The lane is off while a step's inspector is open, since the two together left the floor too narrow to read;
+  the header still counts the queue. On a narrow screen the lane is a row above the floor that scrolls. An empty floor beside a queue says
+  `wf up` starts it.
+
+What was decided, and why:
+
+- **The ghosts are a lane beside the floor, not React Flow nodes.** Nothing waits on a queued card and it waits on nothing, so as a node it
+  would be a card with no edges, laid out by `placeRuns`, saved in the browser's arrangement, fitted, drawn on the minimap, and counted by the
+  e2e as a node. In a lane it touches none of that. The cards' ids, the diamond's edges and the switch are what they were, and the queue stays
+  in view however the floor is panned. The cost is width: on a wide screen the lane takes 16rem from the floor.
+- **The header's two counts are two things, and say so.** `4 in flight` is the floor's (`inFlight` in lib/factory.ts: a run that moves, or
+  `assess` has running). The cap's is `slotNeed`'s: the diamond's bottom waits on a run, so it is on the floor, and takes no run slot, since it
+  has filed nothing. The brief worded the cap's count `2 of 4 runs in flight`. Beside the floor's `4 in flight` with a cap of 4, round 2's review
+  found `3 of 4 runs in flight` read as a full floor with a slot free. It is now worded in the package's own word for what the cap holds,
+  `3 of 4 run slots taken`, as `wf ls` says `waiting for a run slot` and the lane `started in this order as run slots free`. The floor's
+  count, which the e2e holds, is as it was.
+- **`--off` is `DELETE` on the queue.** The mark is a thing the card has, taken away, as a drop is `DELETE` on the card. A body flag would
+  have made a POST that sometimes writes and sometimes takes away.
+- **A route of its own for the cap, not a field on `GET /api/runs`.** The list is an array, compared whole by the api's tests. Its own
+  route costs one more observation per 5 s poll with a cap set, and none with no cap.
+- **The api judges the cap itself, off one observation, rather than calling `runSlots`.** `runSlots` answers the held runs alone, and views
+  each task (an observation each). The count in flight, which the header says, is exported by nothing. The api's loop is `runSlots`' own,
+  over the package's pure parts, and its test holds `held` to `runSlots`' answer on the same store.
+
+What was measured:
+
+- `apps/api/test/queue.test.ts`, 10 tests: the listing's `queued` and `tried` compared whole with `readInbox()`'s; a queue with its place, a
+  second behind it, `{}` taken as no body, DELETE taking one back and the card behind moving up, and a DELETE of a card not queued writing
+  nothing. A card filed an hour before another, queued and taken back, keeps its `filedAt` each time, and a refusal sets none. A queued card
+  whose repository is gone is taken back. Refused, each compared with `queueInInbox`'s own sentence and nothing written:
+  no workflow and a card that does not read (422, for POST and for DELETE), not there and a name with `.md` (404), queued already and started
+  (409). A name refused (a hidden one, and a slash or a backslash sent encoded, 400 for both verbs). A body with `workflow`, `{"off":true}`,
+  `[]`, a string and not JSON (400). The guard on both writes: three content types and none (415), three sites and three hosts (403), then the
+  board's own headers taken. `GET /api/ceilings`: `no cap` with nothing read and no observation. At caps of 1, 2 and 3: one run in flight, two
+  held, then one, then none, `held` equal to `runSlots`' each time, one observation, a run waiting on a run in flight and a run called off
+  neither counted nor held, and in flight ordered by `createdAt` against the id order. Refused: a pass that ran with no cap is `no cap` beside
+  `WF_MAX_RUNS=1` in the api's environment, and a pass's cap of 3 wins over it. The api's own is read only before any pass has written its
+  cap, `WF_MAX_RUNS=two` is a 500 in `runCapOf`'s words, and it is not read once a pass has.
+- Each api guard broken on purpose and the file run again, 11 breaks, each failing 1 to 4 tests: the queue unguarded; the name not refused in
+  the route; the body not read; every refusal 422; a conflict 422; DELETE queueing; the api's environment over the pass; reading with no cap;
+  a run wanting a slot counted in flight; a parent never shipped read as shipped; views read per task. From round 2, the mtime not set back
+  fails 1.
+- `apps/web/test/inbox.test.ts`, 7 new tests: `ordinal` through 113th; `queuedWord`; `queueOf` in place order, a started card out; `queueable`
+  offered, and refused for no workflow, queued, started, and a card that does not read; `triedLine` refused with and without a repo, a why
+  said once, and failed; `capLine` with and without a queue, `no cap`, and a count with no cap; `queueCard`'s POST and DELETE, the api's
+  refusal verbatim, a status line, and an answer with nothing in it. Eight breaks, each failing 1 test.
+- `npm run e2e`, in both themes:
+  - the seed writes three queued cards into the store's `inbox/` as `wf inbox queue` writes them (`seedQueue`). The second names a workflow
+    nobody has, and its refused try is written as the tick writes one. `tick.json` gets a cap of 4;
+  - the `factory` page draws three ghosts in queue order, each with its place, first line, workflow and repository, linked to
+    `/inbox/<name>`. The refused one says why in the package's words, and the others mark no try. No ghost is a node, every ghost is left of
+    the floor, and the header reads `3 of 4 run slots taken · 3 queued`. Every earlier expectation of the page held: node ids, the four edges,
+    the switch, the layout. The lane is off while a step's inspector is open, the header still counting the queue, and back once it closes;
+  - the `inbox` page lists six cards newest first. Each queued card shows its place and when it was queued, and offers Unqueue and not Queue.
+    The refused card says why and that it stays queued. `planned` and `rich` offer Queue, `bare` does not, and the heading counts
+    `· 3 queued`. The card filed from the box is queued from its button, 4th, written with `queued:` last, then taken off the queue with
+    Unqueue, written as it was filed, and removed as before. From round 2: `planned`, listed third, is queued from its button and
+    photographed (`inbox-queued`), then taken off the queue, and each time the list's order, the card's filing time as shown, and its
+    file's mtime are what they were before, and the card is written back as it was;
+  - in a page of its own, a Queue refused because the card was queued behind the page's back, from another tab through the api: a 409 with
+    the package's sentence verbatim, the card read again as `queued · 4th` offering Unqueue, listed where it was, and the sentence kept on it
+    (`inbox-queue-refused`). Until round 2 the e2e queued it by writing the file by hand, which moved its mtime and the card to the top. That 409 and its console
+    line are all its watch sees. The card is written back, dated as it was;
+  - the pictures (`factory`, `factory-diamond`, `inbox`, `inbox-queued`, `inbox-queue-refused`, each in both themes) were read, with the
+    `look` skill. They showed the diamond's last card cut at the floor's right edge, because the lane arrived after the floor was fitted;
+    and, with an inspector open beside the lane, the floor's hint drawn over its buttons. Both were fixed and photographed again. Then, in a
+    browser on a scratch store with three cards queued and no runs, at 390 and 1280 pixels wide: the lane as a row above the floor, and an
+    empty floor's copy said nothing of the queue, which was fixed.
+- From the root, `npx turbo run test --force && npm run typecheck && npm run build` exited 0: agent-engine 313 (305 passed, 8 skipped),
+  agent-workflows 490 (489 passed, 1 skipped), api 175 and web 210. `npm run e2e` ran four times on this branch. Three passed in both themes.
+  One failed on the `say` page in the light theme, which this work does not touch: the watch saw `GET …/steps/draft/transcript/stream?after=…
+  — net::ERR_ABORTED`, a request of the session stream's aborted. It passed on the run straight after.
+- In round 2, the same failure again, two runs in five, so not left as a flake. The cause was on main: the api writes a stream's `settled`
+  and ends its response, and `follow` (`apps/web/src/lib/following.ts`) closed the EventSource the moment that event arrived. When the end of the
+  response had not arrived yet, the browser aborted a request answered in full, and the watch counted it. `follow` now closes such a stream
+  once the api has ended it (the `error` the EventSource fires before it would reconnect), or after `END_GRACE_MS`, 2 s; the page stops
+  following at once as before. `apps/web/test/following.test.ts` holds it: not closed on `settled` or on a read that will not work again, closed
+  when the response ends, and after the grace with none, the grace cleared by either and by the page stopping. Closing at once again fails it.
+
+What it leaves:
+
+- **A held run still reads `waiting` on its card and its page.** `apps/api` passes no slot to `listing`. `GET /api/ceilings` carries `held`
+  with `slotWord`'s words, and only the header's hover names those runs. Putting it on a card means judging every run before each is worded,
+  on the list and on the detail.
+- **The package exports no count in flight.** `runSlots` answers the held runs alone, so the api repeats its loop over `slotNeed` and
+  `heldRuns`, and a test holds the two together. A package function that answered each run's `slotNeed`, or the count, would make it an
+  import. It is also what lets the api judge the cap off one observation where `runSlots` makes one per task.
+- **With a cap set, the Factory observes the harness twice every 5 s**: once for the runs, once for the cap.
+- **The Inbox page is not polled.** A card the daemon starts stays listed as queued until the page is read again. The Factory's lane is
+  polled.
+- **The board queues a card only on the workflow it names.** A card with no workflow is filed again with one, or queued at the command line
+  with `wf inbox queue <name> --workflow <w>`.
+- **A card's page says nothing of its place or its tries.** It shows `queued:` as the key's value alone.
+- **A ghost cuts a refused try's why to two lines.** It is whole on hover and on the Inbox page.
+- **`wf inbox queue` at the command line still moves a card to the top of the Inbox page.** `queueInInbox` writes the card through a file
+  renamed over it, which gives it a new mtime, and the page orders cards by mtime. The api sets the mtime back after its own write; the package
+  could keep it in `queueInInbox` itself, which would cover both, and the api's `utimesSync` could then go.
 ## Shipped: markdown on the board, and a card's page with its keys explained
 
 The board showed every piece of prose as preformatted text: a run's brief, a step's body, a closeout's summary and needs, each reply, a
@@ -2403,7 +2536,8 @@ auto-registration with Remote Control fits.
 ## 3. The queue: a cap on runs in flight, and cards that start themselves
 
 Shipped 2026-09-17 as *Shipped: the queue — a cap on runs in flight, and cards that start themselves*, above, which says what was
-built, measured and left. Left there for the board: the Factory drawing queued cards as ghosts. Which pending step gets a freed
+built, measured and left. Its board half — the Inbox page's Queue and place, the Factory's ghosts and the cap over the floor — shipped with
+it, in *The board half* there. Which pending step gets a freed
 session is the engine's (Engine-side work, below: filing order and `priority`). The number kept so §4–§7 keep theirs.
 
 ## 4. The workflow builder: steps and their edges drawn on the board, written back as the folder

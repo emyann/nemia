@@ -1,11 +1,11 @@
 /**
- * The inbox page's arithmetic (src/lib/inbox.ts) — the cards in order, and the workflow a card's start is preset to — and what the board sends
- * the api for it (src/lib/api.ts): a card filed, dropped, and started. `npm run e2e` looks at the page itself.
+ * The inbox page's arithmetic (src/lib/inbox.ts) — the cards in order, the workflow a card's start is preset to, and the queue as the page and the
+ * Factory say it — and what the board sends the api for it (src/lib/api.ts): a card filed, dropped, started, queued and taken off the queue. `npm run e2e` looks at the page itself.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { dropCard, fileCard, startRun, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
-import { cardLines, hasPage, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
+import { dropCard, fileCard, queueCard, startRun, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
+import { capLine, cardLines, hasPage, namedElsewhere, newestCardsFirst, ordinal, presetOf, queueable, queuedWord, queueOf, triedLine, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
 
 const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}): InboxEntry => ({
   name, file: `${name}.md`, title: name, workflow: null, repo: null, startedAs: [], error: null, body: name, filedAt, ...extra,
@@ -167,4 +167,91 @@ test('a card is started through POST /api/runs with `card` beside the workflow a
   const refusal = 'no card show-what-a-step-cost-c3cw in the inbox. The inbox is empty. Start one of those — wf start /store/inbox/<name>.md — or park the idea first: wf inbox add "<idea>".';
   answer = answered(404, { error: refusal });
   await assert.rejects(startRun(asked), (err: Error) => err.message === refusal);
+});
+
+// ─── the queue ──────────────────────────────────────────────────────────────
+
+test('a place is said as a person says it: 1st, 2nd, 3rd, then th — 11th to 13th too — and 21st, 102nd', () => {
+  assert.deepEqual([1, 2, 3, 4, 10, 11, 12, 13, 14, 21, 22, 23, 101, 102, 111, 112, 113].map(ordinal), [
+    '1st', '2nd', '3rd', '4th', '10th', '11th', '12th', '13th', '14th', '21st', '22nd', '23rd', '101st', '102nd', '111th', '112th', '113th',
+  ]);
+  assert.equal(queuedWord({ at: '2026-09-16T10:00:00.000Z', place: 2 }), 'queued · 2nd');
+  assert.equal(queuedWord({ at: '2026-09-16T10:00:00.000Z', place: null }), 'queued', 'a card a record says was started has no place');
+});
+
+test('the queue is every card with a place, in its place\'s order, whatever order the inbox lists them in — a refused card in its place, a started one not', () => {
+  const at = '2026-09-16T10:00:00.000Z';
+  const cards = [
+    entry('a-third', at, { workflow: 'dev', queued: { at, place: 3 } }),
+    entry('b-parked', at, { workflow: 'dev' }),
+    entry('c-first', at, { workflow: 'dev', queued: { at, place: 1 } }),
+    entry('d-started', at, { workflow: 'dev', queued: { at, place: null }, startedAs: ['r-1'] }),
+    entry('e-refused', at, { workflow: 'gone', queued: { at, place: 2 }, tried: { at, repo: '/code/app', why: 'no workflow gone.', refused: true } }),
+  ];
+  assert.deepEqual(queueOf(cards).map((c) => c.name), ['c-first', 'e-refused', 'a-third']);
+  assert.deepEqual(queueOf([]), []);
+});
+
+test('Queue is offered on a card that names a workflow, reads, is not queued and was not started', () => {
+  assert.equal(queueable(entry('named', null, { workflow: 'dev' })), true);
+});
+
+test("REFUSED: no Queue on a card that names no workflow, one queued already, one a record says was started, or one that does not read — each a refusal of the package's", () => {
+  const at = '2026-09-16T10:00:00.000Z';
+  assert.equal(queueable(entry('bare', null)), false, 'no workflow');
+  assert.equal(queueable(entry('queued', null, { workflow: 'dev', queued: { at, place: 1 } })), false, 'queued already');
+  assert.equal(queueable(entry('started', null, { workflow: 'dev', startedAs: ['r-1'] })), false, 'started');
+  assert.equal(queueable(entry('broken', null, { workflow: 'dev', error: 'broken.md: `after` is not a key an inbox card has.' })), false, 'does not read');
+});
+
+test("a start the tick tried and did not make says so as `wf inbox` does: refused, it stays queued and waits for you; failed, it is tried again — the repository named for a card that names none, and a why the card's own refusal says not said twice", () => {
+  const at = '2026-09-16T10:00:00.000Z';
+  const refused = { at, repo: '/code/app', why: 'no workflow gone in /code/app/workflows.', refused: true };
+  assert.equal(
+    triedLine({ repo: '/code/app', error: null, tried: refused }, 'then'),
+    'Not started at then: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.',
+  );
+  assert.equal(
+    triedLine({ repo: null, error: null, tried: refused }, 'then'),
+    'Not started at then on /code/app: no workflow gone in /code/app/workflows. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again, or run wf up in the repository it is about.',
+  );
+  const gone = 'card.md: `repo: /code/gone` names no directory.';
+  assert.equal(
+    triedLine({ repo: '/code/gone', error: gone, tried: { ...refused, repo: '/code/gone', why: gone } }, 'then'),
+    'Not started at then. It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again.',
+  );
+  assert.equal(
+    triedLine({ repo: '/code/app', error: null, tried: { at, repo: '/code/app', why: 'git: not a git repository', refused: false } }, 'then'),
+    'Failed at then: git: not a git repository. Not a refusal: the tick tries it again on every pass, where it keeps its place.',
+  );
+});
+
+test('the Factory says the run slots taken of the cap and how many are queued — `no cap` with none, and the queue left out when empty', () => {
+  assert.equal(capLine({ cap: 4, inFlight: ['a', 'b'] }, 3), '2 of 4 run slots taken · 3 queued');
+  assert.equal(capLine({ cap: 4, inFlight: ['a', 'b'] }, 0), '2 of 4 run slots taken');
+  assert.equal(capLine({ cap: 1, inFlight: [] }, 1), '0 of 1 run slots taken · 1 queued');
+  assert.equal(capLine({ cap: 0, inFlight: null }, 3), 'no cap · 3 queued');
+  assert.equal(capLine({ cap: 0, inFlight: null }, 0), 'no cap');
+  assert.equal(capLine({ cap: 0, inFlight: ['a'] }, 0), 'no cap', 'a count with no cap is no count against one');
+});
+
+test("a card is queued by its name in the path, POST, and taken off the queue with DELETE, each sent as JSON with no body; a refusal rejects with the api's message word for word", async (t) => {
+  const done = { name: 'a b', file: '/store/inbox/a b.md', was: 'queued', queued: '2026-09-16T10:00:00.000Z', place: 2, of: 2 };
+  let answer = answered(200, done);
+  const sent = sending(t, () => answer);
+  assert.deepEqual(await queueCard('a b'), done);
+  answer = answered(200, { ...done, was: 'taken back', queued: null, place: null, of: null });
+  assert.equal((await queueCard('a b', { off: true })).was, 'taken back');
+  assert.deepEqual(sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), init?.body]), [
+    ['/api/inbox/a%20b/queue', 'POST', 'application/json', undefined],
+    ['/api/inbox/a%20b/queue', 'DELETE', 'application/json', undefined],
+  ]);
+
+  const refusal = 'bare.md: no workflow — a queued card starts on its own, and nothing says what runs it. Queue it with its workflow: wf inbox queue bare --workflow <w> writes both.';
+  answer = answered(422, { error: refusal });
+  await assert.rejects(queueCard('bare'), (err: Error) => err.message === refusal);
+  answer = answered(502, 'Bad Gateway', 'Bad Gateway');
+  await assert.rejects(queueCard('bare', { off: true }), (err: Error) => err.message === 'DELETE /api/inbox/bare/queue answered 502 Bad Gateway');
+  answer = answered(200, {});
+  await assert.rejects(queueCard('bare'), (err: Error) => /^POST \/api\/inbox\/bare\/queue answered 200 +without what it did/.test(err.message) && /before asking again/.test(err.message));
 });

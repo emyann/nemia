@@ -1,4 +1,4 @@
-import type { InboxEntry, WorkflowListing } from './api';
+import type { Ceilings, InboxEntry, WorkflowListing } from './api';
 
 /**
  * The inbox as the page lists it: the newest card first, by when its file was written (`filedAt`) — a card carries no time of its own — then by
@@ -15,8 +15,8 @@ export const newestCardsFirst = (entries: readonly InboxEntry[]): InboxEntry[] =
 export const hasPage = (entry: Pick<InboxEntry, 'name'>): boolean =>
   entry.name.trim() !== '' && !/[\\/\0]/.test(entry.name) && !entry.name.startsWith('.');
 
-/** A start or a drop of a card the api refused: the card as the page listed it, what was asked, and the api's words. */
-export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove'; message: string };
+/** A start, a drop, a queue or its taking back the api refused: the card as the page listed it, what was asked, and the api's words. */
+export type CardRefusal = { entry: InboxEntry; action: 'start' | 'remove' | 'queue' | 'unqueue'; message: string };
 
 /** A line of the inbox page: a card, with the refusal it was last given, or one the inbox no longer lists (`gone`), kept for its refusal. */
 export type CardLine = { entry: InboxEntry; refusal: CardRefusal | null; gone: boolean };
@@ -65,4 +65,51 @@ export function presetOf(workflow: string | null, repo: string | null, here: str
   const readable = workflows.filter((w) => w.error === null);
   if (/^(?:[\\/]|[A-Za-z]:[\\/])/.test(workflow)) return readable.find((w) => trimmed(w.dir) === trimmed(workflow)) ?? null;
   return readable.find((w) => w.from === 'repo' && w.name === workflow) ?? null;
+}
+
+/** A place in a queue as a person says it: `1st`, `2nd`, `3rd`, `4th`, `11th`, `21st`. */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+  return `${n}${suffix}`;
+}
+
+/** What a queued card says of its place: `queued · 2nd` — or `queued` alone for one a record says was started, which has no place. */
+export const queuedWord = (queued: NonNullable<InboxEntry['queued']>): string => (queued.place ? `queued · ${ordinal(queued.place)}` : 'queued');
+
+/**
+ * The queue, as the tick starts it: every card with a place, in its order (the package's `queueOrder`, whose places the listing carries) — a card
+ * whose start was refused among them, where it keeps its place; a card a record says was started, which has none, not.
+ */
+export const queueOf = (entries: readonly InboxEntry[]): InboxEntry[] =>
+  entries.filter((e) => e.queued?.place).sort((a, b) => a.queued!.place! - b.queued!.place!);
+
+/**
+ * Whether the page offers Queue on a card: it names a workflow — a queued card starts on its own, on the workflow it names — it reads, it is not
+ * queued, and no record says it was started. What the api would refuse otherwise, in the package's words.
+ */
+export const queueable = (entry: InboxEntry): boolean => entry.workflow !== null && entry.error === null && !entry.queued && entry.startedAs.length === 0;
+
+/**
+ * What the tick's last try of a queued card's start says, as `wf inbox` says it beside the card: refused, it waits for a person, not for a slot;
+ * failed otherwise, the tick tries it again. The repository it was tried on is said for a card that names none, whose start turns on where the
+ * daemon runs; and `why` is left out where the card's own refusal already says it. `at` is the try's time as the page shows one.
+ */
+export function triedLine(entry: Pick<InboxEntry, 'repo' | 'error'> & { tried: NonNullable<InboxEntry['tried']> }, at: string): string {
+  const { tried } = entry;
+  const on = entry.repo === null && entry.error === null ? ` on ${tried.repo}` : '';
+  const why = tried.why !== entry.error ? `: ${tried.why.trim()}${/[.!?]$/.test(tried.why.trim()) ? '' : '.'}` : '.';
+  return tried.refused
+    ? `Not started at ${at}${on}${why} It stays queued, and the tick does not try it again while it reads the same: edit the card, or take it off the queue and queue it again${on ? ', or run wf up in the repository it is about' : ''}.`
+    : `Failed at ${at}${on}${why} Not a refusal: the tick tries it again on every pass, where it keeps its place.`;
+}
+
+/**
+ * The Factory's line on the cap: `2 of 4 run slots taken · 3 queued`, or `no cap · 3 queued` — the queue left out when it is empty. The count is the
+ * cap's (`Ceilings.inFlight`), not the floor's, and said in the package's word for what the cap holds, a run slot (`slotWord`): beside the floor's
+ * `4 in flight`, which counts a run waiting on runs too, `3 of 4 runs in flight` read as a full floor with a slot free.
+ */
+export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: number): string {
+  const cap = ceilings.cap > 0 && ceilings.inFlight ? `${ceilings.inFlight.length} of ${ceilings.cap} run slots taken` : 'no cap';
+  return queued > 0 ? `${cap} · ${queued} queued` : cap;
 }

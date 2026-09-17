@@ -2,8 +2,8 @@ import { useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient, useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { StartRun } from '../components/StartRun';
-import { dropCard, fileCard, inboxQuery, repositoryQuery, workflowNameOf, workflowsQuery, type InboxEntry, type WorkflowListing } from '../lib/api';
-import { cardLines, hasPage, namedElsewhere, newestCardsFirst, presetOf, workflowKey, type CardRefusal } from '../lib/inbox';
+import { dropCard, fileCard, inboxQuery, queueCard, repositoryQuery, workflowNameOf, workflowsQuery, type InboxEntry, type WorkflowListing } from '../lib/api';
+import { cardLines, hasPage, namedElsewhere, newestCardsFirst, presetOf, queueable, queuedWord, queueOf, triedLine, workflowKey, type CardRefusal } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   loader: ({ context }) => context.queryClient.ensureQueryData(inboxQuery),
@@ -34,6 +34,7 @@ function InboxPage() {
   const { data: entries } = useSuspenseQuery(inboxQuery);
   const [refusals, setRefusals] = useState<CardRefusal[]>([]);
   const cards = newestCardsFirst(entries);
+  const queue = queueOf(entries).length;
   const lines = cardLines(entries, refusals);
   const refusalFor = (entry: InboxEntry) => (refusal: Omit<CardRefusal, 'entry'> | null) =>
     setRefusals((kept) => [...kept.filter((r) => r.entry.name !== entry.name), ...(refusal ? [{ ...refusal, entry }] : [])]);
@@ -42,12 +43,18 @@ function InboxPage() {
     <article className="space-y-6">
       <p className="text-sm text-neutral-500">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as {code('wf inbox add')} parks
-        one. Starting a card writes its run&apos;s record as {code('wf start')} does, and removes the card.
+        one. Starting a card writes its run&apos;s record as {code('wf start')} does, and removes the card. A card queued starts on its own, on the
+        workflow it names, when {code('wf up')} has a run slot free: the oldest queued first.
       </p>
       <FileCard />
       <section aria-label="Cards" className="space-y-3">
         <h2 className="flex items-baseline gap-2 text-sm font-semibold">
           Cards <span data-count className="text-xs font-normal text-neutral-500">{cards.length}</span>
+          {queue > 0 && (
+            <span data-queue-count className="text-xs font-normal text-neutral-500">
+              · {queue} queued
+            </span>
+          )}
         </h2>
         {lines.length > 0 && (
           <ul className="space-y-3">
@@ -173,7 +180,8 @@ function FileCard() {
 
 /**
  * A card: its first line, linked to its page, its workflow and repository when it names them, and when it was filed; Start, which opens its
- * start form, and Remove.
+ * start form, and Remove. Queue on a card that names a workflow (`queueable`), and on a queued card its place and when it was queued, and
+ * Unqueue; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps it.
  * A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a card
  * shows why, and offers Remove when it is a card's file, which `wf inbox rm` can drop.
  *
@@ -197,6 +205,13 @@ function CardItem({ entry, refusal, onRefused }: {
     onMutate: () => onRefused(null),
     onError: (error) => onRefused({ action: 'remove', message: error.message }),
     // Whatever the answer: a card dropped behind the page's back — a 404 — leaves the list too.
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
+  });
+  // Queued, or taken off the queue: read again whatever the answer, so a card queued or started behind the page's back — a 409 — reads as it is.
+  const queue = useMutation({
+    mutationFn: (off: boolean) => queueCard(entry.name, { off }),
+    onMutate: () => onRefused(null),
+    onError: (error, off) => onRefused({ action: off ? 'unqueue' : 'queue', message: error.message }),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
   });
   // The run a start just wrote, before the inbox is read again and names it.
@@ -241,11 +256,37 @@ function CardItem({ entry, refusal, onRefused }: {
               </time>
             )}
           </p>
+          {entry.queued && (
+            <p className="flex flex-wrap items-baseline gap-x-2 text-xs text-neutral-500">
+              <span
+                data-queued={entry.queued.place ?? ''}
+                className="rounded-full border border-sky-300 bg-sky-50 px-2 py-0.5 font-medium text-sky-900 dark:border-sky-800 dark:bg-sky-950/60 dark:text-sky-200"
+              >
+                {queuedWord(entry.queued)}
+              </span>
+              <span>
+                since{' '}
+                <time data-queued-at dateTime={entry.queued.at} title="When it was queued: what orders the queue">
+                  {new Date(entry.queued.at).toLocaleString()}
+                </time>
+              </span>
+            </p>
+          )}
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap justify-end gap-2">
           {startable && (
             <button type="button" aria-expanded={starting} onClick={() => setStarting(!starting)} className={starting ? SECONDARY : PRIMARY}>
               {starting ? 'Close' : 'Start'}
+            </button>
+          )}
+          {queueable(entry) && (
+            <button type="button" disabled={queue.isPending} onClick={() => queue.mutate(false)} className={SECONDARY} title="Start it on its own, on its workflow, when a run slot frees">
+              {queue.isPending ? 'Queueing…' : 'Queue'}
+            </button>
+          )}
+          {entry.queued && (
+            <button type="button" disabled={queue.isPending} onClick={() => queue.mutate(true)} className={SECONDARY} title="Take it off the queue: it waits for you to start it">
+              {queue.isPending ? 'Unqueueing…' : 'Unqueue'}
             </button>
           )}
           {entry.file.endsWith('.md') && (
@@ -275,6 +316,7 @@ function CardItem({ entry, refusal, onRefused }: {
           )}
         </p>
       )}
+      {entry.queued && entry.tried && <Tried entry={{ ...entry, tried: entry.tried }} />}
       {entry.error !== null && (
         <div className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
           <p className="text-sm font-medium text-red-800 dark:text-red-300">Does not read as a card, so it cannot start:</p>
@@ -329,11 +371,29 @@ function GoneItem({ entry, refusal, onDismiss }: { entry: InboxEntry; refusal: C
   );
 }
 
-/** What a start or a drop of a card was refused with, in the api's words. */
+/**
+ * The tick's last try of a queued card's start, which did not start it (`triedLine`): refused, in amber — it stays queued and waits for you; failed
+ * otherwise, muted — the tick tries it again on the next pass.
+ */
+function Tried({ entry }: { entry: InboxEntry & { tried: NonNullable<InboxEntry['tried']> } }) {
+  const { refused } = entry.tried;
+  return (
+    <p
+      data-tried={refused ? 'refused' : 'failed'}
+      className={`rounded border px-3 py-2 text-xs break-words ${refused ? 'border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200' : 'border-neutral-200 text-neutral-600 dark:border-neutral-800 dark:text-neutral-400'}`}
+    >
+      {triedLine(entry, new Date(entry.tried.at).toLocaleString())}
+    </p>
+  );
+}
+
+const NOT_DONE: Record<CardRefusal['action'], string> = { start: 'Not started', remove: 'Not removed', queue: 'Not queued', unqueue: 'Not taken off the queue' };
+
+/** What a start, a drop, a queue or its taking back was refused with, in the api's words. */
 function Refused({ refusal }: { refusal: CardRefusal }) {
   return (
     <div data-refused={refusal.action} className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">{refusal.action === 'start' ? 'Not started' : 'Not removed'}. The api refused it:</p>
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">{NOT_DONE[refusal.action]}. The api refused it:</p>
       <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{refusal.message}</p>
     </div>
   );

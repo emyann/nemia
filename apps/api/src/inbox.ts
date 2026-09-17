@@ -7,13 +7,18 @@
  *
  * A card's page reads one card: as the inbox lists it, as its file is written, and its keys (`GET /api/inbox/:name`).
  *
+ * A card is queued to start on its own, and taken off the queue, as `wf inbox queue <name>` and `wf inbox queue <name> --off` do (`POST` and
+ * `DELETE /api/inbox/:name/queue`, through `queueInInbox`): the tick starts the next card in the queue's order when a run slot is free. The
+ * listing already says where each queued card stands — `queued`, its time and place, and `tried`, the tick's last start of it that did not
+ * happen — since each entry is the package's.
+ *
  * Every refusal is the package's sentence with the api's status, but for the body's shape, which is the api's own (400). Filing and dropping
  * are writes a page on another site must not make, so each passes the guard (guard.ts) before its body is read.
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Hono } from 'hono';
-import { addToInbox, dropFromInbox, HOME, INBOX_KEY_MEANINGS, INBOX_KEYS, inboxDir, inboxNameRefusal, noCardLine, parseInboxCard, readInbox, type InboxListing } from 'agent-workflows';
+import { Hono, type Context } from 'hono';
+import { addToInbox, dropFromInbox, HOME, INBOX_KEY_MEANINGS, INBOX_KEYS, inboxDir, inboxNameRefusal, noCardLine, parseInboxCard, queueInInbox, readInbox, type InboxListing } from 'agent-workflows';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, type KeyRow, type WorkflowSource } from './workflows.ts';
@@ -36,6 +41,13 @@ export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null
 
 /** What `POST /api/inbox` answers: the card written, as `wf inbox add` prints it. */
 export type InboxFiled = { name: string; file: string; workflow: string | null; repo: string | null; body: string };
+
+/**
+ * What `POST` and `DELETE /api/inbox/:name/queue` answer: what `wf inbox queue` did (the package's `InboxQueued`) — `queued`, `taken back`, or
+ * `not queued` for a card taken off a queue it was not in, which writes nothing — the card's `queued:` as it now reads, and, once queued, its
+ * place in the queue's order and how many are in it.
+ */
+export type InboxQueueAnswer = { name: string; file: string; was: 'queued' | 'taken back' | 'not queued'; queued: string | null; place: number | null; of: number | null };
 
 const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
 
@@ -83,6 +95,66 @@ const dropGuard = (name: string): Guarded => ({
   instead: `Drop it from the board's Inbox page, or with \`wf inbox rm ${name}\``,
   shape: 'no body, or `{}`: the card is named in the path',
 });
+
+const QUEUE_SHAPE = 'no body, or `{}`: the card is named in the path, and queued on the workflow it names';
+
+/** A queue of `name`, or its taking back (`off`), as the guard's refusals word it. */
+const queueGuard = (name: string, off: boolean): Guarded => (off
+  ? {
+      route: `DELETE /api/inbox/${name}/queue`,
+      does: 'takes a card off the queue',
+      forAnother: 'take one off',
+      why: 'a card taken off the queue is an idea the tick no longer starts, and its place is lost',
+      reach: 'take the card off the queue from the board',
+      instead: `Take it off from the board's Inbox page, or with \`wf inbox queue ${name} --off\``,
+      shape: QUEUE_SHAPE,
+    }
+  : {
+      route: `POST /api/inbox/${name}/queue`,
+      does: 'queues a card',
+      forAnother: 'queue one',
+      why: "a queued card is started by the tick when a run slot frees, and its body is what the run is asked to do, in the repository it names",
+      reach: 'queue the card from the board',
+      instead: `Queue it from the board's Inbox page, or with \`wf inbox queue ${name}\``,
+      shape: QUEUE_SHAPE,
+    });
+
+/**
+ * Why a queue's body is refused, or null: it takes none, or `{}`. `wf inbox queue --workflow <w>` writes a workflow with the mark, and the api does
+ * not: a card is queued from the board on the workflow it names, and one that names none is the package's to refuse — so a `workflow` sent is
+ * refused by name rather than read as nothing.
+ */
+function queueBodyRefusal(route: string, text: string): Refusal | null {
+  if (!text.trim()) return null;
+  let body: unknown;
+  try {
+    body = JSON.parse(text);
+  } catch {
+    return { status: 400, error: `${route} takes ${QUEUE_SHAPE}, and this request's body is not JSON.` };
+  }
+  if (isObject(body) && Object.keys(body).length === 0) return null;
+  const named = isObject(body) && 'workflow' in body
+    ? ' A card is queued on the workflow it names: file it with one, or queue it with `wf inbox queue <name> --workflow <w>`, which writes both.'
+    : '';
+  return { status: 400, error: `${route} takes ${QUEUE_SHAPE}, and this request sent ${JSON.stringify(body)}.${named}` };
+}
+
+/**
+ * The status of a queue — or its taking back — that `queueInInbox` refused, in its words (`exitCode` 2), by what is on disk once refused: 404
+ * for a card not there; 422 for a card that does not read, or a card to queue that names no workflow; 409 for a card to queue that a run's
+ * record already names, or that is queued already — a card whose state is not the one the request was made against.
+ */
+function queueRefusalStatus(name: string): 404 | 409 | 422 {
+  if (!fs.existsSync(path.join(inboxDir(), `${name}.md`))) return 404;
+  let entry: InboxListing | undefined;
+  try {
+    entry = readInbox().find((e) => e.file === `${name}.md`);
+  } catch {
+    return 422;
+  }
+  if (!entry || entry.error !== null) return 422;
+  return entry.startedAs.length || entry.queued ? 409 : 422;
+}
 
 /**
  * What `POST /api/inbox` files, or why not, before the package is asked: the body's shape (400), and the workflow, found among the folders a
@@ -205,4 +277,42 @@ export const inbox = new Hono()
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);
     }
-  });
+  })
+  // `wf inbox queue <name>`: the card marked to start on its own, on the workflow it names; and `--off`, the mark taken back.
+  .post('/api/inbox/:name/queue', (c) => queueRoute(c, false))
+  .delete('/api/inbox/:name/queue', (c) => queueRoute(c, true));
+
+/**
+ * A queue, or its taking back: the guard, then the name in the package's words (400) and the body (400), before the card is read; then
+ * `queueInInbox`, whose refusals are its sentences with the status of what is on disk (`queueRefusalStatus`).
+ *
+ * The card's file keeps the time it was last written. The package writes a queued card whole, through a hidden file renamed over it, so its
+ * mtime would become the time of the queue — and the mtime is `filedAt`, what the Inbox page orders the cards by: a card queued or taken back
+ * would jump to the top of the list and show the queue's time as its own. A queue is not an edit of the idea, so the time is set back.
+ */
+async function queueRoute(c: Context, off: boolean) {
+  const name = c.req.param('name')!;
+  const guard = queueGuard(name, off);
+  const refused = refusedBeforeReading(guard, c.req.header('host'), c.req.header('sec-fetch-site'), c.req.header('content-type'));
+  if (refused) return c.json({ error: refused.error }, refused.status);
+  const wrong = inboxNameRefusal(name);
+  if (wrong) return c.json({ error: wrong }, 400);
+  const shaped = queueBodyRefusal(guard.route, await c.req.text());
+  if (shaped) return c.json({ error: shaped.error }, shaped.status);
+  const file = path.join(inboxDir(), `${name}.md`);
+  const filed = fs.statSync(file, { throwIfNoEntry: false })?.mtime;
+  try {
+    const done = queueInInbox(name, { off });
+    if (filed && done.was !== 'not queued') {
+      try {
+        fs.utimesSync(file, filed, filed);
+      } catch {
+        // The queue is written all the same: the card lists at the time of the queue, until it is written again.
+      }
+    }
+    return c.json({ name: done.card.name, file: done.file, was: done.was, queued: done.card.queued ?? null, place: done.place ?? null, of: done.of ?? null } satisfies InboxQueueAnswer);
+  } catch (err) {
+    if ((err as { exitCode?: unknown }).exitCode !== 2) return c.json({ error: messageOf(err) }, 500);
+    return c.json({ error: messageOf(err) }, queueRefusalStatus(name));
+  }
+}

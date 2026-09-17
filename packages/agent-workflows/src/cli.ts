@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, addToInbox, dropFromInbox, fromNote, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -26,11 +26,15 @@ const HELP = `wf — run a workflow of agent steps
                                and repo when set, and started as <runId> (wf inbox --help)
   wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]
                                park an idea as a card in the inbox, named from its first line
+  wf inbox queue <name> [--workflow <w>] [--off]
+                               mark a card to start on its own: the tick starts the oldest queued
+                               card once a run slot is free; --off takes the mark back
   wf inbox rm <name>           drop a card without starting it
   wf tick                      one pass: tick the engine, file what became ready
   wf up [ms]                   the same, on a timer
-  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>;
-                               what each step's tries and the run have cost, where measured
+  wf ls [runId]                runs and their steps — a run waiting on another says waiting on <run>,
+                               one the cap on runs in flight holds waiting for a run slot (2 of 2 in
+                               flight); what each step's tries and the run have cost, where measured
   wf cancel <runId>            stop what it has in flight; file nothing more
   wf rm <runId> [<runId> ...] [--delete-branches [--force-unmerged]]
                                forget runs that are over, a line each: a run's worktrees removed
@@ -91,7 +95,10 @@ agent is told is prose.
   it on the run's word) · budget exhausted (its harness ended its session at its budget:).
 
   WF_ROOT            where runs and the engine's board live
-  WF_MAX_CONCURRENT  sessions per harness at once (default 2)
+  WF_MAX_CONCURRENT  sessions per harness at once (default 2): each harness counted apart, a check in a
+                     pool of its own, and one run's review competing with another run's implement
+  WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
+                     slot, oldest first; a run waiting on --after counts once it is filed
 
 To follow what the engine is doing, use the engine — a run's task ids carry the run and the step,
 so its output already names the work. Point it at this board:
@@ -124,15 +131,17 @@ refuses part-way stops the plan: the runs it started stand, and it prints a wf s
 
 const INBOX_HELP = `wf inbox
 wf inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>]
+wf inbox queue <name> [--workflow <w>] [--off]
 wf inbox rm <name>
 
 An inbox is cards before they are started: \${WF_ROOT:-~/.agent-workflows}/inbox/, one <name>.md per card, beside
-runs/. A card is a plan's card with two differences — both keys optional, and no after:, since what it waits on
+runs/. A card is a plan's card with two differences — its keys optional, and no after:, since what it waits on
 is said at start:
 
     ---
     workflow: dev              # what runs it, chosen at start when the card does not say
     repo: /home/me/code/app    # the repository it is about, as an absolute path
+    queued: 2026-09-16T10:00:00.000Z   # when it was queued to start on its own: wf inbox queue writes it
     ---
     Cache the engine's views between passes.
 
@@ -141,10 +150,19 @@ is said at start:
                  An entry that does not read as a card is listed with why.
   wf inbox add   files an idea, text or a file, named with the slug a run id makes of its first line, suffix and
                  all; --workflow and --repo write the keys, over a file's own.
+  wf inbox queue marks a card to start on its own: each pass, once every run has been advanced and a run slot is
+                 free (WF_MAX_RUNS; always, with no cap), the tick starts the oldest queued card, one per pass, on its
+                 workflow: and its repo: or the directory wf up runs in. --workflow writes the key too; --off, or
+                 wf inbox rm, takes the card back. wf inbox says queued and its place; a start the package refused
+                 is said there and on wf up's line, and the card is not tried again until it is edited or queued again
+                 (or, naming no repo:, wf up runs in another repository); a start that failed otherwise is said once,
+                 and tried again on the next pass.
   wf inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
 
 Refused by name: a key a card does not have, a key set to nothing, a repo: that is not an absolute path to a
-directory, an add with no idea, and a name that would leave the folder.`;
+directory, a queued: that is not a time or is on a card with no workflow:, an add with no idea, and a name that
+would leave the folder; and a queue of a name with no card, of a card with no workflow and no --workflow, of one
+already queued, and of one a run was started from.`;
 
 const DECIDE_HELP = `wf decide <runId> [--sensitive <globs>]
 
@@ -278,6 +296,21 @@ function planHow(argv: string[]): { repo?: string } {
     twice: () => 'wf plan takes --repo once: a plan works on one repository.',
   });
   return { repo: values['--repo']?.[0] };
+}
+
+/** `wf inbox queue`'s flags, after the card's name: `--workflow <w>` once, and `--off` — not both. */
+function inboxQueueHow(argv: string[]): { workflow?: string; off: boolean } {
+  const { values, switches } = readFlags(argv, {
+    takes: { '--workflow': 'the workflow the card starts on, by name or as a path: wf inbox queue <name> --workflow <w>' },
+    switches: ['--off'],
+    unknown: (arg) => (arg.startsWith('-')
+      ? `wf inbox queue does not take ${arg}. It takes the card's name, then --workflow <w>, or --off to take the card back.`
+      : `wf inbox queue queues one card, and ${arg} is a second: wf inbox queue <name>, once per card.`),
+    twice: () => 'wf inbox queue takes --workflow once: a card starts on one workflow.',
+  });
+  const workflow = values['--workflow']?.[0];
+  if (switches.length && workflow !== undefined) usage('--off takes the card out of the queue, and --workflow writes what starts it: give one of them.');
+  return { ...(workflow !== undefined ? { workflow } : {}), off: switches.length > 0 };
 }
 
 /** `wf inbox add`'s flags, after the idea: `--workflow <name>` and `--repo <path>`, once each. */
@@ -460,7 +493,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const listing = readInbox();
         if (!listing.length) return console.log(`the inbox is empty — park an idea with wf inbox add "<idea>"`);
         for (const line of inboxLines(listing)) console.log(line);
-        console.log(`\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] — drop one: wf inbox rm <name>`);
+        console.log(`\nstart one: wf start ${path.join(inboxDir(), '<name>.md')} [--workflows <w>] [--repo <r>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`);
         return;
       }
       if (sub === 'add') {
@@ -482,6 +515,19 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         console.log(`filed: ${file} — start it with wf start ${file}${card.workflow ? '' : ' --workflows <w>'}`);
         return;
       }
+      if (sub === 'queue') {
+        const [name, ...more] = args;
+        if (name === undefined || name.startsWith('--')) usage('wf inbox queue takes the name of the card to queue, as wf inbox lists it: wf inbox queue <name> [--workflow <w>] [--off].');
+        const how = inboxQueueHow(more);
+        // A workflow given as a path is kept absolute, as `wf inbox add` keeps it.
+        const workflow = how.workflow === undefined ? undefined : workflowAt(how.workflow, process.cwd());
+        const queued = queueInInbox(name!, { off: how.off, ...(workflow !== undefined ? { workflow } : {}) });
+        if (queued.was === 'not queued') return console.log(`${name}  not queued — nothing to take back`);
+        if (queued.was === 'taken back') return console.log(`${name}  taken back: it no longer starts on its own — start it with wf start ${queued.file}`);
+        console.log(`${name}  queued at ${queued.card.queued}, ${queued.place} of ${queued.of}  workflow: ${queued.card.workflow}${queued.card.repo ? `  repo: ${queued.card.repo}` : ''}`);
+        console.log(`the tick starts it on its own once its turn comes and a run slot is free${queued.card.repo ? '' : ", on the repository wf up runs in"} — take it back with wf inbox queue ${name} --off`);
+        return;
+      }
       if (sub === 'rm') {
         const [name, ...more] = args;
         if (name === undefined || name.startsWith('--')) usage('wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>.');
@@ -489,19 +535,21 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         const dropped = dropFromInbox(name!);
         return console.log(dropped.removed ? `${name}  dropped, and nothing started — ${dropped.file} removed` : `${noCardLine(name!, dropped.cards)} Nothing to drop.`);
       }
-      return usage(`wf inbox does not take ${sub}. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", and drops one with wf inbox rm <name> (wf inbox --help).`);
+      return usage(`wf inbox does not take ${sub}. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", queues one with wf inbox queue <name>, and drops one with wf inbox rm <name> (wf inbox --help).`);
     }
 
     case 'tick': {
-      const results = await tick(e);
-      if (!results.length) return console.log('no runs');
+      // A queued card names no repository: it starts on this one, as `wf start` takes `.`.
+      const { runs: results, queue } = await tick(e, { repo: path.resolve('.') });
+      if (queue) console.log(queueLine(queue));
+      if (!results.length && !queue) return console.log('no runs');
       for (const r of results) {
         const filed = r.filed.length ? `  filed: ${r.filed.join(', ')}` : '';
         const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
         const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
         const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
         const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
-        const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : '';
+        const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : r.held ? `  ${slotWord(r.held)}` : '';
         console.log(`${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`);
         for (const note of r.notes) console.log(`   ${note}`);
       }
@@ -511,8 +559,14 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'up': {
       const every = Number(rest[0]) || 4_000;
       console.log(`up — every ${every}ms, ^C to stop`);
+      // Both ceilings, in words, before the first pass: what the daemon holds work to.
+      for (const line of ceilingLines(ceilings())) console.log(`   ${line}`);
       for (;;) {
-        for (const r of await tick(e)) {
+        // A queued card that names no repository starts on the one `wf up` runs in, as `wf start` takes `.`.
+        const { runs: passed, queue } = await tick(e, { repo: path.resolve('.') });
+        // A failure the same as the last pass's is not said again: it is tried again on every pass, and said once.
+        if (queue && !('again' in queue && queue.again)) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
+        for (const r of passed) {
           for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
           if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);
           if (r.tried.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  tried again ${r.tried.join(', ')}`);
@@ -526,9 +580,11 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
     case 'ls': {
       const runs = rest[0] ? [readRun(rest[0])] : listRuns();
       if (!runs.length) return console.log('no runs');
+      // Which runs the cap on runs in flight holds, judged over the whole store: a run is held by the runs beside it.
+      const held = await runSlots(e);
       for (const run of runs) {
         const calledOff = run.cancelledAt ? '  (cancelled)' : '';
-        const { steps, waitingOnYou, waiting, cost } = await list(e, run);
+        const { steps, waitingOnYou, waiting, cost } = await list(e, run, held.get(run.id));
         // What the run has cost so far, on its line, where the engine measured it.
         console.log(`${run.id}  ${run.brief.split('\n')[0]!.slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`);
         // Each step's word, and what its tries have cost beside it: `verified ✓  $3.01`.
@@ -601,7 +657,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // so is a flag before the run, which would otherwise be the general help and exit 0.
       if (rest[0].startsWith('--')) usage(`wf decide takes the run first: wf decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
       const { sensitive } = decideHow(rest.slice(1));
-      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, waiting, said, timeline } = await decide(e, rest[0]);
+      const { run, decision, closeouts, checks, retrying, rounding, offers, overBudgetLine, used, costs, runCost, answers, answering, waiting, said, timeline, held } = await decide(e, rest[0]);
       // The files a person gave the run, under its line, on every screen: the steps were handed them.
       const given = inputsNote(inputsDir(run), run.inputs);
       // And the inbox card it was started from, when it was.
@@ -612,6 +668,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (decision.kind === 'cancelled') return console.log(`${head}\n\n  cancelled at ${decision.at} — nothing to decide`);
       // Nothing of it is filed: the runs it waits on are the whole of what there is to say, and nothing else is offered.
       if (waiting.length) return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}`);
+      // Nor while the cap on runs in flight holds it: the tick files its roots once a run in flight settles.
+      if (held) return console.log(`${head}\n\n  ${slotWord(held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`);
       if (decision.kind === 'running') {
         console.log(`${head}\n\n  still running: ${decision.waiting.join(', ')}`);
         // A try the next tick files is why a run that had stopped is running again: said, with whose word it is.

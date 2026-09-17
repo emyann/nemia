@@ -19,7 +19,8 @@ in the order they run, `wf start --input`, artifacts collected from the workspac
 file (§6 items 6–9, 24, 25) — and a step gone quiet without its closeout reading `unsigned` again after the engine began
 settling it `failed` — and a step's `budget:`, with what a step and a run cost on `wf ls` and `wf decide` (plan §6 item 29, its
 workflow half), forgetting a run that is over (`wf rm`) — and an inbox of cards parked before they are started (`wf inbox`,
-and its page on the board) — have shipped.
+and its page on the board) — and two small items from the plan's queue (§6 items 28 and 31), a cap on runs in flight (`WF_MAX_RUNS`) and
+cards that start themselves (`wf inbox queue`) — have shipped.
 
 ## Shipped: the check
 
@@ -1852,6 +1853,174 @@ What it leaves:
   `listRuns`.
 - **A directory of worktrees with no record** is named, not removed: nothing says which repository holds them.
 
+## Shipped: two small items from the plan's queue
+
+- **Plan §6 item 28: `unsigned` is the last attempt's word.** `closeoutAsked` already read the last attempt's `reason`, and no test held it
+  to that. Now two do, with a task of `maxAttempts: 2` whose attempt 1 went quiet (`unsigned`) and attempt 2 was `lost`: it reads `failed`,
+  and one lost then quiet reads `unsigned`. The pure one hands `closeoutAsked` a fake view and reads `stepStatus`, `decision` and `listing`
+  off it (`test/run.test.ts`); the store one files the step with `maxAttempts: 2` on the fake board and reads `wf ls`, `wf decide` and the
+  try's brief (`test/store.test.ts`). Reading any attempt's reason instead fails both.
+- **Plan §6 item 31: a round asked past a budget holds nothing on the pass before it is filed.** After `wf round --budget`, `wf ls` and
+  `wf decide` still said the run waited on you for one tick (W7's last review): `assess` marked only the looping step running, so the target
+  held on the round read `over budget`, and the run read failed. Now `roundSpans` names every step of each due round's loop, and `assess`,
+  `listing` and `decision` read each by its own status, never held. Tested pure, with a round asked with a raise, beside a step that failed
+  too, and with no round asked, one without `--budget` and one not above what was spent, which still read held; and on the store, through
+  `wf ls` and `wf decide` between the ask and the tick. Breaking the fix in `assess`, `listing` or `decision`, or taking only the looping
+  step, fails a test each.
+
+## Shipped: the queue — a cap on runs in flight, and cards that start themselves
+
+Item 3 of this list, registered 2026-09-16 by the operator: a Factory canvas filled for a week, cards queued, picked whenever a slot frees.
+The workflow layer built its engine with `WF_MAX_CONCURRENT`, named in no document: a cap on sessions per harness, not on runs. Every run
+started was filed on the next pass, however many were at work, and the inbox parked cards and started none. Now a cap holds runs in flight,
+and a card marked to start on its own is started by the tick when a run slot is free.
+
+What was built, the cap:
+
+- **`WF_MAX_RUNS`**, read beside `WF_MAX_CONCURRENT` (`ceilings` in runner.ts), unset or 0 for no cap, today's behaviour. Anything but a
+  whole count is refused by name, exit 2 (`runCapOf`), by `wf up`, `wf tick` and `wf ls`: read as no cap, a typo would lift the cap.
+- **A pure admission gate beside `runReady`.** `slotNeed` says what a run asks of the cap: in flight — a step's or a check's task filed and
+  not settled, or a started run nobody called off that the pass files something of — and whether it wants a slot: nothing filed, not called
+  off, its `--after` runs shipped, a root ready. `runAdmitted` files a run's roots only while fewer runs than the cap are in flight, and never
+  holds a run that has started. `admissionOrder` is oldest by `createdAt`, then id. `heldRuns` judges a whole store as a pass would.
+- **`tick` in two halves.** Every started run is advanced first, and counted in flight once its pass is done (`Advanced.inFlight`: in flight
+  when read, or it filed something). Then each run with nothing filed, oldest first, is advanced with the slot as counted so far (`advance(e,
+  run, slot)`), and counted once it filed. Results come back in the store's order. Nothing is carried between passes.
+- **The words.** `wf ls` says `waiting for a run slot (2 of 2 in flight)` on a held run's roots (`listing`'s `slot`, `slotWord`), judged over
+  the store by `runSlots` with the cap the last pass ran with (`$WF_ROOT/tick.json`, `lastCeilings`); `wf tick` on the run's line; `wf decide`
+  in place of `still running`. `wf up` prints both ceilings in words when it starts (`ceilingLines`).
+- **The wait on the timeline.** The first pass that holds a run writes `slotHeldAt` on its record, and says so once in its notes. `timeline`
+  then counts `createdAt` → first filing as the run's `slot` (`SlotWait`) and in its total's `queued`, on a `run slot` row of `wf decide`'s
+  timeline: `still waiting` while nothing is filed, `not known` where the feed has no filing.
+
+What was built, the cards:
+
+- **`queued:`**, a third key in `INBOX_KEYS`: the ISO time the card was queued, which orders the queue. `parseInboxCard` refuses by name a
+  value that is not such a time, and a `queued:` on a card with no `workflow:`, since nothing would say what starts it. `wf inbox add` refuses
+  a `queued:` carried in by a file: a card is queued once it is in the inbox.
+- **`wf inbox queue <name> [--workflow <w>] [--off]`** (`queueInInbox`) writes the key, `--workflow` writing `workflow:` too, and `--off`
+  takes it back, the file written whole through a hidden file renamed over it (`queuedText`). Refused by name, exit 2 (`queueRefusal`): a name
+  with no card, a card with no workflow and no `--workflow` — which writes both — one already queued, one a run was started from, and `--off`
+  beside `--workflow`. `wf inbox rm` takes a card back too.
+- **The tick starts the next card** once every run has been advanced, while a run slot is free — always, with no cap (`slotFree`): the
+  oldest by `queued:`, then name (`queueOrder`), a card a record names as started left out, through `startFromInbox` with the card's
+  `workflow:` and its `repo:` or else the daemon's repository (`tick(e, { repo })`; `wf up` and `wf tick` hand it `.`). One card a pass, so
+  the next pass counts its run before another starts. `tick` now answers with a `Pass`: the runs, and what it did with the queue
+  (`QueueStarted`), which `wf up` and `wf tick` log (`queueLine`): `started <card> as <runId>`.
+- **A start that did not happen is written down** (`startQueued`, `QueueTry`): `$WF_ROOT/queue/<name>.json`, the tick's own file, holds when,
+  the card's text, the repository it was tried on, why, and whether the package refused it (exit 2). `nextQueued` passes over a card refused
+  as it stands — its text, and the repository it would be tried on — so the card behind it has its turn; an edit, `--off` then a new queue,
+  or a daemon in another repository for a card that names none makes it a card to try again, and the pass removes the try that no longer
+  reads. A failure that is not a refusal is tried again on the next pass, where the card keeps its place, and `wf up` says it once
+  (`again`). `wf inbox` shows `queued 2 of 3`, and `not started at <time>: <why>` or `failed at <time>: <why>` beside the card (`inboxListing`,
+  `inboxLines`).
+
+What was decided, and why:
+
+- **In flight includes a started run between two steps.** The spec's words were a task not settled, or a check running. But a run whose step
+  just settled has nothing filed for the length of one pass, and judged then, a held run took its slot and the pass filed both. So a started
+  run with something due counts, and `tick` advances started runs before it judges any other, which makes `wf ls` between passes and the pass
+  itself agree.
+- **A cancelled run counts until the engine has stopped what it had in flight.** The engine settles a stop on its tick, which `tick` asks for
+  first, so a slot frees on the pass after `wf cancel` for a task that had not started, and a pass or two later for a live session.
+- **Waiting on runs is from the hold, not from `createdAt`.** The time a run waited on its `--after` runs is not a wait for a slot, so on such
+  a run the slot wait runs from `slotHeldAt`.
+- **The record, and nothing else, says the cap held a run.** One field, written once by the tick, the record's one writer. A run the cap never
+  held has no `slot` on its timeline at all, rather than `not known` on every run from before the cap.
+- **No new field on a shape the board compares whole.** `TimelineTotal` keeps its keys (the slot wait goes into its `queued`), and `Listing`'s
+  `slot` is there only on a held run, since `apps/api`'s tests compare those objects whole. So is an `InboxListing`'s `queued` and `tried`.
+- **A refused card is written down and passed over, not tried every pass.** The brief's *one try per pass, no hot loop* read literally is a
+  refused card tried again on every pass: it logged a refusal every four seconds and, one card a pass, held every card behind it for good.
+  Nothing in memory could say it was tried, so the tick writes it down, in a file of its own outside the inbox, which is a person's; the card
+  itself is left as it is. Keyed on the card's text and the repository it was tried on, so no verb has to clear it. This is a reading, and
+  round 2's review asked a person to confirm it: a queue that stops at a refused card instead is one line in `nextQueued`.
+- **Only the package's refusal lasts.** A start can also fail for reasons that say nothing of the card — git on the repository, a file
+  that cannot be read — and those pass; so such a card is tried again on the next pass and keeps its place, and is said once.
+- **The queue is in the order a person queued, and a refused card loses nothing but its turn.** Order by name would start `a-…` before a card
+  queued an hour earlier. A card queued again is at the back.
+- **`queued:` with no `workflow:` is refused by the parser, not only by the verb.** A card hand-edited into the queue with nothing to say
+  what runs it would otherwise be tried, refused, and written down on every card like it.
+
+What was measured:
+
+- `test/run.test.ts` (7 new), pure: `WF_MAX_RUNS` refused as a word, a negative, a fraction and a unit, and unset, empty and 0 read as no cap;
+  `slotNeed` for a task pending, running, between two steps, finished, waiting on a person, a check running, cancelled and still stopping or
+  stopped, nothing filed, called off first, and waiting on a run before and after it ships; `runAdmitted` refusing at 2 of 2 and 3 of 2, and
+  admitting below it, at cap 0, with no slot and for a started run; `heldRuns` oldest first with ties by id, a run in flight counted, a run
+  waiting on runs neither counted nor held, and none with no cap; `listing` on a held run's roots and followers, and not on one started,
+  called off, or waiting on a run; `ceilingLines`; the timeline's slot wait — measured, from the hold on a run that waited on runs, `not
+  known` with no feed, `still waiting` with nothing filed, and none on a run never held.
+- `test/queue-store.test.ts` (6, a file of its own since `tick` reads every run under `WF_ROOT`), over a fake engine that settles a stop on
+  its tick: at a cap of 2, a third run not filed, and `wf tick`, `wf ls`, `wf ls <run>` and `wf decide` saying so, the hold written once; at a
+  cap of 1, a run finishing and a run cancelled each freeing a slot on the next pass, taken by the run held longest, whose `wf decide`
+  timeline shows the `run slot` wait; a run waiting on `--after` not counted, and the one after it held at 2 of 2; no cap and cap 0 filing
+  all three at once; the oldest by `createdAt` admitted first against the id order; `wf up`'s two ceilings, and `WF_MAX_RUNS=two` refused by
+  `wf up`, `wf tick` and `wf ls`.
+- `test/inbox.test.ts` (4 new), pure: a queued card read, and `queued:` refused as a word, a date, a local time, an offset, an impossible date
+  and a number, on a card with no `workflow:`, twice, and in a file given to `wf inbox add`; `queuedText` writing and taking off the key, a
+  body that opens with a rule, and a text that would not read; `queueRefusal` on a started card, a queued one, and one with no workflow;
+  `inboxListing`'s places by time then name, a started card out of the order, a refusal only while the text is the same, `nextQueued` passing
+  over it, and `inboxLines`; `queueLine`'s three words. Two tests changed their expected words, for the new key and the new hint line.
+- `test/queue-store.test.ts` (7 more): a card queued by the verb, started on the next pass with no cap on its workflow and repo, the card
+  removed, `wf tick` and `wf up` logging `started <card> as <runId>`, and its roots filed on the pass after; a card with no repo started on the
+  daemon's; at a cap of 1 a queued card waiting on a run in flight, started on the pass that sees it finish, and a second card held while its
+  run waits for the slot; the oldest by `queued:` started first against the name order, one a pass, and a card not queued never; every
+  refusal of `wf inbox queue` by name, `--workflow` writing both, `--off` and `wf inbox rm` taking a card back; a card queued and started by
+  hand not started twice, nor, with its removal failed, by any pass after; a refused start named on `wf tick` and in `wf inbox`, the card as it
+  was, not tried on the next pass while the card behind it starts, and tried and started once its workflow is back and it is queued again.
+- Each guard broken and the suites rerun: no gate, 5 failing; started runs not counted, and the rest admitted in the store's order, 4;
+  admission by id, 2; a run with nothing filed counted in flight for what is due, 4; a run waiting on runs wanting a slot, 1; the hold written
+  on every pass, 1. For the cards: a refused card not passed over, 2; a card started with no slot asked, 1; the queue by name, 3; a started
+  card kept in line, 2; `queued:` with no `workflow:` parsed, 2; a refusal matched whatever the text, 2; a queued card queued again, 2; any
+  `queued:` value taken, 1.
+
+Round 2's review found three things, each fixed:
+
+- **`wf ls` and `wf decide` read the cap from their own shell.** The README's own example sets `WF_MAX_RUNS` on `wf up` alone, and from
+  another shell a run the daemon held read plain `waiting`, and `wf decide` said still running; a shell with another value printed a wrong
+  count. Each pass now writes the ceilings it ran with to `$WF_ROOT/tick.json` when they change (`recordCeilings`), the tick its one writer,
+  and `runSlots` reads the cap there, falling back to the shell's own only before any pass has written it. Tested in
+  `test/queue-store.test.ts` through `wf ls` and `wf decide`, run with no `WF_MAX_RUNS`, with `5`, `1` and `two`; with the file removed, the
+  shell's own; and a pass with no cap writing `0`, which a shell setting `1` reads. Reading the shell again, and a pass not writing, fail it.
+- **A queued card whose `repo:` folder was deleted left the queue with nothing said.** `parseInboxCard` refuses a `repo:` that names no
+  directory, so the listing had no `queued` for it, and no pass tried it: `wf up` said nothing, though the brief names the repository gone as
+  a refusal said there. `inboxListing` now reads such a card's `queued:` without the directory check, so it keeps its place beside why it
+  does not read; the tick tries it, `startFromInbox` refuses it by name, and the refusal is written down as any. `--off` takes it back without
+  the check. Tested pure in `test/inbox.test.ts` — a card with another fault is in no queue — and in `test/queue-store.test.ts`, deleting a
+  queued card's repository: named on `wf tick` and in `wf inbox`, the card behind it started on the next pass, and taken back. Leaving it out
+  of the queue fails two; `--off` with the check, one.
+- **Every failure of a start stuck as a refusal**, and a refusal stuck wherever the daemon ran. The catch wrote down any error — git failing
+  once while `start()` read the repository — and a card with no `repo:` refused because `wf up` ran in the wrong repository stayed refused
+  from the right one. Now only an error with exit code 2 is a refusal (`QueueTry.refused`), and it is keyed on the repository it was tried on
+  as well as the card's text; any other failure is tried again on the next pass, in its place, said once. Tested pure — a card refused on
+  one repository tried on another, a failed card not passed over, both on `wf inbox` — and in `test/queue-store.test.ts`: a queued card on a
+  directory with no git failing with git's words, tried on every pass while the card behind it waits, said once over two passes of `wf up`,
+  and started once git is there; and a card with no `repo:` refused on a repository with no such workflow, passed over there, and started in
+  one that has it. Every error lasting fails one; a try not keyed on the repository, two; failures passed over, three; a failure said, or
+  written, on every pass, one each.
+
+What it leaves:
+
+- **The board.** `apps/api` passes no slot to `listing`, so the Factory and the run page say `waiting` on a held run; its inbox page has no
+  queue button and shows no place; and the Factory draws no ghost for a queued card. Left for the board.
+- **A refused card stays refused when the world changes and the card does not.** Put the workflow back, and the tick still passes over it
+  until a person edits it or queues it again: the refusal is keyed on the card's text and the repository it was tried on, and nothing else
+  about the world is written down.
+- **A failure that persists holds the queue behind it.** A card whose start keeps failing without a refusal — a `repo:` that is a directory
+  with no git — is tried on every pass and keeps its place, so the cards behind it wait until a person fixes the repository, or takes the
+  card back. It is said once on `wf up`, and in `wf inbox`.
+- **A card with no `repo:` starts on wherever `wf up` runs.** `wf inbox` cannot know that directory, so a refusal that turns on it is seen
+  only once the tick has tried.
+- **`wf inbox queue --off` in the moment the tick starts the card** can write the card back after the start removed it. The record names it,
+  so `wf inbox` lists it `started as` its run, and nothing starts it again: the guard that exists.
+- **`wf ls` and `wf decide` read every run twice** when a cap is set and some run has nothing filed: once to judge the cap, once to list. Each
+  view of a task in flight observes its harness.
+- **`WF_MAX_CONCURRENT` is still read with `Number() || 2`**: a value that is not a number is 2, silently. Not asked; left as it was.
+- **The cap counts runs, not sessions.** A run fanning out to three steps is one run in flight and three sessions against
+  `WF_MAX_CONCURRENT`.
+- **The ceiling that matters over a week is still the merge.** A child waits on its parent's merge, and every later run is cut from a main
+  missing unmerged results: the operator merges daily, or a workflow's last step merges on a green trial merge. Not decided here.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
@@ -1898,32 +2067,9 @@ auto-registration with Remote Control fits.
 
 ## 3. The queue: a cap on runs in flight, and cards that start themselves
 
-**Registered** 2026-09-16, by the operator: a Factory canvas filled for a week — cards queued, picked whenever a slot frees.
-
-**What exists.** The engine caps sessions per harness (`AE_MAX_CONCURRENT`, default 3). The workflow layer builds its
-engine with `WF_MAX_CONCURRENT`, default 2 (`src/runner.ts`, `engine`), named in no document until this entry. The count is
-sessions, not runs: both steps of `dev` are on `claude`, so one run's review competes with another run's implement; a
-check has a pool of its own; a session the harness lists `blocked` holds its slot until the step's deadline (`LIVE` in the
-engine's `engine.ts`), and `claude` and `claude-detached` are counted apart though they share one subscription. `--after`
-and `wf plan` give order, and a run that waited is cut from main as it is when filed; a run started plainly is cut from
-main at `wf start`. The inbox parks cards and starts none.
-
-**What it needs.**
-
-- A pure admission gate beside `runReady`: a run with nothing filed is admitted only while runs in flight are below
-  `WF_MAX_RUNS` (0: no cap, today's behaviour), oldest first, serial within a pass, level-triggered. `wf ls` says
-  `waiting for a run slot (2 of 2 in flight)`, the run's timeline counts the wait as queued, and `wf up` prints both
-  ceilings when it starts.
-- Cards that start themselves: an inbox card marked to start on its own (`wf inbox queue <name>`). The tick starts the
-  oldest such card when a run slot frees, through `startFromInbox`, so its base is main at that moment and its brief is
-  frozen then. `--after` stays for cards that depend on one another. The Factory draws queued cards as ghosts.
-- The README names `WF_MAX_CONCURRENT` beside `WF_MAX_RUNS`, what each counts, and that checks are apart.
-- Which pending step gets a freed session is the engine's (Engine-side work, below: filing order and `priority`); until
-  that lands, two pending steps are ordered by the alphabet of their run ids, and a new run's first step can take the
-  slot a running run's next step is about to need.
-- The ceiling that matters over a week is the merge: a child waits on its parent's merge, and every later run is cut
-  from a main missing unmerged results. Either the operator merges daily, or a workflow's last step merges on a green
-  trial merge — a change to "a person merges" that this entry does not decide.
+Shipped 2026-09-17 as *Shipped: the queue — a cap on runs in flight, and cards that start themselves*, above, which says what was
+built, measured and left. Left there for the board: the Factory drawing queued cards as ghosts. Which pending step gets a freed
+session is the engine's (Engine-side work, below: filing order and `priority`). The number kept so §4–§7 keep theirs.
 
 ## 4. The workflow builder: steps and their edges drawn on the board, written back as the folder
 

@@ -123,7 +123,7 @@ test("`wf inbox add` files a card under the slug of its first line and a suffix 
   assert.ok(lines.some((l) => new RegExp(`^${escaped(second.slice(0, -3))} +Cache the engine's views between passes  workflow: dev  repo: ${escaped(repo)}$`).test(l)), lines.join('\n'));
   assert.ok(lines.some((l) => new RegExp(`^${escaped(third.slice(0, -3))} +Show the flag on the settings page\\.  workflow: ui  repo: ${escaped(repo)}  started as show-the-flag-on-the-settin-zz99$`).test(l)), lines.join('\n'));
   assert.ok(lines.some((l) => /^broken-a1b2 +broken-a1b2\.md: `harness` is not a key an inbox card has\./.test(l)), lines.join('\n'));
-  assert.deepEqual(lines.slice(-2), ['', `start one: wf start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] — drop one: wf inbox rm <name>`]);
+  assert.deepEqual(lines.slice(-2), ['', `start one: wf start ${path.join(INBOX, '<name>.md')} [--workflows <w>] [--repo <r>] — queue one: wf inbox queue <name> — drop one: wf inbox rm <name>`]);
   fs.rmSync(path.join(ROOT, 'runs', 'show-the-flag-on-the-settin-zz99.json'));
   fs.rmSync(path.join(ROOT, 'runs', 'an-unrelated-run-yy88.json'));
 });
@@ -179,7 +179,7 @@ test("REFUSED by name at shipped defaults: `wf inbox add` with no idea, an empty
   await assert.rejects(rm('.hidden'), refusedWith(/^`\.hidden` is not a card's name: a name that starts with a dot is a hidden file/));
   await assert.rejects(rm(), refusedWith(/^wf inbox rm takes the name of the card to drop, as wf inbox lists it: wf inbox rm <name>\.$/));
   await assert.rejects(rm(card.name, 'another'), refusedWith(/^wf inbox rm drops one card, and another is a second: wf inbox rm <name>, once per card\.$/));
-  await assert.rejects(main(['inbox', 'list'], NO_ENGINE), refusedWith(/^wf inbox does not take list\. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", and drops one with wf inbox rm <name>/));
+  await assert.rejects(main(['inbox', 'list'], NO_ENGINE), refusedWith(/^wf inbox does not take list\. It lists the inbox — wf inbox — files a card with wf inbox add "<idea>", queues one with wf inbox queue <name>, and drops one with wf inbox rm <name>/));
   assert.ok(fs.existsSync(path.join(ROOT, 'runs', 'r-outside.json')), 'the record outside the inbox is still there');
   assert.ok(fs.existsSync(file), 'and so is the card');
   fs.rmSync(path.join(ROOT, 'runs', 'r-outside.json'));

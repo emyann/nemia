@@ -17,16 +17,16 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, budgetRefusal, forgetLine, idRefusal, costLine, dueNote, durationWord, fromNote, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { AskName, BranchFate, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, Said, SaidTo, Shipped, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
+export { artifactLines, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export type { AskName, BranchFate, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, workflowsIn, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
-export { INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, workflowAt } from './inbox.ts';
-export type { InboxCard, InboxListing } from './inbox.ts';
-import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, noCardLine, noWorkflowRefusal, parseInboxCard, startedRefusal, type InboxCard, type InboxListing } from './inbox.ts';
+export { INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
+export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
+import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { afterRefusal, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runWorktrees, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, slotFree, afterRefusal, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -284,6 +284,48 @@ export const HARNESSES = {
   'claude-detached': claudeDetached,
   check: CHECK,
 } as const;
+
+/**
+ * The daemon's two ceilings, read from the environment when asked. `sessions` (`WF_MAX_CONCURRENT`, 2 unless set) is the engine's: sessions
+ * per harness at once, counted apart for each — a check on the `check` harness is in a pool of its own, and a `dev` run's review competes with
+ * another run's implement, both on `claude`. `runs` (`WF_MAX_RUNS`, `runCapOf`) is the tick's: runs in flight at once, 0 — or unset — for no cap.
+ */
+export const ceilings = (): { sessions: number; runs: number } => ({
+  sessions: Number(process.env.WF_MAX_CONCURRENT) || 2,
+  runs: runCapOf(process.env.WF_MAX_RUNS),
+});
+
+/**
+ * What the last pass ran with: `$WF_ROOT/tick.json`, the tick's to write — the ceilings of the process that ran it, `wf up`'s or `wf tick`'s.
+ * `wf ls` and `wf decide` run in a shell of their own, whose environment is not the daemon's: `WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up` sets
+ * the cap on the daemon alone, and read from the shell, a run the daemon holds read as plain `waiting`.
+ */
+const tickFile = (): string => path.join(HOME, 'tick.json');
+
+/** The ceilings the last pass ran with (`tickFile`), or undefined before any pass has written them, or when the file does not read as them. */
+export function lastCeilings(): { sessions: number; runs: number } | undefined {
+  try {
+    const c = JSON.parse(fs.readFileSync(tickFile(), 'utf8')) as { sessions?: unknown; runs?: unknown };
+    const count = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0;
+    return typeof c.sessions === 'number' && count(c.runs) ? { sessions: c.sessions, runs: c.runs } : undefined;
+  } catch { return undefined; }
+}
+
+/**
+ * The ceilings a pass runs with, written down for `wf ls` and `wf decide` — only when they differ from what is there, and through a hidden file
+ * renamed over it, so a reader never reads half of it. A store that cannot be written loses only this: a reader falls back to its own
+ * environment, and the pass goes on.
+ */
+function recordCeilings(c: { sessions: number; runs: number }): void {
+  const last = lastCeilings();
+  if (last && last.sessions === c.sessions && last.runs === c.runs) return;
+  const hidden = path.join(HOME, `.tick.json.${process.pid}`);
+  try {
+    fs.mkdirSync(HOME, { recursive: true });
+    fs.writeFileSync(hidden, JSON.stringify({ sessions: c.sessions, runs: c.runs }, null, 2));
+    fs.renameSync(hidden, tickFile());
+  } catch { /* read from the reader's own environment instead */ }
+}
 
 export const engine = (): Engine => createEngine({
   root: path.join(HOME, 'engine'),
@@ -967,10 +1009,34 @@ function inboxFiles(): Array<{ file: string; text: string }> {
 const inboxCards = (): string[] => inboxListing(inboxFiles(), [], () => true).filter((l) => l.file.endsWith('.md')).map((l) => l.name);
 
 /**
- * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does not
- * read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as started.
+ * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox, which
+ * is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is no longer queued as it
+ * was — started, taken back, dropped or edited.
  */
-export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory);
+const queueDir = (): string => path.join(HOME, 'queue');
+
+/** The tries the tick has written down, by card name. A file that does not read as one is none: the card is tried, and written again. */
+function queueTries(): Map<string, QueueTry> {
+  const tries = new Map<string, QueueTry>();
+  let names: string[];
+  try { names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json')); } catch { return tries; }
+  for (const file of names) {
+    try {
+      const r = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8')) as Partial<QueueTry>;
+      if (typeof r.at === 'string' && typeof r.text === 'string' && typeof r.repo === 'string' && typeof r.why === 'string' && typeof r.refused === 'boolean') {
+        tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
+      }
+    } catch { /* torn, or removed since the listing */ }
+  }
+  return tries;
+}
+
+/**
+ * `wf inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that does not
+ * read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as started; and
+ * the tick's tries, so a queued card whose start was refused, or failed, says why.
+ */
+export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory, queueTries());
 
 /**
  * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
@@ -993,6 +1059,48 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
     }
     return { card: parseInboxCard(`${name}.md`, text, isDirectory), file };
   }
+}
+
+/** What `wf inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order and how many are in it. */
+export type InboxQueued = { card: InboxCard; file: string; place?: number; of?: number; was: 'queued' | 'taken back' | 'not queued' };
+
+/**
+ * `wf inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given; `off`
+ * takes the mark back. The card's file is written whole, through a hidden file renamed over it, so a pass never reads half a card.
+ *
+ * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card — naming the cards
+ * there are — a card that does not read, and what `queueRefusal` refuses: a card a run's record names, one already queued, and one with no
+ * workflow and none given. `off` on a card not queued writes nothing, and says so.
+ */
+export function queueInInbox(name: string, how: { off?: boolean; workflow?: string } = {}): InboxQueued {
+  const refused = inboxNameRefusal(name);
+  if (refused) throw new WorkflowError(refused);
+  const file = path.join(inboxDir(), `${name}.md`);
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+    throw new WorkflowError(`${noCardLine(name, inboxCards())} Queue one of those — wf inbox queue <name> — or park the idea first: wf inbox add "<idea>".`);
+  }
+  // Taken back whatever its `repo:` names: a card whose repository is gone leaves the queue as any card does, and is listed with why.
+  const exists = how.off ? () => true : isDirectory;
+  const card = parseInboxCard(`${name}.md`, text, exists);
+  if (how.off && card.queued === undefined) return { card, file, was: 'not queued' };
+  if (!how.off) {
+    const listing = readInbox();
+    const why = queueRefusal(card, file, listing.find((l) => l.name === name)?.startedAs ?? [], listing.find((l) => l.name === name)?.queued?.place ?? null, how.workflow);
+    if (why) throw new WorkflowError(why);
+  }
+  const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
+  const hidden = path.join(inboxDir(), `.${name}.md.${process.pid}`);
+  fs.writeFileSync(hidden, written);
+  fs.renameSync(hidden, file);
+  const now = parseInboxCard(`${name}.md`, written, exists);
+  if (how.off) return { card: now, file, was: 'taken back' };
+  const order = queueOrder(readInbox());
+  const place = order.findIndex((l) => l.name === name) + 1;
+  return { card: now, file, ...(place ? { place } : {}), of: order.length, was: 'queued' };
 }
 
 /** What `wf inbox rm` did: the card's file removed, or no card of that name, and the cards the inbox has. */
@@ -1110,6 +1218,47 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
 }
 
 /**
+ * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and its `repo:` or else `repo`,
+ * the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start.
+ *
+ * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name: the
+ * workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
+ * repository, and the next card has its turn. Any other failure — git failing on the repository, say — is no verdict on the card: the next
+ * pass tries it again, where it keeps its place, and a failure the same as the last pass's is said as `again`, and not written again. The inbox
+ * and the tries are read once. A try written for a card that is no longer queued as it was is removed on the way.
+ */
+export function startQueued(repo: string, runs: readonly Run[] = listRuns()): QueueStarted | undefined {
+  const files = inboxFiles();
+  const tries = queueTries();
+  const listing = inboxListing(files, runs, isDirectory, tries);
+  for (const name of tries.keys()) {
+    if (listing.some((l) => l.name === name && l.tried)) continue;
+    try { fs.rmSync(path.join(queueDir(), `${name}.json`), { force: true }); } catch { /* removed on a pass that can */ }
+  }
+  const next = nextQueued(listing, repo);
+  if (!next) return undefined;
+  const on = next.repo ?? repo;
+  // Named on the line only for a card that names no repository: whose start turns on where the daemon runs.
+  const where = next.repo ? {} : { on };
+  try {
+    const started = startFromInbox({ name: next.name, callerRepo: repo });
+    return started.removed ? { card: next.name, run: started.run.id, removed: true } : { card: next.name, run: started.run.id, removed: false, why: started.why };
+  } catch (err) {
+    const refused = (err as { exitCode?: number }).exitCode === 2;
+    // On one line: git's words come with its command and its stderr, a line each.
+    const why = (err instanceof Error ? err.message : String(err)).split('\n').map((line) => line.trim()).filter(Boolean).join(' / ');
+    const last = next.tried;
+    if (!refused && last && !last.refused && last.why === why && last.repo === on) return { card: next.name, failed: why, again: true, ...where };
+    const tried: QueueTry = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
+    try {
+      fs.mkdirSync(queueDir(), { recursive: true });
+      fs.writeFileSync(path.join(queueDir(), `${next.name}.json`), JSON.stringify(tried, null, 2));
+    } catch { /* said all the same; not written down, the next pass tries the card again, rather than a daemon dying on it */ }
+    return refused ? { card: next.name, refused: why, ...where } : { card: next.name, failed: why, again: false, ...where };
+  }
+}
+
+/**
  * Commit whatever a step left behind, so the workspace it hands on is the workspace it made.
  *
  * Idempotent: a clean tree commits nothing, so this runs on every pass without accumulating
@@ -1146,8 +1295,13 @@ function failedWords(err: unknown, lines = 4): string {
  * failed), each try and each round filed and on whose word, a blocked session the engine was asked to stop for a try, and an ask file that
  * cannot be read. `looped` names the
  * looping steps whose loop this pass took round again. `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`).
+ * `inFlight` says the run counts against the cap on runs in flight once this pass is done: in flight when the pass read it (`slotNeed`), or
+ * filed something. `held` is the slot the cap held its roots at, on a pass that held them.
  */
-export type Advanced = { run: Run; filed: string[]; checked: string[]; tried: string[]; looped: string[]; status: Assessment['status']; blocked: string[]; notes: string[]; waiting: Wait[] };
+export type Advanced = {
+  run: Run; filed: string[]; checked: string[]; tried: string[]; looped: string[]; status: Assessment['status']; blocked: string[]; notes: string[]; waiting: Wait[];
+  inFlight: boolean; held?: RunSlot;
+};
 
 /**
  * One pass over one run: tick the engine, then file whatever became ready.
@@ -1155,8 +1309,11 @@ export type Advanced = { run: Run; filed: string[]; checked: string[]; tried: st
  * Level-triggered, like everything under it: it reads the current state of each task and decides,
  * so it is safe to run repeatedly, safe to interrupt, and correct after a restart with no memory
  * of what it did last time.
+ *
+ * `slot` is the cap on runs in flight as `tick` judges this run (`runAdmitted`): a run with nothing filed files its roots only while a slot is
+ * free, and the first pass that holds it writes when (`slotHeldAt`). Left out, nothing holds it.
  */
-export async function advance(e: Engine, run: Run): Promise<Advanced> {
+export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Advanced> {
   const steps = stepsOf(run);
 
   const { views, phaseOf } = await taskPhases(e, run);
@@ -1221,7 +1378,12 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
   // Only a run with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`gated`).
   const parent = await parentsOf(e, run);
   const starting = !hasStarted(run);
-  const ready = runReady(run, (id) => parent(id).shipped) ? assessed.ready : [];
+  // And a run with nothing filed files its roots only while the cap on runs in flight leaves a slot (`runAdmitted`): one that wants a slot and
+  // is not admitted is held, and files nothing.
+  const need = slotNeed(run, phaseOf, assessed, (id) => parent(id).shipped);
+  const admitted = runAdmitted(run, slot);
+  const held = need.wants && !admitted ? slot : undefined;
+  const ready = runReady(run, (id) => parent(id).shipped) && admitted ? assessed.ready : [];
   const waiting = waitsOf(run, parent);
 
   // Another try: a refused check `retries:` still covers, or a person's `wf retry`. The step goes on in the
@@ -1452,18 +1614,28 @@ export async function advance(e: Engine, run: Run): Promise<Advanced> {
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };
     filed.push(name);
   }
+  // The first pass the cap holds a run writes when, and says so once: what the run's timeline counts its wait for a slot from.
+  const heldFirst = Boolean(held && !run.slotHeldAt && mayFile());
+  if (heldFirst) {
+    run.slotHeldAt = new Date().toISOString();
+    notes.push(`${assessed.ready.join(', ')}: ${slotWord(held!)} — filed once a run in flight settles`);
+  }
   // A finished run's result branches, as git has them now: the commits `wf decide` offers to ship, kept so that git can still be asked
   // whether they are on the base once a person has deleted the branch after the merge (`isShipped`). Written only when a tip moved.
   const tipped = tipBranches(run, steps, status);
   const tips = tipped.length ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
   if (tips) run.tips = tips;
   // Only to a record that is still there: a run `wf rm` forgot while this pass was at work stays forgotten (`rewriteRun`).
-  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips) rewriteRun(run);
+  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst) rewriteRun(run);
   // After the record is written, never before: an ask is consumed once the record holds its try or its round — this
   // pass's, or one a pass that died before consuming it wrote down.
   consumeAsks(run, asks, roundAsks);
 
-  return { run, filed, checked, tried, looped, status, blocked, notes, waiting };
+  return {
+    run, filed, checked, tried, looped, status, blocked, notes, waiting,
+    inFlight: need.inFlight || filed.length > 0 || checked.length > 0 || tried.length > 0 || looped.length > 0,
+    ...(held ? { held } : {}),
+  };
 }
 
 export type Cancelled = { run: Run; plan: CancelPlan };
@@ -1669,15 +1841,60 @@ function removeKeyed(id: string, names: readonly string[] | undefined): string[]
   return removed;
 }
 
-/** Every run, advanced once, after one engine tick. This is the whole daemon. */
-export async function tick(e: Engine): Promise<Advanced[]> {
+/** One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards, when it did anything (`startQueued`). */
+export type Pass = { runs: Advanced[]; queue?: QueueStarted };
+
+/**
+ * Every run, advanced once, after one engine tick — then, with a run slot free, the queue's next card started. This is the whole daemon.
+ *
+ * Every run that has started first, which the cap on runs in flight (`WF_MAX_RUNS`) never holds: what each has in flight once its pass is done
+ * is what the cap counts. Then each run with nothing filed, oldest first (`admissionOrder`), judged against the runs in flight so far — and
+ * counted, once it filed, for the next (`runAdmitted`). Then, while a slot is still free (`slotFree`) — always, with no cap — one queued card
+ * is started, on `repo` when its card names none: one per pass, so the next pass counts its run before another is started. Nothing is carried
+ * between passes: the next one counts again.
+ */
+export async function tick(e: Engine, { repo = process.cwd() }: { repo?: string } = {}): Promise<Pass> {
   await e.tick();
-  const out: Advanced[] = [];
-  for (const run of listRuns()) {
-    // A finished run still gets assessed — it costs one read and it is how `ls` stays honest.
-    out.push(await advance(e, run));
+  const ran = ceilings();
+  // What `wf ls` and `wf decide` judge the cap by, from a shell of their own.
+  recordCeilings(ran);
+  const cap = ran.runs;
+  const runs = listRuns();
+  const done = new Map<string, Advanced>();
+  // A finished run still gets assessed — it costs one read and it is how `ls` stays honest.
+  for (const run of runs.filter(hasStarted)) done.set(run.id, await advance(e, run));
+  let counted = [...done.values()].filter((a) => a.inFlight).length;
+  for (const run of admissionOrder(runs.filter((r) => !hasStarted(r)))) {
+    const advanced = await advance(e, run, { inFlight: counted, cap });
+    done.set(run.id, advanced);
+    if (advanced.inFlight) counted++;
   }
-  return out;
+  const queue = slotFree({ inFlight: counted, cap }) ? startQueued(repo, runs) : undefined;
+  return { runs: runs.map((run) => done.get(run.id)!), ...(queue ? { queue } : {}) };
+}
+
+/**
+ * The runs the cap on runs in flight holds now, each with the count it is held at (`heldRuns`): every run read as a pass reads it, between
+ * passes — what `wf ls` and `wf decide` say. None, and nothing read, with no cap or no run that has nothing filed. A record whose workflow
+ * no longer reads is left out, as nothing of it could be filed.
+ *
+ * The cap is the one the last pass ran with (`lastCeilings`), not the caller's environment, which is a shell's and not the daemon's; before
+ * any pass has written it, the caller's own (`WF_MAX_RUNS`, refused by name when it is not a count).
+ */
+export async function runSlots(e: Engine, runs: readonly Run[] = listRuns()): Promise<Map<string, RunSlot>> {
+  const cap = lastCeilings()?.runs ?? runCapOf(process.env.WF_MAX_RUNS);
+  if (cap <= 0 || !runs.some((r) => !hasStarted(r) && !r.cancelledAt)) return new Map();
+  const needs: Array<Pick<Run, 'id' | 'createdAt'> & { inFlight: boolean; wants: boolean }> = [];
+  for (const run of runs) {
+    let steps: Workflow[];
+    try { steps = stepsOf(run); } catch { continue; }
+    const { views, phaseOf } = await taskPhases(e, run);
+    const { asks, rounds } = readAsks(run.id);
+    const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+    const parent = await parentsOf(e, run);
+    needs.push({ id: run.id, createdAt: run.createdAt, ...slotNeed(run, phaseOf, a, (id) => parent(id).shipped) });
+  }
+  return heldRuns(needs, cap);
 }
 
 /**
@@ -1686,7 +1903,7 @@ export async function tick(e: Engine): Promise<Advanced[]> {
  * The phase beside a step is the engine's own word (`running (working)`, `needs-human`), not the
  * narrowed `TaskPhase` the DAG decides on: a person reading the list wants the detail.
  */
-export async function list(e: Engine, run: Run): Promise<Listing> {
+export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing> {
   const steps = stepsOf(run);
   const { views, phaseOf } = await taskPhases(e, run);
   // Only a refused check's log is read here: its exit code is the one number on its line.
@@ -1698,7 +1915,7 @@ export async function list(e: Engine, run: Run): Promise<Listing> {
     const v = views.get(taskId);
     return v?.state.brief ? v.phase : 'unknown';
   };
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views));
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot);
 }
 
 /**
@@ -2327,6 +2544,8 @@ export async function decide(e: Engine, id: string): Promise<{
    * on its feed. A feed that cannot be read leaves every queue time `not known`, and the screen printed all the same.
    */
   timeline: Timeline;
+  /** The cap on runs in flight holding this run, with nothing of it filed, and the count it is held at (`runSlots`); absent when it holds none. */
+  held?: RunSlot;
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
@@ -2378,6 +2597,8 @@ export async function decide(e: Engine, id: string): Promise<{
   const used = consumption(views, run);
   const costs = Object.fromEntries(Object.entries(run.steps).filter(([, record]) => record.taskId || record.tries?.length)
     .map(([name]) => [name, costLine(steps.find((s) => s.name === name), run, name, used[name], spendOf)]));
+  // Asked only of a run with nothing filed, which is all the cap holds: every run in the store is read for it.
+  const held = !hasStarted(run) && !run.cancelledAt ? (await runSlots(e)).get(id) : undefined;
   return {
     run, decision: d, closeouts, checks,
     retrying: run.cancelledAt ? [] : retriesDue(steps, run, phaseOf, reader, asked, verdictOf, asks, blocked, spendOf),
@@ -2392,6 +2613,7 @@ export async function decide(e: Engine, id: string): Promise<{
     waiting: waitsOf(run, await parentsOf(e, run)),
     said,
     timeline: timeline(run, everyTry, filed, steps),
+    ...(held ? { held } : {}),
   };
 }
 

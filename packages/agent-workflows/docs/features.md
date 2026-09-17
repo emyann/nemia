@@ -2859,6 +2859,15 @@ What was measured:
   still read; `ship.test.ts` files a child `--after` a run whose ending merged and holds its brief to what the work said, never to the
   ending's account of its own merge; `decide.test.ts` reads the whole screen of a run parked at a gate that worked on the base branch
   itself, which used to return before the decision was printed; `run.test.ts` holds `wf rm`'s words at both kinds of gate.
+- From its fourth, six findings, one commit each: `ship.test.ts` holds two runs of one repository, each at its ending's gate and each
+  approved — the second's approval written older, since a fixture that already has the order proves nothing — to one ending in the checkout,
+  whatever order the pass takes them in, with the other reading `waiting for the checkout (<run>'s ship has it)` on `wf ls`, named on `wf
+  decide`'s screen, and filed on the first pass after that step settles; and refuses, on `err.message`, a send-back with no words, a try of
+  the ending itself, and `wf round` at the ending's gate, each naming the gate and the commands that are honoured. `run.test.ts` pins those
+  three sentences where it had an alternation that passed whatever they said, holds the brief of both kinds of step to its own artifacts
+  contract, and reads `wf ls`, `wf decide`, `gateLines` and `wf approve` in the window between a send-back and the pass that files it,
+  finding them agreed. Measured from the root three times with `npx turbo run test --force`: agent-workflows 582 (581 passed, 1 skipped),
+  from 575; api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) untouched. `npm run typecheck` clean in all four.
 - From its third: `run.test.ts` holds the ending to a loop going round — the round filed, the ending waiting, nothing to decide, and the
   gate held again once the loop hands on — and to a send-back between the ask and its filing; and holds a gate on a last step that merges
   nothing to its own words and to the branch still being a person's once approved. `decide.test.ts` refuses `--no-worktree` on a folder
@@ -2880,7 +2889,12 @@ What it leaves:
 - **A run with two endings.** `validate` refuses two `workspace: main` steps side by side, and `toDecide` names the first ending that waits;
   a workflow that deliberately ends wide with two gated endings is not something anybody has run.
 - **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes
-  into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide`.
+  into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide` — which is
+  now what its brief tells it (round 4, above).
+- **The board offers `git merge` for a run whose ending merges.** `commandsOf` (`apps/api/src/app.ts`) prints the hand-driven `git merge
+  --no-ff` and `git branch -D` for every finished run, where `wf decide` prints them only for a folder with no ending step (`merges`): a
+  folder that says what shipping is does not also tell a person to type it. Found by the review, round 4, and left: it is the api's, and
+  belongs with the board half above.
 
 What the board's run should call:
 

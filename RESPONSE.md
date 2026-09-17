@@ -43,7 +43,7 @@ hands the listing down to the link (`apps/web/src/routes/inbox.tsx`).
 A web test for the collision and an e2e line beside the stray file and the folder already there: with
 `notes.md` and `notes` both in the inbox, both list under `notes`, only the card is linked.
 
-## 4. A cell as tall as the card it holds — the taller cell, not a capped card
+## 4. A cell that holds the cards the board draws — the taller cell, not a capped card
 
 `apps/web/src/lib/factory.ts` — `CELL_HEIGHT` 220 → 260.
 
@@ -67,6 +67,27 @@ The e2e measures it now, after a layout: no card on the floor reaches over the c
 
 — and no screenshot had shown it: the tall cards are finished runs, off the default floor, and the
 page's own photograph is taken with runs open.
+
+The number is not a bound, and round 2 made the comment say so: a card draws a line per ask and per
+blocked step, so a run whose steps each ask outgrows any cell. A grid that measured its cards would be
+the answer to that, and it is not this change.
+
+## Round 2, on what review found
+
+- **The schema the write fails on.** Fixed: `fs.writeFileSync` truncates before it writes, so a write
+  that fails after the open leaves the file short, and counting a schema as written only once the call
+  returned left that one file behind. A schema now counts as written before the write, and putting back
+  compares what the file holds with what it held — which is also what keeps the undo from refusing a
+  read-only file in turn. `putSchemasBack` is exported, and a test drives all three cases.
+- **A save with no status.** Fixed: `BuildRefusal` carries no status for a lost fetch *and* for an
+  answer the api gave without what it wrote, so "the api did not answer" sat above "answered 200 OK
+  without what it wrote". It now reads "the api did not say what it wrote", with the second case tested.
+- **A refusal on two entries of one name.** Fixed, though older than this branch: the page kept and
+  matched refusals by name, so with `notes.md` beside a stray `notes` a refused Remove drew its sentence
+  under both. Matched by file now, which is one per entry.
+- **260 is tuned to the seed.** The comment is fixed; the constant is not. A fixed grid cannot bound a
+  card whose content is unbounded, and the two fixes the brief offered were the cell or a cap — a cap
+  cuts the ask, which is the one thing the card exists to show. See item 4.
 
 ## For CLAUDE.md, at the merge
 

@@ -2293,10 +2293,15 @@ What was built:
   node says `waiting on you · approve plan`. Before, it fell through to `working`, and the node drew a spinner on a step nobody runs.
 - **The Factory and Runs.** The card lists the need `approve plan` (`Need` kind `approve`, amber). The Runs row says
   `waiting on you: approve plan`, off `onYou`. Both counts of runs waiting on you include it, since `waitingOnYou` already named the step.
+- **An api started before this change.** From review, round 2: its detail has no `onYou`, and its steps no `approve` or `gate`. The run
+  page drew Approve on every step (`undefined !== null`), aimed at a route that api does not have, and the banner and the Runs row threw.
+  `withGraph` now refuses such a detail with its restart words. The gate is offered only when `approve` has words (`gateOffered`). The list
+  is read tolerantly instead (`onYouOf`: the step names, as the board said them before), because the Factory polls it and a refusal
+  there would take the whole floor down.
 
 What was measured:
 
-- From the root, `npx turbo run test --force`: api 173, from 166; web 209, from 203; agent-workflows 520 (519 passed, 1 skipped) and
+- From the root, `npx turbo run test --force`: api 173, from 166; web 212, from 203; agent-workflows 520 (519 passed, 1 skipped) and
   agent-engine 326 (317 passed, 9 skipped), unchanged by this run. `npm run typecheck` and `npm run build` clean.
 - `apps/api/test/gate.test.ts`, new, 7 tests, at shipped defaults over a seeded store:
   - the detail's `gates` and every step's `gate`, including a gated step not signed off;
@@ -2310,7 +2315,9 @@ What was measured:
   - a send-back with no words refused in `retry()`'s words, one with words taken, and the approval then refused as already asked for.
   Four guards broken on purpose: no guard, no 422, no type check on `message`, and a need on every step. Each failed at least one test.
 - Web unit tests: `awaiting approval` → `awaiting-approval`, amber, a gate, and not on a run called off. The `approve` need and its lines,
-  and nothing offered in the Decide section. The node at a gate, and the banner's line with its link and no list under it: the first run of
+  and nothing offered in the Decide section. A detail without the gate refused by `withGraph`; `gateOffered` refusing no words, a
+  missing field and a run called off; `onYouOf` falling back to the step names. Each of these four guards was broken on purpose, and a test
+  failed each time. The node at a gate, and the banner's line with its link and no list under it: the first run of
   that test found the need listed twice. The Gate's two forms, buttons and modes, and the approval with and without words.
 - `npm run e2e`: the seed gains `GATED`, a run started `--gate plan` with plan signed off, and the Factory's and Runs' counts move by one.
   The Factory's card says `approve plan`, and the Runs row says `waiting on you: approve plan`. The new `gate` page reads:

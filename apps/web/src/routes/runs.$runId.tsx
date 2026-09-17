@@ -13,7 +13,7 @@ import { StepInspector } from '../components/StepInspector';
 import { Timeline } from '../components/Timeline';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runQuery, type RunDetail } from '../lib/api';
-import { answersOf, stepAnchor } from '../lib/asks';
+import { answersOf, gateOffered, stepAnchor } from '../lib/asks';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
 
@@ -117,7 +117,7 @@ function Run({ run }: { run: RunDetail }) {
 function StepSection({ runId, step, runCancelled }: { runId: string; step: Step; runCancelled: boolean }) {
   const { spec, closeout, gate } = step;
   // Waiting at its gate on you, as `wf ls` asks it (`approve`): on a run nobody called off, and not sent back already.
-  const atGate = step.approve !== null && !runCancelled;
+  const atGate = gateOffered(step, runCancelled);
   const handedOn = closeout && (
     <div className="min-w-0 space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
       <Markdown>{closeout.summary}</Markdown>

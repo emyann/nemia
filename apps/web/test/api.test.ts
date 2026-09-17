@@ -18,7 +18,7 @@ const graph = { roots: ['implement'], edges: [{ from: 'implement', to: 'review',
 /** A run's totals on the clock, with nothing filed: what a detail carries once its api has the timeline. */
 const TOTALS = { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known' } };
 /** A detail cut to what the check reads: the run as an api from before `graph` answers it, give or take the rest. */
-const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], timeline: TOTALS, ...extra }) as unknown as RunDetail;
+const detail = (extra: object = {}) => ({ id: 'r-1', steps: [], timeline: TOTALS, onYou: [], ...extra }) as unknown as RunDetail;
 
 const refusesStale = (err: Error) =>
   /^The api answered run 'r-1' without its graph, so it is older than this board/.test(err.message) && /Restart the api/.test(err.message);
@@ -49,7 +49,7 @@ test("a run's detail whose steps come without their tries is refused, naming the
   assert.throws(() => withGraph('r-1', stale), refusesTries);
   answering(t, stale);
   await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refusesTries);
-  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [], said: [], timeline: [] }] })));
+  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [{ name: 'implement', tries: [], said: [], timeline: [], approve: null, gate: null }] })));
 });
 
 test("a run's detail whose steps come without what was said to them is refused, naming the step and the fix — an api started before the session page showed it", async (t) => {
@@ -62,7 +62,7 @@ test("a run's detail whose steps come without what was said to them is refused, 
 });
 
 test("REFUSED: a run's detail without where its time went — a step's timeline, or the run's totals — naming what is missing and the fix", async (t) => {
-  const timed = { name: 'implement', tries: [], said: [], timeline: [] };
+  const timed = { name: 'implement', tries: [], said: [], timeline: [], approve: null, gate: null };
   const refuses = (what: string) => (err: Error) =>
     err.message.startsWith(`The api answered run 'r-1' without ${what}, so it is older than this board`) && /Restart the api/.test(err.message);
   const stale = detail({ graph, steps: [timed, { name: 'review', tries: [], said: [] }] });
@@ -297,4 +297,24 @@ test("a raise is posted as JSON beside the try's mode, or with the round's step,
     ['/api/runs/r-1/round', 'POST', 'application/json', { step: 'review', budget: 2 }],
     ['/api/runs/r-1/round', 'POST', 'application/json', { budget: 3 }],
   ]);
+});
+
+test("REFUSED: a run's detail without its gate — who it waits on in wf ls's words, or a step's need and gate — naming what is missing and the fix; an api started before the board approved a step", async (t) => {
+  const gated = { name: 'plan', tries: [], said: [], timeline: [], approve: 'approve plan', gate: { awaiting: true, approval: null } };
+  const refuses = (what: string) => (err: Error) =>
+    err.message === `The api answered run 'r-1' without ${what}, so it is older than this board, whose run page approves a step at its gate. Restart the api (\`npm run dev\` from the repository, or whatever serves /api), then reload the page.`;
+  // The detail an api from before the gate answers: every field the board had before, and none of the gate's.
+  const { approve: _approve, gate: _gate, ...before } = gated;
+  const stale = detail({ graph, steps: [before], onYou: undefined });
+  assert.throws(() => withGraph('r-1', stale), refuses("the gate of its step 'plan'"));
+  answering(t, stale);
+  await assert.rejects((runQuery('r-1').queryFn as unknown as () => Promise<RunDetail>)(), refuses("the gate of its step 'plan'"));
+  // One field of the two is not the gate either, whichever it is, nor is a run without `onYou` whose steps have theirs.
+  assert.throws(() => withGraph('r-1', detail({ graph, steps: [gated, { ...before, name: 'review', approve: null }] })), refuses("the gate of its step 'review'"));
+  assert.throws(() => withGraph('r-1', detail({ graph, steps: [{ ...before, gate: null }] })), refuses("the gate of its step 'plan'"));
+  for (const onYou of [undefined, null, 'approve plan']) {
+    assert.throws(() => withGraph('r-1', detail({ graph, steps: [gated], onYou })), refuses("who it waits on in wf ls's words"), JSON.stringify(onYou));
+  }
+  // Null is an answer: a step with no gate, and nothing to approve.
+  assert.doesNotThrow(() => withGraph('r-1', detail({ graph, steps: [gated, { ...gated, name: 'review', approve: null, gate: null }], onYou: ['approve plan'] })));
 });

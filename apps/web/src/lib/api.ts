@@ -860,5 +860,12 @@ export function withGraph(id: string, detail: RunDetail): RunDetail {
     const what = untimed ? `the timeline of its step '${untimed.name}'` : 'the timeline of the run';
     throw new Error(`The api answered run '${id}' without ${what}, so it is older than this board, whose run page shows where a run's time went. ${restart}`);
   }
+  // And a gate: who the run waits on in `wf ls`'s words, and each step's need and gate. Without them the banner cannot say `approve plan`, and a
+  // step's `approve` read as anything but null would offer Approve on a route that api does not have.
+  const ungated = detail.steps.find((step) => !Object.hasOwn(step, 'approve') || !Object.hasOwn(step, 'gate'));
+  if (ungated || !Array.isArray((detail as { onYou?: unknown }).onYou)) {
+    const what = ungated ? `the gate of its step '${ungated.name}'` : 'who it waits on in wf ls\'s words';
+    throw new Error(`The api answered run '${id}' without ${what}, so it is older than this board, whose run page approves a step at its gate. ${restart}`);
+  }
   return detail;
 }

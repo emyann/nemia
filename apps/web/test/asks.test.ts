@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { answersOf, askedSaid, needLine, needOf, needsOf, needText, offersOf, raiseTo, stepAnchor, type Need } from '../src/lib/asks.ts';
+import { answersOf, askedSaid, gateOffered, needLine, needOf, needsOf, needText, offersOf, raiseTo, stepAnchor, type Need } from '../src/lib/asks.ts';
 import type { RetryMode, RunDetail } from '../src/lib/api.ts';
 
 const LOGIN = 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
@@ -176,4 +176,13 @@ test('REFUSED: no raise for a step past its budget the package takes none of, no
   // A check that did not finish within its budget: the api carries no raise, and the board offers a try again, its recheck first.
   const lint = step('lint', 'failed ✗ check (unfinished)', { raise: null, check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null } });
   assert.deepEqual(offersOf(run([lint], ['lint'])), [{ step: 'lint', kind: 'try-again', recheck: true, unfinished: true }]);
+});
+
+test('REFUSED: a step\'s section offers its gate only for the words `wf ls` asks with — not for a step with none, not for a detail that carries no `approve` at all, and not on a run called off', () => {
+  assert.equal(gateOffered({ approve: 'approve plan' }, false), true);
+  assert.equal(gateOffered({ approve: null }, false), false, 'approved, sent back, or never gated');
+  // An api started before it carried `approve`: nothing there is no approval to ask for, and its approve route would answer 404.
+  assert.equal(gateOffered({} as Pick<Step, 'approve'>, false), false, 'a field the api did not send');
+  assert.equal(gateOffered({ approve: '' }, false), false);
+  assert.equal(gateOffered({ approve: 'approve plan' }, true), false, 'nobody waits for an approval on a run called off');
 });

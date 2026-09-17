@@ -13,6 +13,7 @@ import {
   inFlight,
   inFlightFirst,
   keepLayout,
+  onYouOf,
   movedOpen,
   ONE_CELL,
   placeRuns,
@@ -599,4 +600,13 @@ test("a diamond whose bottom also waits on its top, one side opened over the bot
   assert.deepEqual(backwards(at, skip), []);
   assert.deepEqual(overlapping(at, spans), []);
   assert.deepEqual(placeRuns(ids, at, null, spans, skip), at);
+});
+
+test("who a run waits on, on the Runs row, is `wf ls`'s words where the api gives them — `approve plan` — and the steps by name from an api that gives none, never a throw", () => {
+  const gated = run(['awaiting approval', 'waiting'], { status: 'failed', waitingOnYou: ['step-0'], onYou: ['approve step-0'] });
+  assert.deepEqual(onYouOf(gated), ['approve step-0']);
+  // A list from an api started before it carried `onYou`: the Factory polls it, so it is read as that api said it, not refused.
+  const { onYou: _onYou, ...before } = gated;
+  assert.deepEqual(onYouOf(before), ['step-0']);
+  assert.deepEqual(onYouOf({ ...before, waitingOnYou: [] }), []);
 });

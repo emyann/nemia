@@ -53,6 +53,13 @@ export const needText = (need: Need): string =>
 export const needLine = (need: Need): string =>
   need.kind === 'approve' ? need.said : `${need.step} ${need.kind === 'asks' ? '' : 'is '}${needText(need)}`;
 
+/**
+ * Whether a step's section offers its gate — Approve and Send back — beside what it handed on: it waits at its gate on you, as `wf ls` asks it
+ * (`approve plan`), on a run nobody called off. Only words offer it: a step approved or sent back carries none, and neither does a detail from
+ * an api that has no approve route, whose `approve` is not there at all (`withGraph` refuses such a detail first).
+ */
+export const gateOffered = (step: Pick<RunDetail['steps'][number], 'approve'>, runCancelled: boolean): boolean => Boolean(step.approve) && !runCancelled;
+
 /** Where a step's section is on its run's page, as a URL's hash: what the banner's `approve plan` links to, where Approve is. */
 export const stepAnchor = (step: string): string => `step-${step}`;
 

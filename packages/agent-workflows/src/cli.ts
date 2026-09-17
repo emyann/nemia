@@ -731,15 +731,18 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (waiting.length) return console.log(`${head}\n\n  ${waitWord(waiting)}\n  ${waitAdvice(run, waiting)}`);
       // Nor while the cap on runs in flight holds it: the tick files its roots once a run in flight settles.
       if (held) return console.log(`${head}\n\n  ${slotWord(held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`);
+      // An ending a person's word would file, waiting for the repository's own checkout: which run's step is in it, and what frees this one.
+      // Said on either screen — a run whose ending has not run is still running, and one whose ending ended blocked is waiting on a person.
+      const ending = steps.find((s) => s.workspace === 'main');
+      const heldOut = checkout && ending ? `  ${checkoutLine(ending.name, checkout)}` : '';
       if (decision.kind === 'running') {
         console.log(`${head}\n\n  still running: ${decision.waiting.join(', ')}`);
-        // A try the next tick files is why a run that had stopped is running again: said, with whose word it is.
-        for (const r of retrying) console.log(`  ${r.step}: ${dueNote(steps.find((s) => s.name === r.step)!, run, r)}`);
+        // A try the next tick files is why a run that had stopped is running again: said, with whose word it is — unless the checkout holds
+        // it, which the line below says instead: the next tick files nothing of it.
+        for (const r of retrying.filter((r) => !(heldOut && r.step === ending?.name))) console.log(`  ${r.step}: ${dueNote(steps.find((s) => s.name === r.step)!, run, r)}`);
         // So is a loop going round again.
         for (const r of rounding) console.log(`  ${r.step}: ${roundDueNote(steps, r)}`);
-        // And an ending a person has approved, waiting for the repository's own checkout: which run's step is in it, and what frees this one.
-        const ending = steps.find((s) => s.workspace === 'main');
-        if (checkout && ending) console.log(`  ${checkoutLine(ending.name, checkout)}`);
+        if (heldOut) console.log(heldOut);
         return console.log('  nothing to decide yet');
       }
       if (decision.kind === 'shipped') return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}`);
@@ -767,6 +770,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       if (handedOn.length) console.log(`  AWAITING APPROVAL, waiting on you: ${handedOn.join(', ')}  — signed off at its gate; nothing after it is filed until you approve it, or send it back`);
       if (unrun.length) console.log(`  AWAITING APPROVAL, waiting on you: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run, and your approval is what runs it`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
+      // And the checkout, where a try of the ending waits for it: the ask stands, and the tick files it once that step settles.
+      if (heldOut) console.log(heldOut);
       // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.
       if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
 

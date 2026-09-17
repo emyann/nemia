@@ -234,6 +234,34 @@ test('a run whose ending waits for the checkout is filed once the step in it set
   assert.equal((await list(e, readRun(first.id))).steps.find((s) => s.name === 'ship')!.status, 'pending');
 });
 
+test("a try of an ending step waits for the checkout as its first filing does: a person's send-back of a ship that ended blocked files nothing while another run's ship is merging", async () => {
+  const { repo, first, second, e, settle } = await twoApproved();
+  // The older approval takes the checkout, and its ship signs off blocked — its check refused, and its prose aborted the trial merge.
+  await advance(e, readRun(second.id));
+  settle(`${second.id}-ship`, 'succeeded', BLOCKED);
+  const freed = await advance(e, readRun(first.id));
+  assert.deepEqual(freed.filed, ['ship'], 'the checkout is free, and the other run takes it');
+
+  // A person sends the blocked one back while that step is merging: allowed — it is a settled step that signed off blocked — and held.
+  const { ask } = await retry(e, second.id, 'ship', { mode: 'nudge', message: 'the check was green here; run it again' });
+  assert.deepEqual([ask.step, ask.try], ['ship', 2]);
+  for (const pass of [1, 2]) {
+    const held = await advance(e, readRun(second.id));
+    assert.deepEqual([held.tried, held.filed], [[], []], `pass ${pass}: the try waits for the checkout`);
+  }
+  assert.deepEqual(readRun(second.id).steps.ship!.tries, undefined, 'and no try was taken');
+  assert.equal(git(repo, 'rev-parse', 'HEAD'), first.base, 'nothing merged while two endings wanted the same directory');
+  const listed = await list(e, readRun(second.id));
+  assert.deepEqual([listed.steps[1]!.status, listed.steps[1]!.note],
+    ['succeeded · BLOCKED', `try 2 asked (--nudge) — waiting for the checkout (${first.id}'s ship has it)`]);
+
+  // Once the step in the checkout settles, the try is filed there, as any try of it would be.
+  settle(`${first.id}-ship`, 'succeeded', SIGNED);
+  const tried = await advance(e, readRun(second.id));
+  assert.deepEqual(tried.tried, ['ship']);
+  assert.equal(readRun(second.id).steps.ship!.workspace, repo);
+});
+
 test("a `workspace: main` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever", async () => {
   const { first, second, e, tasks } = await twoApproved();
   await advance(e, readRun(second.id));

@@ -26,7 +26,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, resultSteps, slotFree, afterRefusal, approvalOf, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, resultSteps, slotFree, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -1491,33 +1491,51 @@ export type Advanced = {
  * must not hold another run's for ever.
  */
 export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow[]): Promise<CheckoutHold | undefined> {
-  const ending = steps.find((s) => s.workspace === 'main');
-  const mine = ending ? approvalOf(run, ending.name) : undefined;
-  if (!ending || !mine || run.cancelledAt || run.steps[ending.name]?.taskId) return undefined;
-  const repo = path.resolve(run.repo);
-  const claims: MainClaim[] = [{ id: run.id, repo, step: ending.name, holds: false, at: mine.at }];
+  // Only a run whose folder ends in that checkout asks, and only one whose ending a person's word would file now (`mainClaim`): nothing
+  // else of a run works there. A run already in the checkout is not waiting for it.
+  if (!steps.some((s) => s.workspace === 'main')) return undefined;
+  const mine = await mainClaim(e, run);
+  if (!mine || mine.holds) return undefined;
+  const claims: MainClaim[] = [mine];
   for (const other of listRuns()) {
-    if (other.id === run.id || other.cancelledAt || path.resolve(other.repo) !== repo) continue;
-    let its: Workflow[];
-    try { its = stepsOf(other); } catch { continue; }   // a record whose workflow no longer reads files nothing
-    const step = its.find((s) => s.workspace === 'main');
-    if (!step) continue;
-    const taskId = other.steps[step.name]?.taskId;
-    if (taskId) {
-      // In the checkout while the engine holds its task in flight, as `inFlight` counts one: a task the engine has lost (`unknown`) holds
-      // nothing, since a run nobody can stop must not hold every other run's ending for ever.
-      const phase = phaseOfView(await e.view(taskId));
-      if (phase === 'pending' || phase === 'running') claims.push({ id: other.id, repo, step: step.name, holds: true });
-      continue;
-    }
-    const approval = approvalOf(other, step.name);
-    if (!approval) continue;
-    const { views, phaseOf } = await taskPhases(e, other);
-    const { asks, rounds } = readAsks(other.id);
-    const a = assess(its, other, phaseOf, closeoutReader(views, other), closeoutAsked(views), exitVerdicts(views, other), asks, rounds, harnessBlocked(views), spendReader(views));
-    if (a.ready.includes(step.name)) claims.push({ id: other.id, repo, step: step.name, holds: false, at: approval.at });
+    if (other.id === run.id || path.resolve(other.repo) !== mine.repo) continue;
+    const claim = await mainClaim(e, other);
+    if (claim) claims.push(claim);
   }
   return heldCheckouts(claims).get(run.id);
+}
+
+/**
+ * A run's claim on the repository's own checkout, as a pass reads it now (`MainClaim`) — or undefined for a run with no ending step, and
+ * for one whose ending the pass would neither find there nor file.
+ *
+ * Every run is read the same way, this one and the others, so the two readings cannot drift. A step is IN that checkout while the engine
+ * holds its task in flight, as `inFlight` counts one: a task the engine has lost holds nothing, since a run nobody can stop must not hold
+ * every other run's ending for ever — but a run somebody called off holds it while its session is still there, between `wf cancel` asking
+ * the engine to stop it and the engine settling it, because that session is still merging in that directory.
+ *
+ * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
+ * that ended blocked (`endingAsked`) — and only where the pass would in fact file it: a send-back of the work un-holds the gate, and an ask
+ * no tick honours files nothing, so an ending that will not be filed does not hold another run's.
+ */
+async function mainClaim(e: Engine, run: Run): Promise<MainClaim | undefined> {
+  let steps: Workflow[];
+  try { steps = stepsOf(run); } catch { return undefined; }   // a record whose workflow no longer reads files nothing
+  const ending = steps.find((s) => s.workspace === 'main');
+  if (!ending) return undefined;
+  const repo = path.resolve(run.repo);
+  const taskId = run.steps[ending.name]?.taskId;
+  const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
+  if (taskId && (phase === 'pending' || phase === 'running')) return { id: run.id, repo, step: ending.name, holds: true };
+  if (run.cancelledAt) return undefined;
+  const at = endingAsked(run, ending, readAsks(run.id).asks);
+  if (at === undefined) return undefined;
+  const { views, phaseOf } = await taskPhases(e, run);
+  const { asks, rounds } = readAsks(run.id);
+  const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+  return a.ready.includes(ending.name) || a.retry.some((r) => r.step === ending.name)
+    ? { id: run.id, repo, step: ending.name, holds: false, at }
+    : undefined;
 }
 
 /**

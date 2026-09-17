@@ -229,7 +229,11 @@ export function assess(
   const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   const status = new Map(steps.map((s) => [s.name, stood.get(s.name)!.status]));
   // A step about to be tried again is not final: what waits on it waits, and the run is still going.
-  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
+  // An ending step works in the repository's own checkout, and while another run's is in that one directory nothing of it is filed
+  // (`heldByCheckout`): not a first session, and not the try a person asked for after it ended blocked or its check refused — two sessions
+  // trial merging there at once is the collision the hold is for. It keeps the status it ended with, and waits.
+  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf)
+    .filter((r) => !heldByCheckout(steps, r.step, checkout));
   for (const r of retry) status.set(r.step, 'running');
   // Nor is a looping step whose loop goes round again: what waits on it waits for the next round's answer. And no step of that loop is held
   // on its budget on the pass before the round is filed: the round is what a person raised the cap for (`roundSpans`).
@@ -253,9 +257,9 @@ export function assess(
     // A predecessor that is final without satisfying `after` is final for its followers too. Said
     // plainly rather than left to hang, because a run that waits forever looks like a bug.
     if (deps.some(stopsFollowers)) blocked.push(step.name);
-    // An ending step works in the repository's own checkout, and another run's is in it (`heldCheckouts`): it waits, and is filed once
+    // An ending step works in the repository's own checkout, and another run's is in it (`heldByCheckout`): it waits, and is filed once
     // that one settles. Everything else it needs is here, so nothing but the checkout is between it and being filed.
-    else if (deps.every(satisfiesAfter) && !(checkout && step.workspace === 'main')) ready.push(step.name);
+    else if (deps.every(satisfiesAfter) && !heldByCheckout(steps, step.name, checkout)) ready.push(step.name);
   }
 
   const all = [...status.values()];
@@ -504,6 +508,23 @@ export function heldCheckouts(claims: readonly MainClaim[]): Map<string, Checkou
   }
   return held;
 }
+
+/**
+ * Whether the checkout holds this step back on a pass: it works in the repository's own checkout (`workspace: main`), and another run's
+ * step is in that one directory (`heldCheckouts`). Pure. Nothing of it is filed while that is so — a first session, or another try.
+ */
+export const heldByCheckout = (steps: readonly Workflow[], name: string, checkout: CheckoutHold | undefined): boolean =>
+  Boolean(checkout) && steps.some((s) => s.name === name && s.workspace === 'main');
+
+/**
+ * When the person's word that would file a run's ending step was given (`MainClaim`): the approval of an ending that has not run
+ * (`approvalOf`), or the ask for the try that would file it again — a step that ended blocked, or whose check refused, is tried like any
+ * other, and its try works in that same checkout. Undefined where there is no such word, and nothing of it would be filed. Pure.
+ */
+export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>
+  (run.steps[step.name]?.taskId
+    ? asks.find((a) => a.step === step.name && a.try === tryOf(run, step.name) + 1)?.at
+    : approvalOf(run, step.name)?.at);
 
 /** A run whose ending step waits for the repository's own checkout, as `wf ls` says it on that step's line: `waiting for the checkout (r-1's ship has it)`. Pure. */
 export const checkoutWord = (hold: CheckoutHold): string => `waiting for the checkout (${hold.run}'s ${hold.step} has it)`;
@@ -3121,7 +3142,11 @@ export function listing(
     const cost = spent.measured && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
-    const tried = retry ? dueNote(step, run, retry)
+    // A try the checkout holds back says that, where the try due would say the next tick files it: the ask stands, and is honoured once the
+    // step in that checkout settles (`heldByCheckout`). The step's own word — blocked, failed ✗ check — is its status, and stays there.
+    const heldOut = retry && checkout && heldByCheckout(steps, step.name, checkout) ? checkout : undefined;
+    const tried = heldOut ? `try ${retry!.try} asked (${modeWord(retry!)}) — ${checkoutWord(heldOut)}`
+      : retry ? dueNote(step, run, retry)
       : round ? roundDueNote(steps, round)
       : exhausted.has(step.name) ? exhaustedNote(step, run, loopOver(steps, step, run, spendOf).length > 0)
       : heldLoops.has(step.name) ? heldNote(step, run)
@@ -3144,7 +3169,7 @@ export function listing(
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       // An ending step approved and not filed says which run's step has the checkout it works in, where `waiting` would be — unless its own
       // work is being said again (`unheld`), which is what it waits for first.
-      if (checkout && step.workspace === 'main' && !waitingAgain.has(name)) return { name, status: checkoutWord(checkout), branch };
+      if (checkout && heldByCheckout(steps, name, checkout) && !waitingAgain.has(name)) return { name, status: checkoutWord(checkout), branch };
       return { name, status: step.after.length ? 'waiting' : waiting.length ? waitWord(waiting) : held ? slotWord(held) : 'waiting', branch };
     }
 

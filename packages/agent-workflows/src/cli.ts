@@ -618,11 +618,16 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       console.log(`up — every ${every}ms, ^C to stop`);
       // Both ceilings, in words, before the first pass: what the daemon holds work to.
       for (const line of ceilingLines(ceilings())) console.log(`   ${line}`);
+      // A daemon's first pass says whatever it finds of the queue. A failure `again` was written down by a pass before this daemon —
+      // by the one it replaces, or by a `wf tick` — and a person restarting `wf up` to see why cards stopped starting is not told by a
+      // line that was printed on a terminal that is gone.
+      let first = true;
       for (;;) {
         // A queued card that names no repository starts on the one `wf up` runs in, as `wf start` takes `.`.
         const { runs: passed, queue } = await tick(e, { repo: path.resolve('.') });
-        // A failure the same as the last pass's is not said again: it is tried again on every pass, and said once.
-        if (queue && !('again' in queue && queue.again)) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
+        // After that first pass, a failure the same as the last pass's is not said again: it is tried again on every pass, and said once.
+        if (queue && (first || !('again' in queue && queue.again))) console.log(`${new Date().toISOString().slice(11, 19)}  ${queueLine(queue)}`);
+        first = false;
         for (const r of passed) {
           for (const note of r.notes) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  ${note}`);
           if (r.filed.length) console.log(`${new Date().toISOString().slice(11, 19)}  ${r.run.id}  filed ${r.filed.join(', ')}`);

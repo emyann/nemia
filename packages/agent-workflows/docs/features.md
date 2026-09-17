@@ -2018,7 +2018,8 @@ What it leaves:
   about the world is written down.
 - **A failure that persists holds the queue behind it.** A card whose start keeps failing without a refusal — a `repo:` that is a directory
   with no git — is tried on every pass and keeps its place, so the cards behind it wait until a person fixes the repository, or takes the
-  card back. It is said once on `wf up`, and in `wf inbox`.
+  card back. It is said once on `wf up`, and in `wf inbox`. *Four leftovers from the reviews*, below, made a `wf up` say it on its first
+  pass too.
 - **A card with no `repo:` starts on wherever `wf up` runs.** `wf inbox` cannot know that directory, so a refusal that turns on it is seen
   only once the tick has tried.
 - **`wf inbox queue --off` in the moment the tick starts the card** can write the card back after the start removed it. The record names it,
@@ -3004,6 +3005,14 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   error `execFileSync` throws, which is where every failure is read from (`failedWords`, `startQueued`). Tested on the store
   (`test/queue-store.test.ts`): a pass over such a card writes nothing at all to `process.stderr`, while `queueLine` still says
   `no-git-a1b2 not started: Command failed: git rev-parse HEAD / fatal: not a git repository…`. Without the `stdio`, the test fails.
+- **A `wf up` says what the queue is stuck on, on its first pass.** A start that fails without a refusal is tried on every pass and said
+  once: the tick writes the failure down, and `wf up` holds its tongue while the next pass fails the same way on the same repository
+  (`QueueTry`, `again`). But `again` is a fact about the store, not about this daemon: the pass that said it may have been another `wf up`,
+  or a `wf tick`, and its line is on a terminal that is gone. A person restarting the daemon to find out why cards stopped starting was met
+  with the runs advancing and nothing about the card. The `up` loop now says whatever the first pass finds, `again` or not, and holds its
+  tongue from the second on. `wf tick` is unchanged: it says every pass it is asked for. Tested on the store — the test that pinned the
+  silence over two passes now reads exactly one line, matched whole, and it names the card and why. Silent on the first pass fails it; said
+  on every pass fails it too.
 
 ## 1. A run that grows steps from a plan
 

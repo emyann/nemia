@@ -582,7 +582,7 @@ test("a queued card whose start fails without a refusal — its repository no gi
   const listed = (await printedBy(t, b.e, 'inbox')).find((l) => l.startsWith('no-git-a1b2'))!;
   assert.match(listed, / {2}queued 1 of 2 — failed at \S+: Command failed: git rev-parse HEAD .* — not a refusal: the tick tries it again on every pass, where it keeps its place$/);
 
-  // `wf up` over two passes: the failure said once, the card tried on both, and the card behind it not started.
+  // `wf up` over two passes: the failure said on the first, the card tried on both, and the card behind it not started.
   const up = board();
   let passes = 0;
   const stop = new Error('the test stops the daemon');
@@ -593,7 +593,11 @@ test("a queued card whose start fails without a refusal — its repository no gi
   try {
     await assert.rejects(main(['up', '1'], up.e), (err) => err === stop);
   } finally { log.mock.restore(); }
-  assert.deepEqual(printed.filter((l) => l.includes('no-git-a1b2')), [], 'the same failure as the pass before, twice: not said again');
+  // Said on the daemon's first pass though the failure is `again`: it was written down by the `tick` above, whose line this daemon never
+  // printed, and a person restarting `wf up` to see why cards stopped starting is told by it. Then not again, however many passes follow.
+  const named = printed.filter((l) => l.includes('no-git-a1b2'));
+  assert.equal(named.length, 1, printed.join('\n'));
+  assert.match(named[0]!, /^\d\d:\d\d:\d\d  no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ .*not a git repository.* — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise$/);
   const again = await tick(b.e);
   assert.deepEqual([again.queue && 'failed' in again.queue && again.queue.again, listRuns()], [true, []], 'tried again, and nothing started behind it');
   assert.equal(JSON.parse(fs.readFileSync(path.join(ROOT, 'queue', 'no-git-a1b2.json'), 'utf8')).at, written.at, 'not written again');

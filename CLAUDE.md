@@ -46,6 +46,10 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   until a drag is under way, so `dragTo`'s check of what the pointer would hit finds the node over the handle. Drag with `page.mouse`
   (down, move in steps, up), and keep both ends in the frame: a drag that starts off a handle pans the pane (`drawEdge` in
   `apps/web/test/e2e/run.ts`, learned by the run that built the workflow builder).
+- **A file written through a script can turn an escape into the character it names.** A Python heredoc, or a tool that decodes
+  escapes, wrote a raw NUL and DEL into a regular expression's class in `apps/api/src/builder.ts`: ripgrep then took the whole file for
+  binary, and a search of `apps/api/src` did not find it. Each app's `test/source.test.ts` refuses a raw control character in its `src` and
+  `test`; a script that needs one builds it with `String.fromCharCode` (learned by the run that built the workflow builder, round 2).
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).

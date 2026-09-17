@@ -1024,7 +1024,8 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   a continued try with a note finished it); **after W9:** B13 `the-gate-on-the-board-approv-4t7s` (apps: Approve and Send back on the run page, the
   card's need; `dev-build`) — two rounds, $37.12, **merged, `46afb7d`**; **after W10:** W11 `the-workflow-builder-s-packa-x2ha` (agent-workflows: `renderStep`, `writeWorkflow`;
   `dev`) — one round, $10.49, **merged, `de8ea12`**; **after W11 and B13:** B14 `the-workflow-builder-on-the-4ifo` (apps: the builder on the Workflows page, writing the store's
-  folder only; `dev-build`); **after B14:** B15 `the-web-app-s-components-on-3xq9` (apps: React Aria as the base, §7, the plan waiting
+  folder only; `dev-build`) — three rounds, $55.91, **merged, `0f2fbc8`** (it ended its first try in prose; a continued try signed it
+  off for 65 cents); **after B14:** B15 `the-web-app-s-components-on-3xq9` (apps: React Aria as the base, §7, the plan waiting
   for approval; `dev-planned-build`).
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The Factory's
 ghosts for queued cards wait for W8, in its second round. Left: item 20 (settings, by hand). Items 27, 28, 30 and 31 are done.

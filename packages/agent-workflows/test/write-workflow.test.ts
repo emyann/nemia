@@ -232,7 +232,12 @@ test('the files of the steps the folder no longer has go before a byte of the ne
   try {
     writeWorkflow(dir, [implement, { ...review, name: 'REVIEW', rounds: 2 }]);
   } finally { removals.mock.restore(); writes.mock.restore(); }
-  assert.deepEqual(order, ['removed review.md', 'removed ship.md', 'wrote REVIEW.md'], 'implement.md is left as it is, and the removals come first');
+  // Which removal came first is `readdirSync`'s order, which is the filesystem's and not sorted; what the rule says is that every one of
+  // them came before the write.
+  const wrote = order.indexOf('wrote REVIEW.md');
+  assert.ok(wrote >= 0, order.join(', '));
+  assert.deepEqual([...order.slice(0, wrote)].sort(), ['removed review.md', 'removed ship.md'], 'both removals come before the write');
+  assert.deepEqual(order.slice(wrote), ['wrote REVIEW.md'], 'and nothing is removed after it — implement.md is left as it is');
 });
 
 test('a step renamed by case keeps its file where the filesystem does not tell case apart', { skip: caseSensitive && 'this filesystem tells implement.md from Implement.md apart, where a rename by case is an ordinary rename' }, () => {

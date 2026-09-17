@@ -2018,8 +2018,8 @@ What it leaves:
   about the world is written down.
 - **A failure that persists holds the queue behind it.** A card whose start keeps failing without a refusal — a `repo:` that is a directory
   with no git — is tried on every pass and keeps its place, so the cards behind it wait until a person fixes the repository, or takes the
-  card back. It is said once on `wf up`, and in `wf inbox`. *Four leftovers from the reviews*, below, made a `wf up` say it on its first
-  pass too.
+  card back. It is said once on `wf up`, and in `wf inbox`. *Four leftovers from the reviews*, below, made each `wf up` say it once of its
+  own, rather than once in the store.
 - **A card with no `repo:` starts on wherever `wf up` runs.** `wf inbox` cannot know that directory, so a refusal that turns on it is seen
   only once the tick has tried.
 - **`wf inbox queue --off` in the moment the tick starts the card** can write the card back after the start removed it. The record names it,
@@ -3005,14 +3005,18 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   error `execFileSync` throws, which is where every failure is read from (`failedWords`, `startQueued`). Tested on the store
   (`test/queue-store.test.ts`): a pass over such a card writes nothing at all to `process.stderr`, while `queueLine` still says
   `no-git-a1b2 not started: Command failed: git rev-parse HEAD / fatal: not a git repository…`. Without the `stdio`, the test fails.
-- **A `wf up` says what the queue is stuck on, on its first pass.** A start that fails without a refusal is tried on every pass and said
-  once: the tick writes the failure down, and `wf up` holds its tongue while the next pass fails the same way on the same repository
-  (`QueueTry`, `again`). But `again` is a fact about the store, not about this daemon: the pass that said it may have been another `wf up`,
-  or a `wf tick`, and its line is on a terminal that is gone. A person restarting the daemon to find out why cards stopped starting was met
-  with the runs advancing and nothing about the card. The `up` loop now says whatever the first pass finds, `again` or not, and holds its
-  tongue from the second on. `wf tick` is unchanged: it says every pass it is asked for. Tested on the store — the test that pinned the
-  silence over two passes now reads exactly one line, matched whole, and it names the card and why. Silent on the first pass fails it; said
-  on every pass fails it too.
+- **A `wf up` says what the queue is stuck on, once, and it is the daemon that counts.** A start that fails without a refusal is tried on
+  every pass and said once: the tick writes the failure down, and `wf up` held its tongue while the next pass failed the same way on the
+  same repository (`QueueTry`, `again`). But `again` is a fact about the store, not about this daemon: the pass that said it may have been
+  another `wf up`, or a `wf tick`, and its line is on a terminal that is gone. A person restarting the daemon to find out why cards stopped
+  starting was met with the runs advancing and nothing about the card. The `up` loop now keeps the last failure it printed itself — the
+  card, the repository it was tried on, and why — and says anything else; `again` is no longer read there. Round 2 of review is what settled
+  the shape: a flag for the first pass was not enough, because a pass at a full cap reads no queue at all (`tick` calls `startQueued` only
+  while a slot is free), so a daemon restarted under a cap spent its one free pass in silence and never named the card. `wf tick` is
+  unchanged: it says every pass it is asked for. Tested on the store, twice over. With no cap, the test that pinned the silence reads
+  exactly one line over two passes, matched whole, naming the card and why — said on every pass fails it. At a cap of 1, with the failure
+  already written down, a daemon whose first pass files a run and reads no queue names the card on its second, when the run finishes and
+  the slot frees — the first-pass flag fails that one.
 - **`writeWorkflow`: a step renamed by case, and a step's file that is a link.** Two edge cases an earlier review found and left. The write
   put each step's `<name>.md` down and then removed the `.md` of every step the folder no longer has; where the filesystem does not tell
   case apart — macOS's, Windows's — `Plan.md` and `plan.md` are one file, so a step renamed by case was written, and then removed under its
@@ -3022,14 +3026,15 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   folder — a rendered step landing on a file no workflow owns — while a stale one was left behind, since `readdirSync`'s entry for a link
   is no file and the removal takes only files. Such a link is now refused by name, with the folder as it was, before anything is written; a
   linked README is refused only when a `readme` is given, which is when it would be written. Tested in `test/write-workflow.test.ts`: the
-  order of the removals and the writes, read off `fs` on any filesystem, so the rule holds where this repository's tests run; the rename by
+  order of the removals and the writes, read off `fs` on any filesystem, so the rule holds where this repository's tests run — as a
+  partition, every removal before the write, since which removal comes first is `readdirSync`'s order and so the filesystem's; the rename by
   case itself, skipped where the filesystem tells the two names apart and saying so (it skips on Linux, and the folder it asserts —
   `Implement.md` alone beside the README and the schema, read back as one step — is what a case-insensitive filesystem gives); and the
   refusal, in its words, for a link a step would be written through, for a link whose step is gone, and for a linked README with a README
   given, each with what the link points at untouched — and, beside them, that a linked README with no README given is nothing the write
   touches. Writing before removing fails the first; the refusal dropped fails the third.
-- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 592 (590 passed, 2 skipped), from 587 —
-  four new tests, one of them the case rename, which skips where the filesystem tells `implement.md` from `Implement.md` apart, and one
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 593 (591 passed, 2 skipped), from 587 —
+  five new tests, one of them the case rename, which skips where the filesystem tells `implement.md` from `Implement.md` apart, and one
   changed test, the `wf up` silence. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged: nothing outside the package
   changed. `npm run typecheck` clean in all four.
 

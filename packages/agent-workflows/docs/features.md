@@ -2868,7 +2868,7 @@ What was measured:
   the ending itself, and `wf round` at the ending's gate, each naming the gate and the commands that are honoured. `run.test.ts` pins those
   three sentences where it had an alternation that passed whatever they said, holds the brief of both kinds of step to its own artifacts
   contract, and reads `wf ls`, `wf decide`, `gateLines` and `wf approve` in the window between a send-back and the pass that files it,
-  finding them agreed. Measured from the root three times with `npx turbo run test --force`: agent-workflows 582 (581 passed, 1 skipped),
+  finding them agreed. Measured from the root three times with `npx turbo run test --force`: agent-workflows 583 (582 passed, 1 skipped),
   from 575; api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) untouched. `npm run typecheck` clean in all four.
 - From its third: `run.test.ts` holds the ending to a loop going round — the round filed, the ending waiting, nothing to decide, and the
   gate held again once the loop hands on — and to a send-back between the ask and its filing; and holds a gate on a last step that merges

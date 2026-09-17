@@ -2,7 +2,7 @@
  * `npm run e2e`: the web app, built, served against a seeded store, and looked at in a browser.
  *
  *  1. Builds the web app.
- *  2. Seeds a store in a temporary WF_ROOT with five fake runs, the first with a real repository and branch to decide
+ *  2. Seeds a store in a temporary WF_ROOT with six fake runs, the first with a real repository and branch to decide
  *     on, and beside it a checkout for the api to serve (`HKB_REPO`) on the Capabilities page, and workflows in both for
  *     the Workflows page (seed.ts).
  *  3. Starts the api on a free port (`PORT=0`, reading the port it prints) and `vite preview` on another,
@@ -26,7 +26,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
+import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, FAKE, GATED, HELD, INBOX, LOOPING, NEIGHBOUR, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedWorkflows, SESSION, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -229,8 +229,10 @@ const PAGES: PageSpec[] = [
       // Its followers read `waiting`, and will for ever; they do not keep it on the floor.
       await expectCount(card, 0, `a run whose check refused is finished, not in flight: no card on the floor by default (${FAKE.id})`);
       // So is the loop out of rounds: it waits on a person, and nothing of it moves.
-      // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. Waiting on you: FAKE, LOOPING, COSTLY, and the run waiting on one called off.
-      await expectVisible(page.getByText('4 in flight · 7 finished · 4 waiting on you'), 'the Factory counts the runs in flight, the finished, and those waiting on you');
+      // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. Waiting on you: FAKE, LOOPING, COSTLY, GATED, and the run waiting on one called off.
+      await expectVisible(page.getByText('4 in flight · 8 finished · 5 waiting on you'), 'the Factory counts the runs in flight, the finished, and those waiting on you');
+      // A run at its gate is finished too: nothing of it moves until a person approves its step.
+      await expectCount(cardOf(page, GATED.id), 0, `a run waiting at its gate is not in flight: no card on the floor by default (${GATED.id})`);
       await showFinished(page);
       // The run called off, and the one that waits on it: for ever, so on you, and its card names the run it waits on and why.
       await expectVisible(
@@ -253,6 +255,14 @@ const PAGES: PageSpec[] = [
         `the card of a run whose sessions were priced says what it cost beside its age (${COSTLY.cost})`,
       );
       await expectCount(card.locator('[data-cost]'), 0, "the fake run's card says no cost: none of its sessions was priced");
+      // A run at its gate: its card says what is asked of you, in wf ls's words, and its step's chip is amber.
+      const gated = cardOf(page, GATED.id);
+      await expectVisible(
+        gated.locator(`[data-need="approve"][data-step="${GATED.gated}"]`, { hasText: new RegExp(`^approve ${GATED.gated}$`) }),
+        `the card of a run at its gate says approve ${GATED.gated} (${GATED.id})`,
+      );
+      await expectVisible(gated.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }), 'and shows the step as awaiting approval, an amber chip');
+      await expectVisible(gated.getByText('waiting on you', { exact: true }), 'and waits on you');
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
       await expectVisible(
         card.locator(`[data-need="asks"][data-step="${FAKE.blocked}"]`, { hasText: `${FAKE.blocked} asks: ${SESSION.closeout.needs}` }),
@@ -382,17 +392,17 @@ const PAGES: PageSpec[] = [
       await sidebar(page);
       // The runs in flight on top, then the rest, each newest first; in flight as the Factory counts them, which the api's id order is not.
       const rows = page.locator('li[data-in-flight]');
-      await expectCount(rows, 11, 'the runs list has a row for each of the eleven runs the Factory counts');
+      await expectCount(rows, 12, 'the runs list has a row for each of the twelve runs the Factory counts');
       // Under a heading each, which says where the runs in flight end: the first finished row is newer than the last in flight.
       const flying = page.locator('section[data-group="in-flight"]');
       const finished = page.locator('section[data-group="finished"]');
       await expectCount(flying.locator('li[data-in-flight="true"]'), 4, 'the four runs in flight, as the Factory counts them, are under In flight');
       await expectCount(flying.locator('li[data-in-flight="false"]'), 0, 'and no finished run is');
-      await expectCount(finished.locator('li[data-in-flight="false"]'), 7, 'the seven finished runs are under Finished');
+      await expectCount(finished.locator('li[data-in-flight="false"]'), 8, 'the eight finished runs are under Finished');
       await expectCount(finished.locator('li[data-in-flight="true"]'), 0, 'and no run in flight is');
       await expectVisible(flying.getByRole('heading', { name: /^In flight 4 something of each still moves, newest first$/ }), 'In flight is headed with its count and its order');
       await expectVisible(
-        finished.getByRole('heading', { name: /^Finished 7 nothing of these moves any more, newest first · 4 waiting on you$/ }),
+        finished.getByRole('heading', { name: /^Finished 8 nothing of these moves any more, newest first · 5 waiting on you$/ }),
         'Finished is headed with its count, its order, and how many of them wait on you, as the Factory counts them',
       );
       await expectBeneath(finished, flying, 'the finished runs are listed beneath the runs in flight');
@@ -436,6 +446,10 @@ const PAGES: PageSpec[] = [
       );
       await expectVisible(costly.getByText(`waiting on you: ${COSTLY.steps.join(', ')}`), 'and says every step past its budget waits on you');
       await expectCount(page.locator('li', { has: page.locator(`a[href="/runs/${FAKE.id}"]`) }).locator('[data-cost]'), 0, "the fake run's row says no cost: none of its sessions was priced");
+      // A run at its gate: what is asked of you, as wf ls says it, and counted among the runs waiting on you above.
+      const gatedRow = page.locator(`li a[href="/runs/${GATED.id}"]`);
+      await expectVisible(gatedRow.locator('[data-waiting-on-you]', { hasText: new RegExp(`^waiting on you: approve ${GATED.gated}$`) }), `the row of a run at its gate says waiting on you: approve ${GATED.gated}`);
+      await expectVisible(gatedRow.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }), 'and shows its step as awaiting approval, an amber chip');
       const loop = page.locator(`li a[href="/runs/${LOOPING.id}"]`);
       await expectVisible(loop.getByText(`waiting on you: ${LOOPING.exhausted}`), `the runs list says ${LOOPING.exhausted}, out of rounds, is waiting on you`);
       await expectVisible(
@@ -795,6 +809,154 @@ const PAGES: PageSpec[] = [
     },
   },
   {
+    // The gate on the board: a run waiting at plan's gate, the closeout plan handed on rendered, and beside it Approve and Send back. Refused
+    // first, in a page of its own whose one refusal is the point: an approval of a step that is not gated — the page read the gate, and the
+    // record lost it before Approve was pressed — in the package's words beside the button, and nothing written. Then approved from the page,
+    // with words: the approval's file as `wf approve` writes it, and the page reads the approval under the step. Taken back, and sent back
+    // from the page: the ask as `wf retry --message` writes it. Each file is taken back, so every page after this one reads the store as seeded.
+    name: 'gate',
+    route: `/runs/${GATED.id}`,
+    expect: async (page) => {
+      await sidebar(page);
+      const { id, gated } = GATED;
+      const asks = path.join(store!, 'runs', `${id}.asks`);
+      const recordFile = path.join(store!, 'runs', `${id}.json`);
+      const seededRecord = fs.readFileSync(recordFile, 'utf8');
+      const approved = (r: { request: () => { method: () => string }; url: () => string }) =>
+        r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${gated}/approve`;
+      const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
+        r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${gated}/retry`;
+      const gateOf = (p: Page) => p.locator(`section[aria-label="The gate of ${gated}"]`);
+      const wordsOf = (p: Page) => gateOf(p).getByRole('textbox', { name: `Words to approve ${gated} with, if any` });
+      const approveOf = (p: Page) => gateOf(p).getByRole('button', { name: 'Approve', exact: true });
+
+      // The banner's one line, in wf ls's words, linked to the step's section.
+      const banner = page.locator('section[aria-label="Waiting on you"]');
+      const line = `Waiting on you: approve ${gated} — signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget — wf decide ${id}`;
+      await expectVisible(banner.locator(':scope > p', { hasText: line }), `the banner says ${line}`);
+      await expectCount(banner.locator(':scope > p'), 1, 'in its one line');
+      await expectCount(banner.locator(`a[data-approve="${gated}"][href="#step-${gated}"]`), 1, `approve ${gated} links to the step's section`);
+      await expectCount(banner.locator('li'), 0, 'and lists nothing under it: the approval is no question');
+
+      // On the graph: a human gate, saying what is asked of you.
+      const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
+      const node = graph.locator(`.react-flow__node[data-id="${gated}"]`);
+      await expectVisible(node.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }), `${gated}'s chip reads awaiting approval, amber`);
+      await expectVisible(node.locator('[data-need="approve"]', { hasText: `approve ${gated}` }), `${gated} is a human gate on the graph, and says approve ${gated}`);
+      await expectCount(node.getByRole('img', { name: 'running now' }), 0, 'and no spinner: nobody runs a step at its gate');
+
+      // Its section: what it handed on, rendered, and beside it the gate, with Approve and Send back.
+      const section = page.locator(`article > section#step-${gated}`);
+      const handedOn = section.locator('div.grid > div', { has: page.getByRole('heading', { level: 4, name: GATED.plan.heading }) });
+      await expectRendered(handedOn, { heading: GATED.plan.heading, items: GATED.plan.items });
+      await expectVisible(gateOf(page), `${gated}'s section has its gate`);
+      await expectLeftOf(handedOn, gateOf(page), 'the gate is beside what the step handed on');
+      await expectVisible(wordsOf(page), 'a box for the words to approve with');
+      if (!(await approveOf(page).isEnabled())) throw new Refused('Approve is enabled with no words: an approval needs none');
+      const objection = gateOf(page).getByRole('textbox', { name: `What to change, sent back to ${gated}` });
+      const sendBack = gateOf(page).getByRole('button', { name: 'Send back', exact: true });
+      await expectVisible(objection, 'and the answer box that sends it back');
+      if (await sendBack.isEnabled()) throw new Refused('Send back is disabled while there is no objection — it was enabled with none');
+      await expectVisible(gateOf(page).getByRole('radio', { name: /^a new session/ }), 'a new session as an option to continuing its session');
+      await expectVisible(section.locator('dd', { hasText: /^awaiting approval$/ }), "the step's facts say its gate awaits approval");
+      const decide = page.locator('section[aria-label="Decide"]');
+      await expectCount(decide.locator('section[aria-label="Answer"]'), 0, "the Decide section offers no answer of its own: the gate is the step's");
+      // Its commands are the gate's, as `wf decide` prints them under the step — never `None yet: the run is still moving`.
+      await expectVisible(decide.locator('[data-command="approve"] code', { hasText: new RegExp(`^wf approve ${id} ${gated}$`) }), 'the Decide section offers the approval to copy');
+      await expectVisible(decide.locator('[data-command="send back"] code', { hasText: `wf retry ${id} ${gated} --message "<objection>"` }), 'and the send-back');
+      await expectCount(decide.getByText('None yet: the run is still moving.'), 0, 'and does not say the run is still moving: it waits on you');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `gate-awaiting-${await themeOf(page)}.png`), fullPage: true });
+
+      // Refused, in a page of its own: the page read plan's gate, and the record lost it — as a run started without --gate reads — before
+      // Approve was pressed. The run as the page read it is held, so the button is there to press; the package refuses an approval of a step
+      // that is not gated, in its words, beside the button, verbatim; the words stay in the box, and nothing is written.
+      const refused = await page.context().newPage();
+      try {
+        const { problems } = watch(refused);
+        await refused.goto(page.url(), { waitUntil: 'networkidle' });
+        await expectVisible(approveOf(refused), 'Approve, on a page of its own');
+        const detailPath = `/api/runs/${id}`;
+        const read = await (await refused.request.get(new URL(detailPath, refused.url()).href)).text();
+        await refused.route((url) => url.pathname === detailPath, (route) => route.fulfill({ status: 200, contentType: 'application/json', body: read }));
+        const { gates: _gates, ...ungated } = JSON.parse(seededRecord) as { gates?: string[] };
+        fs.writeFileSync(recordFile, JSON.stringify(ungated, null, 2));
+        await wordsOf(refused).fill(GATED.words);
+        const [answered] = await Promise.all([refused.waitForResponse(approved, { timeout: WAIT_MS }), approveOf(refused).click()]);
+        const { error } = (await answered.json()) as { error?: string };
+        if (answered.status() !== 409 || !error?.startsWith(`${gated} has no gate: what waits on it is filed once it has signed off, with nobody's approval, so there is nothing to approve. ${id} is gated at no step.`)) {
+          throw new Refused(`the package refuses an approval of a step that is not gated — the api answered ${answered.status()}: ${JSON.stringify(error)}`);
+        }
+        const refusal = gateOf(refused).locator('form[aria-label^="Approve"] [data-refused]');
+        await expectVisible(refusal.getByText('Not approved. The api refused it:'), 'the refusal is shown beside Approve, not swallowed');
+        const shown = await refusal.locator('p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal beside Approve is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        if ((await wordsOf(refused).inputValue()) !== GATED.words) throw new Refused('the words stay in the box after a refusal, to approve with again');
+        if (fs.existsSync(asks)) throw new Refused(`nothing is written on a refusal — ${asks} holds ${fs.readdirSync(asks, { recursive: true }).join(', ')}`);
+        await settled(refused);
+        await refused.screenshot({ path: path.join(OUT, `gate-refused-${await themeOf(refused)}.png`), fullPage: true });
+        // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
+        const expected = `request answered 409: POST ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await refused.close();
+        fs.writeFileSync(recordFile, seededRecord);
+      }
+
+      // Approved, with words: the api takes it through the board's proxy, and writes the approval as `wf approve` does, and nothing else.
+      await expectVisible(approveOf(page), `with its gate back on the record, ${gated} waits at it once the run is read again`);
+      await wordsOf(page).fill(GATED.words);
+      const [response] = await Promise.all([page.waitForResponse(approved, { timeout: WAIT_MS }), approveOf(page).click()]);
+      if (response.status() !== 202) throw new Refused(`the api takes the approval, through the board's proxy — it answered ${response.status()}: ${await response.text()}`);
+      const took = (await response.json()) as { try?: unknown; at?: unknown; message?: unknown; file?: unknown };
+      const file = path.join(asks, `approve-${gated}-1`);
+      if (took.try !== 1 || typeof took.at !== 'string' || took.message !== GATED.words || took.file !== file) {
+        throw new Refused(`the api answers with the try approved, when, the words and the approval's file — it answered ${JSON.stringify(took)}`);
+      }
+      const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+      if (JSON.stringify(written) !== JSON.stringify({ step: gated, try: 1, at: took.at, message: GATED.words }) || fs.readdirSync(asks).length !== 1) {
+        throw new Refused(`the approval is written as wf approve writes it, and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}, and ${file} ${JSON.stringify(written)}`);
+      }
+      if (fs.readFileSync(recordFile, 'utf8') !== seededRecord) throw new Refused(`the api writes nothing of the run's record — ${recordFile} changed`);
+
+      // The page reads the approval under the step, and nobody is waited on for it.
+      const approval = section.locator(`section[aria-label="The approval of ${gated}"]`);
+      await expectVisible(approval, `the approval shows under ${gated} once the run is read again`);
+      const words = await approval.locator('[data-words]').textContent();
+      if (words !== GATED.words) throw new Refused(`the approval's words are shown as they were written — it shows ${JSON.stringify(words)}`);
+      await expectVisible(approval.locator(`time[datetime="${took.at}"]`), 'with when it was given');
+      await expectCount(gateOf(page), 0, 'and the gate is gone: nothing to approve');
+      await expectCount(banner, 0, 'and the banner with it: nobody is waited on');
+      await expectVisible(section.locator('dd', { hasText: /^approved, try 1$/ }), "the step's facts say its gate is approved");
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `gate-approved-${await themeOf(page)}.png`), fullPage: true });
+
+      // Taken back: the gate holds again, and plan is sent back from its page, as `wf retry --message` sends it — then that is taken back too.
+      fs.rmSync(asks, { recursive: true, force: true });
+      await expectVisible(approveOf(page), `with the approval taken back, ${gated} waits at its gate again once the run is read again`);
+      await expectCount(approval, 0, 'and its approval is gone from under it');
+      await objection.fill(GATED.objection);
+      const [sent] = await Promise.all([page.waitForResponse(retried, { timeout: WAIT_MS }), sendBack.click()]);
+      if (sent.status() !== 202) throw new Refused(`the api takes the send-back — it answered ${sent.status()}: ${await sent.text()}`);
+      const ask = path.join(asks, `retry-${gated}-2`);
+      const asked = fs.existsSync(ask) ? JSON.parse(fs.readFileSync(ask, 'utf8')) : undefined;
+      if (asked?.step !== gated || asked?.try !== 2 || asked?.mode !== 'nudge' || asked?.message !== GATED.objection) {
+        throw new Refused(`the send-back is written as wf retry --message writes it — ${ask} holds ${JSON.stringify(asked)}`);
+      }
+      const note = 'try 2 asked (--nudge, with your answer) — the next tick files it';
+      await expectVisible(section.locator('[data-note]', { hasText: note }), `${gated}'s section says what wf ls says of the try asked (${note})`);
+      await expectCount(gateOf(page), 0, 'and offers the gate no more: it is sent back');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `gate-sent-back-${await themeOf(page)}.png`), fullPage: true });
+
+      fs.rmSync(asks, { recursive: true, force: true });
+      await expectVisible(approveOf(page), `with the send-back taken back, ${gated} waits at its gate again, and the page ends as it began`);
+      await settled(page);
+    },
+  },
+  {
     name: 'session',
     route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
     expect: async (page) => {
@@ -1079,7 +1241,7 @@ const PAGES: PageSpec[] = [
       await expectCount(page.getByText(/no longer reads as a workflow|has changed since this run started/), 0, 'no warning about the workflow folder: it reads as the budgets the run froze');
       await expectVisible(page.locator('article header [data-run-cost]', { hasText: `cost ${COSTLY.cost}` }), `the run's header says what it cost (${COSTLY.cost})`);
       // Whole: implement and review did their work, and are held on implement's budget alone — the reason has to be among those the banner gives.
-      const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, out of rounds, or past its budget — wf decide ${COSTLY.id}`;
+      const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget — wf decide ${COSTLY.id}`;
       await expectVisible(page.locator('section[aria-label="Waiting on you"] > p', { hasText: reasons }), `the banner says every step past its budget waits on you, and why: ${reasons}`);
       await expectVisible(
         page.locator(`section[aria-label="Waiting on you"] [data-need="asks"][data-step="${askingStep.step}"]`, { hasText: `${askingStep.step} asks: ${askingStep.needs}` }),

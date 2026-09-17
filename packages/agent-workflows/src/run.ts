@@ -72,6 +72,12 @@ export type Run = {
    */
   from?: { inbox: string };
   /**
+   * The steps this run is gated at beyond those its workflow gates (`gate: true`), frozen at start: `wf start --gate <step>`, and an inbox
+   * card's `gate:`. Each such step's closeout waits for a person — `wf approve` — before anything after it is filed (`hasGate`). Absent on a
+   * run given none, and on every record from before there were gates.
+   */
+  gates?: string[];
+  /**
    * When the cap on runs in flight (`WF_MAX_RUNS`) first held this run, with nothing of it filed: written once, by the pass that held it. What
    * says the time before its first filing was a wait for a run slot (`timeline`). Absent on a run the cap never held, and on every record
    * from before there was a cap.
@@ -226,6 +232,31 @@ export function assess(
     : 'running';
 
   return { ready, check, retry, round, blocked, status: overall };
+}
+
+// ─── a gate: a handoff that waits for a person ─────────────────────────────
+
+/** Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with. */
+export const hasGate = (step: Pick<Workflow, 'name' | 'gate'>, run: Pick<Run, 'gates'>): boolean => step.gate === true || Boolean(run.gates?.includes(step.name));
+
+/** The steps a run is gated at, in the order they run: those its workflow gates, and those it was started with. Pure. */
+export const gatesOf = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): string[] => steps.filter((s) => hasGate(s, run)).map((s) => s.name);
+
+/**
+ * Why a run cannot be gated at these steps, in words that name the fix — or null. Pure, and asked at start before anything is written: a step
+ * given twice, and a step the workflow does not have, naming the steps it has. `said` is how a refusal names what gave the gate: `--gate <step>`
+ * by default, a card's `gate:` for a card's.
+ */
+export function gateRefusal(gates: readonly string[], steps: readonly Pick<Workflow, 'name'>[], said: (step: string) => string = (step) => `--gate ${step}`): string | null {
+  const seen = new Set<string>();
+  for (const step of gates) {
+    if (seen.has(step)) return `${said(step)} is given twice, and a run is gated at a step once. Give each step one --gate.`;
+    seen.add(step);
+    if (!steps.some((s) => s.name === step)) {
+      return `${said(step)}: the workflow has no step ${JSON.stringify(step)}, so nothing would ever wait at it. Its steps are: ${steps.map((s) => s.name).join(', ')} — gate one of them by its name.`;
+    }
+  }
+  return null;
 }
 
 // ─── waiting on a run ───────────────────────────────────────────────────────

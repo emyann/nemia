@@ -29,7 +29,7 @@ test("each of an inbox card's keys has one line of meaning, in the keys' order",
 });
 
 test('an inbox card is its file: the name without .md, `workflow:` and `repo:` from its frontmatter when set — each optional — and the body', () => {
-  assert.deepEqual(INBOX_KEYS, ['workflow', 'repo', 'queued']);
+  assert.deepEqual(INBOX_KEYS, ['workflow', 'repo', 'queued', 'gate']);
   assert.deepEqual(read('---\nworkflow: dev\nrepo: /home/me/code/app\n---\nCache the views.\n\nBetween passes.\n'),
     { name: 'cache-the-views-k2q9', file: 'cache-the-views-k2q9.md', workflow: 'dev', repo: '/home/me/code/app', body: 'Cache the views.\n\nBetween passes.' });
   assert.deepEqual(read('Cache the views.\n'), { name: 'cache-the-views-k2q9', file: 'cache-the-views-k2q9.md', body: 'Cache the views.' }, 'no frontmatter: an idea, and nothing else');
@@ -42,7 +42,7 @@ test('an inbox card is its file: the name without .md, `workflow:` and `repo:` f
 
 test('REFUSED by name at shipped defaults: a key an inbox card does not have — `after:` with where it is said instead — `workflow:` or `repo:` set to nothing or twice, a `repo:` that is not absolute or names no directory, an empty body, and a frontmatter that never closes', () => {
   assert.throws(() => read('---\nworkflow: dev\nharness: codex\n---\nx\n'),
-    refusedWith(/^cache-the-views-k2q9\.md: `harness` is not a key an inbox card has\. An inbox card's keys are: workflow, repo, queued, each optional — what runs it, the repository it is about, and when it was queued to start on its own;/));
+    refusedWith(/^cache-the-views-k2q9\.md: `harness` is not a key an inbox card has\. An inbox card's keys are: workflow, repo, queued, gate, each optional — what runs it, the repository it is about, when it was queued to start on its own, and the step its run waits at for a person;/));
   assert.throws(() => read('---\nrepos: /home/me/code/app\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `repos` is not a key an inbox card has\./));
   assert.throws(() => read('---\nworkflow: dev\nafter: parse-the-flag-1x2y\n---\nx\n'),
     refusedWith(/^cache-the-views-k2q9\.md: `after` is not a key an inbox card has: what a card waits on is said when it is started, once the runs it could wait on are known — wf start <inbox>\/cache-the-views-k2q9\.md --after <runId>\. Delete the line\.$/));
@@ -58,6 +58,28 @@ test('REFUSED by name at shipped defaults: a key an inbox card does not have —
   assert.throws(() => read('   \n'), refusedWith(/^cache-the-views-k2q9\.md: the body is empty\./));
   assert.throws(() => read('---\nworkflow dev\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `workflow dev` is not `key: value`\./));
   assert.throws(() => read('---\nworkflow: dev\nCache the views.\n'), refusedWith(/^cache-the-views-k2q9\.md: the frontmatter opened on the first line never closes/));
+});
+
+test("`gate:` names the step a card's run waits at for a person, carried by the card, its listing, its line, a queue and a filing — REFUSED by name: more than one step, a step's own `true`, no value, and the line twice", () => {
+  const card = read('---\nworkflow: dev-planned\ngate: plan\n---\nCache the views.\n');
+  assert.deepEqual(card, { name: 'cache-the-views-k2q9', file: 'cache-the-views-k2q9.md', workflow: 'dev-planned', gate: 'plan', body: 'Cache the views.' });
+  assert.equal(read('---\nworkflow: dev\n---\nx\n').gate, undefined, 'no gate unless it says so');
+
+  const [listed] = inboxListing([{ file: 'cache-the-views-k2q9.md', text: '---\nworkflow: dev-planned\ngate: plan\n---\nCache the views.\n' }], [], isDirectory);
+  assert.equal(listed!.gate, 'plan');
+  assert.equal(Object.hasOwn(inboxListing([{ file: 'bare-a1b2.md', text: 'A bare idea.\n' }], [], isDirectory)[0]!, 'gate'), false, 'a card with no gate lists none — the listing is what it was');
+  assert.deepEqual(inboxLines([listed!]), ['cache-the-views-k2q9  Cache the views.  workflow: dev-planned  gate: plan']);
+
+  // Queued, and taken back: the gate stays. Filed from a file whose frontmatter is a card's: the gate is kept.
+  assert.equal(queuedText(card, '2026-09-16T10:00:00.000Z', isDirectory), '---\nworkflow: dev-planned\nqueued: 2026-09-16T10:00:00.000Z\ngate: plan\n---\nCache the views.\n');
+  assert.equal(ideaCard('./idea.md', '---\nworkflow: dev-planned\ngate: plan\n---\nCache the views.\n', {}, isDirectory).text, '---\nworkflow: dev-planned\ngate: plan\n---\nCache the views.\n');
+
+  assert.throws(() => read('---\nworkflow: dev\ngate: plan, review\n---\nx\n'),
+    refusedWith(/^cache-the-views-k2q9\.md: `gate: plan, review` names more than one step\. A card gates one step of its workflow — `gate: plan` — and its start gates any other: wf start <inbox>\/cache-the-views-k2q9\.md --gate <step>\.$/));
+  assert.throws(() => read('---\nworkflow: dev\ngate: true\n---\nx\n'),
+    refusedWith(/^cache-the-views-k2q9\.md: `gate: true` is how a step's own file gates it, and a card names the step its run waits at — `gate: plan` — since a card is not a step\. Name the step, or delete the line\.$/));
+  assert.throws(() => read('---\ngate:\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `gate` has no value\./));
+  assert.throws(() => read('---\ngate: plan\ngate: review\n---\nx\n'), refusedWith(/^cache-the-views-k2q9\.md: `gate` is set twice/));
 });
 
 test("`inboxListing`: each card by file name, with the runs whose record's `from` names it — an entry that is not a card listed with why, never hidden — and neither a hidden file nor a README", () => {

@@ -2466,7 +2466,7 @@ test('REFUSED at `wf start`, before a run is written: an --input that is not the
   await assert.rejects(typed('--input='), refusedWith(/^--input takes a file to hand the run's steps/));
   await assert.rejects(typed('--input', '--after', 'r-xyz'), refusedWith(/^--input takes a file to hand the run's steps/));
   await assert.rejects(typed('--input', path.join(given, 'a')), refusedWith(/ is a directory, and --input copies one file\./));
-  await assert.rejects(typed('--inputs', path.join(given, 'a', 'notes.md')), refusedWith(/^wf start does not take --inputs\. .*; --input <file> once per file to hand its steps; and, for an inbox card, --brief "<brief>"\.$/));
+  await assert.rejects(typed('--inputs', path.join(given, 'a', 'notes.md')), refusedWith(/^wf start does not take --inputs\. .*; --input <file> once per file to hand its steps; --gate <step> once per step to gate; and, for an inbox card, --brief "<brief>"\.$/));
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the only card') }));
   await assert.rejects(main(['plan', plan, '--repo', repo, '--input', path.join(given, 'a', 'notes.md')]), refusedWith(/^wf plan does not take --input: a card's inputs are not a thing yet\./));
   assert.equal(runsWritten(), before, 'nor by the CLI');

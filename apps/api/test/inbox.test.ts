@@ -159,6 +159,7 @@ test("GET /api/inbox/:name is a card's page: the card as the inbox lists it, its
     { key: 'workflow', value: 'dev', meaning: INBOX_KEY_MEANINGS.workflow },
     { key: 'repo', value: repo, meaning: INBOX_KEY_MEANINGS.repo },
     { key: 'queued', value: null, meaning: INBOX_KEY_MEANINGS.queued },
+    { key: 'gate', value: null, meaning: INBOX_KEY_MEANINGS.gate },
   ]);
 
   // A card that sets no key: every key, none set.
@@ -168,6 +169,7 @@ test("GET /api/inbox/:name is a card's page: the card as the inbox lists it, its
     { key: 'workflow', value: null, meaning: INBOX_KEY_MEANINGS.workflow },
     { key: 'repo', value: null, meaning: INBOX_KEY_MEANINGS.repo },
     { key: 'queued', value: null, meaning: INBOX_KEY_MEANINGS.queued },
+    { key: 'gate', value: null, meaning: INBOX_KEY_MEANINGS.gate },
   ]);
 
   // An entry that does not read as a card: its refusal and its file, and no keys to lay out.

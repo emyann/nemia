@@ -17,7 +17,7 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { artifactLines, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export { artifactLines, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { AskName, BranchFate, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, workflowsIn, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
@@ -26,7 +26,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, slotFree, afterRefusal, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, slotFree, afterRefusal, gateRefusal, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -877,10 +877,17 @@ function refuseInclude(repo: string, isolate: boolean): void {
  * names frozen on the record. Left out, no directory is made, and the record is what it was before there were inputs.
  *
  * `from` says where the brief came from — the inbox card `startFromInbox` starts — and is frozen on the record. Left out, the record has none.
+ *
+ * `gates` are the steps whose closeout waits for a person before anything after them is filed, beside those the workflow gates itself
+ * (`wf start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
+ * (`gateRefusal`), and frozen on the record. Left out, the record has none.
  */
-export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[]; inputs?: readonly string[]; from?: { inbox: string } }): Run {
+export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[]; inputs?: readonly string[]; from?: { inbox: string }; gates?: readonly string[] }): Run {
   const isolate = opts.isolate ?? true;
   const steps = stepsToStart(opts.workflowDir, isolate);
+  const gates = opts.gates ?? [];
+  const refusedGates = gateRefusal(gates, steps);
+  if (refusedGates) throw Object.assign(new Error(refusedGates), { exitCode: 2 });
   refuseInclude(opts.repo, isolate);
   const inputs = (opts.inputs ?? []).map((given): InputFile => {
     const resolved = path.resolve(given);
@@ -907,6 +914,7 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
     ...(after.length ? { after: [...after] } : {}),
     ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
+    ...(gates.length ? { gates: [...gates] } : {}),
     branch,
     // Keyed in the order the steps run, as `loadWorkflows` gives them: what `wf ls`, `wf decide` and the board list a run's steps in.
     steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
@@ -1152,6 +1160,8 @@ export type InboxStart = {
   after?: readonly string[];
   isolate?: boolean;
   inputs?: readonly string[];
+  /** The steps its run is gated at (`wf start --gate`), beside the card's own `gate:`. */
+  gates?: readonly string[];
 };
 
 /** What `startFromInbox` did: the run, the card it started, and whether the card left the inbox — and, when not, why. */
@@ -1163,13 +1173,14 @@ export type InboxStarted = { run: Run; card: InboxCard; removed: true } | { run:
  *
  * The brief is `brief`, or else the card's body. The workflow is `workflow`, else the card's `workflow:` — found from the inbox folder as
  * `wf plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the repository's
- * workflows. The repository is `repo`, else the card's `repo:`, else `callerRepo`.
+ * workflows. The repository is `repo`, else the card's `repo:`, else `callerRepo`. The run is gated at the card's `gate:` and at `gates`, the
+ * card's first; a step both name is gated once.
  *
  * The record is written first, so a removal that fails leaves a card `wf inbox` lists as started — never a run with no trace of its card. It
  * says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything is written,
  * exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there — naming the cards there are — a card that does not read, a card
- * already started, no workflow, a workflow that does not load behind the card, and a `brief` with nothing in it; and whatever `start()`
- * refuses — an `--after`, an `--input` — as it refuses it.
+ * already started, no workflow, a workflow that does not load behind the card, a `gate:` naming no step of it, and a `brief` with nothing in it;
+ * and whatever `start()` refuses — an `--after`, an `--input`, a `--gate` — as it refuses it.
  */
 export function startFromInbox(opts: InboxStart): InboxStarted {
   const refused = inboxNameRefusal(opts.name);
@@ -1199,6 +1210,13 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   if (opts.brief !== undefined && !opts.brief.trim()) {
     throw new WorkflowError(`${card.file}: the brief given in place of the card's body is empty. Give what the run is asked to do, or leave it out, and the run is asked what the card says.`);
   }
+  // The card's own gate is refused in the card's words; a `--gate` beside it, by `start()` in its own.
+  const flags = opts.gates ?? [];
+  if (card.gate !== undefined) {
+    const refusedGate = gateRefusal([card.gate], loadWorkflows(workflowDir), (step) => `${card.file}: \`gate: ${step}\``);
+    if (refusedGate) throw new WorkflowError(`${refusedGate} Correct the line, or delete it.`);
+  }
+  const gates = [...(card.gate !== undefined && !flags.includes(card.gate) ? [card.gate] : []), ...flags];
 
   const run = start({
     brief: opts.brief?.trim() ?? card.body,
@@ -1208,6 +1226,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     after: opts.after,
     inputs: opts.inputs,
     from: { inbox: card.name },
+    ...(gates.length ? { gates } : {}),
   });
   try {
     fs.rmSync(file, { force: true });

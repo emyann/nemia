@@ -11,5 +11,5 @@ import type { ComponentType } from 'react';
  * something on a press with `onPress`: an `onClick` given to the link is dropped with TanStack's.
  */
 export function routeLink<P extends object>(Link: ComponentType<P>) {
-  return createLink(({ onClick: _router, ...props }: P & { onClick?: unknown }) => <Link {...(props as P)} />);
+  return createLink(({ onClick: _router, ...props }: P & { onClick?: never }) => <Link {...(props as P)} />);
 }

@@ -14,6 +14,7 @@ test('each word wf ls prints reads as the state a person acts on', () => {
     ['checking', 'checking'],
     ['verified ✓', 'verified'],
     ['rounds exhausted', 'exhausted'],
+    ['awaiting approval', 'awaiting-approval'],
     ['over budget $4.20 of $3', 'over-budget'],
     ['over budget ≥$4.20 of $3', 'over-budget'],
     ['over budget — implement $4.25 of $3', 'over-budget'],
@@ -110,6 +111,20 @@ test('a human gate is a step a person decides: signed off blocked, a loop out of
   // Waiting on you too, but work to try again, not a decision; and every state that waits on nobody.
   const notGates = ['failed ✗ check (exit 1)', 'failed ✗ check (unfinished)', 'unsigned', 'verified ✓', 'unverified · done', 'checking', 'running (working)', 'needs-human', 'failed', 'stopped', 'waiting', 'unknown'];
   for (const status of notGates) assert.equal(isGate(stepState(status, false), false), false, status);
+});
+
+test('a step waiting at its gate waits on a person in amber, as a step signed off blocked does — a human gate, not work done — and says on hover how to approve it or send it back', () => {
+  assert.equal(stepState('awaiting approval', false), 'awaiting-approval');
+  // Final, so a run somebody called off does not make it read as a step that never started.
+  assert.equal(stepState('awaiting approval', true), 'awaiting-approval');
+  // Its work is signed off, and nothing after it may be filed on it until a person says so: `satisfiesAfter` in the package says no too.
+  assert.equal(satisfiesAfter('awaiting-approval'), false);
+  assert.equal(stateClass['awaiting-approval'], stateClass.blocked);
+  assert.equal(isGate('awaiting-approval', false), true);
+  assert.equal(isGate('awaiting-approval', true), false, 'nobody waits for an approval on a run called off');
+  assert.match(stateMeaning['awaiting-approval'], /^awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message$/);
+  // Not a word that merely starts like it: before the board knew the word, it read as working, and a spinner drew on a step nobody runs.
+  assert.equal(stepState('awaiting approvals', false), 'working');
 });
 
 test('a root of a run waiting on runs reads `waiting on <run>`, which is waiting — whatever runs it names, and why — and cancelled on a run called off', () => {

@@ -6,13 +6,14 @@ import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner } from '../components/Needs';
 import { Check, code, Facts, specRows, spentRows, Told, when } from '../components/Facts';
+import { Approved, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
 import { Timeline } from '../components/Timeline';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runQuery, type RunDetail } from '../lib/api';
-import { answersOf } from '../lib/asks';
+import { answersOf, stepAnchor } from '../lib/asks';
 import { spentTitle } from '../lib/cost';
 import { decidableRun } from '../lib/decide';
 
@@ -107,17 +108,31 @@ function Run({ run }: { run: RunDetail }) {
       <Timeline run={run} />
 
       {run.steps.map((step) => (
-        <StepSection key={step.name} step={step} runCancelled={runCancelled} />
+        <StepSection key={step.name} runId={run.id} step={step} runCancelled={runCancelled} />
       ))}
     </article>
   );
 }
 
-function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean }) {
-  const { spec, closeout } = step;
+function StepSection({ runId, step, runCancelled }: { runId: string; step: Step; runCancelled: boolean }) {
+  const { spec, closeout, gate } = step;
+  // Waiting at its gate on you, as `wf ls` asks it (`approve`): on a run nobody called off, and not sent back already.
+  const atGate = step.approve !== null && !runCancelled;
+  const handedOn = closeout && (
+    <div className="min-w-0 space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
+      <Markdown>{closeout.summary}</Markdown>
+      {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
+      {closeout.artifacts.length > 0 && (
+        <div aria-label="Artifacts" className="text-xs text-neutral-500">
+          Artifacts:
+          <Artifacts artifacts={closeout.artifacts} />
+        </div>
+      )}
+    </div>
+  );
 
   return (
-    <section className="space-y-4 border-t border-neutral-200 pt-6 dark:border-neutral-800">
+    <section id={stepAnchor(step.name)} className="scroll-mt-4 space-y-4 border-t border-neutral-200 pt-6 dark:border-neutral-800">
       <div className="space-y-1">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-semibold">{step.name}</h2>
@@ -138,6 +153,8 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
         rows={[
           ['branch', code(step.branch)],
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
+          // Its gate, where it has one: a person's word files what follows it.
+          ...(gate ? ([['gate', gateWord(gate)]] satisfies Array<[string, string]>) : []),
           // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0.
           ['used', step.used?.used],
           ['cost', step.used?.cost],
@@ -146,18 +163,18 @@ function StepSection({ step, runCancelled }: { step: Step; runCancelled: boolean
         ]}
       />
 
-      {closeout && (
-        <div className="space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
-          <Markdown>{closeout.summary}</Markdown>
-          {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
-          {closeout.artifacts.length > 0 && (
-            <div aria-label="Artifacts" className="text-xs text-neutral-500">
-              Artifacts:
-              <Artifacts artifacts={closeout.artifacts} />
-            </div>
-          )}
+      {/* At its gate, what it handed on — which is what a person approves — with Approve and Send back beside it. */}
+      {atGate ? (
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          {handedOn}
+          <Gate runId={runId} step={step.name} />
         </div>
+      ) : (
+        handedOn
       )}
+
+      {/* Once approved, under the step: when, and the words every step after the gate is handed. */}
+      {gate?.approval && <Approved step={step.name} approval={gate.approval} />}
     </section>
   );
 }

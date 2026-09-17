@@ -13,6 +13,7 @@ export type StepState =
   | 'verified'
   | 'unverified'
   | 'blocked'
+  | 'awaiting-approval'
   | 'exhausted'
   | 'over-budget'
   | 'budget-exhausted'
@@ -29,6 +30,8 @@ export function stepState(status: string, runCancelled: boolean): StepState {
   if (said === 'BLOCKED') return 'blocked';
   // The run's own verdict on a signed step: its check exited 0, is running, or did not exit 0.
   if (word === 'verified ✓') return 'verified';
+  // At its gate: signed off — verified first, where it has a check — and nothing after it is filed until a person approves it or sends it back.
+  if (word === 'awaiting approval') return 'awaiting-approval';
   // A loop out of rounds: its looping step asked for another round on the last one `rounds:` allows. Final, and a person decides.
   if (word === 'rounds exhausted') return 'exhausted';
   // Past its cap, with the amounts: its tries have cost its `budget:` or more and another session of it is the way on — `over budget $4.25 of
@@ -59,13 +62,14 @@ export function stepState(status: string, runCancelled: boolean): StepState {
 export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified';
 
 /**
- * A human gate: final, and the run goes no further until a person decides — a step that signed off blocked, a loop out of
- * rounds (`wf round`), or a step past its budget, over it or ended at it (`--budget`), whose way on is a person's word to spend
- * more. What `wf decide` calls a blocked outcome, on the step's own word. Not a refused check nor an unsigned step, which wait on
- * you too but are work to try again (`wf retry`). On a run somebody called off, nobody is waiting for the answer any more.
+ * A human gate: final, and the run goes no further until a person decides — a step that signed off blocked, a step waiting at its gate
+ * for an approval (`wf approve`), a loop out of rounds (`wf round`), or a step past its budget, over it or ended at it (`--budget`), whose
+ * way on is a person's word to spend more. What `wf decide` calls a blocked outcome, on the step's own word. Not a refused check nor an
+ * unsigned step, which wait on you too but are work to try again (`wf retry`). On a run somebody called off, nobody is waiting for the
+ * answer any more.
  */
 export const isGate = (state: StepState, runCancelled: boolean): boolean =>
-  (state === 'blocked' || state === 'exhausted' || state === 'over-budget' || state === 'budget-exhausted') && !runCancelled;
+  (state === 'blocked' || state === 'awaiting-approval' || state === 'exhausted' || state === 'over-budget' || state === 'budget-exhausted') && !runCancelled;
 
 /** What each state means, for a person who hovers over a chip. */
 export const stateMeaning: Record<StepState, string> = {
@@ -75,6 +79,7 @@ export const stateMeaning: Record<StepState, string> = {
   verified: 'verified: its check exited 0',
   unverified: 'unverified: it signed off and has no check, so only its own word says it worked',
   blocked: 'blocked: it signed off without finishing, and needs a person',
+  'awaiting-approval': 'awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it — wf approve — or sends it back — wf retry --message',
   exhausted: 'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — wf round',
   'over-budget': 'over budget: its tries have cost its budget: or more, and the run spends nothing more on it until a person raises the cap — wf retry --budget, wf round --budget',
   'budget-exhausted': 'budget exhausted: its harness ended its session at its budget:, and nothing more is filed for it until a person raises the cap — wf retry --budget',
@@ -94,6 +99,8 @@ export const stateClass: Record<StepState, string> = {
   // Neutral, not green: nothing checked it. `StatusChip` marks it too, so it does not pass for a step still to do.
   unverified: 'bg-neutral-100 text-neutral-700 ring-1 ring-neutral-300 ring-inset dark:bg-neutral-800 dark:text-neutral-200 dark:ring-neutral-600',
   blocked: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
+  // Waiting on a person, as `blocked` is: the work is signed off, and a person's word is what files what follows.
+  'awaiting-approval': 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   // Waiting on a person, as `blocked` is: nothing broke, and the loop goes no further until somebody decides.
   exhausted: 'bg-amber-100 font-semibold text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   // Waiting on a person too: whether to spend more is a decision, and the amounts beside the word say what was spent.

@@ -1,30 +1,36 @@
 /**
  * What a step needs from a person, as the board says it, and what the run's page offers to answer it with. Pure.
  *
- * The facts are the api's — a closeout's `needs`, a session the harness blocked and, on a run's detail, what it said last,
- * `waitingOnYou`, a try a person `asked` for — which are the package's and the engine's. The words that join them to a step, `asks` and
- * `blocked by the harness`, are the board's: the package has none for them.
+ * The facts are the api's — a closeout's `needs`, a session the harness blocked and, on a run's detail, what it said last, what `wf ls`
+ * asks of you for a step at its gate (`approve plan`), `waitingOnYou`, a try a person `asked` for — which are the package's and the engine's.
+ * The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for them.
  */
 import type { RunDetail, RunSummary } from './api';
 import { stepState } from './status.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
-type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedByHarness'> & { lastLine?: string | null };
+type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedByHarness' | 'approve'> & { lastLine?: string | null };
 
 /**
- * What one step needs from a person: the question it signed off blocked with, or that the harness blocked its session — with what the
- * session said last where the api read it (a run's detail), and null where it did not (the list) or the session said nothing.
+ * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what the
+ * session said last where the api read it (a run's detail), and null where it did not (the list) or the session said nothing; or, at its
+ * gate, its approval — `said` in `wf ls`'s words, `approve plan`.
  */
-export type Need = { step: string; kind: 'asks'; needs: string } | { step: string; kind: 'harness'; lastLine: string | null };
+export type Need =
+  | { step: string; kind: 'asks'; needs: string }
+  | { step: string; kind: 'harness'; lastLine: string | null }
+  | { step: string; kind: 'approve'; said: string };
 
 /**
  * A step's need, or null. The question of a step that signed off blocked, while it waits on you — not once a person has asked for its
- * next try, which takes it out of `waitingOnYou`. That the harness blocked its session, for as long as it does. Nothing on a run
- * called off: nobody is waiting for the answer any more.
+ * next try, which takes it out of `waitingOnYou`. Its approval, for a step waiting at its gate, while it waits on you — not once it is
+ * approved, nor sent back. That the harness blocked its session, for as long as it does. Nothing on a run called off: nobody is waiting
+ * for the answer any more.
  */
 export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boolean): Need | null {
   if (runCancelled) return null;
   if (step.blockedByHarness) return { step: step.name, kind: 'harness', lastLine: step.lastLine ?? null };
+  if (step.approve && waitingOnYou) return { step: step.name, kind: 'approve', said: step.approve };
   if (step.needs && waitingOnYou) return { step: step.name, kind: 'asks', needs: step.needs };
   return null;
 }
@@ -33,12 +39,22 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
 export const needsOf = (run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[] }): Need[] =>
   run.steps.flatMap((step) => needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null) ?? []);
 
-/** A need as its step's node says it, under the step's name: `asks: <needs>`, `blocked by the harness: <what it said last>`. */
+/**
+ * A need as its step's node says it, under the step's name: `asks: <needs>`, `blocked by the harness: <what it said last>` — and at a gate,
+ * `wf ls`'s own words, which name the step: `approve plan`.
+ */
 export const needText = (need: Need): string =>
-  need.kind === 'asks' ? `asks: ${need.needs}` : `blocked by the harness${need.lastLine ? `: ${need.lastLine}` : ''}`;
+  need.kind === 'asks' ? `asks: ${need.needs}` : need.kind === 'approve' ? need.said : `blocked by the harness${need.lastLine ? `: ${need.lastLine}` : ''}`;
 
-/** A need with the step it is of, as the card and the banner say it: `implement asks: <needs>`, `implement is blocked by the harness: <…>`. */
-export const needLine = (need: Need): string => `${need.step} ${need.kind === 'asks' ? '' : 'is '}${needText(need)}`;
+/**
+ * A need with the step it is of, as the card and the banner say it: `implement asks: <needs>`, `implement is blocked by the harness: <…>`,
+ * and `approve plan`, whose words name their step already.
+ */
+export const needLine = (need: Need): string =>
+  need.kind === 'approve' ? need.said : `${need.step} ${need.kind === 'asks' ? '' : 'is '}${needText(need)}`;
+
+/** Where a step's section is on its run's page, as a URL's hash: what the banner's `approve plan` links to, where Approve is. */
+export const stepAnchor = (step: string): string => `step-${step}`;
 
 /**
  * What a run's page offers for a step, each a `wf retry` the api asks for (`askTry`):

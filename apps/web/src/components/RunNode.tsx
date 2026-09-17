@@ -102,7 +102,7 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
         ))}
       </ul>
 
-      {/* What a person has to know to act: a step's question, or a session the harness blocked. Two lines each, whole on hover. */}
+      {/* What a person has to know to act: a step's question, its approval at its gate, or a session the harness blocked. Two lines each, whole on hover. */}
       {needs.length > 0 && (
         <ul aria-label="Needs" className="space-y-0.5 px-3 text-[11px]">
           {needs.map((need) => (
@@ -111,7 +111,7 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
               data-need={need.kind}
               data-step={need.step}
               title={needLine(need)}
-              className={`line-clamp-2 break-words ${need.kind === 'asks' ? 'text-amber-800 dark:text-amber-300' : 'text-orange-800 dark:text-orange-300'}`}
+              className={`line-clamp-2 break-words ${need.kind === 'harness' ? 'text-orange-800 dark:text-orange-300' : 'text-amber-800 dark:text-amber-300'}`}
             >
               {needLine(need)}
             </li>

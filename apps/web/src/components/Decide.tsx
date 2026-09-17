@@ -89,16 +89,16 @@ export function DecideSection({ runId, decision, offers = null }: { runId: strin
 }
 
 /** Each of `wf retry`'s ways, as an answer offers it. */
-const MODES: Record<RetryMode, string> = {
+export const MODES: Record<RetryMode, string> = {
   nudge: 'continue its session',
   fresh: 'a new session',
   recheck: 'its check again, and no session',
 };
 
-const BUTTON =
+export const BUTTON =
   'rounded bg-neutral-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-neutral-900 dark:bg-neutral-100 dark:text-neutral-900 dark:hover:bg-neutral-300 dark:disabled:hover:bg-neutral-100';
 
-const TEXTAREA =
+export const TEXTAREA =
   'block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
 
 /**
@@ -432,7 +432,7 @@ export function Continue({ runId, step }: { runId: string; step: string }) {
 }
 
 /** An ask for a step's next try through the api (`askTry`), and the run read again once the api has it. */
-function useAsk(runId: string, step: string, onAsked: () => void) {
+export function useAsk(runId: string, step: string, onAsked: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (how: { mode: RetryMode; message?: string; budget?: number }) => askTry(runId, step, how),
@@ -456,11 +456,14 @@ function useRound(runId: string) {
   });
 }
 
-/** The api's refusal of an ask, beside what made it, verbatim: the package's sentence, or the api's own about the request. */
-function Refusal({ error }: { error: Error }) {
+/**
+ * The api's refusal of an ask, beside what made it, verbatim: the package's sentence, or the api's own about the request. `not` says what did
+ * not happen: `Not asked`, or `Not approved`.
+ */
+export function Refusal({ error, not = 'Not asked' }: { error: Error; not?: string }) {
   return (
     <div data-refused className="space-y-1 rounded border border-red-300 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/40">
-      <p className="text-sm font-medium text-red-800 dark:text-red-300">Not asked. The api refused it:</p>
+      <p className="text-sm font-medium text-red-800 dark:text-red-300">{not}. The api refused it:</p>
       <p className="font-mono text-xs whitespace-pre-wrap break-words text-red-800 dark:text-red-300">{error.message}</p>
     </div>
   );

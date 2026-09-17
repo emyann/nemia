@@ -90,7 +90,7 @@ const at = '2026-09-13T00:00:00.000Z';
 function runWith(note: string | null): RunDetail {
   return {
     id: 'r-1', brief: 'Go round again', repo: '/code/app', workflowDir: '/code/app/workflow', baseRef: 'abc123', branch: 'main',
-    isolate: true, createdAt: at, cancelledAt: null, status: 'failed', moving: false, waitingOnYou: ['review'], warning: null,
+    isolate: true, createdAt: at, cancelledAt: null, status: 'failed', moving: false, waitingOnYou: ['review'], onYou: ['review'], gates: [], warning: null,
     graph: { roots: ['review'], edges: [] },
     steps: [{
       name: 'review', spec: null, filed: null, body: 'Review it.', told: null, taskId: 't-1', workspace: null, branch: 'wf/r-1/implement',
@@ -123,7 +123,7 @@ test("the inspector's Details show a step's note under its chip", () => {
 /** The run of one step, `review`, with the word and note `wf ls` gives it, and who the api says is waited on. */
 function runOf(status: string, { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null }): RunDetail {
   const run = runWith(note);
-  return { ...run, cancelledAt, waitingOnYou, steps: [{ ...run.steps[0]!, status }] };
+  return { ...run, cancelledAt, waitingOnYou, onYou: waitingOnYou, steps: [{ ...run.steps[0]!, status }] };
 }
 
 /**
@@ -1064,7 +1064,7 @@ const bannerMarkup = (run: RunDetail) =>
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
   const base = needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] });
   const asks = { ...base.steps[0]!, name: 'implement', taskId: 't-2', status: 'succeeded · BLOCKED', needs: 'Which database?', blockedByHarness: false, lastLine: null };
-  const run: RunDetail = { ...base, waitingOnYou: ['implement'], steps: [asks, base.steps[0]!] };
+  const run: RunDetail = { ...base, waitingOnYou: ['implement'], onYou: ['implement'], steps: [asks, base.steps[0]!] };
   const html = bannerMarkup(run);
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
@@ -1097,6 +1097,76 @@ test('REFUSED: the banner offers no Continue for a session still at work, which 
   const held = needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] });
   assert.match(bannerMarkup(held), /<form aria-label="Continue review"/);
   assert.equal(bannerMarkup({ ...held, cancelledAt: at }), '', 'called off: nobody waits for the session');
+});
+
+// ─── a gate ─────────────────────────────────────────────────────────────────
+
+const Gates = await import('../src/components/Gate.tsx');
+
+/** The run of one step, `review`, waiting at its gate on you — as the api gives it: its word, the need, and its gate. */
+const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<RunDetail> = {}): RunDetail => {
+  const base = runOf('awaiting approval', { waitingOnYou: ['review'] });
+  return {
+    ...base, onYou: ['approve review'], gates: ['review'], ...run,
+    steps: [{ ...base.steps[0]!, needs: null, blockedByHarness: false, lastLine: null, asked: null, approve: 'approve review', gate: { awaiting: true, approval: null }, ...over }],
+  };
+};
+
+/** A component rendered inside the query client its writes are made with. */
+const withClient = (element: ReturnType<typeof createElement>) => renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, element));
+
+test("a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waiting on you` — and on a run called off, not", () => {
+  const html = nodeMarkup(atGate());
+  assert.match(html, />human gate</);
+  assert.match(html, /border-amber-500/);
+  assert.match(html, /data-state="awaiting-approval"/);
+  const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
+  assert.ok(footer, html);
+  assert.equal(footer[2], '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review</span>');
+  assert.doesNotMatch(html, /running now/, 'no spinner: nobody runs a step at its gate');
+  assert.equal(gateDrawn(nodeMarkup(atGate({ approve: null }, { waitingOnYou: [], onYou: [], cancelledAt: at }))), false);
+});
+
+test("the banner says who the run waits on as `wf ls` does — `approve review`, linked to the step's section, where Approve is — beside a step it names by its name", () => {
+  const theme = { ...atGate().steps[0]!, name: 'theme', status: 'failed ✗ check (exit 1)', approve: null, gate: null };
+  const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
+  const both = bannerMarkup({ ...run, steps: [run.steps[0]!, theme] });
+  const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1]!;
+  assert.equal(textsOf(line).join(''), `Waiting on you:approve review, theme— signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget —wf decide r-1`);
+  assert.match(line, /<strong><a href="#step-review" data-approve="review" class="underline underline-offset-2">approve review<\/a>, theme<\/strong>/);
+  // The need is the banner's line: no question to list under it, and nothing to press in the banner.
+  assert.doesNotMatch(both, /<li |<form|<button/);
+});
+
+test("the gate: Approve with a box for the words, which may stay empty, and Send back — the answer box — with an objection it waits for, continuing the session or in a new one", () => {
+  const html = withClient(createElement(Gates.Gate, { runId: 'r-1', step: 'plan' }));
+  assert.match(html, /^<section aria-label="The gate of plan" data-gate="awaiting"/);
+  const forms = new Map([...html.matchAll(/<form aria-label="([^"]+)"[^>]*>([\s\S]*?)<\/form>/g)].map((m) => [m[1]!, m[2]!]));
+  assert.deepEqual([...forms.keys()], ['Approve plan', 'Send plan back']);
+  const buttons = (form: string) => [...forms.get(form)!.matchAll(/<button type="(\w+)"( disabled="")?[^>]*>([^<]*)<\/button>/g)].map((m) => [m[1], Boolean(m[2]), m[3]]);
+  assert.deepEqual(buttons('Approve plan'), [['submit', false, 'Approve']], 'Approve is enabled with no words: an approval needs none');
+  assert.deepEqual(buttons('Send plan back'), [['submit', true, 'Send back']], 'Send back waits for an objection: the package refuses one with none');
+  assert.match(forms.get('Approve plan')!, /<label for="[^"]+" class="sr-only">Words to approve plan with, if any<\/label><textarea [^>]*placeholder="Your words \(optional\): every step after the gate is handed them, under “Approved”\."/);
+  assert.ok(textsOf(forms.get('Approve plan')!).includes('wf approve r-1 plan'));
+  assert.match(forms.get('Send plan back')!, /<label for="[^"]+" class="sr-only">What to change, sent back to plan<\/label>/);
+  const radios = [...forms.get('Send plan back')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [m[2], Boolean(m[1])]);
+  assert.deepEqual(radios, [['nudge', true], ['fresh', false]], 'no recheck: a gate held nothing a check refused');
+  assert.doesNotMatch(html, /data-refused/);
+});
+
+test('the approval under a step: the try, when, and the words as they were written — or that there were none', () => {
+  const words = 'Ship the second reading.\nKeep the flag <b>off</b> by default.';
+  const html = renderToStaticMarkup(createElement(Gates.Approved, { step: 'plan', approval: { try: 2, at, message: words } }));
+  assert.match(html, /^<section aria-label="The approval of plan" data-approval="2"/);
+  assert.ok(textsOf(html).includes('Approved'), html);
+  assert.match(html, new RegExp(`try 2, <time dateTime="${at}">`));
+  assert.match(html, /<p data-words="true" class="whitespace-pre-wrap break-words">Ship the second reading\.\nKeep the flag &lt;b&gt;off&lt;\/b&gt; by default\.<\/p>/, 'as text, never as markup');
+  const none = renderToStaticMarkup(createElement(Gates.Approved, { step: 'plan', approval: { try: 1, at, message: null } }));
+  assert.match(none, /<p data-words="none"[^>]*>with no words<\/p>/);
+  assert.deepEqual(
+    [Gates.gateWord({ awaiting: true, approval: null }), Gates.gateWord({ awaiting: false, approval: { try: 1, at, message: null } }), Gates.gateWord({ awaiting: false, approval: null })],
+    ['awaiting approval', 'approved, try 1', 'holds once it has signed off'],
+  );
 });
 
 test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits on a run — and a run's page's legend does not", () => {

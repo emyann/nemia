@@ -62,7 +62,7 @@ test("a workflow's steps written back as they were leave every file as it was â€
   const before = snapshot(dir);
   const steps = loadWorkflows(dir);
   const done = writeWorkflow(dir, steps);
-  assert.deepEqual(done, { dir, steps, written: [], kept: ['implement.md', 'review.md'], removed: [] });
+  assert.deepEqual(done, { dir, steps, written: [], kept: ['implement.md', 'review.md', 'ship.md'], removed: [] });
   assert.deepEqual(snapshot(dir), before);
   assert.match(fs.readFileSync(path.join(dir, 'review.md'), 'utf8'), /^# /m, 'the comments are still there');
 });
@@ -70,20 +70,20 @@ test("a workflow's steps written back as they were leave every file as it was â€
 test('a step changed is rendered and written, a step unchanged keeps its file, a step gone loses its file â€” and the schema and the README stay as they are', () => {
   const dir = devIn('changed');
   const before = snapshot(dir);
-  const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
+  const [implement, review, ship] = loadWorkflows(dir) as [Workflow, Workflow, Workflow];
 
-  const fewer = writeWorkflow(dir, [implement, { ...review, rounds: 2 }]);
-  assert.deepEqual([fewer.written, fewer.kept, fewer.removed], [['review.md'], ['implement.md'], []]);
+  const fewer = writeWorkflow(dir, [implement, { ...review, rounds: 2 }, ship]);
+  assert.deepEqual([fewer.written, fewer.kept, fewer.removed], [['review.md'], ['implement.md', 'ship.md'], []]);
   assert.equal(fs.readFileSync(path.join(dir, 'implement.md'), 'utf8'), before['implement.md'], 'byte for byte');
   assert.match(fs.readFileSync(path.join(dir, 'review.md'), 'utf8'), /^rounds: 2$/m);
   assert.doesNotMatch(fs.readFileSync(path.join(dir, 'review.md'), 'utf8'), /^# /m, 'a render has no comments');
   assert.deepEqual(loadWorkflows(dir), fewer.steps, 'what it returns is what the folder reads as');
   assert.equal(fewer.steps.find((s) => s.name === 'review')!.rounds, 2);
 
-  // Implement and docs, review gone: docs.md written, review.md removed, review.schema.json and the README untouched.
+  // Implement and docs, review and ship gone: docs.md written, their files removed, review.schema.json and the README untouched.
   const docs = step('docs', { after: ['implement'], model: 'sonnet' });
   const other = writeWorkflow(dir, [docs, implement]);
-  assert.deepEqual([other.written, other.kept, other.removed], [['docs.md'], ['implement.md'], ['review.md']]);
+  assert.deepEqual([other.written, other.kept, other.removed], [['docs.md'], ['implement.md'], ['review.md', 'ship.md']]);
   assert.deepEqual(Object.keys(snapshot(dir)), ['README.md', 'docs.md', 'implement.md', 'review.schema.json']);
   assert.equal(snapshot(dir)['README.md'], before['README.md']);
   assert.equal(snapshot(dir)['review.schema.json'], before['review.schema.json']);
@@ -103,7 +103,7 @@ test('the README is written only when it is given, to the name the README alread
   const steps = loadWorkflows(dir);
   fs.renameSync(path.join(dir, 'README.md'), path.join(dir, 'readme.md'));
   const done = writeWorkflow(dir, steps, '# readme\n\nWhat it is for, now.\n');
-  assert.deepEqual([done.written, done.kept], [['readme.md'], ['implement.md', 'review.md']]);
+  assert.deepEqual([done.written, done.kept], [['readme.md'], ['implement.md', 'review.md', 'ship.md']]);
   assert.deepEqual(Object.keys(snapshot(dir)).filter((f) => /readme/i.test(f)), ['readme.md'], 'no second README beside it');
   assert.equal(writeWorkflow(dir, steps, '# readme\n\nWhat it is for, now.\n').kept.includes('readme.md'), true, 'the same text is left as it is');
 

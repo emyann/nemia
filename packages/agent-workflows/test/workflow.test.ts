@@ -288,6 +288,26 @@ test('the terminal steps are where the work ends up', () => {
   assert.deepEqual(terminalSteps([{ name: 'a', after: [], body: 'x' }, { name: 'b', after: [], body: 'x' }]).map((s) => s.name), ['a', 'b']);
 });
 
+test("a step that works in the repository's checkout is the workflow's last: REFUSED when anything waits on it, and when another step ends the workflow beside it", () => {
+  const ship = { name: 'ship', after: ['review'], body: 'x', workspace: 'main' } as Workflow;
+  const chain: Workflow[] = [
+    { name: 'implement', after: [], body: 'x' },
+    { name: 'review', after: ['implement'], body: 'x' },
+    ship,
+  ];
+  assert.doesNotThrow(() => validate(chain), 'the last step may work in the checkout');
+  assert.doesNotThrow(() => validate([{ name: 'ship', after: [], body: 'x', workspace: 'main' } as Workflow]), 'and so may a workflow of one step');
+
+  const refused = (steps: Workflow[], pattern: RegExp) => assert.throws(() => validate(steps), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), pattern.source);
+  refused([...chain, { name: 'tell', after: ['ship'], body: 'x' }],
+    /^ship: `workspace: main` runs the step in the repository's own checkout, and tell waits on it — each would start from a checkout this step has changed, and none of them is where the run's work is\. It is a workflow's last step: nothing may wait on it\. Move tell before ship, or delete the line\.$/);
+  refused([...chain, { name: 'tell', after: ['ship'], body: 'x' }, { name: 'say', after: ['ship'], body: 'x' }], /and tell, say wait on it/);
+  refused([...chain, { name: 'publish', after: ['review'], body: 'x' }],
+    /^ship: `workspace: main` runs the step in the repository's own checkout, and publish ends the workflow beside it, so both could be working in that one directory at once\. A run has one ending: make ship wait on publish, or delete the line\.$/);
+  // Two of them side by side: each is refused for the other.
+  refused([{ name: 'a', after: [], body: 'x', workspace: 'main' } as Workflow, { name: 'b', after: [], body: 'x', workspace: 'main' } as Workflow], /^a: .* and b ends the workflow beside it/);
+});
+
 test('the shipped examples are valid workflows too', () => {
   const examples = path.join(import.meta.dirname, '..', 'wf-examples');
   for (const d of fs.readdirSync(examples, { withFileTypes: true }).filter((e) => e.isDirectory())) {
@@ -308,14 +328,18 @@ test('the shipped examples are valid workflows too', () => {
 const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n---\nDo the work.\n`);
 
 test('every key a step has is read — none is accepted and then dropped', () => {
-  const values: Record<StepKey, string> = {
+  // Every key but `workspace:`, which no step may set beside a `check:`: it is read on the ending step below.
+  const values: Record<Exclude<StepKey, 'workspace'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
     tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
   const text = `---\n${Object.entries(values).map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\nDo the work.\n`;
   const w = parseWorkflow('review', text, (file) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined));
-  for (const key of STEP_KEYS) assert.notEqual(w[key], undefined, `${key} is on the list and never read`);
+  const ending = fm('ship', 'after: review\nworkspace: main');
+  assert.equal(ending.workspace, 'main');
+  const all = { ...w, workspace: ending.workspace };
+  for (const key of STEP_KEYS) assert.notEqual(all[key], undefined, `${key} is on the list and never read`);
   assert.equal(w.deadlineSeconds, 900);
   assert.equal(w.retries, 1);
   assert.deepEqual(w.input, ['implement']);
@@ -353,7 +377,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, harness, model, effort, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, harness, model, effort, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -785,6 +809,33 @@ test("`gate: true` gates a step — its closeout waits for a person — and a st
   refused('gate: true\ngate: true', /^plan: `gate` is set twice/);
 });
 
+test("`workspace: main` runs a step in the repository's own checkout, and a step without the line works where the shape puts it; REFUSED at load: `worktree`, another word, a `check:` beside it, no value, and the line twice", () => {
+  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main');
+  assert.equal(fm('implement', 'check: npm test').workspace, undefined, 'a worktree unless it says otherwise');
+  const refused = (lines: string, pattern: RegExp) => assert.throws(() => fm('ship', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
+  refused('workspace: worktree', /^ship: `workspace: worktree` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues\. Delete the line, or write `workspace: main` to run the step in the repository's own checkout\.$/);
+  for (const word of ['Main', 'repo', '\/tmp\/x', 'true']) {
+    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`main\`\.`));
+  }
+  refused('workspace:', /^ship: `workspace` has no value\. Delete the line rather than leaving it blank/);
+  refused('workspace: main\nworkspace: main', /^ship: `workspace` is set twice/);
+});
+
+test("REFUSED at load: a `resume:` on a step that runs in the repository's checkout — its session ran in another directory, and an ending starts cold", () => {
+  assert.throws(() => fm('ship', 'workspace: main\nresume: review'), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `resume: review` continues review's session, which ran in the worktree review worked in — the same conversation, in another directory, told none of what this step needs\. A step that ends a run starts cold, where the base branch is, and is told which branch to act on\. Delete one of the two lines\.$/.test(e.message));
+  assert.throws(() => fm('ship', 'resume: review\nworkspace: main'), /`workspace: main` runs the step in the repository's own checkout, and `resume: review`/, 'whichever order the two lines are written in');
+  // And each key on its own is read as it was: `resume:` implies `after:`, and an ending step waits on what it acts on.
+  assert.deepEqual([fm('ship', 'resume: review').resume, fm('ship', 'resume: review').after], ['review', ['review']]);
+  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main');
+});
+
+test("REFUSED at load: a `check:` on a step that runs in the repository's checkout — the run would execute it there, on whatever a person has in it", () => {
+  assert.throws(() => fm('ship', 'workspace: main\ncheck: npm test'), (e: WorkflowError) => e.exitCode === 2 && /^ship: `workspace: main` runs the step in the repository's own checkout, and `check: npm test` is a command the run executes there after the step hands off — a verdict on whatever is in that checkout by then, not on this step's work\. A step that ends a run runs its check itself, in its prose, and says in its closeout what it found\. Delete one of the two lines\.$/.test(e.message));
+  // Whichever order the two lines are written in, and with the check's own refusals still its own.
+  assert.throws(() => fm('ship', 'check: npm test\nworkspace: main'), /`workspace: main` runs the step in the repository's own checkout, and `check: npm test`/);
+  assert.throws(() => fm('ship', 'workspace: main\ncheck: none'), /`workspace: main` runs the step in the repository's own checkout, and `check: none`/, 'the two together are refused before the check is read on its own');
+});
+
 test("`remote: true` bridges a step's sessions to claude.ai, `remote: false` does not, and a step without the line has neither; REFUSED at load: a word that is not `true` or `false`, no value, and the line twice", () => {
   assert.equal(fm('implement', 'remote: true').remote, true);
   assert.equal(fm('implement', 'remote: false').remote, false, 'the author said no, and it is kept');
@@ -910,13 +961,14 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
 
 test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
-  const values: Record<StepKey, string> = {
+  // Every key but `workspace:`, which the parser refuses beside a `check:`: an ending step renders it below.
+  const values: Record<Exclude<StepKey, 'workspace'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
     tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
-  for (const key of STEP_KEYS) assert.notEqual(step[key], undefined, key);
+  for (const key of STEP_KEYS) if (key !== 'workspace') assert.notEqual(step[key], undefined, key);
   const text = renderStep(step);
   assert.equal(text, [
     '---',
@@ -948,6 +1000,12 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   assert.deepEqual(parseWorkflow('review', text, read), step);
   // `remote: false` is a setting the parser reads, and is written; `retries: 0` too.
   assert.match(renderStep({ ...step, remote: false }), /^remote: false$/m);
+
+  // And `workspace: main`, which no step sets beside a `check:`: after `input`, before `harness`, and read back as the step.
+  const ending = parseWorkflow('ship', '---\nafter: review\ngate: true\nworkspace: main\nharness: claude\n---\nShip it.\n');
+  const rendered = renderStep(ending);
+  assert.equal(rendered, ['---', 'after: review', 'workspace: main', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'));
+  assert.deepEqual(parseWorkflow('ship', rendered), ending);
 });
 
 test('`renderStep` writes only what a step sets: `undefined`, `null` and an empty list of `after`, `input` or `disallow` are no line — and a step that sets nothing is its body', () => {

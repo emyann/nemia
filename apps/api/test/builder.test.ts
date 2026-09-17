@@ -89,7 +89,7 @@ const post = (body: unknown, from = 'yours', headers: Record<string, string> = j
 
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, after: [], resume: null, input: [], workspace: null, permissionMode: null, tools: null, disallow: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -138,10 +138,11 @@ test("PUT /api/workflows/yours/:name with a folder's steps as the listing has th
   const before = snapshot(dir);
   const steps = await listedSteps('as-listed');
   assert.equal(steps.find((s) => s.name === 'review')?.spec.budget, 20, "the listing carries review's budget, so a put does not drop it");
+  assert.equal(steps.find((s) => s.name === 'ship')?.spec.workspace, 'main', "and ship's workspace, so a put does not drop that either");
   const res = await put('as-listed', { steps });
   assert.equal(res.status, 200, await res.clone().text());
   const saved: WorkflowSaved = await res.json();
-  assert.deepEqual([saved.written, saved.kept, saved.removed], [[], ['implement.md', 'review.md'], []]);
+  assert.deepEqual([saved.written, saved.kept, saved.removed], [[], ['implement.md', 'review.md', 'ship.md'], []]);
   assert.deepEqual(snapshot(dir), before, 'byte for byte');
   assert.deepEqual(saved.workflow, listWorkflows(repo, root).find((w) => w.name === 'as-listed' && w.from === 'yours'), 'answered as the listing reads it');
 });

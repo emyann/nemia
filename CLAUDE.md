@@ -106,6 +106,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   configured the `claude-bg` runner as `claude`, whose pool is `claude`, so it passed with `poolsOf`'s mapping
   deleted. Give the fixture the opposite order, or another name, and check the test fails without the rule
   (learned by the run that closed engine issues 24 and 25).
+- **A key added to `STEP_KEYS` has three obligations outside the package.** `KINDS` in `apps/api/src/builder.ts`, or the
+  api's typecheck fails; `WorkflowStepSpec` and `specOf` in `apps/api/src/workflows.ts`, or the key never reaches the
+  board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
+  read the key on a folder that has it and never set it on one that does not (learned by the run that added
+  `workspace: main`).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the
@@ -148,9 +153,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - Commit on your branch, in small coherent commits with plain, human messages: a short
   imperative subject, an optional body saying why. **No attribution trailers**, no session URLs.
 - **Never push, never merge, never `git branch -D`.** `.claude/settings.json` refuses the first
-  and the last; a person merges after a trial merge runs the suite. If you are a workflow step,
-  commit as you go all the same: the run commits only what you leave uncommitted, in one commit
-  under your step's name, and a person decides what ships. (F's two steps read the old wording as
+  and the last; a person merges after a trial merge runs the suite. The one exception is a run's
+  ending step — `workflows/*/ship.md`, which runs in this checkout and is filed only once a person
+  approves it at its gate — and it merges the run's own result branch, aborting on any failure.
+  If you are a workflow step, commit as you go all the same: the run commits only what you leave
+  uncommitted, in one commit under your step's name, and a person decides what ships. (F's two steps read the old wording as
   "do not commit" and handed off 1,300 lines in one commit each.)
 
 ## When you miss

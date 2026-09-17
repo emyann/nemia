@@ -40,13 +40,13 @@ function writesBy(step: Workflow): string[] {
   ];
 }
 
-test('dev-planned loads, at shipped defaults, as plan → implement ⇄ review: the plan first, implement reading it, and dev\'s loop after', () => {
-  assert.deepEqual(planned.map((s) => s.name), ['plan', 'implement', 'review'], "in the order the steps run, not the folder's");
-  assert.deepEqual([steps.plan!.after, steps.implement!.after, steps.review!.after], [[], ['plan'], ['implement']]);
+test('dev-planned loads, at shipped defaults, as plan → implement ⇄ review → ship: the plan first, implement reading it, dev\'s loop after, and the ending last', () => {
+  assert.deepEqual(planned.map((s) => s.name), ['plan', 'implement', 'review', 'ship'], "in the order the steps run, not the folder's");
+  assert.deepEqual([steps.plan!.after, steps.implement!.after, steps.review!.after, steps.ship!.after], [[], ['plan'], ['implement'], ['review']]);
   assert.deepEqual([steps.plan!.input, steps.implement!.input, steps.review!.input], [undefined, ['plan'], undefined]);
   assert.deepEqual([steps.review!.loop, steps.review!.rounds], ['implement', 3]);
   assert.deepEqual(loopSpan(planned, steps.review!), ['implement', 'review'], 'a round goes back to implement, not to planning');
-  assert.deepEqual(terminalSteps(planned).map((s) => s.name), ['review']);
+  assert.deepEqual(terminalSteps(planned).map((s) => s.name), ['ship']);
   // A chain: implement works where the plan looked, and review where implement worked.
   assert.deepEqual(workspacePlan(planned, steps.implement!), { kind: 'inherit', from: 'plan' });
   assert.deepEqual(workspacePlan(planned, steps.review!), { kind: 'inherit', from: 'implement' });
@@ -108,7 +108,7 @@ test("implement is dev's, after the plan and reading it: the plan reaches it und
   assert.deepEqual([after, input], [['plan'], ['plan']]);
   assert.deepEqual(keys, devKeys, "harness, model, check and disallow as dev's");
   for (const paragraph of devBody.split('\n\n')) assert.ok(said(body).includes(said(paragraph)), paragraph);
-  for (const file of ['review.md', 'review.schema.json']) {
+  for (const file of ['review.md', 'review.schema.json', 'ship.md']) {
     assert.equal(fs.readFileSync(path.join(PLANNED, file), 'utf8'), fs.readFileSync(path.join(DEV, file), 'utf8'), file);
   }
 
@@ -132,4 +132,6 @@ test('dev-planned-build is dev-planned with dev-build\'s check on implement: the
   assert.equal(byName.implement?.check, 'npm test && npm run typecheck && npm run build && npm run e2e');
   const plannedByName = Object.fromEntries(loadWorkflows(PLANNED).map((s) => [s.name, s]));
   for (const name of ['plan', 'review']) assert.deepEqual({ ...byName[name], body: '' }, { ...plannedByName[name], body: '' }, `${name} is dev-planned's, key for key`);
+  // And its ending is dev-build's, file for file: the same step, with the build and the e2e in the check it runs itself.
+  assert.equal(fs.readFileSync(path.join(built, 'ship.md'), 'utf8'), fs.readFileSync(path.join(REPO, 'workflows', 'dev-build', 'ship.md'), 'utf8'));
 });

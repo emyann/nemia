@@ -148,6 +148,13 @@ const listed = async (t: TestContext, e: Engine, id: string): Promise<string[]> 
   return out.join('\n').split('\n');
 };
 
+/** An approval as `wf approve` writes one: a file of a person's beside the retry asks. */
+const approveByHand = (id: string, step: string, n: number) => {
+  const dir = path.join(ROOT, 'runs', `${id}.asks`);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, `approve-${step}-${n}`), `${JSON.stringify({ step, try: n, at: '2026-09-17T10:00:00.000Z' }, null, 2)}\n`);
+};
+
 const indexOf = (lines: string[], want: string | RegExp): number => {
   const i = lines.findIndex((l) => (typeof want === 'string' ? l === want : want.test(l)));
   assert.ok(i >= 0, `${want} is on the screen:\n${lines.join('\n')}`);
@@ -404,4 +411,123 @@ test("REFUSED to hide why a step stopped past its budget: `wf decide` on a step 
     indexOf(lines, '    cost  $3.40 · budget $3');
     assert.ok(!lines.some((l) => /its tries have cost its budget: or more/.test(l)), 'the shared reason is gone');
   }
+});
+
+test("the branch's standing against the base is a fact on every screen — on it, ahead by N, gone", async (t) => {
+  const { run, repo, branch, e } = await awaiting();
+  assert.ok((await screen(t, e, run.id)).includes(`  branch    ${branch} is ahead of main by 1 commit`));
+
+  // Merged by hand, as a person ships a run with no ending step: the run reads shipped, and there is nothing left to decide.
+  git(repo, 'merge', '-q', '--no-ff', '--no-edit', branch);
+  assert.deepEqual(await screen(t, e, run.id), [`${run.id}  add sub`, '', `  shipped — ${branch} is already on main`]);
+
+  // And once the branch is deleted after the merge, git still says where it went, by the tip the run's own tick recorded.
+  const { run: other, repo: otherRepo, branch: otherBranch, e: otherEngine } = await awaiting();
+  git(otherRepo, 'branch', '-D', otherBranch);
+  assert.ok((await screen(t, otherEngine, other.id)).includes(`  branch    ${otherBranch} is gone: git no longer has it`), 'no tip was recorded for it');
+});
+
+test("a folder whose last step is an ending: `wf decide` says what that step would do in the folder's words, and the word that runs it — and prints no git command, since the step is the one that merges", async (t) => {
+  const repo = aRepo();
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it: trial merge this run\'s result branch onto main, run the check, and commit.\n\nAbort on any failure.\n');
+  // Worktrees, as a folder with an ending is started: `--no-worktree` is refused for one, since such a run has no branch to merge.
+  const run = start({ brief: 'add sub', repo, workflowDir: dir });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  const work = readRun(run.id).steps.implement!;
+  write(work.workspace!, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b;\nexport const sub = (a, b) => a - b;\n');
+  git(work.workspace!, 'add', '-A');
+  git(work.workspace!, 'commit', '-q', '-m', 'add sub');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  const branch = work.branch!;
+  assert.equal(readRun(run.id).steps.ship!.taskId, null, 'nothing of the ending is filed without a person');
+
+  const lines = await screen(t, e, run.id);
+  indexOf(lines, "  AWAITING APPROVAL, waiting on you: ship  — this workflow's ending, at its gate: nothing of it has run, and your approval is what runs it");
+  indexOf(lines, `  branch    ${branch} is ahead of main by 1 commit`);
+  const decide = indexOf(lines, "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:");
+  assert.deepEqual(lines.slice(decide + 1, decide + 5), [
+    "    Ship it: trial merge this run's result branch onto main, run the check, and commit.",
+    '',
+    `  approve it    wf approve ${run.id} ship [--message "<words>"]`,
+    `  send it back  wf retry ${run.id} implement --message "<objection>"`,
+  ]);
+  assert.ok(!lines.some((l) => /ship it   git|drop it   git/.test(l)), 'the folder says what shipping is, so nobody is told to type it');
+
+  // And `wf ls` says the same, in one line, where it says who the run waits on.
+  const said = await listed(t, e, run.id);
+  indexOf(said, `   → to decide: Ship it: trial merge this run's result branch onto main, run the check, and commit. — wf approve ${run.id} ship`);
+  assert.ok(!said.some((l) => l.includes('waiting on you')), 'the ending is not said twice');
+  indexOf(said, /^   ship {11}awaiting approval/);
+});
+
+test("a gate on the last step of a folder that merges nothing: approving accepts what the step did — its own prose is not offered as what happens next — and the branch keeps its git commands", async (t) => {
+  // `wf start --gate review` on a chain: review is a terminal gated step, so a person's word ends the run, but nothing merges its branch.
+  const repo = aRepo();
+  const run = start({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  const work = readRun(run.id).steps.implement!;
+  fs.appendFileSync(path.join(work.workspace!, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
+  git(work.workspace!, 'add', '-A');
+  git(work.workspace!, 'commit', '-q', '-m', 'add sub');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-check`, 'succeeded');
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', SIGNED);
+  const branch = readRun(run.id).steps.review!.branch!;
+
+  // At the gate: the word is asked for, and the step's own instructions are not read back as what happens next.
+  const held = await screen(t, e, run.id);
+  indexOf(held, "  to decide  review has signed off and waits for your word:");
+  indexOf(held, `  approve it    wf approve ${run.id} review [--message "<words>"]`);
+  assert.ok(!held.some((l) => l.includes('Review the change in this workspace')), "the step's brief is not what happens next");
+  assert.ok(!held.some((l) => /ship it   git/.test(l)), 'the branch is not offered while the gate holds');
+  indexOf(await listed(t, e, run.id), `   → to decide: review has signed off at its gate — wf approve ${run.id} review`);
+
+  // Approved: the run is over, and the branch nobody has merged is still a person's — with the commands, since no step of this folder merges.
+  approveByHand(run.id, 'review', 1);
+  const after = await screen(t, e, run.id);
+  assert.deepEqual(after.slice(-2), [`  ship it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`]);
+  indexOf(await listed(t, e, run.id), `   → to decide: ${branch} is ahead of main, and nothing has merged it — wf decide ${run.id}`);
+});
+
+test("a run that worked on the base branch itself says so, and still says what is to be decided: the screen that used to return before it", async (t) => {
+  const repo = aRepo();
+  const run = start({ brief: 'add sub, directly', repo, workflowDir: folder(), isolate: false, gates: ['review'] });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement-check`, 'succeeded');
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-review`, 'succeeded', SIGNED);
+
+  const direct = await screen(t, e, run.id);
+  const worked = indexOf(direct, /^  worked directly on main; nothing to merge; the base was /);
+  const said = indexOf(direct, '  to decide  review has signed off and waits for your word:');
+  assert.ok(worked < said, 'the branch facts, then what to decide');
+  indexOf(direct, `  approve it    wf approve ${run.id} review [--message "<words>"]`);
+  assert.ok(!direct.some((l) => /^  branch    /.test(l)), 'no standing: it would read `main is on main`');
+  assert.ok(!direct.some((l) => /ship it   git|drop it   git/.test(l)), 'nor a merge of the branch it is already on');
+});
+
+test('REFUSED at `wf start`: --no-worktree on a workflow whose last step merges, before a run is written — such a run has no result branch', () => {
+  const repo = aRepo();
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nworkspace: main\ngate: true\n---\nShip it.\n');
+  const before = fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+  assert.throws(() => start({ brief: 'add sub', repo, workflowDir: dir, isolate: false }), (err: Error & { exitCode?: number }) => {
+    assert.equal(err.exitCode, 2);
+    assert.match(err.message, /^ship: `workspace: main` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch/);
+    assert.match(err.message, /Either drop --no-worktree, or start a workflow whose last step is not an ending\.$/);
+    return true;
+  });
+  assert.equal(fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length, before, 'nothing written');
+  assert.ok(start({ brief: 'add sub', repo, workflowDir: dir }), 'with worktrees, it starts');
 });

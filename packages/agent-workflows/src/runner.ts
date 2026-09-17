@@ -17,16 +17,16 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { approvalOf, approvalRefusal, approvalWordsRefusal, artifactLines, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
-export type { Approval, AskName, BranchFate, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
-import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, stepNameRefusal, terminalSteps, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
+export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
+import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, slotFree, afterRefusal, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, resultSteps, slotFree, afterRefusal, type BranchStanding, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -844,6 +844,11 @@ async function workspaceFor(
   // `validate` refuses a workflow that could run two steps at once in that mode.
   if (!run.isolate) return { workspace: run.repo, branch: run.branch, conflicted: false, notes: [] };
 
+  // And the last step of a workflow may ask for that checkout by name (`workspace: main`): merging a branch onto the base branch is
+  // what a worktree cannot do, since the base branch is checked out here. Nothing is cut, nothing is merged in, and no dependency is
+  // provisioned — it is the repository as a person left it, and `validate` keeps any other step from running beside it.
+  if (plan.kind === 'main') return { workspace: run.repo, branch: run.branch, conflicted: false, notes: [] };
+
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
     return { workspace: parent.workspace, branch: parent.branch, conflicted: false, notes: [] };
@@ -905,6 +910,16 @@ function stepsToStart(workflowDir: string, isolate: boolean): Workflow[] {
       'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
       'Either drop --no-worktree, or make the steps a chain.',
     );
+  }
+  // A run with no worktrees works on the base branch itself, so it has no result branch for an ending step to merge: that step would be
+  // told the work is on a branch it is already standing on, and its prose would merge a branch into itself. Refused before anything is
+  // spent, rather than after a session has paid for the folder's whole check to find there is nothing to commit.
+  const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
+  if (ending) {
+    throw Object.assign(new Error(
+      `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on ${'the base branch'} itself, where the work already is, so there would be nothing to merge.\n`
+      + `Either drop --no-worktree, or start a workflow whose last step is not an ending.`,
+    ), { exitCode: 2 });
   }
   // A check's task is its step's id plus `-check`, so a step named that would share an id with it and
   // the run would read one task as the other.
@@ -2090,7 +2105,9 @@ export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing
     const v = views.get(taskId);
     return v?.state.brief ? v.phase : 'unknown';
   };
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot);
+  // And where the run's result stands against the base branch, read off git on this pass: what says a finished run is one nobody has decided.
+  const standings = branchStandings(run, resultBranches(run));
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings);
 }
 
 /**
@@ -2512,6 +2529,23 @@ export function isShipped(run: Run, branch: string): Shipped {
 }
 
 /**
+ * Where each of a run's result branches stands against the base branch it was cut from, as git says it now (`BranchStanding`): on it
+ * (`isShipped`, either yes), gone — git no longer has it, and no recorded tip puts it on the base — or ahead of it, by the commits the
+ * base branch does not have.
+ *
+ * Read on the pass that asks and never stored, for the reason `shipped` is asked rather than stored: a person merging by hand changes the
+ * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as shipped.
+ */
+export function branchStandings(run: Run, branches: readonly string[]): BranchStanding[] {
+  return [...new Set(branches)].map((branch): BranchStanding => {
+    if (isShipped(run, branch) !== false) return { branch, where: 'on' };
+    if (gitSays(run.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`) === undefined) return { branch, where: 'gone' };
+    const count = Number(gitSays(run.repo, 'rev-list', '--count', `${run.branch}..${branch}`)?.trim());
+    return { branch, where: 'ahead', commits: Number.isSafeInteger(count) ? count : 0 };
+  });
+}
+
+/**
  * A run another waits on, as its record and git say it without the engine: the record, when the store has one, and the result branches
  * it names that git no longer has and cannot find on the base by their recorded tips (`isShipped`). What `wf start --after` refuses an
  * edge by (`afterRefusal`), and where `parentOf` starts.
@@ -2549,7 +2583,7 @@ export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
   if (!record || record.cancelledAt || known.gone) return { ...known, shipped: false };
   let steps: Workflow[];
   try { steps = stepsOf(record); } catch { return { ...known, shipped: false }; }
-  const branches = terminalSteps(steps).map((s) => record.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+  const branches = resultSteps(steps).map((s) => record.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
   if (!branches.length || !branches.every((b) => isShipped(record, b))) return { ...known, shipped: false };
   const { views, phaseOf } = await taskPhases(e, record);
   const { asks, rounds } = readAsks(id);
@@ -2566,8 +2600,15 @@ async function parentsOf(e: Engine, run: Run): Promise<(id: string) => ParentRun
 
 /**
  * What each run this one waited on concluded, for its roots' briefs (`## From run <id>` in `composeBrief`): the first line of its brief, and
- * each terminal step's closeout on the engine's record of its current try, read as `wf decide` reads one (`closeoutOf`). Read once, on the
- * pass that files the roots. It never throws: a parent whose record or workflow no longer reads, a step never filed, a task the engine holds
+ * the closeout of each step whose work is that run's result (`resultSteps`), on the engine's record of its current try, read as `wf decide`
+ * reads one (`closeoutOf`). Read once, on the pass that files the roots.
+ *
+ * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: main`), that step's account
+ * is of the merge — "merged wf/…/implement onto main, the check passed" — and it declares nothing, so a child handed it would be handed
+ * nothing about the work. What the child wants is what the work said, which is the step the ending acts on. A folder with no ending step
+ * is unchanged: its terminal steps are its result.
+ *
+ * It never throws: a parent whose record or workflow no longer reads, a step never filed, a task the engine holds
  * no closeout for — a failed step whose work a person merged all the same — and a closeout that does not parse each say so in the section,
  * and the roots are filed all the same.
  */
@@ -2584,7 +2625,7 @@ async function parentCloseouts(e: Engine, ids: readonly string[]): Promise<Paren
       continue;
     }
     const said: ParentStep[] = [];
-    for (const step of terminalSteps(steps)) {
+    for (const step of resultSteps(steps)) {
       const taskId = record.steps[step.name]?.taskId;
       if (!taskId) {
         said.push({ name: step.name, unreadable: 'it was never filed' });
@@ -2759,6 +2800,10 @@ export async function decide(e: Engine, id: string): Promise<{
   timeline: Timeline;
   /** The cap on runs in flight holding this run, with nothing of it filed, and the count it is held at (`runSlots`); absent when it holds none. */
   held?: RunSlot;
+  /** Where each result branch stands against the base branch, as git says it now (`branchStandings`): the fact under the run's result. */
+  standings: BranchStanding[];
+  /** What is left for a person to decide about the result (`toDecide`): the ending step's gate, or a branch nobody has merged. */
+  toDecide?: ToDecide;
 }> {
   const run = readRun(id);
   const steps = stepsOf(run);
@@ -2773,6 +2818,9 @@ export async function decide(e: Engine, id: string): Promise<{
   const blocked = harnessBlocked(views);
   const spendOf = spendReader(views);
   const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds, blocked, spendOf);
+  // Where the result stands against the base branch, read off git now — and what that leaves a person to decide (`assess`, on the same facts).
+  const standings = branchStandings(run, resultBranches(run));
+  const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
   // What a person said to a step's current try, off their ask file, and what the try before it needed, off the engine's record of that
   // try: the run's record keeps neither.
   const given = readAnswers(id);
@@ -2828,12 +2876,14 @@ export async function decide(e: Engine, id: string): Promise<{
     said,
     timeline: timeline(run, everyTry, filed, steps),
     ...(held ? { held } : {}),
+    standings,
+    ...(decide ? { toDecide: decide } : {}),
   };
 }
 
 export function resultBranches(run: Run): string[] {
   const steps = stepsOf(run);
-  return terminalSteps(steps)
+  return resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
 }

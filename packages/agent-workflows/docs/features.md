@@ -4,7 +4,7 @@ The features agent-workflows is still missing, in the order I would take them. E
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-engine/docs/open-issues.md](../../agent-engine/docs/open-issues.md).
 
-State as of 2026-09-16: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
+State as of 2026-09-17: the check (package C of `docs/plan-hold-the-bar.md`, hkb-v2), declared
 outputs (package J), a step's files directory with `workflows/ui/` (U1), a browser for every Claude
 step (the repository's `.mcp.json`), a worktree's own `node_modules` with `.worktreeinclude`,
 trying a step again with `retries:` and `wf retry` (§4 F), going round again with `loop:`,
@@ -25,7 +25,8 @@ explains their keys — and a gate, a step's handoff that waits for a person (`g
 the engine's `priority` and `remoteControl` put to use: a run in flight filed above a newer run's first step, and `remote:` on a step (§2,
 its package half) — and the workflow builder's package half: a step rendered back to markdown and a folder written from its steps
 (`renderStep`, `writeWorkflow`, §4) — and the builder on the board, which writes a folder of yours from its blocks and edges (§4, its board
-half) — and the web app's components on shadcn's React Aria base (§7) — have shipped.
+half) — and the web app's components on shadcn's React Aria base (§7) — and the end of a run as a step of its
+workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — have shipped.
 
 ## Shipped: the check
 
@@ -2747,6 +2748,125 @@ What the base does not offer, named rather than worked around:
   repository's root the skill does not load at all: its `info` refuses a monorepo root. On aria, the reference is what
   `npx shadcn@latest add <component> --view <file>` prints from `apps/web`.
 
+## Shipped: the end of a run is a step of its workflow — `workspace: main`, the ending's gate, and `to decide`
+
+§8 below, the package half. A run that finished went quiet: its branch sat there, `wf decide` printed two git commands, and nothing on
+the board counted a result nobody had decided. The shape §8 chose held, with one thing it did not say in so many words, which building it
+settled: **where an ending step's gate holds**. Read first: the README's *The end of a run is a step*, `approvedFirst`, `waitsAtGate`,
+`toDecide` and `resultSteps` in run.ts, and `workflows/dev/ship.md`.
+
+What was built, four commits:
+
+- **`workspace: main` on a step**, in `STEP_KEYS` after `input` with its line in `STEP_KEY_MEANINGS`: the step runs in the repository's
+  own checkout rather than a worktree of the run's, which is the one thing a worktree cannot do — the base branch is checked out there.
+  `workspacePlan` gains `{ kind: 'main' }`, and `workspaceFor` cuts nothing, merges nothing in and provisions no `node_modules`: it is the
+  repository as a person left it. `handOffDue` skips such a step, so the run commits nothing in that checkout, and `composeBrief` tells it
+  where the work is — the result branch, the base branch, and the `git log` and `git diff` between them — instead of telling it to read its
+  workspace. Refused with the fix: `workspace: worktree`, any other word, a `check:` beside it (the run would execute it there, on whatever
+  the checkout holds), and, at load, a step anything waits on or one that ends a workflow beside another.
+- **A run's result is the work the ending acts on** (`resultSteps`): the terminal steps, and for a terminal `workspace: main` step, the
+  steps it waits on. Read as the result, its `main` would answer *has it shipped* with yes for ever. `tipBranches`, `decision`,
+  `resultBranches` and `parentOf` read it.
+- **The ending's gate holds before the step is filed.** A gate holds what its approval decides. Where steps follow, that is the handoff, and
+  the step runs first — §6's gate, unchanged. An ending step in the checkout produces nothing to read: it acts, where nothing can be taken
+  back. So `approvedFirst` (gated and `workspace: main`) plus `waitsAtGate` (unfiled, unapproved, every step it waits on satisfied) reads
+  `awaiting approval` from `standing`, which is the one place the words are decided — so `assess`, `decision`, `listing`, `cancelPlan`,
+  `forgetRefusal`, `gateLines` and `approvalRefusal` all saw it at once, with no second judgement to keep in step. `wf approve` files it;
+  its own approval is on its brief under `## Approved` (`approvedSection`), since the words are the terms it acts on; and a send-back goes
+  to the work, not to the ending, which has nothing of its own to object to (`sendBackTo`, `retryable`, `gateNote`, `gateLines`).
+  `approvalRefusal` refuses approving one whose work is unfinished, and one whose work a send-back is asked for.
+- **`to decide`**, the fifth reason a run waits on a person, in `assess` and `listing` (`toDecide`, `ToDecide`, `toDecideWords`): the run is
+  at its result and a last step's gate has nobody's approval — `{ kind: 'approve', step, says }`, `says` being the first line of the step's
+  prose for an ending that has not run and null for a gated step that has, whose closeout is what to read — or, where no step of the
+  workflow merges (`merges`), every step finished and a result branch is ahead of the base and not gone, `{ kind: 'git', branches }`. A
+  gate a run was started with, `--gate <the last step>`, is the second kind: approving accepts what that step did, and what becomes of the
+  branch is still a person's, so the git commands are printed for it. Level-triggered: `branchStandings` asks git on the pass that asks and stores nothing, as `shipped` is asked
+  and not stored, so a branch a person merged by hand stops being one to decide with nobody telling the run. `wf ls` says
+  `→ to decide: <the ending's first line> — wf approve <run> <step>`, above `→ waiting on you` and never the same step twice.
+- **`wf decide` reports facts**: `branch    wf/<id>/implement is ahead of main by 3 commits` (or `is on main`, or `is gone`), then
+  `to decide  ship has not run: this workflow's ending, and your approval is what runs it:` with the step's first paragraph as it is
+  written, the `wf approve` and the send-back. `git merge --no-ff` and `git branch -D` are printed only for a folder with no ending step:
+  a folder that says what shipping is does not also tell a person to type it. `wf start` says `ends at: ship — nothing of it runs until
+  wf approve <run> ship, which is what files it`.
+- **`ship.md` on `dev`, `dev-build`, `dev-planned` and `dev-planned-build`**: `after: review`, `workspace: main`, `gate: true`, implement's
+  denies, no check of its own. Its prose is the loop the operator ran by hand on 2026-09-16 and 17 — look at the checkout, `git merge
+  --no-ff --no-commit`, that folder's check whole, `git commit --no-edit`, `git merge --abort` on any failure — with what happened in its
+  closeout. dev-planned's is dev's file for file; dev-planned-build's is dev-build's. CLAUDE.md's Git rule gained its one exception.
+- **`--after` is unchanged**, as §8 said: a child starts when git says the parent's result branch is on the base, which `ship.md` makes
+  true when it merges; a run at any gate is not shipped, merged or not.
+- **What the gate holds on is the work, and work said again un-holds it.** A looping step that asked for another round signed off, so the
+  record alone reads it as handed on: an ending read off that word offered its merge in the pass that sent the work round again, and an
+  approval taken then named a try nothing spends, so the next round would have merged unread (`notHandedOn`, which `waitsAtGate` and
+  `approvalRefusal` share). The same for a person's send-back between the ask and the pass that files it, which `assess` and `listing`
+  take as waiting (`unheld`). Found by the review, round 3.
+- **`--no-worktree` is refused on a folder whose last step merges** (`stepsToStart`), before a run is written: such a run works on the base
+  branch itself, so there is no result branch for the ending to merge — it would be told the work is on the branch it is standing on, merge
+  a branch into itself, and pay for the folder's whole check to find nothing to commit. Found by the review, round 3.
+
+What was measured:
+
+- From the root, `npx turbo run test --force`, counted as this file counts them — tests, then passed and skipped: agent-workflows 575
+  (574 passed, 1 skipped), from 548; api 200, web 243 and agent-engine 326 (317 passed, 9 skipped) unchanged — the two api tests that
+  changed are the rows below, and no api test was added. `npm run typecheck` clean in all four.
+- New tests. `workflow.test.ts`: `workspace: main` read; `worktree`, another word, no value and the line twice refused; a `check:` beside
+  it refused, either order; a step anything waits on, and one beside another ending, refused at load; the key rendered back in
+  `STEP_KEYS` order. `run.test.ts`: `workspacePlan`, `resultSteps` and `tipBranches` on an ending; the brief that names the branches; the
+  gate held unfiled pass after pass with `toDecide`, and gone once approved; the gate not held while the work runs or after it broke, with
+  `approvalRefusal`'s words; approving refused while a send-back is asked; the send-back offered on the work and refused without words;
+  `wf ls`'s row, note and `approve ship`; a run at its gate never shipped, merged or not; `toDecide`'s git kind on, ahead and gone, on a
+  failed run, a cancelled one and a running one; `branchWord`; `## Approved` to the ending itself; `gateLines`; `wf rm` and `wf cancel`.
+  `decide.test.ts`: the branch's standing on the screen, a branch merged by hand and one deleted after the merge; the ending's screen and
+  `wf ls`'s line, with no git command. `ship.test.ts`, new, in a temporary repository with the shipped `dev/ship.md` as its ending: `wf
+  start`'s line; the run stopped at the gate with nothing filed and the checkout untouched, pass after pass; an approved ending filed in
+  the repository's checkout, told the branches and the words, and its merge shipping the run; a sent-back one filing the work again and
+  merging nothing, with the approval refused meanwhile; and the abort its prose names leaving the checkout clean after a check that
+  refuses.
+- The fence tests hold the new step: `ui-workflow.test.ts` holds every `dev*` folder's `ship` to its keys and its recipe, with each
+  folder's own check in it, and the two copies to their originals; `planned-workflow.test.ts` reads dev-planned as `plan → implement ⇄
+  review → ship`.
+- From the review's second round: `workflow.test.ts` refuses `resume:` beside `workspace: main`, either order, with each key on its own
+  still read; `ship.test.ts` files a child `--after` a run whose ending merged and holds its brief to what the work said, never to the
+  ending's account of its own merge; `decide.test.ts` reads the whole screen of a run parked at a gate that worked on the base branch
+  itself, which used to return before the decision was printed; `run.test.ts` holds `wf rm`'s words at both kinds of gate.
+- From its third: `run.test.ts` holds the ending to a loop going round — the round filed, the ending waiting, nothing to decide, and the
+  gate held again once the loop hands on — and to a send-back between the ask and its filing; and holds a gate on a last step that merges
+  nothing to its own words and to the branch still being a person's once approved. `decide.test.ts` refuses `--no-worktree` on a folder
+  whose last step merges, with nothing written, and reads both screens: the ending that has not run, in its prose, and the gated step that
+  has, by its name with its closeout above.
+
+What it leaves:
+
+- **The board.** §8's apps half: the Factory's count and its marked card, the Runs page's *To decide* group, the run page's banner and its
+  gate panel — the diff and the artifacts beside the closeout — and an e2e with a to-decide run and an approved ending in the seed. What to
+  call is below.
+- **An approval given and then a send-back of the work asked for.** `wf approve` refuses the second order, and `approvalRefusal` refuses
+  approving while an ask is pending; but an approval written first and a send-back asked for after it stands for the next result too — the
+  approval names the ending's try, which a send-back of another step does not spend. Approve after the work, not before it.
+- **The board's builder cannot set `workspace:`** until apps/web's own `WorkflowStepSpec` carries it — and `UNSET`, which a step drawn
+  starts from, and the key form's union. It does not lose it: `draftOf` and `changed` (`apps/web/src/lib/builder.ts`) spread the spec they
+  were given, so the key rides a round trip of a folder that already has it, and the api's side is lossless by type (`WorkflowStepSpec`,
+  `specOf`, `draftOf`), which `builder.test.ts` holds on a `dev` folder.
+- **A run with two endings.** `validate` refuses two `workspace: main` steps side by side, and `toDecide` names the first ending that waits;
+  a workflow that deliberately ends wide with two gated endings is not something anybody has run.
+- **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes
+  into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide`.
+
+What the board's run should call:
+
+- **`listing(...).toDecide` and `assess(...).toDecide`** (`ToDecide`): `{ kind: 'approve', step, says }` — `says` is the ending step's first
+  line, and `toDecideWords(run, t)` is the whole of `wf ls`'s line — or `{ kind: 'git', branches }`. `assess` and `listing` take the
+  branch standings last (`branchStandings(run, resultBranches(run))` in runner.ts, which reads git); without them only the gate says a run
+  is one to decide, which is what the api does until it passes them.
+- **`decide(e, id)`** carries `standings: BranchStanding[]` and `toDecide`, beside what it carried.
+- **A gated ending's step** is `awaiting approval` with no task filed: a board that reads a step's task to decide whether to show it must
+  show this one all the same. `onYou` already says `approve ship`, through `onYouWords`, and Approve on the run page already reaches it —
+  `needsOf` reads the word, not the task, and `taskOfStep` answers for a step with none — so the api needed no change for the verb. What
+  it has not got is the count, the group, the banner and the panel.
+- **`resultSteps(steps)`** is the run's result: `apps/api/src/app.ts` still reads `terminalSteps` for a running run's branches, which for a
+  folder with an ending step is a step with no branch yet — it should read `resultSteps`.
+- **Approve and Send back** are `approve(e, runId, step, message?)` and `retry(e, runId, <the work>, { mode: 'nudge', message })`, as for
+  §6's gate; `sendBackTo(step, run)` says which step the send-back names, and `approvalRefusal` greys the button out in its words.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:
@@ -2932,6 +3052,10 @@ not offer is named, not worked around. The lockfile committed with the dependenc
 One `dev-planned-build` run, the plan waiting for approval; likely the largest apps change so far.
 
 ## 8. The end of a run is a step of its workflow, and a finished run is a decision on the board
+
+Shipped 2026-09-17 as *Shipped: the end of a run is a step of its workflow*, above: the package half — `workspace: main`, the ending's
+gate, `to decide`, `wf decide`'s facts and `ship.md` on the four `dev*` folders — with the board's half still to come. What was registered
+is kept as it was asked.
 
 **Registered** 2026-09-17, by the operator. First as a pain: a card started from the Inbox finished its run and, with nothing
 asking for a merge, seemed to vanish — off the Factory, a row among the finished, its branch waiting for a `wf decide` nobody

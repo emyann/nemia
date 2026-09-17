@@ -119,6 +119,45 @@ const REVIEW_DENIED = ['Bash(npm run build)', 'Bash(npm run e2e)'];
 /** What an unattended session has and no step needs (plan §4b, "what a worker gets, measured"). */
 const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
 
+test("every dev* folder ends in `ship`: gated, in the repository's checkout, with implement's denies and no check of its own — and its prose is the trial merge, that folder's check, the commit, and the abort", () => {
+  const CHECKS: Record<string, string> = {
+    dev: 'npm test && npm run typecheck',
+    'dev-planned': 'npm test && npm run typecheck',
+    'dev-build': E2E,
+    'dev-planned-build': E2E,
+  };
+  for (const [folder, check] of Object.entries(CHECKS)) {
+    const dir = path.join(REPO, 'workflows', folder);
+    const byName = Object.fromEntries(loadWorkflows(dir).map((s) => [s.name, s]));
+    const ship = byName.ship!;
+    assert.ok(ship, `${folder} has an ending step`);
+    const { after, workspace, gate, harness, model, disallow, check: own, tools, output, loop } = ship;
+    assert.deepEqual({ after, workspace, gate, harness, model, disallow, check: own, tools, output, loop }, {
+      after: ['review'], workspace: 'main', gate: true, harness: 'claude', model: 'opus',
+      disallow: IMPLEMENT_DENIED, check: undefined, tools: undefined, output: undefined, loop: undefined,
+    }, folder);
+    assert.deepEqual(terminalSteps(loadWorkflows(dir)).map((s) => s.name), ['ship'], `${folder} ends there`);
+
+    // The prose is the recipe, and the folder's own check is in it: a step whose `check:` the run would execute in a person's checkout
+    // is refused, so what this step is judged by is what it runs itself.
+    const body = said(ship.body);
+    for (const sentence of [
+      "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why.",
+      'git merge --no-ff --no-commit <branch>',
+      `Run this workflow's check, whole, from the repository root: \`${check}\``,
+      'commit the merge: `git commit --no-edit`',
+      '`git merge --abort`, then sign off `blocked` saying what happened',
+      'Do not push, and do not delete the branch',
+    ]) assert.ok(body.includes(sentence), `${folder}: ${sentence}\n\n${body}`);
+  }
+
+  // dev-planned's ending is dev's, file for file, and dev-planned-build's is dev-build's: one ending, written twice over.
+  const shipIn = (folder: string) => fs.readFileSync(path.join(REPO, 'workflows', folder, 'ship.md'), 'utf8');
+  assert.equal(shipIn('dev-planned'), shipIn('dev'));
+  assert.equal(shipIn('dev-planned-build'), shipIn('dev-build'));
+  assert.notEqual(shipIn('dev'), shipIn('dev-build'), 'and each says its own folder\'s check');
+});
+
 test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`, which the settings allow for implement's sake, and every implement what no step needs", () => {
   // The deny is what keeps review from them: the settings allow both, so in dontAsk nothing else would.
   const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { allow: string[] } };

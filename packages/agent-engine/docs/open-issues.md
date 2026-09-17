@@ -11,8 +11,8 @@ session's conversation read as events (§4 S1), and `say`, a person's words into
 record (§6 item 3, the engine half), `find`, one session by its name without `claude agents` (§6 item 17), and
 bug 1, a quiet session with no closeout recorded a success (§6 item 18), and what a session cost, read from its harness,
 with a spend cap on the task (engine `9d075f7`, `26020c1`), and three small items: a view that observes its task's own
-harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20);
-agent-workflows `0e7b02a`.
+harness (§6 item 27), a `blocked` session that holds no slot (issue 19), and pools by subscription (issue 20); and
+admission in filing order (issue 21); agent-workflows `0e7b02a`.
 
 ## Bugs
 
@@ -284,6 +284,29 @@ their own.
   whose harness map lost a harness with tasks still on it has one.
 - **The Effect door** counts per harness unless its caller passes `tick` the pools: it has no harness configs to read
   them from. `createEngine` passes them.
+
+### 21. A free slot goes to the oldest filing, and the filer's clock says which that is
+
+**What changed** (2026-09-16). A pass walks the board in filing order — the `at` of each task's `filed` entry, oldest first,
+and the ids' order only between two filed at the same instant (`admissionOrder` in `agent-engine/src/engine.ts`; `State`
+carries `filedAt`, and `decide` never reads it). It walked `journal.list`'s order, the ids sorted, so which of two waiting
+tasks took a free slot was the alphabet of their ids. `test/engine.test.ts` makes a later filing that sorts first wait behind an
+earlier one, drains three tasks at a ceiling of one in filing order, and breaks a tie by id; `test/facade.test.ts` does
+the first with the times `file()` writes.
+
+**What is left.**
+
+- **Filing order does not give a run its momentum.** A run's next step is filed a check and a pass after its last ended,
+  so a task filed in that gap is older and still goes first. Measured 2026-09-16 (agent-workflows `docs/features.md`,
+  Engine-side work): a card's run filed at 23:53:07Z took the slot a lane's implement released at 23:53:18Z, and that
+  lane's review, filed 23:54:44Z, then waited behind four sessions. Filing order admits the card's run first all the same.
+- **The time is the filer's clock.** `file()` stamps `new Date()` in the process that files, so two processes with skewed
+  clocks filing onto one board are ordered by their clocks. One machine, one clock, today.
+- **A retry keeps its task's place.** A task between attempts is ordered by its filing, not by when its last attempt
+  ended, so an old task's retry goes before newer work waiting on the same pool. Older work first, on purpose.
+- **A time that does not parse** — a `PromiseJournal` that stores `at` in another shape — orders its task after every task
+  whose time does, and by id among such tasks: admitted last, never refused.
+- **`ae ls` and `list()` are still in id order.** Only the pass's walk changed.
 
 ## Verified live, once
 

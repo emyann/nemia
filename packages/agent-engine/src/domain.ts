@@ -278,6 +278,8 @@ export type Attempt = {
 
 export type State = {
   taskId: string;
+  /** The `at` of its `filed` entry. `decide` never reads it: which waiting task a pass admits first is the pass's order. */
+  filedAt?: string;
   brief: string;
   cwd: string;
   maxAttempts: number;
@@ -316,6 +318,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
   for (const e of events) {
     switch (e.kind) {
       case 'filed':
+        s.filedAt = e.at;
         s.brief = e.brief; s.cwd = e.cwd; s.maxAttempts = e.maxAttempts;
         s.model = e.model; s.permissionMode = e.permissionMode; s.harness = e.harness;
         s.deadlineSeconds = e.deadlineSeconds; s.resume = e.resume ?? 'interrupted';

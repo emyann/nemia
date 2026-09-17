@@ -125,6 +125,20 @@ test('start() ticks on a timer and never overlaps', async () => {
   assert.equal(ticks, seen, 'stop() means stopped');
 });
 
+test('a free slot goes to the task filed first, by the time file() wrote — not to the id first in the alphabet', async () => {
+  const sessions = new Map<string, Sighting>();
+  const engine = createEngine({
+    journal: memoryJournal(), harnesses: { fake: fakeHarness(sessions) }, defaultHarness: 'fake', maxConcurrent: 1,
+  });
+  await engine.file({ brief: 'waiting', cwd: '/r', id: 'zz-waiting' });
+  await new Promise((r) => setTimeout(r, 5));
+  await engine.file({ brief: 'filed later', cwd: '/r', id: 'aa-later' });
+
+  await engine.tick();
+  assert.deepEqual([...sessions.keys()], [nameFor('zz-waiting', 1)], 'the task filed first started');
+  assert.equal((await engine.view('aa-later')).phase, 'pending');
+});
+
 test('tasks that name the harness and tasks that do not share ONE pool', async () => {
   // The bug this pins: an unresolved harness counted as its own pool, so one subscription got
   // two ceilings. Three explicit + three implicit, ceiling of two, must admit two in total.

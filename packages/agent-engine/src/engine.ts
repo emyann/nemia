@@ -260,6 +260,20 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, ob
   }
 });
 
+/** When a task was filed, in milliseconds — as a time, not a string, so `10:00:01Z` is after `10:00:00.500Z`. None that parses is after every other. */
+const filedMs = (state: State) => {
+  const ms = Date.parse(state.filedAt ?? '');
+  return Number.isNaN(ms) ? Infinity : ms;
+};
+
+/**
+ * The order a pass walks the board in, and so which waiting task a free slot goes to: the oldest filing first, and
+ * between two filed at the same instant, the ids' order, as `journal.list` sorts them. A retry is ordered by its task's
+ * filing, not by when its last attempt ended: older work goes first.
+ */
+const admissionOrder = (a: State, b: State) =>
+  filedMs(a) - filedMs(b) || (a.taskId < b.taskId ? -1 : a.taskId > b.taskId ? 1 : 0);
+
 /**
  * One pass over every task on the board. This is the whole daemon.
  *
@@ -280,6 +294,11 @@ const releaseFinished = Effect.fn('releaseFinished')(function* (state: State, ob
  * many harnesses run on it. `pools` names the pool each harness is counted in; a harness it does not
  * name is a pool of its own, under its own name. `createEngine` passes the pools its harnesses
  * declare; a caller of this door passes its own.
+ *
+ * **Which waiting task a free slot goes to is the order of this walk** (`admissionOrder`): the oldest filing first,
+ * and the ids' order only between two filed at the same instant. It was the ids' order alone — `journal.list` sorts
+ * them — so which of two waiting tasks started was the alphabet of their names. `decide` sees one task and two
+ * numbers, and never learns there is an order.
  */
 export const tick = Effect.fn('tick')(function* (
   maxConcurrent = DEFAULT_MAX_CONCURRENT,
@@ -312,7 +331,7 @@ export const tick = Effect.fn('tick')(function* (
   }
 
   const taken: Action[] = [];
-  for (const id of ids) {
+  for (const id of [...ids].sort((a, b) => admissionOrder(states.get(a)!, states.get(b)!))) {
     const pool = poolOf(states.get(id)!);
     const before = used.get(pool) ?? 0;
     const actions = yield* settleTask(id, observed, { used: before, max: maxConcurrent });

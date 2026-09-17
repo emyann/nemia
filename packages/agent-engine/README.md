@@ -993,7 +993,7 @@ selector, and it is why no attempt can ever run twice.
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `test/decide.test.ts` | every branch of the decision, no harness needed |
-| `test/engine.test.ts` | the crash cases, the ceiling and what it counts, the fields carried, against a fake harness |
+| `test/engine.test.ts` | the crash cases, the ceiling, what it counts and which waiting task a free slot goes to, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
 | `test/unsigned.test.ts` | a session gone quiet without the closing statement its task asked for: unsigned, continued with a nudge, then failed saying why; quiet with none asked for still succeeds — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
@@ -1074,7 +1074,11 @@ not. A session on a permission prompt makes no API calls, so it costs nothing ag
 ceiling exists for — reasoning, not a measurement. It is counted again on the pass after it moves again, so
 blocked sessions that all move at once can put a board past its ceiling for a while; nothing is stopped for
 that, and nothing more is admitted until the count is back under. Admission is serial within a pass, so the
-count is true rather than approximately true:
+count is true rather than approximately true — and a pass walks the board **in filing order**, so a free slot goes
+to the task that has waited longest: the oldest `filed` entry first, and the ids' order only between two filed at
+the same instant. A retry keeps its task's place, since its task was filed when it was. It used to be the ids' order
+alone, so which of two waiting tasks started was the alphabet of their names. `decide` does not know there is an
+order: it is handed one task and two numbers.
 
 ```
 $ ae tick

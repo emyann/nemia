@@ -10,7 +10,7 @@ import { Effect, Layer } from 'effect';
 import { Journal } from '../src/journal.ts';
 import { Runner } from '../src/runner.ts';
 import { file, GRACE_MS, LIVE, requestStop, step, settleTask, tick, view } from '../src/engine.ts';
-import { decide, fold, nameFor, type Observed, type Sighting } from '../src/domain.ts';
+import { decide, fold, nameFor, type Event, type Observed, type Sighting } from '../src/domain.ts';
 import type { SpawnRequest } from '../src/runner.ts';
 
 /** One board: a journal and a fake harness whose session states a test moves by hand. */
@@ -330,7 +330,7 @@ test('a deadline ends a blocked session, which would otherwise wait on a person 
 // calls, so it costs nothing against the rate limit the ceiling exists for. Reasoning, not a
 // measurement. Counted afresh on every pass, from what the harness says now.
 
-/** A board of tasks `ids`, filed in that order; admission runs in sorted id order. */
+/** A board of tasks `ids`, filed in that order; admission runs in filing order. */
 const filed = async (ids: string[]) => {
   const b = board();
   for (const id of ids) await b.run(file({ ...spec, id, brief: id }));
@@ -384,6 +384,52 @@ test('a blocked session that works again counts again on the next pass — level
   b.set('a', 'blocked');
   await b.run(tick(2));
   assert.ok(b.sessions.has(nameFor('d', 1)), 'and its slot is free again');
+});
+
+// ─── which task a free slot goes to ─────────────────────────────────────────
+// The oldest filing, and the ids' order only between two filed at the same instant. It was the ids'
+// order alone, so which of two waiting tasks started was the alphabet of their names.
+
+/** File `id` as of `at`: the entry `file` writes, with the time chosen by the test. */
+const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
+  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', maxAttempts: 1, ...fields })));
+
+/** Tick at a ceiling of one until every task has run, ending each session once it is seen: the order they started in. */
+const admitted = async (b: ReturnType<typeof board>, count: number) => {
+  const order: string[] = [];
+  for (let i = 0; i < count; i++) {
+    await b.run(tick(1));
+    const started = [...b.sessions].filter(([, s]) => s.state === 'working').map(([name]) => name);
+    assert.equal(started.length, 1, `one at a time: ${started.join(', ')}`);
+    order.push(started[0]!.split('/')[1]!);
+    b.sessions.set(started[0]!, { ...b.sessions.get(started[0]!)!, state: 'done' });
+  }
+  return order;
+};
+
+test('a free slot goes to the task filed first, not the one first in the alphabet', async () => {
+  const b = board();
+  await fileAt(b, 'z-filed-first', '2026-09-16T23:53:07.000Z');
+  await fileAt(b, 'a-filed-last', '2026-09-16T23:54:44.000Z');
+  await b.run(tick(1));
+  assert.deepEqual([...b.sessions.keys()], [nameFor('z-filed-first', 1)], 'the earlier filing is admitted');
+  assert.equal(await b.run(phaseOf('a-filed-last', b)), 'pending', 'and the later one waits, whatever its name');
+});
+
+test('tasks are admitted oldest filing first, pass after pass — a time with or without its milliseconds is the same clock', async () => {
+  const b = board();
+  await fileAt(b, 'c', '2026-09-16T10:00:01Z');
+  await fileAt(b, 'a', '2026-09-16T10:00:02.000Z');
+  await fileAt(b, 'b', '2026-09-16T10:00:00.500Z');
+  assert.deepEqual(await admitted(b, 3), ['b', 'c', 'a']);
+});
+
+test('two tasks filed at the same instant are admitted in the order of their ids', async () => {
+  const b = board();
+  await fileAt(b, 'b', '2026-09-16T10:00:00.000Z');
+  await fileAt(b, 'a', '2026-09-16T10:00:00.000Z');
+  await fileAt(b, 'c', '2026-09-16T09:59:59.000Z');
+  assert.deepEqual(await admitted(b, 3), ['c', 'a', 'b'], 'the time first, and the id only between equal times');
 });
 
 // ─── isolation ──────────────────────────────────────────────────────────────

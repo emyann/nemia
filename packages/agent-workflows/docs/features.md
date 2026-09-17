@@ -2675,7 +2675,7 @@ What it leaves:
 - **What `wf start` refuses beyond the parser** — a step named for another's check, `remote: true` off `claude` — is refused at a start,
   not at a save, as for a folder written by hand.
 - **The two edge cases review found in `writeWorkflow`** (a rename on a case-insensitive filesystem, a symlinked step file) are the
-  package's, and unchanged.
+  package's, and unchanged. *Four leftovers from the reviews*, below, took both up.
 - **A folder the builder cannot open**: one of yours that does not read. Its files are fixed by hand.
 - **The version is checked, not held.** Between the api reading the folder's version and `writeWorkflow` writing, a hand edit can still
   land, in the milliseconds a save takes. Nothing locks a folder, as nothing locks one against an editor.
@@ -3013,6 +3013,31 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   tongue from the second on. `wf tick` is unchanged: it says every pass it is asked for. Tested on the store — the test that pinned the
   silence over two passes now reads exactly one line, matched whole, and it names the card and why. Silent on the first pass fails it; said
   on every pass fails it too.
+- **`writeWorkflow`: a step renamed by case, and a step's file that is a link.** Two edge cases an earlier review found and left. The write
+  put each step's `<name>.md` down and then removed the `.md` of every step the folder no longer has; where the filesystem does not tell
+  case apart — macOS's, Windows's — `Plan.md` and `plan.md` are one file, so a step renamed by case was written, and then removed under its
+  old name, and the folder lost the step. The removals now go first, before a byte of the new files is written, which is right on either
+  kind of filesystem (case-folding the comparison instead would leave a stray `Plan.md` on a case-sensitive one, where `loadWorkflows`
+  would read it as a second step). And a `.md` in the folder that is a link was written *through*, into whatever it points at, outside the
+  folder — a rendered step landing on a file no workflow owns — while a stale one was left behind, since `readdirSync`'s entry for a link
+  is no file and the removal takes only files. Such a link is now refused by name, with the folder as it was, before anything is written; a
+  linked README is refused only when a `readme` is given, which is when it would be written. Tested in `test/write-workflow.test.ts`: the
+  order of the removals and the writes, read off `fs` on any filesystem, so the rule holds where this repository's tests run; the rename by
+  case itself, skipped where the filesystem tells the two names apart and saying so (it skips on Linux, and the folder it asserts —
+  `Implement.md` alone beside the README and the schema, read back as one step — is what a case-insensitive filesystem gives); and the
+  refusal, in its words, for a link a step would be written through, for a link whose step is gone, and for a linked README with a README
+  given, each with what the link points at untouched — and, beside them, that a linked README with no README given is nothing the write
+  touches. Writing before removing fails the first; the refusal dropped fails the third.
+
+What it leaves:
+
+- **Two steps whose names differ only by case** — `Plan` and `plan` in one folder — are two files on a case-sensitive filesystem and one
+  on any other, where the second write silently wins and the result names both. `writeWorkflow` refuses neither, since on the filesystem
+  this repository's tests run on they are two ordinary steps. A refusal that fires on one machine and not another is worse than the hole.
+- **A `*.schema.json` that is a link** is read through, as any file the parser reads is, so a schema could come from outside the folder
+  though `output:` may not name a path outside it. The write never writes one; only the read walks it.
+- **The api's own refusal for a link is the package's sentence**, at 422, since `apps/api` passes `writeWorkflow`'s message through. Nothing
+  in `apps/` changed here.
 
 ## 1. A run that grows steps from a plan
 

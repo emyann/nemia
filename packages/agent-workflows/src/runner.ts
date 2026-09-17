@@ -1054,9 +1054,15 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * `loop:` that is not a back edge, an `output:` naming a schema that is not in the folder. What `wf start` refuses beyond the parser — a
  * step named for another's check, `remote: true` off `claude` — is still `wf start`'s to refuse, as for a folder written by hand.
  *
- * Then each step's `<name>.md` is written — but for one whose file already reads as the step, which is left as it is, comments and all,
- * since a render has none — and the `.md` of each step no longer in the set is removed. A `*.schema.json` is left as it is: a step names
- * one, and the builder writes none. The README is written only when `readme` is given, to the name the folder's README already has.
+ * Then the `.md` of each step no longer in the set is removed, before a byte is written: on a filesystem that does not tell case apart —
+ * macOS's, Windows's — `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed under
+ * its old name, which is the same file. After that each step's `<name>.md` is written, but for one whose file already reads as the step,
+ * which is left as it is, comments and all, since a render has none. A `*.schema.json` is left as it is: a step names one, and the builder
+ * writes none. The README is written only when `readme` is given, to the name the folder's README already has.
+ *
+ * A `.md` in the folder that is a link is refused by name, before any of it: a write follows a link, so a step would be rendered into
+ * whatever it points at, outside the folder, and a link is not a file the write removes, so it would be left behind where its step went. A
+ * linked README is refused only when a `readme` is given, since that is when it would be written.
  *
  * Where: a workflow in the store's `workflows/` or in a repository's, the two places the board lists workflows from. Anywhere else only
  * with `{ anywhere: true }`, since a write removes files, and a path mistyped would remove them from a folder that is not a workflow. A run
@@ -1067,6 +1073,13 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   const refuse = (why: string | undefined) => { if (why) throw new WorkflowError(why); };
   if (!anywhere) refuse(workflowPlaceRefusal(at));
   if (fs.existsSync(at) && !isDirectory(at)) refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
+  // The folder as it is, read before a byte is written — and a workflow's files are its own, so a `.md` among them that is a link is refused.
+  let entries: fs.Dirent[] = [];
+  try { entries = fs.readdirSync(at, { withFileTypes: true }); } catch { /* not there: a new workflow's folder is made below */ }
+  const linked = entries.find((e) => e.isSymbolicLink() && e.name.endsWith('.md') && (readme !== undefined || !isReadme(e.name)));
+  if (linked) {
+    refuse(`${path.join(at, linked.name)} is a link, and a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes. Replace the link with a file of its own — copy what it points at over it, cp --remove-destination — or take it out of the folder.`);
+  }
   if (!steps.length) refuse(`no steps to write to ${at}, and a workflow has at least one. To remove the workflow, remove its folder.`);
   for (const step of steps) refuse(stepNameRefusal(step?.name));
   const twice = steps.find((step, i) => steps.findIndex((other) => other.name === step.name) !== i);
@@ -1078,7 +1091,6 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   const parsed = parseFolder(texts, read);
 
   fs.mkdirSync(at, { recursive: true });
-  const entries = fs.readdirSync(at, { withFileTypes: true });
   const written: string[] = [];
   const kept: string[] = [];
   /** Write `text` to `file`, unless what is there already reads as `same` does. */
@@ -1088,15 +1100,17 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
     fs.writeFileSync(path.join(at, file), text);
     return written.push(file);
   };
+  // The steps the folder no longer has lose their files first: where the filesystem does not tell case apart, a step renamed by case is
+  // written to the file its old name names, and removing that name afterwards would remove what was just written.
+  const names = new Set(texts.map(([name]) => `${name}.md`));
+  const removed = entries.filter((e) => e.isFile() && e.name.endsWith('.md') && !isReadme(e.name) && !names.has(e.name)).map((e) => e.name);
+  for (const file of removed) fs.rmSync(path.join(at, file));
   for (const [name, text] of texts) {
     const step = parsed.find((s) => s.name === name);
     put(`${name}.md`, text, (there) => {
       try { return isDeepStrictEqual(parseWorkflow(name, there, read), step); } catch { return false; }
     });
   }
-  const names = new Set(texts.map(([name]) => `${name}.md`));
-  const removed = entries.filter((e) => e.isFile() && e.name.endsWith('.md') && !isReadme(e.name) && !names.has(e.name)).map((e) => e.name);
-  for (const file of removed) fs.rmSync(path.join(at, file));
   if (readme !== undefined) put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
   return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
 }

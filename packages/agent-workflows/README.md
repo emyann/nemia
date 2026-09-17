@@ -97,9 +97,12 @@ the order listed below, each written as the parser reads it (a list as `a, b`, a
 names), then the body. Before a byte is written, the folder as it would be is parsed in memory by `parseFolder`, the same reading
 `loadWorkflows` uses, with the schemas read from the folder as they are. So anything the parser would refuse is refused first, in
 its words and naming the step: a key a step does not have, an `after` naming no step, a cycle, a loop that is not a back edge, a
-schema that is not in the folder. A step name that is not a file name is refused too, and the folder is left as it was. Then each
-step's `<name>.md` is written; a file that already reads as its step is left alone, with its comments, since a render has none. The
-file of a step no longer in the set is removed. Schemas are never written, and the README only when one is given. The write goes
+schema that is not in the folder. A step name that is not a file name is refused too, and so is a `.md` in the folder that is a
+link — a write would follow it out of the folder, and would not remove it when its step went — and the folder is left as it was.
+Then the file of each step no longer in the set is removed, before a byte of the new ones is written: where the filesystem does
+not tell case apart, `Plan.md` and `plan.md` are one file, and a step renamed by case would otherwise be written and then removed
+under its old name. After that each step's `<name>.md` is written; a file that already reads as its step is left alone, with its
+comments, since a render has none. Schemas are never written, and the README only when one is given. The write goes
 to a workflow in the store's `workflows/` or a repository's, and anywhere else only with `{ anywhere: true }`, since it removes
 files. A run is not changed by it: a run froze its folder at `wf start`.
 

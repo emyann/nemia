@@ -2814,6 +2814,10 @@ What was measured:
 - The fence tests hold the new step: `ui-workflow.test.ts` holds every `dev*` folder's `ship` to its keys and its recipe, with each
   folder's own check in it, and the two copies to their originals; `planned-workflow.test.ts` reads dev-planned as `plan → implement ⇄
   review → ship`.
+- From the review's second round: `workflow.test.ts` refuses `resume:` beside `workspace: main`, either order, with each key on its own
+  still read; `ship.test.ts` files a child `--after` a run whose ending merged and holds its brief to what the work said, never to the
+  ending's account of its own merge; `decide.test.ts` reads the whole screen of a `--no-worktree` run parked at the ending's gate, which
+  used to return before the decision was printed; `run.test.ts` holds `wf rm`'s words at both kinds of gate.
 
 What it leaves:
 

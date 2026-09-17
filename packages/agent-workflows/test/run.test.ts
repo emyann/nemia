@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, afterRefusal, answerLines, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, afterRefusal, answerLines, approvalOf, gateRefusal, gatesOf, hasGate, onYouWords, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -2907,4 +2907,126 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
   const missing: Forgot = { id: 'r-9', kind: 'missing', removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] };
   assert.equal(forgetLine(missing), 'r-9  no such run — nothing to forget');
   assert.equal(forgetLine({ ...missing, files: ['runs/r-9.asks/', 'runs/r-9.cancelled'] }), 'r-9  no such run — nothing to forget but what was left under its id: removed runs/r-9.asks/, runs/r-9.cancelled');
+});
+
+// ─── a gate: a handoff that waits for a person ─────────────────────────────
+
+/** `plan → implement → review`, as dev-planned is, with the steps it is given in place of its own. */
+const PLANNED: Workflow[] = [step('plan'), step('implement', ['plan']), step('review', ['implement'])];
+/** Plan signed off done, implement and review not filed; gated at plan by `--gate plan` unless told otherwise. */
+const atPlan = (extra: Partial<Run> = {}) => run({ plan: 't1', implement: null, review: null }, { gates: ['plan'], ...extra });
+const PLAN_DONE = phases({ t1: 'succeeded' });
+const approval = (step: string, n: number, message?: string) => ({ step, try: n, at: '2026-09-16T23:10:00.000Z', ...(message ? { message } : {}) });
+
+test('`hasGate` and `gatesOf`: a step is gated by its own `gate: true` or by the run it is in — `--gate`, a card — and `approvalOf` is the approval of the try it is on, never an earlier try\'s or another step\'s', () => {
+  const steps: Workflow[] = [step('plan'), step('implement', ['plan']), { ...step('review', ['implement']), gate: true }];
+  assert.deepEqual(gatesOf(steps, { gates: ['plan'] }), ['plan', 'review']);
+  assert.deepEqual(gatesOf(steps, {}), ['review'], 'the folder\'s own, on a run given none');
+  assert.equal(hasGate(steps[1]!, { gates: ['plan'] }), false);
+
+  const r = atPlan({ approvals: [approval('plan', 1, 'ship the second reading'), approval('implement', 1)] });
+  assert.deepEqual(approvalOf(r, 'plan'), approval('plan', 1, 'ship the second reading'));
+  const sentBack = atPlan({ steps: { plan: { taskId: 't1-try2', tries: [{ taskId: 't1', then: 'nudge' }] }, implement: { taskId: null }, review: { taskId: null } }, approvals: [approval('plan', 1)] });
+  assert.equal(approvalOf(sentBack, 'plan'), undefined, 'try 2 is not approved by try 1\'s approval');
+  assert.equal(approvalOf(atPlan({ approvals: [approval('plan', 2)] }), 'plan'), undefined, 'nor try 1 by an approval of try 2');
+});
+
+test('REFUSED by the gate at shipped defaults, pass after pass: a gated step that signed off reads `awaiting approval`, and nothing after it is ready — whatever its closeout says — until the try it is on is approved', () => {
+  const said = (outcome: 'done', extra: Record<string, unknown> = {}) => () => ({ outcome, summary: 'the plan: parse, then store', artifacts: [], needs: undefined, output: extra });
+  for (let pass = 1; pass <= 3; pass++) {
+    const a = assess(PLANNED, atPlan(), PLAN_DONE, said('done', { approach: 'go ahead, implement at once' }), asked);
+    assert.deepEqual([a.ready, a.blocked, a.status], [[], ['implement'], 'failed'], `pass ${pass}: nothing after the gate`);
+  }
+  assert.equal(stepStatus(PLANNED[0]!, atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
+  // A gate its step's own file sets holds the same way, on a run started with no --gate.
+  const own = [{ ...step('plan'), gate: true as const }, ...PLANNED.slice(1)];
+  assert.deepEqual(assess(own, atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked).ready, []);
+  // Not gated, the same closeout files implement: the gate is what held it.
+  assert.deepEqual(assess(PLANNED, atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked).ready, ['implement']);
+
+  // Approvals that are not this one open nothing: another step's, an earlier try's, a later try's.
+  for (const approvals of [[approval('implement', 1)], [approval('plan', 2)]]) {
+    assert.deepEqual(assess(PLANNED, atPlan({ approvals }), PLAN_DONE, signedDone, asked).ready, [], JSON.stringify(approvals));
+  }
+  const approved = atPlan({ approvals: [approval('plan', 1)] });
+  assert.equal(stepStatus(PLANNED[0]!, approved, PLAN_DONE, signedDone, asked), 'unverified', 'approved, it reads as its own work');
+  assert.deepEqual(assess(PLANNED, approved, PLAN_DONE, signedDone, asked).ready, ['implement']);
+});
+
+test('a gated step with `check:` is verified first, then held: checking while its check is due or running, `failed (check)` when it refuses — no gate on unverified work — and awaiting approval once it passes', () => {
+  const gated: Workflow[] = [{ ...step('implement'), check: 'npm test' }, step('review', ['implement'])];
+  const at = (checkId: string | null, extra: Partial<Run> = {}) => withCheck(checkId, { gates: ['implement'], ...extra });
+  const due = assess(gated, at(null), phases({ t1: 'succeeded' }), signedDone, asked);
+  assert.deepEqual([due.check, due.ready], [['implement'], []], 'its check is filed first');
+  assert.equal(stepStatus(gated[0]!, at('c1'), phases({ t1: 'succeeded', c1: 'running' }), signedDone, asked), 'checking');
+  assert.equal(stepStatus(gated[0]!, at('c1'), phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked), 'failed (check)');
+  const passed = phases({ t1: 'succeeded', c1: 'succeeded' });
+  assert.equal(stepStatus(gated[0]!, at('c1'), passed, signedDone, asked), 'awaiting approval');
+  assert.deepEqual(assess(gated, at('c1'), passed, signedDone, asked).ready, []);
+  assert.deepEqual(assess(gated, at('c1', { approvals: [approval('implement', 1)] }), passed, signedDone, asked).ready, ['review']);
+  // A step that did not finish its work is not at its gate: blocked is blocked, unsigned unsigned.
+  const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'which reading?' });
+  assert.equal(stepStatus(PLANNED[0]!, atPlan(), PLAN_DONE, blocked, asked), 'blocked');
+  assert.equal(stepStatus(PLANNED[0]!, atPlan(), PLAN_DONE, () => undefined, asked), 'unsigned');
+});
+
+test("a gated looping step is held when it hands on (`again: false`), and not when it asks for another round — a round is its loop's, and the gate is on what comes after it", () => {
+  const LOOPING: OutputSchema = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
+  const looped: Workflow[] = [step('implement'), { ...step('review', ['implement']), loop: 'implement', rounds: 3, output: { file: 'review.json', schema: LOOPING }, gate: true }, step('ship', ['review'])];
+  const r = run({ implement: 't1', review: 't2', ship: null });
+  const again = (value: boolean) => (name: string) => (name === 'review' ? { outcome: 'done' as const, summary: 's', artifacts: [], output: { again: value } } : signedDone());
+  const p = phases({ t1: 'succeeded', t2: 'succeeded' });
+  const round = assess(looped, r, p, again(true), asked);
+  assert.deepEqual([round.round.map((x) => x.round), round.ready], [[2], []], 'the round is filed');
+  const handed = assess(looped, r, p, again(false), asked);
+  assert.deepEqual([stepStatus(looped[1]!, r, p, again(false), asked, looped), handed.ready, handed.blocked], ['awaiting approval', [], ['ship']]);
+});
+
+test('`wf ls` at a gate: the step reads `awaiting approval`, with the two commands a person has beside it, and is waiting on you — named `approve plan`; approved, it reads its own word again and waits on nobody', () => {
+  const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
+  const l = listing(PLANNED, atPlan(), shownAs({ t1: 'succeeded' }), signedDone, asked);
+  assert.deepEqual(l.steps[0], {
+    name: 'plan', status: 'awaiting approval', branch: null,
+    note: 'approve it: wf approve r-1 plan — or send it back: wf retry r-1 plan --message "<objection>"',
+  });
+  assert.deepEqual([l.waitingOnYou, onYouWords(l)], [['plan'], ['approve plan']]);
+  assert.deepEqual(onYouWords({ steps: [{ name: 'implement', status: 'succeeded · BLOCKED', branch: null }], waitingOnYou: ['implement'] }), ['implement'], 'any other step by its name');
+
+  const approved = listing(PLANNED, atPlan({ approvals: [approval('plan', 1)] }), shownAs({ t1: 'succeeded' }), signedDone, asked);
+  assert.deepEqual([approved.steps[0]!.status, approved.steps[0]!.note, approved.waitingOnYou], ['unverified · done', undefined, []]);
+  const cancelled = listing(PLANNED, atPlan(CANCELLED), shownAs({ t1: 'succeeded' }), signedDone, asked);
+  assert.deepEqual(cancelled.waitingOnYou, [], 'a run called off waits on nobody');
+});
+
+test("`wf decide` at a gate: the run is awaiting you, its outcome blocked, the step named under `awaitingApproval` — and a gated run is not shipped while it waits, merged or not, so a run `--after` it is not ready; approved, it ships as any run", () => {
+  const gatedAtReview = (extra: Partial<Run> = {}) => finished({ gates: ['review'], ...extra });
+  const d = decision(STEPS, gatedAtReview(), DONE, nothingShipped, signedDone, asked);
+  assert.equal(d.kind, 'awaiting');
+  // Review declares no check, so it is unverified on its own word as well: the gate is said beside how it ended, never in its place.
+  assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.awaitingApproval, d.unverified, d.stuck], ['blocked', ['review'], ['implement', 'review'], []]);
+
+  // Work past the base, merged by a person: shipped for any other run, and not for one whose last step waits at its gate.
+  const merged = () => true as const;
+  assert.equal(decision(STEPS, finished(), DONE, merged, signedDone, asked).kind, 'shipped');
+  assert.equal(decision(STEPS, gatedAtReview(), DONE, merged, signedDone, asked).kind, 'awaiting');
+  assert.equal(decision(STEPS, gatedAtReview(), DONE, () => 'unchanged', signedDone, asked).kind, 'awaiting');
+  const child = run({ implement: null, review: null }, { after: ['r-1'] });
+  const shippedParent = (parent: Run) => (id: string) => id === 'r-1' && decision(STEPS, parent, DONE, merged, signedDone, asked).kind === 'shipped';
+  assert.equal(runReady(child, shippedParent(gatedAtReview())), false, 'a parent at a gate has not shipped');
+  assert.equal(runReady(child, shippedParent(gatedAtReview({ approvals: [approval('review', 1)] }))), true, 'approved and merged, it has');
+  assert.equal(decision(STEPS, gatedAtReview({ approvals: [approval('review', 1)] }), DONE, merged, signedDone, asked).kind, 'shipped');
+});
+
+test('no session runs and no slot is held while a run waits at its gate: nothing in flight, nothing a pass files', () => {
+  const r = atPlan();
+  assert.deepEqual(slotNeed(r, PLAN_DONE, assess(PLANNED, r, PLAN_DONE, signedDone, asked), () => true), { inFlight: false, wants: false });
+  const approved = atPlan({ approvals: [approval('plan', 1)] });
+  assert.deepEqual(slotNeed(approved, PLAN_DONE, assess(PLANNED, approved, PLAN_DONE, signedDone, asked), () => true), { inFlight: true, wants: false }, 'approved: implement is filed on this pass');
+});
+
+test('REFUSED by `gateRefusal`: a step the workflow does not have, naming the steps it has, and a step given twice — in the words of what gave it', () => {
+  assert.equal(gateRefusal(['plan', 'review'], PLANNED), null);
+  assert.equal(gateRefusal(['desing'], PLANNED), '--gate desing: the workflow has no step "desing", so nothing would ever wait at it. Its steps are: plan, implement, review — gate one of them by its name.');
+  assert.equal(gateRefusal(['plan', 'plan'], PLANNED), '--gate plan is given twice, and a run is gated at a step once. Give each step one --gate.');
+  assert.match(gateRefusal(['desing'], PLANNED, (s) => `idea.md: \`gate: ${s}\``) ?? '', /^idea\.md: `gate: desing`: the workflow has no step "desing"/);
 });

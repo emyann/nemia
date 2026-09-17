@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -606,8 +606,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
           console.log(`   ${s.name.padEnd(14)} ${said[i]!.padEnd(width)} ${s.branch ?? ''}${s.note ? `  · ${s.note}` : ''}`);
         }
         // The step a person has to act on, and where to act. Said here and not left to the result
-        // line, because a run blocked on its first step has no result branch yet.
-        if (waitingOnYou.length) console.log(`   → waiting on you: ${waitingOnYou.join(', ')}  —  wf decide ${run.id}`);
+        // line, because a run blocked on its first step has no result branch yet. A step at its gate is named with what is asked: approve plan.
+        if (waitingOnYou.length) console.log(`   → waiting on you: ${onYouWords({ steps, waitingOnYou }).join(', ')}  —  wf decide ${run.id}`);
         // A run it waits on that will never ship without a person — cancelled, say — is a person's to resolve, and the line says how.
         if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) console.log(`   → waiting on you: ${waitAdvice(run, waiting)}`);
         // Where to go and look. A run whose result nobody can find is a run that did not happen.

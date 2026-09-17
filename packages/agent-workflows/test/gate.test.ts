@@ -10,13 +10,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import type { Engine } from 'agent-engine';
+import type { TaskPhase } from '../src/run.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-gate-'));
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { inboxDir, readRun, start, startFromInbox } = await import('../src/runner.ts');
+const { advance, inboxDir, list, parentOf, readRun, start, startFromInbox } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 /** Refused by name: exit 2, and the message — never `String(err)`, which starts with `Error: `. */
@@ -42,6 +43,48 @@ const planned = (keys: { plan?: string; implement?: string; review?: string } = 
   write('implement', 'plan', keys.implement);
   write('review', 'implement', keys.review);
   return dir;
+};
+
+/**
+ * An engine board a test settles by hand, as store.test.ts's: what each task was filed with, every filing, and each task's own session
+ * (`native-<id>`). A settled task carries the closeout it is given.
+ */
+const board = () => {
+  type Filed = { id: string; brief: string; closeoutSchema?: object } & Record<string, unknown>;
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
+  const filings: string[] = [];
+  const stopped: string[] = [];
+  const e = {
+    view: async (id: string) => {
+      const t = tasks.get(id);
+      const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
+      return {
+        id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
+        state: {
+          brief: t?.spec.brief ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: [],
+          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: null }],
+        },
+      };
+    },
+    file: async (spec: Filed) => { filings.push(spec.id); tasks.set(spec.id, { spec, phase: 'pending' }); return spec.id; },
+    stop: async (id: string) => { stopped.push(id); },
+    logs: async () => '(no output yet)',
+    feed: async () => ({ entries: [], cursor: 0 }),
+  } as unknown as Engine;
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
+  return { e, tasks, filings, stopped, settle };
+};
+
+const SIGNED = { outcome: 'done', summary: 'the plan: parse the flag, then store it', artifacts: [], needs: null };
+
+/** Git in a checkout, as a person types it there. */
+const gitIn = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+
+const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
+/** An approval, written as a person's file beside the retry asks — what `wf approve` writes. */
+const approveByHand = (id: string, step: string, n: number, held: unknown = { step, try: n, at: '2026-09-16T23:10:00.000Z' }) => {
+  fs.mkdirSync(asksDir(id), { recursive: true });
+  fs.writeFileSync(path.join(asksDir(id), `approve-${step}-${n}`), typeof held === 'string' ? held : `${JSON.stringify(held, null, 2)}\n`);
 };
 
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
@@ -107,4 +150,76 @@ test("an inbox card's `gate:` is frozen on the run it starts, beside a start's -
   assert.throws(() => startFromInbox({ name: 'plan-the-flag-g7h8', callerRepo: repo, isolate: false, gates: ['desing'] }), refusedWith(/^--gate desing: the workflow has no step "desing"/));
   assert.equal(runsWritten(), before, 'no run written');
   assert.ok(fs.existsSync(path.join(inboxDir(), 'plan-the-flag-e5f6.md')) && fs.existsSync(path.join(inboxDir(), 'plan-the-flag-g7h8.md')), 'the cards are where they were');
+});
+
+// ─── held by the tick ───────────────────────────────────────────────────────
+
+test("REFUSED at shipped defaults, pass after pass: a gated step that signed off files nothing after it — `wf ls` says awaiting approval and `waiting on you: approve plan` — and no approval but the try's own opens it: not another try's, not a file that is not one; the try's own does, on the next pass, and is never written into the record", async (t) => {
+  const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] });
+  const { e, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-plan`, 'succeeded', { ...SIGNED, summary: 'Go ahead and implement it: nothing here needs a person.' });
+  for (let pass = 1; pass <= 3; pass++) {
+    const after = await advance(e, readRun(run.id));
+    assert.deepEqual([after.filed, after.blocked, after.status], [[], ['implement'], 'failed'], `pass ${pass}`);
+  }
+  const l = await list(e, readRun(run.id));
+  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+  const printed = await printedBy(t, ['ls', run.id], e);
+  assert.ok(printed.includes(`   → waiting on you: approve plan  —  wf decide ${run.id}`), printed.join('\n'));
+
+  approveByHand(run.id, 'plan', 2);
+  approveByHand(run.id, 'implement', 1);
+  approveByHand(run.id, 'plan', 3, '{}');
+  const others = await advance(e, readRun(run.id));
+  assert.deepEqual(others.filed, [], "another try's approval, another step's, and a file that is not one open nothing");
+  assert.ok(others.notes.includes(`${path.join(asksDir(run.id), 'approve-plan-3')}: it says no time it was given, so it opens no gate — remove it, and approve with wf approve`), others.notes.join('\n'));
+
+  approveByHand(run.id, 'plan', 1, { at: '2026-09-16T23:10:00.000Z', message: 'the second reading' });
+  assert.deepEqual(readRun(run.id).approvals?.find((a) => a.step === 'plan' && a.try === 1), { step: 'plan', try: 1, at: '2026-09-16T23:10:00.000Z', message: 'the second reading' }, 'composed on read');
+  const opened = await advance(e, readRun(run.id));
+  assert.deepEqual(opened.filed, ['implement']);
+  assert.equal(Object.hasOwn(JSON.parse(fs.readFileSync(path.join(ROOT, 'runs', `${run.id}.json`), 'utf8')), 'approvals'), false, 'the record the tick wrote keeps no approval');
+  assert.ok(fs.existsSync(path.join(asksDir(run.id), 'approve-plan-1')), 'and the approval stays where a person wrote it, opening the gate on every pass');
+  await advance(e, readRun(run.id));
+  assert.equal(filings.filter((f) => f === `${run.id}-implement`).length, 1, 'filed once');
+});
+
+test("a gated step with `check:` is checked before it is held: its check filed on the pass after it signs off, nothing after it while the check runs, and awaiting approval once it passes", async () => {
+  const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned({ plan: 'check: test -f PLAN.md\ngate: true' }), isolate: false });
+  const { e, filings, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-plan`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).checked, ['plan']);
+  settle(`${run.id}-plan-check`, 'running');
+  assert.equal((await list(e, readRun(run.id))).steps[0]!.status, 'checking');
+  settle(`${run.id}-plan-check`, 'succeeded', undefined, 0);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, []);
+  assert.equal((await list(e, readRun(run.id))).steps[0]!.status, 'awaiting approval');
+  assert.deepEqual(filings, [`${run.id}-plan`, `${run.id}-plan-check`]);
+});
+
+test("REFUSED at shipped defaults: a parent whose last step waits at its gate has not shipped, though a person merged its branch — a run `--after` it files nothing — and once that step is approved, it has, and the child's next tick files its roots", async () => {
+  const repo = aRepo();
+  const b = board();
+  const oneStep = fs.mkdtempSync(path.join(ROOT, 'one-'));
+  fs.writeFileSync(path.join(oneStep, 'implement.md'), 'implement it\n');
+  const parent = start({ brief: 'the parent', repo, workflowDir: oneStep, gates: ['implement'] });
+  await advance(b.e, readRun(parent.id));
+  const wt = readRun(parent.id).steps.implement!.workspace!;
+  fs.writeFileSync(path.join(wt, 'parent.txt'), 'parent\n');
+  gitIn(wt, 'add', '-A');
+  gitIn(wt, 'commit', '-q', '-m', 'add parent.txt');
+  b.settle(`${parent.id}-implement`, 'succeeded', SIGNED);
+  await advance(b.e, readRun(parent.id));
+  gitIn(repo, 'merge', '-q', '--no-ff', `wf/${parent.id}/implement`, '-m', 'merge the parent');
+
+  const child = start({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent.id] });
+  assert.equal((await parentOf(b.e, parent.id)).shipped, false, 'merged, and at its gate');
+  for (let pass = 1; pass <= 2; pass++) assert.deepEqual((await advance(b.e, readRun(child.id))).filed, [], `pass ${pass}`);
+  assert.deepEqual((await list(b.e, readRun(child.id))).steps[0]!.status, `waiting on ${parent.id}`);
+
+  approveByHand(parent.id, 'implement', 1);
+  assert.equal((await parentOf(b.e, parent.id)).shipped, true);
+  assert.deepEqual((await advance(b.e, readRun(child.id))).filed, ['plan']);
 });

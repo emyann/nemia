@@ -261,6 +261,76 @@ export const gatesOf = (steps: readonly Workflow[], run: Pick<Run, 'gates'>): st
 export const approvalOf = (run: Run, step: string): Approval | undefined =>
   run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
 
+/** The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask. Pure. */
+export const spentApprovals = (run: Run): Approval[] => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step));
+
+/** Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty. */
+export const approvalWordsRefusal = (message: string | undefined, command = 'wf approve <runId> <step>'): string | null =>
+  (message !== undefined && !message.trim()
+    ? `--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing. Say what you approve, or on what terms — ${command} --message "<words>" — or leave --message out.`
+    : null);
+
+/**
+ * Why `wf approve` will not approve this step, in words that name the fix — or null, when it may: the step waits at its gate. Pure.
+ *
+ * Refused: words that are empty (`approvalWordsRefusal`); a step the run does not have; a cancelled run, which files nothing; a step that is
+ * not gated, naming the steps that are; the try it is on already approved; a send-back already asked for — the try after this one, which
+ * would spend an approval of this one at once; and a step that has not signed off, each status with why and what to do instead.
+ */
+export function approvalRefusal(
+  steps: readonly Workflow[],
+  run: Run,
+  name: string,
+  message: string | undefined,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
+  verdictOf: (step: string) => Verdict | undefined = () => undefined,
+  /** What people asked for with `wf retry`, and the run has not consumed yet: a send-back already asked for. */
+  asks: readonly RetryAsk[] = [],
+  spendOf: SpendOf = () => undefined,
+): string | null {
+  const command = `wf approve ${run.id} ${name}`;
+  const words = approvalWordsRefusal(message, command);
+  if (words) return words;
+  const step = steps.find((s) => s.name === name);
+  if (!step || !run.steps[name]) return `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.`;
+  if (run.cancelledAt) {
+    return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so an approval would never be honoured. Start a new run for the work with wf start.`;
+  }
+  if (!hasGate(step, run)) {
+    const gates = gatesOf(steps, run);
+    return `${name} has no gate: what waits on it is filed once it has ${step.check ? 'passed its check' : 'signed off'}, with nobody's approval, so there is nothing to approve. `
+      + `${gates.length ? `${run.id} is gated at ${gates.join(', ')}.` : `${run.id} is gated at no step.`} A gate is set on a step, \`gate: true\`, or at start: wf start --gate <step>.`;
+  }
+  const n = tryOf(run, name);
+  const given = approvalOf(run, name);
+  if (given) {
+    return `try ${n} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: wf retry ${run.id} ${name} --message "<objection>".`;
+  }
+  const pending = asks.find((a) => a.step === name && a.try === n + 1);
+  if (pending) {
+    return `try ${n + 1} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}): the next tick sends it back, and an approval of try ${n} would be spent by it at once. Approve try ${n + 1} once it has signed off — or, to approve this one, take that ask back first: retry-${name}-${n + 1}, in the run's .asks directory.`;
+  }
+  const { status } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
+  if (status === 'awaiting approval') return null;
+  const then = `Its gate holds once it has signed off${step.check ? ' and passed its check' : ''}: approve it then (wf ls ${run.id}).`;
+  const why: Partial<Record<StepStatus, string>> = {
+    waiting: `${name} has not signed off yet: it has not been filed. ${then}`,
+    running: `${name} has not signed off yet: it is still running. ${then}`,
+    checking: `${name} has signed off, and its check is still due or running: a gated step is verified first, then held. Approve it once its check has passed (wf ls ${run.id}).`,
+    blocked: `${name} has not signed off its work: it signed off blocked, so there is nothing to approve. Answer it: wf retry ${run.id} ${name} --message "<answer>".`,
+    unsigned: `${name} has not signed off: it ended without its closeout, so there is nothing to approve. Try it again: wf retry ${run.id} ${name}.`,
+    'failed (check)': `${name} has not passed its check, so its work is not verified and there is nothing to approve. See what the check said: wf decide ${run.id}.`,
+    failed: `${name} has not signed off: its session failed first, so there is nothing to approve. Try it again: wf retry ${run.id} ${name}.`,
+    stopped: `${name} has not signed off: its session was stopped first, so there is nothing to approve. Try it again: wf retry ${run.id} ${name}.`,
+    exhausted: `${name} has handed nothing on: it asked for another round on the last one \`rounds:\` allows. Go round once more — wf round ${run.id} ${name} — and approve what a later round hands on.`,
+    verified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
+    unverified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
+  };
+  return why[status] ?? `${name} is ${status}, not awaiting approval, so there is nothing to approve. See why: wf decide ${run.id}.`;
+}
+
 /**
  * Whether a step waits at its gate: gated (`hasGate`), signed off on its own work — verified, or unverified with no check — and not approved
  * for the try it is on (`approvalOf`). A looping step that asked for another round (`again: true`) hands nothing on, so no gate holds it:
@@ -588,6 +658,18 @@ function standing(
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   if (held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)) return { own, status: 'over budget' };
   return { own, status: atGate(step, run, own, closeoutOf) ? 'awaiting approval' : own };
+}
+
+/**
+ * How a step's last try ended, as a try's brief says it (`RetryBriefing.status`): on its own work (`ownStatus`) — and, for a gated step that
+ * signed off, `awaiting approval`, since a try of it is a send-back from its gate (`retryable`), approved or not. Pure.
+ */
+export function triedFrom(
+  step: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf,
+): StepStatus {
+  const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+  return satisfiesAfter(own) && hasGate(step, run) ? 'awaiting approval' : own;
 }
 
 /** The statuses a try takes a step on from (`retryable`): a step over its budget in one waits for a person to raise the cap. */
@@ -963,6 +1045,10 @@ export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): bo
  * person's raising it is what a cap forbids. A recheck costs nothing, and needs none. So `raise` is on a settled step over its budget, or
  * ended at it, that may be tried: those two statuses, and a `failed (check)` whose check did not finish past its budget, which is offered
  * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `wf round`'s.
+ *
+ * And a gated step that signed off, while nothing after it is filed: `awaiting approval`, or approved and not yet handed on. A try of it is
+ * a send-back from its gate (`sendsBack`) — `nudge` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try after it
+ * is on a try its approval does not name, so an approval given before the send-back is spent by it.
  */
 export function retryable(
   step: Workflow,
@@ -977,18 +1063,21 @@ export function retryable(
   spendOf: SpendOf = () => undefined,
   /** What each step's current check exited with (`stepStatus`): a check that refused holds a step over its budget, one that did not finish does not. */
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean; raise?: Raise } {
+): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean; sendsBack?: true; raise?: Raise } {
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
   const blockedByHarness = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
   const tried = status === 'over budget' ? own : status;
+  // At its gate, or approved with nothing after it filed yet: a person may still send it back. Once what follows is filed, it has handed on.
+  const sendsBack = settled && (status === 'awaiting approval'
+    || (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && !steps.some((s) => s.after.includes(step.name) && run.steps[s.name]?.taskId)));
   const modes: RetryMode[] =
     tried === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
-    : tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || (tried === 'blocked' && settled) || tried === 'budget exhausted' || blockedByHarness ? ['nudge', 'fresh']
+    : tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || (tried === 'blocked' && settled) || tried === 'budget exhausted' || blockedByHarness || sendsBack ? ['nudge', 'fresh']
     : [];
   const raise = settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
-  return { status, modes, blockedByHarness, ...(raise ? { raise } : {}) };
+  return { status, modes, blockedByHarness, ...(sendsBack ? { sendsBack: true as const } : {}), ...(raise ? { raise } : {}) };
 }
 
 /** Whether a person's ask carries what a try of its step needs past its budget (`Raise`): a `--budget` above it, on an ask that files a session. */
@@ -1114,7 +1203,7 @@ export function retryRefusal(
     return `${run.id} was cancelled at ${run.cancelledAt}, and a cancelled run files nothing, so a retry would never be honoured. Start a new run for the work with wf start.`;
   }
   const next = tryOf(run, name) + 1;
-  const { status, modes, blockedByHarness, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
+  const { status, modes, blockedByHarness, sendsBack, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
   const pending = asks.find((a) => a.step === name && a.try === next);
   if (pending && !carries(pending, raise)) {
     return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --budget <amount>.`;
@@ -1137,7 +1226,15 @@ export function retryRefusal(
   }
   if (!modes.includes(how.mode)) {
     const is = blockedByHarness ? 'is running, its session blocked by its harness with nothing signed off' : `is ${status}`;
-    return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`;
+    return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. ${sendsBack
+      ? `To send it back from its gate, say what to change: wf retry ${run.id} ${name} --message "<objection>".`
+      : `Ask for another session instead: wf retry ${run.id} ${name} (or --fresh).`}`;
+  }
+  // A send-back is an objection: a try of a step at its gate with nothing to change would sign off as it did, and wait there again.
+  if (sendsBack && how.message === undefined) {
+    const given = approvalOf(run, name);
+    const where = given ? `approved (try ${given.try}, at ${given.at}), and nothing after it is filed yet` : 'awaiting approval';
+    return `${name} is ${where}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
   }
   if (raise && how.mode !== 'recheck' && how.budget === undefined) {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
@@ -1229,8 +1326,9 @@ export function retryLines(
   if (d.kind !== 'awaiting') return [];
   const lines: string[] = [];
   for (const step of steps) {
-    const { status, modes, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
-    if (!modes.length) continue;
+    const { status, modes, sendsBack, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
+    // A step at its gate is offered its approval and its send-back beside it (`gateLines`), never a try with nothing to change.
+    if (!modes.length || sendsBack) continue;
     const command = `wf retry ${run.id} ${step.name}`;
     const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
     // A check that did not finish first, past a budget or not: run again as the work stands, it costs nothing. A session needs the raise.
@@ -1553,6 +1651,12 @@ export function roundAsk(
   if (stuck) {
     return no(`${stuck} is ${at(stuck).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stuck} again: wf retry ${run.id} ${stuck} — or see why: wf decide ${run.id}.`);
   }
+  // A step of the loop at its gate has signed off and waits for a person, whose word — not another round — is what moves it.
+  const gate = loopSpan(steps, looping).find((n) => at(n).status === 'awaiting approval');
+  if (gate && budget === undefined) {
+    const handedOn = gate === looping.name ? `${gate} signed off without asking for another round (\`again: false\`), and waits at its gate` : `${gate} waits at its gate in round ${now} of ${looping.name}'s loop`;
+    return no(`${handedOn}: a person's word moves it, not a round. Approve it — wf approve ${run.id} ${gate} — or send it back: wf retry ${run.id} ${gate} --message "<objection>".`);
+  }
   const { status, own } = at(looping.name);
   if (status === 'exhausted' || (status === 'over budget' && satisfiesAfter(own))) {
     if (over.length && budget === undefined) {
@@ -1637,7 +1741,8 @@ export function roundLines(steps: readonly Workflow[], run: Run, d: Decision, sp
  *     step in flight AND none ready to file. It is deliberately NOT relabelled — a run that
  *     succeeded succeeded, and overwriting that would make `wf ls` lie about work that landed.
  *
- * "Finished" has to mean both of those, because `failed` does not mean a run has stopped moving:
+ * "Finished" has to mean both of those — and no step waiting at its gate, whose approval would file what follows — because
+ * `failed` does not mean a run has stopped moving:
  * in a fan-out where `a` failed and `b` succeeded, a step waiting only on `b` is still READY while
  * the run as a whole reads failed. Treating that as finished wrote no mark, and the next tick
  * filed the step anyway — the exact thing cancelling is for.
@@ -1688,7 +1793,9 @@ export function cancelPlan(
   // Nothing in flight, so the question is only whether a tick would still file something — a step, a
   // check, a try or a round. `ready`, `check`, `retry` and `round` are the honest test for that; `status` alone is not.
   const { ready, check, retry, round, status } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, () => false, spendOf);
-  if (!ready.length && !check.length && !retry.length && !round.length && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
+  // Nor is a run waiting at a gate finished: an approval would file what waits on it, and the mark is what stops that.
+  const atGate = steps.some((s) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval');
+  if (!ready.length && !check.length && !retry.length && !round.length && !atGate && (status === 'succeeded' || status === 'failed')) return { kind: 'finished', status };
   return { kind: 'cancel', stop: [] };
 }
 
@@ -1736,6 +1843,8 @@ const andList = (items: readonly string[]): string =>
  *   the same way.
  * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
  *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by deleting its file (`askAt`).
+ * - **a step waiting at its gate** (`awaiting approval`), on a run nobody called off: something is due to be asked for, and an approval
+ *   files what waits on it. Approve it, or call the run off first.
  * - **a run another run waits on, and has not started on** (`gated`): forgotten, it would read `waiting on <id> (no such run)` for ever.
  *
  * A cancelled run whose tasks have settled is forgettable: it files nothing, and its asks are never honoured. `steps` is undefined for a
@@ -1775,6 +1884,7 @@ export function forgetRefusal(
   const due: string[] = [];
   const unheard: AskName[] = [];
   let waits = false;
+  let atGates: string[] = [];
   if (!run.cancelledAt) {
     const a = steps ? assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, () => false, spendOf) : undefined;
     if (a && steps) {
@@ -1788,6 +1898,11 @@ export function forgetRefusal(
         due.push(`try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : `wf retry ${modeWord(r)}`})`);
       }
       for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
+      atGates = steps.filter((s) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval').map((s) => s.name);
+      if (atGates.length) {
+        const one = atGates.length === 1;
+        held.push(`${andList(atGates)} ${one ? 'waits at its gate' : 'wait at their gates'} for your approval, and what waits on ${one ? 'it' : 'them'} is filed once ${one ? 'it is' : 'each is'} approved: ${atGates.map((name) => `wf approve ${id} ${name}`).join(', ')}`);
+      }
     }
     if (due.length) held.push(`${andList(due)}, and a pass may be filing ${due.length > 1 ? 'them' : 'it'} now`);
     // A person's word no pass has spent, and none will file as the step stands: what the pass files is named above.
@@ -1808,7 +1923,7 @@ export function forgetRefusal(
   // Said once for what cancelling settles — what is in flight, what a pass would file — and once for the asks nothing files.
   if (live.length && run.cancelledAt) {
     fixes.push(`It was cancelled at ${run.cancelledAt}, and a tick stops what is in flight: wf rm ${id} once it has settled (wf ls ${id})`);
-  } else if (live.length || due.length || waits) {
+  } else if (live.length || due.length || waits || atGates.length) {
     fixes.push(`Forgetting is not cancelling: wf cancel ${id} ${live.length ? 'stops what is in flight and ' : ''}files nothing more, then wf rm ${id}${live.length ? ` once what was in flight has settled (wf ls ${id})` : ''}`);
   }
   if (unheard.length) fixes.push(`Take ${unheard.length > 1 ? 'those asks' : 'that ask'} back, then wf rm ${id}: rm ${unheard.map(askAt).join(' ')}`);
@@ -2916,6 +3031,7 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
     failed: "The last try's session ended `failed` before it signed off.",
     stopped: "The last try's session was stopped before it signed off.",
     'budget exhausted': "The last try's session was ended by its harness at this step's budget, before it signed off.",
+    'awaiting approval': "The last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below. When you sign off again, it waits there again.",
   };
   // Beside why the last try ended, never in its place: a budget reached is why nothing more was filed, not what the session has to fix.
   const pastBudget = r.budget !== undefined && r.status !== 'budget exhausted'

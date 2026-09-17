@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -61,6 +61,11 @@ const HELP = `wf — run a workflow of agent steps
                                that is only one of these flags' names goes as --message=<answer>;
                                --budget <amount>: for a step over budget or budget exhausted, its
                                cap raised to that many dollars, above what its tries have cost
+  wf approve <runId> <step> [--message "<words>"]
+                               let a step waiting at its gate hand on: what waits on it is filed on
+                               the next tick, and every step after the gate is handed your words
+                               under ## Approved. To send it back instead, with what to change:
+                               wf retry <runId> <step> --message "<objection>"
   wf round <runId> [<step>] [--budget <amount>]
                                once more: a loop out of rounds goes round again, once, on the
                                next tick — the step it loops to continued, then a new reviewer;
@@ -392,6 +397,28 @@ function retryHow(argv: string[]): RetryHow {
   const wrong = messageRefusal(how) ?? budgetRefusal(how);
   if (wrong) usage(wrong);
   return how;
+}
+
+/**
+ * `wf approve`'s one flag, after the run and the step: `--message "<words>"`, or `--message=<words>`, once — the next argument is the words
+ * whatever it starts with, as `wf retry`'s is — refused before a run is read when it is missing or empty (`approvalWordsRefusal`). Anything
+ * else is refused.
+ */
+function approveHow(argv: string[]): string | undefined {
+  let message: string | undefined;
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg !== '--message' && !arg.startsWith('--message=')) {
+      usage(`wf approve does not take ${arg}. It takes the run, the step, and --message "<words>": wf approve <runId> <step> [--message "<words>"].`);
+    }
+    if (message !== undefined) usage('wf approve takes --message once: put all your words in it, quoted — wf approve <runId> <step> --message "<words>".');
+    const text = arg === '--message' ? argv[++i] : arg.slice('--message='.length);
+    if (text === undefined) usage('--message takes the words that go with your approval, quoted: wf approve <runId> <step> --message "<words>".');
+    message = text;
+  }
+  const wrong = approvalWordsRefusal(message);
+  if (wrong) usage(wrong);
+  return message;
 }
 
 /** A `--budget`'s value as dollars (`dollarsOf`), or refused, saying what it takes: an amount above zero, in digits. */
@@ -825,6 +852,16 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
       const then = stopFirst ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped' : 'the next tick files it, once';
       console.log(`${runId}  asked: try ${ask.try} of ${stepName} (${how})${ask.message !== undefined ? ', with your answer' : ''} — ${then}`);
+      console.log(`   ${file}`);
+      return;
+    }
+
+    // A person's word at a gate. Like `wf retry`, it writes the approval and nothing else: the tick reads it on every pass, and files what waits.
+    case 'approve': {
+      const [runId, stepName, ...more] = rest;
+      if (!runId || !stepName || runId.startsWith('--') || stepName.startsWith('--')) return console.log(HELP);
+      const { approval, file } = await approve(e, runId, stepName, approveHow(more));
+      console.log(`${runId}  approved: try ${approval.try} of ${stepName}${approval.message !== undefined ? ', with your words' : ''} — the next tick files what waits on it`);
       console.log(`   ${file}`);
       return;
     }

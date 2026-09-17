@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, afterRefusal, answerLines, approvalOf, gateRefusal, gatesOf, hasGate, onYouWords, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -3029,4 +3029,94 @@ test('REFUSED by `gateRefusal`: a step the workflow does not have, naming the st
   assert.equal(gateRefusal(['desing'], PLANNED), '--gate desing: the workflow has no step "desing", so nothing would ever wait at it. Its steps are: plan, implement, review — gate one of them by its name.');
   assert.equal(gateRefusal(['plan', 'plan'], PLANNED), '--gate plan is given twice, and a run is gated at a step once. Give each step one --gate.');
   assert.match(gateRefusal(['desing'], PLANNED, (s) => `idea.md: \`gate: ${s}\``) ?? '', /^idea\.md: `gate: desing`: the workflow has no step "desing"/);
+});
+
+test('REFUSED by `approvalRefusal`, by name: empty words, a step the run does not have, a cancelled run, a step not gated — naming the gates there are — the try already approved, a send-back already asked for, and a step that has not signed off, each saying why and what instead; a step at its gate may be approved', () => {
+  const refused = (r: Run, name: string, p: (id: string) => TaskPhase, said: (step: string) => Closeout | undefined = signedDone, message?: string, asks: RetryAsk[] = []) =>
+    approvalRefusal(PLANNED, r, name, message, p, said, asked, () => undefined, asks);
+  assert.equal(refused(atPlan(), 'plan', PLAN_DONE), null);
+  assert.equal(refused(atPlan(), 'plan', PLAN_DONE, signedDone, 'ship the second reading'), null);
+
+  assert.match(refused(atPlan(), 'plan', PLAN_DONE, signedDone, ' \n') ?? '', /^--message is empty, and an approval's words are handed to every step after the gate: empty, they tell them nothing\. .*wf approve r-1 plan --message "<words>" — or leave --message out\.$/);
+  assert.equal(approvalWordsRefusal(''), approvalWordsRefusal(' ', 'wf approve <runId> <step>'), 'the CLI says it in the same words');
+  assert.equal(refused(atPlan(), 'desing', PLAN_DONE), 'r-1 has no step "desing" — its steps are plan, implement, review.');
+  assert.match(refused(atPlan(CANCELLED), 'plan', PLAN_DONE) ?? '', /^r-1 was cancelled at .*, and a cancelled run files nothing, so an approval would never be honoured\./);
+  assert.equal(refused(run({ plan: 't1', implement: 't2', review: null }, { gates: ['plan'] }), 'implement', phases({ t1: 'succeeded', t2: 'succeeded' })),
+    'implement has no gate: what waits on it is filed once it has signed off, with nobody\'s approval, so there is nothing to approve. r-1 is gated at plan. A gate is set on a step, `gate: true`, or at start: wf start --gate <step>.');
+  assert.match(refused(atPlan({ gates: undefined }), 'plan', PLAN_DONE) ?? '', /^plan has no gate: .* r-1 is gated at no step\./);
+  assert.equal(refused(atPlan({ approvals: [approval('plan', 1, 'yes')] }), 'plan', PLAN_DONE),
+    'try 1 of plan is already approved, at 2026-09-16T23:10:00.000Z, with words: what waits on it is filed on the next tick, once. To send it back instead, before that tick: wf retry r-1 plan --message "<objection>".');
+  const sendBack: RetryAsk = { step: 'plan', try: 2, mode: 'nudge', message: 'store it first', at: '2026-09-16T23:00:00.000Z' };
+  assert.match(refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [sendBack]) ?? '',
+    /^try 2 of plan is already asked for \(--nudge, at 2026-09-16T23:00:00\.000Z\): the next tick sends it back, and an approval of try 1 would be spent by it at once\. /);
+
+  // Not signed off yet, each in its own words.
+  const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'which reading?' });
+  for (const [r, p, said, pattern] of [
+    [atPlan({ steps: { plan: { taskId: null }, implement: { taskId: null }, review: { taskId: null } } }), phases({}), signedDone, /^plan has not signed off yet: it has not been filed\. Its gate holds once it has signed off: approve it then \(wf ls r-1\)\.$/],
+    [atPlan(), phases({ t1: 'running' }), signedDone, /^plan has not signed off yet: it is still running\./],
+    [atPlan(), PLAN_DONE, blocked, /^plan has not signed off its work: it signed off blocked, so there is nothing to approve\. Answer it: wf retry r-1 plan --message "<answer>"\.$/],
+    [atPlan(), PLAN_DONE, () => undefined, /^plan has not signed off: it ended without its closeout/],
+    [atPlan(), phases({ t1: 'failed' }), () => undefined, /^plan has not signed off: its session failed first/],
+  ] as const) {
+    assert.match(refused(r, 'plan', p, said) ?? '', pattern);
+  }
+  const checked: Workflow[] = [{ ...step('plan'), check: 'test -f PLAN.md' }, ...PLANNED.slice(1)];
+  const withPlanCheck = (phase: TaskPhase) => approvalRefusal(checked, atPlan({ steps: { plan: { taskId: 't1', check: { taskId: 'c1' } }, implement: { taskId: null }, review: { taskId: null } } }), 'plan', undefined, phases({ t1: 'succeeded', c1: phase }), signedDone, asked, () => 1);
+  assert.match(withPlanCheck('running') ?? '', /^plan has signed off, and its check is still due or running: a gated step is verified first, then held\./);
+  assert.match(withPlanCheck('failed') ?? '', /^plan has not passed its check, so its work is not verified and there is nothing to approve\./);
+  assert.equal(withPlanCheck('succeeded'), null);
+});
+
+test("sending back from a gate is `wf retry --message`: a step at its gate — or approved, with nothing after it filed yet — may be tried with words, and is REFUSED without them or with --recheck; once what follows is filed, it has handed on", () => {
+  const at = retryable(PLANNED[0]!, atPlan(), PLAN_DONE, signedDone, asked, PLANNED);
+  assert.deepEqual([at.status, at.modes, at.sendsBack], ['awaiting approval', ['nudge', 'fresh'], true]);
+  const refusal = (r: Run, how: RetryHow, p = PLAN_DONE) => retryRefusal(PLANNED, r, 'plan', how, p, signedDone, asked);
+  assert.equal(refusal(atPlan(), { mode: 'nudge', message: 'store the flag before you parse it' }), null);
+  assert.equal(refusal(atPlan(), { mode: 'fresh', message: 'start over from the second reading' }), null);
+  assert.equal(refusal(atPlan(), { mode: 'nudge' }),
+    'plan is awaiting approval: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. Say what to change: wf retry r-1 plan --message "<objection>" — or approve it: wf approve r-1 plan.');
+  assert.match(refusal(atPlan(), { mode: 'fresh' }) ?? '', /Say what to change: wf retry r-1 plan --message "<objection>" --fresh — or approve it/);
+  assert.equal(refusal(atPlan(), { mode: 'recheck' }), '--recheck runs a step\'s check again, and plan is awaiting approval: no check of it failed. To send it back from its gate, say what to change: wf retry r-1 plan --message "<objection>".');
+
+  const approved = atPlan({ approvals: [approval('plan', 1)] });
+  assert.equal(refusal(approved, { mode: 'nudge', message: 'not yet: store it first' }), null, 'approved, and nothing after it filed: an approval given before the send-back');
+  assert.match(refusal(approved, { mode: 'nudge' }) ?? '', /^plan is approved \(try 1, at 2026-09-16T23:10:00\.000Z\), and nothing after it is filed yet: .* — or leave it approved, and the next tick files what waits on it\.$/);
+  const handedOn = run({ plan: 't1', implement: 't2', review: null }, { gates: ['plan'], approvals: [approval('plan', 1)] });
+  assert.equal(refusal(handedOn, { mode: 'nudge', message: 'too late' }, phases({ t1: 'succeeded', t2: 'running' })),
+    'plan signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.');
+  // A gate is offered its own lines on `wf decide`, never a try with nothing to change.
+  const d = decision(PLANNED, atPlan(), PLAN_DONE, nothingShipped, signedDone, asked);
+  assert.deepEqual(retryLines(PLANNED, atPlan(), d, PLAN_DONE, signedDone, asked), []);
+});
+
+test("a send-back's brief says why the step is back — its handoff waited at its gate, and a person sent it back — beside what they want changed; `triedFrom` names that for a gated step that signed off, and a step's own ending otherwise; `spentApprovals` are those of a try the step is past", () => {
+  assert.equal(triedFrom(PLANNED[0]!, atPlan(), PLAN_DONE, signedDone, asked, PLANNED, () => undefined), 'awaiting approval');
+  assert.equal(triedFrom(PLANNED[0]!, atPlan({ approvals: [approval('plan', 1)] }), PLAN_DONE, signedDone, asked, PLANNED, () => undefined), 'awaiting approval', 'approved, and sent back all the same');
+  assert.equal(triedFrom(PLANNED[0]!, atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked, PLANNED, () => undefined), 'unverified');
+  assert.equal(triedFrom(PLANNED[0]!, atPlan(), phases({ t1: 'failed' }), () => undefined, asked, PLANNED, () => undefined), 'failed');
+
+  const brief = retrySection(PLANNED[0]!, { try: 2, by: 'ask', mode: 'nudge', resumed: true, status: 'awaiting approval', message: 'store the flag before you parse it' });
+  assert.match(brief, /^\n## Try 2\n\nThe last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below\. When you sign off again, it waits there again\.\nA person asked for this try: `wf retry --nudge --message`, with what they said below\./);
+  assert.ok(brief.includes('## Your answer\n\n```text\nstore the flag before you parse it\n```'), brief);
+
+  const tried = atPlan({ steps: { plan: { taskId: 't1-try2', tries: [{ taskId: 't1', then: 'nudge' }] }, implement: { taskId: null }, review: { taskId: null } }, approvals: [approval('plan', 1), approval('plan', 2), approval('implement', 1)] });
+  assert.deepEqual(spentApprovals(tried), [approval('plan', 1)]);
+});
+
+test("REFUSED at a gate: `cancelPlan` calls a run waiting at its gate off — it is not finished, an approval would file what follows — `forgetRefusal` holds it, naming the approval, and a round of a loop at its gate is a person's word, not `wf round`'s", () => {
+  assert.deepEqual(cancelPlan(PLANNED, atPlan(), PLAN_DONE, signedDone, asked), { kind: 'cancel', stop: [] });
+  assert.deepEqual(cancelPlan(PLANNED, atPlan({ gates: undefined, steps: { plan: { taskId: 't1' }, implement: { taskId: 't2' }, review: { taskId: 't3' } } }), phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedDone, asked),
+    { kind: 'finished', status: 'succeeded' }, 'a run with no gate held is finished as before');
+
+  assert.equal(forgetRefusal(PLANNED, atPlan(), PLAN_DONE, [], signedDone, asked),
+    'plan waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve r-1 plan. Forgetting is not cancelling: wf cancel r-1 files nothing more, then wf rm r-1.');
+  assert.equal(forgetRefusal(PLANNED, atPlan(CANCELLED), PLAN_DONE, [], signedDone, asked), null, 'called off, it files nothing: forgettable');
+
+  const LOOPING: OutputSchema = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
+  const looped: Workflow[] = [step('implement'), { ...step('review', ['implement']), loop: 'implement', rounds: 1, output: { file: 'review.json', schema: LOOPING } }, step('ship', ['review'])];
+  const r = run({ implement: 't1', review: 't2', ship: null }, { gates: ['review'] });
+  const handed = (name: string) => (name === 'review' ? { outcome: 'done' as const, summary: 's', artifacts: [], output: { again: false } } : signedDone());
+  const refusal = roundAsk(looped, r, 'review', phases({ t1: 'succeeded', t2: 'succeeded' }), handed, asked);
+  assert.deepEqual(refusal, { refusal: 'review signed off without asking for another round (`again: false`), and waits at its gate: a person\'s word moves it, not a round. Approve it — wf approve r-1 review — or send it back: wf retry r-1 review --message "<objection>".' });
 });

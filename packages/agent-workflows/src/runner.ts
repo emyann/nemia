@@ -17,7 +17,7 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { approvalOf, artifactLines, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export { approvalOf, approvalRefusal, approvalWordsRefusal, artifactLines, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, WorkflowError, workflowFolder, workflowsIn, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
@@ -26,7 +26,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, slotFree, afterRefusal, gateRefusal, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, slotFree, afterRefusal, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, budgetOf, budgetUsdFor, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -239,7 +239,7 @@ export function readAnswers(id: string): RetryAsk[] {
  * name that exists, as `wx` does, and unlike `wx` leaves no moment in which the tick can read an ask that has
  * been created and not yet written. False when an ask for that try was already there.
  */
-function writeAsk(file: string, ask: RetryAsk | RoundAsk): boolean {
+function writeAsk(file: string, ask: RetryAsk | RoundAsk | Approval): boolean {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const whole = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${Date.now()}`);
   fs.writeFileSync(whole, `${JSON.stringify(ask, null, 2)}\n`, { flag: 'wx' });
@@ -254,11 +254,15 @@ function writeAsk(file: string, ask: RetryAsk | RoundAsk): boolean {
   }
 }
 
-/** Move each ask the run's record already answers into `done/`. The tick's one touch on a person's file, and never an edit. */
+/**
+ * Move each ask the run's record already answers into `done/` — and each approval a later try of its step spent (`spentApprovals`). The
+ * tick's one touch on a person's file, and never an edit.
+ */
 function consumeAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly RoundAsk[]): void {
   const spent = [
     ...spentAsks(run, asks).map((a) => askFile(run.id, a.step, a.try)),
     ...spentRoundAsks(run, rounds).map((a) => roundAskFile(run.id, a.step, a.round)),
+    ...spentApprovals(run).map((a) => approvalFile(run.id, a.step, a.try)),
   ];
   for (const file of spent) {
     const done = path.join(asksDir(run.id), 'done', path.basename(file));
@@ -1512,7 +1516,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           // What was said to the session a nudge continues: it may never have read it (agent-engine open issue 16).
           ...(resumeFrom ? { said: saidIn(views.get(record.taskId!)) } : {}),
           // How the last try ended on its own work — unsigned, failed, its check — and not `over budget`, which is why nothing was filed: `budget` says that.
-          status: ownStatus(step, run, phaseOf, signedOff, asked, steps, spendOf), ...(refusal ? { refusal } : {}),
+          // A gated step that signed off was sent back from its gate.
+          status: triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf), ...(refusal ? { refusal } : {}),
         }, undefined, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
@@ -2032,6 +2037,42 @@ export async function retry(e: Engine, id: string, stepName: string, how: RetryH
   }
   const step = steps.find((s) => s.name === stepName)!;
   return { run, ask, file, stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked, spendOf).blockedByHarness };
+}
+
+/** What `wf approve` did: the run, the approval as written, and its file. */
+export type Approved = { run: Run; approval: Approval; file: string };
+
+/**
+ * Approve a step waiting at its gate — `wf approve` — by writing the approval, and nothing else: `runs/<id>.asks/approve-<step>-<try>`, whole and
+ * exclusively, beside the retry asks, with the time and the words given (`message`). The next tick reads it with the run (`readRun`) and files
+ * what waits on the step, handing each step after the gate the words under `## Approved`. Like a retry ask it is the person's own file, and the
+ * verb never writes the run's json.
+ *
+ * Refused before anything is written, exit 2, with what to do instead: a run not there; and what `approvalRefusal` refuses — empty words, a
+ * step the run does not have, a cancelled run, a step not gated, not signed off yet, or already approved, and a send-back already asked for.
+ * A file at the approval's name that is not one is named, with how to clear it.
+ *
+ * Sending back is not this verb's: `wf retry <run> <step> --message "<objection>"` — the try it files is one this approval does not name.
+ */
+export async function approve(e: Engine, id: string, stepName: string, message?: string): Promise<Approved> {
+  const refuse = (words: string): never => { throw Object.assign(new Error(words), { exitCode: 2 }); };
+  if (!fs.existsSync(runFile(id))) refuse(`no such run: ${id}. wf approve takes a run by its id, as wf ls lists it: wf approve <runId> <step>.`);
+  const run = readRun(id);
+  const steps = stepsOf(run);
+  const { views, phaseOf } = await taskPhases(e, run);
+  const refusal = (now: Run) => approvalRefusal(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), exitVerdicts(views, now), readAsks(id).asks, spendReader(views));
+  const refused = refusal(run);
+  if (refused) refuse(refused);
+  const approval: Approval = { step: stepName, try: tryOf(run, stepName), at: new Date().toISOString(), ...(message !== undefined ? { message } : {}) };
+  const file = approvalFile(id, stepName, approval.try);
+  // Someone approved in the moment since the look above: said as the look would have said it. Or a file is at the name that opens no gate.
+  if (!writeAsk(file, approval)) {
+    const read = approvalIn(file, stepName, approval.try);
+    refuse(refusal(readRun(id)) ?? (typeof read === 'string' && lstatOf(file)
+      ? `try ${approval.try} of ${stepName} cannot be approved: ${file} is already there, and it is not an approval — ${read}. It opens no gate, and no tick moves it, so waiting would be for ever. Delete it (rm ${file}), then approve again: wf approve ${id} ${stepName}.`
+      : `try ${approval.try} of ${stepName} is already approved. What waits on it is filed on the next tick: wf ls ${id}.`));
+  }
+  return { run, approval, file };
 }
 
 /** What `wf say` did: the step's task the words were said to, the try that task is, and the engine's `said` entry, as it journalled it. */

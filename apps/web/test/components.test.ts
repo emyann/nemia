@@ -1599,3 +1599,47 @@ test("outside dontAsk the settings' allow rules are listed, and the read-only co
   assert.deepEqual(readOnlyChips(html), ['cat', 'grep', 'find:documented', 'git:documented']);
   assert.doesNotMatch(html, /denied without a prompt/, 'nothing is denied without a prompt outside dontAsk');
 });
+
+/** The builder's banner for a save that did not go through, as the api answered it: the head line, and whether it offers to read the folder again. */
+async function refusedMarkup(message: string, steps: string[], status: number | null): Promise<{ head: string; reread: boolean; said: string }> {
+  const { SaveRefused } = await import('../src/components/WorkflowBuilder.tsx');
+  const { BuildRefusal } = await import('../src/lib/api.ts');
+  const html = renderToStaticMarkup(createElement(SaveRefused, {
+    refusal: new BuildRefusal(message, steps, status),
+    rereading: false,
+    onReread: () => {},
+  }));
+  const texts = textsOf(html);
+  return { head: texts[0]!, reread: /Read the folder again/.test(html), said: texts[1]! };
+}
+
+test("a save the api refused — a 4xx — says nothing was written, and only a 409 offers to read the folder again", async () => {
+  const refused = await refusedMarkup('review: waits on "x", which is not a step here', ['review'], 422);
+  assert.equal(refused.head, 'Not saved, and nothing written. The api refused it, for review:');
+  assert.equal(refused.said, 'review: waits on "x", which is not a step here');
+  assert.equal(refused.reread, false, 'nothing to read again: the folder is as the draft read it');
+  const cycle = await refusedMarkup('these steps wait on each other: implement, review', ['implement', 'review'], 422);
+  assert.equal(cycle.head, 'Not saved, and nothing written. The api refused it, for implement and review:');
+  const folder = await refusedMarkup('no steps to write to /w, and a workflow has at least one.', [], 400);
+  assert.equal(folder.head, 'Not saved, and nothing written. The api refused it:', 'no steps named, no clause');
+  // The folder changed since it was read: nothing written either, and the way on is to read it again.
+  const stale = await refusedMarkup('/w has changed since it was read at version 3. Nothing was written. Read the folder again', [], 409);
+  assert.equal(stale.head, 'Not saved, and nothing written. The api refused it:');
+  assert.equal(stale.reread, true);
+});
+
+test("REFUSED at shipped defaults: a save the api broke off — a 500 — does not say nothing was written; it says the folder may have been, and offers to read it again", async () => {
+  const broke = await refusedMarkup("EACCES: permission denied, open '/w/plan.md'", [], 500);
+  assert.equal(broke.head, 'Not saved. The folder may have been written all the same: the api broke off (500), and what the folder holds is what is on disk:');
+  assert.doesNotMatch(broke.head, /nothing written/, 'a 500 is a write that broke off partway, and the api cannot say what it wrote');
+  assert.equal(broke.said, "EACCES: permission denied, open '/w/plan.md'");
+  assert.equal(broke.reread, true);
+});
+
+test("REFUSED at shipped defaults: a save whose fetch never landed does not say nothing was written; it says the folder may have been, names no status, and offers to read it again", async () => {
+  const lost = await refusedMarkup('Failed to fetch', [], null);
+  assert.equal(lost.head, 'Not saved. The folder may have been written all the same: the api did not answer, and what the folder holds is what is on disk:');
+  assert.doesNotMatch(lost.head, /nothing written/, 'the api may have carried the write out and died before answering');
+  assert.equal(lost.said, 'Failed to fetch');
+  assert.equal(lost.reread, true);
+});

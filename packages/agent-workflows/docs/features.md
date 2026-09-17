@@ -2238,7 +2238,7 @@ Not agent-workflows features, listed so nothing is lost:
   A session on a permission prompt makes no API calls, so it costs nothing against the rate limit the ceiling exists for:
   reasoning, not a measurement;
 - ~~pools by subscription~~ *done, engine `912d537`*: `claude` and `claude-detached` counted as one pool, a harness declaring its
-  pool with its own name as the default. The workflow layer's README and `wf --help` still say "sessions per harness";
+  pool with its own name as the default. The workflow layer's README, banner and `wf --help` say pools since `00d4c06`'s follow-up;
 - **admission in filing order, and a task's priority.** The tick walks tasks in `journal.list`'s order, which is the ids
   sorted (`readdirSync(...).sort()`), and admits each pending one while `used < max`: so which of two pending tasks gets a
   slot is decided by the alphabet of their run ids, and a run never keeps its slot across its own steps — its next step is

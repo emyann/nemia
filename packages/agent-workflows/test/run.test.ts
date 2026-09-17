@@ -332,9 +332,9 @@ test("`wf ls` on a run the cap holds: its roots say `waiting for a run slot (2 o
   assert.deepEqual([waits.steps[0]!.status, waits.slot], ['waiting on a-1x2y', undefined]);
 });
 
-test('`wf up` says both ceilings in words: sessions per harness, checks apart, and runs in flight — `no cap` when none', () => {
+test('`wf up` says both ceilings in words: sessions at work per pool, and runs in flight — `no cap` when none', () => {
   assert.deepEqual(ceilingLines({ sessions: 4, runs: 0 }), [
-    'sessions per harness: at most 4 at once, checks in a pool of their own (WF_MAX_CONCURRENT)',
+    'sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
     'runs in flight: no cap (WF_MAX_RUNS)',
   ]);
   assert.equal(ceilingLines({ sessions: 2, runs: 2 })[1], 'runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)');

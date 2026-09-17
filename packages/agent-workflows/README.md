@@ -1263,15 +1263,15 @@ Two ceilings, both read from the environment `wf up` runs in, and both said in w
 ```text
 $ WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up
 up — every 4000ms, ^C to stop
-   sessions per harness: at most 4 at once, checks in a pool of their own (WF_MAX_CONCURRENT)
+   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)
    runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)
 ```
 
-- **`WF_MAX_CONCURRENT`, 2 unless set, counts sessions, not runs.** It is the engine's ceiling (`maxConcurrent`), per harness: `claude`,
-  `claude-detached` and `codex` are each counted apart — though `claude` and `claude-detached` share one subscription — and a step's check
-  runs on the `check` harness, a pool of its own, so a suite never waits behind a session. Both steps of `dev` are on `claude`, so one run's
+- **`WF_MAX_CONCURRENT`, 2 unless set, counts sessions at work, not runs.** It is the engine's ceiling (`maxConcurrent`), per pool:
+  `claude` and `claude-detached` share one, since they share one subscription; `codex` has its own; and a step's check runs on the
+  `check` harness, a pool of its own, so a suite never waits behind a session (engine `912d537`). Both steps of `dev` are on `claude`, so one run's
   review competes with another run's implement for the same slots. A task filed past the ceiling waits for a slot, `pending`; the timeline
-  counts that wait as queued. A session its harness lists `blocked` holds its slot until the step's deadline.
+  counts that wait as queued. A session its harness lists `blocked` holds no slot: it makes no API calls, so the engine counts only `working` sessions (engine `912d537`).
 - **`WF_MAX_RUNS`, unset or 0 for no cap, counts runs in flight.** A run is in flight while a task of it — a step's or a check's — is filed
   and not settled, or while it has started and the tick files something of it on the pass: a run between two steps is still in flight. One
   that waits on a person, or has finished, is not; one called off is, until the engine has stopped what it had in flight. A run with nothing
@@ -1301,7 +1301,7 @@ cache-the-engine-s-views-bet-9prl  queued at 2026-09-16T10:00:00.000Z, 1 of 1  w
 the tick starts it on its own once its turn comes and a run slot is free — take it back with wf inbox queue cache-the-engine-s-views-bet-9prl --off
 $ wf up
 up — every 4000ms, ^C to stop
-   sessions per harness: at most 2 at once, checks in a pool of their own (WF_MAX_CONCURRENT)
+   sessions at work per pool: at most 2 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)
    runs in flight: no cap (WF_MAX_RUNS)
 10:00:04  started cache-the-engine-s-views-bet-9prl as cache-the-engine-s-views-bet-k2q9
 10:00:09  cache-the-engine-s-views-bet-k2q9  filed implement

@@ -95,8 +95,9 @@ agent is told is prose.
   it on the run's word) · budget exhausted (its harness ended its session at its budget:).
 
   WF_ROOT            where runs and the engine's board live
-  WF_MAX_CONCURRENT  sessions per harness at once (default 2): each harness counted apart, a check in a
-                     pool of its own, and one run's review competing with another run's implement
+  WF_MAX_CONCURRENT  sessions at work per pool at once (default 2): claude and claude-detached one pool,
+                     codex and checks their own; a blocked session holds no slot; one run's review
+                     competes with another run's implement
   WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
                      slot, oldest first; a run waiting on --after counts once it is filed
 

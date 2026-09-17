@@ -1017,7 +1017,8 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   $12.53, **merged, `92d6783`**; W9
   `a-gate-a-step-s-handoff-that-18iy` (agent-workflows: the gate, features.md §6; `dev`) — three rounds, $62.21, **merged,
   `500e7a2`**; B12 `the-queue-on-the-board-queue-ppu1`
-  (apps: queued cards as Factory ghosts, Queue from the Inbox page, the ceilings on the board; `dev-build`);
+  (apps: queued cards as Factory ghosts, Queue from the Inbox page, the ceilings on the board; `dev-build`) — two rounds, $49.68,
+  **merged, `ea01f12`** (its first try sat 77 minutes behind its own stuck shell, engine open issue 24);
 - **after E10 and W9:** W10 `two-small-items-in-agent-wor-5l9e` (agent-workflows: `priority: 1` on every filing after a run's first,
   `remote:` on a step; `dev`) — one round, $11.20, **merged, `925aff3`** (its first try lost its connection when the laptop slept;
   a continued try with a note finished it); **after W9:** B13 `the-gate-on-the-board-approv-4t7s` (apps: Approve and Send back on the run page, the

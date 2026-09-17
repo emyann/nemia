@@ -1046,7 +1046,8 @@ export const refusedCheck = (phase: TaskPhase, verdict: Verdict | undefined): bo
  * ended at it, that may be tried: those two statuses, and a `failed (check)` whose check did not finish past its budget, which is offered
  * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `wf round`'s.
  *
- * And a gated step that signed off, while nothing after it is filed: `awaiting approval`, or approved and not yet handed on. A try of it is
+ * And a gated step that signed off, while nothing after it is filed: `awaiting approval`, or approved and not yet handed on — which a step
+ * nothing waits on never is: approved, it has handed on, since there is nothing left to file. A try of it is
  * a send-back from its gate (`sendsBack`) — `nudge` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try after it
  * is on a try its approval does not name, so an approval given before the send-back is spent by it.
  */
@@ -1069,9 +1070,11 @@ export function retryable(
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
   const blockedByHarness = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
   const tried = status === 'over budget' ? own : status;
-  // At its gate, or approved with nothing after it filed yet: a person may still send it back. Once what follows is filed, it has handed on.
+  // At its gate, or approved with something after it and none of it filed yet: a person may still send it back. Once what follows is filed,
+  // it has handed on — and a step nothing waits on hands on with its approval: its run is over, and may be merged and shipped.
+  const followers = steps.filter((s) => s.after.includes(step.name));
   const sendsBack = settled && (status === 'awaiting approval'
-    || (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && !steps.some((s) => s.after.includes(step.name) && run.steps[s.name]?.taskId)));
+    || (hasGate(step, run) && satisfiesAfter(status) && Boolean(approvalOf(run, step.name)) && followers.length > 0 && !followers.some((s) => run.steps[s.name]?.taskId)));
   const modes: RetryMode[] =
     tried === 'failed (check)' ? ['nudge', 'fresh', 'recheck']
     : tried === 'unsigned' || tried === 'failed' || tried === 'stopped' || (tried === 'blocked' && settled) || tried === 'budget exhausted' || blockedByHarness || sendsBack ? ['nudge', 'fresh']
@@ -1653,7 +1656,7 @@ export function roundAsk(
   }
   // A step of the loop at its gate has signed off and waits for a person, whose word — not another round — is what moves it.
   const gate = loopSpan(steps, looping).find((n) => at(n).status === 'awaiting approval');
-  if (gate && budget === undefined) {
+  if (gate) {
     const handedOn = gate === looping.name ? `${gate} signed off without asking for another round (\`again: false\`), and waits at its gate` : `${gate} waits at its gate in round ${now} of ${looping.name}'s loop`;
     return no(`${handedOn}: a person's word moves it, not a round. Approve it — wf approve ${run.id} ${gate} — or send it back: wf retry ${run.id} ${gate} --message "<objection>".`);
   }

@@ -2185,11 +2185,11 @@ What was built, four commits:
   stopped, out of rounds, or asking for a round — the try already approved, empty words (`approvalWordsRefusal`, which the CLI asks
   before a run is read), and one §6 did not list: a send-back already asked for, which would spend the approval at once. A stray file at
   the name is named, with `rm`.
-- **Sending back** is `wf retry --message`: `retryable` gives `nudge` and `fresh` to a step at its gate, or approved with nothing after
-  it filed (`sendsBack`), and `retryRefusal` refuses one without words, and `--recheck`. The try's brief says its handoff waited at its
+- **Sending back** is `wf retry --message`: `retryable` gives `nudge` and `fresh` to a step at its gate, or approved with steps after
+  it and none of them filed (`sendsBack`) — not to an approved step nothing waits on, whose run is over (found in review, round 2), and `retryRefusal` refuses one without words, and `--recheck`. The try's brief says its handoff waited at its
   gate and was sent back (`triedFrom`, `retrySection`). `retryLines` offers a gated step nothing: `gateLines` does. `cancelPlan` calls
   a run at its gate off rather than finished; `forgetRefusal` holds it, naming the `wf approve`; `roundAsk` on a loop at its gate says
-  to approve or send back.
+  to approve or send back, with `--budget` or without it (review, round 2).
 - **What the next steps are told**: `## Approved` (`approvedSection`), in every brief composed for a step after an approved gate,
   directly or through another (`upstreamOf`, now exported) — which step, which try, when, and the words, fenced — beside `## From run
   <id>` under what was asked for, and in a resumed step's brief. **`wf decide`** prints `AWAITING APPROVAL` among the verdicts and, under

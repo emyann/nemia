@@ -222,6 +222,13 @@ test("REFUSED at shipped defaults: a parent whose last step waits at its gate ha
   approveByHand(parent.id, 'implement', 1);
   assert.equal((await parentOf(b.e, parent.id)).shipped, true);
   assert.deepEqual((await advance(b.e, readRun(child.id))).filed, ['plan']);
+
+  // Approved, its one step has handed on: nothing waits on it, and a send-back would file a session on a run a person merged.
+  await assert.rejects(retry(b.e, parent.id, 'implement', { mode: 'nudge', message: 'one more thing' }),
+    refusedWith(/^implement signed off done and declares no check: what waits on it has been filed, and there is nothing to try again\.$/));
+  assert.ok(!fs.existsSync(path.join(asksDir(parent.id), 'retry-implement-2')), 'no ask written');
+  assert.deepEqual((await advance(b.e, readRun(parent.id))).filed.concat((await advance(b.e, readRun(parent.id))).tried), []);
+  assert.equal((await parentOf(b.e, parent.id)).shipped, true, 'still shipped');
 });
 
 // ─── `wf approve`, and sending back ─────────────────────────────────────────

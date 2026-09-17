@@ -3085,6 +3085,14 @@ test("sending back from a gate is `wf retry --message`: a step at its gate — o
   const handedOn = run({ plan: 't1', implement: 't2', review: null }, { gates: ['plan'], approvals: [approval('plan', 1)] });
   assert.equal(refusal(handedOn, { mode: 'nudge', message: 'too late' }, phases({ t1: 'succeeded', t2: 'running' })),
     'plan signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.');
+  // A step nothing waits on has handed on once approved: its run is over, and a send-back would file a session on a finished — maybe merged — run.
+  const terminal: Workflow[] = [{ ...step('implement'), check: 'npm test' }];
+  const last = run({}, { gates: ['implement'], steps: { implement: { taskId: 't1', check: { taskId: 'c1' } } }, approvals: [approval('implement', 1)] });
+  const passed = phases({ t1: 'succeeded', c1: 'succeeded' });
+  assert.equal(retryable(terminal[0]!, last, passed, signedDone, asked, terminal).sendsBack, undefined);
+  assert.equal(retryRefusal(terminal, last, 'implement', { mode: 'nudge', message: 'one more thing' }, passed, signedDone, asked),
+    'implement is verified: its check passed, and there is nothing to try again.');
+  assert.equal(retryRefusal(terminal, { ...last, approvals: undefined }, 'implement', { mode: 'nudge', message: 'one more thing' }, passed, signedDone, asked), null, 'not yet approved, it may be sent back');
   // A gate is offered its own lines on `wf decide`, never a try with nothing to change.
   const d = decision(PLANNED, atPlan(), PLAN_DONE, nothingShipped, signedDone, asked);
   assert.deepEqual(retryLines(PLANNED, atPlan(), d, PLAN_DONE, signedDone, asked), []);
@@ -3119,6 +3127,7 @@ test("REFUSED at a gate: `cancelPlan` calls a run waiting at its gate off — it
   const handed = (name: string) => (name === 'review' ? { outcome: 'done' as const, summary: 's', artifacts: [], output: { again: false } } : signedDone());
   const refusal = roundAsk(looped, r, 'review', phases({ t1: 'succeeded', t2: 'succeeded' }), handed, asked);
   assert.deepEqual(refusal, { refusal: 'review signed off without asking for another round (`again: false`), and waits at its gate: a person\'s word moves it, not a round. Approve it — wf approve r-1 review — or send it back: wf retry r-1 review --message "<objection>".' });
+  assert.deepEqual(roundAsk(looped, r, 'review', phases({ t1: 'succeeded', t2: 'succeeded' }), handed, asked, [], () => undefined, 5), refusal, 'with --budget, the same: the round has ended, and waits for a person');
 });
 
 test("every step after an approved gate is handed the approval and its words under `## Approved`, as data — the step after the gate and the one after that, beside what was asked for and before where to look; no step before the gate, none after a gate not approved, and a run with no gate composes as it always did", () => {

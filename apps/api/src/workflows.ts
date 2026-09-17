@@ -134,13 +134,15 @@ export function listed(name: string, from: WorkflowSource, dir: string): Workflo
 
 /**
  * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what a
- * save writes, removes or reads — by name, with what it holds. Any of them edited, added or removed changes it, and nothing else does: a
- * note beside the steps, or a hidden file, is no step. A file that cannot be read counts as what it says, so it changes the word too.
+ * save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and `writeWorkflow`
+ * removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or removed changes it,
+ * and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as what it says, so it
+ * changes the word too.
  */
 export function versionOf(dir: string): string {
   let names: string[];
   try {
-    names = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.isDirectory() && !e.name.startsWith('.') && /\.(md|json)$/.test(e.name)).map((e) => e.name).sort();
+    names = fs.readdirSync(dir, { withFileTypes: true }).filter((e) => !e.isDirectory() && /\.(md|json)$/.test(e.name)).map((e) => e.name).sort();
   } catch {
     names = [];
   }

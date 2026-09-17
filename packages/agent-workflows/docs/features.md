@@ -2435,8 +2435,9 @@ What was built:
   written and the folder after them; should `writeWorkflow` refuse all the same, or the disk fail, each schema is put back as it was. The
   answer's `written` and `kept` name the schemas too.
 - **A save carries the version it was read at.** The listing gives each folder a `version`, a digest of its `.md` and `.json` files
-  (`versionOf`): a step, the README or a schema edited, added or removed changes it; a note beside the steps, a hidden file or a folder
-  inside does not. A PUT without one is a 400. One that no longer matches is a 409, nothing written, that says the folder changed since it
+  (`versionOf`): a step, the README or a schema edited, added or removed changes it, a hidden one included — the package reads `.draft.md`
+  as a step, and a save without it removes it, which review found in round 3 when the version still skipped hidden files; a note beside
+  the steps, hidden or not, or a folder inside, does not. A PUT without one is a 400. One that no longer matches is a 409, nothing written, that says the folder changed since it
   was read at that version, gives the version it is at, and says to read it again. Review found it: with the builder open, a step file added
   by hand was deleted by the next Save, and one edited was written over from the stale draft — the lost update of two writers doing
   read-modify-write.
@@ -2503,7 +2504,7 @@ What was measured:
   binary, and a search of `apps/api/src` did not find it. They are escapes now, and each app has `test/source.test.ts`, which refuses a raw
   control character anywhere in its `src` and `test` and names where. `apps/api/test/builder.test.ts` is now 15 tests: the schema
   route's two gave way to a schema saved with the folder (new and replaced, kept when the same), six schema refusals with the folder
-  unchanged, five hand edits each refused with a 409 and kept, and a disk failure that puts both schemas back. Nine guards broken on purpose,
+  unchanged, hand edits each refused with a 409 and kept (seven since round 3: a hidden step and a hidden schema added among them), and a disk failure that puts both schemas back. Nine guards broken on purpose,
   one at a time — the version check, the version required, the schemas' judgement, their JSON object check, putting them back, leaving a
   refused name to the package, a schema's file name, one given twice, and the source scan (a NUL planted in `src`) — each failed a test.
   The first run of those left one unnoticed: schemas written beside a refused name were put back, so no file told; the case gained a cycle,

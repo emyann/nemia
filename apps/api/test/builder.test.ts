@@ -447,6 +447,10 @@ test("REFUSED at shipped defaults: a save of a folder that changed since it was 
     ['build.md removed', () => fs.rmSync(path.join(dir, 'build.md')), () => write(path.join(dir, 'build.md'), '---\nafter: plan\ncheck: npm test\n---\nBuild what PLAN.md says.\n')],
     ['a schema edited', () => write(path.join(dir, 'build.schema.json'), `${again}\n`), () => write(path.join(dir, 'build.schema.json'), again)],
     ['the README edited', () => write(path.join(dir, 'README.md'), '# edited, by hand\n'), () => write(path.join(dir, 'README.md'), '# edited\n')],
+    // Hidden, and a step all the same: the package reads it as one, and the save below, which does not have it, would remove it.
+    ['.draft.md added', () => write(path.join(dir, '.draft.md'), 'Draft.\n'), () => fs.rmSync(path.join(dir, '.draft.md'))],
+    // And a hidden schema, which an `output:` may name, and a save then reads.
+    ['.shared.schema.json added', () => write(path.join(dir, '.shared.schema.json'), again), () => fs.rmSync(path.join(dir, '.shared.schema.json'))],
   ];
   for (const [what, edit, undo] of handEdits) {
     edit();
@@ -463,9 +467,9 @@ test("REFUSED at shipped defaults: a save of a folder that changed since it was 
     assert.equal(versionOf(dir), read, `${what}: undone, the folder is at the version it was read at again`);
   }
 
-  // What is no step moves nothing: a note beside the steps, a hidden file, a folder inside it.
+  // What is no step and no schema moves nothing: a note beside the steps, a hidden one, a folder inside it.
   write(path.join(dir, 'NOTES.txt'), 'Ideas.\n');
-  write(path.join(dir, '.draft.md'), 'Draft.\n');
+  write(path.join(dir, '.notes.txt'), 'Ideas.\n');
   write(path.join(dir, 'sub', 'x.md'), 'Not a step.\n');
   assert.equal(versionOf(dir), read);
 
@@ -473,6 +477,7 @@ test("REFUSED at shipped defaults: a save of a folder that changed since it was 
   const taken = await put('edited', draft);
   assert.equal(taken.status, 200, await taken.clone().text());
   assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^retries: 2$/m);
+  for (const kept of ['NOTES.txt', '.notes.txt', 'sub/x.md']) assert.ok(fs.existsSync(path.join(dir, kept)), `the save leaves ${kept}, which it did not count, where it was`);
   const again409 = await put('edited', { ...draft, steps: [plan, build] });
   assert.equal(again409.status, 409, 'a second save from the same read is refused: the first one changed the folder');
   assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^retries: 2$/m, 'and the first save stands');

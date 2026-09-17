@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { approve, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lessonLine, listRuns, messageRefusal, parentOf, phaseOfView, readAnswers, readAsks, readFilings, retry, round, runCostLines, runSpend, saidCount, say, sensitiveDiff, spendReader, spentWord, stepSpend, timeline, touchedBy, usedLines, verdictWord, waitAdvice, waitWord, type ParentRun, type Retry, type RetryAsk, type RetryHow, type RetryMode, type Said, type Spend, type SpendOf, type Timeline, type TimelineTotal, type TimelineTry, type Wait } from 'agent-workflows';
-import { addSpend, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, gatesOf, hasGate, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
+import { addSpend, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, declaredOutput, type Decision, decision, type EarlierTry, gated, gateLines, gatesOf, hasGate, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, type StepRecord, type StepStatus, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, terminalSteps, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
@@ -399,10 +399,11 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /**
- * A command `wf decide` prints, and runs none of: ship it, drop it, read it for a run worked on its base branch, and each
- * once-more (`wf retry`, `wf round`) with the line it prints it in. `said` is null where the label is all it says.
+ * A command `wf decide` prints, and runs none of: ship it, drop it, read it for a run worked on its base branch, each
+ * once-more (`wf retry`, `wf round`) with the line it prints it in, and for a step waiting at its gate on you, the two its gate line
+ * prints under the step — approve (`wf approve`) and send back (`wf retry --message`). `said` is null where the label is all it says.
  */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more'; command: string; said: string | null };
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back'; command: string; said: string | null };
 
 /**
  * What `wf decide` shows a person about a run: what each branch it reads touched, the lesson line, the check-affecting
@@ -1192,13 +1193,25 @@ function lessonOf(touched: readonly Touched[]): Lesson {
  */
 const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck| --budget <amount>)?)/;
 
+/** A gate line's two commands, as `gateLines` prints them for a step awaiting approval: the approval, without its words, and the send-back. */
+const AT_GATE = /^awaiting approval:\s{2}(wf approve \S+ \S+)(?: \[--message "<words>"\])?\s{2}— or send it back:\s{2}(wf retry \S+ \S+ --message "<objection>")$/;
+
 /**
- * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, then ship it and drop it
- * for the branches, or read it for a run worked on its base branch — which has nothing to merge, nor a branch to delete.
+ * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and the send-back for
+ * each step waiting at its gate on you (`gates`, `gateLines`' lines), then ship it and drop it for the branches, or read it for a run
+ * worked on its base branch — which has nothing to merge, nor a branch to delete.
  */
-function commandsOf(run: Run, d: Decision, offers: readonly string[]): DecideCommand[] {
+function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Readonly<Record<string, string>> = {}): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
-  const once = offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said }));
+  const once = [
+    ...offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said })),
+    ...Object.entries(gates).flatMap(([name, line]): DecideCommand[] => {
+      const [, approve, sendBack] = AT_GATE.exec(line) ?? [];
+      return approve && sendBack
+        ? [{ label: 'approve', command: approve, said: `${name} waits at its gate — with words: ${approve} --message "<words>"` }, { label: 'send back', command: sendBack, said: null }]
+        : [];
+    }),
+  ];
   if (d.direct) {
     const said = `worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`;
     return [...once, { label: 'read it', command: `git -C ${run.repo} diff ${run.baseRef}...${run.branch}`, said }];
@@ -1260,6 +1273,8 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
   const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
+  // Each step waiting at its gate on you — not one a person has sent back already, which waits on nobody — as `wf decide` prints its gate.
+  const gates = Object.fromEntries(Object.entries(gateLines(steps, run, phase, reader, asked, verdicts, spendOf)).filter(([name]) => judged.waitingOnYou.includes(name)));
   return {
     touched,
     lesson: lessonOf(touched),
@@ -1268,7 +1283,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     total: usedOf(sumUsages(filed.map((name) => consumed[name]))),
     cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
     overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
-    commands: commandsOf(run, d, offers),
+    commands: commandsOf(run, d, offers, gates),
   };
 }
 

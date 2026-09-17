@@ -109,6 +109,7 @@ const approveRefuses = async (step: string, message?: string, run = R): Promise<
 
 type Step = { name: string; status: string; approve: string | null; gate: unknown; asked: unknown; closeout: { summary: string } | null };
 const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json();
+const commandsOf = async (id = R): Promise<Array<{ label: string; command: string; said: string | null }>> => (await (await app.request(`/api/runs/${id}/decision`)).json()).commands;
 const summary = async (id = R) => (await (await app.request('/api/runs')).json()).find((r: { id: string }) => r.id === id);
 
 test("a run's detail carries its gates and each gated step's gate — awaiting approval, or not signed off yet — and the list and the detail carry the need `approve plan`, in `wf ls`'s words", async () => {
@@ -134,6 +135,13 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
   assert.deepEqual(listed.onYou, ['approve plan']);
   assert.deepEqual(listed.steps.map((s: Step) => [s.name, s.approve]), [['plan', 'approve plan'], ['implement', null], ['review', null], ['tokens', null], ['sketch', null]]);
   assert.equal(listed.steps.some((s: object) => Object.hasOwn(s, 'gate')), false, 'the list carries the need, and no gate: the Factory needs no more');
+
+  // The decision offers the gate's two commands, as `wf decide` prints them under the step: nothing else is offered on a run with no branch to
+  // ship — which read `None yet: the run is still moving` on the board.
+  assert.deepEqual(await commandsOf(), [
+    { label: 'approve', command: `wf approve ${R} plan`, said: `plan waits at its gate — with words: wf approve ${R} plan --message "<words>"` },
+    { label: 'send back', command: `wf retry ${R} plan --message "<objection>"`, said: null },
+  ]);
 
   // A run called off waits on nobody: no need, though its step still reads as it stands.
   const cancelled = await summary(CANCELLED);
@@ -276,6 +284,8 @@ test("REFUSED at shipped defaults: sending a step back from its gate without wor
   // Still at its gate until the tick files the try, and no longer waiting on you: what is asked of you, you asked.
   assert.deepEqual([plan.status, plan.gate, plan.approve], ['awaiting approval', { awaiting: true, approval: null }, null]);
   assert.deepEqual((await detail(id)).onYou, []);
+  // The send-back is due, so the run moves and waits on nobody: nothing to decide, as `wf decide` says, and so no gate offered.
+  assert.deepEqual(await (await app.request(`/api/runs/${id}/decision`)).json(), { running: true });
 
   const res = await approveOver('plan', { message: 'Ship it.' }, BOARD, id);
   assert.equal(res.status, 409);

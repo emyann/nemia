@@ -17,7 +17,7 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
-export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
 import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
@@ -26,7 +26,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, type BranchStanding, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -1494,6 +1494,74 @@ export type Advanced = {
 };
 
 /**
+ * Which run's `workspace: main` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
+ * when nothing does and this run's may be filed.
+ *
+ * Asked of the store on the pass that asks, never stored: only of a run whose ending step is approved and not filed, since nothing else of
+ * a run works in that checkout, and then of every run of the same repository. A run is in the checkout while the engine holds its
+ * `workspace: main` task in flight, as `inFlight` counts one, so a step filed earlier in this very pass is read as being in it. One waiting
+ * to be filed counts only if the pass would in fact file it: a send-back of the work un-holds its gate, and an ending that will not be filed
+ * must not hold another run's for ever.
+ */
+export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow[]): Promise<CheckoutHold | undefined> {
+  const ending = steps.find((s) => s.workspace === 'main');
+  // Cheap, and first: a run reads the store only where a person's word would file its own ending (`endingAsked`) — the approval of one that
+  // has not run, or the ask for a try of one that has. A run with no such word is waiting for nothing, and one whose ending is in that
+  // checkout is not waiting for it either; neither needs anybody else's claim read.
+  if (!ending || run.cancelledAt || endingAsked(run, ending, readAsks(run.id).asks) === undefined) return undefined;
+  const runs = listRuns();
+  // The cap on runs in flight, read once for every claim here: a run it holds files nothing, so its ending claims nothing (`mainClaim`).
+  const slots = await runSlots(e, runs);
+  const mine = await mainClaim(e, run, slots.get(run.id));
+  if (!mine || mine.holds) return undefined;
+  const claims: MainClaim[] = [mine];
+  for (const other of runs) {
+    if (other.id === run.id || path.resolve(other.repo) !== mine.repo) continue;
+    const claim = await mainClaim(e, other, slots.get(other.id));
+    if (claim) claims.push(claim);
+  }
+  return heldCheckouts(claims).get(run.id);
+}
+
+/**
+ * A run's claim on the repository's own checkout, as a pass reads it now (`MainClaim`) — or undefined for a run with no ending step, and
+ * for one whose ending the pass would neither find there nor file.
+ *
+ * Every run is read the same way, this one and the others, so the two readings cannot drift. A step is IN that checkout while the engine
+ * holds its task in flight, as `inFlight` counts one: a task the engine has lost holds nothing, since a run nobody can stop must not hold
+ * every other run's ending for ever — but a run somebody called off holds it while its session is still there, between `wf cancel` asking
+ * the engine to stop it and the engine settling it, because that session is still merging in that directory.
+ *
+ * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
+ * that ended blocked (`endingAsked`) — and only where the pass would in fact file it: a send-back of the work un-holds the gate, an ask no
+ * tick honours files nothing, a run waiting on runs that have not shipped files no root of its own (`runReady`), and neither does one the
+ * cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed does not hold another run's. Those last two are the
+ * questions `advance` asks before it files a ready step, and they bite only on a run with nothing filed: an ending is one when it is also
+ * its root, which a folder whose one step merges has. Neither touches a try, since a run with a try due has started.
+ */
+async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promise<MainClaim | undefined> {
+  let steps: Workflow[];
+  try { steps = stepsOf(run); } catch { return undefined; }   // a record whose workflow no longer reads files nothing
+  const ending = steps.find((s) => s.workspace === 'main');
+  if (!ending) return undefined;
+  const repo = path.resolve(run.repo);
+  const taskId = run.steps[ending.name]?.taskId;
+  const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
+  if (taskId && (phase === 'pending' || phase === 'running')) return { id: run.id, repo, step: ending.name, holds: true };
+  if (run.cancelledAt) return undefined;
+  const { asks, rounds } = readAsks(run.id);
+  const at = endingAsked(run, ending, asks);
+  if (at === undefined) return undefined;
+  const { views, phaseOf } = await taskPhases(e, run);
+  const a = assess(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), exitVerdicts(views, run), asks, rounds, harnessBlocked(views), spendReader(views));
+  const parent = await parentsOf(e, run);
+  const files = runReady(run, (id) => parent(id).shipped) && runAdmitted(run, slot);
+  return (files && a.ready.includes(ending.name)) || a.retry.some((r) => r.step === ending.name)
+    ? { id: run.id, repo, step: ending.name, holds: false, at }
+    : undefined;
+}
+
+/**
  * One pass over one run: tick the engine, then file whatever became ready.
  *
  * Level-triggered, like everything under it: it reads the current state of each task and decides,
@@ -1564,7 +1632,11 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
     return collectArtifacts(run, name, signedOff(name));
   });
 
-  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf);
+  // Two runs' ending steps never work in one checkout at once (`checkoutHold`): while another run's `workspace: main` task is unsettled
+  // there, this run's is not filed, whatever its approval says. Read from the world on this pass, including what the pass has already
+  // filed, so the order a pass takes the runs in decides nothing, and a restart changes nothing.
+  const checkout = await checkoutHold(e, run, steps);
+  const assessed = assess(steps, run, phaseOf, signedOff, asked, verdictOf, asks, roundAsks, sessionBlocked, spendOf, [], checkout);
   const { check, retry, round, blocked, status } = assessed;
   // A run that waits on runs (`--after`) files its roots once every one of them has shipped, as its `wf decide` says, read on this pass.
   // Only a run with nothing filed is gated, and nothing else about it changes: once it has started its parents are never read again (`gated`).
@@ -2123,7 +2195,9 @@ export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing
   };
   // And where the run's result stands against the base branch, read off git on this pass: what says a finished run is one nobody has decided.
   const standings = branchStandings(run, resultBranches(run));
-  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings);
+  // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
+  const checkout = await checkoutHold(e, run, steps);
+  return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout);
 }
 
 /**
@@ -2818,6 +2892,8 @@ export async function decide(e: Engine, id: string): Promise<{
   held?: RunSlot;
   /** Where each result branch stands against the base branch, as git says it now (`branchStandings`): the fact under the run's result. */
   standings: BranchStanding[];
+  /** The run whose ending step has the repository's own checkout while this run's waits for it (`checkoutHold`); absent when nothing holds it. */
+  checkout?: CheckoutHold;
   /** What is left for a person to decide about the result (`toDecide`): the ending step's gate, or a branch nobody has merged. */
   toDecide?: ToDecide;
 }> {
@@ -2833,7 +2909,9 @@ export async function decide(e: Engine, id: string): Promise<{
   const verdictOf = (name: string) => checks[name]?.verdict;
   const blocked = harnessBlocked(views);
   const spendOf = spendReader(views);
-  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds, blocked, spendOf);
+  // Which run's ending step has the repository's own checkout, when this run's waits for it: a run still running for that, and nothing else.
+  const checkout = await checkoutHold(e, run, steps);
+  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
   // Where the result stands against the base branch, read off git now — and what that leaves a person to decide (`assess`, on the same facts).
   const standings = branchStandings(run, resultBranches(run));
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
@@ -2887,12 +2965,13 @@ export async function decide(e: Engine, id: string): Promise<{
     runCost: runCostLines(run, spendOf),
     answers,
     answering: answerLines(steps, run, d, phaseOf, reader, asked, spendOf),
-    gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf),
+    gates: gateLines(steps, run, phaseOf, reader, asked, verdictOf, spendOf, asks, rounds),
     waiting: waitsOf(run, await parentsOf(e, run)),
     said,
     timeline: timeline(run, everyTry, filed, steps),
     ...(held ? { held } : {}),
     standings,
+    ...(checkout ? { checkout } : {}),
     ...(decide ? { toDecide: decide } : {}),
   };
 }

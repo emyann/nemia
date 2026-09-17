@@ -214,6 +214,11 @@ export function assess(
    * whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
    */
   standings: readonly BranchStanding[] = [],
+  /**
+   * The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts),
+   * if one is: such a step is not filed while another is working there, whatever else is ready. Left out, nothing holds the checkout.
+   */
+  checkout?: CheckoutHold,
 ): Assessment {
   // A cancelled run outranks anything its tasks say. Nothing more is filed for it however
   // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
@@ -224,7 +229,11 @@ export function assess(
   const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   const status = new Map(steps.map((s) => [s.name, stood.get(s.name)!.status]));
   // A step about to be tried again is not final: what waits on it waits, and the run is still going.
-  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
+  // An ending step works in the repository's own checkout, and while another run's is in that one directory nothing of it is filed
+  // (`heldByCheckout`): not a first session, and not the try a person asked for after it ended blocked or its check refused — two sessions
+  // trial merging there at once is the collision the hold is for. It keeps the status it ended with, and waits.
+  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf)
+    .filter((r) => !heldByCheckout(steps, r.step, checkout));
   for (const r of retry) status.set(r.step, 'running');
   // Nor is a looping step whose loop goes round again: what waits on it waits for the next round's answer. And no step of that loop is held
   // on its budget on the pass before the round is filed: the round is what a person raised the cap for (`roundSpans`).
@@ -248,7 +257,9 @@ export function assess(
     // A predecessor that is final without satisfying `after` is final for its followers too. Said
     // plainly rather than left to hang, because a run that waits forever looks like a bug.
     if (deps.some(stopsFollowers)) blocked.push(step.name);
-    else if (deps.every(satisfiesAfter)) ready.push(step.name);
+    // An ending step works in the repository's own checkout, and another run's is in it (`heldByCheckout`): it waits, and is filed once
+    // that one settles. Everything else it needs is here, so nothing but the checkout is between it and being filed.
+    else if (deps.every(satisfiesAfter) && !heldByCheckout(steps, step.name, checkout)) ready.push(step.name);
   }
 
   const all = [...status.values()];
@@ -453,6 +464,85 @@ export function unheld(steps: readonly Workflow[], run: Run, retry: readonly Ret
 
 /** The steps a send-back at a gate goes to: the gated step itself, once it has run — or, at a gate held before its step is filed, the steps it waits on, whose work the objection is about. Pure. */
 export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[step.name]?.taskId ? [step.name] : [...step.after]);
+
+// ─── one checkout, one ending step ──────────────────────────────────────────
+
+/**
+ * Which run's `workspace: main` step is working in a repository's own checkout while another run's waits for it (`heldCheckouts`): the run,
+ * and its step.
+ */
+export type CheckoutHold = { run: string; step: string };
+
+/**
+ * A run's claim on a repository's own checkout on a pass (`checkoutHold` in runner.ts): the `workspace: main` step that works there, the
+ * repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`, the
+ * time of the approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
+ */
+export type MainClaim = { id: string; repo: string; step: string; holds: boolean; at?: string };
+
+/**
+ * The runs whose ending step waits for a checkout another run's step has, each with the run and step holding it. Pure.
+ *
+ * An ending step works in the repository's own checkout, which is one directory on the base branch: two of them at once read the same
+ * `git status`, trial merge over each other, and the loser's `git merge --abort` throws away the winner's staged merge. Prose in a
+ * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: main` task is in flight has the checkout, and
+ * every other run of the same repository waiting to file one is held until it settles. With none in it, the oldest approval takes it —
+ * then by id — so which pass reads which run first decides nothing.
+ *
+ * Level-triggered, like the rest: the claims are read from the world on the pass that asks, including what that pass has already filed,
+ * and a run held on one pass is asked again on the next.
+ */
+export function heldCheckouts(claims: readonly MainClaim[]): Map<string, CheckoutHold> {
+  const held = new Map<string, CheckoutHold>();
+  const repos = new Map<string, MainClaim[]>();
+  for (const c of claims) repos.set(c.repo, [...(repos.get(c.repo) ?? []), c]);
+  for (const group of repos.values()) {
+    // A step already in the checkout keeps it; a run that is in it is not waiting for it, whatever else the group says.
+    let taken = group.find((c) => c.holds);
+    const waiting = group.filter((c) => !c.holds && c.at !== undefined)
+      .sort((a, b) => a.at!.localeCompare(b.at!) || a.id.localeCompare(b.id));
+    for (const c of waiting) {
+      if (!taken) taken = c;
+      else if (taken.id !== c.id) held.set(c.id, { run: taken.id, step: taken.step });
+    }
+  }
+  return held;
+}
+
+/**
+ * Whether the checkout holds this step back on a pass: it works in the repository's own checkout (`workspace: main`), and another run's
+ * step is in that one directory (`heldCheckouts`). Pure. Nothing of it is filed while that is so — a first session, or another try.
+ */
+export const heldByCheckout = (steps: readonly Workflow[], name: string, checkout: CheckoutHold | undefined): boolean =>
+  Boolean(checkout) && steps.some((s) => s.name === name && s.workspace === 'main');
+
+/**
+ * When the person's word that would file a run's ending step was given (`MainClaim`): the approval of an ending that has not run
+ * (`approvalOf`), or the ask for the try that would file it again — a step that ended blocked, or whose check refused, is tried like any
+ * other, and its try works in that same checkout. Undefined where there is no such word, and nothing of it would be filed. Pure.
+ */
+export const endingAsked = (run: Run, step: Workflow, asks: readonly RetryAsk[]): string | undefined =>
+  (run.steps[step.name]?.taskId
+    ? asks.find((a) => a.step === step.name && a.try === tryOf(run, step.name) + 1)?.at
+    : approvalOf(run, step.name)?.at);
+
+/**
+ * A run whose ending step waits for the repository's own checkout, as `wf ls` says it on that step's line: `waiting on the checkout
+ * (r-1's ship has it)`. Pure.
+ *
+ * `waiting on …`, and not `waiting for …`, because the board reads the words: `stepState` (`apps/web/src/lib/status.ts`) takes `waiting`,
+ * `waiting on …` and `pending` as a step not filed and anything else as one still working, so a step with no session of its own would be
+ * drawn as one whose session is running. The same is true of `slotWord`, which says `waiting for a run slot` and is drawn as working;
+ * that one is the board's to fix, this one was a word away.
+ */
+export const checkoutWord = (hold: CheckoutHold): string => `waiting on the checkout (${hold.run}'s ${hold.step} has it)`;
+
+/**
+ * What `wf decide` says for an ending step still waiting for the repository's own checkout: which run's step is in it, and what frees this
+ * one. Pure.
+ */
+export const checkoutLine = (step: string, hold: CheckoutHold): string =>
+  `${step}: ${checkoutWord(hold)} — it works in the repository's own checkout, and two endings never do at once; the next tick files ${step} once ${hold.run}'s ${hold.step} has settled`;
 
 /**
  * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in runner.ts):
@@ -1481,6 +1571,13 @@ export function retryRefusal(
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
   }
   if (!modes.length) {
+    // An ending step waiting at its gate with nothing of it filed (`approvedFirst`): there is no try of it to replace, and the two things
+    // there are to say to it are the approval that files it and an objection to the work it would act on (`sendBackTo`).
+    if (status === 'awaiting approval' && !run.steps[name]!.taskId) {
+      const back = sendBackTo(step, run).map((s) => `wf retry ${run.id} ${s} --message "<objection>"`).join(' or ');
+      return `${name} is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. `
+        + `Approve it: wf approve ${run.id} ${name}${back ? ` — or send the work back: ${back}` : ''}.`;
+    }
     const why: Partial<Record<StepStatus, string>> = {
       waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: wf ls ${run.id}.`,
       running: `${name} is still running, so there is nothing to try again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`,
@@ -1501,8 +1598,17 @@ export function retryRefusal(
   }
   // A send-back is an objection: a try of a step at its gate with nothing to change would sign off as it did, and wait there again.
   if (sendsBack && how.message === undefined) {
+    const say = `Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
+    // The gate may be another step's: an ending step is held before it is filed (`waitsAtGate`), and the send-back from it goes to the work
+    // it would act on, which is this step. Then the step at the gate is the one to name, and the approval to offer is the ending's — this
+    // step has no gate of its own, so `wf approve` of it would be refused, and a refusal never names a command that is itself refused.
+    const ending = steps.find((s) => s.after.includes(name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf));
+    if (ending) {
+      return `${ending.name} is at its gate, not ${name}: ${ending.name} ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to ${name}, the work it would act on. `
+        + `A try with no words tells its session nothing to change, so it would sign off as it did. ${say} — or approve the ending, which is what files it: wf approve ${run.id} ${ending.name}.`;
+    }
     const given = approvalOf(run, name);
-    return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
+    return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. ${say} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
   }
   if (raise && how.mode !== 'recheck' && how.budget === undefined) {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
@@ -1945,6 +2051,15 @@ export function roundAsk(
     return no(`the run goes round again itself: ${looping.name} asked for another round, and \`rounds: ${capOf(looping)}\` has ${capOf(looping) - now} left, so the next tick files round ${now + 1}. Wait for it: wf ls ${run.id}.`);
   }
   if (satisfiesAfter(status)) {
+    // What waits on it may be an ending held at its gate before it is filed (`waitsAtGate`): nothing has been filed, and saying so would
+    // send a person to `wf ls` to read a run that is waiting for them. The two things there are to say to it are the approval that files
+    // it and an objection to the work it would act on (`sendBackTo`), which is this loop.
+    const ending = steps.find((s) => s.after.includes(looping.name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, () => undefined));
+    if (ending) {
+      const back = sendBackTo(ending, run).map((n) => `wf retry ${run.id} ${n} --message "<objection>"`).join(' or ');
+      return no(`${looping.name} signed off without asking for another round (\`again: false\`), so its loop is over — and nothing waiting on it has been filed: the run is at ${ending.name}'s gate, `
+        + `where nothing of ${ending.name} has run and your approval is what files it. Approve it: wf approve ${run.id} ${ending.name}${back ? ` — or send the work back: ${back}` : ''}.`);
+    }
     return no(`${looping.name} signed off without asking for another round (\`again: false\`), so its loop is over and there is nothing to go round again. What waits on it has been filed: wf ls ${run.id}.`);
   }
   return no(`round ${now} of ${looping.name}'s loop is still running, so there is nothing to go round again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`);
@@ -2863,12 +2978,18 @@ export function decision(
   harnessBlocked: (taskId: string) => boolean = () => false,
   /** What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person. */
   spendOf: SpendOf = () => undefined,
+  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts): what this run is still running for. */
+  checkout?: CheckoutHold,
 ): Decision {
   if (run.cancelledAt) return { kind: 'cancelled', at: run.cancelledAt };
 
-  const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf);
+  const { status, ready, retry, round } = assess(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, roundAsks, harnessBlocked, spendOf, [], checkout);
   const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   // A step a round due files again is held on no budget (`roundSpans`), as `assess` reads it.
+  //
+  // An ending un-held at its gate (`unheld`) takes no adjustment here, though `assess`, `listing` and `gateLines` each take one: this map
+  // is read in the branches below, and a try or a round due makes `assess` call the run `running`, which returns before them. The word a
+  // person would have seen in that window was `gateLines`'s, and that is where the adjustment is.
   const refiled = roundSpans(steps, round);
   const statusOf = new Map(steps.map((s) => [s.name, refiled.has(s.name) ? standingOf.get(s.name)!.own : standingOf.get(s.name)!.status]));
   if (status === 'running') {
@@ -2878,9 +2999,12 @@ export function decision(
       .filter((s) => statusOf.get(s.name) === 'checking'
         || (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name]!.taskId!))))
       .map((s) => s.name);
+    // An ending step waiting for the repository's own checkout is waited on too: a person's word that files it is given, and what holds it
+    // is another run's step in that one directory. `checkoutHold` answers only for a step this pass would otherwise file (`mainClaim`).
+    const waitsForCheckout = checkout ? steps.filter((s) => heldByCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
     // A step the next tick tries again is waited on too: nothing is decided about it yet. So is a loop going round again. A step whose
     // blocked session the tick stops first is both live and due, and named once.
-    return { kind: 'running', waiting: [...new Set([...live, ...ready, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort() };
+    return { kind: 'running', waiting: [...new Set([...live, ...ready, ...waitsForCheckout, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort() };
   }
 
   const branches = resultSteps(steps)
@@ -3005,6 +3129,8 @@ export function listing(
   slot?: RunSlot,
   /** Where each result branch stands against the base branch, as git says it on this pass (`branchStandings` in runner.ts): what says a finished run is one nobody has decided. */
   standings: readonly BranchStanding[] = [],
+  /** The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in runner.ts): what this run's ending says where `waiting` would be. */
+  checkout?: CheckoutHold,
 ): Listing {
   // Asked again here, so a caller's stale list cannot say a run that started, or was called off, waits on a run — or for a run slot.
   const waiting = gated(run) ? [...waits] : [];
@@ -3043,7 +3169,11 @@ export function listing(
     const cost = spent.measured && !priced.has(step.name) ? { cost: spentWord(spent) } : {};
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
-    const tried = retry ? dueNote(step, run, retry)
+    // A try the checkout holds back says that, where the try due would say the next tick files it: the ask stands, and is honoured once the
+    // step in that checkout settles (`heldByCheckout`). The step's own word — blocked, failed ✗ check — is its status, and stays there.
+    const heldOut = retry && checkout && heldByCheckout(steps, step.name, checkout) ? checkout : undefined;
+    const tried = heldOut ? `try ${retry!.try} asked (${modeWord(retry!)}) — ${checkoutWord(heldOut)}`
+      : retry ? dueNote(step, run, retry)
       : round ? roundDueNote(steps, round)
       : exhausted.has(step.name) ? exhaustedNote(step, run, loopOver(steps, step, run, spendOf).length > 0)
       : heldLoops.has(step.name) ? heldNote(step, run)
@@ -3064,6 +3194,9 @@ export function listing(
     // holds says so, with the count: what waits on a root still says `waiting`. An ending step waiting at its gate says that instead: it is
     // not filed, and a person's approval is what files it.
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
+      // An ending step approved and not filed says which run's step has the checkout it works in, where `waiting` would be — unless its own
+      // work is being said again (`unheld`), which is what it waits for first.
+      if (checkout && heldByCheckout(steps, name, checkout) && !waitingAgain.has(name)) return { name, status: checkoutWord(checkout), branch };
       return { name, status: step.after.length ? 'waiting' : waiting.length ? waitWord(waiting) : held ? slotWord(held) : 'waiting', branch };
     }
 
@@ -3120,7 +3253,7 @@ export function listing(
   const total = runSpend(run, spendOf);
   // What is left for a person to decide about the result, as `assess` judges it on these same inputs: `wf ls` says it where it says who
   // a run waits on, and the board reads it there.
-  const { toDecide: decide } = assess(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, roundAsks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf, standings);
+  const { toDecide: decide } = assess(steps, run, settledOf, readable, askedCloseout, verdictOf, asks, roundAsks, (taskId) => phaseOf(taskId) === 'needs-human', spendOf, standings, checkout);
   return {
     steps: rows, waitingOnYou: run.cancelledAt ? [] : waitingOnYou, waiting,
     ...(held ? { slot: held } : {}), ...(total.measured ? { cost: spentWord(total) } : {}), ...(decide ? { toDecide: decide } : {}),
@@ -3616,10 +3749,19 @@ export function gateLines(
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
   spendOf: SpendOf = () => undefined,
+  /** What people asked for with `wf retry`, and the run has not consumed yet: what un-holds an ending's gate (`unheld`). */
+  asks: readonly RetryAsk[] = [],
+  /** What people asked for with `wf round`, and the run has not consumed yet: the same. */
+  roundAsks: readonly RoundAsk[] = [],
 ): Record<string, string> {
   const lines: Record<string, string> = {};
+  // An ending whose work this pass files again holds no gate (`unheld`), as `assess`, `listing` and `decision` read it: between a person's
+  // send-back and the pass that honours it, this offered the approval that `wf approve` was refusing at the same moment.
+  const waitingAgain = unheld(steps, run,
+    retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, () => false, spendOf),
+    roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf));
   for (const step of steps) {
-    if (!hasGate(step, run)) continue;
+    if (!hasGate(step, run) || waitingAgain.has(step.name)) continue;
     const given = approvalOf(run, step.name);
     if (given) {
       lines[step.name] = `approved ${given.at.slice(11, 16)}Z${given.message !== undefined ? ` — "${given.message}"` : ''}`;

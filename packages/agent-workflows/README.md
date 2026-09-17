@@ -1137,6 +1137,8 @@ dropped. **Nothing in the packages knows what shipping means.**
   its check itself, in its prose — on a step with a `resume:`, whose session ran in another directory — and, at
   load, on a step anything waits on or one that ends a workflow beside another: a run has one ending. A run of
   such a folder started `--no-worktree` is refused too: it has no result branch to merge.
+  Its brief carries one way of handing a file over rather than the usual two: what it leaves in that checkout is collected by nobody, so
+  it is told the run's artifacts directory, and that the checkout is to be left as it was found.
 - **The gate is the decision, and it holds before the step is filed.** A gate holds what its approval decides.
   Where steps follow, that is the handoff, and the step runs first — a person reads what it produced. An
   ending step in the checkout produces nothing to read: it acts, where nothing can be taken back. So a gated
@@ -1145,6 +1147,20 @@ dropped. **Nothing in the packages knows what shipping means.**
   under `## Approved`: they are the terms it acts on. **Send back** there is `wf retry <run> <the work>
   --message "<objection>"` — the work's step, since the ending has nothing of its own to object to — and it
   un-holds the gate until the work signs off again.
+- **Two runs' ending steps never work in one checkout at once.** That checkout is one directory, on the base
+  branch: two approved `ship` steps filed in one pass would both read `git status --porcelain` clean, both
+  trial merge, and the loser's `git merge --abort` would throw away the winner's staged merge while its check
+  ran. The prose of a `ship.md` is not a constraint, so the machinery holds the second: while a `workspace:
+  main` task of any run on the same repository is in flight, **nothing of another is filed** — not a first
+  session, and not the try a person asks for after one ended blocked, which works in that same directory. It
+  reads `waiting on the checkout (<run>'s ship has it)` on `wf ls`, on its own line or beside the try it is
+  waiting to take, and `wf decide` says which run's step has it. A claim on that checkout is a promise that the
+  pass would file the step, so a run whose ending it would not file claims nothing and holds nobody: one whose
+  work is being sent back, one waiting on a run that has not shipped, and one the cap on runs in flight holds —
+  the last two reachable where a folder's one step merges, which makes its ending its root. With nothing in the
+  checkout, the oldest approval takes it. Level-triggered: the claims are read from the world on the pass that
+  asks, including what that pass has already filed, so the order a pass reads the runs in decides nothing, and
+  a restart changes nothing.
 - **A run's result is the work the ending acts on**, not the ending's own branch: `resultSteps` reads the steps
   before it, so *has it shipped*, *what did it touch* and *what is there to decide* are asked of
   `wf/<run>/implement`, never of `main`, which would answer yes to everything.

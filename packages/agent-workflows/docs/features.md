@@ -2800,6 +2800,46 @@ What was built, four commits:
   approval taken then named a try nothing spends, so the next round would have merged unread (`notHandedOn`, which `waitsAtGate` and
   `approvalRefusal` share). The same for a person's send-back between the ask and the pass that files it, which `assess` and `listing`
   take as waiting (`unheld`). Found by the review, round 3.
+- **Two runs' ending steps never work in one checkout at once** (`heldCheckouts`, `checkoutHold`). `workspaceFor` hands `run.repo` to any
+  approved `workspace: main` step, so two approved `ship` steps filed in one pass both read `git status --porcelain` clean, both trial
+  merge, and the loser's `git merge --abort` throws away the winner's staged merge while its check runs; ship.md's prose was the only thing
+  in the way. Now, while a `workspace: main` task of any run on the same repository is in flight, nothing of another is filed — not a first
+  session, and not a try of one that ended blocked, which works in that same directory: it reads as waiting,
+  `wf ls` says `waiting on the checkout (<run>'s ship has it)` on its line and `wf decide` names the step in it (`checkoutWord`,
+  `checkoutLine`). The word is `waiting on the checkout (…)`, not `waiting for …`: the board takes `waiting`, `waiting on …` and `pending`
+  for a step with nothing filed and anything else for a session at work (`stepState`, `apps/web/src/lib/status.ts`), so `waiting for …`
+  would have drawn a step with no session as one that is running. `slotWord` (`waiting for a run slot (…)`) reads as working there for the
+  same reason, and is the board's to fix. Oldest approval first, then by id. Level-triggered: the claims are read from the store and the engine on the pass that
+  asks — including what that pass has already filed — so the order a pass takes the runs in decides nothing, and a restart changes nothing.
+  `assess`, `listing` and `decision` take the hold as they take a run slot. A step holds the checkout while the engine holds its task in
+  flight, as `inFlight` counts one: a task the engine has lost holds nothing, since a run nobody can stop must not hold every other run's
+  ending for ever — but a run somebody called off holds it until the engine has settled its session, which is still merging in that
+  directory between `wf cancel` asking and the engine stopping it. Found by the review, round 4.
+- **An ending step's brief carries one way of handing a file over, not two** (`artifactsContract`). Its workspace is the person's checkout:
+  `handOffDue` skips such a step, so nothing it leaves there is collected or committed, and a file left lying makes the next run's ship read
+  `git status --porcelain` as dirty and sign off blocked. It is told the artifacts directory and nothing else — no *leave it in this
+  workspace* bullet, no `WF_ARTIFACTS` (it runs no check of the run's), and that what it leaves in the checkout reaches nobody, reads
+  `not collected` where it is named from the workspace root, and is to be left as it was found. Found by the review, round 4.
+- **A send-back at an ending's gate with no words names the step at the gate** (`retryRefusal`). `wf retry <run> review` said `review is
+  awaiting approval` — review is not, ship is — and offered `wf approve <run> review`, which `wf approve` refuses, since review has no gate
+  of its own. It now says which step is at its gate, that the send-back from it goes to the work, and names the two commands that are
+  honoured: `wf approve <run> ship` and `wf retry <run> review --message "<objection>"`. The test that pinned it used an alternation,
+  `/^review is awaiting approval|--message/`, which passed whatever the sentence said; the sentence is pinned now, and refused again at the
+  store on `err.message`. Found by the review, round 4.
+- **`gateLines` takes the same `unheld` adjustment `assess` and `listing` take.** Between `wf retry <run> <the work> --message` and the pass
+  that files it, `wf decide`'s `gates` offered `wf approve <run> ship` — the very approval `approvalRefusal` was refusing in that moment,
+  while `wf ls` showed ship waiting. `gateLines` now reads an un-held ending as the waiting step it is, taking the asks as `listing` does.
+  `decision` took the adjustment too at first and does not now: a try or a round due makes `assess` call the run `running`, and `decision`
+  returns on that before its `statusOf` is read, so nothing could reach it and no test could fail without it (round 5's review). Found by
+  the review, round 4.
+- **`wf retry <run> ship` at the ending's gate says what there is to say** (`retryRefusal`). The step `wf ls` names as awaiting approval
+  answered `ship is awaiting approval, and there is nothing to try again` — the end of the road, in the one place a person who typed the
+  step's own name would look. It now says nothing of it has run, so there is no try of it to replace, and names the two things there are:
+  `wf approve <run> ship`, and the send-back `sendBackTo` computes. Found by the review, round 4.
+- **`wf round <run> review` at an ending's gate no longer says "What waits on it has been filed"** (`roundAsk`): nothing has been — the
+  ending is held before it is filed, and a person's word is what files it. It says the run is at that gate and names the approval and the
+  send-back (`sendBackTo`), as the gate's other refusals do; a loop whose follower is a step like any other says what it always said. Found
+  by the review, round 4.
 - **`--no-worktree` is refused on a folder whose last step merges** (`stepsToStart`), before a run is written: such a run works on the base
   branch itself, so there is no result branch for the ending to merge — it would be told the work is on the branch it is standing on, merge
   a branch into itself, and pay for the folder's whole check to find nothing to commit. Found by the review, round 3.
@@ -2829,6 +2869,25 @@ What was measured:
   still read; `ship.test.ts` files a child `--after` a run whose ending merged and holds its brief to what the work said, never to the
   ending's account of its own merge; `decide.test.ts` reads the whole screen of a run parked at a gate that worked on the base branch
   itself, which used to return before the decision was printed; `run.test.ts` holds `wf rm`'s words at both kinds of gate.
+- From its fourth, six findings, one commit each: `ship.test.ts` holds two runs of one repository, each at its ending's gate and each
+  approved — the second's approval written older, since a fixture that already has the order proves nothing — to one ending in the checkout,
+  whatever order the pass takes them in, with the other reading `waiting on the checkout (<run>'s ship has it)` on `wf ls`, named on `wf
+  decide`'s screen, and filed on the first pass after that step settles; and refuses, on `err.message`, a send-back with no words, a try of
+  the ending itself, and `wf round` at the ending's gate, each naming the gate and the commands that are honoured. `run.test.ts` pins those
+  three sentences where it had an alternation that passed whatever they said, holds the brief of both kinds of step to its own artifacts
+  contract, and reads `wf ls`, `wf decide`, `gateLines` and `wf approve` in the window between a send-back and the pass that files it,
+  finding them agreed. Measured from the root three times with `npx turbo run test --force`: agent-workflows 588 (587 passed, 1 skipped),
+  from 575; api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) untouched. `npm run typecheck` clean in all four.
+- From its second round, four findings: a try of an ending step is held by the checkout as its first filing is — `ship.test.ts` sends back a
+  ship that ended blocked while another run's is merging, and holds it for two passes, with nothing merged, `wf ls` saying it beside the try
+  and `wf decide` saying it on the screen of a run that is not running; a cancelled run holds the checkout until the engine has settled its
+  session, which `ship.test.ts` reads between `wf cancel` and the stop; `run.test.ts` holds `heldCheckouts` to the oldest word, the id on a
+  tie, a step already in it keeping it, and one repository at a time, and holds the word to the `waiting on …` prefix the board reads.
+- From its third round, one finding: a claim on the checkout is a promise the pass would file the step. `ship.test.ts` holds a merge-only
+  folder — one `workspace: main` step, which is its own root — to claiming nothing while it waits on a run that has not shipped and while
+  the cap on runs in flight holds it, with the oldest word of all; and to being held all the same, once its parent has shipped, by a step
+  that is in the checkout, and filed on the pass after that one settles. Each half fails without its gate, and the second fails on the
+  `hasStarted` shortcut that would have opened the reverse hole.
 - From its third: `run.test.ts` holds the ending to a loop going round — the round filed, the ending waiting, nothing to decide, and the
   gate held again once the loop hands on — and to a send-back between the ask and its filing; and holds a gate on a last step that merges
   nothing to its own words and to the branch still being a person's once approved. `decide.test.ts` refuses `--no-worktree` on a folder
@@ -2850,7 +2909,12 @@ What it leaves:
 - **A run with two endings.** `validate` refuses two `workspace: main` steps side by side, and `toDecide` names the first ending that waits;
   a workflow that deliberately ends wide with two gated endings is not something anybody has run.
 - **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes
-  into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide`.
+  into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide` — which is
+  now what its brief tells it (round 4, above).
+- **The board offers `git merge` for a run whose ending merges.** `commandsOf` (`apps/api/src/app.ts`) prints the hand-driven `git merge
+  --no-ff` and `git branch -D` for every finished run, where `wf decide` prints them only for a folder with no ending step (`merges`): a
+  folder that says what shipping is does not also tell a person to type it. Found by the review, round 4, and left: it is the api's, and
+  belongs with the board half above.
 
 What the board's run should call:
 

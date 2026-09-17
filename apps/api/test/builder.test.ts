@@ -498,6 +498,27 @@ test('a write the package does not refuse but the disk does puts each pasted sch
   assert.deepEqual(snapshot(dir), before, 'the new schema removed, the replaced one written back');
 });
 
+test('a pasted schema the disk refuses puts back every schema written before it: one of two read-only', { skip: process.getuid?.() === 0 ? 'root writes a read-only file all the same' : false }, async () => {
+  const dir = path.join(STORE, 'read-only');
+  write(path.join(dir, 'plan.md'), 'Plan it.\n');
+  write(path.join(dir, 'build.md'), '---\nafter: plan\n---\nBuild it.\n');
+  write(path.join(dir, 'kept.schema.json'), again);
+  fs.chmodSync(path.join(dir, 'kept.schema.json'), 0o444);
+  const before = snapshot(dir);
+  try {
+    // `new.schema.json` is written, then `kept.schema.json` is not: the write of the first is undone, as a refusal of the folder undoes it.
+    const res = await put('read-only', {
+      steps: [{ name: 'plan', spec: spec({ output: 'new.schema.json' }), body: 'Plan it.' }, { name: 'build', spec: spec({ after: ['plan'], output: 'kept.schema.json' }), body: 'Build it.' }],
+      schemas: [{ file: 'new.schema.json', text: risks }, { file: 'kept.schema.json', text: risks }],
+    });
+    assert.equal(res.status, 500, await res.clone().text());
+    assert.match((await res.json()).error, /EACCES/);
+    assert.deepEqual(snapshot(dir), before, 'the schema written before it removed, the read-only one as it was, and no step written');
+  } finally {
+    fs.chmodSync(path.join(dir, 'kept.schema.json'), 0o644);
+  }
+});
+
 test("stepsNamed: the steps a refusal names — a cycle's several, a name refused or given twice, and the step a refusal opens on, the longest name first", () => {
   const names = ['review', 'review-2', 'plan', 'a/b'];
   assert.deepEqual(stepsNamed('these steps wait on each other: plan, review', names), ['plan', 'review']);

@@ -254,12 +254,16 @@ function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly 
 const unnamed = (steps: readonly StepDraft[]): boolean =>
   !steps.length || steps.some((s) => stepNameRefusal(s.name) !== undefined) || new Set(steps.map((s) => s.name)).size < steps.length;
 
+/** A schema as the folder held it before a save wrote it: its text, or undefined where the folder had no such file. */
+type SchemaWas = { file: string; was: string | undefined };
+
 /**
  * A folder written through the package, with the schemas pasted for it, or its refusal (422, with the steps it names), then read back from disk.
  *
  * Judged whole before a byte is written: the steps' names by `writeWorkflow` itself, which refuses them before anything; the schemas and the
  * steps together by `judgedWith`. Then the schemas are written and the folder after them, whose parse now reads them from disk. Should
- * `writeWorkflow` refuse all the same — the folder changed between the two reads — each schema is put back as it was.
+ * `writeWorkflow` refuse all the same — the folder changed between the two reads — each schema is put back as it was; and so it is when the
+ * disk refuses a schema itself, a file read-only among them, which leaves the save no more written than a refusal does.
  */
 function write(name: string, dir: string, steps: readonly StepDraft[], readme: string | undefined, schemas: readonly SchemaFile[] = []): WorkflowSaved | BuildRefused {
   const refused = (message: string): BuildRefused => ({ error: message, steps: stepsNamed(message, steps.map((s) => (typeof s.name === 'string' ? s.name : ''))) });
@@ -268,16 +272,21 @@ function write(name: string, dir: string, steps: readonly StepDraft[], readme: s
     const judged = judgedWith(dir, steps, writing);
     if (judged) return judged;
   }
-  const before = writing.map(({ file }) => {
+  const before: SchemaWas[] = writing.map(({ file }) => {
     try { return { file, was: fs.readFileSync(path.join(dir, file), 'utf8') }; } catch { return { file, was: undefined }; }
   });
   const schemasWritten = writing.filter((s, i) => s.text !== before[i]!.was).map((s) => s.file);
-  for (const { file, text } of writing) fs.writeFileSync(path.join(dir, file), text);
+  // What the save has written, in the order it wrote it: what is put back should anything after it fail — the next schema, or the folder.
+  const written: SchemaWas[] = [];
   let result;
   try {
+    for (const [i, { file, text }] of writing.entries()) {
+      fs.writeFileSync(path.join(dir, file), text);
+      written.push(before[i]!);
+    }
     result = writeWorkflow(dir, steps, readme);
   } catch (err) {
-    for (const { file, was } of before) {
+    for (const { file, was } of written) {
       if (was === undefined) fs.rmSync(path.join(dir, file), { force: true });
       else fs.writeFileSync(path.join(dir, file), was);
     }

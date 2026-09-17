@@ -51,6 +51,12 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
 - **A browser's `requestAnimationFrame` throws when called off another object.** `{ request: requestAnimationFrame }`
   lost every live event of the session stream with no error on the page; call it as `(f) => requestAnimationFrame(f)`
   (`animationFrames`, learned by the say page's e2e).
+- **Playwright's `hasText` reads `textContent`, which puts no space between two elements.** A label beside a rendered
+  `Markdown` block — `<p>asks:</p><div data-markdown>…` — reads `asks:Warm colours…`, and a locator for `asks: Warm colours…`
+  waits for ever. Put `{' '}` between them (`Asks` in `Decide.tsx`, learned by the run that rendered markdown on the board).
+- **An encoded `..` never reaches a Hono route in a test.** `app.request` parses its URL, and a URL resolves `%2E%2E` as `..`
+  before the router sees it: the answer is the router's 404, not the route's refusal. Send `..%2F…` — a slash encoded — to reach
+  a name refusal (learned by the run that added a card's page).
 - **A guard is not proven by a test that asks whether it allows.** Every new refusal — a parser
   key, a value, a tool, a check — gets a test that makes it *refuse*, at shipped defaults. Guards
   that were only ever tested for the allowing case have been silently inert before (hkb's

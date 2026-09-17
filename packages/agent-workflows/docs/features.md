@@ -2837,7 +2837,9 @@ What the board's run should call:
   is one to decide, which is what the api does until it passes them.
 - **`decide(e, id)`** carries `standings: BranchStanding[]` and `toDecide`, beside what it carried.
 - **A gated ending's step** is `awaiting approval` with no task filed: a board that reads a step's task to decide whether to show it must
-  show this one all the same. `onYou` already says `approve ship`, through `onYouWords`, with no api change.
+  show this one all the same. `onYou` already says `approve ship`, through `onYouWords`, and Approve on the run page already reaches it —
+  `needsOf` reads the word, not the task, and `taskOfStep` answers for a step with none — so the api needed no change for the verb. What
+  it has not got is the count, the group, the banner and the panel.
 - **`resultSteps(steps)`** is the run's result: `apps/api/src/app.ts` still reads `terminalSteps` for a running run's branches, which for a
   folder with an ending step is a step with no branch yet — it should read `resultSteps`.
 - **Approve and Send back** are `approve(e, runId, step, message?)` and `retry(e, runId, <the work>, { mode: 'nudge', message })`, as for

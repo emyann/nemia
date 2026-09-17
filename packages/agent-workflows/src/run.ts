@@ -569,13 +569,27 @@ export function afterRefusal(
 }
 
 /**
+ * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) — and, where one of those works in the
+ * repository's own checkout (`workspace: main`), the steps it waits on instead. Pure.
+ *
+ * An ending step has no branch of its own: it works on the base branch, and what it acts on is the work of the steps before it. Read as
+ * the result, its `main` would be the run's own branch, and every question about the run's result — has it shipped, what did it touch,
+ * what is there to decide — would be asked of the base branch and answered yes.
+ */
+export function resultSteps(steps: readonly Workflow[]): Workflow[] {
+  const ends = terminalSteps(steps);
+  const result = ends.flatMap((s) => (s.workspace === 'main' ? steps.filter((x) => s.after.includes(x.name)) : [s]));
+  return [...new Set(result)];
+}
+
+/**
  * The branches whose tips this pass records (`tipsSeen`): a finished run's result branches — succeeded or failed, so neither running nor
  * cancelled — when it cut worktrees and did not work on its base branch itself. What `wf decide` offers to ship. None for any other run,
  * so git is not asked about it.
  */
 export function tipBranches(run: Run, steps: readonly Workflow[], status: Assessment['status']): string[] {
   if (!run.isolate || (status !== 'succeeded' && status !== 'failed')) return [];
-  const branches = terminalSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+  const branches = resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
   return branches.includes(run.branch) ? [] : [...new Set(branches)];
 }
 
@@ -938,6 +952,9 @@ export const namesInOrder = (run: Pick<Run, 'steps'>, steps: readonly Pick<Workf
 export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
   const finished = ['succeeded', 'failed', 'stopped'];
   return Object.entries(run.steps)
+    // Never a step that works in the repository's own checkout (`workspace: main`): what is lying in a person's checkout is
+    // not the run's to commit under a step's name, and such a step commits its own work there, as a person would.
+    .filter(([name]) => steps.find((s) => s.name === name)?.workspace !== 'main')
     .filter(([name, s]) => s.taskId && s.workspace && !s.check && finished.includes(phaseOf(s.taskId))
       && ![...downstreamOf(steps, name)].some((later) => run.steps[later]?.taskId && run.steps[later]?.workspace === s.workspace))
     .map(([name]) => name);
@@ -2640,7 +2657,7 @@ export function decision(
     return { kind: 'running', waiting: [...new Set([...live, ...ready, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort() };
   }
 
-  const branches = terminalSteps(steps)
+  const branches = resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
 
@@ -2989,7 +3006,8 @@ export function composeBrief(
   const request = [run.brief, ...(inputs ? ['', inputs] : [])];
   const parts = [step.body, '', '## What was asked for', '', ...request, ...handed];
 
-  if (step.after.length > 1) {
+  // A fan-in works on a branch with every one of them merged into it — unless it works in the repository's checkout, where nothing is merged.
+  if (step.after.length > 1 && step.workspace !== 'main') {
     return [
       step.body, '', '## What was asked for', '', ...request, ...handed, '',
       '## What is in this workspace', '',
@@ -3002,8 +3020,23 @@ export function composeBrief(
     ].join('\n');
   }
 
-  if (earlier.length || tree.length) parts.push('', '## Where to look', '');
-  if (earlier.length) {
+  if (earlier.length || tree.length || step.workspace === 'main') parts.push('', '## Where to look', '');
+  if (step.workspace === 'main') {
+    // The one step that is not where the run's work is. Its directory is the repository as a person left it, and the work is on the
+    // run's branches, so it is told those rather than told to read the workspace. What it does here, a person sees in their checkout.
+    const results = resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+    parts.push(
+      `You are in ${run.repo}, the repository's own checkout, on ${run.branch} — not in a worktree of this run's.`,
+      `${earlier.length ? `The work of ${earlier.join(', ')} is not in this directory: it is` : 'The run\'s work is'} on ${results.length ? results.join(' and ') : 'the run\'s result branch'}, cut from \`${run.baseRef}\`:`,
+      '',
+      '```',
+      ...results.flatMap((b) => [`git log --oneline ${run.branch}..${b}`, `git diff ${run.branch}...${b}`]),
+      '```',
+      '',
+      'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
+      'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',
+    );
+  } else if (earlier.length) {
     parts.push(
       `This workspace has already been worked in by: ${earlier.join(', ')}.`,
       `Their work is on disk, and against \`${run.baseRef}\` you can see exactly what changed:`,
@@ -3400,6 +3433,10 @@ function fromRunSection(parent: ParentCloseout): string {
  *   - **merge** — a step that waits on SEVERAL steps is a fan-in, so it gets a worktree with all
  *     of their work combined. `after: a, b` already means "wait for both"; it now also means
  *     "and give me both". Nobody has to learn a new key for the thing they already asked for.
+ *   - **main** — the one a step says rather than the shape: `workspace: main`, the repository's own
+ *     checkout, for the last step of a workflow, which acts on the base branch. No worktree is cut,
+ *     nothing is merged into it, and the run commits nothing there: what a person's checkout holds is
+ *     theirs, and the step commits its own work as they would.
  *
  * Conflicts are not an error here. A merge that conflicts leaves the markers in place and the
  * step is told about it, because resolving them is exactly the work a fan-in step exists to do.
@@ -3407,9 +3444,12 @@ function fromRunSection(parent: ParentCloseout): string {
 export type WorkspacePlan =
   | { kind: 'inherit'; from: string }
   | { kind: 'fork'; from: string | null }
-  | { kind: 'merge'; from: string; also: string[] };
+  | { kind: 'merge'; from: string; also: string[] }
+  | { kind: 'main' };
 
 export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
+  // Said by the step, not by the shape: the repository's own checkout, where the base branch is (`workspace: main`).
+  if (step.workspace === 'main') return { kind: 'main' };
   if (step.after.length === 0) return { kind: 'fork', from: null };
   if (step.after.length > 1) {
     const [first, ...also] = [...step.after].sort();

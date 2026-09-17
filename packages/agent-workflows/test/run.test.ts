@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, resultSteps, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -248,6 +248,48 @@ test('several roots each fork from the base — a run may start wide', () => {
   const wide = [step('a'), step('b')];
   assert.deepEqual(workspacePlan(wide, wide[0]!), { kind: 'fork', from: null });
   assert.deepEqual(workspacePlan(wide, wide[1]!), { kind: 'fork', from: null });
+});
+
+test("`workspace: main` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch", () => {
+  const ending: Workflow = { name: 'ship', after: ['review'], body: 'ship it', workspace: 'main', gate: true };
+  const dev = [step('implement'), step('review', ['implement']), ending];
+  assert.deepEqual(workspacePlan(dev, ending), { kind: 'main' }, 'said by the step, not by the shape');
+  assert.deepEqual(workspacePlan(dev, dev[1]!), { kind: 'inherit', from: 'implement' }, 'and nothing else changes');
+  // The result is what the ending step would merge: review's branch, never `main`, which every question about a result would answer yes.
+  assert.deepEqual(resultSteps(dev).map((s) => s.name), ['review']);
+  assert.deepEqual(resultSteps([step('implement'), step('review', ['implement'])]).map((s) => s.name), ['review'], 'a folder with no ending step is unchanged');
+  const fanIn: Workflow[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'ship it', workspace: 'main' }];
+  assert.deepEqual(resultSteps(fanIn).map((s) => s.name), ['a', 'b'], 'an ending step that waits on several: each of them');
+
+  const r = run({ implement: 't1', review: 't2', ship: 't3' }, {
+    steps: {
+      implement: { taskId: 't1', workspace: '/wt/implement', branch: 'wf/r-1/implement' },
+      review: { taskId: 't2', workspace: '/wt/implement', branch: 'wf/r-1/implement' },
+      ship: { taskId: 't3', workspace: '/repo', branch: 'main' },
+    },
+  });
+  assert.deepEqual(tipBranches(r, dev, 'succeeded'), ['wf/r-1/implement'], "the work's branch, not the base branch the ending step is on");
+  // And the run commits nothing in that checkout: what a person left lying there is theirs.
+  assert.deepEqual(handOffDue(dev, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' })), ['review']);
+});
+
+test("an ending step is told where the work is — the branches, not the workspace — since the repository's checkout is not where the run worked", () => {
+  const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'main', gate: true };
+  const dev = [step('implement'), step('review', ['implement']), ending];
+  const r = run({ implement: 't1', review: 't2', ship: null }, {
+    steps: {
+      implement: { taskId: 't1', workspace: '/wt/implement', branch: 'wf/r-1/implement' },
+      review: { taskId: 't2', workspace: '/wt/implement', branch: 'wf/r-1/implement' },
+      ship: { taskId: null },
+    },
+  });
+  const brief = composeBrief(ending, r, dev);
+  assert.match(brief, /You are in \/repo, the repository's own checkout, on main — not in a worktree of this run's\./);
+  assert.match(brief, /The work of review is not in this directory: it is on wf\/r-1\/implement, cut from `abc123`:/);
+  assert.match(brief, /git log --oneline main\.\.wf\/r-1\/implement/);
+  assert.match(brief, /git diff main\.\.\.wf\/r-1\/implement/);
+  assert.match(brief, /the run commits nothing here for you/);
+  assert.doesNotMatch(brief, /This workspace has already been worked in by/, 'the work is not here');
 });
 
 test('a fan-in step is told it is holding merged work, and that conflicts are its job', () => {

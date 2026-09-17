@@ -48,6 +48,18 @@ export type Workflow = {
    * Implies `after`, since you cannot continue a session that has not run.
    */
   resume?: string;
+  /**
+   * `workspace: main`: the step runs in the repository's own checkout rather than a worktree of its own.
+   *
+   * The third structural key, and the only one that is about a directory: everything else about where a step works is the shape of
+   * the workflow (`workspacePlan`). A run's work happens on branches in worktrees, which is what keeps two steps out of each other's
+   * way — and merging one of those branches onto the base branch is the one thing a worktree cannot do, since the base branch is
+   * checked out in the repository. So the step that ends a run works where a person would.
+   *
+   * Refused on a step with a `check:` — the run would execute it in a person's checkout, which is no verdict on the step's work —
+   * and on a step anything waits on, or one that ends a workflow beside another: a run has one ending (`validate`).
+   */
+  workspace?: 'main';
   /** Everything below the frontmatter: what the agent is told. */
   body: string;
   harness?: string;
@@ -155,7 +167,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -176,6 +188,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   after: 'the steps that must finish first, verified, or unverified where one has no check — the step `resume:` names included; none, and it starts at once',
   resume: 'the step whose session this one continues instead of starting cold, which implies waiting on it',
   input: "the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on",
+  workspace: "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
   harness: 'what runs the session: `claude` (the default), `codex` or `claude-detached`',
   model: "the model the harness runs the session on: the harness's own default when unset",
   effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
@@ -305,6 +318,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     name,
     after,
     resume: meta.resume,
+    workspace: workspaceOf(name, meta.workspace, meta.check),
     body,
     harness,
     model: meta.model,
@@ -628,6 +642,28 @@ function gateOf(step: string, gate: string | undefined): true | undefined {
   return refuse(`${step}: \`gate: ${gate}\` is not \`true\`. \`gate: true\` holds the step's closeout for a person — wf approve — before anything after it is filed; without the line the step has no gate. To gate one run of the workflow and not every run, delete the line and start it with --gate ${step}.`);
 }
 
+/** The words `workspace:` takes. One: a step either works in the repository's checkout or where the workflow's shape puts it. */
+export const WORKSPACES: readonly string[] = ['main'];
+
+/**
+ * `workspace:` as written: `main`, or refused. A step without the line works where the shape of the workflow puts it (`workspacePlan`) — a
+ * worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is a directory the run
+ * would have to invent. Refused too on a step with a `check:`, whose command the run executes in the step's workspace.
+ */
+function workspaceOf(step: string, workspace: string | undefined, check: string | undefined): 'main' | undefined {
+  if (workspace === undefined) return undefined;
+  if (workspace === 'worktree') {
+    refuse(`${step}: \`workspace: worktree\` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues. Delete the line, or write \`workspace: main\` to run the step in the repository's own checkout.`);
+  }
+  if (workspace !== 'main') {
+    refuse(`${step}: \`workspace: ${workspace}\` is not \`main\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. Without the line, the step works where the workflow's shape puts it.`);
+  }
+  if (check !== undefined) {
+    refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there after the step hands off — a verdict on whatever is in that checkout by then, not on this step's work. A step that ends a run runs its check itself, in its prose, and says in its closeout what it found. Delete one of the two lines.`);
+  }
+  return 'main';
+}
+
 function checkOf(step: string, check: string | undefined): string | undefined {
   // Each of these reads as "no check" to a person and as a command to the shell, which cannot find
   // it: exit 127 on every attempt, for a check nobody meant to run.
@@ -905,6 +941,8 @@ export function validate(steps: readonly Workflow[]): void {
     }
   }
 
+  validateMainWorkspace(steps);
+
   // Kahn's algorithm: if anything is left when nothing else can be removed, it is a cycle.
   const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
   for (let moved = true; moved;) {
@@ -920,6 +958,27 @@ export function validate(steps: readonly Workflow[]): void {
   if (pending.size) throw new WorkflowError(`these steps wait on each other: ${[...pending.keys()].sort().join(', ')}`);
 
   validateLoops(steps);
+}
+
+/**
+ * The ways a step cannot run in the repository's own checkout (`workspace: main`): it is not the workflow's last step.
+ *
+ * The checkout is where a person's work is, and it is one directory, on the base branch. A step after this one would start from a
+ * checkout this one has changed, and a step running beside it would share that directory — the arrangement worktrees exist to prevent.
+ * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
+ */
+function validateMainWorkspace(steps: readonly Workflow[]): void {
+  for (const s of steps.filter((x) => x.workspace === 'main')) {
+    const named = `${s.name}: \`workspace: main\` runs the step in the repository's own checkout`;
+    const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
+    if (waiting.length) {
+      throw new WorkflowError(`${named}, and ${waiting.join(', ')} ${waiting.length > 1 ? 'wait' : 'waits'} on it — each would start from a checkout this step has changed, and none of them is where the run's work is. It is a workflow's last step: nothing may wait on it. Move ${waiting.join(', ')} before ${s.name}, or delete the line.`);
+    }
+    const beside = steps.filter((x) => x.name !== s.name && !steps.some((other) => other.after.includes(x.name))).map((x) => x.name);
+    if (beside.length) {
+      throw new WorkflowError(`${named}, and ${beside.join(', ')} ${beside.length > 1 ? 'end' : 'ends'} the workflow beside it, so both could be working in that one directory at once. A run has one ending: make ${s.name} wait on ${beside.join(', ')}, or delete the line.`);
+    }
+  }
 }
 
 /**

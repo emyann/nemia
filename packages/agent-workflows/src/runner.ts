@@ -26,7 +26,7 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { admissionOrder, slotFree, afterRefusal, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
+import { admissionOrder, resultSteps, slotFree, afterRefusal, approvalRefusal, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
@@ -843,6 +843,11 @@ async function workspaceFor(
   // Without isolation every step works in the repository itself, which is only safe because
   // `validate` refuses a workflow that could run two steps at once in that mode.
   if (!run.isolate) return { workspace: run.repo, branch: run.branch, conflicted: false, notes: [] };
+
+  // And the last step of a workflow may ask for that checkout by name (`workspace: main`): merging a branch onto the base branch is
+  // what a worktree cannot do, since the base branch is checked out here. Nothing is cut, nothing is merged in, and no dependency is
+  // provisioned — it is the repository as a person left it, and `validate` keeps any other step from running beside it.
+  if (plan.kind === 'main') return { workspace: run.repo, branch: run.branch, conflicted: false, notes: [] };
 
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
@@ -2549,7 +2554,7 @@ export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
   if (!record || record.cancelledAt || known.gone) return { ...known, shipped: false };
   let steps: Workflow[];
   try { steps = stepsOf(record); } catch { return { ...known, shipped: false }; }
-  const branches = terminalSteps(steps).map((s) => record.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
+  const branches = resultSteps(steps).map((s) => record.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
   if (!branches.length || !branches.every((b) => isShipped(record, b))) return { ...known, shipped: false };
   const { views, phaseOf } = await taskPhases(e, record);
   const { asks, rounds } = readAsks(id);
@@ -2833,7 +2838,7 @@ export async function decide(e: Engine, id: string): Promise<{
 
 export function resultBranches(run: Run): string[] {
   const steps = stepsOf(run);
-  return terminalSteps(steps)
+  return resultSteps(steps)
     .map((s) => run.steps[s.name]?.branch)
     .filter((b): b is string => Boolean(b));
 }

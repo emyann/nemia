@@ -72,9 +72,13 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   `content-visibility: hidden`, not `display: none`: a folded result is rendered for nobody, and a margin or a border on the panel shows under
   a closed fold. The board's folds draw their content only while open (the `Disclosure`'s render function, or `DisclosureStateContext`) and
   put their spacing on what they draw (`ToolRun`, `ToolContent`, `ReasoningContent`; learned by the run that put the app on React Aria).
-- **A React Aria link follows Enter with a click that never reaches the router's `onClick`.** `createLink` hands a mouse click to the
-  router, and Enter on the same link loaded the whole page until the root mounted React Aria's `RouterProvider` on `router.navigate`
-  (`__root.tsx`). No test presses Enter on a link; try one by hand after touching the root (learned by the same run).
+- **Enter on a React Aria link is two clicks, and each can navigate.** On keydown the browser clicks the link, and React Aria does not
+  prevent it: without React Aria's `RouterProvider` (the root's, on `router.navigate`) the browser follows it and loads the whole page. On
+  keyup React Aria calls the link's `onClick` itself, with a click it makes, so TanStack's `createLink` over it navigates again to the same
+  place and the route loads twice (measured by counting `onBeforeLoad`). A link to a route is `routeLink` (`components/routeLink.tsx`):
+  `createLink` for the typed `to`, `href`, preloading and `aria-current`, with TanStack's click handler left off, and anything to run on a
+  press in `onPress`. The e2e's runs page presses Enter on a place and fails without the provider; nothing counts loads (learned by the same
+  run, its second round).
 - **Playwright's click on a React Aria switch waits for ever.** Its role and name are on an input hidden to the eye inside the switch's own
   `<label>`, which intercepts the click. Press the label, `page.locator('label', { has: toggle })`, then check it is `checked`
   (`showFinished` in `run.ts`). A checkbox or radio from React Aria is built the same way (learned by the same run).

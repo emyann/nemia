@@ -2697,10 +2697,15 @@ What changed in the app's own code:
 
 - **Buttons are pressed.** `onPress` and `isDisabled`: the Factory's Reset layout, Collapse all and Fit view, Send under the prompt box,
   the code block's copy button.
-- **A link in a button's or a menu item's look is `createLink` over the aria component**, which keeps the router's typed `to`: `NavLink`
-  over `SidebarMenuButton` in `__root.tsx`, `RouterLinkButton` over `LinkButton` for the Factory's Go to Runs. And the root mounts React
-  Aria's `RouterProvider` on `router.navigate`. Enter on a React Aria link dispatches a click of its own, which never reaches the router's
-  `onClick`: until the provider was there, Enter on a place in the menu loaded the whole page again.
+- **A link to a route is `routeLink`** (`components/routeLink.tsx`): TanStack's `createLink` over the aria component, with TanStack's own
+  click handler left off. `NavLink` over `SidebarMenuButton` in `__root.tsx`, and `RouterLinkButton` over `LinkButton` for the Factory's Go
+  to Runs. `createLink` gives the link its typed `to`, its `href`, preloading on intent and `aria-current`, and the root mounts React Aria's
+  `RouterProvider` on `router.navigate`, which navigates. Enter on a link is two clicks. On keydown the browser clicks the link, and React
+  Aria does not prevent it: with no provider the browser followed it and loaded the whole page again. On keyup React Aria calls the link's
+  `onClick` with a click it makes itself, and TanStack's handler took that as a second navigation to the same place. Measured in a build
+  that counted the router's `onBeforeLoad`: with `createLink` alone over the provider, Enter loaded the route twice and a click once; with
+  the handler left off, each loads it once, at 1280 and at 390 pixels, and hovering a place still fetches its data. Something to run on a
+  press goes through `onPress`, as `picked` does, which closes the phone's sheet.
 - **Show finished is the switch with a `<label htmlFor>` beside it.** React Aria's switch is itself a `<label>`, sized as the track, round
   an input hidden to the eye: the words cannot go inside it, and a label round it would nest two labels.
 - **The folds are React Aria's `Disclosure`**: a tool call (`tool.tsx`), a thought (`reasoning.tsx`) and a run of calls (`ToolRun`).
@@ -2709,30 +2714,34 @@ What changed in the app's own code:
   `content-visibility: hidden`, so the panel is still laid out: a margin on it grew a closed fold from 20 to 28 pixels, measured. So each
   fold draws its content only while open, as Radix's did, with its spacing on what it draws. `Reasoning`'s `useControllableState` is a few
   lines of local state.
-- **One local edit to a registry file.** The mobile sidebar's sheet hides its close button with `showCloseButton={false}`: the registry's
-  `[&>button]:hidden` misses the button inside the dialog, and at 390 pixels it sat over the hkb row.
+- **Two local edits to a registry file, both in `sidebar.tsx`.** The mobile sidebar's sheet hides its close button with
+  `showCloseButton={false}`: the registry's `[&>button]:hidden` misses the button inside the dialog, and at 390 pixels it sat over the hkb
+  row. And `SidebarMenu` and `SidebarMenuItem` are a `ul` of `li`s again. aria-nova draws them as `div`s, where radix-nova drew a list and
+  aria-nova's own `SidebarMenuSub` still does, so a screen reader no longer heard a list of five places. React Aria plays no part in it.
 
 **Tests.** `components.test.ts` reads `data-expanded` where it read `data-state`, and a new test refuses a closed fold or call that draws
 what it holds; with the folds drawn always, it fails. The e2e presses Show finished on its track and checks it reads off, then on: a click
-aimed at the hidden input is intercepted by the switch's label, and Playwright waits for ever. Nothing else in the e2e changed. Every role
-and name it finds by kept theirs, and React Aria passes through the `data-sidebar`, `data-active`, `data-turn` and `data-tool` it reads.
+aimed at the hidden input is intercepted by the switch's label, and Playwright waits for ever. On the runs page it presses Enter on the Inbox
+and then on Runs in the menu, and refuses a page loaded again or a history that is not one entry longer; with the `RouterProvider` taken out,
+it fails there. Nothing else in the e2e changed. Every role and name it finds by kept theirs, and React Aria passes through the
+`data-sidebar`, `data-active`, `data-turn` and `data-tool` it reads. Nothing in it counts the router's loads, so the double load above is
+held by `routeLink`'s comment and the measurement, not by a test.
 
-**Looked at by hand**, since the e2e runs at 1280 × 800 and only clicks. Enter on a place in the menu navigates in place, keeps focus and
-adds one entry to the history, as a click does. Collapsed with Ctrl+B, the sidebar shows a place's name in a tooltip on hover, and expanded,
-none. At 390 pixels the trigger opens the sheet, a pick closes it, by click or by Enter, and Escape gives focus back to the trigger. Show finished toggles with Tab and Space, and from its
-words. A fold opens and closes with Enter and keeps focus. Scroll to end shows once the conversation is scrolled up, and takes it back down.
+**Looked at by hand**, since the e2e runs at 1280 × 800. Enter on a place in the menu keeps focus on it, and Ctrl+click opens the place in a
+new tab and leaves the page where it is. The menu reads as a list of five. Collapsed with Ctrl+B, the sidebar shows a place's name in a
+tooltip on hover, and expanded, none. At 390 pixels the trigger opens the sheet, a pick closes it, by click or by Enter, and Escape gives
+focus back to the trigger. On a store with no runs, the Factory's Go to Runs navigates in the page by click and by Enter. Show finished
+toggles with Tab and Space, and from its words. A fold opens and closes with Enter and keeps focus. Scroll to end shows once the conversation is scrolled up, and takes it back down.
 
 What the base does not offer, named rather than worked around:
 
 - **AI Elements has no React Aria variant.** `tool.tsx`, `reasoning.tsx` and `code-block.tsx` are its Radix versions adapted by hand, each
   saying so in its header. An update from registry.ai-sdk.dev comes back on Radix.
 - **No `asChild` and no `Slot`.** Badge, Bubble and Marker take a `render` function, Button has a `LinkButton`, and a router link is
-  `createLink`.
+  `routeLink`.
 - **No `TooltipProvider`**: each `TooltipTrigger` carries its own delay, 0 in the registry's, and nothing is shared between tooltips.
 - **A `DisclosurePanel` does not unmount what it holds.** The board's folds do it by hand, and lose the closing animation Radix's had.
 - **The switch cannot hold its own label**, as said above.
-- **The sidebar's menu is a `div` of `div`s** on aria, where Radix's was a `ul` of `li`s, so a screen reader no longer hears a list of
-  five places. Kept as the registry has it.
 - **`add` installs no React Aria** in a project switched to `aria-nova`.
 - **The shadcn skill knows two bases, radix and base.** Its `base-vs-radix.md` and SKILL.md's `base` field name no aria, and from the
   repository's root the skill does not load at all: its `info` refuses a monorepo root. On aria, the reference is what

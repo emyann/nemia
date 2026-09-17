@@ -3173,3 +3173,40 @@ test('`gateLines`: what `wf decide` prints under a gated step — `approved 23:1
   assert.deepEqual(gateLines(PLANNED, atPlan(), phases({ t1: 'running' }), signedDone, asked), {}, 'not signed off');
   assert.deepEqual(gateLines(PLANNED, atPlan({ gates: undefined }), PLAN_DONE, signedDone, asked), {}, 'no gate');
 });
+
+test("REFUSED at a gate, pass after pass: a wordless ask for the next try — asked while the step's harness blocked its session, or written by hand — is not due once the step signs off and waits at its gate, or is approved and not handed on; it stays awaiting approval and waiting on you, and `wf approve` and `wf retry` name that ask and say to delete it", () => {
+  const wordless: RetryAsk = { step: 'plan', try: 2, mode: 'nudge', at: '2026-09-16T23:00:00.000Z' };
+  const withWords: RetryAsk = { ...wordless, message: 'store it first' };
+  // While the session runs, blocked by its harness, a wordless try is due: the tick stops the session first, as for any step.
+  assert.deepEqual(retriesDue(PLANNED, atPlan(), phases({ t1: 'running' }), () => undefined, asked, () => undefined, [wordless], () => true).map((r) => [r.step, r.stopFirst]), [['plan', true]]);
+  // Once it has signed off at its gate, not: nothing to change, and nobody has read what it handed on.
+  for (let pass = 1; pass <= 3; pass++) {
+    const a = assess(PLANNED, atPlan(), PLAN_DONE, signedDone, asked, () => undefined, [wordless]);
+    assert.deepEqual([a.retry, a.ready, stepStatus(PLANNED[0]!, atPlan(), PLAN_DONE, signedDone, asked)], [[], [], 'awaiting approval'], `pass ${pass}`);
+  }
+  assert.deepEqual(retriesDue(PLANNED, atPlan({ approvals: [approval('plan', 1)] }), PLAN_DONE, signedDone, asked, () => undefined, [wordless]), [], 'approved, and not handed on: not due either');
+  assert.deepEqual(retriesDue(PLANNED, atPlan(), PLAN_DONE, signedDone, asked, () => undefined, [withWords]).map((r) => [r.step, r.message]), [['plan', 'store it first']], 'with words, it is a send-back, and due');
+  const l = listing(PLANNED, atPlan(), (id) => (id === 't1' ? 'succeeded' : 'unknown'), signedDone, asked, () => undefined, [wordless]);
+  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+  assert.match(l.steps[0]!.note ?? '', /^approve it: wf approve r-1 plan/, 'no try said to be due');
+
+  assert.equal(approvalRefusal(PLANNED, atPlan(), 'plan', undefined, PLAN_DONE, signedDone, asked, () => undefined, [wordless]),
+    'try 2 of plan is asked for (--nudge, at 2026-09-16T23:00:00.000Z) with no words, and plan is at its gate, so no tick honours it: a send-back says what to change. Delete that ask — retry-plan-2, in the run\'s .asks directory — then approve it, or send it back with words: wf retry r-1 plan --message "<objection>".');
+  assert.equal(retryRefusal(PLANNED, atPlan(), 'plan', { mode: 'nudge', message: 'store it first' }, PLAN_DONE, signedDone, asked, () => undefined, [wordless]),
+    'try 2 of plan is asked for (--nudge, at 2026-09-16T23:00:00.000Z) with no words, and plan is awaiting approval, so no tick honours it: a send-back says what to change. Delete that ask — retry-plan-2, in the run\'s .asks directory — and ask again: wf retry r-1 plan --message "<objection>".');
+  assert.match(approvalRefusal(PLANNED, atPlan(), 'plan', undefined, PLAN_DONE, signedDone, asked, () => undefined, [withWords]) ?? '', /^try 2 of plan is already asked for \(--nudge, at .*\): the next tick sends it back/, 'one with words is still said to be on its way');
+});
+
+test("REFUSED as already approved, in words that hold: while it may still be sent back, the send-back is offered; once it has handed on — what waits on it filed, or nothing waiting on it — it says so, and offers no `wf retry` that would be refused", () => {
+  const approved = (r: Run, p: (id: string) => TaskPhase, steps = PLANNED) => approvalRefusal(steps, r, steps[0]!.name, undefined, p, signedDone, asked);
+  assert.equal(approved(atPlan({ approvals: [approval('plan', 1)] }), PLAN_DONE),
+    'try 1 of plan is already approved, at 2026-09-16T23:10:00.000Z: what waits on it is filed on the next tick, once. To send it back instead, before that tick: wf retry r-1 plan --message "<objection>".');
+  const filed = run({ plan: 't1', implement: 't2', review: 't3' }, { gates: ['plan'], approvals: [approval('plan', 1, 'yes')] });
+  const all = phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' });
+  assert.equal(approved(filed, all),
+    'try 1 of plan is already approved, at 2026-09-16T23:10:00.000Z, with words, and it has handed on: what waits on it has been filed, so there is nothing to approve, nor to send back. See where the run stands: wf ls r-1.');
+  assert.equal(retryRefusal(PLANNED, filed, 'plan', { mode: 'nudge', message: 'x' }, all, signedDone, asked)?.startsWith('plan signed off done'), true, 'the send-back it no longer offers is refused');
+  const one: Workflow[] = [step('implement')];
+  assert.equal(approved(run({ implement: 't1' }, { gates: ['implement'], approvals: [approval('implement', 1)] }), phases({ t1: 'succeeded' }), one),
+    'try 1 of implement is already approved, at 2026-09-16T23:10:00.000Z, and it has handed on: nothing waits on it, and its run goes on without it, so there is nothing to approve, nor to send back. See where the run stands: wf ls r-1.');
+});

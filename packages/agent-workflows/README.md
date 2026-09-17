@@ -1110,7 +1110,9 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
 - **Sending back is `wf retry <run> <step> --message "<objection>"`**, as for a step that signed off blocked, on a step at its gate
   or one approved with nothing after it filed yet — never on an approved step nothing waits on, whose run is over and may be merged. `--nudge` continues its session, told under `## Try <n>` that its handoff waited
   at its gate and was sent back, with the objection as `## Your answer`; `--fresh` starts a new one. It signs off again, and the gate
-  holds again. Refused without words, and with `--recheck`: an objection with nothing to change would sign off as it did. An
+  holds again. Refused without words, and with `--recheck`: an objection with nothing to change would sign off as it did. The tick
+  holds an ask to the same word: a wordless one — taken while the step's harness blocked its session, which then signed off, or
+  written by hand — is not filed at the gate, and `wf approve` and `wf retry` name it and say to delete it. An
   approval names the try it approves, as a retry ask names its try, so one given before the send-back is spent by it — the tick
   moves it into `done/` with the spent ask — and the new try is approved with a new `wf approve`.
 - **What the steps after it are told.** Every step after an approved gate — the one after it and each after that one, the

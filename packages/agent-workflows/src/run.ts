@@ -264,6 +264,12 @@ export const approvalOf = (run: Run, step: string): Approval | undefined =>
 /** The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask. Pure. */
 export const spentApprovals = (run: Run): Approval[] => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step));
 
+/** Where a step that may be sent back stands at its gate, in words: `is awaiting approval`, or `is approved (try 1, at …), and nothing after it is filed yet`. */
+const gateWords = (run: Run, step: string): string => {
+  const given = approvalOf(run, step);
+  return given ? `is approved (try ${given.try}, at ${given.at}), and nothing after it is filed yet` : 'is awaiting approval';
+};
+
 /** Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty. */
 export const approvalWordsRefusal = (message: string | undefined, command = 'wf approve <runId> <step>'): string | null =>
   (message !== undefined && !message.trim()
@@ -274,8 +280,10 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'wf 
  * Why `wf approve` will not approve this step, in words that name the fix — or null, when it may: the step waits at its gate. Pure.
  *
  * Refused: words that are empty (`approvalWordsRefusal`); a step the run does not have; a cancelled run, which files nothing; a step that is
- * not gated, naming the steps that are; the try it is on already approved; a send-back already asked for — the try after this one, which
- * would spend an approval of this one at once; and a step that has not signed off, each status with why and what to do instead.
+ * not gated, naming the steps that are; the try it is on already approved — while it may still be sent back, or once it has handed on, each
+ * said so; a send-back already asked for — the try after this one, which would spend an approval of this one at once — or one asked with no
+ * words, which no tick files (`heard`), named with how to take it back; and a step that has not signed off, each status with why and what to
+ * do instead.
  */
 export function approvalRefusal(
   steps: readonly Workflow[],
@@ -305,10 +313,17 @@ export function approvalRefusal(
   }
   const n = tryOf(run, name);
   const given = approvalOf(run, name);
+  const { sendsBack } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, () => false, spendOf, verdictOf);
   if (given) {
-    return `try ${n} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: wf retry ${run.id} ${name} --message "<objection>".`;
+    const approved = `try ${n} of ${name} is already approved, at ${given.at}${given.message !== undefined ? ', with words' : ''}`;
+    if (sendsBack) return `${approved}: what waits on it is filed on the next tick, once. To send it back instead, before that tick: wf retry ${run.id} ${name} --message "<objection>".`;
+    const after = steps.some((s) => s.after.includes(name));
+    return `${approved}, and it has handed on: ${after ? 'what waits on it has been filed' : 'nothing waits on it, and its run goes on without it'}, so there is nothing to approve, nor to send back. See where the run stands: wf ls ${run.id}.`;
   }
   const pending = asks.find((a) => a.step === name && a.try === n + 1);
+  if (pending && !heard(pending, sendsBack)) {
+    return `try ${n + 1} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} is at its gate, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${n + 1}, in the run's .asks directory — then approve it, or send it back with words: wf retry ${run.id} ${name} --message "<objection>".`;
+  }
   if (pending) {
     return `try ${n + 1} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}): the next tick sends it back, and an approval of try ${n} would be spent by it at once. Approve try ${n + 1} once it has signed off — or, to approve this one, take that ask back first: retry-${name}-${n + 1}, in the run's .asks directory.`;
   }
@@ -1088,6 +1103,13 @@ const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined)
   !raise || a.mode === 'recheck' || (a.budget !== undefined && a.budget > raise.above);
 
 /**
+ * Whether a person's ask says what a send-back from a gate needs (`sendsBack`): words. One with none — written while the step's harness
+ * blocked its session, which takes a wordless try, or by hand — tells a session it was sent back and gives it nothing to change, so no tick
+ * files it for a step at its gate, as `wf retry` refuses to write one.
+ */
+const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boolean => !sendsBack || a.message !== undefined;
+
+/**
  * The tries due now. Pure, and blind to cancellation on purpose: `assess` answers for a cancelled run, and
  * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
  *
@@ -1106,6 +1128,9 @@ const carries = (a: Pick<RetryAsk, 'mode' | 'budget'>, raise: Raise | undefined)
  *
  * A step over its budget, or ended at it, is never tried on the run's word — it is not `failed (check)`, so `retries:` files nothing — and a
  * person's ask for a session of it is due only with a `--budget` above what it has spent (`Raise`), which the try carries and the record keeps.
+ *
+ * A step at its gate, or approved and not handed on (`sendsBack`), is tried only on an ask with words (`heard`): a wordless one, asked while
+ * its harness blocked the session that then signed off, would send it back with nothing to change, before anyone read what it handed on.
  */
 export function retriesDue(
   steps: readonly Workflow[],
@@ -1123,14 +1148,14 @@ export function retriesDue(
   const due: Retry[] = [];
   for (const step of steps) {
     const record = run.steps[step.name];
-    const { status, modes, blockedByHarness, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
+    const { status, modes, blockedByHarness, sendsBack, raise } = retryable(step, run, phaseOf, closeoutOf, askedCloseout, steps, harnessBlocked, spendOf, verdictOf);
     if (!record?.taskId) continue;
     const phase = phaseOf(record.taskId);
     const unsettled = phase === 'pending' || phase === 'running';
     const ways = unsettled ? STOPPED_FIRST : modes;
     if (!ways.length) continue;
     const next = tryOf(run, step.name) + 1;
-    const ask = asks.find((a) => a.step === step.name && a.try === next && ways.includes(a.mode) && carries(a, raise));
+    const ask = asks.find((a) => a.step === step.name && a.try === next && ways.includes(a.mode) && carries(a, raise) && heard(a, sendsBack));
     if (ask) {
       due.push({
         step: step.name, try: next, mode: ask.mode, ...(ask.model ? { model: ask.model } : {}), ...(ask.message !== undefined ? { message: ask.message } : {}),
@@ -1211,6 +1236,9 @@ export function retryRefusal(
   if (pending && !carries(pending, raise)) {
     return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --budget <amount>.`;
   }
+  if (pending && !heard(pending, sendsBack)) {
+    return `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at}) with no words, and ${name} ${gateWords(run, name)}, so no tick honours it: a send-back says what to change. Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again: ${command} --message "<objection>".`;
+  }
   if (pending) {
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: wf ls ${run.id}.`;
   }
@@ -1236,8 +1264,7 @@ export function retryRefusal(
   // A send-back is an objection: a try of a step at its gate with nothing to change would sign off as it did, and wait there again.
   if (sendsBack && how.message === undefined) {
     const given = approvalOf(run, name);
-    const where = given ? `approved (try ${given.try}, at ${given.at}), and nothing after it is filed yet` : 'awaiting approval';
-    return `${name} is ${where}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
+    return `${name} ${gateWords(run, name)}: a try of it sends it back from its gate, and one with no words tells its session nothing to change, so it would sign off as it did. Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''} — or ${given ? 'leave it approved, and the next tick files what waits on it' : `approve it: wf approve ${run.id} ${name}`}.`;
   }
   if (raise && how.mode !== 'recheck' && how.budget === undefined) {
     const withTry = `${command} --budget <amount>${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;

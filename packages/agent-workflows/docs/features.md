@@ -2189,7 +2189,10 @@ What was built, four commits:
   it and none of them filed (`sendsBack`) — not to an approved step nothing waits on, whose run is over (found in review, round 2), and `retryRefusal` refuses one without words, and `--recheck`. The try's brief says its handoff waited at its
   gate and was sent back (`triedFrom`, `retrySection`). `retryLines` offers a gated step nothing: `gateLines` does. `cancelPlan` calls
   a run at its gate off rather than finished; `forgetRefusal` holds it, naming the `wf approve`; `roundAsk` on a loop at its gate says
-  to approve or send back, with `--budget` or without it (review, round 2).
+  to approve or send back, with `--budget` or without it (review, round 2). From review, round 3: the tick files no wordless ask at a
+  gate (`heard` in `retriesDue`) — one taken while the harness blocked the session that then signed off would have sent the step back
+  with nothing to change, before anyone read it — and `wf approve` and `wf retry` name such an ask and say to delete it; `wf approve` on
+  a step already approved and handed on says so, rather than offer a send-back that is refused.
 - **What the next steps are told**: `## Approved` (`approvedSection`), in every brief composed for a step after an approved gate,
   directly or through another (`upstreamOf`, now exported) — which step, which try, when, and the words, fenced — beside `## From run
   <id>` under what was asked for, and in a resumed step's brief. **`wf decide`** prints `AWAITING APPROVAL` among the verdicts and, under

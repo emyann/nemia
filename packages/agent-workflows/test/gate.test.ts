@@ -386,3 +386,36 @@ test("`wf decide` at a gate says AWAITING APPROVAL and, under the step, the appr
   const plan = decided.indexOf('  plan');
   assert.equal(decided[plan + 1], `    gate  approved ${approval.at.slice(11, 16)}Z — "Ship the second reading."`);
 });
+
+test("REFUSED at shipped defaults: a wordless `wf retry` taken while a gated step's harness blocked its session, whose session then signs off before any tick, is not filed at the gate — pass after pass nothing is tried or filed, `wf ls` says awaiting approval, `wf approve` names the ask to delete — and with it deleted, the approval files what follows", async () => {
+  const run = start({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] });
+  const { e, tasks, filings, stopped, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-plan`, 'needs-human' as TaskPhase);
+  const { ask, stopFirst } = await retry(e, run.id, 'plan', { mode: 'nudge' }, { stopBlocked: true });
+  assert.deepEqual([ask.try, ask.message, stopFirst], [2, undefined, true], 'a wordless try of a blocked session is allowed');
+
+  // The session works again, signs off and settles before any tick stops it.
+  settle(`${run.id}-plan`, 'succeeded', SIGNED);
+  for (let pass = 1; pass <= 3; pass++) {
+    const after = await advance(e, readRun(run.id));
+    assert.deepEqual([after.tried, after.filed], [[], []], `pass ${pass}`);
+  }
+  assert.deepEqual([filings, stopped], [[`${run.id}-plan`], []], 'no try filed, no session stopped');
+  assert.equal(tasks.has(`${run.id}-plan-try2`), false);
+  const l = await list(e, readRun(run.id));
+  assert.deepEqual([l.steps[0]!.status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+  assert.match(l.steps[0]!.note ?? '', /^approve it: /, 'no try said to be due');
+
+  const file = path.join(asksDir(run.id), 'retry-plan-2');
+  await assert.rejects(approve(e, run.id, 'plan'), refusedWith(/^try 2 of plan is asked for \(--nudge, at .*\) with no words, and plan is at its gate, so no tick honours it: .*Delete that ask — retry-plan-2, in the run's \.asks directory — then approve it/));
+  await assert.rejects(retry(e, run.id, 'plan', { mode: 'nudge', message: 'store it first' }), refusedWith(/^try 2 of plan is asked for \(--nudge, at .*\) with no words, and plan is awaiting approval, so no tick honours it/));
+  assert.ok(fs.existsSync(file), 'left where it is, for a person to take back');
+
+  fs.rmSync(file);
+  await approve(e, run.id, 'plan');
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['implement']);
+
+  // Handed on, a second approval says so, and offers no send-back that would be refused.
+  await assert.rejects(approve(e, run.id, 'plan'), refusedWith(new RegExp(`^try 1 of plan is already approved, at .*, and it has handed on: what waits on it has been filed, so there is nothing to approve, nor to send back\\. See where the run stands: wf ls ${run.id}\\.$`)));
+});

@@ -1028,7 +1028,15 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   off for 65 cents); **after B14:** B15 `the-web-app-s-components-on-3xq9` (apps: React Aria as the base, §7, the plan waiting
   for approval; `dev-planned-build`) — the study, the operator's four answers (aria; folds mount only while open; one run; the
   settings allow `npx shadcn@latest`, `d06cff6`), two rounds, $63.03, **merged, `cc512be`**, `npm install` run on main. **All eight
-  are merged** by 2026-09-17 07:50Z; nothing in flight.
+  are merged** by 2026-09-17 07:50Z. The store was torn down that morning (daemon stopped, 88 worktrees removed through git,
+  records and branches kept), then six more runs filed as a graph with the daemon back at four sessions and four runs:
+  now — E11 `four-small-items-in-agent-en-ug4p` (engine: open issues 24 and 25, two test gaps), W12
+  `the-end-of-a-run-is-a-step-o-y1wl` (agent-workflows: features.md §8 — `workspace: main`, *to decide*, `wf decide`'s facts,
+  `ship.md` gated on the `dev*` folders), B16 `four-leftovers-on-the-board-fmk9` (apps: the builder's two disk-failure gaps, a
+  stray inbox file's link, a card taller than its cell); after W12 — W13 `the-supervisor-packages-agen-n7c2` (§9: the
+  supervisor's folder and a step that never ends; the operator starts its first run); after W12 and B16 — B17
+  `a-finished-run-is-a-decision-vjcj` (§8's board half); after W13 — W14 `four-leftovers-in-agent-work-3uyy` (the queue's and
+  the builder's package leftovers). Each finish is a merge question to the operator.
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
 `each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
 the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,

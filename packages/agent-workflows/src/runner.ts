@@ -813,7 +813,15 @@ function includeFiles(repo: string, worktree: string): string[] {
   return notes;
 }
 
-const git = (repo: string, ...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+/**
+ * A git command in `repo`, its stdout trimmed — or it throws, and git's words are on the error: its message carries the command and the
+ * stderr git wrote, which is what a failure is said in (`failedWords`, `startQueued`).
+ *
+ * `stdio` is given so that stderr is read and no more. Handed none, `execFileSync` captures git's stderr *and* writes it to this process's
+ * own: a queued card whose `repo:` is no git repository made the tick run `rev-parse` there on every pass, and each one printed git's `fatal:
+ * not a git repository` on the daemon's terminal, beside the one line `wf up` says about the card.
+ */
+const git = (repo: string, ...args: string[]) => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /**
  * Cut the run's starting workspace.

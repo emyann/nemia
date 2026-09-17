@@ -2997,6 +2997,13 @@ app's own workaround redundant, the workaround stays, and the bullet says so.
   is written again. The api's own `utimesSync` around the call now sets the same time a second time; it is `apps/api`'s, and was left there.
   Tested on the store (`test/queue-store.test.ts`): a card filed at 08:00, queued and taken back through `wf inbox queue` and its `--off`,
   keeps 08:00 across both writes, while `wf inbox add` still writes a card at the time it is filed. Without the two lines, the test fails.
+- **Git's stderr is no longer the daemon's.** `runner.ts`'s `git` helper ran `execFileSync` with no `stdio`, which captures git's stderr
+  *and* writes it to this process's own. A queued card whose `repo:` is a directory with no git in it is tried on every pass — that is the
+  rule, since a failure is no verdict on the card — so `wf up` printed git's `fatal: not a git repository` every four seconds, beside the one
+  line it says about the card. The helper now passes `['ignore', 'pipe', 'pipe']`, which changes nothing else: the words are still on the
+  error `execFileSync` throws, which is where every failure is read from (`failedWords`, `startQueued`). Tested on the store
+  (`test/queue-store.test.ts`): a pass over such a card writes nothing at all to `process.stderr`, while `queueLine` still says
+  `no-git-a1b2 not started: Command failed: git rev-parse HEAD / fatal: not a git repository…`. Without the `stdio`, the test fails.
 
 ## 1. A run that grows steps from a plan
 

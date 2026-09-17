@@ -609,6 +609,26 @@ test("a queued card whose start fails without a refusal — its repository no gi
   assert.deepEqual([behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))], ['behind-c3d4', []]);
 });
 
+test("a queued card whose `repo:` is no git repository leaves the daemon's own stderr alone: git's words are read off the failure, not passed through", async (t) => {
+  emptyStore(undefined);
+  const b = board();
+  // A directory with a workflow in it and no git, as above: the start's `git rev-parse` fails, and git writes `fatal:` on its stderr.
+  const bare = fs.mkdtempSync(path.join(ROOT, 'bare-'));
+  fs.mkdirSync(path.join(bare, 'workflows', 'dev'), { recursive: true });
+  fs.writeFileSync(path.join(bare, 'workflows', 'dev', 'implement.md'), 'implement it\n');
+  aCard('no-git-a1b2', { workflow: 'dev', repo: bare, queued: '2026-09-16T09:00:00.000Z' }, 'Its repository has no git');
+
+  const said: string[] = [];
+  const stderr = t.mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => { said.push(String(chunk)); return true; });
+  let pass: Awaited<ReturnType<typeof tick>>;
+  try { pass = await tick(b.e); } finally { stderr.mock.restore(); }
+  assert.deepEqual(said, [], "git's stderr is not the daemon's: a pass every four seconds would print it every four seconds");
+
+  // Read all the same, and said once, with the card's name on it.
+  assert.ok(pass.queue && 'failed' in pass.queue, JSON.stringify(pass.queue));
+  assert.match(queueLine(pass.queue), /^no-git-a1b2 not started: Command failed: git rev-parse HEAD \/ fatal: not a git repository/);
+});
+
 test("REFUSED at shipped defaults, on the repository it was tried on: a queued card that names no repository, refused on the daemon's — no such workflow there — is passed over by every pass there, and started by a pass in a repository that has its workflow", async (t) => {
   emptyStore(undefined);
   const b = board();

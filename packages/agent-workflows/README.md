@@ -1599,7 +1599,8 @@ up — every 4000ms, ^C to stop
   in another repository — and the next pass tries it again.
 - **A start that fails otherwise is tried again.** Git failing on the repository, a file that cannot be read: no verdict on the
   card, so the next pass tries it again, where it keeps its place and the card behind it waits. `wf up` says it once, and again
-  only if it fails differently; `wf inbox` says `failed at <time>: <why>`. A card whose `repo:` folder was deleted after it was queued no
+  only if it fails differently; `wf inbox` says `failed at <time>: <why>`. Git's own stderr is not the daemon's: it is read off the
+  failure and said in that one line, so a `repo:` with no git in it does not print `fatal: not a git repository` on every pass. A card whose `repo:` folder was deleted after it was queued no
   longer reads as a card, and keeps its place all the same: `wf inbox` lists why beside `queued 1 of 2`, the tick tries it and
   names the refusal, and `--off` takes it back.
 - **Refused by name**, exit 2, before anything is written: a name with no card, naming the cards there are; a card with no

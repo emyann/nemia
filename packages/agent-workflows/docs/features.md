@@ -2878,15 +2878,16 @@ What the board does with it, an item a commit — §8's apps half, the run after
   other one was drawn over its foot — the floor's cards overlapped by 18 units once the seed filled the grid. `cellsOf` now gives a card
   every row it reaches, since a card is drawn up to a cell tall.
 
-What the board half measured, counted as this file counts them — tests, then passed and skipped: api 208 (from 202), web 256 (from 243),
+What the board half measured, counted as this file counts them — tests, then passed and skipped: api 209 (from 202), web 259 (from 243),
 agent-workflows 575 (574 passed, 1 skipped) and agent-engine 340 (331 passed, 9 skipped) unchanged, no package having been touched.
 `npm run typecheck`, `npm run build` and `npm run e2e` clean, the e2e's pictures read in both themes. New tests: `to-decide.test.ts` in the
 api, on a real repository with every `git` it runs counted — both kinds on the list and on the detail, the `said` that ends with its own
 `command`, the branch merged by hand, the approved ending with nothing left to decide, and no `git` asked of a run still going, one called
 off or a folder whose ending merges; in the web, the floor keeping such a card whatever the switch says and a list from an api that carries
 no `toDecide`, the ending's gate left out of `waiting on you` twice over (`onYouOf`, `needsOf`), the to-decide banner in both kinds,
-`actsOnly`, the panel's standing and stat and the work's closeout, the ending's gate wording with its send-back named, and a card dropped
-between two rows.
+`endsTheRun` and the gate's word for where it holds, the panel's standing and stat and the work's closeout, the ending's gate wording with
+its send-back named, the words it takes and the step each is about (`takenOf`), the ending that waits on nothing being offered no send-back,
+`workspace` among a step's facts, and a card dropped between two rows.
 
 What it leaves:
 

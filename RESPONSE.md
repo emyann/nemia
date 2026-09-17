@@ -45,16 +45,22 @@ reading on the board. features.md's leaves say so.
 
 ## Round 2
 
-Review's five findings: four fixed — the approve box's placeholder at an ending's gate (the words are
-the terms that step acts on, which is what its brief is handed, not something passed to steps after
-it); the panel shown the moment a word is taken (it named the ending for a try filed for the work, and
-told an approval it files what waits on it, where nothing does — `takenOf`); an ending that waits on
-nothing, which was offered a send-back the package refuses, and now gets the approval alone as
-`wf ls`'s gate note prints it; and the gate's facts row, which said "holds once it has signed off" of a
-step that never signs off before its gate — the run's detail now carries `workspace` on a step's spec,
-which is what tells such a gate from §6's, and `gateWord` says where it really holds. The fifth, the
-`git` on the polled list, is narrowed as above rather than left for a person: the design call that
-remains is the package's batching, not the board's.
+All five of review's findings are fixed; none was wrong. Four were the ending's gate saying something
+that is not true of it, and every one of them is a sentence a person reads while deciding a merge:
+
+- the approve box said the words go to the steps after the gate. Nothing follows an ending, and its own
+  brief is handed them as the terms it acts on (`approvedSection`);
+- the panel shown the moment a word is taken named the gated step for a try filed for the work, and told
+  an approval it files what waits on it, where nothing does (`takenOf`, tested on its own);
+- an ending that waits on nothing was offered a send-back the package refuses. Such a folder does load
+  — one step, `workspace: main`, `gate: true`, and `sendBackTo` is empty — so the form is gone and the
+  approval is the only word, as `wf ls`'s gate note prints it;
+- the facts row said the gate "holds once it has signed off" of a step that never signs off before its
+  gate. The run's detail now carries `workspace` on a step's spec, which is the only thing that tells
+  such a gate from §6's — the two read the same off a step's record — and `gateWord` says where it holds.
+
+The fifth, the `git` on the polled list, is narrowed above rather than left for a person: what remains
+is the package's batching, beside the judgement it belongs to.
 
 ## What I left
 

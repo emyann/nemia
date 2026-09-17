@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useQueries, useQuery } from '@tanstack/react-query';
-import { createLink } from '@tanstack/react-router';
 import {
   applyNodeChanges,
   Background,
@@ -19,6 +18,7 @@ import {
 import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { routeLink } from '@/components/routeLink';
 import { ceilingsQuery, inboxQuery, runQuery, type RunDetail, type RunSummary } from '@/lib/api';
 import { forgetFactoryLayout, forgetFactoryOpen, readFactoryLayout, readFactoryOpen, saveFactoryLayout, saveFactoryOpen } from '@/lib/canvas';
 import {
@@ -562,8 +562,8 @@ function CapLine({ queued, queueError }: { queued: number; queueError: Error | n
   );
 }
 
-/** A button that is a link to a route: React Aria's link in the button's look, given the router's typed `to` and its click. */
-const RouterLinkButton = createLink(LinkButton);
+/** A button that is a link to a route: React Aria's link in the button's look, given the router's `to` and its preloading. */
+const RouterLinkButton = routeLink(LinkButton);
 
 /** Nothing on the floor: say so, where the runs are, and that the queue beside it starts on its own. */
 function Empty({ anyRuns, queued }: { anyRuns: boolean; queued: number }) {

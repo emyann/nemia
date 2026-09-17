@@ -2809,7 +2809,8 @@ What was built, four commits:
   asks — including what that pass has already filed — so the order a pass takes the runs in decides nothing, and a restart changes nothing.
   `assess`, `listing` and `decision` take the hold as they take a run slot. A step holds the checkout while the engine holds its task in
   flight, as `inFlight` counts one: a task the engine has lost holds nothing, since a run nobody can stop must not hold every other run's
-  ending for ever. Found by the review, round 4.
+  ending for ever — but a run somebody called off holds it until the engine has settled its session, which is still merging in that
+  directory between `wf cancel` asking and the engine stopping it. Found by the review, round 4.
 - **An ending step's brief carries one way of handing a file over, not two** (`artifactsContract`). Its workspace is the person's checkout:
   `handOffDue` skips such a step, so nothing it leaves there is collected or committed, and a file left lying makes the next run's ship read
   `git status --porcelain` as dirty and sign off blocked. It is told the artifacts directory and nothing else — no *leave it in this

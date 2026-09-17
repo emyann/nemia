@@ -19,7 +19,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, approve, decide, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
+const { advance, approve, cancel, decide, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -260,6 +260,23 @@ test("a try of an ending step waits for the checkout as its first filing does: a
   const tried = await advance(e, readRun(second.id));
   assert.deepEqual(tried.tried, ['ship']);
   assert.equal(readRun(second.id).steps.ship!.workspace, repo);
+});
+
+test("a cancelled run holds the checkout while its ending's session is still in it: `wf cancel` asks the engine to stop it, and it is still merging until it has", async () => {
+  const { repo, first, second, e, settle, tasks } = await twoApproved();
+  await advance(e, readRun(second.id));
+  assert.equal(tasks.get(`${second.id}-ship`)!.phase, 'pending', 'its session is in the checkout');
+
+  // Called off: the engine is asked to stop it, and until it has settled that agent is still mid `git merge` in that directory.
+  const { plan } = await cancel(e, second.id);
+  assert.deepEqual(plan.kind === 'cancel' ? plan.stop.map((x) => x.name) : [], ['ship']);
+  assert.deepEqual((await advance(e, readRun(first.id))).filed, [], 'so the other run files nothing into it');
+  assert.equal((await list(e, readRun(first.id))).steps.find((s) => s.name === 'ship')!.status, `waiting for the checkout (${second.id}'s ship has it)`);
+
+  // Settled `stopped`, a tick or two later: the checkout is free, and the next pass takes it.
+  settle(`${second.id}-ship`, 'stopped');
+  assert.deepEqual((await advance(e, readRun(first.id))).filed, ['ship']);
+  assert.equal(readRun(first.id).steps.ship!.workspace, repo);
 });
 
 test("a `workspace: main` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever", async () => {

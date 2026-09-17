@@ -29,7 +29,7 @@ export function KeyTable({ rows, note }: { rows: readonly KeyRow[]; note?: React
                 <th scope="row" className={cn('w-36 px-3 py-1.5 font-mono text-xs font-medium', value === null && 'text-neutral-500')}>
                   {key}
                 </th>
-                <td data-value className="w-1/3 px-3 py-1.5 font-mono text-xs break-all">
+                <td data-value className="w-56 px-3 py-1.5 font-mono text-xs break-all">
                   {value ?? <span className="font-sans text-neutral-400 dark:text-neutral-500">not set</span>}
                 </td>
                 <td data-meaning className={cn('px-3 py-1.5 text-xs', value === null ? 'text-neutral-500' : 'text-neutral-700 dark:text-neutral-300')}>

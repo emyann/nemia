@@ -215,13 +215,13 @@ function CardItem({ entry, refusal, onRefused }: {
           {/* Its title opens its page: the body rendered and its keys explained — for an entry that does not read too, with its file as written. */}
           {entry.error === null ? (
             <p data-title className="font-medium break-words">
-              <Link to="/inbox/$name" params={{ name: entry.name }} className="underline-offset-2 hover:underline">
+              <Link to="/inbox/$name" params={{ name: entry.name }} className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600">
                 {entry.title}
               </Link>
             </p>
           ) : (
             <p className="font-mono text-sm break-all">
-              <Link to="/inbox/$name" params={{ name: entry.name }} className="underline-offset-2 hover:underline">
+              <Link to="/inbox/$name" params={{ name: entry.name }} className="underline decoration-neutral-300 underline-offset-4 hover:decoration-current dark:decoration-neutral-600">
                 {entry.file}
               </Link>
             </p>

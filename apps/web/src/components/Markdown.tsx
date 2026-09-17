@@ -66,7 +66,7 @@ const COMPONENTS: Components = {
     return <CodeBlock code={code} language={languageOf(className)} className="my-3 text-[13px]" />;
   },
   code: ({ node: _node, className, ...props }) => (
-    <code className={cn('rounded bg-neutral-100 px-1 py-px font-mono text-[0.9em] dark:bg-neutral-800', className)} {...props} />
+    <code className={cn('box-decoration-clone rounded bg-neutral-100 px-1 py-px font-mono text-[0.9em] dark:bg-neutral-800', className)} {...props} />
   ),
   h1: heading('h1'),
   h2: heading('h2'),
@@ -98,7 +98,7 @@ const COMPONENTS: Components = {
   hr: ({ node: _node, className, ...props }) => <hr className={cn('my-4 border-neutral-200 dark:border-neutral-800', className)} {...props} />,
   table: ({ node: _node, className, ...props }) => (
     <div className="my-3 max-w-full overflow-x-auto">
-      <table className={cn('w-max min-w-full border-collapse text-left text-[0.95em]', className)} {...props} />
+      <table className={cn('w-max border-collapse text-left text-[0.95em]', className)} {...props} />
     </div>
   ),
   th: ({ node: _node, className, ...props }) => (

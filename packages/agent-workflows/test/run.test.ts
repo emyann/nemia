@@ -3402,3 +3402,11 @@ test('REFUSED at an ending gate: `wf rm` holds the run and `wf cancel` calls it 
   assert.match(String(forgetRefusal(ENDS, atEnd(), DONE, [], signedDone, asked)), /ship waits at its gate for your approval, and what waits on it is filed once it is approved: wf approve r-1 ship/);
   assert.deepEqual(cancelPlan(ENDS, atEnd(), DONE, signedDone, asked), { kind: 'cancel', stop: [] });
 });
+
+test('a run called off holds no ending gate: nothing files it, so its ending reads as the waiting step it is', () => {
+  const off = atEnd({ cancelledAt: '2026-09-17T10:00:00.000Z' });
+  assert.equal(stepStatus(SHIP, off, DONE, signedDone, asked, ENDS), 'waiting');
+  const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
+  const l = listing(ENDS, off, shownAs({ t1: 'succeeded', t2: 'succeeded' }), signedDone, asked);
+  assert.deepEqual([l.steps[2]!.status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
+});

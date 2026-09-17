@@ -404,7 +404,8 @@ function waitsAtGate(
   step: Workflow, run: Run, phaseOf: (taskId: string) => TaskPhase, closeoutOf: (step: string) => Closeout | undefined,
   askedCloseout: (taskId: string) => CloseoutAsked, steps: readonly Workflow[], spendOf: SpendOf, verdictOf: (step: string) => Verdict | undefined,
 ): boolean {
-  if (!approvedFirst(step, run) || run.steps[step.name]?.taskId || approvalOf(run, step.name)) return false;
+  // A cancelled run files nothing, so no gate of its holds anything: its unfiled steps read as the waiting steps they are.
+  if (run.cancelledAt || !approvedFirst(step, run) || run.steps[step.name]?.taskId || approvalOf(run, step.name)) return false;
   return step.after.every((name) => {
     const dep = steps.find((s) => s.name === name);
     if (!dep) return false;

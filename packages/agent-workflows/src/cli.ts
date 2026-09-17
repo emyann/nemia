@@ -757,8 +757,12 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // Beside how each ended on its own work, above: why each is held — its own spend, or a step its loop would file again.
       if (overBudgetLine) console.log(`  ${overBudgetLine}`);
       if (decision.budgetExhausted.length) console.log(`  BUDGET EXHAUSTED, waiting on you: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`);
-      // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the send-back.
-      if (decision.awaitingApproval.length) console.log(`  AWAITING APPROVAL, waiting on you: ${decision.awaitingApproval.join(', ')}  — signed off at its gate; nothing after it is filed until you approve it, or send it back`);
+      // A gate is a person's word the run waits for: what the step handed on is below, with the approval that lets it go on and the
+      // send-back. An ending step is held before it is filed, so it has handed nothing on: its approval is what runs it.
+      const handedOn = decision.awaitingApproval.filter((name) => run.steps[name]?.taskId);
+      const unrun = decision.awaitingApproval.filter((name) => !run.steps[name]?.taskId);
+      if (handedOn.length) console.log(`  AWAITING APPROVAL, waiting on you: ${handedOn.join(', ')}  — signed off at its gate; nothing after it is filed until you approve it, or send it back`);
+      if (unrun.length) console.log(`  AWAITING APPROVAL, waiting on you: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run, and your approval is what runs it`);
       if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
       // What a person can do about a step short of starting over: try it again, or a loop once more, the way that fits why it stopped.
       if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);

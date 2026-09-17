@@ -439,7 +439,7 @@ test("a folder whose last step is an ending: `wf decide` says what that step wou
   assert.equal(record.steps.ship!.taskId, null, 'nothing of the ending is filed without a person');
 
   const lines = await screen(t, e, run.id);
-  indexOf(lines, '  AWAITING APPROVAL, waiting on you: ship  — signed off at its gate; nothing after it is filed until you approve it, or send it back');
+  indexOf(lines, "  AWAITING APPROVAL, waiting on you: ship  — this workflow's ending, at its gate: nothing of it has run, and your approval is what runs it");
   indexOf(lines, `  branch    ${branch} is ahead of main by 1 commit`);
   const decide = indexOf(lines, "  to decide  ship has not run: this workflow's ending, and your approval is what runs it:");
   assert.deepEqual(lines.slice(decide + 1, decide + 5), [

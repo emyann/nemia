@@ -29,13 +29,42 @@ function Runs() {
     );
   }
 
+  // The runs still going on top, then the rest, each newest first (`inFlightFirst`): the api lists them by id. Under a heading each, in
+  // the Factory's words and counts, since no row says whether its run is in flight: without one, the first finished row, newer than the
+  // last in flight, reads as a sort gone wrong.
+  const ordered = inFlightFirst(runs);
+  const flying = ordered.filter((run) => inFlight(run));
+  const finished = ordered.filter((run) => !inFlight(run));
+
   return (
-    // The runs still going on top, then the rest, each newest first (`inFlightFirst`): the api lists them by id.
-    <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
-      {inFlightFirst(runs).map((run) => (
-        <RunRow key={run.id} run={run} />
-      ))}
-    </ul>
+    <article className="space-y-8">
+      {flying.length > 0 && <RunGroup group="in-flight" title="In flight" about="something of each still moves" runs={flying} />}
+      {finished.length > 0 && <RunGroup group="finished" title="Finished" about="nothing of these moves any more" runs={finished} />}
+    </article>
+  );
+}
+
+/**
+ * One group of rows, under a heading that says how many, what the group is and its order, and how many of them wait on you — in either
+ * group: a run whose check refused while a sibling's session still works is in flight, and waits on you.
+ */
+function RunGroup({ group, title, about, runs }: { group: string; title: string; about: string; runs: RunSummary[] }) {
+  const waiting = runs.filter(waitsOnYou).length;
+  return (
+    <section aria-label={title} data-group={group} className="space-y-1">
+      <h2 className="flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
+        {title} <span data-count className="text-xs font-normal text-neutral-500">{runs.length}</span>
+        <span className="text-xs font-normal text-neutral-500">
+          {about}, newest first
+          {waiting > 0 && <span className="text-amber-600"> · {waiting} waiting on you</span>}
+        </span>
+      </h2>
+      <ul className="divide-y divide-neutral-200 dark:divide-neutral-800">
+        {runs.map((run) => (
+          <RunRow key={run.id} run={run} />
+        ))}
+      </ul>
+    </section>
   );
 }
 

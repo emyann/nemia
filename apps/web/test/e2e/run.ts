@@ -334,7 +334,19 @@ const PAGES: PageSpec[] = [
       // The runs in flight on top, then the rest, each newest first; in flight as the Factory counts them, which the api's id order is not.
       const rows = page.locator('li[data-in-flight]');
       await expectCount(rows, 11, 'the runs list has a row for each of the eleven runs the Factory counts');
-      await expectCount(page.locator('li[data-in-flight="true"]'), 4, 'four rows are in flight, as the Factory counts them');
+      // Under a heading each, which says where the runs in flight end: the first finished row is newer than the last in flight.
+      const flying = page.locator('section[data-group="in-flight"]');
+      const finished = page.locator('section[data-group="finished"]');
+      await expectCount(flying.locator('li[data-in-flight="true"]'), 4, 'the four runs in flight, as the Factory counts them, are under In flight');
+      await expectCount(flying.locator('li[data-in-flight="false"]'), 0, 'and no finished run is');
+      await expectCount(finished.locator('li[data-in-flight="false"]'), 7, 'the seven finished runs are under Finished');
+      await expectCount(finished.locator('li[data-in-flight="true"]'), 0, 'and no run in flight is');
+      await expectVisible(flying.getByRole('heading', { name: /^In flight 4 something of each still moves, newest first$/ }), 'In flight is headed with its count and its order');
+      await expectVisible(
+        finished.getByRole('heading', { name: /^Finished 7 nothing of these moves any more, newest first · 4 waiting on you$/ }),
+        'Finished is headed with its count, its order, and how many of them wait on you, as the Factory counts them',
+      );
+      await expectBeneath(finished, flying, 'the finished runs are listed beneath the runs in flight');
       const listed = await rows.evaluateAll((lis) => lis.map((li) => ({
         id: li.querySelector('a[href^="/runs/"]')?.getAttribute('href')?.slice('/runs/'.length) ?? '',
         inFlight: li.getAttribute('data-in-flight') === 'true',

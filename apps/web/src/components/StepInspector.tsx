@@ -9,7 +9,7 @@ import { cn } from '../lib/utils';
 import { Rounds, TryCloseouts, tryLabel } from './Closeout';
 import { Check, code, Facts, specRows, spentRows, Told, when } from './Facts';
 
-// Loaded when the Activity tab is first opened: markdown and the scroller weigh more than the canvas the inspector sits beside.
+// Loaded when the Activity tab is first opened: the scroller and the tool views are not needed to read the canvas the inspector sits beside.
 const Conversation = lazy(() => import('./conversation/Conversation').then((m) => ({ default: m.Conversation })));
 import { StatusChip, StepNote } from './StatusChip';
 

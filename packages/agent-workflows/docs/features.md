@@ -2004,6 +2004,53 @@ with another, and implement builds that one.
 
 One `dev-planned-build` run: the plan is the study.
 
+## 6. A gate: a step's handoff that waits for a person
+
+**Registered** 2026-09-16, by the operator: a card, then a plan, then a person reads the plan before anyone implements
+it — and the same pause placeable in any workflow. Asked as a design question: is the gate the handoff, or a step of
+its own that could go anywhere?
+
+**What exists.** `dev-planned`'s plan step pauses by prose: a brief that says to wait for approval makes it sign off
+`blocked` with the plan in `needs`, and a person answers with `wf retry --message` or the run page's answer box. Nothing
+in the machinery holds it — a plan that signs off `done` lets implement start — and approving costs a try, since the
+answer continues the agent's session so it can sign off again. The plan's §5 "no mid-run human gate; the run boundary
+is the gate" predates the inbox and the board's answer box. A run already has one state a person owns, *waiting on
+you*, with an ask file behind it and a box on the board; that state has three reasons today (blocked, unsigned, over
+budget).
+
+**The shape: the handoff is the gate.** Argo Workflows made suspension a step (`suspend`), Tekton a custom task; here a
+step is a session on a harness, and a person is not a harness — a gate step would need a runner whose "session" is a file
+that fills when someone answers, and a step whose body nobody writes. The handoff already has everything a gate needs.
+
+**What it needs.**
+
+- **`gate: true` on a step** — this step's closeout waits for a person before anything after it is filed. It composes
+  with `check:`: verified first, then held. **And `wf start --gate <step>`**, or `gate:` on an inbox card naming a step,
+  for a run gated at a step its folder does not gate. Both freeze into one field on the record, `gates`, read by `assess`;
+  a step named that the workflow does not have is refused at start.
+- **Held by the tick, level-triggered.** A gated step that signed off reads `awaiting approval`; nothing after it is
+  filed on any pass until an approval is on disk, whatever the agent wrote. No session runs and no budget is spent while
+  it waits. `wf ls`: `waiting on you: approve plan`; the run's outcome is `blocked` for `--after` and the Factory.
+- **`wf approve <run> <step> [--message "<words>"]`** writes `runs/<id>.asks/approve-<step>` beside the retry asks — one
+  writer, composed on read — with the time and the words; refused for a step that is not gated, not signed off, or
+  already approved. Sending back is `wf retry <run> <step> --message`, as today: the session continues with the
+  objection, signs off again, and the gate holds again; an approval given before the send-back is spent by it.
+- **What the next step is told.** The approval and its words reach every step after the gate as data, `## Approved`
+  under the brief, as a parent run's closeout does (`## From run <id>`): a person's decision on the record, read by the
+  implementer and by the reviewer after.
+- **`wf decide`** prints the gate under the step (`approved 23:10Z — "ship the second reading"`), and a run cancelled
+  while gated is cancelled as any run is. `wf rm` refuses a run at a gate: something is due to be asked for.
+- **Board.** The Factory's card says `approve plan`; the run page shows the gated step's closeout — rendered, once §5
+  lands — with Approve (a box for the words) and Send back (the answer box that exists); `POST …/approve`, the seventh
+  guarded write. From a phone once Remote Control (§2) lands.
+- **`dev-planned` and `dev-planned-build`** put `gate: true` on `plan`? No: a folder decides for every run of it, and a
+  plan that reads one way should start implement at once. Keep the folders as they are and let the card or the start
+  say `--gate plan`; a `dev-gated` folder is not needed.
+
+One agent-workflows run (the key, the record field, `assess`, the verb, the brief section, README, tests that refuse:
+a gated step's dependents never filed without the file, an approval for the wrong step refused, a send-back spending
+the approval) — about $40; then one apps run (the button, the card's need, the e2e) — about $30.
+
 ## Engine-side work
 
 Not agent-workflows features, listed so nothing is lost:

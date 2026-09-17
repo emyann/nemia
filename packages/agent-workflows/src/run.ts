@@ -2728,8 +2728,23 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  * Both ways are said, because not every step can use the first: Codex in `workspace-write` writes only its
  * worktree, and the engine gives it no other directory. A file named from the workspace root is collected into
  * the directory at hand-off, before the check (`collectArtifacts` in runner.ts), so such a step hands it over too.
+ *
+ * `main` is a step whose workspace is the repository's own checkout (`workspace: main`), which is told the first way only: `handOffDue`
+ * skips such a step, so nothing it leaves there is collected or committed — a file it named from the workspace root would reach nobody,
+ * and one left lying makes the next run's ending read the checkout as dirty and sign off blocked.
  */
-export const artifactsContract = (dir: string): string => [
+export const artifactsContract = (dir: string, main = false): string => (main ? [
+  '', '## Files for the person who decides', '',
+  'A screenshot, a log or a report reaches the person who decides in one way.',
+  '',
+  `- Put it in \`${dir}\`, and name it in \`artifacts\` by absolute path. The run made that directory for`,
+  '  this step, outside every workspace, and what is in it is what reaches them.',
+  '',
+  "You are in the repository's own checkout, not a workspace of this run's: the run collects nothing from it and commits nothing",
+  'in it. A file you leave there reaches nobody — named in `artifacts` from the workspace root it reads `not collected` — and one left',
+  "behind is what the next run's ending reads as a dirty checkout. Leave it as you found it. Refused, and not read: an absolute path",
+  'anywhere else. A directory is not collected, nor a file that is not there: name each file.',
+].join('\n') : [
   '', '## Files for the steps after you', '',
   'A screenshot, a log or a report reaches the steps after you and the person who decides in either of two ways.',
   '',
@@ -2743,7 +2758,7 @@ export const artifactsContract = (dir: string): string => [
   "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
   'path anywhere else, and a path that climbs out of the workspace with `..`. A directory is not collected, nor a',
   'file that is not there: name each file.',
-].join('\n');
+].join('\n'));
 
 /**
  * Where a declared artifact is looked for. Pure: it reads the path, never the disk.
@@ -3258,7 +3273,7 @@ export function composeBrief(
   // round answers the findings it was handed, filed as the round or tried again within it.
   const contracts = [
     ...(step.check ? [checkContract(step.check)] : []),
-    ...(artifactsDir ? [artifactsContract(artifactsDir)] : []),
+    ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main')] : []),
     closeoutContract(step, Boolean(round) || owesReplies(steps, run, step.name)),
   ].join('\n');
   const again = retry ? retrySection(step, retry) + retriedInRound(step, run, steps, retry, closeoutOf)

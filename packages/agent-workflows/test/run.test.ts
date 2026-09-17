@@ -3375,6 +3375,21 @@ test("`to decide` in a folder with no ending step: a finished run whose branch i
     { kind: 'approve', step: 'ship', says: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit." });
 });
 
+test("an ending step's brief carries one way of handing a file over, not two: the run collects nothing from the repository's own checkout, and commits nothing there", () => {
+  const ending = composeBrief(SHIP, atEnd(), ENDS, undefined, FILES);
+  assert.ok(ending.includes('\n## Files for the person who decides\n'), ending);
+  assert.ok(ending.includes(`- Put it in \`${FILES}\`, and name it in \`artifacts\` by absolute path.`), ending);
+  assert.doesNotMatch(ending, /Or leave it in this workspace/, 'the run hands nothing off in that checkout (`handOffDue`)');
+  assert.match(ending, /A file you leave there reaches nobody — named in `artifacts` from the workspace root it reads `not collected`/);
+  assert.match(ending, /one left\nbehind is what the next run's ending reads as a dirty checkout\. Leave it as you found it\./);
+  assert.doesNotMatch(ending, /WF_ARTIFACTS/, 'and it runs no check of the run\'s, so there is none to name');
+  // Every other step is told both ways, as it was: its workspace is the run's, and what it leaves there is collected and committed.
+  const work = composeBrief(ENDS[1]!, atEnd(), ENDS, undefined, FILES);
+  assert.ok(work.includes('\n## Files for the steps after you\n'), work);
+  assert.ok(work.includes('- Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root'), work);
+  assert.doesNotMatch(work, /## Files for the person who decides/);
+});
+
 test('`branchWord`: where a result branch stands against the base branch, for a person', () => {
   const r = finished();
   assert.equal(branchWord(r, { branch: 'wf/r-1/implement', where: 'on' }), 'wf/r-1/implement is on main');

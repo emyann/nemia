@@ -1133,6 +1133,8 @@ dropped. **Nothing in the packages knows what shipping means.**
   its check itself, in its prose — on a step with a `resume:`, whose session ran in another directory — and, at
   load, on a step anything waits on or one that ends a workflow beside another: a run has one ending. A run of
   such a folder started `--no-worktree` is refused too: it has no result branch to merge.
+  Its brief carries one way of handing a file over rather than the usual two: what it leaves in that checkout is collected by nobody, so
+  it is told the run's artifacts directory, and that the checkout is to be left as it was found.
 - **The gate is the decision, and it holds before the step is filed.** A gate holds what its approval decides.
   Where steps follow, that is the handoff, and the step runs first — a person reads what it produced. An
   ending step in the checkout produces nothing to read: it acts, where nothing can be taken back. So a gated

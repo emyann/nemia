@@ -125,6 +125,12 @@ function filingOf(body: unknown, repo: string, home: string): { text: string; wo
   return { ...filing, workflow: byName ? workflow : folder.dir };
 }
 
+/**
+ * The cards a sentence about a card not there names, as the package's does (`wf inbox rm`, a start): every `.md` file, read as a card or
+ * not — never a stray file or a folder, which no name reaches as a card.
+ */
+const cardsIn = (entries: readonly InboxEntry[]): string[] => entries.filter((e) => e.file.endsWith('.md')).map((e) => e.name);
+
 export const inbox = new Hono()
   // The cards, and every entry of the folder that does not read as one, with why: never hidden, as a workflow that does not load is not.
   .get('/api/inbox', (c) => {
@@ -147,15 +153,15 @@ export const inbox = new Hono()
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);
     }
-    const entry = entries.find((e) => e.name === name);
-    const missing = () => c.json({ error: noCardLine(name, entries.filter((e) => e !== entry).map((e) => e.name)) }, 404);
-    if (!entry) return missing();
+    // A card before a stray file of the same name: `notes.md` and `notes` both list as `notes`.
+    const entry = entries.find((e) => e.name === name && e.file.endsWith('.md')) ?? entries.find((e) => e.name === name);
+    if (!entry) return c.json({ error: noCardLine(name, cardsIn(entries)) }, 404);
     let source: string;
     try {
       source = fs.readFileSync(path.join(inboxDir(), entry.file), 'utf8');
     } catch {
-      // Dropped since the listing read it.
-      return missing();
+      // Dropped since the listing read it: not among the cards the sentence names.
+      return c.json({ error: noCardLine(name, cardsIn(entries.filter((e) => e !== entry))) }, 404);
     }
     const keys = entry.error === null ? INBOX_KEYS.map((key) => ({ key, value: entry[key], meaning: INBOX_KEY_MEANINGS[key] })) : null;
     return c.json({ ...entry, source, keys } satisfies InboxCardPage);

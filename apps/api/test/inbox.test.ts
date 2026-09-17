@@ -202,6 +202,35 @@ test("REFUSED at shipped defaults: a card's page for a name that is not a card's
   fs.rmSync(path.join(root, 'runs'), { recursive: true, force: true });
 });
 
+test("REFUSED at shipped defaults: a card's page for a name that is not there, in an inbox holding more than cards, names the cards as the package does — a card that does not read among them, a stray file and a folder not — and a card is found before a stray file of its name", async () => {
+  clear();
+  const { card } = addToInbox({ text: 'Keep this one' });
+  write(path.join(inbox, 'broken.md'), '---\ncolour: red\n---\nPaint it.\n');
+  write(path.join(inbox, 'notes.txt'), 'not a card\n');
+  fs.mkdirSync(path.join(inbox, 'sub'));
+  assert.deepEqual((await listed()).map((e) => e.name).sort(), ['broken', card.name, 'notes.txt', 'sub/'].sort(), 'the listing has all four');
+
+  const missing = await cardPage('no-such-card');
+  assert.equal(missing.status, 404);
+  const { error } = await missing.json();
+  // The sentence `wf inbox rm` gives for the same name, word for word: the package's own list of cards.
+  const dropped = await drop('no-such-card');
+  assert.equal(dropped.status, 404);
+  assert.equal(error, (await dropped.json()).error);
+  assert.equal(error, noCardLine('no-such-card', ['broken', card.name]));
+  assert.ok(!error.includes('notes.txt') && !error.includes('sub/'), error);
+
+  // `notes.md` and a stray `notes` both list as `notes`: the page is the card's.
+  write(path.join(inbox, 'notes'), 'a stray file\n');
+  write(path.join(inbox, 'notes.md'), '---\nworkflow: dev\n---\nThe card called notes\n');
+  const notes: InboxCardPage = await (await cardPage('notes')).json();
+  assert.deepEqual([notes.file, notes.body, notes.source, notes.keys?.[0]?.value], ['notes.md', 'The card called notes', '---\nworkflow: dev\n---\nThe card called notes\n', 'dev']);
+  // A stray file with no card of its name has a page all the same: its refusal and its text.
+  const stray: InboxCardPage = await (await cardPage('notes.txt')).json();
+  assert.deepEqual([stray.body, stray.source, stray.keys], [null, 'not a card\n', null]);
+  assert.match(stray.error!, /^notes\.txt: not a card/);
+});
+
 test('REFUSED at shipped defaults: a filing of the wrong shape is a 400 in the api\'s words, a workflow nobody has a 404, one both have a 409 — before anything is written', async () => {
   clear();
   for (const body of ['not json', '[]', '"an idea"']) {

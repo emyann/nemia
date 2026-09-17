@@ -15,10 +15,10 @@ import {
   type Edge,
   type NodeChange,
 } from '@xyflow/react';
+import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { routeLink } from '@/components/routeLink';
 import { ceilingsQuery, inboxQuery, runQuery, type RunDetail, type RunSummary } from '@/lib/api';
 import { forgetFactoryLayout, forgetFactoryOpen, readFactoryLayout, readFactoryOpen, saveFactoryLayout, saveFactoryOpen } from '@/lib/canvas';
 import {

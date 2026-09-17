@@ -281,9 +281,11 @@ export function WorkflowBuilder({ workflow, onClose }: { workflow: WorkflowListi
  * What a save that did not go through says, by what the api answered.
  *
  * A 4xx is the api's judgement of the request — the package's refusal, a body it will not read, a folder changed since (409) — and it writes
- * nothing, so the banner says so. Anything else leaves what the folder holds unknown: a 500 is a write that broke off partway, and a fetch
- * that never landed may have been carried out all the same. Neither says nothing was written, and both offer to read the folder again, as a
- * 409 does — the one way back to what is on disk, since the draft is a folder read at a version the api no longer has.
+ * nothing, so the banner says so. Anything else leaves what the folder holds unknown: a 500 is a write that broke off partway, and an answer
+ * with no status of its own may have been carried out all the same — a fetch that never landed, or one the api answered without what it wrote
+ * (`build` in lib/api.ts), which is why the words for it are what the api did not say rather than that it said nothing. None of them says
+ * nothing was written, and each offers to read the folder again, as a 409 does — the one way back to what is on disk, since the draft is a
+ * folder read at a version the api no longer has.
  */
 export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRefusal; rereading: boolean; onReread: () => void }) {
   const nothingWritten = refusal.status !== null && refusal.status < 500;
@@ -297,7 +299,7 @@ export function SaveRefused({ refusal, rereading, onReread }: { refusal: BuildRe
           </>
         ) : (
           <>
-            Not saved. The folder may have been written all the same: {refusal.status === null ? 'the api did not answer' : `the api broke off (${refusal.status})`},
+            Not saved. The folder may have been written all the same: {refusal.status === null ? 'the api did not say what it wrote' : `the api broke off (${refusal.status})`},
             and what the folder holds is what is on disk:
           </>
         )}

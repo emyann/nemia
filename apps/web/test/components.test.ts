@@ -1636,10 +1636,18 @@ test("REFUSED at shipped defaults: a save the api broke off — a 500 — does n
   assert.equal(broke.reread, true);
 });
 
-test("REFUSED at shipped defaults: a save whose fetch never landed does not say nothing was written; it says the folder may have been, names no status, and offers to read it again", async () => {
+test("REFUSED at shipped defaults: a save with no status — a fetch that never landed, and an answer without what it wrote — does not say nothing was written; it says the folder may have been, names no status, and offers to read it again", async () => {
+  const said = 'Not saved. The folder may have been written all the same: the api did not say what it wrote, and what the folder holds is what is on disk:';
   const lost = await refusedMarkup('Failed to fetch', [], null);
-  assert.equal(lost.head, 'Not saved. The folder may have been written all the same: the api did not answer, and what the folder holds is what is on disk:');
+  assert.equal(lost.head, said);
   assert.doesNotMatch(lost.head, /nothing written/, 'the api may have carried the write out and died before answering');
   assert.equal(lost.said, 'Failed to fetch');
   assert.equal(lost.reread, true);
+
+  // The other refusal with no status of its own (`build` in lib/api.ts): the api answered, and not with what it wrote. The head says what it
+  // did not say, not that it said nothing, which its own message would contradict on the line below.
+  const shapeless = await refusedMarkup('PUT /api/workflows/yours/mine answered 200 OK without what it wrote, so the api and this board disagree about what a write answers.', [], null);
+  assert.equal(shapeless.head, said);
+  assert.doesNotMatch(shapeless.head, /did not answer/, 'it answered: 200, without what it wrote');
+  assert.equal(shapeless.reread, true);
 });

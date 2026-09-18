@@ -252,8 +252,12 @@ export const gateWord = (gate: StepGate, ends = false): string =>
 /**
  * A gated step's approval, under the step: the try approved, when, and the words given with it, as the person wrote them — what every step
  * after the gate is handed under `## Approved`.
+ *
+ * `ends` for the step that ends the run in the checkout (`endsTheRun`): nothing follows its gate, and the package hands the words to that
+ * step itself — the terms it acts on (`approvedSection` in agent-workflows). Its approval is also what filed it, so the sentence says that
+ * and not that something after it was let through.
  */
-export function Approved({ step, approval }: { step: string; approval: StepApproval }) {
+export function Approved({ step, approval, ends = false }: { step: string; approval: StepApproval; ends?: boolean }) {
   return (
     <section
       aria-label={`The approval of ${step}`}
@@ -263,7 +267,10 @@ export function Approved({ step, approval }: { step: string; approval: StepAppro
       <p>
         <span className="font-medium text-emerald-800 dark:text-emerald-300">Approved</span>{' '}
         <span className="text-neutral-600 dark:text-neutral-400">
-          try {approval.try}, {when(approval.at)} — every step after the gate is handed {approval.message === null ? 'the approval' : 'these words'}
+          try {approval.try}, {when(approval.at)} —{' '}
+          {ends
+            ? `your approval filed it, and the step is handed ${approval.message === null ? 'it' : 'these words'} as the terms it acts on`
+            : `every step after the gate is handed ${approval.message === null ? 'the approval' : 'these words'}`}
         </span>
       </p>
       {approval.message === null ? (

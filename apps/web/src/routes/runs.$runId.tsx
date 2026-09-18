@@ -184,8 +184,9 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
         handedOn
       )}
 
-      {/* Once approved, under the step: when, and the words every step after the gate is handed. */}
-      {gate?.approval && <Approved step={step.name} approval={gate.approval} />}
+      {/* Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run,
+          what its own approval filed and the terms it acts on. */}
+      {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} />}
     </section>
   );
 }

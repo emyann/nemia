@@ -1212,6 +1212,14 @@ test('the approval under a step: the try, when, and the words as they were writt
   assert.match(html, /<p data-words="true" class="whitespace-pre-wrap break-words">Ship the second reading\.\nKeep the flag &lt;b&gt;off&lt;\/b&gt; by default\.<\/p>/, 'as text, never as markup');
   const none = renderToStaticMarkup(createElement(Gates.Approved, { step: 'plan', approval: { try: 1, at, message: null } }));
   assert.match(none, /<p data-words="none"[^>]*>with no words<\/p>/);
+  // §6's gate lets what follows through; an ending's approval files the step itself, and the words are the terms it acts on.
+  assert.ok(textsOf(html).join(' ').includes('every step after the gate is handed these words'), html);
+  assert.ok(textsOf(none).join(' ').includes('every step after the gate is handed the approval'), none);
+  const ending = renderToStaticMarkup(createElement(Gates.Approved, { step: 'ship', approval: { try: 1, at, message: words }, ends: true }));
+  assert.ok(textsOf(ending).join(' ').includes('your approval filed it, and the step is handed these words as the terms it acts on'), ending);
+  const bare = renderToStaticMarkup(createElement(Gates.Approved, { step: 'ship', approval: { try: 1, at, message: null }, ends: true }));
+  assert.ok(textsOf(bare).join(' ').includes('your approval filed it, and the step is handed it as the terms it acts on'), bare);
+  assert.doesNotMatch(ending, /every step after the gate/);
   assert.deepEqual(
     [Gates.gateWord({ awaiting: true, approval: null }), Gates.gateWord({ awaiting: false, approval: { try: 1, at, message: null } }), Gates.gateWord({ awaiting: false, approval: null })],
     ['awaiting approval', 'approved, try 1', 'holds once it has signed off'],

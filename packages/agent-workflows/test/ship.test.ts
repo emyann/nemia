@@ -269,6 +269,7 @@ test("two runs' ending steps never work in one checkout at once: the oldest appr
   const one = await advance(e, readRun(first.id));
   const two = await advance(e, readRun(second.id));
   assert.deepEqual([one.filed, two.filed], [[], ['ship']], 'one ending, in one checkout');
+  assert.equal(one.inFlight, true, 'and the run held back is in flight all the same: its ending is approved, and a directory is what it waits for');
   assert.equal(readRun(first.id).steps.ship!.taskId, null);
   assert.equal(readRun(second.id).steps.ship!.workspace, repo, "and the one that was filed is in the repository's own checkout");
 

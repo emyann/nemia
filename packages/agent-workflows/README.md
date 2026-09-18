@@ -1157,7 +1157,9 @@ dropped. **Nothing in the packages knows what shipping means.**
   main` task of any run on the same repository is in flight, **nothing of another is filed** — not a first
   session, and not the try a person asks for after one ended blocked, which works in that same directory. It
   reads `waiting on the checkout (<run>'s ship has it)` on `wf ls`, on its own line or beside the try it is
-  waiting to take, and `wf decide` says which run's step has it. A claim on that checkout is a promise that the
+  waiting to take, and `wf decide` says which run's step has it. Such a run is running, not waiting on anybody:
+  the word that files its ending is given, so `wf decide` reads it as still running, nothing is `→ waiting on
+  you`, and it keeps counting against the cap on runs in flight. A claim on that checkout is a promise that the
   pass would file the step, so a run whose ending it would not file claims nothing and holds nobody: one whose
   work is being sent back, one waiting on a run that has not shipped, and one the cap on runs in flight holds —
   the last two reachable where a folder's one step merges, which makes its ending its root. With nothing in the
@@ -1173,7 +1175,10 @@ dropped. **Nothing in the packages knows what shipping means.**
   (approving that one accepts what it did) — or, where no step of the workflow merges, when every step
   finished and a result branch is ahead of the base branch and not gone. Level-triggered: the branches are
   read off git on the pass that asks and nothing is stored, so a run whose branch a person merged by hand
-  stops being one to decide without anybody telling the run. A run whose work is going round again, or whose
+  stops being one to decide without anybody telling the run. That holds at an ending's gate too: an ending
+  that has not run, whose result git already has on the base branch, has nothing left to merge — nothing is to
+  decide, its line on `wf ls` says where the branch stands and names `wf cancel <run>` to close the record, and
+  `wf approve <run> ship` is refused in those words. A run whose work is going round again, or whose
   work a person has just sent back, has nothing to decide: the gate holds on what the work says, and the work
   is being said again.
 - **`--no-worktree` is refused** on a workflow whose last step merges: such a run works on the base branch
@@ -1280,7 +1285,7 @@ workspace: main       # the repository's own checkout: it reads the store and th
 slot: none            # not one of the runs the cap holds — it watches them
 harness: claude
 remote: true          # bridged to claude.ai, so the person it asks can answer from a phone
-disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger
+disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git checkout:*), …
 ---
 Watch this repository's runs, and put what needs a person in front of the person.
 ```
@@ -1292,6 +1297,15 @@ and the last step's file, which say what *that* workflow's ending is — then `w
 screenshots through the look skill, and prepares the brief a person decides from. **It decides nothing
 itself, and it never types git for a run**: on a yes it says `wf approve <run> <step>`, and the run's own
 ending step does the shipping, in its folder's words, with the person's words on its brief.
+
+**Its `disallow:` denies that git by name**, because a sentence in its brief is not a constraint: `git merge`,
+`checkout`, `switch`, `rebase`, `reset`, `stash`, `cherry-pick`, `revert`, `clean` and `push`, as `Bash(git
+merge:*)` rules. The refusal has to live on the step. `.claude/settings.json` holds `git push` and `git branch
+-D` for every session in the checkout, but it cannot hold `git merge`: `ship.md` runs in the same checkout,
+and merging is its whole job. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
+`git status`, `git log`, `git diff` — is not denied. A deny is a prefix, not a sandbox (`git -C <dir> merge`
+is not `git merge`): it stops a command that should not have been typed, and `supervisor.test.ts` fails when
+one of those rules leaves the folder.
 
 **How to start it**, once, and leave it running:
 

@@ -2917,6 +2917,14 @@ What it leaves:
   --no-ff` and `git branch -D` for every finished run, where `wf decide` prints them only for a folder with no ending step (`merges`): a
   folder that says what shipping is does not also tell a person to type it. Found by the review, round 4, and left: it is the api's, and
   belongs with the board half above.
+- **The board cannot show the checkout hold yet.** It calls `listing`, `assess` and `decision` with no checkout (`apps/api/src/app.ts`), so
+  an ending held for the checkout draws as plain `waiting` — and a held try as one the next tick files — where `wf ls` says `waiting on the
+  checkout (<run>'s ship has it)`.
+- **An open question, not designed: a merge conflict at the end of a run whose rounds are spent.** `ship.md` aborts a trial merge that
+  conflicts and signs off `blocked`, naming the paths, because "resolving a merge is the work's job, not this step's". But once ship has run,
+  the send-back from its gate goes to ship itself (`sendBackTo`), the work's steps are verified and have nothing to try again, and a loop that
+  handed on is over (`roundAsk`): a run whose rounds are spent has no step left to give the conflict to. Today a person resolves it by hand
+  or starts a new run. Which step should own it — the ending, the work re-opened, a step of its own — is the question; nothing here answers it.
 
 What the board's run should call:
 
@@ -3038,6 +3046,9 @@ What it leaves:
   one is the supervisor". `apps/web`'s builder cannot set `slot:`, as it cannot set `workspace:` — its mirror of `WorkflowStepSpec`
   carries neither — though a folder that has the key rides a round trip. The api reads the key (`specOf`) and counts the cap with the
   run's steps in hand, so its numbers agree with the tick's.
+- **The board draws a supervisor at rest as a failed run.** A supervisor waiting for its person is a step signed off `blocked`, which stops
+  what follows, so `assess` puts its run at `failed`, and the board's `RunStatus` draws the healthy state of this workflow — asking, and
+  waiting to be answered — in the colour of a run that broke.
 - **A queued inbox card of such a workflow still waits for a free slot.** The queue starts one card a pass while a slot is free,
   whatever workflow the card names, and `startQueued` is not given the folder's steps. Start the supervisor by hand, as its README says.
 - **`--no-worktree` is refused for it**, because its step says `workspace: main` and `stepsToStart` reads that as a folder that merges.
@@ -3111,6 +3122,68 @@ What it leaves:
   though `output:` may not name a path outside it. The write never writes one; only the read walks it.
 - **The api's own refusal for a link is the package's sentence**, at 422, since `apps/api` passes `writeWorkflow`'s message through. Nothing
   in `apps/` changed here.
+
+## Shipped: five leftovers from the reviews of the supervisor and of the ending's checkout hold
+
+Five things the reviews of §9's package half and of the checkout hold found and left, one commit each, in `packages/agent-workflows` and
+`workflows/supervisor/` only. Nothing in `apps/` and nothing in the engine: where the board would show a fix differently, the bullet says so.
+
+- **A step in the checkout is not told a sha frozen at `wf start`.** The brief of a `workspace: main` step whose run cut no branch ended "The
+  checkout is at `<run.baseRef>`": a present-tense claim made from the sha the run froze. The supervisor's run never ends and its brief is
+  composed again on every answer that starts a new session, so from the first merge on it named a commit several merges behind. The clause
+  is dropped rather than reworded — the sentence before it already names the base branch, `on main`, which stays true however far the
+  checkout moves — and the historical sentence of a run that cut branches keeps its sha, since what a result was cut from does not move.
+  `run.test.ts` composes the brief of the supervisor's fourth try as a new session and refuses the sha and the claim; the clause put back
+  fails it.
+- **The supervisor denies by name the git it must never type.** "Never type git for a run" was prose, and prose is not a constraint.
+  `.claude/settings.json` refuses `git push` and `git branch -D` for every session in the checkout, and cannot refuse `git merge`, which
+  `ship.md` runs in the same checkout: the step's own `disallow:` is the only place that refusal can live. It denies `git merge`,
+  `checkout`, `switch`, `rebase`, `reset`, `stash`, `cherry-pick`, `revert`, `clean` and `push` as `Bash(git <verb>:*)` rules, and leaves
+  what its bookkeeping needs — `git add <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. `git branch` is left alone on
+  purpose: a prefix deny would take `git branch --list` with it, which is diagnosis, and `-D` is the checkout's refusal. The folder's
+  README, the step's frontmatter comment and its prose say what the denies are and that a prefix is a fence, not a sandbox (`git -C <dir>
+  merge` is not `git merge`). `supervisor.test.ts` reads the shipped folder: it fails by name when one of the rules is missing — measured
+  by dropping `git reset` — asserts that a harness given the list would refuse `ship.md`'s own merge command, and that none of the
+  bookkeeping commands is denied.
+- **A held try of an ending step leaves the run running, and counted.** `assess` dropped a try the checkout holds back from `retry`, so
+  the ending kept the status it ended with — `blocked`, which stops followers — and the run read `failed`: `wf decide` said "BLOCKED,
+  waiting on you: ship" and offered a `wf retry` that `retryRefusal` refuses, while `wf ls` said the step was waiting on the checkout, and
+  the run stopped counting against the cap on runs in flight, freeing the slot its ending was queued for. A try a person asked for and a
+  pass has not filed is work in hand: `assess` sets every due try running, held or not, and returns the held names in a new field,
+  `Assessment.held`, which `slotNeed` counts as due. An approved ending the checkout holds before its first filing goes into the same field,
+  so it counts too. `ship.test.ts` reads the pass, `wf ls`'s listing and `decision` in that window — nothing filed, `running`, in flight,
+  nobody waited on, nothing to decide, `running` with ship waiting — and the try filed on the first pass after the step in the checkout
+  settles. Each half of the change, undone alone, fails it. The test of two approved endings for one checkout now also asserts that the one
+  held back is in flight.
+- **An ending's gate whose result git already has decides nothing.** A run at its ending's gate whose result branch a person had merged by
+  hand — the run that built the checkout hold was one — read `→ to decide: Ship it …` for ever, and offered an approval that would file a
+  session to merge what the base branch already had. `resultOnBase` (every result branch `on` the base, as `branchStandings` reads git) is
+  now read by `toDecide`, `listing` and `approvalRefusal` alike, for an ending that merges and has not run: nothing is to decide; `wf ls`
+  names nobody after `→ waiting on you` and says on the ending's line, where the approval would be, `<branch> is on main — nothing is left
+  for ship to merge, and nothing waits on you; close the record if you want it closed: wf cancel <run>`; and `wf approve <run> ship` is
+  refused, exit 2, in the same words — so ship is never filed. The step keeps its `awaiting approval` word, which the board knows, and the
+  fact rides in the note. With no standings read — the board's call — the gate speaks alone, as it did; a gate that accepts a step's work
+  rather than merging it is not read this way. `ship.test.ts` merges by hand in a real repository and reads the listing, `wf ls`'s lines,
+  the refusal on `err.message`, two passes that file nothing, and the `wf cancel` it names; then resets the merge away and finds the gate a
+  decision again, approved and filed. `run.test.ts` holds the three readers to one standing, and leaves `ahead`, `gone` and unread standings
+  to the gate. Each reader, turned off alone, fails the store test.
+- **What the board cannot show yet, and an open question**, in the two sections above: a supervisor waiting for its person draws as a
+  failed run (the supervisor's *What it leaves*); a held ending draws as plain `waiting`, since the board passes no checkout; and a merge
+  conflict at the end of a run whose rounds are spent has no step to be given to (the ending's *What it leaves*).
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 612 (610 passed, 2 skipped), from 606 —
+  six new tests, and three that gained an assertion or a fixture: the supervisor's shape, whose `disallow:` grew; the brief of a step in the
+  checkout whose run cut no branch, which now refuses the claim too; and two endings for one checkout, which asserts the run held back is in
+  flight. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged: nothing outside the package changed. `npm run
+  typecheck` clean in all four.
+
+What it leaves:
+
+- **`wf decide` still says `AWAITING APPROVAL, waiting on you: ship`** for a run whose result a person merged by hand, below the branch
+  line that says it is on the base. `decision` is left as it is on purpose: a run at a gate is never shipped whatever git says, so a run
+  waiting on it does not start on a merge nobody approved (`run.test.ts` pins that), and `awaitingApproval` is also what holds it back. The
+  screen's `to decide` block is gone, and `wf approve` says why.
+- **An approval given before the hand merge still files ship.** `advance` reads no git for its gate, so an ending approved and then merged
+  by hand before the next pass is filed, and its prose finds nothing to merge. The window is one pass; the refusal is at the approval.
 
 ## 1. A run that grows steps from a plan
 

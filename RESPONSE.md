@@ -62,6 +62,24 @@ that is not true of it, and every one of them is a sentence a person reads while
 The fifth, the `git` on the polled list, is narrowed above rather than left for a person: what remains
 is the package's batching, beside the judgement it belongs to.
 
+## Round 3
+
+Both findings fixed, and both were real:
+
+- the approval that stays under a step said "every step after the gate is handed the approval" of an
+  ending, where nothing follows the gate and the package hands the words to that step itself. It now
+  says its approval filed the step and the words are the terms it acts on — the same correction round 2
+  made one form above, which I had not carried to this panel. The e2e gained a `shipped` page: the other
+  side of that gate, where the approval filed the step, the branch is merged and nothing is left to
+  decide. It reads the panel, the `approved, try 1` fact and that no sentence on the page claims a step
+  follows the gate — the seed had the state (`SHIPPED`) and nothing read it.
+- the api parsed the package's gate line with a pattern that assumed one send-back and required the
+  clause. Two shapes the loader accepts break it — an ending that waits on nothing, whose line has no
+  clause, and a fan-in ending, whose clause joins two commands with ` or ` — and in both the Decide
+  section showed an empty command list for a run whose only remaining action was that approval. The
+  commands are now built from the steps a send-back names (`sendBackTo`), which is what the package
+  builds the line from; the pattern is gone. A test covers both shapes and fails on the old parsing.
+
 ## What I left
 
 - **The builder still cannot set `workspace:`**, as §8's leaves already say: `WorkflowStepSpec` in

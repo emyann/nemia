@@ -2849,7 +2849,10 @@ What the board does with it, an item a commit — §8's apps half, the run after
   with a result branch on 2026-09-17, 66 were already on main — the first read of the list 691 ms of `git`, every later one three branches.
   Beside it, `GET /api/runs/:id/decision` carries `standings` — where each result branch stands and
   git's own diff stat of it (`branchWord`, `diffStat`) — reads the result with `resultSteps` rather than `terminalSteps`, and offers
-  `ship it` and `drop it` no more for a folder whose ending merges, as `wf decide` never has.
+  `ship it` and `drop it` no more for a folder whose ending merges, as `wf decide` never has. A gate's two commands are built from the
+  steps a send-back names (`sendBackTo`) and not read out of the package's gate line with a pattern: that line carries no send-back at all
+  for an ending that waits on nothing and joins the commands with ` or ` for one that waits on several, and a run whose only remaining
+  action is an approval must not be handed an empty list of commands because a sentence did not parse.
 - **The Factory counts them (`2 to decide`), and their cards stay on the floor**, whatever "Show finished" says, until they are decided:
   nothing of such a run moves, so `inFlight` has it finished and the switch would hide the one card on the board that is waiting for a
   person rather than for a machine — which is the pain §8 was registered as. The card is marked with an emerald ring rather than dimmed, a
@@ -2866,19 +2869,21 @@ What the board does with it, an item a commit — §8's apps half, the run after
   (`gateNote`). The words a person approves with are the terms that step acts on, which is what its own brief is handed (`approvedSection`),
   so its box says that and not that they go to the steps after it; and the run's detail now carries `workspace` on a step's spec, which is
   what tells such a gate from §6's — the two read the same off a step's record — so its facts row says where the gate holds instead of
-  saying it holds once a step that never signs off first has signed off. A gate on a step that has run is unchanged, to the markup. Found by the panel: **a write invalidated the decision key the page was
+  saying it holds once a step that never signs off first has signed off, and the approval that stays under the step says it filed the step
+  rather than that a step after the gate was handed the words. A gate on a step that has run is unchanged, to the markup. Found by the panel: **a write invalidated the decision key the page was
   on**, and the refetch filled that key — which stands for the state the decision was read for (`decisionStamp`) — with the answer for the
   state after the write. A run whose state then went back to one already read showed a blank Decide section and a panel still reading, until
   a reload. A write now invalidates the run's record alone (`exact`), which is the key that means "the run as it is".
 - **The e2e's seed gains three runs** (`ENDING`, `SHIPPED`, `UNMERGED` in `apps/web/test/e2e/seed.ts`), with real branches in FAKE's
   repository: one at its ending's gate, two commits ahead of main; one whose ending was approved, ran and merged, which leaves nothing to
   decide; and one finished run whose branch nobody took, which is the git kind. A `decide` page reads the banner and the panel, sends the
-  work back — to `review`, never to `ship` — and takes that back, and the Factory and Runs pages check the counts, the marked cards and the
-  group. Found on the way: **a card a person dropped between two rows held only the row its top was nearest**, so a card placed in the
+  work back — to `review`, never to `ship` — and takes that back; a `shipped` page reads the other side of that gate, where the approval
+  filed the step, the branch is merged and there is nothing left to decide; and the Factory and Runs pages check the counts, the marked
+  cards and the group. Found on the way: **a card a person dropped between two rows held only the row its top was nearest**, so a card placed in the
   other one was drawn over its foot — the floor's cards overlapped by 18 units once the seed filled the grid. `cellsOf` now gives a card
   every row it reaches, since a card is drawn up to a cell tall.
 
-What the board half measured, counted as this file counts them — tests, then passed and skipped: api 209 (from 202), web 259 (from 243),
+What the board half measured, counted as this file counts them — tests, then passed and skipped: api 210 (from 202), web 259 (from 243),
 agent-workflows 575 (574 passed, 1 skipped) and agent-engine 340 (331 passed, 9 skipped) unchanged, no package having been touched.
 `npm run typecheck`, `npm run build` and `npm run e2e` clean, the e2e's pictures read in both themes. New tests: `to-decide.test.ts` in the
 api, on a real repository with every `git` it runs counted — both kinds on the list and on the detail, the `said` that ends with its own
@@ -2887,7 +2892,8 @@ off or a folder whose ending merges; in the web, the floor keeping such a card w
 no `toDecide`, the ending's gate left out of `waiting on you` twice over (`onYouOf`, `needsOf`), the to-decide banner in both kinds,
 `endsTheRun` and the gate's word for where it holds, the panel's standing and stat and the work's closeout, the ending's gate wording with
 its send-back named, the words it takes and the step each is about (`takenOf`), the ending that waits on nothing being offered no send-back,
-`workspace` among a step's facts, and a card dropped between two rows.
+`workspace` among a step's facts, the approval under an ending saying it filed the step, a gate that waits on nothing and one that waits on
+several — whose commands are never empty — and a card dropped between two rows.
 
 What it leaves:
 

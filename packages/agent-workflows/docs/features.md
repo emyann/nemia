@@ -2870,18 +2870,19 @@ What the board does with it, an item a commit — §8's apps half, the run after
   so its box says that and not that they go to the steps after it; and the run's detail now carries `workspace` on a step's spec, which is
   what tells such a gate from §6's — the two read the same off a step's record — so its facts row says where the gate holds instead of
   saying it holds once a step that never signs off first has signed off, and the approval that stays under the step says it filed the step
-  rather than that a step after the gate was handed the words. A gate on a step that has run is unchanged, to the markup. Found by the panel: **a write invalidated the decision key the page was
-  on**, and the refetch filled that key — which stands for the state the decision was read for (`decisionStamp`) — with the answer for the
-  state after the write. A run whose state then went back to one already read showed a blank Decide section and a panel still reading, until
-  a reload. A write now invalidates the run's record alone (`exact`), which is the key that means "the run as it is".
+  rather than that a step after the gate was handed the words. A gate on a step that has run is unchanged, to the markup. Found by the
+  panel: **a write invalidated the decision key the page was on**, and the refetch filled that key — which stands for the state the
+  decision was read for (`decisionStamp`) — with the answer for the state after the write. A run whose state then went back to one already
+  read showed a blank Decide section and a panel still reading, until a reload. A write now invalidates the run's record alone (`exact`),
+  which is the key that means "the run as it is".
 - **The e2e's seed gains three runs** (`ENDING`, `SHIPPED`, `UNMERGED` in `apps/web/test/e2e/seed.ts`), with real branches in FAKE's
   repository: one at its ending's gate, two commits ahead of main; one whose ending was approved, ran and merged, which leaves nothing to
   decide; and one finished run whose branch nobody took, which is the git kind. A `decide` page reads the banner and the panel, sends the
   work back — to `review`, never to `ship` — and takes that back; a `shipped` page reads the other side of that gate, where the approval
   filed the step, the branch is merged and there is nothing left to decide; and the Factory and Runs pages check the counts, the marked
-  cards and the group. Found on the way: **a card a person dropped between two rows held only the row its top was nearest**, so a card placed in the
-  other one was drawn over its foot — the floor's cards overlapped by 18 units once the seed filled the grid. `cellsOf` now gives a card
-  every row it reaches, since a card is drawn up to a cell tall.
+  cards and the group. Found on the way: **a card a person dropped between two rows held only the row its top was nearest**, so a card
+  placed in the other one was drawn over its foot — the floor's cards overlapped by 18 units once the seed filled the grid. `cellsOf` now
+  gives a card every row it reaches, since a card is drawn up to a cell tall.
 
 What the board half measured, counted as this file counts them — tests, then passed and skipped: api 210 (from 202), web 259 (from 243),
 agent-workflows 575 (574 passed, 1 skipped) and agent-engine 340 (331 passed, 9 skipped) unchanged, no package having been touched.

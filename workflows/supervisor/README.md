@@ -13,6 +13,17 @@ what it reads is the store and the runs' own branches, and the little it writes 
 `CLAUDE.md`, a section in `packages/agent-workflows/docs/features.md`. It carries implement's denies and no
 `check:`: there is nothing to verify, because it produces nothing but questions and approvals.
 
+**Its `disallow:` denies git by name.** "Never type git for a run" is a sentence in `supervise.md`, and prose
+is not a constraint. `.claude/settings.json` refuses `git push` and `git branch -D` for every session in this
+checkout, and that is where those two live; it cannot refuse `git merge`, because `ship.md` runs in the same
+checkout and merging is its whole job. So the step's own fence is the only place the rest of the refusal can
+live, and it denies `git merge`, `git checkout`, `git switch`, `git rebase`, `git reset`, `git stash`,
+`git cherry-pick`, `git revert`, `git clean` and `git push` — the merge a run's ending step owns, and
+everything that moves or throws away what is in a person's checkout. What its bookkeeping needs is untouched:
+`git add <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. It is a prefix fence and not a
+sandbox — `git -C <dir> merge` is not `git merge` — so it stops the command a session should not have typed,
+not a session that means to get round it.
+
 `slot: none` keeps its run out of the cap on runs in flight (`WF_MAX_RUNS`). The cap holds the work this
 machine does at once; a supervisor behind it would be held by the very runs it exists to answer.
 

@@ -756,7 +756,13 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         if (heldOut) console.log(heldOut);
         return console.log('  nothing to decide yet');
       }
-      if (decision.kind === 'shipped') return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}`);
+      if (decision.kind === 'shipped') {
+        // An ending that never ran, on a run git reads as shipped: its result was merged without it, and its line on `wf ls` still sits at its
+        // gate — said here too, with the one command there still is, so the two screens do not disagree about who is waited on.
+        const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
+        const never = unrun ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel ${run.id}` : '';
+        return console.log(`${head}\n\n  shipped — ${decision.branches.join(', ')} is already on ${run.branch}${never}`);
+      }
 
       console.log(`${head}\n`);
       // The run's own verdicts first: they decide how much of the rest is worth reading.

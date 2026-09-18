@@ -388,7 +388,7 @@ export function approvalRefusal(
     // session to merge what the base branch has, and nothing is left for anybody to decide: the one thing there is, is closing the record.
     if (resultOnBase(standings)) {
       return `${standings.map((s) => branchWord(run, s)).join(', ')}, so there is nothing left for ${name} to merge: approving would file it to merge what the base branch already has. `
-        + `Nothing waits on you — if you want the record closed: wf cancel ${run.id}.`;
+        + `The run has shipped as git reads it — wf decide ${run.id} says so, and a run started --after it goes on without ${name}. Nothing waits on you; if you want the record closed: wf cancel ${run.id}.`;
     }
   }
   if (status === 'awaiting approval') return null;
@@ -593,10 +593,11 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
 
 /**
  * An ending at its gate whose work git already has on the base branch, beside its line on `wf ls` where the approval would be: where each
- * branch stands, that nothing is left for the step to merge, and the one command there still is. Pure.
+ * branch stands, that nothing is left for the step to merge and the run has shipped as git reads it (`decision`), and the one command there
+ * still is. Pure.
  */
 const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: readonly BranchStanding[]): string =>
-  `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge, and nothing waits on you; close the record if you want it closed: wf cancel ${run.id}`;
+  `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: wf cancel ${run.id}`;
 
 /**
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
@@ -2299,6 +2300,11 @@ export function forgetRefusal(
   spendOf: SpendOf = () => undefined,
   /** Where an ask's file is, for the command that takes it back. */
   askAt: (ask: AskName) => string = (a) => `${run.id}.asks/${a.kind}-${a.step}-${a.n}`,
+  /**
+   * Where each result branch stands against the base branch, as git says it now (`branchStandings` in runner.ts): an ending whose result git
+   * already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
+   */
+  standings: readonly BranchStanding[] = [],
 ): string | null {
   const held: string[] = [];
   const fixes: string[] = [];
@@ -2331,7 +2337,10 @@ export function forgetRefusal(
         due.push(`try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : `wf retry ${modeWord(r)}`})`);
       }
       for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
-      atGates = steps.filter((s) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval').map((s) => s.name);
+      // Save an ending that has not run whose result git already has: nothing files it — its approval is refused (`approvalRefusal`) — and the
+      // run has shipped as git reads it (`decision`), so naming the approval here would name a command that is itself refused.
+      const takenByHand = (st: Workflow): boolean => resultOnBase(standings) && approvedFirst(st, run) && !run.steps[st.name]?.taskId;
+      atGates = steps.filter((s) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf).status === 'awaiting approval' && !takenByHand(s)).map((s) => s.name);
       if (atGates.length) {
         const one = atGates.length === 1;
         // What the approval would file: what waits on a step that has run and handed on — and the step itself, at an ending's gate, which
@@ -3074,7 +3083,15 @@ export function decision(
     return said.get(branch)!;
   };
   // A step waiting at its gate is a person's word not yet given, and git cannot give it: the run is not shipped while one does.
-  const awaitingApproval = steps.filter((s) => statusOf.get(s.name) === 'awaiting approval').map((s) => s.name).sort();
+  const atGate = steps.filter((s) => statusOf.get(s.name) === 'awaiting approval').map((s) => s.name).sort();
+  // Save one: an ending at its gate that has not run, whose result git already has on the base branch (`resultOnBase`, as `toDecide`,
+  // `listing` and `approvalRefusal` read it). Its gate holds one thing, the merge, and a person has made it by hand — so the word is given,
+  // by the only other hand that merges onto the base. Read as the no-ending kind is read, off git: shipped, and a run `--after` it starts
+  // (`parentOf`). Held back instead, that child waited for ever — the approval that would release it is refused, since there is nothing
+  // left to merge, and the `wf cancel` the refusal names makes its parent one that never ships. Any other gate still holds whatever git says.
+  const unrunEnding = (name: string): boolean => !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
+  const byHand = atGate.length > 0 && atGate.every(unrunEnding) && branches.length > 0 && !direct && branches.every((b) => landed(b) !== false);
+  const awaitingApproval = byHand ? [] : atGate;
   const onBase = branches.length > 0 && !direct && !awaitingApproval.length && branches.every(landed);
   // Work past the base on the base branch was merged by a person: shipped, whatever the steps said.
   if (onBase && branches.every((b) => landed(b) === true)) return { kind: 'shipped', branches };

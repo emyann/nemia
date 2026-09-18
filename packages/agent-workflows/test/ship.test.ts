@@ -19,7 +19,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, approve, cancel, decide, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
+const { advance, approve, cancel, decide, forget, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -161,9 +161,12 @@ test('a run stops at its ending step: nothing of it is filed, the checkout is un
   assert.equal(isShipped(readRun(id), branch), false);
 });
 
-test("REFUSED at shipped defaults: an ending's gate whose result a person merged by hand — nothing to decide, the listing says where the branch stands, and `wf approve` names `wf cancel` instead", async (t) => {
+test("REFUSED at shipped defaults: an ending's gate whose result a person merged by hand — the run has shipped as git reads it, a run `--after` it starts, every screen agrees, and `wf approve` names `wf cancel` instead", async (t) => {
   const { repo, id, branch, e, filings } = await atTheGate();
   assert.equal((await list(e, readRun(id))).toDecide?.kind, 'approve', 'at its gate, with the branch ahead: a decision to make');
+  // A run waiting on it: nothing of it is filed while the result is off the base.
+  const child = start({ brief: 'read the flag', repo, workflowDir: oneStep(), after: [id] });
+  assert.deepEqual((await advance(e, readRun(child.id))).filed, [], 'the child waits on a run that has not shipped');
 
   // A person merges the result by hand, as happened to the run that built the checkout hold. Nobody tells the run.
   git(repo, 'merge', '--no-ff', '--no-edit', branch);
@@ -175,30 +178,52 @@ test("REFUSED at shipped defaults: an ending's gate whose result a person merged
   assert.deepEqual(listed.waitingOnYou, [], 'and nobody is waited on for an approval that would be refused');
   const ship = listed.steps.find((s) => s.name === 'ship')!;
   assert.deepEqual([ship.status, ship.note], ['awaiting approval',
-    `${branch} is on main — nothing is left for ship to merge, and nothing waits on you; close the record if you want it closed: wf cancel ${id}`]);
+    `${branch} is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: wf cancel ${id}`]);
   const printed: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
   try { await main(['ls', id], e); } finally { log.mock.restore(); }
   assert.ok(!printed.some((l) => l.includes('→ to decide') || l.includes('→ waiting on you')), printed.join('\n'));
   assert.ok(printed.some((l) => l.includes(`${branch} is on main — nothing is left for ship to merge`)), printed.join('\n'));
 
+  // `wf decide` says the same, before anybody closes the record: shipped, the ending never ran, and no AWAITING APPROVAL above a branch on main.
+  const { decision } = await decide(e, id);
+  assert.deepEqual([decision.kind, decision.kind === 'shipped' ? decision.branches : []], ['shipped', [branch]]);
+  const screen: string[] = [];
+  const log2 = t.mock.method(console, 'log', (...args: unknown[]) => { screen.push(args.map(String).join(' ')); });
+  try { await main(['decide', id], e); } finally { log2.mock.restore(); }
+  assert.ok(screen.some((l) => l.endsWith(`\n\n  shipped — ${branch} is already on main\n  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel ${id}`)), screen.join('\n'));
+  assert.ok(!screen.some((l) => l.includes('AWAITING APPROVAL') || l.includes('wf approve')), screen.join('\n'));
+
   // `wf approve`: refused, saying so, and naming what to type if the record should be closed.
   await assert.rejects(approve(e, id, 'ship', 'Merge it.'), (err: Error & { exitCode?: number }) => {
     assert.equal(err.exitCode, 2);
     assert.equal(err.message, `${branch} is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. `
-      + `Nothing waits on you — if you want the record closed: wf cancel ${id}.`);
+      + `The run has shipped as git reads it — wf decide ${id} says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: wf cancel ${id}.`);
     return true;
   });
   assert.deepEqual(readRun(id).approvals ?? [], [], 'nothing was written');
 
-  // And ship is never filed: pass after pass, nothing of it runs.
+  // And ship is never filed: pass after pass, nothing of it runs — while the run that waited on it starts, on git's word.
   for (const pass of [1, 2]) assert.deepEqual((await advance(e, readRun(id))).filed, [], `pass ${pass}`);
   assert.deepEqual(filings, [`${id}-implement`]);
   assert.equal(readRun(id).steps.ship!.taskId, null);
+  assert.deepEqual((await advance(e, readRun(child.id))).filed, ['implement'], 'the child starts: its parent has shipped');
 
-  // The command it names is honoured: the record is closed, and there is nothing to decide about it.
+  // The command it names is honoured, once the child has started: the record is closed, and there is nothing to decide about it.
   await cancel(e, id);
   assert.equal((await decide(e, id)).decision.kind, 'cancelled');
+});
+
+test("`wf rm` of a run whose ending never ran and whose result a person merged by hand forgets it: the gate holds nothing, so the approval it named is not named", async () => {
+  const { repo, id, branch, e } = await atTheGate();
+  const held = await forget(e, id);
+  assert.equal(held.kind, 'refused', 'at its gate with the branch ahead, the run is held');
+  assert.match(held.kind === 'refused' ? held.refusal : '', new RegExp(`ship waits at its gate for your approval, and it is filed once it is approved: wf approve ${id} ship`));
+
+  git(repo, 'merge', '--no-ff', '--no-edit', branch);
+  const forgot = await forget(e, id);
+  assert.equal(forgot.kind, 'forgotten', forgot.kind === 'refused' ? forgot.refusal : '');
+  assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false);
 });
 
 test("an ending's gate is a decision again once the base branch no longer has the result: git is read each pass, and the approval is honoured", async () => {

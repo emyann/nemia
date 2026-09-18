@@ -3425,13 +3425,27 @@ test("`wf ls` at an ending step's gate: the step reads `awaiting approval` unfil
   assert.deepEqual([after.steps[2]!.status, after.waitingOnYou, after.toDecide], ['unverified · done', [], undefined]);
 });
 
-test("a run at its ending step's gate is never shipped, and nothing that waits on it starts — whatever git says of its branch", () => {
+test("a run at its ending step's gate is not shipped while its result is off the base, and nothing that waits on it starts — but one whose result a person merged by hand has, as git says, and any other gate holds whatever git says", () => {
   const merged = () => true as const;
-  const d = decision(ENDS, atEnd(), DONE, merged, signedDone, asked);
+  const ahead = () => false as const;
+  const d = decision(ENDS, atEnd(), DONE, ahead, signedDone, asked);
   assert.equal(d.kind, 'awaiting');
   if (d.kind !== 'awaiting') return;
   assert.deepEqual([d.outcome, d.awaitingApproval, d.branches, d.direct], ['blocked', ['ship'], ['wf/r-1/implement'], false]);
   assert.equal(runReady(run({}, { after: ['r-1'] }), () => false), false, 'a run waiting on it is not ready');
+
+  // Merged by hand before the ending ran: the gate held the merge and nothing else, and git has it — shipped, so a run `--after` it starts.
+  // The approval that would once have released it is refused (`approvalRefusal`), and the `wf cancel` it names is a parent that never ships.
+  const byHand = decision(ENDS, atEnd(), DONE, merged, signedDone, asked);
+  assert.deepEqual([byHand.kind, byHand.kind === 'shipped' ? byHand.branches : []], ['shipped', ['wf/r-1/implement']]);
+  // And the work committed nothing past the run's base: on the base as the no-ending kind reads it, shipped once every step finished.
+  assert.equal(decision(ENDS, atEnd(), DONE, () => 'unchanged' as const, signedDone, asked).kind, 'shipped');
+
+  // Any other gate is a person's word git cannot give: a gated step that has run and signed off, its branch merged, is still awaiting it.
+  const accepted = [step('implement'), { ...step('review', ['implement']), gate: true }];
+  const signed = run({ implement: 't1', review: 't2' }, { steps: { implement: { taskId: 't1', workspace: '/wt', branch: 'wf/r-1/implement' }, review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' } } });
+  const held = decision(accepted, signed, DONE, merged, signedDone, asked);
+  assert.deepEqual([held.kind, held.kind === 'awaiting' ? held.awaitingApproval : []], ['awaiting', ['review']]);
   // Approved, filed and done, it ships as any run does — on the branch the ending step merged, never on `main`.
   const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
   const shipped = decision(ENDS, ran, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), merged, signedDone, asked);
@@ -3445,9 +3459,13 @@ test("an ending's gate whose result git already has is nothing to decide: `to de
   assert.deepEqual([onBase.ready, onBase.toDecide], [[], undefined], 'nothing filed, and nothing to decide');
   const l = listing(ENDS, atEnd(), DONE, signedDone, asked, () => undefined, [], [], [], [], () => 0, () => undefined, undefined, ON);
   assert.deepEqual([l.toDecide, l.waitingOnYou], [undefined, []]);
-  assert.equal(l.steps[2]!.note, 'wf/r-1/implement is on main — nothing is left for ship to merge, and nothing waits on you; close the record if you want it closed: wf cancel r-1');
+  assert.equal(l.steps[2]!.note, 'wf/r-1/implement is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: wf cancel r-1');
   assert.equal(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [], () => undefined, ON),
-    'wf/r-1/implement is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. Nothing waits on you — if you want the record closed: wf cancel r-1.');
+    'wf/r-1/implement is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. '
+    + 'The run has shipped as git reads it — wf decide r-1 says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: wf cancel r-1.');
+  // `wf rm` reads the same standing: the gate holds nothing, so it names no approval; without it, the approval is what holds the run.
+  assert.equal(forgetRefusal(ENDS, atEnd(), DONE, [], signedDone, asked, () => undefined, [], [], () => undefined, undefined, ON), null);
+  assert.match(String(forgetRefusal(ENDS, atEnd(), DONE, [], signedDone, asked)), /^ship waits at its gate for your approval, and it is filed once it is approved: wf approve r-1 ship/);
 
   // A branch ahead, one git no longer has, and no standing read at all (the board's call) each leave the gate a person's word.
   for (const [said, standings] of [['ahead', AHEAD], ['gone', GONE], ['not read', []]] as const) {

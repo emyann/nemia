@@ -3155,18 +3155,29 @@ Five things the reviews of §9's package half and of the checkout hold found and
   nobody waited on, nothing to decide, `running` with ship waiting — and the try filed on the first pass after the step in the checkout
   settles. Each half of the change, undone alone, fails it. The test of two approved endings for one checkout now also asserts that the one
   held back is in flight.
-- **An ending's gate whose result git already has decides nothing.** A run at its ending's gate whose result branch a person had merged by
-  hand — the run that built the checkout hold was one — read `→ to decide: Ship it …` for ever, and offered an approval that would file a
-  session to merge what the base branch already had. `resultOnBase` (every result branch `on` the base, as `branchStandings` reads git) is
-  now read by `toDecide`, `listing` and `approvalRefusal` alike, for an ending that merges and has not run: nothing is to decide; `wf ls`
-  names nobody after `→ waiting on you` and says on the ending's line, where the approval would be, `<branch> is on main — nothing is left
-  for ship to merge, and nothing waits on you; close the record if you want it closed: wf cancel <run>`; and `wf approve <run> ship` is
-  refused, exit 2, in the same words — so ship is never filed. The step keeps its `awaiting approval` word, which the board knows, and the
-  fact rides in the note. With no standings read — the board's call — the gate speaks alone, as it did; a gate that accepts a step's work
-  rather than merging it is not read this way. `ship.test.ts` merges by hand in a real repository and reads the listing, `wf ls`'s lines,
-  the refusal on `err.message`, two passes that file nothing, and the `wf cancel` it names; then resets the merge away and finds the gate a
-  decision again, approved and filed. `run.test.ts` holds the three readers to one standing, and leaves `ahead`, `gone` and unread standings
-  to the gate. Each reader, turned off alone, fails the store test.
+- **An ending's gate whose result git already has decides nothing, and the run has shipped.** A run at its ending's gate whose result
+  branch a person had merged by hand — the run that built the checkout hold was one — read `→ to decide: Ship it …` for ever, and offered an
+  approval that would file a session to merge what the base branch already had. `resultOnBase` (every result branch `on` the base, as
+  `branchStandings` reads git) is now read by `toDecide`, `listing`, `approvalRefusal` and `forgetRefusal` alike, for an ending that merges
+  and has not run: nothing is to decide; `wf ls` names nobody after `→ waiting on you` and says on the ending's line, where the approval
+  would be, `<branch> is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close
+  the record if you want it closed: wf cancel <run>`; `wf approve <run> ship` is refused, exit 2, in the same terms — so ship is never
+  filed; and `wf rm` forgets the run rather than naming that refused approval. The step keeps its `awaiting approval` word, which the board
+  knows, and the fact rides in the note. With no standings read — the board's call — the gate speaks alone, as it did; a gate that accepts
+  a step's work rather than merging it is not read this way.
+  Review's round 2 found what the first version left: a run started `--after` such a run waited for ever. `decision` never called a run at
+  a gate shipped, whatever git said — the rule §8 wrote, "a run at any gate is not shipped, merged or not" — so the child needed the
+  parent's approval, which is now refused, and the `wf cancel` the refusal named makes a parent that never ships. `decision` now makes the
+  one exception the rest of this bullet already makes: an ending that has not run, whose result git has on the base branch, is a merge a
+  person made by hand, and the run reads as shipped — as a run with no ending reads, off git. Any other gate still holds whatever git says.
+  So `wf decide` says `shipped — <branch> is already on main` and that ship never ran, with the `wf cancel`, where it said `AWAITING
+  APPROVAL, waiting on you: ship` a few lines above that branch on main; and the child starts on the next pass.
+  `ship.test.ts` merges by hand in a real repository, with a child waiting on the run, and reads the listing, `wf ls`'s lines, `wf decide`'s
+  screen, the refusal on `err.message`, two passes that file nothing, the child filed, and the `wf cancel` it names; forgets such a run with
+  `wf rm`, which held it while its branch was ahead; and resets the merge away and finds the gate a decision again, approved and filed.
+  `run.test.ts` holds the four readers to one standing, leaves `ahead`, `gone` and unread standings to the gate, and restates §8's pinned
+  rule with its exception: not shipped while the result is off the base, shipped once git has it (with work, or with none), and a gate on a
+  step that has run still awaiting approval with its branch merged. Each reader, turned off alone, fails a store test.
 - **What the board cannot show yet, and an open question**, in the two sections above: a supervisor waiting for its person draws as a
   failed run (the supervisor's *What it leaves*); a held ending draws as plain `waiting`, since the board passes no checkout; and a merge
   conflict at the end of a run whose rounds are spent has no step to be given to (the ending's *What it leaves*).
@@ -3178,10 +3189,9 @@ Five things the reviews of §9's package half and of the checkout hold found and
 
 What it leaves:
 
-- **`wf decide` still says `AWAITING APPROVAL, waiting on you: ship`** for a run whose result a person merged by hand, below the branch
-  line that says it is on the base. `decision` is left as it is on purpose: a run at a gate is never shipped whatever git says, so a run
-  waiting on it does not start on a merge nobody approved (`run.test.ts` pins that), and `awaitingApproval` is also what holds it back. The
-  screen's `to decide` block is gone, and `wf approve` says why.
+- **A `wf cancel` typed before the next pass strands a child.** A run started `--after` a hand-merged parent starts on the first pass that
+  reads the parent shipped; cancelled before that pass, the parent never ships (`parentOf`), and the child's own screen says so and how to
+  resolve it — as it does for any parent cancelled under a child. The window is one pass.
 - **An approval given before the hand merge still files ship.** `advance` reads no git for its gate, so an ending approved and then merged
   by hand before the next pass is filed, and its prose finds nothing to merge. The window is one pass; the refusal is at the approval.
 

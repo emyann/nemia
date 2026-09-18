@@ -1177,8 +1177,9 @@ dropped. **Nothing in the packages knows what shipping means.**
   read off git on the pass that asks and nothing is stored, so a run whose branch a person merged by hand
   stops being one to decide without anybody telling the run. That holds at an ending's gate too: an ending
   that has not run, whose result git already has on the base branch, has nothing left to merge — nothing is to
-  decide, its line on `wf ls` says where the branch stands and names `wf cancel <run>` to close the record, and
-  `wf approve <run> ship` is refused in those words. A run whose work is going round again, or whose
+  decide, the run reads as shipped (below), its line on `wf ls` and `wf decide`'s screen say where the branch
+  stands and name `wf cancel <run>` to close the record, `wf rm` forgets it, and `wf approve <run> ship` is
+  refused in those words. A run whose work is going round again, or whose
   work a person has just sent back, has nothing to decide: the gate holds on what the work says, and the work
   is being said again.
 - **`--no-worktree` is refused** on a workflow whose last step merges: such a run works on the base branch
@@ -1198,7 +1199,10 @@ add-sub-8imz  add sub
 **`--after` is unchanged.** A child run starts when its parent has shipped as git sees it — the result branch
 on the base branch, or nothing committed on it — which a run's `ship.md` makes true when it merges, and a run
 with no ending makes true when a person merges. A run waiting at any gate has not shipped, merged or not: the
-gate is a person's word on the record, and a merge is not that word.
+gate is a person's word on the record, and a merge is not that word — save one. An ending that has not run
+holds its gate on the merge and nothing else, so when git already has its result on the base branch, a person
+has made that merge by hand: the run has shipped as git reads it, and its children start. Held back, they
+would wait for ever, since the approval that would release them is refused with nothing left to merge.
 
 ## A gate: a handoff that waits for a person — `gate:`, `--gate` and `wf approve`
 

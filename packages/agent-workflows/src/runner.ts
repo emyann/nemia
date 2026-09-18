@@ -2047,7 +2047,9 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   const askAt = (a: AskName) => (a.kind === 'retry' ? askFile(id, a.step, a.n) : roundAskFile(id, a.step, a.n));
   const others = listRuns().filter((o) => o.id !== id);
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
-  const refusal = forgetRefusal(steps, run, phaseOf, others, reader, asked, verdictOf, asks, rounds, spendOf, askAt);
+  // Where the result stands against the base branch, for an ending that has not run: one whose result git already has holds nothing.
+  const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? branchStandings(run, resultBranches(run)) : [];
+  const refusal = forgetRefusal(steps, run, phaseOf, others, reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings);
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing };
 
   // 1. The worktrees, through git — which lists each by its real path, so the run's directory and the record's are read the same way.

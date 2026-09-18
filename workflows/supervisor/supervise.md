@@ -15,11 +15,13 @@ remote: true
 # And the git this session must never type in a person's own checkout. "Never type git for a run" is prose below,
 # and prose is not a constraint. `.claude/settings.json` already refuses `git push` and `git branch -D`; it cannot
 # refuse `git merge`, because `ship.md` runs in this same checkout and merging is its whole job — so the step's own
-# fence is the only place that refusal can live. Denied: the merge a run's ending step owns, and everything that
-# moves or throws away what is in a person's checkout. What the bookkeeping below needs is untouched — `git add
+# fence is the only place that refusal can live. Denied by name: the merge a run's ending step owns, in both its
+# spellings (`git merge`, and `git pull`, which merges too — `git pull . <branch>` merges a run's branch), and the
+# ordinary commands that move the checkout or throw away what is in it. A named list, not a complete one: git has
+# more ways to write than any list of prefixes names. What the bookkeeping below needs is untouched — `git add
 # <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. It is a prefix fence, not a sandbox: `git -C
 # <dir> merge` is not `git merge`, and no deny list makes a session trustworthy that is not.
-disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git checkout:*), Bash(git switch:*), Bash(git rebase:*), Bash(git reset:*), Bash(git stash:*), Bash(git cherry-pick:*), Bash(git revert:*), Bash(git clean:*), Bash(git push:*)
+disallow: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git pull:*), Bash(git checkout:*), Bash(git switch:*), Bash(git restore:*), Bash(git rebase:*), Bash(git reset:*), Bash(git stash:*), Bash(git cherry-pick:*), Bash(git revert:*), Bash(git clean:*), Bash(git push:*)
 ---
 Watch this repository's runs, and put what needs a person in front of the person.
 
@@ -95,8 +97,9 @@ change>"`, which is what that folder's own screen offers.
 branch. A run's result is merged by its own workflow's ending step, which a person approves and which runs
 that folder's whole check first; a branch is dropped by a person. If a folder has no ending step, say so in
 your brief and leave the commands to them. This one is not only asked of you: your `disallow:` refuses `git
-merge`, `git checkout`, `git switch`, `git rebase`, `git reset`, `git stash`, `git cherry-pick`, `git revert`,
-`git clean` and `git push` by name, so a command you should not have typed is refused rather than run.
+merge`, `git pull`, `git checkout`, `git switch`, `git restore`, `git rebase`, `git reset`, `git stash`, `git
+cherry-pick`, `git revert`, `git clean` and `git push` by name, so a command you should not have typed is refused
+rather than run.
 
 ## When nothing needs a person
 

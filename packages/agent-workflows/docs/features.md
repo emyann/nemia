@@ -3137,8 +3137,10 @@ Five things the reviews of §9's package half and of the checkout hold found and
   fails it.
 - **The supervisor denies by name the git it must never type.** "Never type git for a run" was prose, and prose is not a constraint.
   `.claude/settings.json` refuses `git push` and `git branch -D` for every session in the checkout, and cannot refuse `git merge`, which
-  `ship.md` runs in the same checkout: the step's own `disallow:` is the only place that refusal can live. It denies `git merge`,
-  `checkout`, `switch`, `rebase`, `reset`, `stash`, `cherry-pick`, `revert`, `clean` and `push` as `Bash(git <verb>:*)` rules, and leaves
+  `ship.md` runs in the same checkout: the step's own `disallow:` is the only place that refusal can live. It denies `git merge`, `pull`,
+  `checkout`, `switch`, `restore`, `rebase`, `reset`, `stash`, `cherry-pick`, `revert`, `clean` and `push` as `Bash(git <verb>:*)` rules — `pull`
+  and `restore` from review's round 2: `git pull . <branch>` merges a run's branch, and `git restore <path>` throws work away as `git
+  checkout -- <path>` does — and the folder calls it a named list of the ordinary commands, not everything git can write. It leaves
   what its bookkeeping needs — `git add <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. `git branch` is left alone on
   purpose: a prefix deny would take `git branch --list` with it, which is diagnosis, and `-D` is the checkout's refusal. The folder's
   README, the step's frontmatter comment and its prose say what the denies are and that a prefix is a fence, not a sandbox (`git -C <dir>

@@ -17,9 +17,10 @@ what it reads is the store and the runs' own branches, and the little it writes 
 is not a constraint. `.claude/settings.json` refuses `git push` and `git branch -D` for every session in this
 checkout, and that is where those two live; it cannot refuse `git merge`, because `ship.md` runs in the same
 checkout and merging is its whole job. So the step's own fence is the only place the rest of the refusal can
-live, and it denies `git merge`, `git checkout`, `git switch`, `git rebase`, `git reset`, `git stash`,
-`git cherry-pick`, `git revert`, `git clean` and `git push` — the merge a run's ending step owns, and
-everything that moves or throws away what is in a person's checkout. What its bookkeeping needs is untouched:
+live, and it denies `git merge` and `git pull` — the merge a run's ending step owns, in both its spellings —
+and `git checkout`, `git switch`, `git restore`, `git rebase`, `git reset`, `git stash`, `git cherry-pick`,
+`git revert`, `git clean` and `git push`, the ordinary commands that move a person's checkout or throw away
+what is in it. It is a named list, not a complete one. What its bookkeeping needs is untouched:
 `git add <path>`, `git commit <path>`, `git status`, `git log`, `git diff`. It is a prefix fence and not a
 sandbox — `git -C <dir> merge` is not `git merge` — so it stops the command a session should not have typed,
 not a session that means to get round it.

@@ -1302,9 +1302,10 @@ screenshots through the look skill, and prepares the brief a person decides from
 itself, and it never types git for a run**: on a yes it says `wf approve <run> <step>`, and the run's own
 ending step does the shipping, in its folder's words, with the person's words on its brief.
 
-**Its `disallow:` denies that git by name**, because a sentence in its brief is not a constraint: `git merge`,
-`checkout`, `switch`, `rebase`, `reset`, `stash`, `cherry-pick`, `revert`, `clean` and `push`, as `Bash(git
-merge:*)` rules. The refusal has to live on the step. `.claude/settings.json` holds `git push` and `git branch
+**Its `disallow:` denies that git by name**, because a sentence in its brief is not a constraint: `git merge`
+and `git pull`, which merges too, then `checkout`, `switch`, `restore`, `rebase`, `reset`, `stash`,
+`cherry-pick`, `revert`, `clean` and `push`, as `Bash(git merge:*)` rules — a named list of the ordinary
+commands, not every way git can write. The refusal has to live on the step. `.claude/settings.json` holds `git push` and `git branch
 -D` for every session in the checkout, but it cannot hold `git merge`: `ship.md` runs in the same checkout,
 and merging is its whole job. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
 `git status`, `git log`, `git diff` — is not denied. A deny is a prefix, not a sandbox (`git -C <dir> merge`

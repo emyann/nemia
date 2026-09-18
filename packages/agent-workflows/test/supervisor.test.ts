@@ -40,7 +40,7 @@ const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrig
  * `.claude/settings.json` holds `git push` and `git branch -D` for every session here, but it cannot hold `git merge` — `ship.md` runs in
  * the same checkout and merging is its whole job — so the step's own `disallow:` is the only place this refusal can live.
  */
-const GIT_DENIED = ['merge', 'checkout', 'switch', 'rebase', 'reset', 'stash', 'cherry-pick', 'revert', 'clean', 'push'];
+const GIT_DENIED = ['merge', 'pull', 'checkout', 'switch', 'restore', 'rebase', 'reset', 'stash', 'cherry-pick', 'revert', 'clean', 'push'];
 
 /** The rules the shipped step is given, in the order it writes them. */
 const DENIED = [...IMPLEMENT_DENIED, ...GIT_DENIED.map((verb) => `Bash(git ${verb}:*)`)];
@@ -170,8 +170,11 @@ test("REFUSED by the shipped folder: the git a session in a person's checkout mu
     assert.ok(disallow!.includes(`Bash(git ${verb}:*)`), `git ${verb} is not denied: ${disallow!.join(', ')}`);
     assert.ok(denies(disallow!, `git ${verb} some-branch`), `a harness given this list would run \`git ${verb} some-branch\``);
   }
-  // The merge a run's own ending step does, as `ship.md` writes it: the one command this session exists not to type.
+  // The merge a run's own ending step does, as `ship.md` writes it: the one command this session exists not to type — in either spelling.
   assert.ok(denies(disallow!, 'git merge --no-ff --no-commit wf/add-sub-8imz/implement'));
+  assert.ok(denies(disallow!, 'git pull . wf/add-sub-8imz/implement'), '`git pull` merges too');
+  // And throwing away a person's uncommitted work, in either spelling.
+  assert.ok(denies(disallow!, 'git checkout -- CLAUDE.md') && denies(disallow!, 'git restore CLAUDE.md'));
 
   // And what its bookkeeping is told to do — write and commit by path, and read the world — is not denied by any of them.
   for (const command of [

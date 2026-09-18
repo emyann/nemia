@@ -3419,7 +3419,11 @@ export function composeBrief(
         '',
       );
     } else {
-      parts.push(`This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look. The checkout is at \`${run.baseRef}\`.`, '');
+      // And nothing about where the checkout stands. `run.baseRef` is the sha frozen at `wf start`, and the sentence above already names
+      // the branch: a step that does not end — the supervisor — is composed again on every answer, so from the first merge on, a
+      // present-tense "the checkout is at <sha>" named a commit several merges behind. The historical sentence above keeps the sha,
+      // because what a result branch was cut from does not move.
+      parts.push(`This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`, '');
     }
     parts.push(
       'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',

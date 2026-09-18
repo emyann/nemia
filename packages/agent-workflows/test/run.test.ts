@@ -301,6 +301,18 @@ test("a step in the checkout whose run cut no branch — the whole workflow is t
   assert.doesNotMatch(brief, /result branch/);
   assert.doesNotMatch(brief, /```\n```/, 'no fence with nothing in it');
   assert.match(brief, /the run commits nothing here for you/);
+  assert.doesNotMatch(brief, /The checkout is at/, 'a sha frozen at `wf start` is no claim about where the checkout stands now');
+});
+
+test("a late try of a step in the checkout is told the base branch by name, never the sha the run froze: a step that does not end is composed again on every answer", () => {
+  const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'main', slot: 'none' };
+  const r = run({ supervise: 't1' }, { steps: { supervise: { taskId: 't1', workspace: '/repo', branch: 'main', tries: [{ taskId: 't0', then: 'nudge' }, { taskId: 't0b', then: 'nudge' }, { taskId: 't0c', then: 'nudge' }] } } });
+  // Try 4, and a new session — a nudge whose last try left none to continue — so the whole brief is composed, `## Where to look` and all.
+  const briefing: RetryBriefing = { try: 4, by: 'person', mode: 'nudge', resumed: false, status: 'blocked', message: 'Merge it.' };
+  const brief = composeBrief(watcher, r, [watcher], () => undefined, FILES, undefined, briefing);
+  assert.match(brief, /You are in \/repo, the repository's own checkout, on main — not in a worktree of this run's\./, 'the base branch, by name');
+  assert.doesNotMatch(brief, /abc123/, "the run's frozen base is several merges behind by the fourth answer, and the brief claims nothing about it");
+  assert.doesNotMatch(brief, /The checkout is at/);
 });
 
 test("a step in the checkout is told the one place its files go: the run hands nothing off there, so nothing it leaves is collected or committed", () => {

@@ -1070,6 +1070,11 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   as long as the checkout is held. Seen at the merge: `wf decide` on a shipped run prints one line, *shipped — <branch> is already on
   main*, and not the ending's closeout — the summary ship.md says "is what the person who approved this reads next" is only on
   the engine's task record (`engine/tasks/<run>-ship.jsonl`) and `wf logs`. For the next agent-workflows run.
+  Torn down 2026-09-18 01:15Z: daemon stopped, the eight worktrees of the night removed through git, records and 111 `wf/*` branches
+  kept, nothing in flight, no run's session left. Found at the teardown: four processes of an engine test — two `ae-worker.ts` with a
+  fake `codex` under `/tmp/ae-pool-bin-*`, reparented to init — had outlived their suite by an hour, and `/tmp` holds 1,330
+  `ae-pool-*` directories the engine's tests never remove. Killed the four; the directories are left. For the engine's ledger:
+  which test leaks its workers, and a fixture that removes its directory.
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
 `each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
 the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,

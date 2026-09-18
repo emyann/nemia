@@ -1,8 +1,8 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, readFilings, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
-import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gateLines, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
+import { approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, readFilings, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
+import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
@@ -1375,28 +1375,37 @@ function lessonOf(touched: readonly Touched[]): Lesson {
  */
 const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck| --budget <amount>)?)/;
 
-/** A gate line's two commands, as `gateLines` prints them for a step awaiting approval: the approval, without its words, and the send-back. */
-const AT_GATE = /^awaiting approval:\s{2}(wf approve \S+ \S+)(?: \[--message "<words>"\])?\s{2}— or send it back:\s{2}(wf retry \S+ \S+ --message "<objection>")$/;
+/**
+ * A step waiting at its gate on a person, and the steps a send-back of it names (`sendBackTo`): what `wf decide` prints under the step, as
+ * the facts it prints them from rather than the sentence it prints. Empty `back` for an ending step that waits on nothing, which has no
+ * work to object to, and several for one that waits on several — `wf decide` prints a line for each.
+ */
+type AtGate = { step: string; back: string[] };
 
 /**
- * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and the send-back for
- * each step waiting at its gate on you (`gates`, `gateLines`' lines), then ship it and drop it for the branches, or read it for a run
- * worked on its base branch — which has nothing to merge, nor a branch to delete.
+ * The commands `wf decide` prints on a run awaiting a person: once more for each step it offers, the approval and a send-back for each
+ * step waiting at its gate on you (`gates`), then ship it and drop it for the branches, or read it for a run worked on its base branch —
+ * which has nothing to merge, nor a branch to delete.
+ *
+ * The gate's commands are built from the steps a send-back names and not read out of the package's own gate line: that line has no
+ * send-back at all for an ending step that waits on nothing, and joins the commands with ` or ` for one that waits on several, and a run
+ * whose only remaining action is an approval must not be handed an empty list of commands because a sentence did not parse.
  *
  * `endingMerges` is whether a step of the workflow acts on the base branch itself (`workspace: main`): ship it and drop it are for the folder
  * that says nothing about what happens when the work is done, and a folder that says it in prose does not also tell a person to type
  * `git merge` — its ending step is what merges, and a run parked at that step's gate is one approval away from doing it. As `wf decide`
  * decides it (cli.ts, `!merges(steps)`).
  */
-function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: Readonly<Record<string, string>> = {}, endingMerges = false): DecideCommand[] {
+function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: readonly AtGate[] = [], endingMerges = false): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
   const once = [
     ...offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said })),
-    ...Object.entries(gates).flatMap(([name, line]): DecideCommand[] => {
-      const [, approve, sendBack] = AT_GATE.exec(line) ?? [];
-      return approve && sendBack
-        ? [{ label: 'approve', command: approve, said: `${name} waits at its gate — with words: ${approve} --message "<words>"` }, { label: 'send back', command: sendBack, said: null }]
-        : [];
+    ...gates.flatMap(({ step, back }): DecideCommand[] => {
+      const approve = `wf approve ${run.id} ${step}`;
+      return [
+        { label: 'approve', command: approve, said: `${step} waits at its gate — with words: ${approve} --message "<words>"` },
+        ...back.map((name): DecideCommand => ({ label: 'send back', command: `wf retry ${run.id} ${name} --message "<objection>"`, said: null })),
+      ];
     }),
   ];
   if (d.direct) {
@@ -1467,8 +1476,11 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
   const offers = [...roundLines(steps, run, d, spendOf), ...retryLines(steps, run, d, phase, reader, asked, spendOf, verdicts)];
-  // Each step waiting at its gate on you — not one a person has sent back already, which waits on nobody — as `wf decide` prints its gate.
-  const gates = Object.fromEntries(Object.entries(gateLines(steps, run, phase, reader, asked, verdicts, spendOf)).filter(([name]) => judged.waitingOnYou.includes(name)));
+  // Each step waiting at its gate on you — not one a person has sent back already, which waits on nobody — with the steps its send-back
+  // names (`sendBackTo`), which is what `wf decide` prints under the step. The word is `listing`'s, as `needsOf` reads it for the verb.
+  const gates: AtGate[] = steps
+    .filter((step) => judged.words.get(step.name) === 'awaiting approval' && judged.waitingOnYou.includes(step.name))
+    .map((step) => ({ step: step.name, back: sendBackTo(step, run) }));
   return {
     standings,
     touched,

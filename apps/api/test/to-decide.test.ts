@@ -146,6 +146,49 @@ test("the decision of a run at its ending's gate offers the approval and the sen
   assert.deepEqual(standings?.map((b) => [b.branch, b.where]), [['wf/r-ending/implement', 'ahead']]);
 });
 
+test("an ending that waits on several steps offers a send-back to each, and one that waits on nothing offers only the approval — the gate's commands are never empty", async () => {
+  // A fan-in ending: `ship` after implement and docs, which the loader allows — nothing waits on it, and nothing ends beside it.
+  const fan = 'r-fan';
+  const wide = [
+    { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+    { name: 'docs', after: [], body: 'Write the docs.', harness: 'codex' },
+    { name: 'ship', after: ['implement', 'docs'], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true },
+  ];
+  branchOff(repo, `wf/${fan}/implement`, 'src/fan.ts', 'export const fan = 1;\n');
+  signedOff(`${fan}-implement`, repo);
+  signedOff(`${fan}-docs`, repo);
+  writeRun({
+    id: fan, repo, baseRef: base, workflow: wide,
+    steps: {
+      implement: { taskId: `${fan}-implement`, branch: `wf/${fan}/implement` },
+      docs: { taskId: `${fan}-docs`, branch: `wf/${fan}/implement` },
+      ship: { taskId: null },
+    },
+  });
+  const wideGate = await decisionOf(fan);
+  assert.deepEqual(wideGate.commands?.map((c) => c.label), ['approve', 'send back', 'send back'], 'a send-back for each step the objection could be about');
+  assert.deepEqual(wideGate.commands?.map((c) => c.command), [
+    `wf approve ${fan} ship`,
+    `wf retry ${fan} implement --message "<objection>"`,
+    `wf retry ${fan} docs --message "<objection>"`,
+  ]);
+
+  // And an ending that waits on nothing: a workflow of one step in the checkout, which the loader allows too. There is no work to send
+  // back, so the approval is the only command — and it is there.
+  const alone = 'r-alone';
+  writeRun({
+    id: alone, repo, baseRef: base,
+    workflow: [{ name: 'ship', after: [], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true }],
+    steps: { ship: { taskId: null } },
+  });
+  const lone = await decisionOf(alone);
+  assert.deepEqual(lone.commands?.map((c) => [c.label, c.command]), [['approve', `wf approve ${alone} ship`]]);
+  // Neither is handed `git merge` by hand: the ending step is what merges.
+  for (const { commands } of [wideGate, lone]) {
+    assert.deepEqual(commands?.filter((c) => c.label === 'ship it' || c.label === 'drop it'), []);
+  }
+});
+
 test('a finished run whose folder says nothing about shipping: `to decide` is its branch ahead of the base, and the command is `wf decide`', async () => {
   const id = 'r-plain';
   const branch = `wf/${id}/implement`;

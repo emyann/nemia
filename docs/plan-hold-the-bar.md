@@ -1062,6 +1062,14 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   graph are on main.** Its leaves: the builder still cannot set `workspace:`; `isShipped` costs two `merge-base` calls a branch,
   which one `git for-each-ref --merged` a repository would answer for a whole store (package side); the api remembers the
   branches it has seen on their base.
+  W16, two rounds, $31.41, **shipped by its own `ship` step, `e60540a`** — the first live ending: approved at 00:45Z with the operator's
+  words, filed on the next tick, merged with `--no-ff`, `npm test && npm run typecheck` green (two packages replayed from turbo's
+  cache, which the step judged sound and said so), committed and signed off at $0.75. So the supervisor's denies, the checkout hold's
+  run status and the hand-merged run's *shipped* are in. Its review's two doc-only notes: the board still shows Approve for a
+  hand-merged run, whose press would now get the package's 422; and the "one pass" window before a stale approval files ship lasts
+  as long as the checkout is held. Seen at the merge: `wf decide` on a shipped run prints one line, *shipped — <branch> is already on
+  main*, and not the ending's closeout — the summary ship.md says "is what the person who approved this reads next" is only on
+  the engine's task record (`engine/tasks/<run>-ship.jsonl`) and `wf logs`. For the next agent-workflows run.
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
 `each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
 the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,

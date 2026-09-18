@@ -3438,6 +3438,31 @@ test("a run at its ending step's gate is never shipped, and nothing that waits o
   assert.deepEqual([shipped.kind, shipped.kind === 'shipped' ? shipped.branches : []], ['shipped', ['wf/r-1/implement']]);
 });
 
+test("an ending's gate whose result git already has is nothing to decide: `to decide`, the listing and `wf approve` read the same standing — and only an ending that has not run, only on git's word", () => {
+  const ON = [{ branch: 'wf/r-1/implement', where: 'on' as const }];
+  const GONE = [{ branch: 'wf/r-1/implement', where: 'gone' as const }];
+  const onBase = assess(ENDS, atEnd(), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, ON);
+  assert.deepEqual([onBase.ready, onBase.toDecide], [[], undefined], 'nothing filed, and nothing to decide');
+  const l = listing(ENDS, atEnd(), DONE, signedDone, asked, () => undefined, [], [], [], [], () => 0, () => undefined, undefined, ON);
+  assert.deepEqual([l.toDecide, l.waitingOnYou], [undefined, []]);
+  assert.equal(l.steps[2]!.note, 'wf/r-1/implement is on main — nothing is left for ship to merge, and nothing waits on you; close the record if you want it closed: wf cancel r-1');
+  assert.equal(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [], () => undefined, ON),
+    'wf/r-1/implement is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. Nothing waits on you — if you want the record closed: wf cancel r-1.');
+
+  // A branch ahead, one git no longer has, and no standing read at all (the board's call) each leave the gate a person's word.
+  for (const [said, standings] of [['ahead', AHEAD], ['gone', GONE], ['not read', []]] as const) {
+    assert.equal(assess(ENDS, atEnd(), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, standings).toDecide?.kind, 'approve', said);
+    assert.equal(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [], () => undefined, standings), null, said);
+    assert.deepEqual(listing(ENDS, atEnd(), DONE, signedDone, asked, () => undefined, [], [], [], [], () => 0, () => undefined, undefined, standings).waitingOnYou, ['ship'], said);
+  }
+
+  // A gate on a last step that has run and merges nothing is acceptance of what it did, not a merge: git's standing does not answer it.
+  const accepted = [step('implement'), { ...step('review', ['implement']), gate: true }];
+  const signed = run({ implement: 't1', review: 't2' }, { steps: { implement: { taskId: 't1', workspace: '/wt', branch: 'wf/r-1/implement' }, review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' } } });
+  assert.deepEqual(assess(accepted, signed, DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, ON).toDecide, { kind: 'approve', step: 'review', says: null });
+  assert.equal(approvalRefusal(accepted, signed, 'review', undefined, DONE, signedDone, asked, () => undefined, [], () => undefined, ON), null);
+});
+
 test("`to decide` in a folder with no ending step: a finished run whose branch is ahead of the base and not gone, read off git each pass — and nothing once it is merged", () => {
   const ahead = assess(STEPS, finished(), DONE, signedDone, asked, () => undefined, [], [], () => false, () => undefined, AHEAD);
   assert.deepEqual([ahead.status, ahead.toDecide], ['succeeded', { kind: 'git', branches: ['wf/r-1/implement'] }]);

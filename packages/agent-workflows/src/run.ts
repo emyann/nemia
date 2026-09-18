@@ -333,6 +333,11 @@ export function approvalRefusal(
   /** What people asked for with `wf retry`, and the run has not consumed yet: a send-back already asked for. */
   asks: readonly RetryAsk[] = [],
   spendOf: SpendOf = () => undefined,
+  /**
+   * Where each result branch stands against the base branch, as git says it now (`branchStandings` in runner.ts): an ending whose result git
+   * already has has nothing to merge (`resultOnBase`). Left out, git is not asked, and the gate alone speaks.
+   */
+  standings: readonly BranchStanding[] = [],
 ): string | null {
   const command = `wf approve ${run.id} ${name}`;
   const words = approvalWordsRefusal(message, command);
@@ -378,6 +383,12 @@ export function approvalRefusal(
       const unfinished = notHandedOn(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
       return `${name} is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once ${andList(unfinished)} ${unfinished.length > 1 ? 'have' : 'has'} handed on — `
         + `your approval is then what files it, and nothing of it runs before that. See where the run stands: wf ls ${run.id}.`;
+    }
+    // At its gate, with the result it would merge already on the base branch — merged by hand, say (`resultOnBase`). Approving would file a
+    // session to merge what the base branch has, and nothing is left for anybody to decide: the one thing there is, is closing the record.
+    if (resultOnBase(standings)) {
+      return `${standings.map((s) => branchWord(run, s)).join(', ')}, so there is nothing left for ${name} to merge: approving would file it to merge what the base branch already has. `
+        + `Nothing waits on you — if you want the record closed: wf cancel ${run.id}.`;
     }
   }
   if (status === 'awaiting approval') return null;
@@ -571,6 +582,23 @@ export const branchWord = (run: Pick<Run, 'branch'>, s: BranchStanding): string 
     : `${s.branch} is gone: git no longer has it`);
 
 /**
+ * Whether git has already taken a run's result: every result branch is on the base branch (`branchStandings`), so an ending step that merges
+ * has nothing left to merge — a person merged it by hand, as happened to the run that built the checkout hold, or the work committed
+ * nothing past the run's base. Pure.
+ *
+ * False with no standings read, which is every caller that has not asked git (the board's): there the gate alone speaks, as it always did.
+ */
+export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
+  standings.length > 0 && standings.every((b) => b.where === 'on');
+
+/**
+ * An ending at its gate whose work git already has on the base branch, beside its line on `wf ls` where the approval would be: where each
+ * branch stands, that nothing is left for the step to merge, and the one command there still is. Pure.
+ */
+const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: readonly BranchStanding[]): string =>
+  `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge, and nothing waits on you; close the record if you want it closed: wf cancel ${run.id}`;
+
+/**
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
  * at a gate.
  *
@@ -595,8 +623,15 @@ export function toDecide(
 ): ToDecide | undefined {
   if (run.cancelledAt || status === 'running' || status === 'cancelled') return undefined;
   const waiting = endingSteps(steps, run).find((s) => statusOf(s.name) === 'awaiting approval');
-  // What it would do, for an ending that has not run; its closeout, which the screen prints, for a gated step that has signed off.
-  if (waiting) return { kind: 'approve', step: waiting.name, says: run.steps[waiting.name]?.taskId ? null : firstLine(waiting.body) };
+  if (waiting) {
+    // Unless git has already taken the result (`resultOnBase`): an ending that has not run would merge a branch the base branch already
+    // has, so there is nothing to decide and nothing for an approval to file. Read off git each pass, like the `git` kind below — a person
+    // who merges by hand tells the run nothing, and this is how it finds out. Its listing says where the branch stands, and `wf approve` is
+    // refused in those words (`approvalRefusal`).
+    if (approvedFirst(waiting, run) && !run.steps[waiting.name]?.taskId && resultOnBase(standings)) return undefined;
+    // What it would do, for an ending that has not run; its closeout, which the screen prints, for a gated step that has signed off.
+    return { kind: 'approve', step: waiting.name, says: run.steps[waiting.name]?.taskId ? null : firstLine(waiting.body) };
+  }
   // Only a run every step of which finished: one waiting on a person for a step that broke is waiting on them for that, and says so.
   if (status !== 'succeeded' || merges(steps)) return undefined;
   const ahead = standings.filter((b) => b.where === 'ahead').map((b) => b.branch);
@@ -3168,6 +3203,10 @@ export function listing(
   const refiled = roundSpans(steps, rounds);
   // Nor does an ending step hold its gate while the work it would act on is filed again (`unheld`): it reads as the waiting step it is.
   const waitingAgain = unheld(steps, run, due, rounds);
+  // And an ending at its gate whose work git already has on the base branch waits on nobody (`resultOnBase`), as `toDecide` reads it: its
+  // line says where the branch stands where the approval would be, and `wf approve` is refused in those words (`approvalRefusal`).
+  const takenByHand = (name: string): boolean =>
+    resultOnBase(standings) && !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
 
   const waitingOnYou: string[] = [];
   const exhausted = new Set<string>();
@@ -3194,7 +3233,10 @@ export function listing(
       : heldLoops.has(step.name) ? heldNote(step, run)
       : tryNote(step, run.steps[step.name], steps, Boolean(answerOf(run, step.name, answers)));
     // A step at its gate says the two words a person has, beside the try it is on: a gate held again after a send-back is on its second.
-    const gate = atGates.has(step.name) && !retry ? gateNote(run, step.name, sendBackTo(step, run)) : '';
+    // An ending whose result git already has says that instead, and the one command there still is.
+    const gate = !atGates.has(step.name) || retry ? ''
+      : takenByHand(step.name) ? onBaseNote(run, step.name, standings)
+      : gateNote(run, step.name, sendBackTo(step, run));
     // A step its current try's session was told something, said beside the try it is on: a person's word the reviewer has to weigh.
     const note = [tried, gate, saidWord(saidTo(step.name))].filter(Boolean).join(' · ');
     return { ...row, ...(note ? { note } : {}), ...cost };
@@ -3217,7 +3259,7 @@ export function listing(
 
     const status = refiled.has(name) ? own : stands;
     const onYou = status === 'blocked' || status === 'unsigned' || status === 'failed (check)' || status === 'awaiting approval' || status === 'exhausted' || status === 'over budget' || status === 'budget exhausted';
-    if (onYou && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
+    if (onYou && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name)) waitingOnYou.push(name);
     // A cap reached says so, with what was spent and the cap in force: `over budget $4.20 of $3`.
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);

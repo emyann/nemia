@@ -161,6 +161,59 @@ test('a run stops at its ending step: nothing of it is filed, the checkout is un
   assert.equal(isShipped(readRun(id), branch), false);
 });
 
+test("REFUSED at shipped defaults: an ending's gate whose result a person merged by hand — nothing to decide, the listing says where the branch stands, and `wf approve` names `wf cancel` instead", async (t) => {
+  const { repo, id, branch, e, filings } = await atTheGate();
+  assert.equal((await list(e, readRun(id))).toDecide?.kind, 'approve', 'at its gate, with the branch ahead: a decision to make');
+
+  // A person merges the result by hand, as happened to the run that built the checkout hold. Nobody tells the run.
+  git(repo, 'merge', '--no-ff', '--no-edit', branch);
+  assert.equal(isShipped(readRun(id), branch), true);
+
+  // `wf ls`: nothing to decide, nobody waited on, and the ending's line says where the branch stands and the one command there still is.
+  const listed = await list(e, readRun(id));
+  assert.equal(listed.toDecide, undefined, 'nothing to decide: git already has the result');
+  assert.deepEqual(listed.waitingOnYou, [], 'and nobody is waited on for an approval that would be refused');
+  const ship = listed.steps.find((s) => s.name === 'ship')!;
+  assert.deepEqual([ship.status, ship.note], ['awaiting approval',
+    `${branch} is on main — nothing is left for ship to merge, and nothing waits on you; close the record if you want it closed: wf cancel ${id}`]);
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
+  try { await main(['ls', id], e); } finally { log.mock.restore(); }
+  assert.ok(!printed.some((l) => l.includes('→ to decide') || l.includes('→ waiting on you')), printed.join('\n'));
+  assert.ok(printed.some((l) => l.includes(`${branch} is on main — nothing is left for ship to merge`)), printed.join('\n'));
+
+  // `wf approve`: refused, saying so, and naming what to type if the record should be closed.
+  await assert.rejects(approve(e, id, 'ship', 'Merge it.'), (err: Error & { exitCode?: number }) => {
+    assert.equal(err.exitCode, 2);
+    assert.equal(err.message, `${branch} is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. `
+      + `Nothing waits on you — if you want the record closed: wf cancel ${id}.`);
+    return true;
+  });
+  assert.deepEqual(readRun(id).approvals ?? [], [], 'nothing was written');
+
+  // And ship is never filed: pass after pass, nothing of it runs.
+  for (const pass of [1, 2]) assert.deepEqual((await advance(e, readRun(id))).filed, [], `pass ${pass}`);
+  assert.deepEqual(filings, [`${id}-implement`]);
+  assert.equal(readRun(id).steps.ship!.taskId, null);
+
+  // The command it names is honoured: the record is closed, and there is nothing to decide about it.
+  await cancel(e, id);
+  assert.equal((await decide(e, id)).decision.kind, 'cancelled');
+});
+
+test("an ending's gate is a decision again once the base branch no longer has the result: git is read each pass, and the approval is honoured", async () => {
+  const { repo, id, branch, e, base } = await atTheGate();
+  git(repo, 'merge', '--no-ff', '--no-edit', branch);
+  assert.equal((await list(e, readRun(id))).toDecide, undefined);
+  // Taken back — the merge reset away before anybody pushed it: the branch is ahead again, and the gate is a person's word again.
+  git(repo, 'reset', '-q', '--hard', base);
+  const listed = await list(e, readRun(id));
+  assert.equal(listed.toDecide?.kind, 'approve');
+  assert.match(listed.steps.find((s) => s.name === 'ship')!.note ?? '', /^approve it: wf approve /);
+  assert.equal((await approve(e, id, 'ship')).approval.step, 'ship');
+  assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
+});
+
 test('an approved ending is filed, in the repository\'s own checkout, and the merge its prose describes ships the run', async () => {
   const { repo, id, branch, e, tasks, settle, base } = await atTheGate();
   const { approval } = await approve(e, id, 'ship', 'Merge it.');

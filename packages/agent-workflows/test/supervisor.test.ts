@@ -33,6 +33,25 @@ const said = (text: string) => text.replace(/\s+/g, ' ');
 /** What an unattended session has and no step needs (plan §4b, "what a worker gets, measured"), as every implement is denied it. */
 const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
 
+/**
+ * The git this session must never type in a person's own checkout, denied by name on the step itself: the merge a run's ending step owns,
+ * and everything that moves or throws away what is in that checkout.
+ *
+ * `.claude/settings.json` holds `git push` and `git branch -D` for every session here, but it cannot hold `git merge` — `ship.md` runs in
+ * the same checkout and merging is its whole job — so the step's own `disallow:` is the only place this refusal can live.
+ */
+const GIT_DENIED = ['merge', 'pull', 'checkout', 'switch', 'restore', 'rebase', 'reset', 'stash', 'cherry-pick', 'revert', 'clean', 'push'];
+
+/** The rules the shipped step is given, in the order it writes them. */
+const DENIED = [...IMPLEMENT_DENIED, ...GIT_DENIED.map((verb) => `Bash(git ${verb}:*)`)];
+
+/** Whether a deny list refuses a command, as a harness reads a `Bash(<prefix>:*)` rule: the command is the prefix, or begins with it and a space. */
+const denies = (rules: readonly string[], command: string): boolean =>
+  rules.some((rule) => {
+    const prefix = /^Bash\((.+):\*\)$/.exec(rule)?.[1];
+    return prefix !== undefined && (command === prefix || command.startsWith(`${prefix} `));
+  });
+
 /** A repository with one commit, so `wf start` has a base to record. */
 const aRepo = (): string => {
   const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
@@ -96,7 +115,7 @@ test('the supervisor is one step that never ends: in the repository\'s checkout,
   const { after, workspace, slot, harness, model, remote, disallow, check, tools, output, gate, loop, resume, input } = supervise;
   assert.deepEqual({ after, workspace, slot, harness, model, remote, disallow, check, tools, output, gate, loop, resume, input }, {
     after: [], workspace: 'main', slot: 'none', harness: 'claude', model: 'opus', remote: true,
-    disallow: IMPLEMENT_DENIED, check: undefined, tools: undefined, output: undefined, gate: undefined, loop: undefined, resume: undefined, input: undefined,
+    disallow: DENIED, check: undefined, tools: undefined, output: undefined, gate: undefined, loop: undefined, resume: undefined, input: undefined,
   });
   assert.deepEqual(terminalSteps(steps).map((s) => s.name), ['supervise'], 'it is the whole workflow');
   // No `output:` and no `gate:`, which is what lets it sign off `blocked` and be answered for ever: a declared output would have to be
@@ -140,6 +159,39 @@ test("the supervisor's brief is the loop: what it watches, how it reads a run to
   // The skill it is told to use is in the repository, under that name, and this step has every tool, so `Skill` loads it.
   assert.ok(fs.existsSync(path.join(REPO, '.claude', 'skills', 'look', 'SKILL.md')));
   assert.equal(loadWorkflows(FOLDER)[0]!.tools, undefined, 'the harness\'s own set: it reads the store, git, the registry and the browser');
+});
+
+test("REFUSED by the shipped folder: the git a session in a person's checkout must never type is denied by name, and the bookkeeping it does need is not", () => {
+  const { disallow } = loadWorkflows(FOLDER)[0]!;
+  assert.ok(disallow, 'the step carries a deny list');
+
+  // Each one on its own, so a rule dropped from the folder fails here by name rather than in one deepEqual nobody reads.
+  for (const verb of GIT_DENIED) {
+    assert.ok(disallow!.includes(`Bash(git ${verb}:*)`), `git ${verb} is not denied: ${disallow!.join(', ')}`);
+    assert.ok(denies(disallow!, `git ${verb} some-branch`), `a harness given this list would run \`git ${verb} some-branch\``);
+  }
+  // The merge a run's own ending step does, as `ship.md` writes it: the one command this session exists not to type — in either spelling.
+  assert.ok(denies(disallow!, 'git merge --no-ff --no-commit wf/add-sub-8imz/implement'));
+  assert.ok(denies(disallow!, 'git pull . wf/add-sub-8imz/implement'), '`git pull` merges too');
+  // And throwing away a person's uncommitted work, in either spelling.
+  assert.ok(denies(disallow!, 'git checkout -- CLAUDE.md') && denies(disallow!, 'git restore CLAUDE.md'));
+
+  // And what its bookkeeping is told to do — write and commit by path, and read the world — is not denied by any of them.
+  for (const command of [
+    'git add packages/agent-workflows/docs/features.md',
+    'git commit CLAUDE.md -m "a trap the queue taught"',
+    'git status --porcelain',
+    'git log --oneline main..wf/add-sub-8imz/implement',
+    'git diff main...wf/add-sub-8imz/implement',
+    'git show HEAD',
+  ]) assert.equal(denies(disallow!, command), false, `${command} is denied, and the step is told to run it`);
+
+  // `git push` and `git branch -D` are the checkout's own refusal too (`.claude/settings.json`), which is why the step says nothing of
+  // `git branch`: denying it by prefix would take `git branch --list` with it, and that is diagnosis.
+  const settings = JSON.parse(fs.readFileSync(path.join(REPO, '.claude', 'settings.json'), 'utf8')) as { permissions: { deny: string[] } };
+  assert.ok(settings.permissions.deny.includes('Bash(git push:*)'));
+  assert.ok(settings.permissions.deny.some((r) => r.startsWith('Bash(git branch -D')));
+  assert.equal(denies(disallow!, 'git branch --list'), false);
 });
 
 // ─── a step that never ends ─────────────────────────────────────────────────

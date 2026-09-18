@@ -19,7 +19,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, approve, cancel, decide, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
+const { advance, approve, cancel, decide, forget, isShipped, list, readRun, retry, round, start } = await import('../src/runner.ts');
 const { main } = await import('../src/cli.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
@@ -161,6 +161,84 @@ test('a run stops at its ending step: nothing of it is filed, the checkout is un
   assert.equal(isShipped(readRun(id), branch), false);
 });
 
+test("REFUSED at shipped defaults: an ending's gate whose result a person merged by hand — the run has shipped as git reads it, a run `--after` it starts, every screen agrees, and `wf approve` names `wf cancel` instead", async (t) => {
+  const { repo, id, branch, e, filings } = await atTheGate();
+  assert.equal((await list(e, readRun(id))).toDecide?.kind, 'approve', 'at its gate, with the branch ahead: a decision to make');
+  // A run waiting on it: nothing of it is filed while the result is off the base.
+  const child = start({ brief: 'read the flag', repo, workflowDir: oneStep(), after: [id] });
+  assert.deepEqual((await advance(e, readRun(child.id))).filed, [], 'the child waits on a run that has not shipped');
+
+  // A person merges the result by hand, as happened to the run that built the checkout hold. Nobody tells the run.
+  git(repo, 'merge', '--no-ff', '--no-edit', branch);
+  assert.equal(isShipped(readRun(id), branch), true);
+
+  // `wf ls`: nothing to decide, nobody waited on, and the ending's line says where the branch stands and the one command there still is.
+  const listed = await list(e, readRun(id));
+  assert.equal(listed.toDecide, undefined, 'nothing to decide: git already has the result');
+  assert.deepEqual(listed.waitingOnYou, [], 'and nobody is waited on for an approval that would be refused');
+  const ship = listed.steps.find((s) => s.name === 'ship')!;
+  assert.deepEqual([ship.status, ship.note], ['awaiting approval',
+    `${branch} is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: wf cancel ${id}`]);
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
+  try { await main(['ls', id], e); } finally { log.mock.restore(); }
+  assert.ok(!printed.some((l) => l.includes('→ to decide') || l.includes('→ waiting on you')), printed.join('\n'));
+  assert.ok(printed.some((l) => l.includes(`${branch} is on main — nothing is left for ship to merge`)), printed.join('\n'));
+
+  // `wf decide` says the same, before anybody closes the record: shipped, the ending never ran, and no AWAITING APPROVAL above a branch on main.
+  const { decision } = await decide(e, id);
+  assert.deepEqual([decision.kind, decision.kind === 'shipped' ? decision.branches : []], ['shipped', [branch]]);
+  const screen: string[] = [];
+  const log2 = t.mock.method(console, 'log', (...args: unknown[]) => { screen.push(args.map(String).join(' ')); });
+  try { await main(['decide', id], e); } finally { log2.mock.restore(); }
+  assert.ok(screen.some((l) => l.endsWith(`\n\n  shipped — ${branch} is already on main\n  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: wf cancel ${id}`)), screen.join('\n'));
+  assert.ok(!screen.some((l) => l.includes('AWAITING APPROVAL') || l.includes('wf approve')), screen.join('\n'));
+
+  // `wf approve`: refused, saying so, and naming what to type if the record should be closed.
+  await assert.rejects(approve(e, id, 'ship', 'Merge it.'), (err: Error & { exitCode?: number }) => {
+    assert.equal(err.exitCode, 2);
+    assert.equal(err.message, `${branch} is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. `
+      + `The run has shipped as git reads it — wf decide ${id} says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: wf cancel ${id}.`);
+    return true;
+  });
+  assert.deepEqual(readRun(id).approvals ?? [], [], 'nothing was written');
+
+  // And ship is never filed: pass after pass, nothing of it runs — while the run that waited on it starts, on git's word.
+  for (const pass of [1, 2]) assert.deepEqual((await advance(e, readRun(id))).filed, [], `pass ${pass}`);
+  assert.deepEqual(filings, [`${id}-implement`]);
+  assert.equal(readRun(id).steps.ship!.taskId, null);
+  assert.deepEqual((await advance(e, readRun(child.id))).filed, ['implement'], 'the child starts: its parent has shipped');
+
+  // The command it names is honoured, once the child has started: the record is closed, and there is nothing to decide about it.
+  await cancel(e, id);
+  assert.equal((await decide(e, id)).decision.kind, 'cancelled');
+});
+
+test("`wf rm` of a run whose ending never ran and whose result a person merged by hand forgets it: the gate holds nothing, so the approval it named is not named", async () => {
+  const { repo, id, branch, e } = await atTheGate();
+  const held = await forget(e, id);
+  assert.equal(held.kind, 'refused', 'at its gate with the branch ahead, the run is held');
+  assert.match(held.kind === 'refused' ? held.refusal : '', new RegExp(`ship waits at its gate for your approval, and it is filed once it is approved: wf approve ${id} ship`));
+
+  git(repo, 'merge', '--no-ff', '--no-edit', branch);
+  const forgot = await forget(e, id);
+  assert.equal(forgot.kind, 'forgotten', forgot.kind === 'refused' ? forgot.refusal : '');
+  assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${id}.json`)), false);
+});
+
+test("an ending's gate is a decision again once the base branch no longer has the result: git is read each pass, and the approval is honoured", async () => {
+  const { repo, id, branch, e, base } = await atTheGate();
+  git(repo, 'merge', '--no-ff', '--no-edit', branch);
+  assert.equal((await list(e, readRun(id))).toDecide, undefined);
+  // Taken back — the merge reset away before anybody pushed it: the branch is ahead again, and the gate is a person's word again.
+  git(repo, 'reset', '-q', '--hard', base);
+  const listed = await list(e, readRun(id));
+  assert.equal(listed.toDecide?.kind, 'approve');
+  assert.match(listed.steps.find((s) => s.name === 'ship')!.note ?? '', /^approve it: wf approve /);
+  assert.equal((await approve(e, id, 'ship')).approval.step, 'ship');
+  assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
+});
+
 test('an approved ending is filed, in the repository\'s own checkout, and the merge its prose describes ships the run', async () => {
   const { repo, id, branch, e, tasks, settle, base } = await atTheGate();
   const { approval } = await approve(e, id, 'ship', 'Merge it.');
@@ -216,6 +294,7 @@ test("two runs' ending steps never work in one checkout at once: the oldest appr
   const one = await advance(e, readRun(first.id));
   const two = await advance(e, readRun(second.id));
   assert.deepEqual([one.filed, two.filed], [[], ['ship']], 'one ending, in one checkout');
+  assert.equal(one.inFlight, true, 'and the run held back is in flight all the same: its ending is approved, and a directory is what it waits for');
   assert.equal(readRun(first.id).steps.ship!.taskId, null);
   assert.equal(readRun(second.id).steps.ship!.workspace, repo, "and the one that was filed is in the repository's own checkout");
 
@@ -280,6 +359,34 @@ test("a try of an ending step waits for the checkout as its first filing does: a
   const tried = await advance(e, readRun(second.id));
   assert.deepEqual(tried.tried, ['ship']);
   assert.equal(readRun(second.id).steps.ship!.workspace, repo);
+});
+
+test("a run whose ending's try the checkout holds is a run still running: `wf ls`, `wf decide` and the pass agree, and it still counts against the cap on runs in flight", async () => {
+  const { first, second, e, settle } = await twoApproved();
+  // The older approval takes the checkout and signs off blocked; the other run takes the freed directory; a person answers the blocked one.
+  await advance(e, readRun(second.id));
+  settle(`${second.id}-ship`, 'succeeded', BLOCKED);
+  assert.deepEqual((await advance(e, readRun(first.id))).filed, ['ship']);
+  await retry(e, second.id, 'ship', { mode: 'nudge', message: 'the check was green here; run it again' });
+
+  // A try asked for and not yet filed is work in hand, not a run waiting on a person.
+  const pass = await advance(e, readRun(second.id));
+  assert.deepEqual([pass.filed, pass.tried], [[], []], 'nothing of it is filed while the other run is in the checkout');
+  assert.equal(pass.status, 'running', 'and the run is running, not failed');
+  assert.equal(pass.inFlight, true, 'so the cap on runs in flight still counts it: the slot is held for the ending it is queued for');
+
+  // The three screens say the same thing in that window.
+  const listed = await list(e, readRun(second.id));
+  assert.deepEqual(listed.waitingOnYou, [], 'nobody is waited on — the answer was given, and what holds it is a directory');
+  assert.equal(listed.toDecide, undefined, 'and there is nothing to decide');
+  assert.deepEqual([listed.steps[1]!.status, listed.steps[1]!.note],
+    ['succeeded · BLOCKED', `try 2 asked (--nudge) — waiting on the checkout (${first.id}'s ship has it)`]);
+  const { decision } = await decide(e, second.id);
+  assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
+
+  // And the try is filed, as it always was, on the first pass after the step in the checkout settles.
+  settle(`${first.id}-ship`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(second.id))).tried, ['ship']);
 });
 
 test("a cancelled run holds the checkout while its ending's session is still in it: `wf cancel` asks the engine to stop it, and it is still merging until it has", async () => {

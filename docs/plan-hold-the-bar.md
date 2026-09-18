@@ -1057,8 +1057,11 @@ dependent ones `--after` the runs they need so each is cut from a main that has 
   give it to. One flake seen under load during a trial merge, gone on the rerun: `agent-engine/test/say.test.ts` and
   `apps/api/test/transcript.test.ts` each failed as a file at about 10.8s.
   W14, two rounds, $22.21, **merged, `242f9b1`**, its one finding (a GNU-only `cp` flag named in a refusal) fixed at the merge;
-  W16 started on it. B17 is in its third round after an unsigned second (nudged by hand at $115). **All six of the graph are
-  in but B17.**
+  W16 started on it. B17, three rounds (the second ended unsigned at $115 and was nudged by hand), $155.51, **merged by hand,
+  `4dec94c`** — one hunk of `app.ts` against W13, and the last review's one-line finding applied at the merge. **All six of the
+  graph are on main.** Its leaves: the builder still cannot set `workspace:`; `isShipped` costs two `merge-base` calls a branch,
+  which one `git for-each-ref --merged` a repository would answer for a whole store (package side); the api remembers the
+  branches it has seen on their base.
 Each finishes at a question to the operator (merge or hold); a merge lets the tick file what waited on it. The operator's own card
 `each-node-of-the-factory-can-bol3` (any node on the Factory draggable, what waits on it following) finished unnoticed for a while —
 the watch knew only the ids this session filed, and the board shows a finished run as finished, not as a decision — merged `7994c4c`,

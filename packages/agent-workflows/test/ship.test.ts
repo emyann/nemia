@@ -282,6 +282,34 @@ test("a try of an ending step waits for the checkout as its first filing does: a
   assert.equal(readRun(second.id).steps.ship!.workspace, repo);
 });
 
+test("a run whose ending's try the checkout holds is a run still running: `wf ls`, `wf decide` and the pass agree, and it still counts against the cap on runs in flight", async () => {
+  const { first, second, e, settle } = await twoApproved();
+  // The older approval takes the checkout and signs off blocked; the other run takes the freed directory; a person answers the blocked one.
+  await advance(e, readRun(second.id));
+  settle(`${second.id}-ship`, 'succeeded', BLOCKED);
+  assert.deepEqual((await advance(e, readRun(first.id))).filed, ['ship']);
+  await retry(e, second.id, 'ship', { mode: 'nudge', message: 'the check was green here; run it again' });
+
+  // A try asked for and not yet filed is work in hand, not a run waiting on a person.
+  const pass = await advance(e, readRun(second.id));
+  assert.deepEqual([pass.filed, pass.tried], [[], []], 'nothing of it is filed while the other run is in the checkout');
+  assert.equal(pass.status, 'running', 'and the run is running, not failed');
+  assert.equal(pass.inFlight, true, 'so the cap on runs in flight still counts it: the slot is held for the ending it is queued for');
+
+  // The three screens say the same thing in that window.
+  const listed = await list(e, readRun(second.id));
+  assert.deepEqual(listed.waitingOnYou, [], 'nobody is waited on — the answer was given, and what holds it is a directory');
+  assert.equal(listed.toDecide, undefined, 'and there is nothing to decide');
+  assert.deepEqual([listed.steps[1]!.status, listed.steps[1]!.note],
+    ['succeeded · BLOCKED', `try 2 asked (--nudge) — waiting on the checkout (${first.id}'s ship has it)`]);
+  const { decision } = await decide(e, second.id);
+  assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
+
+  // And the try is filed, as it always was, on the first pass after the step in the checkout settles.
+  settle(`${first.id}-ship`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(second.id))).tried, ['ship']);
+});
+
 test("a cancelled run holds the checkout while its ending's session is still in it: `wf cancel` asks the engine to stop it, and it is still merging until it has", async () => {
   const { repo, first, second, e, settle, tasks } = await twoApproved();
   await advance(e, readRun(second.id));

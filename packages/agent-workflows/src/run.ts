@@ -173,6 +173,12 @@ export type Assessment = {
   round: Round[];
   /** Steps that can never run, because something they wait on is final without satisfying them. */
   blocked: string[];
+  /**
+   * Steps the repository's own checkout holds back on this pass (`heldByCheckout`): an ending a person's word would file, or a try of one,
+   * while another run's `workspace: main` step is in that one directory. Nothing of them is filed, and the run is running for them — so the
+   * cap on runs in flight still counts it (`slotNeed`), as it counts a run whose next step the pass files.
+   */
+  held: string[];
   status: 'running' | 'succeeded' | 'failed' | 'cancelled';
   /** What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing. */
   toDecide?: ToDecide;
@@ -224,17 +230,22 @@ export function assess(
   // cheerfully its predecessors succeeded — which is the entire reason the fact is written down:
   // a tick after a cancel must not helpfully start the next step of a run somebody just stopped.
   // Nor its checks: a suite nobody will read the verdict of is a suite nobody asked for. Nor a try, nor a round.
-  if (run.cancelledAt) return { ready: [], check: [], retry: [], round: [], blocked: [], status: 'cancelled' };
+  if (run.cancelledAt) return { ready: [], check: [], retry: [], round: [], blocked: [], held: [], status: 'cancelled' };
 
   const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   const status = new Map(steps.map((s) => [s.name, stood.get(s.name)!.status]));
   // A step about to be tried again is not final: what waits on it waits, and the run is still going.
   // An ending step works in the repository's own checkout, and while another run's is in that one directory nothing of it is filed
   // (`heldByCheckout`): not a first session, and not the try a person asked for after it ended blocked or its check refused — two sessions
-  // trial merging there at once is the collision the hold is for. It keeps the status it ended with, and waits.
-  const retry = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf)
-    .filter((r) => !heldByCheckout(steps, r.step, checkout));
-  for (const r of retry) status.set(r.step, 'running');
+  // trial merging there at once is the collision the hold is for. The try is not filed on this pass, and the step is still `running` all
+  // the same: a try a person asked for is work asked for and not yet filed, so nobody is waited on for it. Reading it as the status it
+  // ended with made the run `failed` while its ending waited its turn — `wf decide` said "BLOCKED, waiting on you: ship" and offered a
+  // `wf retry` that `retryRefusal` refuses, while `wf ls` said it was waiting on the checkout, and the run stopped counting against the
+  // cap on runs in flight. The held names go to `held`, which is what makes it count.
+  const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
+  const retry = due.filter((r) => !heldByCheckout(steps, r.step, checkout));
+  const held: string[] = due.filter((r) => heldByCheckout(steps, r.step, checkout)).map((r) => r.step);
+  for (const r of due) status.set(r.step, 'running');
   // Nor is a looping step whose loop goes round again: what waits on it waits for the next round's answer. And no step of that loop is held
   // on its budget on the pass before the round is filed: the round is what a person raised the cap for (`roundSpans`).
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
@@ -259,7 +270,9 @@ export function assess(
     if (deps.some(stopsFollowers)) blocked.push(step.name);
     // An ending step works in the repository's own checkout, and another run's is in it (`heldByCheckout`): it waits, and is filed once
     // that one settles. Everything else it needs is here, so nothing but the checkout is between it and being filed.
-    else if (deps.every(satisfiesAfter) && !heldByCheckout(steps, step.name, checkout)) ready.push(step.name);
+    else if (!deps.every(satisfiesAfter)) continue;
+    else if (heldByCheckout(steps, step.name, checkout)) held.push(step.name);
+    else ready.push(step.name);
   }
 
   const all = [...status.values()];
@@ -269,7 +282,7 @@ export function assess(
     : 'running';
 
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'waiting', standings);
-  return { ready, check, retry, round, blocked, status: overall, ...(decide ? { toDecide: decide } : {}) };
+  return { ready, check, retry, round, blocked, held, status: overall, ...(decide ? { toDecide: decide } : {}) };
 }
 
 // ─── a gate: a handoff that waits for a person ─────────────────────────────
@@ -704,7 +717,7 @@ export function runCapOf(value: string | undefined): number {
 export function slotNeed(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round'>,
+  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'held'>,
   shipped: (runId: string) => boolean,
   /** The run's steps, for the one workflow the cap does not hold (`takesNoSlot`). Left out, every run is counted, as every run was. */
   steps: readonly Pick<Workflow, 'slot'>[] = [],
@@ -712,7 +725,9 @@ export function slotNeed(
   // A run that watches the others is in nobody's way and waits for nobody: it neither counts against the cap nor asks it for anything.
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
-  const due = a.ready.length + a.check.length + a.retry.length + a.round.length > 0;
+  // What the checkout holds back counts as due (`Assessment.held`): the word that files it is given, and what stands in the way is another
+  // run's ending in one directory — not a person. A run that stopped counting there would free the very slot the ending is queued for.
+  const due = a.ready.length + a.check.length + a.retry.length + a.round.length + a.held.length > 0;
   return {
     inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
     wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, shipped),

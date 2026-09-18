@@ -4,7 +4,7 @@ import { StatusChip } from '../components/StatusChip';
 import { WorkflowLink } from '../components/WorkflowLink';
 import { runsQuery, type RunSummary } from '../lib/api';
 import { spentTitle } from '../lib/cost';
-import { inFlight, inFlightFirst, onYouOf, titleOf, waitsOnYou } from '../lib/factory';
+import { inFlight, inFlightFirst, onYouOf, titleOf, toDecideOf, waitsOnYou } from '../lib/factory';
 
 export const Route = createFileRoute('/runs/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(runsQuery),
@@ -29,24 +29,31 @@ function Runs() {
     );
   }
 
-  // The runs still going on top, then the rest, each newest first (`inFlightFirst`): the api lists them by id. Under a heading each, in
-  // the Factory's words and counts, since no row says whether its run is in flight: without one, the first finished row, newer than the
-  // last in flight, reads as a sort gone wrong.
+  // The runs still going on top, then those nobody has decided, then the rest, each newest first (`inFlightFirst`): the api lists them by
+  // id. Under a heading each, in the Factory's words and counts, since no row says whether its run is in flight: without one, the first
+  // finished row, newer than the last in flight, reads as a sort gone wrong.
+  //
+  // To decide between the two, as `wf ls` says it before who else a run waits on: a run at its result that nobody has decided is finished,
+  // and would otherwise be a row among the finished with nothing to say it is the one row that is waiting for a person. In flight first all
+  // the same, for a run that is somehow both: what still moves is not yet a result to decide.
   const ordered = inFlightFirst(runs);
   const flying = ordered.filter((run) => inFlight(run));
-  const finished = ordered.filter((run) => !inFlight(run));
+  const deciding = ordered.filter((run) => !inFlight(run) && toDecideOf(run) !== null);
+  const finished = ordered.filter((run) => !inFlight(run) && toDecideOf(run) === null);
 
   return (
     <article className="space-y-8">
       {flying.length > 0 && <RunGroup group="in-flight" title="In flight" about="something of each still moves" runs={flying} />}
+      {deciding.length > 0 && <RunGroup group="to-decide" title="To decide" about="each is at its result, and nobody has decided it" runs={deciding} />}
       {finished.length > 0 && <RunGroup group="finished" title="Finished" about="nothing of these moves any more" runs={finished} />}
     </article>
   );
 }
 
 /**
- * One group of rows, under a heading that says how many, what the group is and its order, and how many of them wait on you — in either
- * group: a run whose check refused while a sibling's session still works is in flight, and waits on you.
+ * One group of rows, under a heading that says how many, what the group is and its order, and how many of them wait on you — in any of the
+ * three: a run whose check refused while a sibling's session still works is in flight, and waits on you, and a run at its ending's gate
+ * waits on you for the decision itself.
  */
 function RunGroup({ group, title, about, runs }: { group: string; title: string; about: string; runs: RunSummary[] }) {
   const waiting = runs.filter(waitsOnYou).length;
@@ -70,6 +77,7 @@ function RunGroup({ group, title, about, runs }: { group: string; title: string;
 
 function RunRow({ run }: { run: RunSummary }) {
   const title = titleOf(run);
+  const decide = toDecideOf(run);
 
   return (
     // The run's link, and beside it when it started and the workflow's link: side by side, since a link inside a link is not HTML.
@@ -81,12 +89,19 @@ function RunRow({ run }: { run: RunSummary }) {
           <span>{run.repo}</span>
           {run.cancelledAt && <span className="text-amber-600">cancelled</span>}
           {/* As `wf ls` prints `→ waiting on you:` — the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships, what is yours to resolve. */}
-          {waitsOnYou(run) && (
+          {waitsOnYou(run) && (onYouOf(run).length > 0 || run.waiting?.advice) && (
             <span data-waiting-on-you className="font-medium text-amber-600">
               waiting on you: {onYouOf(run).length ? onYouOf(run).join(', ') : run.waiting?.advice}
             </span>
           )}
         </p>
+        {/* What there is to decide about its result, in `wf ls`'s words (`toDecideWords`): the ending step's gate with the command that
+            approves it, or a branch nobody has merged. The step's own `approve <step>` is on this line, and not above it too. */}
+        {decide && (
+          <p data-to-decide={decide.kind} className="mt-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+            to decide: {decide.said}
+          </p>
+        )}
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           {run.steps.map((step) => (
             <li key={step.name} className="flex items-center gap-1.5">

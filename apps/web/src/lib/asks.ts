@@ -5,7 +5,7 @@
  * asks of you for a step at its gate (`approve plan`), `waitingOnYou`, a try a person `asked` for — which are the package's and the engine's.
  * The words that join the first two to a step, `asks` and `blocked by the harness`, are the board's: the package has none for them.
  */
-import type { RunDetail, RunSummary } from './api';
+import type { RunDetail, RunSummary, RunToDecide } from './api';
 import { stepState } from './status.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
@@ -35,9 +35,19 @@ export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boo
   return null;
 }
 
-/** Each step's need, in the run's order: what the Factory's card and the run's banner say. */
-export const needsOf = (run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[] }): Need[] =>
-  run.steps.flatMap((step) => needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null) ?? []);
+/**
+ * Each step's need, in the run's order: what the Factory's card and the run's banner say.
+ *
+ * Without the ending step whose gate the run's to-decide line already says, as `wf ls` leaves it out of `→ waiting on you` (cli.ts): that
+ * line names the step and the command that approves it, and the same step is not asked for twice.
+ */
+export const needsOf = (run: Pick<RunSummary, 'cancelledAt' | 'waitingOnYou'> & { steps: readonly NeedsStep[]; toDecide?: RunToDecide | null }): Need[] => {
+  const decided = run.toDecide?.kind === 'approve' ? run.toDecide.step : null;
+  return run.steps.flatMap((step) => {
+    const need = needOf(step, run.waitingOnYou.includes(step.name), run.cancelledAt !== null);
+    return need && !(need.kind === 'approve' && need.step === decided) ? [need] : [];
+  });
+};
 
 /**
  * A need as its step's node says it, under the step's name: `asks: <needs>`, `blocked by the harness: <what it said last>` — and at a gate,

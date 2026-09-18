@@ -28,6 +28,9 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
   ['model', modelRow(spec.model, filed)],
   ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
   ['after', spec.after.length ? code(spec.after.join(', ')) : null],
+  // Only where the step says it: `main`, the repository's own checkout rather than a worktree of the run's. A detail from an api that does
+  // not carry the key says nothing, rather than an empty row.
+  ...(spec.workspace ? ([['workspace', code(spec.workspace)]] satisfies Array<[string, ReactNode]>) : []),
   // Beside `after`, on a looping step only: the edge back, and how many rounds it may run.
   ...(spec.loop === null ? [] : ([['loop', code(spec.loop)], ['rounds', spec.rounds]] satisfies Array<[string, ReactNode]>)),
   ['resume', code(spec.resume)],

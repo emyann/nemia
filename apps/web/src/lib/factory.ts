@@ -2,7 +2,7 @@
  * What the Factory works out about the runs, without React Flow: which are in flight, what a card
  * says, where a card goes, and where an open run's graph goes beside it. Pure.
  */
-import type { RunSummary } from './api';
+import type { RunSummary, RunToDecide } from './api';
 import type { EdgeState } from './canvas.ts';
 import { COLUMN_WIDTH, layers, NODE_WIDTH, ROW_HEIGHT, type Point, type StepEdges } from './layout.ts';
 
@@ -24,6 +24,13 @@ export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & { waiting?
   run.moving || (run.status === 'running' && !run.waiting?.onYou);
 
 /**
+ * What a person has to decide about the run's result, off the api's `toDecide`: its ending step's gate, or a branch nobody merged. Null
+ * while there is nothing — and for a list from an api started before it carried one, read tolerantly as `onYouOf` is, since the Factory
+ * polls the list and a refusal would take the whole floor down for a word.
+ */
+export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide | null => run.toDecide ?? null;
+
+/**
  * Whether the run waits on a person: a step does (`waitingOnYou`), or a run it waits on never ships without one — what `wf ls` prints
  * `→ waiting on you` for, either way.
  */
@@ -34,8 +41,16 @@ export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou'> & { waiting?: R
  * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and for
  * a list from an api started before it carried `onYou`, the steps by name, as the board said them then. The list is read tolerantly, not
  * refused as a run's detail is (`withGraph`): the Factory polls it, and a refusal would take the whole floor down for a word.
+ *
+ * Without the ending step whose gate the to-decide line already says, as `wf ls` prints it (cli.ts): that line is above, it names the step
+ * and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the whole of what is
+ * asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
  */
-export const onYouOf = (run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readonly string[] }): readonly string[] => run.onYou ?? run.waitingOnYou;
+export const onYouOf = (run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readonly string[]; toDecide?: RunToDecide | null }): readonly string[] => {
+  const said = run.onYou ?? run.waitingOnYou;
+  const decide = toDecideOf(run);
+  return decide?.kind === 'approve' ? said.filter((one) => one !== `approve ${decide.step}`) : said;
+};
 
 /**
  * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
@@ -44,11 +59,16 @@ export const onYouOf = (run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readon
 export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
   run.cancelledAt ? 'cancelled' : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
 
-type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after'>;
+type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after'> & { toDecide?: RunToDecide | null };
 
 /**
- * The runs on the Factory's floor, oldest first: every run when finished runs are asked for; otherwise every run in flight, and each
- * finished run that a run in flight waits on (`after`), so the edge into it leaves from a card.
+ * The runs on the Factory's floor, oldest first: every run when finished runs are asked for; otherwise every run in flight, every run
+ * nobody has decided (`toDecideOf`), and each finished run that a run in flight waits on (`after`), so the edge into it leaves from a card.
+ *
+ * A run to decide stays on the floor whatever "Show finished" says, and until it is decided. Nothing of it moves, so `inFlight` has it
+ * finished and the switch would hide it: a run that finished with its ending waiting for a word, or its branch waiting for a merge, would
+ * step off the board the moment it wanted a person most — which is the pain §8 was registered as. Level-triggered, as the api reads it:
+ * the card goes when the approval or the merge is given, with nothing told to the board.
  *
  * The finished card, and not a stub: it is dimmed as a finished card is, it says what the run was for and whether it shipped or was
  * called off, and it opens into the run's steps — a stub would say only an id, and send a person to Runs to learn the rest. One level: a
@@ -56,7 +76,7 @@ type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'wai
  */
 export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean): T[] {
   const waitedOn = new Set(runs.filter(inFlight).flatMap((run) => run.after));
-  return byAge(runs).filter((run) => showFinished || inFlight(run) || waitedOn.has(run.id));
+  return byAge(runs).filter((run) => showFinished || inFlight(run) || toDecideOf(run) !== null || waitedOn.has(run.id));
 }
 
 /** An edge between two cards on the Factory: from a run to one that waits on it. Dashed, to come, until the child starts; solid once it has. */
@@ -384,14 +404,19 @@ export function placeRuns(
 }
 
 /**
- * The cells a card at `point` is in, as `row:column`: from the cell nearest its corner, `span` across and down, on the grid or off it.
- * A card a quarter of a row or more from its nearest row is in the row it straddles too: the layering puts a card halfway down a row, level
- * with the middle of the two beside it, and a card placed beneath it must not land on its lower half.
+ * The cells a card at `point` is in, as `row:column`: `span` across, from the column nearest its corner, and down every row it reaches.
+ *
+ * A card between two rows is in both of them, since a card is drawn up to a cell tall (`CELL_HEIGHT`): the layering puts a card halfway
+ * down a row, level with the middle of the two beside it, and a person drags a card wherever they like. Rounding to the nearest row
+ * instead left the row a card hangs a little way into free, and the card placed there was drawn over its foot — the e2e's floor had a
+ * card 45 short of its row over the bottom of a card 27 short of a cell, and the two overlapped by the difference.
+ *
+ * Across it still rounds: cards are narrower than their cell by the gap between them, so two columns' cards never touch.
  */
 function cellsOf({ x, y }: Point, span: Span): string[] {
   const column = Math.round(x / CELL_WIDTH);
-  const top = Math.round(y / CELL_HEIGHT - 0.25);
-  const bottom = Math.round(y / CELL_HEIGHT + 0.25) + span.rows - 1;
+  const top = Math.floor(y / CELL_HEIGHT);
+  const bottom = Math.ceil(y / CELL_HEIGHT + span.rows) - 1;
   const cells: string[] = [];
   for (let r = top; r <= bottom; r++) {
     for (let c = column; c < column + span.columns; c++) cells.push(`${r}:${c}`);

@@ -289,6 +289,67 @@ export const GATED = {
 } as const;
 
 /**
+ * A seventh run, whose workflow's ending is a step of its own: `implement → review → ship`, with `ship` in the repository's own checkout
+ * (`workspace: main`) and gated. implement and review signed off; ship has never run, so it reads `awaiting approval` — its approval is
+ * what files it — and nothing of the run moves. So it is finished, and it stays on the Factory's floor all the same: nobody has decided it.
+ *
+ * Its branch is committed in FAKE's repository, two commits ahead of main, so the gate panel has a standing and a diff stat to show, and
+ * `review`'s files directory holds the file it named. The `decide` page reads the banner and the panel, and sends the work back — to
+ * review, which the send-back at an ending's gate names, and never to ship — then takes that back.
+ */
+export const ENDING = {
+  id: 'ship-it-or-send-it-back-e2e12',
+  title: 'Ship it, or send it back',
+  steps: ['implement', 'review', 'ship'],
+  /** The step that ends the run, at its gate: `workspace: main`, gated, and not filed. */
+  ending: 'ship',
+  /** The step a send-back at that gate goes to: the work it would act on, not the step at the gate (`sendBackTo`). */
+  back: 'review',
+  /** What ship's prose says first, which is the whole of what a person is deciding: `wf ls`'s `→ to decide:` line is this and the command. */
+  says: 'Merge this run onto the base branch, or abort on any failure.',
+  /** Its result branch, which review worked on and ship would merge. */
+  branch: 'wf/ship-it-or-send-it-back-e2e12/implement',
+  /** Where that branch stands against the base, and git's own diff stat of it, as `wf decide` prints them under the run. */
+  standing: 'wf/ship-it-or-send-it-back-e2e12/implement is ahead of main by 2 commits',
+  stat: '3 files changed, 14 insertions(+), 1 deletion(-)',
+  /** What review handed on, which is what a person approves: rendered as the markdown it is. */
+  review: { heading: 'What I found', items: ['The cap is read on every pass', 'One finding left: the queue has no test'] },
+  /** The file review named in its closeout, in its files directory, which the api serves. */
+  artifact: 'REVIEW.md',
+  /** What the `decide` page sends the work back with. */
+  objection: 'Say in the README that the cap is read on every pass.',
+} as const;
+
+/**
+ * An eighth run, the same workflow with its ending approved and run: ship was approved with no words, filed in the repository's own
+ * checkout, and merged the run's branch onto main. Every step is done and its branch is on the base, so there is nothing left to decide —
+ * the folder answered for its own branch — and its card is off the Factory's floor with the rest of the finished.
+ */
+export const SHIPPED = {
+  id: 'it-shipped-itself-e2e13',
+  title: 'It shipped itself',
+  steps: ['implement', 'review', 'ship'],
+  ending: 'ship',
+  branch: 'wf/it-shipped-itself-e2e13/implement',
+  /** What ship said it did, which is the account a person reads under the step. */
+  merged: 'Merged it onto main with --no-ff, and the check passed.',
+} as const;
+
+/**
+ * A ninth run whose folder says nothing about what happens when the work is done: one step, signed off, its branch two commits ahead of
+ * main and nobody has merged it. The second kind of thing to decide — the pain §8 was registered as: with nothing asking for a merge, the
+ * run seemed to vanish. Its card stays on the floor, marked, and `wf decide` is the command in the line.
+ */
+export const UNMERGED = {
+  id: 'nobody-merged-it-e2e14',
+  title: 'Nobody merged it',
+  steps: ['implement'],
+  branch: 'wf/nobody-merged-it-e2e14/implement',
+  /** What `wf ls` says after `→ to decide:` for it, and the board's line with it. */
+  said: 'wf/nobody-merged-it-e2e14/implement is ahead of main, and nothing has merged it — wf decide nobody-merged-it-e2e14',
+} as const;
+
+/**
  * Runs that wait on runs (`wf start --after`), on the checkout's repository — a real one (`seedDiamond`), and the one a start from the
  * Workflows page runs in, so the start form offers them. The diamond: `top` shipped first; `shipped` and `running` started from a main
  * that had it, and `shipped` was merged while `running`'s session still works; `bottom` waits on both, so on `running` alone. Beside it,
@@ -737,6 +798,121 @@ function seedRepo(repo: string, branch: string): string {
   return base;
 }
 
+/**
+ * Write the three runs whose result is a decision into the store at `root`, and their branches into FAKE's repository at `repo`, cut from
+ * `base` on main: ENDING at its ending's gate, SHIPPED with that ending approved and merged, and UNMERGED with a branch nobody took.
+ *
+ * Real commits, because what the board says about each is read out of git on every request: where the branch stands against the base, and
+ * git's own diff stat of it. ENDING's two commits are three files, fourteen insertions and one deletion against the base — `stat` — with
+ * `CLAUDE.md` among them, so its radius has a lesson line too. SHIPPED's branch is merged into main with `--no-ff`, as its ending step
+ * would have merged it, which is what makes the run read as shipped with nothing left to decide.
+ */
+function seedDecisions(root: string, repo: string, base: string, now: number): void {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const git = (...args: string[]): string =>
+    execFileSync('git', ['-c', 'user.name=e2e', '-c', 'user.email=e2e@example.com', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], {
+      cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  /** A commit of `files` on `branch`, cut from the base the first time. */
+  const commit = (branch: string, message: string, files: ReadonlyArray<readonly [string, string]>, cut = false) => {
+    git('checkout', '-q', ...(cut ? ['-b', branch, base] : [branch]));
+    for (const [file, text] of files) write(path.join(repo, file), text);
+    git('add', '-A');
+    git('commit', '-q', '-m', message);
+    git('checkout', '-q', 'main');
+  };
+
+  // ENDING's branch: eight lines of source, then five of docs and a line of CLAUDE.md rewritten — `ENDING.stat` against the base.
+  commit(ENDING.branch, 'Cap the runs in flight', [['packages/agent-workflows/src/queue.ts', [
+    '/** The cap on runs in flight, read on every pass. */',
+    'export function capOf(env: string | undefined): number {',
+    '  const n = Number(env);',
+    '  return Number.isSafeInteger(n) && n > 0 ? n : 0;',
+    '}',
+    '',
+    '/** How many runs the pass counts against it. */',
+    'export const inFlight = (runs: readonly string[]): number => runs.length;',
+  ].join('\n') + '\n']], true);
+  commit(ENDING.branch, "Write the queue's rule down", [
+    ['packages/agent-workflows/docs/queue.md', '# The queue\n\nThe cap is read on every pass, and stored nowhere.\n\nA card that cannot start keeps its place.\n'],
+    ['CLAUDE.md', "# hkb-v2 — contributor guide, with the queue's rule\n"],
+  ]);
+  commit(SHIPPED.branch, 'Say what shipping is', [['workflows/dev/ship.md', '---\nworkspace: main\ngate: true\n---\nMerge it onto the base branch.\n']], true);
+  git('merge', '-q', '--no-ff', '-m', `Merge ${SHIPPED.id}`, SHIPPED.branch);
+  commit(UNMERGED.branch, 'Draw the queue on the Factory', [['apps/web/src/components/QueueLane.tsx', "export const QueueLane = () => null;\n"]], true);
+
+  /** A task that ran once and signed off with `closeout`, from `began` to `ended` minutes ago. */
+  const signedOff = (task: string, cwd: string, brief: string, began: number, ended: number, closeout: object): void =>
+    write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
+      { kind: 'filed', at: ago(began), brief, cwd, maxAttempts: 1, harness: 'claude' },
+      { kind: 'starting', at: ago(began - 0.01), attempt: 1 },
+      { kind: 'spawned', at: ago(began - 0.01), attempt: 1 },
+      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${task}/1`, observed: 'done', reason: 'harness', closeout },
+      { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
+    ]));
+  const done = (summary: string, artifacts: string[] = []) => ({ outcome: 'done', summary, needs: null, artifacts });
+
+  // The folder both runs of it were started from: implement ⇄ nothing, review, then the ending in the repository's own checkout.
+  const shipDir = path.join(root, 'workflow-ship');
+  write(path.join(shipDir, 'implement.md'), '---\nharness: claude\n---\nImplement what was asked.\n');
+  write(path.join(shipDir, 'review.md'), '---\nharness: claude\nafter: implement\n---\nReview the change.\n');
+  const shipBody = `${ENDING.says}\n\nLook at the checkout first: it is a person's, and this step is the run doing what they would do by hand.`;
+  write(path.join(shipDir, 'ship.md'), `---\nharness: claude\nafter: review\nworkspace: main\ngate: true\n---\n${shipBody}\n`);
+  const shipWorkflow = [
+    { name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude' },
+    { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'claude' },
+    { name: 'ship', after: ['review'], body: shipBody, harness: 'claude', workspace: 'main', gate: true },
+  ];
+
+  /** One of the two runs of that folder: its steps' records, and the brief a person reads. */
+  const shipRun = (id: string, title: string, why: string, branch: string, minutes: number, steps: object) =>
+    write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
+      id, repo, workspace: repo, baseRef: base, branch: 'main', isolate: true,
+      brief: `${title}\n\nA run seeded by npm run e2e: ${why}`,
+      workflowDir: shipDir, workflow: shipWorkflow, createdAt: ago(minutes), steps,
+    }, null, 2));
+
+  // ENDING: implement and review signed off on the run's branch; ship has never been filed, and waits at its gate.
+  const lane = path.join(root, 'worktrees', ENDING.id, 'implement');
+  const files = path.join(root, 'runs', ENDING.id, 'artifacts', 'review');
+  write(path.join(files, ENDING.artifact), `# ${ENDING.review.heading}\n\n${ENDING.review.items.map((item) => `- ${item}`).join('\n')}\n`);
+  signedOff(`${ENDING.id}-implement`, lane, 'Implement what was asked.', 0.9, 0.7, done('Capped the runs in flight, and wrote the rule down.'));
+  signedOff(`${ENDING.id}-review`, lane, 'Review the change.', 0.69, 0.5, done(
+    `## ${ENDING.review.heading}\n\n${ENDING.review.items.map((item) => `- ${item}`).join('\n')}`,
+    [path.join(files, ENDING.artifact)],
+  ));
+  shipRun(ENDING.id, ENDING.title, 'implement and review signed off, and the ending step waits at its gate for your word.', ENDING.branch, 0.9, {
+    implement: { taskId: `${ENDING.id}-implement`, workspace: lane, branch: ENDING.branch },
+    review: { taskId: `${ENDING.id}-review`, workspace: lane, branch: ENDING.branch },
+    ship: { taskId: null },
+  });
+
+  // SHIPPED: the same, with ship approved — the approval as `wf approve` writes one, with no words — filed in the checkout, and merged.
+  const shippedLane = path.join(root, 'worktrees', SHIPPED.id, 'implement');
+  signedOff(`${SHIPPED.id}-implement`, shippedLane, 'Implement what was asked.', 0.8, 0.6, done('Said what shipping is, in the folder.'));
+  signedOff(`${SHIPPED.id}-review`, shippedLane, 'Review the change.', 0.59, 0.4, done('One reading of it, and nothing to change.'));
+  signedOff(`${SHIPPED.id}-ship`, repo, shipBody, 0.3, 0.2, done(SHIPPED.merged));
+  write(path.join(root, 'runs', `${SHIPPED.id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at: ago(0.35) }, null, 2));
+  shipRun(SHIPPED.id, SHIPPED.title, 'its ending step was approved, ran in the checkout and merged the branch: nothing left to decide.', SHIPPED.branch, 0.8, {
+    implement: { taskId: `${SHIPPED.id}-implement`, workspace: shippedLane, branch: SHIPPED.branch },
+    review: { taskId: `${SHIPPED.id}-review`, workspace: shippedLane, branch: SHIPPED.branch },
+    ship: { taskId: `${SHIPPED.id}-ship`, workspace: repo },
+  });
+
+  // UNMERGED: one step, signed off, and a branch nobody took — the folder says nothing about shipping, so git is what ends it.
+  const aloneDir = path.join(root, 'workflow-alone');
+  write(path.join(aloneDir, 'implement.md'), '---\nharness: claude\n---\nImplement what was asked.\n');
+  const aloneLane = path.join(root, 'worktrees', UNMERGED.id, 'implement');
+  signedOff(`${UNMERGED.id}-implement`, aloneLane, 'Implement what was asked.', 0.7, 0.5, done('Drew the queue at the floor\'s left edge.'));
+  write(path.join(root, 'runs', `${UNMERGED.id}.json`), JSON.stringify({
+    id: UNMERGED.id, repo, workspace: repo, baseRef: base, branch: 'main', isolate: true,
+    brief: `${UNMERGED.title}\n\nA run seeded by npm run e2e: it finished, and its branch is ahead of the base with nothing asking for a merge.`,
+    workflowDir: aloneDir, workflow: [{ name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude' }],
+    createdAt: ago(0.7),
+    steps: { implement: { taskId: `${UNMERGED.id}-implement`, workspace: aloneLane, branch: UNMERGED.branch } },
+  }, null, 2));
+}
+
 /** Events as the engine journals them: a line of JSON each. */
 /** SAYING's session so far, as Claude Code 2.1.270 writes it: the prompt, words, and a Read with no result yet. */
 function draftConversation(ago: (minutes: number) => string): object[] {
@@ -1085,4 +1261,8 @@ export function seed(root: string, now = Date.now()): void {
   priced(cost('palette'), 'claude', paletteLane, 'Pick the palette for the dark theme.', [1.49, 1.48, 1.2], {
     outcome: 'blocked', summary: 'Drafted a warm palette and a cool one, and cannot choose between them.', needs: COSTLY.asks.needs, artifacts: [],
   }, { turns: 11, toolCalls: 19, inputTokens: 980_000, outputTokens: 12_300, costUsd: 1.5, apiMs: 290_000, toolMs: 9_000 });
+
+  // The three runs whose result is a decision, in FAKE's repository: at an ending's gate, shipped by an approved ending, and a branch
+  // nobody took. Last, and newest: their cards take the cells after every other run's.
+  seedDecisions(root, repo, baseRef, now);
 }

@@ -435,11 +435,15 @@ export function Continue({ runId, step }: { runId: string; step: string }) {
 export function useAsk(runId: string, step: string, onAsked: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (how: { mode: RetryMode; message?: string; budget?: number }) => askTry(runId, step, how),
+    // `step` in the ask names another step to try instead, for an ending step's gate, where the send-back goes to the work and not to the
+    // step at the gate (`sendBackTo` in agent-workflows); it is not part of the request the api takes.
+    mutationFn: ({ step: to, ...how }: { mode: RetryMode; message?: string; budget?: number; step?: string }) => askTry(runId, to ?? step, how),
     onSuccess: () => {
       onAsked();
-      // The run as the api has it now: the step's note says the try is asked, and the step waits on nobody.
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+      // The run as the api has it now: the step's note says the try is asked, and the step waits on nobody. The run's own record alone
+      // (`exact`), never its decisions: those are keyed by the state of the run they were read for (`decisionStamp`), and a refetch of the
+      // key the page is on would fill it with the answer for the state after this write — which is what the next key is for.
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },
   });
 }
@@ -450,8 +454,9 @@ function useRound(runId: string) {
   return useMutation({
     mutationFn: (how: { step?: string; budget?: number }) => askRound(runId, how),
     onSuccess: () => {
-      // The run as the api has it now: the looping step's note says the round is asked, and the loop waits on nobody.
-      void queryClient.invalidateQueries({ queryKey: ['runs', runId] });
+      // The run as the api has it now: the looping step's note says the round is asked, and the loop waits on nobody. Its record alone, as
+      // for a try: a decision is keyed by the state it was read for.
+      void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
     },
   });
 }

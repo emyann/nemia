@@ -4,9 +4,9 @@ import { createFileRoute, Link } from '@tanstack/react-router';
 import { Artifacts, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
-import { NeedsBanner } from '../components/Needs';
+import { NeedsBanner, ToDecideBanner } from '../components/Needs';
 import { Check, code, Facts, specRows, spentRows, Told, when } from '../components/Facts';
-import { Approved, Gate, gateWord } from '../components/Gate';
+import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
 import { StepInspector } from '../components/StepInspector';
@@ -49,6 +49,9 @@ function Run({ run }: { run: RunDetail }) {
   return (
     <article className="space-y-6">
       <BackToRuns />
+
+      {/* What is left to decide about the result, above who else the run waits on, as `wf ls` prints the two. */}
+      <ToDecideBanner run={run} />
 
       <NeedsBanner run={run} />
 
@@ -108,16 +111,24 @@ function Run({ run }: { run: RunDetail }) {
       <Timeline run={run} />
 
       {run.steps.map((step) => (
-        <StepSection key={step.name} runId={run.id} step={step} runCancelled={runCancelled} />
+        <StepSection key={step.name} run={run} step={step} runCancelled={runCancelled} />
       ))}
     </article>
   );
 }
 
-function StepSection({ runId, step, runCancelled }: { runId: string; step: Step; runCancelled: boolean }) {
+function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; runCancelled: boolean }) {
+  const runId = run.id;
   const { spec, closeout, gate } = step;
   // Waiting at its gate on you, as `wf ls` asks it (`approve`): on a run nobody called off, and not sent back already.
   const atGate = gateOffered(step, runCancelled);
+  // An ending step's gate, which holds before the step is filed (`endsTheRun`): it has no closeout of its own, and what a person approves is
+  // the work it would act on — the branch's standing and diff stat, and each work step's closeout with its files (`ActsOn`).
+  const ends = endsTheRun(step);
+  // An ending that has already run — filed, aborted, retried — is at its gate for its own closeout, as any gated step is.
+  const acts = atGate && ends && step.taskId === null;
+  // The steps a send-back names, as the package names them (`sendBackTo`): the step itself once it has run, or the steps it waits on.
+  const back = acts ? run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from) : [step.name];
   const handedOn = closeout && (
     <div className="min-w-0 space-y-2 rounded border border-neutral-200 p-3 text-sm dark:border-neutral-800">
       <Markdown>{closeout.summary}</Markdown>
@@ -153,8 +164,8 @@ function StepSection({ runId, step, runCancelled }: { runId: string; step: Step;
         rows={[
           ['branch', code(step.branch)],
           ['task', step.taskId ? code(step.taskId) : 'not filed'],
-          // Its gate, where it has one: a person's word files what follows it.
-          ...(gate ? ([['gate', gateWord(gate)]] satisfies Array<[string, string]>) : []),
+          // Its gate, where it has one: a person's word files what follows it — or, for the step that ends the run, the step itself.
+          ...(gate ? ([['gate', gateWord(gate, ends)]] satisfies Array<[string, string]>) : []),
           // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0.
           ['used', step.used?.used],
           ['cost', step.used?.cost],
@@ -163,18 +174,20 @@ function StepSection({ runId, step, runCancelled }: { runId: string; step: Step;
         ]}
       />
 
-      {/* At its gate, what it handed on — which is what a person approves — with Approve and Send back beside it. */}
+      {/* At its gate, what it handed on — which is what a person approves — with Approve and Send back beside it. At an ending step's
+          gate, what it would act on instead: it has handed nothing on, and approving is what runs it. */}
       {atGate ? (
         <div className="grid items-start gap-4 lg:grid-cols-2">
-          {handedOn}
-          <Gate runId={runId} step={step.name} />
+          {acts ? <ActsOn run={run} step={step} /> : handedOn}
+          <Gate runId={runId} step={step.name} back={back} acts={acts} />
         </div>
       ) : (
         handedOn
       )}
 
-      {/* Once approved, under the step: when, and the words every step after the gate is handed. */}
-      {gate?.approval && <Approved step={step.name} approval={gate.approval} />}
+      {/* Once approved, under the step: when, and the words every step after the gate is handed — or, for the step that ends the run,
+          what its own approval filed and the terms it acts on. */}
+      {gate?.approval && <Approved step={step.name} approval={gate.approval} ends={ends} />}
     </section>
   );
 }

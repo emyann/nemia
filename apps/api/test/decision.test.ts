@@ -119,7 +119,14 @@ writeRun({
 test('a finished run: what its result branch touched, the lesson, the check-affecting diffs cut per file, what each step consumed, and the commands', async () => {
   const { status, body } = await decisionOf('r-d1');
   assert.equal(status, 200);
-  assert.deepEqual(Object.keys(body), ['touched', 'lesson', 'sensitive', 'used', 'total', 'cost', 'overBudget', 'commands']);
+  assert.deepEqual(Object.keys(body), ['standings', 'touched', 'lesson', 'sensitive', 'used', 'total', 'cost', 'overBudget', 'commands']);
+
+  // Where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run: git's own
+  // `--shortstat`, trimmed.
+  assert.deepEqual(body.standings, [{
+    branch, where: 'ahead', commits: 1, said: `${branch} is ahead of main by 1 commit`,
+    stat: '4 files changed, 456 insertions(+), 2 deletions(-)',
+  }]);
 
   // The package and the root, each once, with the files an agent reads and those a check is decided by named.
   assert.equal(body.touched.length, 1);

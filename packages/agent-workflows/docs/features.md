@@ -3183,11 +3183,12 @@ Five things the reviews of §9's package half and of the checkout hold found and
 - **What the board cannot show yet, and an open question**, in the two sections above: a supervisor waiting for its person draws as a
   failed run (the supervisor's *What it leaves*); a held ending draws as plain `waiting`, since the board passes no checkout; and a merge
   conflict at the end of a run whose rounds are spent has no step to be given to (the ending's *What it leaves*).
-- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 612 (610 passed, 2 skipped), from 606 —
-  six new tests, and three that gained an assertion or a fixture: the supervisor's shape, whose `disallow:` grew; the brief of a step in the
-  checkout whose run cut no branch, which now refuses the claim too; and two endings for one checkout, which asserts the run held back is in
-  flight. api 202, web 248 and agent-engine 340 (331 passed, 9 skipped) unchanged: nothing outside the package changed. `npm run
-  typecheck` clean in all four.
+- From the root, `npx turbo run test --force`, counted as this file counts them: agent-workflows 613 (611 passed, 2 skipped), from 606 —
+  seven new tests, and four that changed: the supervisor's shape, whose `disallow:` grew; the brief of a step in the checkout whose run cut
+  no branch, which now refuses the claim too; two endings for one checkout, which asserts the run held back is in flight; and §8's pinned
+  "never shipped at an ending's gate, whatever git says", restated with its one exception (round 2). api 202, web 248 and agent-engine 340
+  (331 passed, 9 skipped) unchanged: nothing outside the package changed, though the api's `decision` call now reads a hand-merged ending's
+  run as shipped, as `wf decide` does. `npm run typecheck` clean in all four.
 
 What it leaves:
 

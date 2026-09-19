@@ -252,6 +252,10 @@ export type StepReply = { finding: string; answer: string; why: string };
  * `output` is what it gave of the fields its `output:` declares, and `missing` those it did not (`declaredOutput`). `replies`
  * is a loop's target's answer to each finding it was handed, when its closeout gave them. `artifacts` are the files it named,
  * each as `artifactOf` reads it: a file the api serves from the step's files directory, or the path alone.
+ *
+ * `schema` is the JSON Schema of each field asked about — given or missing — off the workflow the run froze, so the board can
+ * draw a value by what it was declared to be and say what a field means. `raw` is the statement as the engine recorded it,
+ * untouched: the fields above are read forgivingly (`parseCloseout`, `replyOf`), and a person may want what the agent said.
  */
 export type StepCloseout = {
   outcome: 'done' | 'blocked';
@@ -261,6 +265,8 @@ export type StepCloseout = {
   output: Record<string, unknown>;
   missing: string[];
   replies: StepReply[] | null;
+  schema: Record<string, unknown>;
+  raw: unknown;
 };
 
 /**
@@ -301,6 +307,9 @@ export type StepCheck = {
  * the step; on an earlier one, the engine's own word for its task — `succeeded`, `failed` — since `wf ls` words only the try
  * that decides the step. `attempts`, `check` and `closeout` are the try's own, in the step's shapes.
  */
+/** A closing statement that `parseCloseout` could not read: its words for why, and the statement as it came. */
+export type StepUnreadable = { error: string; raw: unknown };
+
 export type StepTry = {
   try: number;
   round: number;
@@ -312,6 +321,11 @@ export type StepTry = {
   attempts: StepAttempts;
   check: StepCheck | null;
   closeout: StepCloseout | null;
+  /**
+   * A statement the try gave that could not be read — why, and the statement as the engine recorded it — or null. `closeout` is null
+   * then, and this is the only place what the agent said reaches the board.
+   */
+  unreadable: StepUnreadable | null;
   /**
    * What a person said to this try when they asked for it (`answerOf`, off their ask file): the answer `wf decide` prints under the
    * `needs` of the try before as `your answer`. Null for a try nobody answered — and for every first try, which nobody asked for.
@@ -1179,8 +1193,8 @@ async function detail(run: Run): Promise<RunDetail> {
       const current = {
         status: judged.words.get(name)!,
         check: checks.get(name) ?? null,
-        // An unreadable closeout is already in `status`; there is nothing here to show of it.
         closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
+        unreadable: unreadableIn(taskId, views),
         attempts: attemptsIn(taskId, views),
       };
       return {
@@ -1280,15 +1294,17 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
 /**
  * How one try of a step signed off, off the engine's record of its task's last attempt — as `closeoutOf` reads the current try's —
  * with what it gave of the fields its step declares, its `replies`, and each file it named as `artifactOf` reads it. Null for a
- * try that gave none, and for one whose closeout could not be read, which the step's `status` says of its current try.
+ * try that gave none, and for one whose closeout could not be read, which `unreadableIn` answers for.
  */
 function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | null, views: Views): StepCloseout | null {
   const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
   const c = said === undefined ? undefined : parseCloseout(said);
   if (!c || 'error' in c) return null;
   // `replies` apart: a loop's target owes them beside what its step declares, and they are shown as answers, not as a field.
-  const { given, missing } = declaredOutput(step, c, outputFields(step).filter((field) => field !== LOOP_REPLIES));
+  const fields = outputFields(step).filter((field) => field !== LOOP_REPLIES);
+  const { given, missing } = declaredOutput(step, c, fields);
   const replies = c.output?.[LOOP_REPLIES];
+  const declared = step.output?.schema.properties ?? {};
   return {
     outcome: c.outcome,
     summary: c.summary,
@@ -1297,7 +1313,18 @@ function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | nul
     output: given,
     missing,
     replies: Array.isArray(replies) ? replies.map(replyOf) : null,
+    // `fromEntries`, as `declaredOutput` does it: a field JSON names `__proto__` is a property of its own.
+    schema: Object.fromEntries(fields.map((field) => [field, declared[field]])),
+    raw: said,
   };
+}
+
+/** A try's statement that could not be read, off the same record as `closeoutIn`'s: why, and what it said, untouched. */
+function unreadableIn(taskId: string | null, views: Views): StepUnreadable | null {
+  const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
+  if (said === undefined) return null;
+  const c = parseCloseout(said);
+  return 'error' in c ? { error: c.error, raw: said } : null;
 }
 
 /** One of a closeout's `replies`, forgivingly: the harness held it to its schema, and an agent filled it in. */
@@ -1319,7 +1346,7 @@ function triesOf(
   name: string,
   steps: readonly Workflow[],
   views: Views,
-  current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'attempts'>,
+  current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'unreadable' | 'attempts'>,
   answers: readonly RetryAsk[],
 ): StepTry[] {
   const step = steps.find((s) => s.name === name) ?? bare(name);
@@ -1343,6 +1370,7 @@ function triesOf(
       attempts: attemptsIn(t.taskId, views),
       check: step.check ? checkIn(step.check, t.check?.taskId, views) : null,
       closeout: closeoutIn(run, name, step, t.taskId, views),
+      unreadable: unreadableIn(t.taskId, views),
       answer: answerAt(i + 1),
     })),
     {

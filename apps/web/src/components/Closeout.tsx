@@ -1,8 +1,15 @@
-import type { StepArtifact, StepAttempts, StepCloseout, StepTry } from '../lib/api';
+import { useId, useState } from 'react';
+import { Switch } from '@/components/ui/switch';
+import type { StepAttempts, StepCloseout, StepTry } from '../lib/api';
 import { duration } from '../lib/canvas';
+import { imagePaths, type Outcome, outcomeOf, outcomeWord } from '../lib/outcome';
 import { cn } from '../lib/utils';
-import { code, Facts } from './Facts';
+import { Artifacts } from './Artifacts';
 import { Markdown } from './Markdown';
+import { FieldView, Json, OutcomeHead } from './Outcome';
+
+// Where they were: the Gate, the run's page and the tests read them from here.
+export { Artifacts, bytesWord } from './Artifacts';
 
 /**
  * A try as the Rounds rows and the Output tab name it: its round, its number, and in brackets how it was reached — what replaced
@@ -19,10 +26,6 @@ export function attemptsWord({ count, latest }: StepAttempts): string {
   const took = latest.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : latest.ended ? null : 'running';
   return took ? `#${count} · ${took}` : `#${count}`;
 }
-
-/** Bytes as a person reads them, as `wf decide` prints a file's size. */
-export const bytesWord = (bytes: number): string =>
-  bytes < 1024 ? `${bytes} B` : bytes < 1024 ** 2 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / 1024 ** 2).toFixed(1)} MB`;
 
 const verdictClass = (verdict: string | null) =>
   verdict === 'passed'
@@ -88,8 +91,8 @@ export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[
 }
 
 /**
- * The closeout of the try selected — the current one until another is — and beneath it every other try's, folded. `none` is what
- * is said of the selected try when it gave no closeout.
+ * The outcome of the try selected — the current one until another is — and beneath it every other try's, folded. `none` is what
+ * is said of the selected try when it gave no statement and the engine records no reason it has none.
  */
 export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTry[]; selected: StepTry; none: string }) {
   const others = tries.filter((t) => t.try !== selected.try).reverse();
@@ -102,24 +105,36 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTr
         </p>
       )}
       {selected.answer && <YourAnswer answer={selected.answer} />}
-      {selected.closeout ? <CloseoutView closeout={selected.closeout} /> : <p className="text-neutral-500">{none}</p>}
+      <TryOutcome t={selected} none={none} />
       {others.length > 0 && (
         <section aria-label="Other tries" className="space-y-1">
           {others.map((t) => (
             <details key={t.try} data-try={t.try} className="rounded border border-neutral-200 text-sm dark:border-neutral-800">
               <summary className="cursor-pointer px-2 py-1 text-xs text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100">
                 {tryLabel(t, tries)}
-                {t.current && ' · current'} — {t.closeout ? t.closeout.outcome : 'no closeout'}
+                {t.current && ' · current'} — {outcomeWord(outcomeOf(t, EARLIER_NONE))}
               </summary>
               <div className="space-y-3 border-t border-neutral-200 p-2 dark:border-neutral-800">
                 {t.answer && <YourAnswer answer={t.answer} />}
-                {t.closeout ? <CloseoutView closeout={t.closeout} /> : <p className="text-neutral-500">No closeout on the engine's record of this try.</p>}
+                <TryOutcome t={t} none={EARLIER_NONE} />
               </div>
             </details>
           ))}
         </section>
       )}
     </>
+  );
+}
+
+const EARLIER_NONE = "No closeout on the engine's record of this try.";
+
+/** A statement whole, as the engine recorded it: what Raw shows, and all there is of one that could not be read. */
+function AsItCame({ raw }: { raw: unknown }) {
+  return (
+    <section aria-label="As it came" className="space-y-1">
+      <h4 className="text-xs text-neutral-500">the statement as it came</h4>
+      <Json data-raw value={raw} />
+    </section>
   );
 }
 
@@ -132,58 +147,63 @@ function YourAnswer({ answer }: { answer: string }) {
   );
 }
 
-/** How a try signed off: its outcome and summary, what it needs, what it gave of its declared output, its replies, and its files. */
-export function CloseoutView({ closeout }: { closeout: StepCloseout }) {
+/** How a try ended, said first — by its agent, or by the machine for it — then its statement drawn, when there is one. */
+function TryOutcome({ t, none }: { t: StepTry; none: string }) {
+  const outcome = outcomeOf(t, none);
+  if (t.unreadable) {
+    // Nothing to draw, and nothing hidden: the statement whole, as the engine recorded it.
+    return (
+      <div data-closeout className="space-y-3">
+        <OutcomeHead outcome={outcome} />
+        <AsItCame raw={t.unreadable.raw} />
+      </div>
+    );
+  }
+  if (!t.closeout) return <OutcomeHead outcome={outcome} />;
+  return <CloseoutView closeout={t.closeout} outcome={outcome} />;
+}
+
+/**
+ * A statement drawn: its outcome and who said it, what it needs, its summary, each declared field by its shape (`outputKind`), its
+ * replies, what it did not give, and its files. The Raw switch shows the statement as the engine recorded it instead, whole.
+ */
+export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; outcome: Outcome }) {
+  const [raw, setRaw] = useState(false);
+  const switchId = useId();
+  const images = imagePaths(closeout.artifacts);
   const declared = Object.entries(closeout.output);
+  const field = (name: string, value: unknown) => (
+    <FieldView key={name} name={name} schema={closeout.schema[name]} value={value} artifacts={closeout.artifacts} images={images} />
+  );
+  const toggle = (
+    // The aria switch is a label of its own, round its input, so its word is a label beside it that names that input.
+    <div className="flex shrink-0 items-center gap-1.5 text-xs text-neutral-500">
+      <Switch id={switchId} size="sm" isSelected={raw} onChange={setRaw} />
+      <label htmlFor={switchId} className="cursor-pointer">
+        Raw
+      </label>
+    </div>
+  );
   return (
     <div data-closeout className="space-y-3">
-      <p>
-        <span className="text-neutral-500">outcome </span>
-        <span className={closeout.outcome === 'blocked' ? 'font-semibold text-amber-700 dark:text-amber-400' : 'font-medium'}>{closeout.outcome}</span>
-      </p>
-      <Markdown>{closeout.summary}</Markdown>
+      <OutcomeHead outcome={outcome} aside={toggle} />
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
-      {(declared.length > 0 || closeout.missing.length > 0) && (
-        <section aria-label="Declared output" className="space-y-1">
-          <h4 className="text-neutral-500">declared output</h4>
-          {declared.length > 0 && <Facts rows={declared.map(([name, value]) => [name, <OutputValue value={value} />])} />}
+      <Markdown>{closeout.summary}</Markdown>
+      {raw ? (
+        <AsItCame raw={closeout.raw} />
+      ) : (
+        <>
+          {declared.map(([name, value]) => field(name, value))}
+          {closeout.replies && field('replies', closeout.replies)}
           {closeout.missing.length > 0 && (
-            <p className="text-xs text-amber-700 dark:text-amber-400">declared and not given: {closeout.missing.join(', ')}</p>
+            <p data-missing className="text-xs text-amber-700 dark:text-amber-400">declared and not given: {closeout.missing.join(', ')}</p>
           )}
-        </section>
+          <div>
+            <p className="text-xs text-neutral-500">artifacts</p>
+            <Artifacts artifacts={closeout.artifacts} />
+          </div>
+        </>
       )}
-      {closeout.replies && (
-        <section aria-label="Replies" className="space-y-1">
-          <h4 className="text-neutral-500">replies</h4>
-          {closeout.replies.length ? (
-            <ul className="space-y-1 text-xs">
-              {closeout.replies.map((reply, i) => (
-                // The finding, then its answer and why beneath it: each of the agent's texts is markdown, and may be more than a line.
-                <li key={i} data-answer={reply.answer} className="space-y-0.5">
-                  <Markdown>{reply.finding}</Markdown>{' '}
-                  <div className="flex gap-1.5 text-neutral-500">
-                    <span className="shrink-0">
-                      →{' '}<span className="font-medium text-neutral-900 dark:text-neutral-100">{reply.answer}</span>
-                    </span>
-                    {reply.why && (
-                      <>
-                        {' '}<span aria-hidden>·</span>{' '}
-                        <Markdown>{reply.why}</Markdown>
-                      </>
-                    )}
-                  </div>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-xs text-neutral-500">none</p>
-          )}
-        </section>
-      )}
-      <div>
-        <p className="text-neutral-500">artifacts</p>
-        <Artifacts artifacts={closeout.artifacts} />
-      </div>
     </div>
   );
 }
@@ -198,66 +218,3 @@ export function ClosedNeeds({ needs }: { needs: string }) {
   );
 }
 
-/** A declared field's value: text as text, a number or a flag as itself, and anything else as the JSON it came as. */
-function OutputValue({ value }: { value: unknown }) {
-  if (typeof value === 'string') return <span className="whitespace-pre-wrap">{value}</span>;
-  if (value === null || typeof value === 'number' || typeof value === 'boolean') return code(String(value));
-  return (
-    <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-neutral-100 p-2 font-mono text-[11px] leading-snug dark:bg-neutral-950">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  );
-}
-
-/**
- * The files a closeout named. One the api serves: an image drawn inline, opening full-size in a new tab; a text file as a link;
- * anything else as a link with its size. Any other path as the path, as the closeout gave it.
- */
-export function Artifacts({ artifacts }: { artifacts: readonly StepArtifact[] }) {
-  if (!artifacts.length) return <p className="text-xs text-neutral-500">none named</p>;
-  return (
-    <ul className="mt-1 space-y-2 text-xs">
-      {artifacts.map((artifact, i) => (
-        <li key={`${i}:${artifact.path}`} className="break-all">
-          <ArtifactView artifact={artifact} />
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-const linkClass = 'font-mono font-medium text-neutral-900 underline underline-offset-2 dark:text-neutral-100';
-
-function ArtifactView({ artifact }: { artifact: StepArtifact }) {
-  if (!('url' in artifact)) {
-    return (
-      <span data-artifact="path" className="font-mono">
-        {artifact.path}
-      </span>
-    );
-  }
-  if (artifact.kind === 'image') {
-    return (
-      <figure data-artifact="image" className="space-y-1">
-        <a href={artifact.url} target="_blank" rel="noreferrer" title={`Open ${artifact.name} full-size in a new tab`} className="block">
-          <img
-            src={artifact.url}
-            alt={artifact.name}
-            className="max-h-60 max-w-full rounded border border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-950"
-          />
-        </a>
-        <figcaption className="font-mono text-neutral-500">
-          {artifact.name} · {bytesWord(artifact.size)}
-        </figcaption>
-      </figure>
-    );
-  }
-  return (
-    <span data-artifact={artifact.kind}>
-      <a href={artifact.url} target="_blank" rel="noreferrer" className={linkClass}>
-        {artifact.name}
-      </a>
-      {artifact.kind === 'other' && <span className="text-neutral-500"> · {bytesWord(artifact.size)}</span>}
-    </span>
-  );
-}

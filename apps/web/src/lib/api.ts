@@ -182,7 +182,10 @@ export type StepArtifact = { path: string } | { path: string; name: string; url:
 /** Mirrors `StepReply` in apps/api/src/app.ts: a loop's target's answer to one finding. */
 export type StepReply = { finding: string; answer: string; why: string };
 
-/** Mirrors `StepCloseout` in apps/api/src/app.ts: with what it gave of its declared output, what it did not, and its `replies`. */
+/**
+ * Mirrors `StepCloseout` in apps/api/src/app.ts: with what it gave of its declared output, what it did not, and its `replies`;
+ * each declared field's JSON Schema off the workflow the run froze, and the statement as the engine recorded it (`raw`).
+ */
 export type StepCloseout = {
   outcome: 'done' | 'blocked';
   summary: string;
@@ -191,6 +194,8 @@ export type StepCloseout = {
   output: Record<string, unknown>;
   missing: string[];
   replies: StepReply[] | null;
+  schema: Record<string, unknown>;
+  raw: unknown;
 };
 
 /**
@@ -210,6 +215,9 @@ export type StepCheck = {
  * try, which `current` marks; `note` how it was reached, in `wf ls`'s words. `status` is the step's word on the current try, and
  * the engine's word for the task on an earlier one.
  */
+/** A closing statement the api could not read: its words for why, and the statement as it came. */
+export type StepUnreadable = { error: string; raw: unknown };
+
 export type StepTry = {
   try: number;
   round: number;
@@ -221,6 +229,8 @@ export type StepTry = {
   attempts: StepAttempts;
   check: StepCheck | null;
   closeout: StepCloseout | null;
+  /** A statement it gave that could not be read: why, and the statement as it came. `closeout` is null then. */
+  unreadable: StepUnreadable | null;
   /** What a person said to this try when they asked for it — `wf decide`'s `your answer` — or null. */
   answer: string | null;
 };
@@ -286,6 +296,7 @@ export type RunDetail = {
     /** The try a person asked for that the next tick files; null when none is. */
     asked: StepAsked | null;
     closeout: StepCloseout | null;
+    unreadable: StepUnreadable | null;
     /** Null for a step with no `check:`. */
     check: StepCheck | null;
     attempts: StepAttempts;

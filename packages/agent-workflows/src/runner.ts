@@ -19,7 +19,7 @@ export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, doll
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
-import { agentsDir, agentsFolderRefusal, fansOut, isReadme, linkRefusal, loadAgents, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
+import { agentNameRefusal, agentsDir, agentsFolderRefusal, agentUsers, agentVersion, AGENTS_FOLDER, fansOut, frontmatterKey, parseAgent, renderAgent, type Agent, type AgentDraft, isReadme, linkRefusal, loadAgents, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
@@ -1125,9 +1125,165 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
 function workflowPlaceRefusal(at: string): string | undefined {
   const holder = path.dirname(at);
   const store = path.resolve(HOME, 'workflows');
-  if (holder === store) return undefined;
-  if (path.basename(holder) === 'workflows' && fs.existsSync(path.join(path.dirname(holder), '.git'))) return undefined;
+  if (isWorkflowsHolder(holder)) return undefined;
   return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's (<repo>/workflows/<name>, beside its .git), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, or pass { anywhere: true } to write ${at} all the same.`;
+}
+
+/** Whether `dir` holds the workflows the board lists: the store's `workflows/`, or a repository's, beside its `.git`. */
+function isWorkflowsHolder(dir: string): boolean {
+  if (dir === path.resolve(HOME, 'workflows')) return true;
+  return path.basename(dir) === 'workflows' && fs.existsSync(path.join(path.dirname(dir), '.git'));
+}
+
+/**
+ * A refusal of an agent's write, in the package's words, and what kind it is: `missing` for an agent that is not there, `stale` for one
+ * that changed since it was read, `exists` for a name another agent has, `in-use` for one steps still name — `users` says which, as
+ * `<workflow>/<step>` — and `refused` for the rest: a place, a name, a key or a value the parser refuses.
+ */
+export class AgentWriteError extends WorkflowError {
+  readonly why: 'missing' | 'stale' | 'exists' | 'in-use' | 'refused';
+  readonly users: string[];
+  constructor(message: string, why: AgentWriteError['why'] = 'refused', users: string[] = []) {
+    super(message);
+    this.why = why;
+    this.users = users;
+  }
+}
+
+/** What `writeAgent` did: the agent as it now reads, its version, and its files by name — written, and removed. */
+export type AgentWritten = { dir: string; agent: Agent; version: string; written: string[]; removed: string[] };
+
+/** A result schema written with an agent: its file, beside the agent, and what it holds. */
+export type AgentSchema = { file: string; text: string };
+
+/**
+ * Why no agent may be written to or removed from `dir`, or `undefined`: an agent is a file in `agents/` beside the workflows the board lists
+ * — the store's (`<store>/workflows/agents`) or a repository's (`<repo>/workflows/agents`). Anywhere else only with `{ anywhere: true }`.
+ */
+function agentPlaceRefusal(dir: string, anywhere: boolean): string | undefined {
+  if (path.basename(dir) !== AGENTS_FOLDER) {
+    return `${dir} is not a folder of agents: the agents the workflows name are in the ${AGENTS_FOLDER}/ beside them. Name <workflows>/${AGENTS_FOLDER}.`;
+  }
+  if (anywhere || isWorkflowsHolder(path.dirname(dir))) return undefined;
+  return `${dir} is not the store's ${AGENTS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), AGENTS_FOLDER)}) nor a repository's (<repo>/workflows/${AGENTS_FOLDER}, beside its .git), the two places the board lists agents from. Write it to one of the two, or pass { anywhere: true } to write ${dir} all the same.`;
+}
+
+/** Whether two paths are one file on disk: a rename by case, where the filesystem does not tell case apart. */
+function sameFile(a: string, b: string): boolean {
+  const [x, y] = [fs.statSync(a, { throwIfNoEntry: false }), fs.statSync(b, { throwIfNoEntry: false })];
+  return Boolean(x && y && x.ino === y.ino && x.dev === y.dev);
+}
+
+const inUse = (name: string, users: readonly string[], does: string): string =>
+  `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} beside it — ${users.join(', ')} — and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent, or remove the \`agent:\` line, first.`;
+
+/**
+ * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir` is
+ * a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps name, at
+ * `wf start`, so a write changes what a later `wf start` freezes and nothing else.
+ *
+ * `version` is the agent's as it was read (`agentVersion`), or `null` for a new agent; `from` names the agent the draft was read from, when
+ * it is renamed. Judged whole before a byte is written, each refusal by name: the place (`agentPlaceRefusal`), each name as a file's
+ * (`agentNameRefusal`), a link where a file would be written or removed, a new agent whose name is taken, an agent no longer there or changed
+ * since `version` was read, a rename onto another agent or of one steps still name — saying which — and then the file as it would be,
+ * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words.
+ *
+ * `schema` is the result schema the agent's `output:` names, written beside it with it: a `.json` file's name with no folder, the one
+ * `output:` names, and not a schema another agent names — that one is its agent's to change. Without it the schema `output:` names is read
+ * from the folder as it is.
+ */
+export function writeAgent(dir: string, draft: AgentDraft, { version, from, schema, anywhere = false }: { version: string | null; from?: string; schema?: AgentSchema | null; anywhere?: boolean }): AgentWritten {
+  const at = path.resolve(dir);
+  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
+  refuse(agentPlaceRefusal(at, anywhere));
+  const name = draft?.name;
+  refuse(agentNameRefusal(name));
+  const old = from ?? name;
+  if (from !== undefined) refuse(agentNameRefusal(from));
+  if (from !== undefined && version === null) refuse(`a new agent is not renamed from another: to rename ${AGENTS_FOLDER}/${from}.md, give the version it was read at.`);
+  const file = (n: string) => path.join(at, `${n}.md`);
+  const linked = (target: string) => Boolean(fs.lstatSync(target, { throwIfNoEntry: false })?.isSymbolicLink());
+  const linkWhy = "an agent's file is its own: a write follows a link, and would write into whatever it points at, outside the folder.";
+  for (const target of new Set([file(name), file(old)])) if (linked(target)) refuse(linkRefusal(target, linkWhy));
+  const renamed = old !== name;
+  if (version === null) {
+    if (fs.existsSync(file(name))) refuse(`${AGENTS_FOLDER}/${name}.md is there already. Open it to change it, or give the new agent another name.`, 'exists');
+  } else {
+    const now = agentVersion(at, old);
+    if (now === null) refuse(`${AGENTS_FOLDER}/${old}.md is not there: it was removed since it was read. Write it as a new agent to have it back.`, 'missing');
+    if (now !== version) refuse(`${AGENTS_FOLDER}/${old}.md changed since it was read (version ${version}, now ${now}), and writing it would lose what changed. Read it again, and make the change on what it holds now.`, 'stale');
+  }
+  if (renamed) {
+    if (fs.existsSync(file(name)) && !sameFile(file(name), file(old))) refuse(`${AGENTS_FOLDER}/${name}.md is there already, and renaming ${old} to it would write over it. Give ${old} another name.`, 'exists');
+    const users = agentUsers(path.dirname(at), old);
+    if (users.length) refuse(inUse(old, users, `renaming it to ${name}`), 'in-use', users);
+  }
+  const text = renderAgent(draft);
+  const output = frontmatterKey(text, 'output');
+  if (schema) {
+    const bad = typeof schema.file !== 'string' || !/^[^\\/]+\.json$/.test(schema.file) || schema.file.startsWith('.');
+    if (bad) refuse(`\`${schema?.file}\` is not a result schema's name: it is a .json file beside the agent, named with no folder — ${name}.schema.json, say.`);
+    if (schema.file !== output) refuse(`the result schema is ${schema.file}, and ${AGENTS_FOLDER}/${name}.md ${output === undefined ? 'names none' : `names ${output}`}: a schema travels with the agent whose \`output:\` names it. Set \`output: ${schema.file}\`, or send no schema.`);
+    if (linked(path.join(at, schema.file))) refuse(linkRefusal(path.join(at, schema.file), "a result schema is its agent's own: a write follows a link, and would write into whatever it points at, outside the folder."));
+    const others = [...fs.readdirSync(at, { withFileTypes: true })].filter((e) => e.name.endsWith('.md') && e.name !== `${old}.md` && e.name !== `${name}.md`)
+      .filter((e) => { try { return frontmatterKey(fs.readFileSync(path.join(at, e.name), 'utf8'), 'output') === schema.file; } catch { return false; } })
+      .map((e) => path.basename(e.name, '.md'));
+    if (others.length) refuse(`${schema.file} is the result schema of ${others.join(', ')} too, and changing it here would change what ${others.length === 1 ? 'that agent' : 'those agents'} declare. Name a schema of this agent's own: ${name}.schema.json, say.`);
+  }
+  const read = (f: string): string | undefined => {
+    if (schema && f === schema.file) return schema.text;
+    try { return fs.readFileSync(path.resolve(at, f), 'utf8'); } catch { return undefined; }
+  };
+  const agent = parseAgent(name, text, read);
+
+  const written: string[] = [];
+  const removed: string[] = [];
+  const before = schema ? (() => { try { return fs.readFileSync(path.join(at, schema.file), 'utf8'); } catch { return undefined; } })() : undefined;
+  if (schema && before !== schema.text) {
+    fs.writeFileSync(path.join(at, schema.file), schema.text);
+    written.push(schema.file);
+  }
+  try {
+    // Renamed by case where the filesystem does not tell case apart, the old name is the new file: it goes first, as in `writeWorkflow`.
+    if (renamed && sameFile(file(name), file(old))) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
+    fs.writeFileSync(file(name), text);
+    written.push(`${name}.md`);
+  } catch (err) {
+    // The schema goes back to what it was, so an agent that was not written leaves nothing of itself behind.
+    if (schema && written.includes(schema.file)) before === undefined ? fs.rmSync(path.join(at, schema.file), { force: true }) : fs.writeFileSync(path.join(at, schema.file), before);
+    throw err;
+  }
+  if (renamed && !removed.length) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
+  return { dir: at, agent, version: agentVersion(at, name)!, written, removed };
+}
+
+/**
+ * An agent removed: its file, and the result schema its `output:` names unless another agent names it too. Refused, by name, as a write
+ * is — the place, the name, a link, an agent not there or changed since `version` was read — and while any step of any workflow beside
+ * it still names it, saying which: removed, each of those workflows would stop loading.
+ */
+export function removeAgent(dir: string, name: string, { version, anywhere = false }: { version: string; anywhere?: boolean }): { dir: string; removed: string[] } {
+  const at = path.resolve(dir);
+  const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
+  refuse(agentPlaceRefusal(at, anywhere));
+  refuse(agentNameRefusal(name));
+  const file = path.join(at, `${name}.md`);
+  if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(file, "an agent's file is its own, and this one is not a file in the folder. Remove the link by hand."));
+  const now = agentVersion(at, name);
+  if (now === null) refuse(`${AGENTS_FOLDER}/${name}.md is not there: it was removed already.`, 'missing');
+  if (now !== version) refuse(`${AGENTS_FOLDER}/${name}.md changed since it was read (version ${version}, now ${now}). Read it again before removing it.`, 'stale');
+  const users = agentUsers(path.dirname(at), name);
+  if (users.length) refuse(inUse(name, users, 'removing it'), 'in-use', users);
+  const read = (f: string) => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
+  const output = frontmatterKey(read(`${name}.md`) ?? '', 'output');
+  fs.rmSync(file);
+  const removed = [`${name}.md`];
+  if (output !== undefined && /^[^\\/]+\.json$/.test(output)) {
+    const shared = fs.readdirSync(at).some((f) => f.endsWith('.md') && frontmatterKey(read(f) ?? '', 'output') === output);
+    const schemaAt = path.join(at, output);
+    if (!shared && fs.lstatSync(schemaAt, { throwIfNoEntry: false })?.isFile()) { fs.rmSync(schemaAt); removed.push(output); }
+  }
+  return { dir: at, removed };
 }
 
 /**

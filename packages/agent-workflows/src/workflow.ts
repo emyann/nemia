@@ -31,6 +31,7 @@
  * beside the implementer, with write access; `deadlineSeconds: 5m` read as NaN and stopped the
  * step on its first tick. A `check:` the parser drops is a constraint nobody enforces.
  */
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -1169,6 +1170,116 @@ export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
     }
   }
   return agents;
+}
+
+/**
+ * An agent as it is written back: what `renderAgent` takes, and what `parseAgent` reads — its name, the file's, its description, its keys as
+ * written (`200k`, `Read, Grep`), and its instructions. A key unset is left out, or `null`.
+ */
+export type AgentDraft = { name: string; description?: string | null; keys: Partial<Record<RoleKey, string | null>>; body: string };
+
+/**
+ * An agent as its file: the frontmatter, `description:` first and then each role key it sets in `AGENT_KEYS`' order, as written; then its
+ * instructions. The inverse of `parseAgent`: an agent it read renders to a file it reads back as the same agent, which
+ * `test/write-agent.test.ts` holds over every shipped agent. Pure. A file's comments are not on the agent, so a render has none.
+ *
+ * As `renderStep`, it judges nothing the parser judges: a value the parser would refuse is written as given, and `writeAgent` parses what it
+ * rendered before it writes. Refused here is only what a file cannot hold: a key an agent may not set — `agent:`, a step's wiring, one no
+ * agent has — in the parser's words (`agentKeyRefusal`), since it would be written and then refused, or dropped; `description` among the
+ * keys, where it would be written twice; and a line break in a value, which would make what follows it a line of its own — a key, even.
+ */
+export function renderAgent(draft: AgentDraft): string {
+  const file = `${AGENTS_FOLDER}/${draft.name}.md`;
+  const keys = (draft.keys ?? {}) as Record<string, string | null | undefined>;
+  for (const key of Object.keys(keys)) {
+    if (keys[key] == null) continue;
+    if (key === 'description') refuse(`${file}: \`description\` is the agent's own line, not one of its role keys — give it as the description, once.`);
+    const refused = agentKeyRefusal(file, key);
+    if (refused !== undefined) refuse(refused);
+  }
+  const values: Array<[string, string | null | undefined]> = [['description', draft.description], ...AGENT_KEYS.filter((key) => key !== 'description').map((key) => [key, keys[key]] as [string, string | null | undefined])];
+  const lines = values.flatMap(([key, value]) => {
+    if (value == null) return [];
+    const text = String(value);
+    if (/[\r\n]/.test(text)) refuse(`${file}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line.`);
+    return [`${key}: ${text}`];
+  });
+  const body = String(draft.body ?? '').trim();
+  if (lines.length) return `---\n${lines.map((line) => `${line}\n`).join('')}---\n${body}\n`;
+  return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : body ? `${body}\n` : '';
+}
+
+/**
+ * Why `name` cannot be an agent's name, or `undefined` when it can. An agent is its file, `agents/<name>.md`, and a step names it with
+ * `agent: <name>`: so a name is one file's in that folder, not hidden, not the README's, and one a line of frontmatter can hold.
+ */
+export function agentNameRefusal(name: unknown): string | undefined {
+  const fix = 'Name it as its file is named, without .md — reviewer, say.';
+  if (typeof name !== 'string' || !name.trim()) return `An agent has no name, and an agent is named by its file in ${AGENTS_FOLDER}/. ${fix}`;
+  const as = `\`${name}\` is not an agent's name:`;
+  if (/[\\/]/.test(name)) return `${as} an agent is a file in ${AGENTS_FOLDER}/, and a slash names a file in another folder. ${fix}`;
+  if (/[\u0000-\u001f\u007f]/.test(name)) return `${as} it holds a control character — ${JSON.stringify(name)} — which a line of frontmatter cannot. ${fix}`;
+  if (name.startsWith('.')) return `${as} a name that starts with a dot is a hidden file, which a person listing ${AGENTS_FOLDER}/ does not see. ${fix}`;
+  if (name !== name.trim()) return `${as} \`agent:\` is trimmed as it is read, so no step could name it. Write it without the spaces around it.`;
+  if (/\.md$/i.test(name)) return `${as} it is a file's name, and an agent is named without its .md: \`${name.slice(0, -3)}\`.`;
+  if (isReadme(`${name}.md`)) return `${as} ${AGENTS_FOLDER}/${name}.md is the folder's README, which says what the agents are for and is never read as one. ${fix}`;
+  if (new TextEncoder().encode(`${name}.md`).length > 255) return `${as} ${name}.md is longer than a file's name may be, 255 bytes. ${fix}`;
+  return undefined;
+}
+
+/**
+ * The value a file's frontmatter gives `key`, read as the parser reads it — each line trimmed, the key trimmed before its colon — or
+ * `undefined` for a file with no such line, or whose frontmatter never closes (the parser refuses it). `agent : coder` names `coder`.
+ */
+export function frontmatterKey(text: string, key: string): string | undefined {
+  let block: string | null;
+  try {
+    block = splitFrontmatter('', text).block;
+  } catch {
+    return undefined;
+  }
+  for (const raw of (block ?? '').split('\n')) {
+    const line = raw.trim();
+    const i = line.indexOf(':');
+    if (line.startsWith('#') || i <= 0 || line.slice(0, i).trim() !== key) continue;
+    return line.slice(i + 1).trim() || undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Every step, in every workflow in `workflowsDir`, that names the agent `name` (`agent:`), as `<workflow>/<step>`, sorted. Each step file is
+ * read as the parser reads its `agent:` line, so a folder that does not load counts as much as one that does: a step that names the agent
+ * is broken by its going, whether or not something else is broken beside it.
+ */
+export function agentUsers(workflowsDir: string, name: string): string[] {
+  const users: string[] = [];
+  for (const workflow of workflowsIn(workflowsDir)) {
+    const dir = path.join(workflowsDir, workflow);
+    for (const file of stepFiles(fs.readdirSync(dir))) {
+      let text: string;
+      try { text = fs.readFileSync(path.join(dir, file), 'utf8'); } catch { continue; }
+      if (frontmatterKey(text, 'agent') === name) users.push(`${workflow}/${path.basename(file, '.md')}`);
+    }
+  }
+  return users.sort();
+}
+
+/**
+ * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md` and of the schema its `output:`
+ * names beside it, each by name with what it holds — a file that cannot be read counts as what it says. A write of the agent carries it, and
+ * is refused when the agent no longer holds it (`writeAgent`), rather than written over what changed since it was read.
+ */
+export function agentVersion(dir: string, name: string): string | null {
+  const at = path.join(dir, `${name}.md`);
+  if (!fs.lstatSync(at, { throwIfNoEntry: false })) return null;
+  const read = (file: string): string | { unreadable: string } => {
+    try { return fs.readFileSync(file, 'utf8'); } catch (err) { return { unreadable: (err as Error).message }; }
+  };
+  const text = read(at);
+  const schema = typeof text === 'string' ? frontmatterKey(text, 'output') : undefined;
+  const files = [[`${name}.md`, text], ...(schema === undefined ? [] : [[schema, read(path.resolve(dir, schema))]])];
+  return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
 }
 
 /**

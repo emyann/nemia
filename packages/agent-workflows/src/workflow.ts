@@ -60,8 +60,13 @@ export type Workflow = {
    * Refused on a step with a `check:` — the run would execute it in a person's checkout, which is no verdict on the step's work — on one
    * with a `resume:`, whose session ran in another directory and was told none of what an ending needs, and on a step anything waits on,
    * or one that ends a workflow beside another: a run has one ending (`validate`).
+   *
+   * `workspace: folder`: the step works in a folder the run makes for it, and the run needs no git repository — the first kind of
+   * workspace that is not the git kind (`place` on the run record). A team is of one kind: every step says it, or none does
+   * (`validate`). A step that continues another's session (`resume:`) works in that step's folder, as it would in its worktree; any
+   * other step gets a folder of its own, empty, and what the steps before it made reaches it as their output and their files.
    */
-  workspace?: 'main';
+  workspace?: 'main' | 'folder';
   /**
    * `slot: none`: a run of this workflow takes no run slot (`WF_MAX_RUNS`).
    *
@@ -225,7 +230,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   after: 'the steps that must finish first, verified, or unverified where one has no check — the step `resume:` names included; none, and it starts at once',
   resume: 'the step whose session this one continues instead of starting cold, which implies waiting on it',
   input: "the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on",
-  workspace: "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
+  workspace: "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch. `folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none",
   slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
   agent: "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",
   harness: 'what runs the session: `claude` (the default), `codex` or `claude-detached`',
@@ -803,21 +808,27 @@ function gateOf(step: string, gate: string | undefined): true | undefined {
   return refuse(`${step}: \`gate: ${gate}\` is not \`true\`. \`gate: true\` holds the step's closeout for a person — wf approve — before anything after it is filed; without the line the step has no gate. To gate one run of the workflow and not every run, delete the line and start it with --gate ${step}.`);
 }
 
-/** The words `workspace:` takes. One: a step either works in the repository's checkout or where the workflow's shape puts it. */
-export const WORKSPACES: readonly string[] = ['main'];
+/**
+ * The words `workspace:` takes. `main`: a step of a git run works in the repository's checkout rather than where the workflow's shape puts
+ * it. `folder`: the run is not a git run at all, and the step works in a folder the run makes — the first of the kinds a workspace can be
+ * beside git's, which is what a step without the line is.
+ */
+export const WORKSPACES: readonly string[] = ['main', 'folder'];
 
 /**
- * `workspace:` as written: `main`, or refused. A step without the line works where the shape of the workflow puts it (`workspacePlan`) — a
- * worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is a directory the run
- * would have to invent. Refused too on a step with a `check:`, whose command the run executes in the step's workspace.
+ * `workspace:` as written: `main`, `folder`, or refused. A step without the line works where the shape of the workflow puts it
+ * (`workspacePlan`) — a worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is
+ * a directory the run would have to invent. `main` is refused too on a step with a `check:`, whose command the run executes in the step's
+ * workspace. `folder` takes a check and a `resume:` as a worktree does: its folder is the run's, and the session's.
  */
-function workspaceOf(step: string, workspace: string | undefined, check: string | undefined, resume: string | undefined): 'main' | undefined {
+function workspaceOf(step: string, workspace: string | undefined, check: string | undefined, resume: string | undefined): 'main' | 'folder' | undefined {
   if (workspace === undefined) return undefined;
+  if (workspace === 'folder') return 'folder';
   if (workspace === 'worktree') {
     refuse(`${step}: \`workspace: worktree\` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues. Delete the line, or write \`workspace: main\` to run the step in the repository's own checkout.`);
   }
   if (workspace !== 'main') {
-    refuse(`${step}: \`workspace: ${workspace}\` is not \`main\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. Without the line, the step works where the workflow's shape puts it.`);
+    refuse(`${step}: \`workspace: ${workspace}\` is not \`main\` or \`folder\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. \`workspace: folder\` runs it in a folder the run makes, in a run that needs no git repository. Without the line, the step works where the workflow's shape puts it.`);
   }
   if (check !== undefined) {
     refuse(`${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there after the step hands off — a verdict on whatever is in that checkout by then, not on this step's work. A step that ends a run runs its check itself, in its prose, and says in its closeout what it found. Delete one of the two lines.`);
@@ -1308,6 +1319,9 @@ export function workflowDescription(dir: string): string | null {
   return null;
 }
 
+/** Whether a team works in folders the run makes, with no git repository (`workspace: folder`): every step says it, or none does (`validate`). */
+export const isFolderTeam = (steps: readonly Pick<Workflow, 'workspace'>[]): boolean => steps.length > 0 && steps.every((s) => s.workspace === 'folder');
+
 /**
  * The ways a folder of markdown is not a workflow: a step waits on one that does not exist, the steps
  * wait on each other, or a step reads the output of one that has not finished or declares none. All
@@ -1347,6 +1361,7 @@ export function validate(steps: readonly Workflow[]): void {
     }
   }
 
+  validateFolder(steps);
   validateMainWorkspace(steps);
   validateSlot(steps);
 
@@ -1386,6 +1401,23 @@ function validateMainWorkspace(steps: readonly Workflow[]): void {
       throw new WorkflowError(`${named}, and ${beside.join(', ')} ${beside.length > 1 ? 'end' : 'ends'} the workflow beside it, so both could be working in that one directory at once. A run has one ending: make ${s.name} wait on ${beside.join(', ')}, or delete the line.`);
     }
   }
+}
+
+/**
+ * The one way a team cannot work in folders (`workspace: folder`): some of its steps do not say so.
+ *
+ * A run is of one kind — a git run, whose steps work on branches of one repository, or a folder run, which needs no repository — and the
+ * kind is the run's, frozen on its record at start (`place`). A step without the line is a git step, so a team that says it on some steps
+ * and not on others would be both. Refused, rather than one of the two guessed.
+ */
+function validateFolder(steps: readonly Workflow[]): void {
+  const folder = steps.filter((s) => s.workspace === 'folder').map((s) => s.name);
+  const not = steps.filter((s) => s.workspace !== 'folder').map((s) => s.name);
+  if (!folder.length || !not.length) return;
+  throw new WorkflowError(
+    `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`workspace: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'do' : 'does'} not — every step of a team says workspace: folder, or none does.`
+    + ` A run works in folders it makes, with no git repository, or on branches of one: it cannot do both. Add the line to ${not.join(', ')}, or delete it from ${folder.join(', ')}.`,
+  );
 }
 
 /**

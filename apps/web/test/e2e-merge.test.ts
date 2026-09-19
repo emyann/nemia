@@ -68,23 +68,31 @@ const shippedPages = (): Record<string, string> => ({
   '.gitattributes': fs.readFileSync(path.join(REPO, '.gitattributes'), 'utf8'),
 });
 
+/** The last page there is, and the number after it, as two runs would each take it: a page added since does not move the tests. */
+const lastAndNext = (): [string, string] => {
+  const last = pageFiles(PAGES_DIR).at(-1)!;
+  return [last, String(Number(last.slice(0, 3)) + 10).padStart(3, '0')];
+};
+
 /** A page added as a run adds one: its file, and its line at the end of NAMES. */
 const added = (base: Record<string, string>, file: string, name: string): Record<string, string> =>
   ({ [path.join(PAGES, file)]: pageFile(name), [path.join(PAGES, NAMES)]: `${base[path.join(PAGES, NAMES)]}${name}\n` });
 
 test('two branches that each add a page and its line in NAMES, with the same number, merge cleanly, and both are visited', () => {
   const base = shippedPages();
-  const { repo, clean, said } = mergeOf(base, added(base, '250-alpha.ts', 'alpha'), added(base, '250-beta.ts', 'beta'));
+  const [last, next] = lastAndNext();
+  const { repo, clean, said } = mergeOf(base, added(base, `${next}-alpha.ts`, 'alpha'), added(base, `${next}-beta.ts`, 'beta'));
   assert.ok(clean, `the merge is clean — git said:\n${said}`);
   const merged = pageFiles(path.join(repo, PAGES));
-  assert.deepEqual(merged.slice(-3), ['240-capabilities.ts', '250-alpha.ts', '250-beta.ts']);
+  assert.deepEqual(merged.slice(-3), [last, `${next}-alpha.ts`, `${next}-beta.ts`]);
   assert.equal(merged.length, fs.readdirSync(PAGES_DIR).length - 1 + 2);
   assert.ok(['alpha', 'beta'].every((name) => namesIn(path.join(repo, PAGES)).has(name)), 'NAMES keeps both lines');
 });
 
 test('without the union rule for NAMES, the same two pages conflict on their lines', () => {
   const base = { ...shippedPages(), '.gitattributes': '' };
-  const { clean } = mergeOf(base, added(base, '250-alpha.ts', 'alpha'), added(base, '250-beta.ts', 'beta'));
+  const [, next] = lastAndNext();
+  const { clean } = mergeOf(base, added(base, `${next}-alpha.ts`, 'alpha'), added(base, `${next}-beta.ts`, 'beta'));
   assert.equal(clean, false, 'two lines added at the end of NAMES conflict');
 });
 

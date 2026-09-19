@@ -1,0 +1,27 @@
+{
+  "name": "agent-judge",
+  "version": "1.0.0",
+  "description": "A typed judgment from TypeSafe's Jev, asked once and recorded",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "0.6.0",
+    "effect": "^4.0.0-rc.116"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "typescript": "^5.9.3"
+  },
+  "bin": {
+    "judge": "bin/judge.ts"
+  },
+  "exports": {
+    ".": "./src/facade.ts",
+    "./effect": "./src/index.ts",
+    "./package.json": "./package.json"
+  }
+}

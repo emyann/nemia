@@ -871,10 +871,32 @@ test("`workspace: main` runs a step in the repository's own checkout, and a step
   const refused = (lines: string, pattern: RegExp) => assert.throws(() => fm('ship', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
   refused('workspace: worktree', /^ship: `workspace: worktree` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues\. Delete the line, or write `workspace: main` to run the step in the repository's own checkout\.$/);
   for (const word of ['Main', 'repo', '\/tmp\/x', 'true']) {
-    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`main\`\.`));
+    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`main\` or \`folder\`\.`));
   }
   refused('workspace:', /^ship: `workspace` has no value\. Delete the line rather than leaving it blank/);
   refused('workspace: main\nworkspace: main', /^ship: `workspace` is set twice/);
+});
+
+test("`workspace: folder` runs a step in a folder the run makes, with a check and a resume as a worktree takes them; REFUSED at load: `Folder`, `folders`, a team only some of whose steps say it", () => {
+  assert.equal(fm('write', 'workspace: folder').workspace, 'folder');
+  assert.equal(fm('review', 'workspace: folder\ncheck: test -s note.md').workspace, 'folder', 'a check runs in the step\'s folder');
+  assert.equal(fm('review', 'workspace: folder\nresume: write').workspace, 'folder', 'and a resumed session works in the folder of the step it continues');
+  const refusedWord = (lines: string, pattern: RegExp) => assert.throws(() => fm('write', lines), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), lines);
+  for (const word of ['Folder', 'folders', 'dir']) refusedWord(`workspace: ${word}`, new RegExp(`^write: \`workspace: ${word}\` is not \`main\` or \`folder\`\. `));
+
+  const team = (...words: Array<'folder' | 'main' | undefined>): Workflow[] => words.map((workspace, i) =>
+    ({ name: `s${i}`, after: i ? [`s${i - 1}`] : [], body: 'x', ...(workspace ? { workspace } : {}) }) as Workflow);
+  assert.doesNotThrow(() => validate(team('folder', 'folder')), 'every step says it');
+  assert.doesNotThrow(() => validate(team(undefined, undefined, 'main')), 'or none does');
+  const refused = (steps: Workflow[], pattern: RegExp) => assert.throws(() => validate(steps), (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message), pattern.source);
+  refused(team('folder', undefined),
+    /^s0 says `workspace: folder`, and s1 does not — every step of a team says workspace: folder, or none does\. A run works in folders it makes, with no git repository, or on branches of one: it cannot do both\. Add the line to s1, or delete it from s0\.$/);
+  refused(team(undefined, 'folder', 'folder'), /^s1, s2 say `workspace: folder`, and s0 does not — every step of a team says workspace: folder, or none does\./);
+  refused(team('folder', 'main'), /^s0 says `workspace: folder`, and s1 does not/);
+
+  // And at load, from a folder of files, as a person writes them.
+  assert.throws(() => parseFolder([['write', '---\nworkspace: folder\n---\nWrite.\n'], ['review', '---\nafter: write\n---\nReview.\n']]),
+    (e: WorkflowError) => e.exitCode === 2 && /^write says `workspace: folder`, and review does not/.test(e.message));
 });
 
 test("`slot: none` takes a run out of the cap on runs in flight, and a run without the line waits for a slot like any other; REFUSED at load: another word, no value, and the line twice", () => {

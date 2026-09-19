@@ -15,6 +15,8 @@ who it is — `description:`, then the keys of a role (`harness`, `model`, `effo
 | `shipper` | `ship` in the same four as `implementer` |
 | `ui-implementer` | `implement` in `ui` |
 | `ui-reviewer` | `review` in `ui` |
+| `note-writer` | `write` in `note` |
+| `note-reviewer` | `review` in `note` |
 
 At `wf start` each step is resolved and frozen on the run: the agent's keys are the defaults, a key the step
 writes wins, and the step's brief is the agent's instructions with the step's own note after them. So a change

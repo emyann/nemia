@@ -1,0 +1,9 @@
+{
+  "type": "object",
+  "properties": {
+    "title": { "type": "string", "description": "The note's title, as its first heading gives it." },
+    "gist": { "type": "string", "description": "What the note says, in one sentence, for the reviewer to hold it to." }
+  },
+  "required": ["title", "gist"],
+  "additionalProperties": false
+}

@@ -48,6 +48,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   own, `e2e-pages.test.ts` and `e2e-merge.test.ts`, typechecked by `test/e2e/tsconfig.json`); `test/e2e/*.test.ts` are the ones that
   launch Chromium, and only `npm run e2e` runs them. The two sat in `test/e2e/`, so the check of a run that touches nothing under
   `apps/` stayed green with CLAUDE.md's union line gone (learned by the run that put the e2e's page names in `pages/NAMES`).
+- **A test that names the last e2e page fails on the next page added.** The merge test (`apps/web/test/e2e-merge.test.ts`) wrote
+  `240-capabilities.ts` as the last page and `250` as the number two runs would both take, so the page after it failed before a browser
+  opened. It reads both off `pages/` now; a test about the pages reads the pages that exist (learned by the run that added the `outcome` page).
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.
@@ -174,6 +177,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   file it lists and removes the rest writes *through* a link — into whatever it points at, outside the folder — and leaves
   it behind when it should have removed it, with nothing said either way. Where a folder's files are meant to be its own,
   refuse a link by name (`writeWorkflow`, same run).
+- **A fake engine's closeout is flat, as a harness writes it.** `parseCloseout` moves the fields beside `outcome` — a schema's
+  `title`, `gist` — under `output`; a test that hands the fake an `output` already nested reads the step as `unsigned`, and the next
+  step is never filed. Give the fake `{ ...SIGNED, title, gist }` (learned by the run that added `workspace: folder`).
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

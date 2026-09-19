@@ -32,7 +32,7 @@ import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, t
  * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallow`); `count`, a whole number;
  * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as
  * `choices` has them (`remote`, `gate`); `schema`, a file beside the step (`output`).
- * `workspace` is a `choice` of one word, `main`, and `slot` of one word, `none`, since a step either says it or says nothing. `agent` is a
+ * `workspace` is a `choice` of its words, `main` and `folder`, and `slot` of one word, `none`, since a step either says it or says nothing. `agent` is a
  * `choice` of the agents in yours' `agents/`, the only folder the builder writes the steps of.
  */
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';

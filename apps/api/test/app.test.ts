@@ -80,8 +80,11 @@ const workflowDir = workflowFolder({
 
 const blocked = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: ['NOTES.md'] };
 
-/** `blocked` as the api gives it: a path on the branch is the path alone, and it declared no output and gave no replies. */
-const blockedCloseout = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: [{ path: 'NOTES.md' }], output: {}, missing: [], replies: null };
+/**
+ * `blocked` as the api gives it: a path on the branch is the path alone, and it declared no output and gave no replies. `raw` is the
+ * statement as the engine recorded it.
+ */
+const blockedCloseout = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: [{ path: 'NOTES.md' }], output: {}, missing: [], replies: null, schema: {}, raw: blocked };
 
 /** What a step on its first try says of it, as its one entry in `tries`: the current try, reached by nothing. */
 const firstTry = (step: { taskId: string | null; status: string; attempts: object; check: object | null; closeout: object | null }) => [{
@@ -996,16 +999,23 @@ test('a step on its third try, in the second round of its loop, carries every tr
     { finding: 'src/cache.ts:12 — the cache never expires', answer: 'fixed', why: 'Entries expire after the TTL now, and a test waits it out.' },
     { finding: 'src/cache.ts:40 — a miss is counted twice', answer: "won't fix", why: 'It is counted once per layer, on purpose.' },
   ];
-  settledTask('r-50-implement', { ...done, summary: 'Added the cache.' });
+  const said = {
+    implement: { ...done, summary: 'Added the cache.' },
+    implement2: { ...done, summary: 'Fixed the failing test.' },
+    implement3: { ...done, summary: 'Answered the review.', replies },
+    review: { ...done, summary: 'Two findings.', again: true, findings },
+    review2: { ...done, summary: 'Nothing left.', again: false, findings: [] },
+  };
+  settledTask('r-50-implement', said.implement);
   checkTask('r-50-implement-check', { settled: 'failed', exitCode: 1 });
   fs.mkdirSync(path.join(root, 'checks'), { recursive: true });
   fs.writeFileSync(path.join(root, 'checks', 'r-50-implement-check.stderr'), 'npm error Test failed.\n');
-  settledTask('r-50-implement-try2', { ...done, summary: 'Fixed the failing test.' });
+  settledTask('r-50-implement-try2', said.implement2);
   checkTask('r-50-implement-try2-check', { settled: 'succeeded', exitCode: 0 });
-  settledTask('r-50-review', { ...done, summary: 'Two findings.', again: true, findings });
-  settledTask('r-50-implement-try3', { ...done, summary: 'Answered the review.', replies });
+  settledTask('r-50-review', said.review);
+  settledTask('r-50-implement-try3', said.implement3);
   checkTask('r-50-implement-try3-check', { settled: 'succeeded', exitCode: 0 });
-  settledTask('r-50-review-try2', { ...done, summary: 'Nothing left.', again: false, findings: [] });
+  settledTask('r-50-review-try2', said.review2);
   const reviewOutput = {
     type: 'object', properties: { again: { type: 'boolean' }, findings: { type: 'array' } }, required: ['again', 'findings'], additionalProperties: false,
   };
@@ -1034,7 +1044,8 @@ test('a step on its third try, in the second round of its loop, carries every tr
   assert.equal(observations(), 1);
 
   const once = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } };
-  const closeout = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, ...more });
+  // Each closeout with what was recorded, untouched, as `raw`: `replies` is read into the api's shape, and the statement is not.
+  const closeout = (raw: { summary: string }, more: object = {}) => ({ outcome: 'done', summary: raw.summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, schema: {}, raw, ...more });
   const passed = (taskId: string) => ({ command: 'npm test', taskId, verdict: 'passed', refused: null });
   const [implement, review] = run.steps;
   assert.deepEqual([implement.status, implement.note, implement.attempts], ['verified ✓', 'round 2 of 3', once]);
@@ -1046,16 +1057,16 @@ test('a step on its third try, in the second round of its loop, carries every tr
         command: 'npm test', taskId: 'r-50-implement-check', verdict: 'exit 1',
         refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['npm error Test failed.'], truncated: false }, unreadable: null },
       },
-      closeout: closeout('Added the cache.'),
+      closeout: closeout(said.implement),
       answer: null,
     },
     {
       try: 2, round: 1, then: 'round', current: false, taskId: 'r-50-implement-try2', note: 'try 2, by retries: 1', status: 'succeeded', attempts: once,
-      check: passed('r-50-implement-try2-check'), closeout: closeout('Fixed the failing test.'), answer: null,
+      check: passed('r-50-implement-try2-check'), closeout: closeout(said.implement2), answer: null,
     },
     {
       try: 3, round: 2, then: null, current: true, taskId: 'r-50-implement-try3', note: 'round 2 of 3', status: 'verified ✓', attempts: once,
-      check: passed('r-50-implement-try3-check'), closeout: closeout('Answered the review.', { replies }), answer: null,
+      check: passed('r-50-implement-try3-check'), closeout: closeout(said.implement3, { replies }), answer: null,
     },
   ]);
   // The current try is where it was: the step's own check and closeout are its.
@@ -1064,17 +1075,42 @@ test('a step on its third try, in the second round of its loop, carries every tr
   assert.deepEqual(review.tries, [
     {
       try: 1, round: 1, then: 'round', current: false, taskId: 'r-50-review', note: null, status: 'succeeded', attempts: once, check: null,
-      // What it declared, in its schema's order: the findings implement was handed.
-      closeout: closeout('Two findings.', { output: { again: true, findings } }),
+      // What it declared, in its schema's order: the findings implement was handed, and each field's schema off the frozen workflow.
+      closeout: closeout(said.review, { output: { again: true, findings }, schema: reviewOutput.properties }),
       answer: null,
     },
     {
       try: 2, round: 2, then: null, current: true, taskId: 'r-50-review-try2', note: 'round 2 of 3', status: review.status, attempts: once, check: null,
-      closeout: closeout('Nothing left.', { output: { again: false, findings: [] } }),
+      closeout: closeout(said.review2, { output: { again: false, findings: [] }, schema: reviewOutput.properties }),
       answer: null,
     },
   ]);
   assert.equal(review.status, 'unverified · done');
+});
+
+test("a closeout carries each declared field's schema off the workflow the run froze — given or missing — and the statement as it was recorded", async () => {
+  const schema = {
+    type: 'object',
+    properties: {
+      approach: { type: 'string', description: 'The change in a paragraph.' },
+      files: { type: 'array', items: { type: 'object', properties: { path: { type: 'string' }, change: { type: 'string' } } } },
+    },
+    required: ['approach', 'files'], additionalProperties: false,
+  };
+  // An outcome that is neither word, an artifact that is not a path, a field nobody declared: read forgivingly, and kept as said.
+  const said = { outcome: 'finished', summary: 'A plan.', needs: null, artifacts: ['PLAN.md', 7], approach: 'Cache it.', aside: { mood: 'fine' } };
+  settledTask('r-51-plan', said);
+  writeRun({
+    ...r2, id: 'r-51', workflowDir: gone,
+    workflow: [{ name: 'plan', after: [], body: 'Plan it.', output: { file: 'plan.json', schema } }],
+    steps: { plan: { taskId: 'r-51-plan' } },
+  });
+  const run = await (await app.request('/api/runs/r-51')).json();
+  const { closeout } = run.steps[0];
+  assert.deepEqual([closeout.outcome, closeout.artifacts, closeout.output, closeout.missing], ['done', [{ path: 'PLAN.md' }], { approach: 'Cache it.' }, ['files']]);
+  // The folder is gone: the schema is the record's, a field's own, `files` among them though it was not given.
+  assert.deepEqual(closeout.schema, schema.properties);
+  assert.deepEqual(closeout.raw, said);
 });
 
 test('a step says what it runs with: the workflow\'s effort, context window and tools, and what the engine filed its try with where the workflow says nothing', async () => {

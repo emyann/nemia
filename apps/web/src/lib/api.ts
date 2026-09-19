@@ -177,7 +177,10 @@ export type StepArtifact = { path: string } | { path: string; name: string; url:
 /** Mirrors `StepReply` in apps/api/src/app.ts: a loop's target's answer to one finding. */
 export type StepReply = { finding: string; answer: string; why: string };
 
-/** Mirrors `StepCloseout` in apps/api/src/app.ts: with what it gave of its declared output, what it did not, and its `replies`. */
+/**
+ * Mirrors `StepCloseout` in apps/api/src/app.ts: with what it gave of its declared output, what it did not, and its `replies`;
+ * each declared field's JSON Schema off the workflow the run froze, and the statement as the engine recorded it (`raw`).
+ */
 export type StepCloseout = {
   outcome: 'done' | 'blocked';
   summary: string;
@@ -186,6 +189,8 @@ export type StepCloseout = {
   output: Record<string, unknown>;
   missing: string[];
   replies: StepReply[] | null;
+  schema: Record<string, unknown>;
+  raw: unknown;
 };
 
 /**

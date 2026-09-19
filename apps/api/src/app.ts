@@ -249,6 +249,10 @@ export type StepReply = { finding: string; answer: string; why: string };
  * `output` is what it gave of the fields its `output:` declares, and `missing` those it did not (`declaredOutput`). `replies`
  * is a loop's target's answer to each finding it was handed, when its closeout gave them. `artifacts` are the files it named,
  * each as `artifactOf` reads it: a file the api serves from the step's files directory, or the path alone.
+ *
+ * `schema` is the JSON Schema of each field asked about — given or missing — off the workflow the run froze, so the board can
+ * draw a value by what it was declared to be and say what a field means. `raw` is the statement as the engine recorded it,
+ * untouched: the fields above are read forgivingly (`parseCloseout`, `replyOf`), and a person may want what the agent said.
  */
 export type StepCloseout = {
   outcome: 'done' | 'blocked';
@@ -258,6 +262,8 @@ export type StepCloseout = {
   output: Record<string, unknown>;
   missing: string[];
   replies: StepReply[] | null;
+  schema: Record<string, unknown>;
+  raw: unknown;
 };
 
 /**
@@ -1278,8 +1284,10 @@ function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | nul
   const c = said === undefined ? undefined : parseCloseout(said);
   if (!c || 'error' in c) return null;
   // `replies` apart: a loop's target owes them beside what its step declares, and they are shown as answers, not as a field.
-  const { given, missing } = declaredOutput(step, c, outputFields(step).filter((field) => field !== LOOP_REPLIES));
+  const fields = outputFields(step).filter((field) => field !== LOOP_REPLIES);
+  const { given, missing } = declaredOutput(step, c, fields);
   const replies = c.output?.[LOOP_REPLIES];
+  const declared = step.output?.schema.properties ?? {};
   return {
     outcome: c.outcome,
     summary: c.summary,
@@ -1288,6 +1296,9 @@ function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | nul
     output: given,
     missing,
     replies: Array.isArray(replies) ? replies.map(replyOf) : null,
+    // `fromEntries`, as `declaredOutput` does it: a field JSON names `__proto__` is a property of its own.
+    schema: Object.fromEntries(fields.map((field) => [field, declared[field]])),
+    raw: said,
   };
 }
 

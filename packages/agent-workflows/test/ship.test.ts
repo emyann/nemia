@@ -138,7 +138,7 @@ test('`wf start` on a folder with an ending says so: nothing of that step runs u
   const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
   try { await main(['start', 'add sub', '--repo', repo, '--workflows', folder()], {} as Engine); } finally { log.mock.restore(); }
   const id = printed[0]!.split(' ')[0]!;
-  assert.equal(printed[0], `${id}  2 step(s): implement → ship`);
+  assert.equal(printed[0], `${id}  2 step(s): implement → ship (shipper)`, "the shipped ship.md names its agent");
   assert.ok(printed.includes(`ends at: ship — nothing of it runs until wf approve ${id} ship, which is what files it`), printed.join('\n'));
   assert.ok(!printed.some((l) => l.startsWith('gated at:')), 'an ending is not a handoff waiting to be let through');
 });

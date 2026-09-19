@@ -113,7 +113,7 @@ The run's record is keyed in that order, and `wf ls`, `wf decide` and the board 
 keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf decide`; one whose order already runs forward
 reads as it was written.
 
-A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `harness`, `model`, `effort`, `context`,
+A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
 `permissionMode`, `tools`, `disallow`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`, `gate`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
@@ -134,6 +134,56 @@ who does the work and for how long. Whether the work goes round again is still a
 `read-only` runs the step `-s read-only`: it reads and runs commands and writes nothing, which is why
 the shipped reviewer hands its review on as its closeout. `retries` is how many times the run re-files
 a step its check refused (*Trying again*, under the check).
+
+### An agent is a node's attachment, and we pass it a brief: `agent:`
+
+A step is a node of its workflow: a place, with its wiring (`after`, `loop`, `gate`, `workspace`, `check`), and typed data
+handed in (`input:`) and out (`output:`). What is attached to the node does the work, and the run passes it a brief. Today
+the one attachment is an agent; a script, an HTTP call or a remote agent may be others later, and none is built. `agent:`
+is never required, and a step without it is read exactly as before: its keys and its words are all its own.
+
+An agent is written once, in `agents/` beside the workflow folders — `<repo>/workflows/agents/` for a repository's,
+`~/.agent-workflows/workflows/agents/` for yours (`agentsDir`) — and named by every node it does the work of:
+
+```md
+---
+description: Reviews a change read-only, as a second engineer would
+harness: claude
+model: opus
+tools: Read, Grep, Glob, Bash
+permissionMode: dontAsk
+output: review.schema.json   # beside the agent, in agents/
+---
+Review the changes on this branch. Be specific about correctness, not style.
+```
+
+```md
+---
+after: implement
+agent: reviewer
+loop: implement
+rounds: 3
+---
+```
+
+Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `tools`, `disallow`, `remote`,
+`output` — and a `description:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
+is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
+agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
+there is refused listing the agents there are. A link in `agents/` is refused as a linked step is. `agents` is not a
+workflow — the listings skip it, and a workflow named `agents` is refused by name.
+
+At `wf start` each node is resolved and frozen on the run, so a run never reads `agents/` again, from a worktree or
+anywhere: the agent's keys are the defaults, a key the step writes wins, and the refusals that depend on the harness
+read the merged keys and name the step. The brief is the agent's instructions, a blank line, then the step's own
+words. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
+case: no shipped step has one. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
+set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
+`implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its name alone.
+
+The repository's shipped folders are written this way (`workflows/agents/README.md` lists who does what), and the
+board's builder edits the node — which agent, its own keys and its note — showing the agent's values as placeholders.
+The agent is edited in its file.
 
 ### What a step may have: `tools:` and `effort:`
 

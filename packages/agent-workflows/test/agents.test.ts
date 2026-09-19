@@ -259,3 +259,26 @@ test('wf start freezes the resolved steps on the run: an agent edited after the 
   assert.equal(build!.body, 'Implement what you are asked.\n\nBuild it.');
   assert.deepEqual(build!.agent, { name: 'implementer', keys: [], body: 'Build it.', given: { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallow: 'SendMessage' } });
 });
+
+test("`wf start` names each node's agent beside it — by the agent's name, not the step's — and a node with no agent by its name alone", async (t) => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
+  git('init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  const dir = workflows({
+    'agents/coder.md': IMPLEMENTER,
+    'agents/critic.md': '---\nharness: claude\n---\nFind what is wrong.\n',
+    'dev/build.md': '---\nagent: coder\n---\n',
+    'dev/judge.md': '---\nafter: build\nagent: critic\n---\n',
+    'dev/wrap.md': '---\nafter: judge\n---\nWrap it up.\n',
+  });
+  const printed: string[] = [];
+  t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
+  const { main } = await import('../src/cli.ts');
+  await main(['start', 'build it', '--workflows', path.join(dir, 'dev'), '--repo', repo], {} as never);
+  const [id, said] = printed[0]!.split('  ');
+  assert.ok(id, printed.join('\n'));
+  assert.equal(said, '3 step(s): build (coder) → judge (critic) → wrap');
+});

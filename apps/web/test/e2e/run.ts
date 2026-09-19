@@ -204,6 +204,9 @@ const IN_FLIGHT_BY_CAP = 3;
 /** The workflow the `builder` page makes, and what its two steps' agents are told. */
 const BUILT = { name: 'built', plan: 'Write PLAN.md.', implement: 'Implement what PLAN.md says.' };
 
+/** The workflow of yours the `builder` page opens a step with an agent on: `build`, whose agent is `agent`, and `other`, the agent it is moved to. */
+const CREWED = { name: 'crew', agent: 'coder', other: 'critic' };
+
 /** The schema the `builder` page pastes for an `output:`: strict, as the parser takes one. */
 const PASTED = JSON.stringify({ type: 'object', properties: { risks: { type: 'array', items: { type: 'string' } } }, required: ['risks'], additionalProperties: false });
 
@@ -2110,6 +2113,63 @@ const PAGES: PageSpec[] = [
       } finally {
         await stale.close();
         fs.writeFileSync(planFile, seeded);
+      }
+
+      // A step with an agent: in a page of its own, over a folder and two agents of yours written for it and taken away after, nothing saved.
+      // Its form says the body is its own note, told after its agent's instructions; each key the agent gives it shows as the agent's; the
+      // picker offers no agent and each agent of yours; moved to another agent, the form shows what that one gives and nothing the last gave;
+      // and with no agent, the body is all it is told again.
+      const { name: crew, agent, other } = CREWED;
+      const crewDir = path.join(store!, 'workflows', crew);
+      const agentsDir = path.join(store!, 'workflows', 'agents');
+      const hadAgents = fs.existsSync(agentsDir);
+      const crewed = await page.context().newPage();
+      try {
+        fs.mkdirSync(agentsDir, { recursive: true });
+        fs.writeFileSync(path.join(agentsDir, `${agent}.md`), '---\nharness: claude\nmodel: opus\neffort: high\n---\nYou write code.\n');
+        fs.writeFileSync(path.join(agentsDir, `${other}.md`), '---\nmodel: sonnet\n---\nYou review code.\n');
+        fs.mkdirSync(crewDir, { recursive: true });
+        fs.writeFileSync(path.join(crewDir, 'build.md'), `---\nagent: ${agent}\ncheck: npm test\n---\nMind the cache.\n`);
+        const { problems } = watch(crewed);
+        await crewed.goto(page.url(), { waitUntil: 'networkidle' });
+        await card(crewed, crew).getByRole('button', { name: 'Build', exact: true }).click();
+        const builder = card(crewed, crew).locator(`section[data-builder="${crew}"]`);
+        const keys = builder.locator('[data-step-form="build"]');
+        await expectVisible(keys, "build's form, open as the builder opens");
+        const note = keys.getByRole('textbox', { name: 'Its own note' });
+        await expectVisible(note, 'its body is its own note');
+        if ((await note.inputValue()) !== 'Mind the cache.') throw new Refused(`the note is the step's own words, not its agent's — it shows ${JSON.stringify(await note.inputValue())}`);
+        await expectTexts(keys.locator('[data-agent-note]'), [`Told after ${agent}'s instructions, agents/${agent}.md.`], 'and says whose instructions it is told after');
+        const picker = keys.locator('[data-field="agent"] select');
+        const offered = await picker.locator('option').allTextContents();
+        if ((await picker.inputValue()) !== agent || JSON.stringify(offered) !== JSON.stringify(['no agent', agent, other])) {
+          throw new Refused(`the picker names ${agent}, and offers no agent and each agent of yours — it offers ${JSON.stringify(offered)} on ${JSON.stringify(await picker.inputValue())}`);
+        }
+        const model = keys.locator('[data-field="model"] input');
+        const effort = keys.locator('[data-field="effort"] select');
+        const unsetEffort = effort.locator('option[value=""]');
+        if ((await model.inputValue()) !== '' || (await model.getAttribute('placeholder')) !== `opus — ${agent}'s`) throw new Refused(`the model ${agent} gives it is shown as ${agent}'s, and the field is empty — it holds ${JSON.stringify(await model.inputValue())} under ${JSON.stringify(await model.getAttribute('placeholder'))}`);
+        if ((await effort.inputValue()) !== '' || (await unsetEffort.textContent()) !== `high — ${agent}'s`) throw new Refused(`and the effort — it reads ${JSON.stringify(await unsetEffort.textContent())}`);
+        if ((await keys.locator('[data-field="check"] input').inputValue()) !== 'npm test') throw new Refused('the check it sets itself is in its field');
+        await settled(crewed);
+        await crewed.screenshot({ path: path.join(OUT, `builder-agent-${await themeOf(crewed)}.png`), fullPage: true });
+
+        await picker.selectOption(other);
+        await expectTexts(keys.locator('[data-agent-note]'), [`Told after ${other}'s instructions, agents/${other}.md.`], `moved to ${other}, the note is told after ${other}'s`);
+        if ((await model.getAttribute('placeholder')) !== `sonnet — ${other}'s`) throw new Refused(`moved to ${other}, the model is ${other}'s — it reads ${JSON.stringify(await model.getAttribute('placeholder'))}`);
+        if ((await unsetEffort.textContent()) !== `not set — nor by ${other}`) throw new Refused(`and ${agent}'s effort is not shown as ${other}'s — it reads ${JSON.stringify(await unsetEffort.textContent())}`);
+        if ((await note.inputValue()) !== 'Mind the cache.' || (await keys.locator('[data-field="check"] input').inputValue()) !== 'npm test') throw new Refused('and what the step sets itself stays');
+
+        await picker.selectOption('');
+        await expectCount(keys.locator('[data-agent-note]'), 0, 'with no agent, nothing is told before its body');
+        await expectVisible(keys.getByRole('textbox', { name: 'What its agent is told' }), 'and its body is all it is told');
+        await crewed.waitForLoadState('networkidle');
+        if (problems().length) throw new Refused(`the agent's page saw nothing refused — it saw:\n    ${problems().join('\n    ')}`);
+      } finally {
+        await crewed.close();
+        fs.rmSync(crewDir, { recursive: true, force: true });
+        fs.rmSync(hadAgents ? path.join(agentsDir, `${agent}.md`) : agentsDir, { recursive: true, force: true });
+        if (hadAgents) fs.rmSync(path.join(agentsDir, `${other}.md`), { force: true });
       }
 
       // A workflow made, built and saved.

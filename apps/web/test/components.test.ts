@@ -1627,8 +1627,10 @@ test("what sessions read, by price: beside the cost, the peak marked at a cap or
   assert.match(plain, /<span class="font-mono text-xs"><span>read 21\.4M<\/span><span> · wrote 412k<\/span><span> · peak 167k<\/span><\/span>/);
   assert.doesNotMatch(plain, /data-peak|data-rebuilt/, 'under its cap, and resumed from a warm cache: nothing marked');
 
-  const capped = markup(createElement(Read, { said: 'read 4.4M · wrote 355k · peak 204k, at its 200k cap · a resumed session wrote its context to the cache again instead of reading it', peak: 'cap', rebuilt: 1 }));
-  assert.match(capped, /<span data-peak="cap" class="[^"]*text-amber-700[^"]*" title="Its context reached the step&#x27;s context: cap[^"]*">peak 204k, at its 200k cap<\/span>/);
+  const capped = markup(createElement(Read, { said: 'read 4.4M · wrote 355k · peak 174k, compacted twice at its 200k cap · a resumed session wrote its context to the cache again instead of reading it', peak: 'cap', rebuilt: 1 }));
+  assert.match(capped, /<span data-peak="cap" class="[^"]*text-amber-700[^"]*" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/);
+  const unpeaked = markup(createElement(Read, { said: 'read 900k · wrote 20k · compacted at its 100k cap', peak: 'cap', rebuilt: 0 }));
+  assert.match(unpeaked, /<span data-peak="cap"[^>]*>compacted at its 100k cap<\/span>/, 'no peak measured: the compaction is where it stands, and not dropped');
   assert.match(capped, /<span data-rebuilt="1" class="block text-xs [^"]*" title="[^"]*the cache was rebuilt\.">a resumed session wrote its context to the cache again instead of reading it<\/span>/);
 
   const large = markup(createElement(Read, { said: 'read 2.9M · wrote 100k · peak 250k, past 200k with no cap', peak: 'large', rebuilt: 0 }));

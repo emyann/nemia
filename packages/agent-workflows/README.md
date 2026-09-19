@@ -1175,8 +1175,11 @@ screen shows what the branch touched, read out of git:
   (the engine's *What a session read, by price*): tokens read from the cache (`read 21.4M`, the cheapest input)
   and written to it (`wrote 412k`, twenty times dearer a token), and the largest context any one response read (`peak 167k`),
   marked where it reached the step's `context:` cap (`, at its 200k cap`) or passed 200k with no cap
-  (`, past 200k with no cap`). A resumed attempt that wrote to the cache more than half its peak rebuilt the cache it
-  should have read, and the line says so (`a resumed session wrote its context to the cache again instead of reading it`).
+  (`, past 200k with no cap`). A session that compacted reached its cap, though Claude Code compacts well short of it —
+  173,584 tokens under a 200k one — and the line says how often (`peak 174k, compacted twice at its 200k cap`). A resumed
+  attempt whose first response wrote more than half the context it read to the cache rebuilt the cache it should have
+  read, and the line says so (`a resumed session wrote its context to the cache again instead of reading it`): its first
+  response, since a continuation's writes over all its responses grow with its work.
   An attempt that measured none of it says nothing, and nothing here is priced: the cost is still the harness's.
   After the steps, the run's (`cost  run $12.40`): every step's tries together, saying how many
   ended attempts had no cost on them.

@@ -128,7 +128,8 @@ const WARN = 'text-amber-700 dark:text-amber-400';
  */
 export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; rebuilt: number }) {
   const parts = said.split(' · ');
-  const counts = parts.filter((part) => /^(read|wrote|peak) /.test(part));
+  // The peak, or where no peak was measured, the compactions alone (`compacted at its 200k cap`), which are where it stands.
+  const counts = parts.filter((part) => /^(read|wrote|peak|compacted)\b/.test(part));
   const rest = parts.filter((part) => !counts.includes(part));
   return (
     <span data-read className="block">
@@ -137,7 +138,7 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
           {counts.map((part, i) => (
             <span key={part}>
               {i > 0 && ' · '}
-              {part.startsWith('peak ') && peak ? (
+              {/^(peak|compacted)\b/.test(part) && peak ? (
                 <span data-peak={peak} className={`font-semibold ${WARN}`} title={PEAK_TITLE[peak]}>{part}</span>
               ) : (
                 part
@@ -154,7 +155,7 @@ export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; re
 }
 
 const PEAK_TITLE: Record<Exclude<PeakMark, null>, string> = {
-  cap: "Its context reached the step's context: cap, where Claude Code compacts the conversation.",
+  cap: "It reached the step's context: cap: Claude Code compacted the conversation, a summary in place of what it read, or was about to.",
   large: 'Its context passed 200k tokens on a step with no context: cap. Every response reads all of it.',
 };
 const REBUILT_TITLE = 'A resumed session should read its context from the cache. It wrote it again instead, at twenty times the price of a read: the cache was rebuilt.';

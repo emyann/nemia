@@ -2800,9 +2800,9 @@ test("`costLine`: a step's cost on `wf decide` — its current try's, and where 
 test("a step's usage counts the resumed attempts that rebuilt their cache, off the attempt that knows it was resumed", () => {
   const at = (n: number) => `2026-09-18T09:0${n}:00Z`;
   const attempt = (n: number, usage: object, resumeFrom?: string) => ({ startedAt: at(n), spawnedAt: at(n), endedAt: at(n + 1), reason: 'harness', usage, ...(resumeFrom ? { resumeFrom } : {}) });
-  const cold = { cacheReadTokens: 900_000, cacheWriteTokens: 180_000, peakContextTokens: 180_000 };
-  const rewrote = { cacheReadTokens: 183_000, cacheWriteTokens: 184_500, peakContextTokens: 184_501 };
-  const read = { cacheReadTokens: 2_100_000, cacheWriteTokens: 9_000, peakContextTokens: 190_000 };
+  const cold = { cacheReadTokens: 900_000, cacheWriteTokens: 180_000, peakContextTokens: 180_000, firstContextTokens: 20_000, firstCacheWriteTokens: 20_000 };
+  const rewrote = { cacheReadTokens: 183_000, cacheWriteTokens: 184_500, peakContextTokens: 184_501, firstContextTokens: 183_006, firstCacheWriteTokens: 183_000 };
+  const read = { cacheReadTokens: 2_100_000, cacheWriteTokens: 9_000, peakContextTokens: 190_000, firstContextTokens: 181_000, firstCacheWriteTokens: 800 };
   const view = (...attempts: object[]): TaskClock => ({ state: { brief: 'b', attempts: attempts as TaskClock['state']['attempts'], settled: 'succeeded' } });
   assert.equal(taskUsage(view(attempt(1, cold), attempt(2, rewrote, 'sess-1')))!.rebuiltCaches, 1);
   assert.equal('rebuiltCaches' in taskUsage(view(attempt(1, rewrote)))!, false, 'a first attempt, cold, wrote its cache once');

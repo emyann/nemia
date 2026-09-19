@@ -341,7 +341,7 @@ export type TimelineTotal = {
 /** Mirrors `Usage` in apps/api/src/app.ts: a count nobody measured is absent, never 0. */
 export type Usage = {
   turns?: number; toolCalls?: number; inputTokens?: number; outputTokens?: number; costUsd?: number; apiMs?: number; toolMs?: number;
-  cacheReadTokens?: number; cacheWriteTokens?: number; uncachedTokens?: number; peakContextTokens?: number; rebuiltCaches?: number;
+  cacheReadTokens?: number; cacheWriteTokens?: number; uncachedTokens?: number; peakContextTokens?: number; firstContextTokens?: number; firstCacheWriteTokens?: number; compactions?: number; rebuiltCaches?: number;
 };
 
 /** Where a peak context stands: at the step's `context:` cap, or past 200k on a step with none. */

@@ -46,9 +46,9 @@ const task = (taskId: string, harness: string, usages: object[]) => write(path.j
  * reached the cap. `review` has no cap and peaked past 200k. `plan` ran on a runner that counted its input as one number.
  */
 const USAGE = {
-  cold: { turns: 30, inputTokens: 4_150_000, cacheReadTokens: 4_000_000, cacheWriteTokens: 149_990, uncachedTokens: 10, peakContextTokens: 150_000, outputTokens: 30_000, costUsd: 3 },
-  rebuilt: { turns: 4, inputTokens: 605_000, cacheReadTokens: 400_000, cacheWriteTokens: 204_990, uncachedTokens: 10, peakContextTokens: 204_000, outputTokens: 2_000, costUsd: 2.3 },
-  review: { turns: 20, inputTokens: 3_000_000, cacheReadTokens: 2_900_000, cacheWriteTokens: 99_995, uncachedTokens: 5, peakContextTokens: 250_000, outputTokens: 9_000, costUsd: 1.5 },
+  cold: { turns: 30, inputTokens: 4_150_000, cacheReadTokens: 4_000_000, cacheWriteTokens: 149_990, uncachedTokens: 10, peakContextTokens: 150_000, firstContextTokens: 21_000, firstCacheWriteTokens: 21_000, outputTokens: 30_000, costUsd: 3 },
+  rebuilt: { turns: 4, inputTokens: 605_000, cacheReadTokens: 400_000, cacheWriteTokens: 204_990, uncachedTokens: 10, peakContextTokens: 204_000, firstContextTokens: 150_010, firstCacheWriteTokens: 150_000, outputTokens: 2_000, costUsd: 2.3 },
+  review: { turns: 20, inputTokens: 3_000_000, cacheReadTokens: 2_900_000, cacheWriteTokens: 99_995, uncachedTokens: 5, peakContextTokens: 250_000, firstContextTokens: 21_000, firstCacheWriteTokens: 21_000, outputTokens: 9_000, costUsd: 1.5 },
   plan: { toolCalls: 6, inputTokens: 50_000, outputTokens: 2_000 },
 };
 const R = 'r-read';
@@ -108,4 +108,35 @@ test("the run's reads are every try's of every step, beside its cost — no clas
     said: 'read 7.3M · wrote 455k · peak 250k, past 200k with no cap · a resumed session wrote its context to the cache again instead of reading it',
     peak: 'large', rebuilt: 1,
   });
+});
+
+test("a session that compacted reached its cap, short of it in tokens — and the run's peak says so of its own step's compactions alone", async () => {
+  // Measured (engine open issue 26): under --autocompact 200000, compacted at 173,584 and 173,254 tokens, and the boundary's context is the peak.
+  const compacted = { turns: 60, inputTokens: 6_000_000, cacheReadTokens: 5_700_000, cacheWriteTokens: 299_990, uncachedTokens: 10, peakContextTokens: 173_584, compactions: 2, outputTokens: 20_000, costUsd: 4 };
+  const RC = 'r-read-compacted';
+  const run = (id: string, reviewPeak: number) => {
+    write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
+      id, repo: '/code/app', workspace: '/code/app', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'What it read', workflowDir: path.join(root, 'no-such-workflow'), createdAt: at(0),
+      workflow: [
+        { name: 'implement', after: [], body: 'Implement it.', harness: 'claude', context: 200_000 },
+        { name: 'review', after: ['implement'], body: 'Review it.', harness: 'claude' },
+      ],
+      steps: { implement: { taskId: `${id}-implement` }, review: { taskId: `${id}-review` } },
+    }));
+    task(`${id}-implement`, 'claude', [compacted]);
+    // No cap, on the harness's own window: it compacted once, short of 200k.
+    task(`${id}-review`, 'claude', [{ ...USAGE.review, peakContextTokens: reviewPeak, compactions: 1 }]);
+  };
+  run(RC, 120_000);
+  const detail = await (await app.request(`/api/runs/${RC}`)).json();
+  const implement = detail.steps.find((s: Step) => s.name === 'implement').used as Used;
+  assert.deepEqual([implement.read, implement.peak], ['read 5.7M · wrote 300k · peak 174k, compacted twice at its 200k cap', 'cap'], 'its peak is short of its cap, and it reached it');
+  const review = detail.steps.find((s: Step) => s.name === 'review').used as Used;
+  assert.deepEqual([review.read, review.peak], ['read 2.9M · wrote 100k · peak 120k, compacted', null], 'no cap to reach');
+  assert.deepEqual(detail.read, { said: 'read 8.6M · wrote 400k · peak 174k, compacted twice at its 200k cap', peak: 'cap', rebuilt: 0 }, "implement's two, not review's third");
+
+  const RL = 'r-read-compacted-larger';
+  run(RL, 180_000);
+  const larger = await (await app.request(`/api/runs/${RL}`)).json();
+  assert.deepEqual(larger.read, { said: 'read 8.6M · wrote 400k · peak 180k, compacted', peak: null, rebuilt: 0 }, "the peak is review's, which had no cap: implement's cap is not its");
 });

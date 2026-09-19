@@ -429,7 +429,10 @@ export type StepUsed = {
    * against the step's `context:` cap, and a resumed session that rebuilt its cache. Null where the runner measured none of it.
    */
   read: string | null;
-  /** Where the peak stands (`peakMark`): `cap` once it reached the step's `context:` cap, `large` past 200k on a step with none; null otherwise. */
+  /**
+   * Where the peak stands (`peakMark`): `cap` once the session reached the step's `context:` cap — it compacted, or its peak got there —
+   * `large` past 200k on a step with none; null otherwise.
+   */
   peak: 'cap' | 'large' | null;
   /** How many resumed sessions wrote their context to the cache again instead of reading it (`rebuiltCache`); 0 where none did, or nobody could tell. */
   rebuilt: number;
@@ -1327,25 +1330,29 @@ function triesOf(
 
 /**
  * A usage in `wf decide`'s words: `usedLines`, each line without the label it starts with — the cost alone, since what the sessions read
- * is `read` — and the peak against `cap`, the `context:` of the step whose peak it is.
+ * is `read` — and the peak against `cap`, the `context:` of the step whose peak it is. `read` is the usage the words and the mark are of,
+ * where that is not all of `usage`.
  */
-function usedOf(usage: Usage | undefined, cap?: number): StepUsed {
+function usedOf(usage: Usage | undefined, cap?: number, read: Usage | undefined = usage): StepUsed {
   const [used = ''] = usedLines(usage);
   return {
     usage: usage ?? null, used: used.replace(/^used\s+/, ''), cost: usage?.costUsd !== undefined ? dollars(usage.costUsd) : 'not measured',
     costUsd: usage?.costUsd ?? null, apiMs: usage?.apiMs ?? null, toolMs: usage?.toolMs ?? null,
-    read: readWords(usage, cap) || null, peak: peakMark(usage, cap), rebuilt: usage?.rebuiltCaches ?? 0,
+    read: readWords(read, cap) || null, peak: peakMark(read, cap), rebuilt: read?.rebuiltCaches ?? 0,
   };
 }
 
 /**
  * Several steps' usage as one (`sumUsage`), each usage with the name of the step it is of, its peak read against the cap of the step it
- * is the peak of: two steps' caps are not one cap, and the largest peak was reached under its own.
+ * is the peak of: two steps' caps are not one cap, and the largest peak was reached under its own. So are its compactions: that step's
+ * own say whether it reached its cap, and another's, under another cap or none, would say it of a step that did not.
  */
 function totalOf(steps: readonly Workflow[], usages: ReadonlyArray<readonly [name: string, usage: Usage | undefined]>): StepUsed {
   const total = sumUsage(usages.map(([, u]) => u));
   const peakOf = usages.find(([, u]) => total?.peakContextTokens !== undefined && u?.peakContextTokens === total.peakContextTokens)?.[0];
-  return usedOf(total, steps.find((s) => s.name === peakOf)?.context);
+  const compactions = sumUsage(usages.filter(([name]) => name === peakOf).map(([, u]) => u))?.compactions;
+  const { compactions: _all, ...rest } = total ?? {};
+  return usedOf(total, steps.find((s) => s.name === peakOf)?.context, total && { ...rest, ...(compactions ? { compactions } : {}) });
 }
 
 const readOf = (u: StepUsed): RunRead | null => (u.read === null ? null : { said: u.read, peak: u.peak, rebuilt: u.rebuilt });

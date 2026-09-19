@@ -257,6 +257,7 @@ test("what a session read, by price: its classes add up, its peak is the largest
   const b = { cacheReadTokens: 1_400_000, cacheWriteTokens: 100_000, uncachedTokens: 3, peakContextTokens: 167_000 };
   assert.deepEqual(sumUsage([a, b]), { cacheReadTokens: 21_400_000, cacheWriteTokens: 400_000, uncachedTokens: 15, peakContextTokens: 167_000 }, 'a peak is not a sum');
   assert.equal('peakContextTokens' in sumUsage([a, { cacheReadTokens: 1 }])!, false, 'an attempt with no peak may have been the largest');
+  assert.equal('firstContextTokens' in sumUsage([{ ...a, firstContextTokens: 9, firstCacheWriteTokens: 1 }])!, false, "one attempt's first response is not a sum's");
   assert.equal(sumUsage([{ ...a, rebuiltCaches: 1 }, b, { ...b, rebuiltCaches: 1 }])!.rebuiltCaches, 2);
 
   assert.equal(readWords(sumUsage([a, b])), 'read 21.4M · wrote 400k · peak 167k');
@@ -268,7 +269,18 @@ test("what a session read, by price: its classes add up, its peak is the largest
 
 test("a peak is marked where it reached a step's context: cap, or passed 200k with none — and only there", () => {
   assert.equal(peakMark({ peakContextTokens: 200_000 }, 200_000), 'cap');
-  assert.equal(peakMark({ peakContextTokens: 167_000 }, 200_000), null, 'the cap held');
+  assert.equal(peakMark({ peakContextTokens: 167_000 }, 200_000), null, 'the cap held: it never compacted');
+  // Measured (engine open issue 26): under --autocompact 200000, compacted at 173,584 and 173,254 — the boundary's context is the peak.
+  assert.equal(peakMark({ peakContextTokens: 173_584, compactions: 2 }, 200_000), 'cap', 'it compacted: it reached its cap, short of it in tokens');
+  assert.equal(peakMark({ compactions: 1 }, 200_000), 'cap', 'compacted, with no peak measured');
+  assert.equal(peakMark({ peakContextTokens: 173_584, compactions: 2 }, undefined), null, "compacted on the harness's own window, not past 200k");
+  assert.equal(readWords({ peakContextTokens: 173_584, compactions: 2 }, 200_000), 'peak 174k, compacted twice at its 200k cap');
+  assert.equal(readWords({ peakContextTokens: 204_000, compactions: 1 }, 200_000), 'peak 204k, compacted at its 200k cap');
+  assert.equal(readWords({ peakContextTokens: 831_000, compactions: 3 }), 'peak 831k, compacted 3 times, past 200k with no cap');
+  assert.equal(readWords({ peakContextTokens: 150_000, compactions: 1 }), 'peak 150k, compacted');
+  assert.equal(readWords({ compactions: 1 }, 100_000), 'compacted at its 100k cap');
+  assert.equal(sumUsage([{ compactions: 2 }, {}, { compactions: 1 }])!.compactions, 3, 'none seen is none: added where there were some');
+  assert.equal('compactions' in sumUsage([{ turns: 1 }, { turns: 2 }])!, false);
   assert.equal(peakMark({ peakContextTokens: 440_000 }, 500_000), null, 'under a larger cap, past 200k is what was asked for');
   assert.equal(peakMark({ peakContextTokens: 200_001 }, undefined), 'large');
   assert.equal(peakMark({ peakContextTokens: 200_000 }, undefined), null);
@@ -277,12 +289,15 @@ test("a peak is marked where it reached a step's context: cap, or passed 200k wi
   assert.equal(readWords({ peakContextTokens: 831_000 }), 'peak 831k, past 200k with no cap');
 });
 
-test('a resumed attempt that wrote more to the cache than half its peak rebuilt its cache, and says so in words', () => {
-  const rebuilt = { cacheReadTokens: 183_000, cacheWriteTokens: 184_500, peakContextTokens: 184_501 };
+test("a resumed attempt whose first response wrote its context to the cache again rebuilt its cache, and says so in words", () => {
+  const rebuilt = { cacheReadTokens: 183_000, cacheWriteTokens: 184_500, peakContextTokens: 184_501, firstContextTokens: 183_006, firstCacheWriteTokens: 183_000 };
   assert.equal(rebuiltCache(rebuilt, true), true);
   assert.equal(rebuiltCache(rebuilt, false), false, 'a cold start writes its cache once: that is not a rebuild');
-  assert.equal(rebuiltCache({ ...rebuilt, cacheWriteTokens: 92_250 }, true), false, 'half its peak is not more than half');
-  assert.equal(rebuiltCache({ cacheWriteTokens: 184_500 }, true), false, 'no peak, no reading');
+  assert.equal(rebuiltCache({ ...rebuilt, firstCacheWriteTokens: 91_503 }, true), false, 'half its first context is not more than half');
+  assert.equal(rebuiltCache({ cacheWriteTokens: 184_500, peakContextTokens: 184_501 }, true), false, 'no first response seen, no reading');
+  // A warm continuation of a 60k session that works up to 150k: it read its parent's context, and its writes are its growth.
+  const grew = { cacheReadTokens: 4_200_000, cacheWriteTokens: 96_000, peakContextTokens: 150_000, firstContextTokens: 61_000, firstCacheWriteTokens: 1_200 };
+  assert.equal(rebuiltCache(grew, true), false, 'its writes pass half its peak, and it rebuilt nothing');
   assert.equal(readWords({ ...rebuilt, rebuiltCaches: 1 }), 'read 183k · wrote 185k · peak 185k · a resumed session wrote its context to the cache again instead of reading it');
   assert.match(readWords({ ...rebuilt, rebuiltCaches: 2 }), / · 2 resumed sessions wrote their context to the cache again instead of reading it$/);
 });

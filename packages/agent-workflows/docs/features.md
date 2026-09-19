@@ -2990,11 +2990,21 @@ What it leaves:
 - **The board cannot show the checkout hold yet.** It calls `listing`, `assess` and `decision` with no checkout (`apps/api/src/app.ts`), so
   an ending held for the checkout draws as plain `waiting` — and a held try as one the next tick files — where `wf ls` says `waiting on the
   checkout (<run>'s ship has it)`.
-- **An open question, not designed: a merge conflict at the end of a run whose rounds are spent.** `ship.md` aborts a trial merge that
-  conflicts and signs off `blocked`, naming the paths, because "resolving a merge is the work's job, not this step's". But once ship has run,
-  the send-back from its gate goes to ship itself (`sendBackTo`), the work's steps are verified and have nothing to try again, and a loop that
-  handed on is over (`roundAsk`): a run whose rounds are spent has no step left to give the conflict to. Today a person resolves it by hand
-  or starts a new run. Which step should own it — the ending, the work re-opened, a step of its own — is the question; nothing here answers it.
+- **Answered: work that does not hold on the base branch once the ending has run.** `ship.md` aborts a trial merge that conflicts and signs
+  off `blocked`, because "resolving a merge is the work's job, not this step's" — and then no step could take it: the send-back from ship's
+  gate went to ship itself, the work's steps were verified, and the loop had handed on. Now an ending approved and stopped on the base branch
+  (`endingStopped`: blocked, failed, stopped or at its budget) sends the work back with the gate's own verb, to the loop step it waits on:
+  `wf retry <run> review --message "<objection>"` (`Retry.back`). Review is filed with the objection and what the ending said
+  (`RetryBriefing.ending`), and its `again: true` is the round, on the run's branch, where merging the base in is the work's to do; the ending's
+  try moves behind it (`sentBack`, `then: 'back'`) in the same write, so it waits for the work and then at its gate — the approval of the try
+  that stopped is spent. `wf decide` offers it beside `wf retry <run> ship`, which is for what was not the work: a dirty checkout, a flaky test.
+  Refused, each naming the fix: no words, a step that is not the loop's, `wf round` of the loop, either way while the other is asked for, and
+  a folder with no loop before its ending — there a reviewer filed again cannot change the code, so it says to ship again, or to cancel and
+  start a run on the base as it is now. A folder without a loop that wants this gives its ending a `loop:` step to wait on.
+- **The tick hands a step's leftovers off once for each try** (`StepRecord.handedOff`). It used to commit whatever was uncommitted in a
+  finished step's worktree on every pass until a later step worked there, and a gated ending in the repository's checkout never does: a
+  person's edits in the reviewed worktree, made while ship waited, were committed as `review: hand off what was left uncommitted`. What a
+  person leaves there now stays theirs until the step's next try.
 
 What the board calls:
 

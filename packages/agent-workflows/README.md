@@ -1407,6 +1407,16 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   written by hand — is not filed at the gate, and `wf approve` and `wf retry` name it and say to delete it. An
   approval names the try it approves, as a retry ask names its try, so one given before the send-back is spent by it — the tick
   moves it into `done/` with the spent ask — and the new try is approved with a new `wf approve`.
+- **An ending that stopped on the base branch sends the work back through the loop.** A `workspace: main` ending a person approved,
+  which then signed off blocked, failed, was stopped or reached its budget, has two ways on, and `wf decide` prints both with when to
+  take each. Ship again — `wf retry <run> ship` — for what was not the work: a dirty checkout, a flaky test; its try runs on that word,
+  with no new approval. Send the work back — `wf retry <run> review --message "<objection>"`, to the loop step the ending waits on — when
+  the work does not hold on the base as it is now: review is filed with the objection and what the ending said, and its `again: true` is
+  a round on the run's branch, where merging the base in is the work's to do. The ending's try moves behind (`then: 'back'`) in the same
+  write; once the loop settles it waits at its gate, nothing of it run, for a new approval. Refused, naming the fix: no words, a step
+  that is not the loop's, `wf round` of the loop, one way while the other is asked for, and a folder with no loop before its ending.
+- **The tick hands a step's leftovers off once for each try.** What a person leaves in a step's worktree after its hand-off is theirs,
+  not committed under the step's name, until the step's next try.
 - **What the steps after it are told.** Every step after an approved gate — the one after it and each after that one, the
   implementer and then the reviewer — is filed with `## Approved` beside what was asked for, as a run that waited is handed
   `## From run <id>`: which step, which try, when, and the words, fenced, as data. The summary still goes nowhere but to the person;

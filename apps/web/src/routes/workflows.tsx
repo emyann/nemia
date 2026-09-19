@@ -137,7 +137,7 @@ function WorkflowCard({ workflow, building: opened = false }: { workflow: Workfl
   );
 }
 
-/** Each step's page — what its agent is told, and its keys explained — in the order a run runs them: as a block on the graph opens it, by keyboard. */
+/** Each step's page — what it is told, and its keys explained — in the order a run runs them: as a block on the graph opens it, by keyboard. */
 function StepLinks({ workflow }: { workflow: WorkflowListing }) {
   return (
     <nav aria-label={`Steps of ${workflow.name}`} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">

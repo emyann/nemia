@@ -577,7 +577,24 @@ export const WORKFLOWS = {
   yours: { name: 'mine', steps: ['plan'] },
 } as const;
 
-/** Write WORKFLOWS: the checkout's into `repo`, and yours into the store at `root`. */
+/**
+ * The agents the Agents page lists: the checkout's `implementer` (WORKFLOWS' `dev` › implement names it), and one of yours, `scribe`, in the
+ * store's `workflows/agents/`, which sets a description, two role keys and a result schema, and which no node of yours names. `made` is the
+ * agent the page creates, edits and removes; `naming` the folder of yours the refusal page writes, whose one step names `scribe`.
+ */
+export const AGENTS = {
+  seeded: {
+    name: 'scribe',
+    description: 'Use this when a change needs its notes written.',
+    keys: { model: 'sonnet', effort: 'low', output: 'scribe.schema.json' },
+    body: 'You write the notes of a change.\n\n## What they say\n\n- What changed, and why.\n- What a reader should try first.',
+    schema: JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false }, null, 2),
+  },
+  made: { name: 'notary', description: 'Use this when a decision needs writing down.', model: 'haiku', edited: 'opus', body: 'You write down what was decided, and by whom.' },
+  naming: 'noted',
+} as const;
+
+/** Write WORKFLOWS: the checkout's into `repo`, and yours into the store at `root`, with AGENTS' seeded agent of yours. */
 export function seedWorkflows(repo: string, root: string): void {
   const { good, broken, yours } = WORKFLOWS;
   const dev = path.join(repo, 'workflows', good.name);
@@ -591,6 +608,10 @@ export function seedWorkflows(repo: string, root: string): void {
   write(path.join(bad, 'implement.md'), 'Implement what was asked.\n');
   write(path.join(bad, 'review.md'), '---\nafer: implement\n---\nReview the change.\n');
   write(path.join(root, 'workflows', yours.name, 'plan.md'), '---\nharness: codex\n---\nWrite PLAN.md.\n');
+  const { seeded } = AGENTS;
+  const keys = Object.entries(seeded.keys).map(([key, value]) => `${key}: ${value}\n`).join('');
+  write(path.join(root, 'workflows', 'agents', `${seeded.name}.md`), `---\ndescription: ${seeded.description}\n${keys}---\n${seeded.body}\n`);
+  write(path.join(root, 'workflows', 'agents', seeded.keys.output), `${seeded.schema}\n`);
 }
 
 /**

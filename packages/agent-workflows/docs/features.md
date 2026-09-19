@@ -3341,8 +3341,7 @@ The README's *An agent is a node's attachment* says the rules; this is what the 
 
 What it leaves:
 
-- **Editing an agent from the board.** The builder edits the node and shows the agent's values; the agent is edited in its file. A
-  page for `agents/` — list, read, write — is its own change, with `writeWorkflow`'s refusals for a folder that is not a workflow.
+- **Editing an agent from the board.** Shipped next: *Agents on the board*, below.
 - **Other attachments.** A script, an HTTP call, a typed judgement, a remote agent: `agent:` is the one kind built.
 - **Teams and dispatch.** Which agent takes a card, or a team of agents chosen per brief (`docs/pivot-2026-09-18.md`), is not here: a
   folder still names its agents by hand.
@@ -3384,6 +3383,34 @@ git, where the owner and anyone reading history later look.
 What it leaves: nothing refuses a bare default message; this is prose. The cheapest refusal is where a settled `workspace: main` step's
 closeout is read as `done` (`isShipped` and the ending's decision): a merge commit on the base with the result branch as a parent whose
 subject matches `^Merge branch '` reads as not signed off well — a finding for the person, not a revert.
+
+## Shipped: agents on the board — a page that lists them, and a form for one
+
+The Agents page beside Workflows, and the package's half that writes the file. An agent is still one kind of thing attached to a node;
+the page says which nodes, and never words a node as an agent.
+
+- **The package writes an agent** (`renderAgent`, `writeAgent`, `removeAgent`), the inverse of `parseAgent`: the round trip holds over
+  every shipped agent. It writes only where `writeWorkflow` may — the store's `agents/`, or a repository's with `anywhere` — and refuses by
+  name, each with a test at shipped defaults asserted on `err.message`: a wiring key, `agent:`, a value no step could run with, a line break
+  in a key, a name that is not a file's name, a link where it would write, a write against a version the file has moved from (`stale`), a
+  make over one there (`exists`), a put of one gone (`missing`), and a remove or a rename while a step beside it names the agent, naming
+  the steps (`in-use`, `agentUsers`). The result schema `output:` names travels with it: written first, put back if the agent is refused,
+  removed with it unless another agent names it, and refused when it is another agent's to change. `agentVersion` covers the file and its
+  schema.
+- **The api serves them** (`apps/api/src/agents.ts`): every agent of the repository's and of yours, with its description, role keys,
+  body, schema, source, version, the nodes that name it and the parser's refusal when it does not read; one read; one made, put back —
+  renamed — or removed. Refusals are 4xx in the package's words — 404 gone, 409 stale, taken or still named (with `users`), 422 refused,
+  403 for the repository's, which the board never writes. Nothing touches a run: an edit changes what a later `wf start` freezes.
+- **The board draws them.** An Agents entry in the menu; the list, yours then the repository's; an agent's page, its form — name,
+  description, harness, model, effort, context, permission mode, tools, denied tools, remote, result schema and its instructions — and
+  the nodes it is attached to, as links. A node's form in the builder and a step's page link to their agent. The repository's is
+  read-only, with the `cp` that starts one of yours from it. The e2e draws the list, the repository's agent, a make, an edit and a remove,
+  and, on a page of its own, a remove refused because a node names the agent.
+
+What it leaves:
+
+- **Teams, dispatch, capabilities, other attachments.** Out of this change, as the pivot orders them.
+- **Renaming across the nodes.** A rename is refused while a node names the agent; moving each node to the new name is by hand.
 
 ## 1. A run that grows steps from a plan
 

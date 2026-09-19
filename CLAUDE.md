@@ -111,6 +111,10 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   a step moves — and the shot showed `Reading the branch…` where the branch's diff stat belongs. End such a page by waiting for what it
   reads again, with an assertion of its own (the `decide` page's last line, learned by the run that put a finished run's decision on the
   board).
+- **Closing an e2e's second page refetches the first.** The first page is focused again, and react-query refetches its queries on focus:
+  a fixture taken back *after* `refused.close()` is read by that refetch, and the page's last picture shows it (the Agents list showed a
+  node that names `scribe` which was gone). Take the fixture back before the close, then wait for what the page reads again (learned by the
+  run that put the agents on the board).
 - **A background shell that never exits keeps your session busy, and your closeout is never read.** A
   `run_in_background` loop such as `until grep -q Local: server.log; do sleep 0.5; done` outlives the server it waits for,
   the registry reads the session as `shell`, the engine reads the step as working, and nothing settles it (seventy-seven

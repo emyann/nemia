@@ -7,7 +7,7 @@ const INPUT =
   'block w-full rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400';
 
 /**
- * A new workflow of yours: its name — its folder's — and a first step, a name and what its agent is told (`POST /api/workflows/yours`). Once
+ * A new workflow of yours: its name — its folder's — and a first step, a name and what it is told (`POST /api/workflows/yours`). Once
  * made, `onCreated` is told its name, and the page opens its builder. Refused in the api's words: a name taken, or a step the package refuses.
  */
 export function NewWorkflow({ onCreated }: { onCreated: (name: string) => void }) {
@@ -72,7 +72,7 @@ export function NewWorkflow({ onCreated }: { onCreated: (name: string) => void }
       </div>
       <div className="space-y-1">
         <label htmlFor={ids.body} className="block text-xs font-medium">
-          What its agent is told
+          What it is told
         </label>
         <textarea id={ids.body} value={body} rows={3} onChange={(event) => setBody(event.target.value)} className={`${INPUT} resize-y`} />
       </div>

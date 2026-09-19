@@ -10,6 +10,7 @@ import { graphOf, type RunGraph } from './graph.ts';
 import { capabilitiesWithSteps } from './reach.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { inbox } from './inbox.ts';
+import { agents } from './agents.ts';
 import { builder } from './builder.ts';
 import { workflows } from './workflows.ts';
 
@@ -1839,6 +1840,9 @@ export const app = new Hono()
   // A folder of yours built on the board: made with a first step, and put back from its steps with the schemas pasted for them — two writes,
   // guarded as a start is, each through the package's `writeWorkflow` (builder.ts).
   .route('/', builder)
+  // The agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put back or removed —
+  // three writes, guarded as a start is, through the package's `writeAgent` and `removeAgent` (agents.ts).
+  .route('/', agents)
   // The inbox: its cards listed, one filed, one dropped — two writes, guarded as a start is (inbox.ts).
   .route('/', inbox)
   .get('/api/runs', async (c) => {

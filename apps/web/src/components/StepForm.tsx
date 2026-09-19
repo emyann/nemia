@@ -1,6 +1,7 @@
 import { useId, useState, type ReactNode } from 'react';
 import type { KeyField, KeyForm, WorkflowStepSpec } from '../lib/api';
 import { contextText, listOf, numberOf, removeStep, setBody, setKey, setSchema, tokensOf, type DraftStep } from '../lib/builder';
+import { AgentLink } from './AgentParts';
 import { Markdown } from './Markdown';
 
 /** A change to the whole draft, made in one step so a key and what comes with it land together. */
@@ -14,7 +15,7 @@ const MONO_INPUT = `${INPUT} font-mono text-xs`;
 const PASTE = '(paste)';
 
 /**
- * A step's form on the builder: what its agent is told, then a field per key the api's form has (`KeyForm`), in the package's order, each with
+ * A step's form on the builder: what it is told, then a field per key the api's form has (`KeyForm`), in the package's order, each with
  * the package's line of what it means — drawn by kind, so a key the package adds is drawn once the api says how it is set. Every change is
  * made to the draft at once; nothing is judged here that the package judges on save, and a refusal of the last save for this step is shown
  * above its fields.
@@ -63,11 +64,11 @@ export function StepForm({ step, steps, form, schemas, refused, update, onRemove
 
       <div className="space-y-1">
         <label htmlFor={body} className="block text-xs font-medium">
-          {step.own ? 'Its own note' : 'What its agent is told'}
+          {step.own ? 'Its own note' : 'What it is told'}
         </label>
         {step.own && (
           <p data-agent-note className="text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
-            Told after <span className="font-mono">{step.spec.agent}</span>'s instructions, <span className="font-mono">agents/{step.spec.agent}.md</span>.
+            Told after <AgentLink from="yours" name={step.spec.agent ?? ''} />'s instructions, <span className="font-mono">agents/{step.spec.agent}.md</span>.
           </p>
         )}
         <textarea

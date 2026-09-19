@@ -22,7 +22,9 @@ here reaches every step that names the agent, on the next run — a run already 
 `output:` schema sits here, beside the agent that declares it.
 
 A step may still write words of its own under its frontmatter: a team's note to its agent (*in this team, also check
-…*), told after the agent's instructions. It is an escape hatch, not the normal case, and no shipped step has one.
+…*), told after the agent's instructions. It is an escape hatch, not the normal case. Two shipped steps have one: `ship` in `dev-build` and
+`dev-planned-build`, whose check builds the web app and runs its e2e, tell the shipper why that matters on the merged
+tree. The shipper's own instructions name no check, and serve every dev folder.
 
 The package's README, *Agents*, says the rules: which keys an agent may carry, what refuses, and why a step's
 note comes after the instructions and never replaces them.

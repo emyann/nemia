@@ -1014,10 +1014,11 @@ const shippedFolders = (): string[] => {
   ].filter((dir) => fs.statSync(dir).isDirectory());
 };
 
-test("every agent step of the shipped workflows of work runs on a 200k window, the package's own ui copy included", () => {
-  // Measured before it was set (agent-engine open issue 26): a `--bg` session compacts at its window, carries on and signs off.
+test("every agent step of the shipped workflows runs on a 200k window — the workflows of work, the package's own ui copy, and the supervisor", () => {
+  // Measured before it was set (agent-engine open issue 26): a `--bg` session compacts at its window, carries on and signs off. The
+  // supervisor's session never ends and grows on every answer, which makes it the one a cap is for.
   const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
-  const folders = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'].map((name) => path.join(root, name));
+  const folders = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui', 'supervisor'].map((name) => path.join(root, name));
   folders.push(path.join(import.meta.dirname, '..', 'workflows', 'ui'));
   for (const dir of folders) {
     for (const step of loadWorkflows(dir)) assert.equal(step.context, 200_000, `${path.relative(root, dir)}/${step.name}.md`);

@@ -7,7 +7,7 @@ import { foldTranscript } from '../lib/transcript';
 import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
 import { Rounds, TryCloseouts, tryLabel } from './Closeout';
-import { Check, code, Facts, specRows, spentRows, Told, when } from './Facts';
+import { Check, code, Facts, readRows, specRows, spentRows, Told, when } from './Facts';
 
 // Loaded when the Activity tab is first opened: the scroller and the tool views are not needed to read the canvas the inspector sits beside.
 const Conversation = lazy(() => import('./conversation/Conversation').then((m) => ({ default: m.Conversation })));
@@ -133,6 +133,8 @@ function Details({ step, state, runCancelled, current, selected, onSelect }: Det
           // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0. A dash for a step not filed.
           ['used', step.used?.used],
           ['cost', step.used?.cost],
+          // What its sessions read, by price, where anything measured it: the peak and a rebuilt cache marked.
+          ...readRows(step.used),
           // What every try has cost together, and of its cap where it has one: `$4.25 of $3`, red once past it.
           ...spentRows(step),
           ['branch', code(step.branch)],

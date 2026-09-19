@@ -435,14 +435,16 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number): Transcri
  * in `modelUsage` together, input as a response's are counted (`transcriptUsage`): uncached, cache writes and cache reads.
  */
 type CostState = {
-  costUsd?: number; apiMs?: number; toolMs?: number; inputTokens?: number; outputTokens?: number; startTime?: number; unpriced: boolean;
-};
+  costUsd?: number; apiMs?: number; toolMs?: number; startTime?: number; unpriced: boolean;
+} & Tokens;
+
+/** An attempt's tokens: its input in three classes and in their sum, and its output. */
+type Tokens = { inputTokens?: number; uncachedTokens?: number; cacheWriteTokens?: number; cacheReadTokens?: number; outputTokens?: number };
 
 /** The tokens of a `cost-state`'s `modelUsage`, every model's together — or none, when any model's count is not all there. */
-const tokensOf = (modelUsage: unknown): { inputTokens?: number; outputTokens?: number } => {
+const tokensOf = (modelUsage: unknown): Tokens => {
   if (typeof modelUsage !== 'object' || modelUsage === null || Array.isArray(modelUsage)) return {};
-  let input = 0;
-  let output = 0;
+  const sum = { uncachedTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, outputTokens: 0 };
   for (const m of Object.values(modelUsage as Record<string, unknown>)) {
     const n = (key: string) => {
       const v = (m as Record<string, unknown> | null)?.[key];
@@ -450,10 +452,12 @@ const tokensOf = (modelUsage: unknown): { inputTokens?: number; outputTokens?: n
     };
     const counts = [n('inputTokens'), n('cacheReadInputTokens'), n('cacheCreationInputTokens'), n('outputTokens')];
     if (counts.some((c) => c === undefined)) return {};
-    input += counts[0]! + counts[1]! + counts[2]!;
-    output += counts[3]!;
+    sum.uncachedTokens += counts[0]!;
+    sum.cacheReadTokens += counts[1]!;
+    sum.cacheWriteTokens += counts[2]!;
+    sum.outputTokens += counts[3]!;
   }
-  return { inputTokens: input, outputTokens: output };
+  return { inputTokens: sum.uncachedTokens + sum.cacheReadTokens + sum.cacheWriteTokens, ...sum };
 };
 
 const costStateOf = (line: string): CostState | undefined => {
@@ -496,7 +500,7 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
   const carried = after.startTime < since - COST_START_SLACK_MS;
   const base = carried && before?.startTime === after.startTime ? before : undefined;
   if (carried && !base) return {};
-  const own = (key: 'costUsd' | 'apiMs' | 'toolMs' | 'inputTokens' | 'outputTokens') => {
+  const own = (key: 'costUsd' | 'apiMs' | 'toolMs' | keyof Tokens) => {
     const total = after[key];
     const was = base ? base[key] : 0;
     if (total === undefined || was === undefined || total < was) return undefined;
@@ -504,9 +508,11 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
   };
   const unpriced = after.unpriced || base?.unpriced === true;
   const [costUsd, apiMs, toolMs] = [own('costUsd'), own('apiMs'), own('toolMs')];
-  const [inputTokens, outputTokens] = tokens ? [own('inputTokens'), own('outputTokens')] : [];
+  const counts = tokens
+    ? { inputTokens: own('inputTokens'), uncachedTokens: own('uncachedTokens'), cacheWriteTokens: own('cacheWriteTokens'), cacheReadTokens: own('cacheReadTokens'), outputTokens: own('outputTokens') }
+    : undefined;
   return {
-    ...(inputTokens !== undefined && outputTokens !== undefined ? { inputTokens, outputTokens } : {}),
+    ...(counts && Object.values(counts).every((c) => c !== undefined) ? counts : {}),
     ...(costUsd !== undefined && !unpriced ? { costUsd } : {}),
     ...(apiMs !== undefined ? { apiMs } : {}),
     ...(toolMs !== undefined ? { toolMs } : {}),
@@ -533,14 +539,27 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * writes no `assistant` line, so its responses undercount it: 408,348 input tokens counted against the 601,367 its
  * `cost-state` said, over three compactions (2.1.278, open issue 26). Its tokens are the `cost-state`'s instead, its own
  * share as its cost is, and none until one is written.
+ *
+ * The input is counted in its three classes — `input_tokens` uncached, `cache_creation_input_tokens` written to the
+ * cache, `cache_read_input_tokens` read from it — and `inputTokens` is their sum. The peak is the largest of the three
+ * together on any one of the attempt's responses, or on the summary call of any of its compactions, whose context Claude
+ * Code writes on the boundary (`compactMetadata.preTokens`: on 25 boundaries read, at or a few thousand past the last
+ * response before it). A resumed attempt's first response reads its parent's conversation, and its peak keeps that.
+ *
+ * `compactions` counts the attempt's own boundaries: a session compacts well short of its window (173,584 and 173,254
+ * under a 200k one, open issue 26), so its peak never says it reached it. And the attempt's first response is kept
+ * apart — its context and its cache write — since that is where a continuation either reads its parent's conversation
+ * from the cache or writes it there again.
  */
 export const transcriptUsage = (jsonl: string, since: number): Usage => {
-  const responses = new Map<string, { input: number; output: number } | null>();
+  const responses = new Map<string, { uncached: number; write: number; read: number; output: number } | null>();
   const toolCalls = new Set<string>();
   let before: CostState | undefined;
   let after: CostState | undefined;
   let begun = false;
-  let compacted = false;
+  let compactions = 0;
+  // The context each of the attempt's compactions summarised, as Claude Code counted it (`compactMetadata.preTokens`).
+  let summarised = 0;
   let name: string | undefined;
   for (const line of jsonl.split('\n')) {
     if (line.includes('"cost-state"')) {
@@ -564,7 +583,14 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     }
     // A resumed transcript carries its parent's last boundary, before this attempt began: that summary is not this attempt's.
     if (begun && line.includes('"compact_boundary"')) {
-      try { compacted ||= (JSON.parse(line) as { subtype?: unknown } | null)?.subtype === 'compact_boundary'; } catch { /* not a line */ }
+      try {
+        const entry = JSON.parse(line) as { subtype?: unknown; compactMetadata?: { preTokens?: unknown } } | null;
+        if (entry?.subtype === 'compact_boundary') {
+          compactions += 1;
+          const pre = entry.compactMetadata?.preTokens;
+          if (typeof pre === 'number' && Number.isFinite(pre)) summarised = Math.max(summarised, pre);
+        }
+      } catch { /* not a line */ }
     }
     if (!line.includes('"assistant"')) continue;
     let entry: { type?: string; timestamp?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } };
@@ -574,7 +600,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     const u = message.usage;
     const n = (key: string) => (typeof u?.[key] === 'number' ? (u[key] as number) : 0);
     responses.set(message.id, typeof u?.input_tokens === 'number' && typeof u?.output_tokens === 'number'
-      ? { input: n('input_tokens') + n('cache_creation_input_tokens') + n('cache_read_input_tokens'), output: n('output_tokens') }
+      ? { uncached: n('input_tokens'), write: n('cache_creation_input_tokens'), read: n('cache_read_input_tokens'), output: n('output_tokens') }
       : null);
     if (Array.isArray(message.content)) {
       for (const block of message.content as Array<{ type?: string; id?: string }>) {
@@ -584,12 +610,24 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
   }
   const counted = [...responses.values()];
   const measured = counted.filter((c) => c !== null);
+  const all = measured.length === counted.length;
+  const total = (key: 'uncached' | 'write' | 'read' | 'output') => measured.reduce((t, c) => t + c[key], 0);
+  const peak = measured.reduce((most, c) => Math.max(most, c.uncached + c.write + c.read), summarised);
+  const compacted = compactions > 0;
+  const first = counted[0];
   return {
     turns: responses.size,
     toolCalls: toolCalls.size,
-    ...(measured.length === counted.length && !compacted
-      ? { inputTokens: measured.reduce((t, c) => t + c.input, 0), outputTokens: measured.reduce((t, c) => t + c.output, 0) }
+    ...(all && !compacted
+      ? {
+          inputTokens: total('uncached') + total('write') + total('read'),
+          uncachedTokens: total('uncached'), cacheWriteTokens: total('write'), cacheReadTokens: total('read'),
+          outputTokens: total('output'),
+        }
       : {}),
+    ...(all && peak > 0 ? { peakContextTokens: peak } : {}),
+    ...(first ? { firstContextTokens: first.uncached + first.write + first.read, firstCacheWriteTokens: first.write } : {}),
+    ...(compacted ? { compactions } : {}),
     ...costOf(before, after, since, compacted),
   };
 };

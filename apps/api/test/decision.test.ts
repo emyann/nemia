@@ -158,14 +158,14 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
 
   // `wf decide`'s words beside each check: a count nobody measured says so, and so does the total that one step lacks.
   assert.deepEqual(body.used, {
-    implement: { usage: { turns: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 }, used: '12 turns · 30 tool calls · 112k in · 6.35k out', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null },
-    review: { usage: { toolCalls: 4, inputTokens: 8_000, outputTokens: 650, costUsd: 0.004 }, used: 'turns not measured · 4 tool calls · 8k in · 650 out', cost: '$0.004', costUsd: 0.004, apiMs: null, toolMs: null },
+    implement: { usage: { turns: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 }, used: '12 turns · 30 tool calls · 112k in · 6.35k out', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
+    review: { usage: { toolCalls: 4, inputTokens: 8_000, outputTokens: 650, costUsd: 0.004 }, used: 'turns not measured · 4 tool calls · 8k in · 650 out', cost: '$0.004', costUsd: 0.004, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
   });
   assert.deepEqual(body.total, {
     usage: { toolCalls: 34, inputTokens: 120_000, outputTokens: 7_000 },
     used: 'turns not measured · 34 tool calls · 120k in · 7k out',
     cost: 'not measured',
-    costUsd: null, apiMs: null, toolMs: null,
+    costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0,
   });
   // The run's cost after its steps, as `wf decide` prints it: review's session was priced, implement's was not. And no step held on a budget.
   assert.equal(body.cost, 'run $0.004 measured · 1 attempt not measured');
@@ -183,6 +183,22 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
   assert.deepEqual(Object.fromEntries(detail.steps.map((s: { name: string; used: unknown }) => [s.name, s.used])), body.used);
 });
 
+test("the run's total reads its peak against the cap of the step that reached it: two steps' caps are not one cap", async () => {
+  // `implement` ran under a 1M cap and peaked at 831k, which is no mark there; `review` had no cap and stayed small. Read against no cap, the
+  // total's 831k would say `past 200k with no cap`, of a session that had one.
+  const classes = (read: number, wrote: number, peak: number) => ({ inputTokens: read + wrote, cacheReadTokens: read, cacheWriteTokens: wrote, uncachedTokens: 0, peakContextTokens: peak });
+  settledTask('t-dr-implement', done, classes(9_000_000, 900_000, 831_000));
+  settledTask('t-dr-review', done, classes(1_000_000, 100_000, 120_000));
+  writeRun({
+    id: 'r-dr', repo, baseRef: base,
+    workflow: [{ ...workflow[0], context: 1_000_000 }, workflow[1]],
+    steps: { implement: { taskId: 't-dr-implement', branch }, review: { taskId: 't-dr-review', branch } },
+  });
+  const { body } = await decisionOf('r-dr');
+  assert.deepEqual([body.used.implement.read, body.used.implement.peak], ['read 9M · wrote 900k · peak 831k', null]);
+  assert.deepEqual([body.total.read, body.total.peak], ['read 10M · wrote 1M · peak 831k', null]);
+});
+
 test('a run still running is `running` and nothing else, and not one `git` is run for it', async () => {
   journal('t-d2-implement', [filed('t-d2-implement'), { kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 }]);
   // On a branch git can read, so a route that asked would have had an answer.
@@ -190,7 +206,7 @@ test('a run still running is `running` and nothing else, and not one `git` is ru
   const detail = await (await app.request('/api/runs/r-d2')).json();
   assert.deepEqual([detail.status, detail.waitingOnYou], ['running', []]);
   // A step not filed has consumed nothing, which is not `not measured`.
-  assert.deepEqual(detail.steps.map((s: { used: unknown }) => s.used), [{ usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null }, null]);
+  assert.deepEqual(detail.steps.map((s: { used: unknown }) => s.used), [{ usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 }, null]);
 
   const before = gitCount();
   assert.deepEqual(await decisionOf('r-d2'), { status: 200, body: { running: true } });

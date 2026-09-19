@@ -824,7 +824,8 @@ test("the inspector's Details say what a step used and what it cost beside its a
 // ─── what each round did, what a step runs with, and its files ──────────────
 
 const { Artifacts, TryCloseouts } = await import('../src/components/Closeout.tsx');
-const { Facts, specRows } = await import('../src/components/Facts.tsx');
+const facts = await import('../src/components/Facts.tsx');
+const { Facts, specRows } = facts;
 type StepTry = import('../src/lib/api.ts').StepTry;
 type StepCloseout = import('../src/lib/api.ts').StepCloseout;
 type StepSpec = import('../src/lib/api.ts').StepSpec;
@@ -1612,6 +1613,36 @@ test("the Decide section says why a step past its budget is held — `wf decide`
   const none = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision: { ...decision, overBudget: null, cost: null } }));
   assert.doesNotMatch(none, /data-over-budget/, 'no step held on a budget: no line');
   assert.match(none, /<dt[^>]*>every try<\/dt><dd[^>]*>—<\/dd>/, 'nothing ended yet: a dash, not $0');
+});
+
+test("what sessions read, by price: beside the cost, the peak marked at a cap or past 200k, a rebuilt cache said beneath — and no row where nothing measured it", () => {
+  const { Read, readRows } = facts;
+  const markup = (node: unknown) => renderToStaticMarkup(node as Parameters<typeof renderToStaticMarkup>[0]);
+  const used = (read: string | null, peak: 'cap' | 'large' | null = null, rebuilt = 0) => ({ usage: null, used: '', cost: '$3.01', costUsd: 3.01, apiMs: null, toolMs: null, read, peak, rebuilt });
+
+  assert.deepEqual(readRows(used(null)), [], "a runner that counted its input as one number: no row, not 0");
+  assert.deepEqual(readRows(null), []);
+
+  const plain = markup(createElement(Read, { said: 'read 21.4M · wrote 412k · peak 167k', peak: null, rebuilt: 0 }));
+  assert.match(plain, /<span class="font-mono text-xs"><span>read 21\.4M<\/span><span> · wrote 412k<\/span><span> · peak 167k<\/span><\/span>/);
+  assert.doesNotMatch(plain, /data-peak|data-rebuilt/, 'under its cap, and resumed from a warm cache: nothing marked');
+
+  const capped = markup(createElement(Read, { said: 'read 4.4M · wrote 355k · peak 174k, compacted twice at its 200k cap · a resumed session wrote its context to the cache again instead of reading it', peak: 'cap', rebuilt: 1 }));
+  assert.match(capped, /<span data-peak="cap" class="[^"]*text-amber-700[^"]*" title="It reached the step&#x27;s context: cap: Claude Code compacted[^"]*">peak 174k, compacted twice at its 200k cap<\/span>/);
+  const unpeaked = markup(createElement(Read, { said: 'read 900k · wrote 20k · compacted at its 100k cap', peak: 'cap', rebuilt: 0 }));
+  assert.match(unpeaked, /<span data-peak="cap"[^>]*>compacted at its 100k cap<\/span>/, 'no peak measured: the compaction is where it stands, and not dropped');
+  assert.match(capped, /<span data-rebuilt="1" class="block text-xs [^"]*" title="[^"]*the cache was rebuilt\.">a resumed session wrote its context to the cache again instead of reading it<\/span>/);
+
+  const large = markup(createElement(Read, { said: 'read 2.9M · wrote 100k · peak 250k, past 200k with no cap', peak: 'large', rebuilt: 0 }));
+  assert.match(large, /<span data-peak="large"[^>]*>peak 250k, past 200k with no cap<\/span>/);
+
+  // On the Decide section, beside the total's cost.
+  const decision = {
+    touched: [], lesson: { said: 'nothing written where the next agent reads', state: 'nothing' as const }, sensitive: [], used: {},
+    total: used('read 7.3M · wrote 455k · peak 250k, past 200k with no cap', 'large'), cost: 'run $6.80', overBudget: null, commands: [],
+  };
+  const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision }));
+  assert.match(html, /<dt[^>]*>cost<\/dt><dd[^>]*>\$3\.01<\/dd><\/div><div class="contents"><dt[^>]*>read<\/dt><dd[^>]*><span data-read="true" class="block"><span class="font-mono text-xs"><span>read 7\.3M<\/span>/);
 });
 
 test("a step past its budget is offered a raise: its word with the amounts, a box started above what it cost with no floor of the board's, and Raise the budget and try again — answer, for a step that asks; its check again, where one did not pass; go round again, for its loop", () => {

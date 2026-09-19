@@ -145,24 +145,46 @@ test("every dev* folder ends in `ship`: gated, in the repository's checkout, wit
       "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why.",
       'git merge --no-ff --no-commit <branch>',
       "Run this workflow's check, whole, from the repository root: the command named under *Where to look*.",
-      'commit the merge: `git commit --no-edit`',
+      // The merge is committed with a message the shipper writes, not git's `Merge branch '…'`: what shipped, and the evidence for it.
+      'commit the merge with a message you write — never git\'s default, so never `--no-edit`.',
+      "the run's own title — the first line under *What was asked for* — trimmed to about 72 characters.",
+      '"Merge branch …" is what this message replaces.',
+      'a body of two to six lines: what was built, in plain words, then one line naming the run, its branch, how many commits it brought, and the check that passed on the merged tree.',
+      "`git log --format='%s' <base>..<branch>`, `git diff --stat <base>...<branch>`",
+      "never from anyone's account of the work.",
+      'No trailers of any kind: no `Co-Authored-By`, no `Signed-off-by`, no session URL.',
+      'Write the message to a file in the directory named under *Files for the person who decides*, outside this checkout, and commit with `git commit -F <that file>`',
       '`git merge --abort`, then sign off `blocked` saying what happened',
+      'Nothing is committed, so no message reaches git.',
       'Do not push, and do not delete the branch',
     ]) assert.ok(body.includes(sentence), `${folder}: ${sentence}\n\n${body}`);
+    assert.ok(!body.includes('`git commit --no-edit`'), `${folder}: the recipe no longer commits git's default message\n\n${body}`);
     const run: Run = {
       id: 'r-1', repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Ship it',
       workflowDir: dir, createdAt: '2026-09-19T00:00:00Z',
       steps: Object.fromEntries(Object.keys(byName).map((name) => [name, name === 'ship' ? { taskId: null } : { taskId: `t-${name}`, workspace: '/wt', branch: 'wf/r-1/implement' }])),
     };
-    const brief = composeBrief(ship, run, loadWorkflows(dir));
+    const brief = composeBrief(ship, run, loadWorkflows(dir), undefined, '/wf/runs/r-1/artifacts/ship');
+    // The title the recipe's subject is taken from, and the directory it writes its message into, are the brief's, under those headings.
+    assert.ok(brief.includes('\n## What was asked for\n\nShip it'), `${folder}\n\n${brief}`);
+    // The directory the recipe writes its message into is the one the brief names under that heading, by absolute path.
+    assert.ok(brief.includes('\n## Files for the person who decides\n\nA report, a log or a screenshot reaches them one way: put it in `/wf/runs/r-1/artifacts/ship`'), `${folder}\n\n${brief}`);
     const where = brief.slice(brief.indexOf('\n## Where to look\n'));
     assert.ok(where.includes(`This workflow's check, which its work was judged by: \`${check}\``), `${folder}\n\n${brief}`);
     assert.equal(brief.split("This workflow's check, which its work was judged by:").length, 2, `${folder}: its check, and no other`);
   }
 
-  // One ending, written once: every dev* folder's ship.md is the same file, wiring and the shipper.
+  // One ending, written once: every dev* folder's ship.md is the same wiring and the shipper. A build folder's adds a note after it, the
+  // team's reason to run its build and e2e on the merged tree, which the shipper — one recipe for every folder — does not give.
   const shipIn = (folder: string) => fs.readFileSync(path.join(REPO, 'workflows', folder, 'ship.md'), 'utf8');
-  for (const folder of ['dev-planned', 'dev-build', 'dev-planned-build']) assert.equal(shipIn(folder), shipIn('dev'), folder);
+  assert.equal(shipIn('dev-planned'), shipIn('dev'), 'dev-planned');
+  assert.equal(shipIn('dev-planned-build'), shipIn('dev-build'), 'dev-planned-build');
+  assert.ok(shipIn('dev-build').startsWith(shipIn('dev')), 'dev-build is the same wiring, then its note');
+  const WHY = ["`npm run build` regenerates the web app's route tree", '`npm run e2e` visits every page in both themes', 'the merged tree is the first tree either has seen'];
+  for (const folder of Object.keys(CHECKS)) {
+    const body = said(loadWorkflows(path.join(REPO, 'workflows', folder)).find((s) => s.name === 'ship')!.body);
+    for (const why of WHY) assert.equal(body.includes(why), CHECKS[folder] === E2E, `${folder}: ${why}\n\n${body}`);
+  }
 });
 
 test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`, which the settings allow for implement's sake, and every implement what no step needs", () => {

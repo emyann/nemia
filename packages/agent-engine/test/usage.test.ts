@@ -28,7 +28,7 @@ test('a response written as several lines is one turn, with its tokens counted o
   ].join('\n');
   assert.deepEqual(
     transcriptUsage(jsonl, Date.parse('2026-09-12T09:00:00Z')),
-    { turns: 2, toolCalls: 3, inputTokens: 2220, outputTokens: 10 },
+    { turns: 2, toolCalls: 3, inputTokens: 2220, uncachedTokens: 20, cacheWriteTokens: 200, cacheReadTokens: 2000, outputTokens: 10, peakContextTokens: 1110, firstContextTokens: 1110, firstCacheWriteTokens: 100 },
   );
 });
 
@@ -41,7 +41,7 @@ test("a resumed session's inherited conversation is not counted as its own", () 
   ].join('\n');
   assert.deepEqual(
     transcriptUsage(jsonl, Date.parse('2026-09-13T04:06:15Z')),
-    { turns: 1, toolCalls: 0, inputTokens: 1110, outputTokens: 5 },
+    { turns: 1, toolCalls: 0, inputTokens: 1110, uncachedTokens: 10, cacheWriteTokens: 100, cacheReadTokens: 1000, outputTokens: 5, peakContextTokens: 1110, firstContextTokens: 1110, firstCacheWriteTokens: 100 },
   );
 });
 
@@ -77,7 +77,7 @@ test("a transcript's cost is the cost-state its session wrote as its process exi
     costState(0.1925, 44777, 217, since - 300),
     costState(0.1925, 44777, 217, since - 300),
   ].join('\n');
-  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 1, toolCalls: 1, inputTokens: 1110, outputTokens: 5, costUsd: 0.1925, apiMs: 44777, toolMs: 217 });
+  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 1, toolCalls: 1, inputTokens: 1110, uncachedTokens: 10, cacheWriteTokens: 100, cacheReadTokens: 1000, outputTokens: 5, peakContextTokens: 1110, firstContextTokens: 1110, firstCacheWriteTokens: 100, costUsd: 0.1925, apiMs: 44777, toolMs: 217 });
 });
 
 test('no cost-state written since the attempt began is no cost — not 0, and not the cost of the session it continues', () => {
@@ -115,7 +115,7 @@ test("a resumed session's cost is its own: the total it exited with, less the to
     costState(47.2087, 3771263, 356266, first),
   ].join('\n');
   const own = transcriptUsage(jsonl, second);
-  assert.deepEqual(own, { turns: 1, toolCalls: 0, inputTokens: 1110, outputTokens: 5, costUsd: 14.7222, apiMs: 679931, toolMs: 29305 },
+  assert.deepEqual(own, { turns: 1, toolCalls: 0, inputTokens: 1110, uncachedTokens: 10, cacheWriteTokens: 100, cacheReadTokens: 1000, outputTokens: 5, peakContextTokens: 1110, firstContextTokens: 1110, firstCacheWriteTokens: 100, costUsd: 14.7222, apiMs: 679931, toolMs: 29305 },
     'the second process: its total less the first, and its tokens only — not the third, which continued it under another name');
   assert.equal(transcriptUsage(jsonl, first).costUsd, 28.3161, "the first, read again while its session is still listed: its own, not what the later ones spent");
   assert.equal(transcriptUsage(jsonl, Date.parse('2026-09-15T02:47:53Z')).costUsd, 4.1704, 'the third');
@@ -124,7 +124,7 @@ test("a resumed session's cost is its own: the total it exited with, less the to
 test('a count carried on from a total the transcript does not show is no cost', () => {
   const since = Date.parse('2026-09-15T01:12:01Z');
   const jsonl = [prompt('2026-09-15T01:12:05Z'), costState(43.0383, 3335346, 341815, Date.parse('2026-09-15T00:04:43Z'))].join('\n');
-  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 }, 'its count began an hour before it did, and nothing says at what');
+  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 }, 'its count began an hour before it did, and nothing says at what');
 
   const otherCount = [
     costState(5, 1000, 100, Date.parse('2026-09-14T22:00:00Z')),
@@ -158,10 +158,14 @@ test("a compacted attempt's tokens are its cost-state's, which counts the summar
     response('2026-09-19T03:56:51Z', 'msg_2', [{ type: 'tool_use', id: 'tu_2', name: 'Read' }]),
   ];
   const running = transcriptUsage(lines.join('\n'), since);
-  assert.deepEqual(running, { turns: 2, toolCalls: 2 }, 'no tokens rather than a count missing the summary');
+  assert.deepEqual(running, { turns: 2, toolCalls: 2, peakContextTokens: 83770, firstContextTokens: 1110, firstCacheWriteTokens: 100, compactions: 1 }, 'no tokens rather than a count missing the summary');
 
   const exited = [...lines, costStateWith(1.248613, since - 300, { 'claude-sonnet-5': [77091, 298435, 225841, 13138] })].join('\n');
-  assert.deepEqual(transcriptUsage(exited, since), { turns: 2, toolCalls: 2, inputTokens: 601367, outputTokens: 13138, costUsd: 1.248613, apiMs: 1000, toolMs: 10 });
+  assert.deepEqual(transcriptUsage(exited, since), {
+    turns: 2, toolCalls: 2, peakContextTokens: 83770, firstContextTokens: 1110, firstCacheWriteTokens: 100, compactions: 1,
+    inputTokens: 601367, uncachedTokens: 77091, cacheWriteTokens: 225841, cacheReadTokens: 298435, outputTokens: 13138,
+    costUsd: 1.248613, apiMs: 1000, toolMs: 10,
+  }, 'its classes are the cost-state\'s too, and its peak the summary call\'s context, larger than any response\'s');
 
   const twoModels = [...lines, costStateWith(1, since, { 'claude-sonnet-5': [10, 20, 30, 4], 'claude-haiku-4-5': [1, 2, 3, 5] })].join('\n');
   assert.deepEqual([transcriptUsage(twoModels, since).inputTokens, transcriptUsage(twoModels, since).outputTokens], [66, 9], 'every model the session used');
@@ -179,12 +183,83 @@ test("a boundary its session wrote before the attempt began is not the attempt's
     prompt('2026-09-19T04:00:47Z'),
     response('2026-09-19T04:01:24Z', 'msg_child', []),
   ].join('\n');
-  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 1, toolCalls: 0, inputTokens: 1110, outputTokens: 5 }, 'its own responses, counted as ever');
+  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 1, toolCalls: 0, inputTokens: 1110, uncachedTokens: 10, cacheWriteTokens: 100, cacheReadTokens: 1000, outputTokens: 5, peakContextTokens: 1110, firstContextTokens: 1110, firstCacheWriteTokens: 100 }, 'its own responses, counted as ever');
 
   const compactedToo = [...jsonl.split('\n').slice(0, 4), boundary('2026-09-19T04:01:18Z'), jsonl.split('\n')[4]!,
     costStateWith(1.6757343, first, { 'claude-sonnet-5': [100000, 500000, 375784, 19745] })].join('\n');
   const u = transcriptUsage(compactedToo, since);
   assert.deepEqual([u.inputTokens, u.outputTokens, u.costUsd], [975784 - 601367, 19745 - 13138, 0.427121], 'compacted itself: its share of the carried count, tokens as cost');
+  assert.deepEqual([u.uncachedTokens, u.cacheReadTokens, u.cacheWriteTokens], [100000 - 77091, 500000 - 298435, 375784 - 225841], 'its classes too');
+  assert.equal(u.peakContextTokens, 83770, "its own boundary's context, not taken off for the parent's before it");
+  assert.equal(u.compactions, 1, "its own boundary, not the parent's before it");
+
+  const twice = [...compactedToo.split('\n').slice(0, 5), boundary('2026-09-19T04:01:20Z'), ...compactedToo.split('\n').slice(5)].join('\n');
+  assert.equal(transcriptUsage(twice, since).compactions, 2, 'each of its own');
+  assert.equal('compactions' in transcriptUsage(jsonl, since), false, "none of its own: absent, and the parent's does not count");
+});
+
+test("an attempt's input is counted in its three classes, which sum to inputTokens, and its peak is the largest any one response read", () => {
+  const since = Date.parse('2026-09-18T09:00:00Z');
+  const usage = (uncached: number, write: number, read: number) => ({ input_tokens: uncached, cache_creation_input_tokens: write, cache_read_input_tokens: read, output_tokens: 7 });
+  const jsonl = [
+    prompt('2026-09-18T09:00:01Z'),
+    response('2026-09-18T09:00:02Z', 'msg_1', [], usage(5, 20_000, 0)),
+    response('2026-09-18T09:00:03Z', 'msg_2', [], usage(3, 1_000, 20_000)),
+    response('2026-09-18T09:00:03Z', 'msg_2', [], usage(3, 1_000, 20_000)),
+    response('2026-09-18T09:00:04Z', 'msg_3', [], usage(2, 500, 21_000)),
+  ].join('\n');
+  const u = transcriptUsage(jsonl, since);
+  assert.deepEqual([u.uncachedTokens, u.cacheWriteTokens, u.cacheReadTokens], [10, 21_500, 41_000], 'a response written as two lines is counted once');
+  assert.equal(u.inputTokens, u.uncachedTokens! + u.cacheWriteTokens! + u.cacheReadTokens!);
+  assert.equal(u.peakContextTokens, 21_502, "msg_3's: the three classes of one response together, not the attempt's sum");
+
+  const unmeasured = transcriptUsage([prompt('2026-09-18T09:00:01Z'), response('2026-09-18T09:00:02Z', 'msg_1', [], usage(5, 20_000, 0)), response('2026-09-18T09:00:03Z', 'msg_2', [], null)].join('\n'), since);
+  assert.equal('peakContextTokens' in unmeasured, false, 'a response without its counts may have been the largest: no peak rather than a low one');
+  assert.deepEqual([unmeasured.firstContextTokens, unmeasured.firstCacheWriteTokens], [20_005, 20_000], 'the first response measured its own, whatever came after');
+  const firstUnmeasured = transcriptUsage([prompt('2026-09-18T09:00:01Z'), response('2026-09-18T09:00:02Z', 'msg_1', [], null), response('2026-09-18T09:00:03Z', 'msg_2', [], usage(5, 20_000, 0))].join('\n'), since);
+  assert.equal('firstContextTokens' in firstUnmeasured, false, 'not the second response standing in for a first that carried no counts');
+  assert.equal('cacheReadTokens' in unmeasured, false);
+});
+
+test("a resumed attempt's classes and peak are its own lines', and its peak starts where its parent's conversation ended", () => {
+  // One transcript, as `--resume` leaves it: the parent's conversation under the parent's times, then the child's.
+  const parentStart = Date.parse('2026-09-18T08:00:00Z');
+  const since = Date.parse('2026-09-18T09:00:00Z');
+  const usage = (uncached: number, write: number, read: number) => ({ input_tokens: uncached, cache_creation_input_tokens: write, cache_read_input_tokens: read, output_tokens: 9 });
+  const jsonl = [
+    prompt('2026-09-18T08:00:01Z'),
+    response('2026-09-18T08:00:02Z', 'msg_p1', [], usage(4, 30_000, 0)),
+    response('2026-09-18T08:10:00Z', 'msg_p2', [], usage(2, 2_000, 180_000)),
+    prompt('2026-09-18T09:00:01Z'),
+    // The child's first response reads the whole of the parent's conversation, and here rewrites it to the cache.
+    response('2026-09-18T09:00:05Z', 'msg_c1', [], usage(6, 183_000, 0)),
+    response('2026-09-18T09:00:09Z', 'msg_c2', [], usage(1, 1_500, 183_000)),
+  ].join('\n');
+  const child = transcriptUsage(jsonl, since);
+  assert.deepEqual(
+    [child.turns, child.uncachedTokens, child.cacheWriteTokens, child.cacheReadTokens, child.inputTokens, child.peakContextTokens],
+    [2, 7, 184_500, 183_000, 367_507, 184_501],
+    "its own two responses: the parent's are not counted, and nothing of the parent's is taken off the peak",
+  );
+  assert.deepEqual([child.firstContextTokens, child.firstCacheWriteTokens], [183_006, 183_000], "its first response: the parent's conversation, written again");
+  const warm = transcriptUsage(jsonl.replace('"cache_creation_input_tokens":183000,"cache_read_input_tokens":0', '"cache_creation_input_tokens":1000,"cache_read_input_tokens":182000'), since);
+  assert.deepEqual([warm.firstContextTokens, warm.firstCacheWriteTokens], [183_006, 1_000], 'read from the cache, it writes only what is new');
+  const parent = transcriptUsage(jsonl.split('\n').slice(0, 3).join('\n'), parentStart);
+  assert.deepEqual([parent.cacheWriteTokens, parent.cacheReadTokens, parent.peakContextTokens], [32_000, 180_000, 182_002], "the parent's, read on its own");
+});
+
+test('a journal written before the classes were measured folds as it did: inputTokens alone, and no class standing in as 0', () => {
+  // Two lines as the engine wrote them on 2026-09-18, verbatim in shape.
+  const journal = [
+    '{"kind":"filed","at":"2026-09-18T09:00:00Z","brief":"b","cwd":"/r","maxAttempts":1}',
+    '{"kind":"starting","at":"2026-09-18T09:00:01Z","attempt":1}',
+    '{"kind":"ended","at":"2026-09-18T09:05:00Z","attempt":1,"sessionId":"s","observed":"done","reason":"harness","usage":{"turns":85,"toolCalls":40,"inputTokens":21861234,"outputTokens":40100}}',
+    '{"kind":"measured","at":"2026-09-18T09:05:02Z","attempt":1,"usage":{"costUsd":14.72,"apiMs":679931,"toolMs":29305}}',
+  ].map((l) => JSON.parse(l) as Event);
+  const [a] = fold('t', journal).attempts;
+  assert.deepEqual(a!.usage, { turns: 85, toolCalls: 40, inputTokens: 21861234, outputTokens: 40100, costUsd: 14.72, apiMs: 679931, toolMs: 29305 });
+  for (const key of ['uncachedTokens', 'cacheWriteTokens', 'cacheReadTokens', 'peakContextTokens']) assert.equal(key in a!.usage!, false, key);
+  assert.equal(usageLine(a!.usage), '85 turns · 40 tool calls · 21.9M in · 40.1k out · $14.72 · cache not measured · peak not measured', 'and ae show names what it did not count');
 });
 
 test('a session that used a model its harness could not price has no cost — a total too low reads as the whole — and says why', () => {
@@ -242,7 +317,17 @@ test('an attempt its runner measured nothing about records null, and a person re
 test('a measured attempt prints what was measured, and names what was not', () => {
   assert.equal(
     usageLine({ turns: 12, toolCalls: 31, inputTokens: 1_234_567, outputTokens: 20_400 }),
-    '12 turns · 31 tool calls · 1.2M in · 20.4k out · cost not measured',
+    '12 turns · 31 tool calls · 1.2M in · 20.4k out · cost not measured · cache not measured · peak not measured',
+  );
+  assert.equal(
+    usageLine({ turns: 85, toolCalls: 40, inputTokens: 21_861_234, uncachedTokens: 1_234, cacheWriteTokens: 412_000, cacheReadTokens: 21_448_000, peakContextTokens: 167_012, outputTokens: 40_100, costUsd: 14.72 }),
+    '85 turns · 40 tool calls · 21.9M in · 40.1k out · $14.72 · read 21.4M · wrote 412.0k · uncached 1.2k · peak 167.0k',
+    'the classes and the peak beside the cost',
+  );
+  assert.equal(
+    usageLine({ inputTokens: 601_367, uncachedTokens: 77_091, cacheWriteTokens: 225_841, cacheReadTokens: 298_435, peakContextTokens: 173_584, compactions: 2, outputTokens: 13_138, costUsd: 1.25 }),
+    'turns not measured · tool calls not measured · 601.4k in · 13.1k out · $1.25 · read 298.4k · wrote 225.8k · uncached 77.1k · peak 173.6k · compacted 2 times',
+    'a session that compacted says so: its peak stops short of its window',
   );
   assert.equal(usageLine({ turns: 4, toolCalls: 2, costUsd: 0.1054 }), '4 turns · 2 tool calls · tokens not measured · $0.11');
   const [a] = fold('t', [
@@ -292,9 +377,9 @@ test('ae ls shows a task\'s priority when it was filed with one, and nothing whe
 test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {
   assert.equal(
     usageLine({ toolCalls: 12, inputTokens: 373_710, outputTokens: 1_082 }),
-    'turns not measured · 12 tool calls · 373.7k in · 1.1k out · cost not measured',
+    'turns not measured · 12 tool calls · 373.7k in · 1.1k out · cost not measured · cache not measured · peak not measured',
   );
-  assert.equal(usageLine({ inputTokens: 10, outputTokens: 5 }), 'turns not measured · tool calls not measured · 10 in · 5 out · cost not measured');
+  assert.equal(usageLine({ inputTokens: 10, outputTokens: 5 }), 'turns not measured · tool calls not measured · 10 in · 5 out · cost not measured · cache not measured · peak not measured');
 });
 
 // ─── Codex: its exec --json stream ──────────────────────────────────────────
@@ -317,7 +402,7 @@ test("a Codex run's usage is read from its stream: tokens from turn.completed, t
     completed(),
   ));
   // Cached tokens are part of input_tokens and reasoning part of output_tokens: neither is added.
-  assert.deepEqual(read.usage, { toolCalls: 2, inputTokens: 373710, outputTokens: 1082 });
+  assert.deepEqual(read.usage, { toolCalls: 2, inputTokens: 373710, uncachedTokens: 59854, cacheWriteTokens: 0, cacheReadTokens: 313856, outputTokens: 1082 });
   assert.equal('turns' in read.usage!, false, "Codex's turns are prompts, not model responses");
   assert.equal('costUsd' in read.usage!, false);
 });
@@ -326,7 +411,7 @@ test('a Codex stream that cannot say is not made to: a turn cut short gives no t
   assert.deepEqual(codexOutput(codexStream(THREAD, TURN, item('started', 'item_1', 'command_execution'))).usage, { toolCalls: 1 }, 'killed mid-turn: the calls seen, no tokens');
   assert.deepEqual(codexOutput(codexStream(TURN, completed(), TURN)).usage, { toolCalls: 0 }, 'the first turn of two is not the whole');
   assert.deepEqual(codexOutput(codexStream(TURN, completed({ output_tokens: 5 }))).usage, { toolCalls: 0 }, 'a turn.completed without both counts');
-  assert.deepEqual(codexOutput(codexStream(TURN, item('completed', 'item_1', 'mcp_tool_call'), completed())).usage, { inputTokens: 373710, outputTokens: 1082 }, 'a type never seen is not guessed at');
+  assert.deepEqual(codexOutput(codexStream(TURN, item('completed', 'item_1', 'mcp_tool_call'), completed())).usage, { inputTokens: 373710, uncachedTokens: 59854, cacheWriteTokens: 0, cacheReadTokens: 313856, outputTokens: 1082 }, 'a type never seen is not guessed at');
   assert.deepEqual(codexOutput(codexStream(TURN, completed({ ...USED, cache_write_input_tokens: 5 }))).usage, { toolCalls: 0, outputTokens: 1082 }, 'whether input_tokens counts cache writes is unknown');
   assert.deepEqual(codexOutput(codexStream(TURN, completed(), TURN, completed({ ...USED, input_tokens: 1, output_tokens: 2 }))).usage, { toolCalls: 0, inputTokens: 373711, outputTokens: 1084 }, 'turns that all completed are summed');
 });

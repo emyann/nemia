@@ -10,3 +10,6 @@ agent: shipper
 # `wf approve <run> ship` — and the words they give with it are on this brief under `## Approved`.
 gate: true
 ---
+In this team the check builds the web app and runs its e2e, and both matter on the merged tree though the branch's
+own check was green: `npm run build` regenerates the web app's route tree, `npm run e2e` visits every page in both
+themes, and the merged tree is the first tree either has seen. Run the whole check on it.

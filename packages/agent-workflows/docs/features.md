@@ -3331,7 +3331,7 @@ The README's *An agent is a node's attachment* says the rules; this is what the 
   (`agents-before-after.test.ts` prints each diff). The implementer's plan paragraph became conditional on a plan being below; the ship
   recipe's item 3 runs "the command named under *Where to look*", and `composeBrief` names there each check the run's work was judged by
   (`039055a`), so the four `ship.md` files are one file and each ship brief names its own folder's check — proven by a test, not by prose.
-  No shipped step keeps words of its own. The supervisor, the package's codex `workflows/` and `wf-examples` stay without `agent:`.
+  No shipped step kept words of its own. The supervisor, the package's codex `workflows/` and `wf-examples` stay without `agent:`.
 - **`wf start` names each node's agent**: `implement (implementer) → review (reviewer) → ship (shipper)`; a node with none by its name.
 - **The board edits the node.** The listing's `spec` is resolved, so `ListedStep.own` carries the keys and note the step writes itself,
   and a PUT carries it back: without it a step saved as listed would write its agent's keys into its file. The builder picks the agent
@@ -3345,6 +3345,44 @@ What it leaves:
 - **Other attachments.** A script, an HTTP call, a typed judgement, a remote agent: `agent:` is the one kind built.
 - **Teams and dispatch.** Which agent takes a card, or a team of agents chosen per brief (`docs/pivot-2026-09-18.md`), is not here: a
   folder still names its agents by hand.
+
+Two of its leftovers were taken up after it (`docs/pivot-2026-09-18.md` §6, P1, *Still open from it*):
+
+- **The build folders' ship says why again, as a team's note.** The reworded recipe no longer said that the build regenerates the web
+  app's route tree, the e2e visits every page in both themes, and the merged tree is the first tree either has seen. `ship.md` in
+  `dev-build` and `dev-planned-build` says it after the shipper's instructions; `dev` and `dev-planned` say nothing of their own.
+  `agents-before-after.test.ts` still holds every resolved key and the same eight moved bodies, and names the two steps that keep a note
+  (`NOTES`); every other shipped step must keep none.
+- **The supervisor's session is capped, `context: 200k`.** It never ends and grows on every answer, so it is the session a cap is for.
+  `supervisor.test.ts` files the shipped folder and checks each of five answers continues the session on that window; the fixture test
+  names it as the one key a shipped step gained (`KEYS_ADDED`). The supervisor's README says what a thrash looks like — the step
+  `blocked`, its log ending on Claude Code's *"Autocompact is thrashing"* — and what to do: answer it, or raise the cap and start a fresh one.
+
+## Shipped: the shipper says what it shipped
+
+Every run the shipper merged read `Merge branch 'wf/<run>/implement'` and nothing else (56e7d40, 6c4e57b, f937d12, f1db95c on main): its
+recipe's fourth item said `git commit --no-edit`, and it did as told. What it merged and what the check said reached its closeout, not
+git, where the owner and anyone reading history later look.
+
+- **Item 4 writes the message.** Once the check exits 0, the merge is committed with a subject that says what shipped — the run's own
+  title, the first line under *What was asked for*, trimmed — and a body of two to six lines: what was built, then one line naming the run,
+  its branch, how many commits it brought, and the check that passed on the merged tree. It is read off the checkout (`git log
+  --format='%s'`, `git diff --stat`, `git rev-list --count`, base to branch), never off an account of the work. No trailers of any kind;
+  `--no-edit` is named only to be forbidden.
+- **Written to a file outside the checkout, committed with `-F`.** The file goes in the directory the brief names under *Files for the
+  person who decides* — the step's artifacts directory, by absolute path. The brief of a `workspace: main` step does not name it as
+  `WF_ARTIFACTS`, and the step's session is not given that variable (only a check is, `checkBrief`), so the recipe points at the heading
+  rather than at `$WF_ARTIFACTS`, which would be empty in the shipper's shell. Item 5 is unchanged in effect: on anything but a green check
+  the merge is aborted, nothing is committed, and no message reaches git.
+- **Tests.** `ui-workflow.test.ts` pins the new sentences of the recipe in every dev folder's ship body, that `git commit --no-edit` is
+  gone, and that the ship brief carries both headings the recipe points at. `ship.test.ts` plays the merge as the prose now says — the
+  message written into the directory the brief names, `git commit -F` — and checks the subject, no trailer, and a clean checkout, where it
+  used to pin git's default subject. `agents-before-after.test.ts` holds every resolved key and the same eight moved bodies: the four ship
+  bodies were already among them.
+
+What it leaves: nothing refuses a bare default message; this is prose. The cheapest refusal is where a settled `workspace: main` step's
+closeout is read as `done` (`isShipped` and the ending's decision): a merge commit on the base with the result branch as a parent whose
+subject matches `^Merge branch '` reads as not signed off well — a finding for the person, not a revert.
 
 ## Shipped: agents on the board — a page that lists them, and a form for one
 

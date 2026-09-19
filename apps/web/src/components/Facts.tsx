@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import type { RunDetail, StepCheck, StepFiled, StepLog, StepSpec } from '../lib/api';
+import type { PeakMark, RunDetail, StepCheck, StepFiled, StepLog, StepSpec, StepUsed } from '../lib/api';
 import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
 
@@ -110,6 +110,55 @@ export function spentRows(step: Priced): Array<[string, ReactNode]> {
   const over = pastBudget(step);
   return [['spent', <span data-spent={over ? 'over' : 'within'} className={`font-mono text-xs ${over ? 'font-semibold text-red-700 dark:text-red-400' : ''}`}>{text}</span>]];
 }
+
+/**
+ * A `read` row for `Facts`, beside a step's `cost`: what its sessions read, by price, in `wf decide`'s words, where anything measured it.
+ * None where nothing did — a runner that counted its input as one number has nothing to say here, which is not 0.
+ */
+export function readRows(used: StepUsed | null | undefined): Array<[string, ReactNode]> {
+  return used?.read ? [['read', <Read said={used.read} peak={used.peak} rebuilt={used.rebuilt} />]] : [];
+}
+
+const WARN = 'text-amber-700 dark:text-amber-400';
+
+/**
+ * What sessions read, by price: the counts — `read 21.4M · wrote 412k · peak 167k` — and, beneath, a resumed session that wrote its
+ * context to the cache again. The peak is marked where it reached the step's `context:` cap or passed 200k with none, and so is the rebuild:
+ * each is a session that paid for a context it need not have carried, or carried again. The words are the package's (`readWords`).
+ */
+export function Read({ said, peak, rebuilt }: { said: string; peak: PeakMark; rebuilt: number }) {
+  const parts = said.split(' · ');
+  // The peak, or where no peak was measured, the compactions alone (`compacted at its 200k cap`), which are where it stands.
+  const counts = parts.filter((part) => /^(read|wrote|peak|compacted)\b/.test(part));
+  const rest = parts.filter((part) => !counts.includes(part));
+  return (
+    <span data-read className="block">
+      {counts.length > 0 && (
+        <span className="font-mono text-xs">
+          {counts.map((part, i) => (
+            <span key={part}>
+              {i > 0 && ' · '}
+              {/^(peak|compacted)\b/.test(part) && peak ? (
+                <span data-peak={peak} className={`font-semibold ${WARN}`} title={PEAK_TITLE[peak]}>{part}</span>
+              ) : (
+                part
+              )}
+            </span>
+          ))}
+        </span>
+      )}
+      {rebuilt > 0 && rest.map((part) => (
+        <span key={part} data-rebuilt={rebuilt} className={`block text-xs ${WARN}`} title={REBUILT_TITLE}>{part}</span>
+      ))}
+    </span>
+  );
+}
+
+const PEAK_TITLE: Record<Exclude<PeakMark, null>, string> = {
+  cap: "It reached the step's context: cap: Claude Code compacted the conversation, a summary in place of what it read, or was about to.",
+  large: 'Its context passed 200k tokens on a step with no context: cap. Every response reads all of it.',
+};
+const REBUILT_TITLE = 'A resumed session should read its context from the cache. It wrote it again instead, at twenty times the price of a read: the cache was rebuilt.';
 
 /**
  * The command a step is judged by, and once its check refused, what it exited with and the last lines of

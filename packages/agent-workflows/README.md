@@ -177,7 +177,8 @@ At `wf start` each node is resolved and frozen on the run, so a run never reads 
 anywhere: the agent's keys are the defaults, a key the step writes wins, and the refusals that depend on the harness
 read the merged keys and name the step. The brief is the agent's instructions, a blank line, then the step's own
 words. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
-case: no shipped step has one. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
+case: two shipped steps have one, the `ship` of `dev-build` and `dev-planned-build`, which tell the shipper why a build
+and an e2e matter on a merged tree. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
 set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
 `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its name alone.
 
@@ -1140,7 +1141,7 @@ screen shows what the branch touched, read out of git:
   implement
     check  npm test  →  exit 0 ✓
     used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s
-    cost  $3.01 · budget $5
+    cost  $3.01 · read 21.4M · wrote 412k · peak 167k · budget $5
     timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 turns · …  cost $3.01
               try 1 check  filed 08:19:56Z  spawned 08:19:57Z  ended 08:20:55Z  queued 1s  ran 58s
 
@@ -1172,7 +1173,17 @@ screen shows what the branch touched, read out of git:
   harness counted waiting on the model and running tools, once either was measured (`api 8m06s · tools 2s`).
   The cost is the harness's own figure, to the cent (three figures under one); for a step whose tries ran more
   than one session, also what they cost together (`$1.19 this try · $4.20 over 3 tries`); then the cap in force
-  (`· budget $5`). After the steps, the run's (`cost  run $12.40`): every step's tries together, saying how many
+  (`· budget $5`). Between the two, what the try's sessions read, by price, where the harness counted it
+  (the engine's *What a session read, by price*): tokens read from the cache (`read 21.4M`, the cheapest input)
+  and written to it (`wrote 412k`, twenty times dearer a token), and the largest context any one response read (`peak 167k`),
+  marked where it reached the step's `context:` cap (`, at its 200k cap`) or passed 200k with no cap
+  (`, past 200k with no cap`). A session that compacted reached its cap, though Claude Code compacts well short of it —
+  173,584 tokens under a 200k one — and the line says how often (`peak 174k, compacted twice at its 200k cap`). A resumed
+  attempt whose first response wrote more than half the context it read to the cache rebuilt the cache it should have
+  read, and the line says so (`a resumed session wrote its context to the cache again instead of reading it`): its first
+  response, since a continuation's writes over all its responses grow with its work.
+  An attempt that measured none of it says nothing, and nothing here is priced: the cost is still the harness's.
+  After the steps, the run's (`cost  run $12.40`): every step's tries together, saying how many
   ended attempts had no cost on them.
 - **timeline** is where the step's time went (`timeline` in `src/run.ts`, pure): a row for each try's
   session and each try's check, in UTC — filed, spawned, ended; *queued*, filed → spawned, which is the wait
@@ -1223,7 +1234,9 @@ dropped. **Nothing in the packages knows what shipping means.**
   load, on a step anything waits on or one that ends a workflow beside another: a run has one ending. A run of
   such a folder started `--no-worktree` is refused too: it has no result branch to merge.
   Its brief carries one way of handing a file over rather than the usual two: what it leaves in that checkout is collected by nobody, so
-  it is told the run's artifacts directory, and that the checkout is to be left as it was found.
+  it is told the run's artifacts directory, and that the checkout is to be left as it was found. The shipped shipper
+  (`workflows/agents/shipper.md`) writes its merge message there and commits it with `git commit -F`: a subject of what
+  shipped, the run's own title, and a short body read off `git log` and `git diff --stat` — never git's `Merge branch '…'`.
 - **The gate is the decision, and it holds before the step is filed.** A gate holds what its approval decides.
   Where steps follow, that is the handoff, and the step runs first — a person reads what it produced. An
   ending step in the checkout produces nothing to read: it acts, where nothing can be taken back. So a gated

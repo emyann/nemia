@@ -730,8 +730,8 @@ and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 
 ## What an attempt consumed
 
-Every attempt records `usage` — `{ turns?, toolCalls?, inputTokens?, outputTokens?, costUsd?, apiMs?, toolMs?,
-unpricedModel? }` — and `exitCode`, copied from the sighting that ended it, or, for what a harness writes only as its
+Every attempt records `usage` — `{ turns?, toolCalls?, inputTokens?, uncachedTokens?, cacheWriteTokens?, cacheReadTokens?,
+peakContextTokens?, firstContextTokens?, firstCacheWriteTokens?, compactions?, outputTokens?, costUsd?, apiMs?, toolMs?, unpricedModel? }` — and `exitCode`, copied from the sighting that ended it, or, for what a harness writes only as its
 session exits, read once the session was let go (`measured`, below). **Each is `null` when nothing measured it,
 never `0`**: a zero that means "nobody counted" reads as "cost nothing". A count its runner could not
 see is absent from `usage` in the same way, and `ae show` names it not measured. `decide` reads neither.
@@ -740,10 +740,10 @@ An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of it
 
 | runner | `usage` | `exitCode` |
 |---|---|---|
-| `claude` | from the transcript it already reads: responses, tool calls and tokens since the session's own start; its cost, API time and tool time from the `cost-state` Claude Code writes as the session's process exits, read once the engine has let it go | `null` — the process is the harness's |
-| `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens from `turn.completed`; no turns — a Codex turn is a prompt, not a model response — and no cost: the stream carries none (seventeen runs of codex-cli 0.154.0 read) | the worker's record of the process |
-| `claude-detached` | its cost and API time, from the result `claude -p` prints (`total_cost_usd`, `duration_api_ms`); no turns, tokens or tool calls ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
-| `sdkRunner()` | from the SDK's result message, cost included when the SDK gives one | `null` |
+| `claude` | from the transcript it already reads: responses, tool calls, tokens in their three classes and the peak context since the session's own start; its cost, API time and tool time from the `cost-state` Claude Code writes as the session's process exits, read once the engine has let it go | `null` — the process is the harness's |
+| `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens and their classes from `turn.completed`; no peak, no turns — a Codex turn is a prompt, not a model response — and no cost: the stream carries none (seventeen runs of codex-cli 0.154.0 read) | the worker's record of the process |
+| `claude-detached` | its cost and API time, from the result `claude -p` prints (`total_cost_usd`, `duration_api_ms`), and its tokens in their classes from the same result's `usage`; no peak, turns or tool calls ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
+| `sdkRunner()` | from the SDK's result message: tokens, their classes when it gives all three, and cost when it gives one; no peak | `null` |
 
 **What a session cost is the harness's figure, never a price worked out here.** Claude Code writes it into a `--bg`
 session's transcript as a `cost-state` line — `totalCostUSD`, `totalAPIDuration`, `totalToolDuration`, `startTime`,
@@ -765,6 +765,46 @@ attempt's. No cost is given, rather than a wrong one: while no line has been wri
 count was carried on from a total the transcript does not show; and, for `costUsd` alone, when Claude Code could not price
 a model the session used — `unpricedModel: true`, since a total too low reads as the whole.
 
+**What a session read, by price.** Measured over 234 worker sessions on 2026-09-18: 96.9% of input tokens were read
+from the cache, 3.1% written to it, almost none uncached — a read priced $0.50 a million and a write $10, a
+twenty-fold spread that `inputTokens` adds into one number. So an attempt records its input in its three classes as its
+runner measured them, and `inputTokens` stays their sum, so a journal written before they were still folds:
+
+| field | Claude Code's count | `claude --bg` (transcript) | `claude -p` (result) | `codex exec` (stream) |
+|---|---|---|---|---|
+| `cacheReadTokens` | `cache_read_input_tokens` | each response's, summed | its `usage`'s | `cached_input_tokens` |
+| `cacheWriteTokens` | `cache_creation_input_tokens` | each response's, summed | its `usage`'s | `cache_write_input_tokens`: 0 in every run |
+| `uncachedTokens` | `input_tokens` | each response's, summed | its `usage`'s | `input_tokens` less the cached |
+| `peakContextTokens` | the three on one response | the largest response, or compaction | **absent** | **absent** |
+| `firstContextTokens`, `firstCacheWriteTokens` | the first response's | its first response's three, and its write | **absent** | **absent** |
+| `compactions` | `compact_boundary` lines | the attempt's own, absent when none | **absent** | **absent** |
+
+Measured by running each on this machine, 2026-09-19. `claude -p` (2.1.278) prints its session's totals in `usage` —
+the process's own, for a `--resume` too — and in `usage.iterations` the last response alone, which is not the largest: no
+peak. `codex exec` (0.154.0) counts `cached_input_tokens` inside `input_tokens`, and a `turn.completed` totals a prompt's
+responses: no peak, though its rollout's `token_count` events carry each response's, unread. A class a runner cannot see
+is absent, never 0, and a Codex turn whose cache writes are not 0 gives no input count at all, as before.
+
+**How large a session's context got** is `peakContextTokens`: the largest input — the three classes together — any one
+of the attempt's responses read. A compaction's summary call writes no response line, and Claude Code writes the context
+it summarised on the boundary (`compactMetadata.preTokens`, at or a few thousand past the last response before it on 25
+boundaries read), so that counts as one. It is what a task's `contextTokens` caps: the median worker of 2026-09-18
+peaked at 173k tokens and the largest at 831k. It does not say a session reached its window: Claude Code compacts well
+short of it — at 173,584 and 173,254 tokens under `--autocompact 200000`, and 63k to 84k under 100k (open issue 26) —
+and a compaction's context is the peak. So an attempt counts its own compactions, `compactions`, and that is what says it
+got there.
+
+**A resumed attempt's numbers are its own**, as its cost is: its classes and its peak are counted over its own lines.
+Its first response reads its parent's whole conversation, so its peak starts where its parent ended, and nothing is
+taken off it — that is the context it carried. That first response is kept apart, `firstContextTokens` and
+`firstCacheWriteTokens`: a continuation whose cache still holds its parent's conversation reads it there and writes only
+what is new, and one whose cache missed writes the whole of it again, at twenty times a read — 43 did on 2026-09-18, 200k
+to 640k tokens each, and one number hid it for a week. The attempt's writes in all cannot tell them apart: a warm
+continuation that grows from 60k to 150k writes some 90k over its responses. The engine records the counts; the reading
+is a caller's (`wf`, the board).
+
+**None of it is priced here.** `costUsd` is the harness's own figure; the engine turns no token into a dollar.
+
 Two measured traps shape the transcript count. A response is written as one line per content block,
 each repeating its message id and usage, so responses are counted once, by id. And a resumed
 transcript holds its parent's conversation with the parent's timestamps, so only what came after
@@ -772,10 +812,10 @@ the session's `startedAt` in `claude agents --json` is counted; a row with no st
 usage rather than a wrong one. A count read from a finished session is kept as its statement is: for
 that start, while the transcript is unchanged. `ae show` prints one line per attempt — when it ran, then what it
 consumed, naming what was not measured, and its cost to the cent (`<$0.01` under one: `$0.00` would read as free) — and an
-attempt still running as `running since <start>`. `ae ls` prints the latest attempt's cost beside its turns, `$3.01 · 12t`:
+attempt still running as `running since <start>`. After the cost, what the attempt read by class and its peak context, each named not measured where its runner could not see it. `ae ls` prints the latest attempt's cost beside its turns, `$3.01 · 12t`:
 
 ```
-attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · $4.87
+attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · $4.87 · read <r> · wrote <w> · uncached <u> · peak <p>
 attempt 2  failed  09:05:02 → 09:05:40 (38s)  exit 1  usage not measured
 attempt 3  failed (budget)  09:05:41 → 09:05:44 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02
 ```
@@ -789,7 +829,7 @@ them, so whether `input_tokens` counts it is unknown, and a stream where it is n
 count:
 
 ```
-attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  turns not measured · <calls> tool calls · <in> in · <out> out · cost not measured
+attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  turns not measured · <calls> tool calls · <in> in · <out> out · cost not measured · read <r> · wrote 0 · uncached <u> · peak not measured
 ```
 
 ## Following a session: `transcript`

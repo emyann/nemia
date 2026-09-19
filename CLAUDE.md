@@ -130,10 +130,22 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **A shipped folder is not whole without `workflows/agents/`.** Every shipped step but the supervisor's names an agent there, so a
+  test that copies a folder (`cpSync(SHIPPED/dev, …)`) copies `agents/` beside it, or the load refuses `agent: implementer` as not
+  there. The package's `workflows/ui` copy has its two agents in the package's `workflows/agents`, held byte for byte by the ui copy
+  test: a change to `ui-implementer.md` or `ui-reviewer.md` is copied there too (learned by the run that put the roles in `agents/`).
+- **The board's listing of a step is resolved; its file is not.** `spec` holds the agent's keys merged in, so a PUT that sends `spec`
+  alone writes every one of them into the step file, and `renderStep` of an edited resolved step writes any inherited key whose value
+  moved off the agent's (`given`). A step's own keys and note travel as `own` (`ListedStep.own`), and the builder writes those (same run).
 - **A step key read into another form is shown as the package writes it.** `context: 200k` is read into `200000`, and the step
   page's key rows (`keyValue` in `apps/api/src/workflows.ts`) printed the number, which the e2e refuses as not what the file says.
   A key the parser converts gets its written form there and in `renderStep` (`contextText`), one function for both (learned by the
   run that added `context:`).
+- **Code outside the package that reads a step's frontmatter reads it as the parser does.** `readKeys` trims each line and each key,
+  so `  agent: coder` and `agent : coder` name an agent; the builder's `versionOf` matched `^agent:` and missed both, so an edit of that
+  agent's file never moved the folder's version. Read the block through `splitFrontmatter` and trim as `readKeys` does, and version what
+  the key names in turn (the agent's `output:` schema; `frontmatterValue` in `apps/api/src/workflows.ts`, learned by the run that put the
+  roles in `agents/`, round 2).
 - **`execFileSync` with no `stdio` writes the child's stderr on yours.** It captures stderr for the error's message *and*
   copies it to `process.stderr`, so a command that fails on every pass of a loop prints git's words on every pass, beside
   the line the loop says itself. Pass `stdio: ['ignore', 'pipe', 'pipe']`: the error's message keeps them (`git` in

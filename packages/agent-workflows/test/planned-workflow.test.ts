@@ -103,12 +103,13 @@ test("plan's brief says when to sign off done and when blocked with the question
 });
 
 test("implement is dev's, after the plan and reading it: the plan reaches it under `## From plan`, as data, and never plan's summary — review is dev's, file for file", () => {
-  const { after, input, body, ...keys } = steps.implement!;
-  const { after: _after, input: _input, body: devBody, ...devKeys } = dev.implement!;
+  const { after, input, body, agent, ...keys } = steps.implement!;
+  const { after: _after, input: _input, body: devBody, agent: devAgent, ...devKeys } = dev.implement!;
   assert.deepEqual([after, input], [['plan'], ['plan']]);
   assert.deepEqual(keys, devKeys, "harness, model, check and disallow as dev's");
+  assert.deepEqual([agent?.name, devAgent?.name], ['implementer', 'implementer'], 'the same agent does the work');
   for (const paragraph of devBody.split('\n\n')) assert.ok(said(body).includes(said(paragraph)), paragraph);
-  for (const file of ['review.md', 'review.schema.json', 'ship.md']) {
+  for (const file of ['review.md', 'ship.md']) {
     assert.equal(fs.readFileSync(path.join(PLANNED, file), 'utf8'), fs.readFileSync(path.join(DEV, file), 'utf8'), file);
   }
 

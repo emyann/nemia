@@ -471,7 +471,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const how = startHow(rest.slice(1));
       const printStarted = (run: ReturnType<typeof start>, from?: string) => {
         const steps = stepsOf(run);
-        console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.name).join(' → ')}`);
+        // Each node with what is attached to it: `review (reviewer)`. A node with no agent is its name alone.
+        console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.agent ? `${s.name} (${s.agent.name})` : s.name).join(' → ')}`);
         if (from) console.log(from);
         console.log(`workspace: ${run.workspace}`);
         if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);

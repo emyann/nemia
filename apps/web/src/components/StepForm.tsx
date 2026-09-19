@@ -18,6 +18,10 @@ const PASTE = '(paste)';
  * the package's line of what it means — drawn by kind, so a key the package adds is drawn once the api says how it is set. Every change is
  * made to the draft at once; nothing is judged here that the package judges on save, and a refusal of the last save for this step is shown
  * above its fields.
+ *
+ * A step with an agent (`agent:`) is edited as its file is written: the text is its own note, which follows the agent's instructions, and a
+ * key the agent gives it shows the agent's value in place of none — set, it is the step's own; unset, the agent's again. Its agent's file
+ * is not edited here.
  */
 export function StepForm({ step, steps, form, schemas, refused, update, onRemoved }: {
   step: DraftStep;
@@ -59,12 +63,18 @@ export function StepForm({ step, steps, form, schemas, refused, update, onRemove
 
       <div className="space-y-1">
         <label htmlFor={body} className="block text-xs font-medium">
-          What its agent is told
+          {step.own ? 'Its own note' : 'What its agent is told'}
         </label>
+        {step.own && (
+          <p data-agent-note className="text-[11px] leading-snug text-neutral-500 dark:text-neutral-400">
+            Told after <span className="font-mono">{step.spec.agent}</span>'s instructions, <span className="font-mono">agents/{step.spec.agent}.md</span>.
+          </p>
+        )}
         <textarea
           id={body}
-          value={step.body}
+          value={step.own ? step.own.body : step.body}
           rows={5}
+          placeholder={step.own ? `Nothing of its own: ${step.spec.agent}'s instructions are all it is told.` : undefined}
           onChange={(event) => update((all) => setBody(all, step.name, event.target.value))}
           className={`${INPUT} resize-y`}
         />
@@ -88,8 +98,11 @@ function KeyInput({ field, step, others, form, schemas, update }: {
 }) {
   const id = useId();
   const { key, kind, meaning } = field;
-  const value = step.spec[key];
-  const set = <K extends keyof WorkflowStepSpec>(k: K, v: WorkflowStepSpec[K]) => update((all) => setKey(all, step.name, k, v));
+  // A key the step's agent gives it is shown as the agent's, in place of none: the field is empty until the step sets it itself.
+  const inherited = step.own !== null && form.roleKeys.includes(key) && !step.own.keys.includes(key);
+  const value = inherited ? (Array.isArray(step.spec[key]) ? [] : null) : step.spec[key];
+  const given = inherited ? givenText(key, step.spec[key], step.spec.agent) : null;
+  const set = <K extends keyof WorkflowStepSpec>(k: K, v: WorkflowStepSpec[K]) => update((all) => setKey(all, step.name, k, v, form));
   const harness = step.spec.harness ?? form.defaultHarness;
 
   let control: ReactNode;
@@ -127,7 +140,14 @@ function KeyInput({ field, step, others, form, schemas, update }: {
       break;
     case 'choice':
       control = (
-        <Choose id={id} value={(value as string | null) ?? ''} onChange={(v) => set(key, (v || null) as never)} options={field.choices ?? []} unset={`not set — ${form.defaultHarness}`} />
+        <Choose
+          id={id}
+          value={(value as string | null) ?? ''}
+          onChange={(v) => set(key, (v || null) as never)}
+          options={field.choices ?? []}
+          unset={given ?? (key === 'agent' ? 'no agent' : `not set — ${form.defaultHarness}`)}
+          stray={key === 'agent' ? (v) => `${v} — not in agents/` : undefined}
+        />
       );
       break;
     case 'harness-word':
@@ -137,14 +157,14 @@ function KeyInput({ field, step, others, form, schemas, update }: {
           value={(value as string | null) ?? ''}
           onChange={(v) => set(key, (v || null) as never)}
           options={field.byHarness?.[harness] ?? []}
-          unset={`not set — ${harness}'s own`}
+          unset={given ?? `not set — ${harness}'s own`}
           stray={(v) => `${v} — not a word ${harness} takes`}
         />
       );
       break;
     case 'text':
       control = (
-        <Typed id={id} value={(value as string | null) ?? ''} mono={key === 'check'} canon={(typed) => typed.trim()} commit={(typed) => set(key, (typed.trim() || null) as never)} />
+        <Typed id={id} value={(value as string | null) ?? ''} mono={key === 'check'} placeholder={given ?? undefined} canon={(typed) => typed.trim()} commit={(typed) => set(key, (typed.trim() || null) as never)} />
       );
       break;
     case 'list': {
@@ -154,7 +174,7 @@ function KeyInput({ field, step, others, form, schemas, update }: {
           id={id}
           mono
           value={listed ? listed.join(', ') : ''}
-          placeholder={key === 'tools' ? "the harness's own set" : 'nothing denied'}
+          placeholder={given ?? (key === 'tools' ? "the harness's own set" : 'nothing denied')}
           canon={(typed) => listOf(typed).join(', ')}
           // No tools typed is no `tools:` line, the harness's own set; no rule typed denies nothing. A list of commas the package refuses.
           commit={(typed) => set(key, (key === 'tools' && !typed.trim() ? null : listOf(typed)) as never)}
@@ -170,6 +190,7 @@ function KeyInput({ field, step, others, form, schemas, update }: {
           type="number"
           step={kind === 'dollars' ? '0.01' : '1'}
           value={value === null ? '' : String(value)}
+          placeholder={given ?? undefined}
           canon={(typed) => String(numberOf(typed) ?? '')}
           commit={(typed) => set(key, numberOf(typed) as never)}
         />
@@ -183,7 +204,7 @@ function KeyInput({ field, step, others, form, schemas, update }: {
           id={id}
           mono
           value={tokens === null ? '' : contextText(tokens)}
-          placeholder="the model's whole window"
+          placeholder={given ?? "the model's whole window"}
           canon={(typed) => { const n = tokensOf(typed); return n === null ? '' : contextText(n); }}
           commit={(typed) => set(key, tokensOf(typed) as never)}
         />
@@ -197,11 +218,11 @@ function KeyInput({ field, step, others, form, schemas, update }: {
           <span className="font-mono">{key}: {field.choices![0]}</span>
         </label>
       ) : (
-        <Choose id={id} value={value === null ? '' : String(value)} onChange={(v) => set(key, (v === '' ? null : v === 'true') as never)} options={field.choices ?? []} unset="not set" />
+        <Choose id={id} value={value === null ? '' : String(value)} onChange={(v) => set(key, (v === '' ? null : v === 'true') as never)} options={field.choices ?? []} unset={given ?? 'not set'} />
       );
       break;
     case 'schema':
-      control = <SchemaInput id={id} step={step} schemas={schemas} update={update} />;
+      control = <SchemaInput form={form} id={id} step={step} schemas={schemas} update={update} given={given} />;
       break;
   }
 
@@ -214,6 +235,13 @@ function KeyInput({ field, step, others, form, schemas, update }: {
       <Meaning>{meaning}</Meaning>
     </div>
   );
+}
+
+/** A value a step's agent gives it, as its field shows it in place of none: `opus — implementer's`, or that the agent sets none either. */
+function givenText(key: keyof WorkflowStepSpec, value: WorkflowStepSpec[keyof WorkflowStepSpec], agent: string | null): string {
+  if (value === null || (Array.isArray(value) && !value.length)) return `not set — nor by ${agent}`;
+  const text = Array.isArray(value) ? value.join(', ') : key === 'context' && typeof value === 'number' ? contextText(value) : String(value);
+  return `${text} — ${agent}'s`;
 }
 
 function Meaning({ children }: { children: string }) {
@@ -279,11 +307,11 @@ function Typed({ id, value, commit, canon, mono = false, type = 'text', step, pl
  * `output:`: a schema beside the step, picked from the folder's — or pasted, with the file it is written to, which is written when the draft is
  * saved and replaces a file of that name. Picking a file or none takes a paste back.
  */
-function SchemaInput({ id, step, schemas, update }: { id: string; step: DraftStep; schemas: readonly string[]; update: DraftUpdate }) {
+function SchemaInput({ id, step, form, schemas, update, given }: { id: string; step: DraftStep; form: KeyForm; schemas: readonly string[]; update: DraftUpdate; given: string | null }) {
   const text = useId();
   const file = useId();
   const pasted = step.schema;
-  const value = pasted ? PASTE : step.spec.output ?? '';
+  const value = pasted ? PASTE : given !== null ? '' : step.spec.output ?? '';
 
   return (
     <div className="space-y-1.5">
@@ -295,13 +323,13 @@ function SchemaInput({ id, step, schemas, update }: { id: string; step: DraftSte
           update((all) =>
             picked === PASTE
               ? setSchema(all, step.name, { file: `${step.name}.schema.json`, text: '' })
-              : setKey(setSchema(all, step.name, null), step.name, 'output', picked || null),
+              : setKey(setSchema(all, step.name, null), step.name, 'output', picked || null, form),
           );
         }}
         className={INPUT}
       >
-        <option value="">not set</option>
-        {step.spec.output && !pasted && !schemas.includes(step.spec.output) && <option value={step.spec.output}>{step.spec.output} — not in the folder</option>}
+        <option value="">{given ?? 'not set'}</option>
+        {step.spec.output && !pasted && given === null && !schemas.includes(step.spec.output) && <option value={step.spec.output}>{step.spec.output} — not in the folder</option>}
         {schemas.map((schema) => (
           <option key={schema} value={schema}>
             {schema}

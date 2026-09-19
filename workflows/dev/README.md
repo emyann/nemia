@@ -29,8 +29,11 @@ trial merge `git merge --no-ff --no-commit`, this folder's check, `git commit`, 
 failure, with what happened in its closeout. It carries implement's denies and no `check:` of its own: the run
 would execute one in a person's checkout, and what this step is judged by is the check it runs itself.
 
-`review.md` is the package's reviewer (`packages/agent-workflows/workflows/review.md`) moved onto
-Claude, with the paragraph saying which commands it may run; `review.schema.json` is the package's.
+Each step names who does it — `implementer`, `reviewer`, `shipper`, in `workflows/agents/` — and keeps only its
+wiring: the keys above that are a role's (harness, model, tools, denies, the schema) are the agent's, and the step
+files say `after`, `check`, `loop`, `budget`, `workspace` and `gate`. The reviewer is the package's
+(`packages/agent-workflows/workflows/review.md`) moved onto Claude, with the paragraph saying which commands it may run;
+`review.schema.json` is the package's, beside the reviewer in `agents/`.
 
 ```bash
 wf start "<what to do>" --workflows workflows/dev

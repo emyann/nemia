@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { contextText, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, agentsDir, contextText, loadWorkflows, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -44,6 +44,8 @@ export type WorkflowStepSpec = {
   workspace: 'main' | null;
   /** `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can say. */
   slot: 'none' | null;
+  /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
+  agent: string | null;
   permissionMode: string | null;
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallow:`): empty where the step denies nothing. */
@@ -86,8 +88,15 @@ export type WorkflowListing = {
   error: string | null;
 };
 
-/** A step as a workflow's listing has it, and as the builder takes it back. */
-export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string };
+/**
+ * A step as a workflow's listing has it, and as the builder takes it back. `spec` and `body` are the step resolved, what a run of it would
+ * be; for a step with an agent, `own` is what its file sets itself — the keys (the rest are its agent's) and its own note, which follows
+ * the agent's instructions in `body`. Null for a step with no agent, whose file is all of it.
+ */
+export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null };
+
+/** What a step with an agent sets itself: the keys its file writes, and its own note (empty where the agent's instructions are all of it). */
+export type StepOwn = { keys: StepKey[]; body: string };
 
 /**
  * One key of a file, as a card's or a step's page lays them out: the key, its value as the package read it — null where the file does not
@@ -107,7 +116,7 @@ export type WorkflowStepPage = { workflow: string; from: WorkflowSource; dir: st
  * `renderStep` writes it), `output:` as the file it names, and null for none.
  */
 function keyValue(step: Workflow, key: StepKey): string | null {
-  const value = key === 'output' ? step.output?.file : step[key];
+  const value = key === 'output' ? step.output?.file : key === 'agent' ? step.agent?.name : step[key];
   if (value === undefined) return null;
   if (key === 'context' && typeof value === 'number') return contextText(value);
   if (Array.isArray(value)) return value.length ? value.join(', ') : null;
@@ -139,15 +148,25 @@ export function listed(name: string, from: WorkflowSource, dir: string): Workflo
   } catch (err) {
     return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, version, error: messageOf(err) };
   }
-  return { name, from, dir, description, steps: steps.map((step) => ({ name: step.name, spec: specOf(step), body: step.body })), graph: graphOf(steps), schemas, version, error: null };
+  return { name, from, dir, description, steps: steps.map(listedStep), graph: graphOf(steps), schemas, version, error: null };
 }
+
+/** A step as the listing has it: resolved, and what its file sets itself where an agent gives it the rest. */
+const listedStep = (step: Workflow): ListedStep => ({
+  name: step.name,
+  spec: specOf(step),
+  body: step.body,
+  own: step.agent ? { keys: step.agent.keys.filter((key) => key !== 'agent'), body: step.agent.body } : null,
+});
 
 /**
  * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what a
  * save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and `writeWorkflow`
  * removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or removed changes it,
  * and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as what it says, so it
- * changes the word too.
+ * changes the word too. So does each agent a step names (`agent:`), its file in `agents/` beside the folder, and the schema that agent's
+ * `output:` names beside it: what the board shows a step with an agent is the agent's keys, words and declared fields as much as the step's,
+ * and an agent edited since is a step the board no longer shows as it is.
  */
 export function versionOf(dir: string): string {
   let names: string[];
@@ -156,14 +175,43 @@ export function versionOf(dir: string): string {
   } catch {
     names = [];
   }
-  const files = names.map((name) => {
+  const read = (file: string): string | { unreadable: string } => {
     try {
-      return [name, fs.readFileSync(path.join(dir, name), 'utf8')];
+      return fs.readFileSync(file, 'utf8');
     } catch (err) {
-      return [name, { unreadable: messageOf(err) }];
+      return { unreadable: messageOf(err) };
     }
+  };
+  const files = names.map((name) => [name, read(path.join(dir, name))] as const);
+  const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? frontmatterValue(text, 'agent') : [])))].sort();
+  const agents = named.flatMap((agent) => {
+    const text = read(path.join(agentsDir(dir), `${agent}.md`));
+    const schemas = typeof text === 'string' ? frontmatterValue(text, 'output') : [];
+    return [[`${AGENTS_FOLDER}/${agent}.md`, text], ...schemas.map((schema) => [`${AGENTS_FOLDER}/${schema}`, read(path.resolve(agentsDir(dir), schema))])];
   });
-  return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
+  return createHash('sha256').update(JSON.stringify([...files, ...agents])).digest('hex').slice(0, 16);
+}
+
+/**
+ * The value a file's frontmatter gives `key`, read as the parser reads it — each line trimmed, the key trimmed before its colon — so
+ * `  agent: coder` and `agent : coder` name the agent they load with. None for a file with no such line, or whose frontmatter never
+ * closes (the load refuses it). A name with a slash names no file of agents/.
+ */
+function frontmatterValue(text: string, key: 'agent' | 'output'): string[] {
+  let block: string | null;
+  try {
+    block = splitFrontmatter('', text).block;
+  } catch {
+    return [];
+  }
+  for (const raw of (block ?? '').split('\n')) {
+    const line = raw.trim();
+    const i = line.indexOf(':');
+    if (line.startsWith('#') || i <= 0 || line.slice(0, i).trim() !== key) continue;
+    const value = line.slice(i + 1).trim();
+    return value && (key === 'output' || !/[\\/]/.test(value)) ? [value] : [];
+  }
+  return [];
 }
 
 /** The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed. */
@@ -175,7 +223,7 @@ function schemasIn(dir: string): string[] {
   }
 }
 
-const specOf = (step: Workflow): WorkflowStepSpec => ({
+export const specOf = (step: Workflow): WorkflowStepSpec => ({
   harness: step.harness ?? null,
   model: step.model ?? null,
   effort: step.effort ?? null,
@@ -185,6 +233,7 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
   input: step.input ?? [],
   workspace: step.workspace ?? null,
   slot: step.slot ?? null,
+  agent: step.agent?.name ?? null,
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,
   disallow: step.disallow ?? [],
@@ -203,7 +252,7 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
 /**
  * The folders directly in `dir`, sorted, a link to one included. None when `dir` is not there. A hidden folder is not a
  * workflow — `.git`, where a person keeps their workflows in git, or an editor's `.vscode` — so it is not listed, and no start
- * can name it.
+ * can name it; nor is `agents/`, whose files are the agents the workflows beside it name.
  */
 export function foldersIn(dir: string): string[] {
   let names: string[];
@@ -214,7 +263,7 @@ export function foldersIn(dir: string): string[] {
     throw new Error(`${dir} could not be listed (${messageOf(err)}), so no workflow in it is shown. Check its permissions.`);
   }
   return names.filter((name) => {
-    if (name.startsWith('.')) return false;
+    if (name.startsWith('.') || name === AGENTS_FOLDER) return false;
     try {
       return fs.statSync(path.join(dir, name)).isDirectory();
     } catch {

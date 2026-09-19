@@ -22,9 +22,10 @@ const { app } = await import('../src/app.ts');
 const { DEFAULT_HARNESS, putSchemasBack, stepsNamed } = await import('../src/builder.ts');
 const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { writeWorkflow } = await import('agent-workflows');
-const { EFFORTS, HARNESSES, loadWorkflows, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-workflows/workflow');
+const { AGENT_KEYS, EFFORTS, HARNESSES, loadWorkflows, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-workflows/workflow');
 type KeyForm = import('../src/builder.ts').KeyForm;
 type WorkflowSaved = import('../src/builder.ts').WorkflowSaved;
+type BuildRefused = import('../src/builder.ts').BuildRefused;
 type ListedStep = import('../src/workflows.ts').ListedStep;
 type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
 
@@ -44,10 +45,11 @@ const snapshot = (dir: string): Record<string, string> =>
     ? Object.fromEntries(fs.readdirSync(dir).sort().map((f) => [f, fs.statSync(path.join(dir, f)).isDirectory() ? '(a folder)' : fs.readFileSync(path.join(dir, f), 'utf8')]))
     : {});
 
-/** A copy of the repository's `dev` — README, schema, comments and `budget: 20` — as a workflow of yours named `name`. */
+/** A copy of the repository's `dev` — README, comments and `budget: 20` — as a workflow of yours named `name`, with the agents it names beside it. */
 function devIn(name: string): string {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });
+  fs.cpSync(path.join(SHIPPED, '..', 'agents'), path.join(STORE, 'agents'), { recursive: true });
   for (const file of fs.readdirSync(SHIPPED)) fs.copyFileSync(path.join(SHIPPED, file), path.join(dir, file));
   return dir;
 }
@@ -89,7 +91,7 @@ const post = (body: unknown, from = 'yours', headers: Record<string, string> = j
 
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -103,6 +105,20 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(form.keys.find((k) => k.key === 'harness')?.choices, HARNESSES);
   assert.deepEqual(form.keys.find((k) => k.key === 'effort')?.byHarness, EFFORTS);
   assert.deepEqual(form.keys.find((k) => k.key === 'permissionMode')?.byHarness, PERMISSION_MODES);
+  // The agent is picked from yours' agents/, and the keys a step takes from it are the package's agent keys but the description.
+  // Each that loads comes with its role values as a step's spec gives them — only those it sets — and one the load refuses is picked from
+  // all the same, with no values: a step saved naming it is refused in its words.
+  write(path.join(STORE, 'agents', 'picked.md'), '---\nmodel: opus\ncontext: 200k\ntools: Read, Grep\noutput: picked.schema.json\n---\nPick me.\n');
+  write(path.join(STORE, 'agents', 'picked.schema.json'), JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false }));
+  write(path.join(STORE, 'agents', 'broken.md'), '---\nloop: build\n---\nWired wrong.\n');
+  const withAgents = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
+  const agents = withAgents.keys.find((k) => k.key === 'agent');
+  assert.deepEqual([agents?.kind, agents?.choices?.includes('picked'), agents?.choices?.includes('broken')], ['choice', true, true]);
+  assert.deepEqual(agents?.choices, fs.readdirSync(path.join(STORE, 'agents')).filter((f) => f.endsWith('.md')).map((f) => f.slice(0, -3)).sort());
+  assert.deepEqual(withAgents.agents.picked, { model: 'opus', context: 200000, tools: ['Read', 'Grep'], output: 'picked.schema.json' });
+  assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
+  for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
+  assert.deepEqual(form.roleKeys, AGENT_KEYS.filter((k) => k !== 'description'));
 
   // The kinds held to the parser. A count is what the parser refuses as "not a count", and nothing else is: in a folder where every key can be
   // read — `b` waits on `a`, loops to it, and declares `again` — each key set to a word that is not a number.
@@ -145,6 +161,85 @@ test("PUT /api/workflows/yours/:name with a folder's steps as the listing has th
   assert.deepEqual([saved.written, saved.kept, saved.removed], [[], ['implement.md', 'review.md', 'ship.md'], []]);
   assert.deepEqual(snapshot(dir), before, 'byte for byte');
   assert.deepEqual(saved.workflow, listWorkflows(repo, root).find((w) => w.name === 'as-listed' && w.from === 'yours'), 'answered as the listing reads it');
+});
+
+/** A workflow of yours whose one step, `build`, has the agent `coder` (a name not its own), with a key and a note of its own. */
+function attached(name: string): string {
+  const dir = path.join(STORE, name);
+  write(path.join(STORE, 'agents', 'coder.md'), '---\nharness: claude\nmodel: opus\neffort: high\n---\nYou write code.\n');
+  write(path.join(dir, 'build.md'), '---\nagent: coder\ncheck: npm test\n---\nAnd mind the cache.\n');
+  return dir;
+}
+
+test("a step with an agent is listed resolved, with what its file sets itself (`own`), and put back as `agent`, its own keys and its own note — a key changed on the board is its own from then on", async () => {
+  const dir = attached('with-agent');
+  const [build] = await listedSteps('with-agent');
+  assert.deepEqual(build, {
+    name: 'build', spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
+    body: 'You write code.\n\nAnd mind the cache.', own: { keys: ['check'], body: 'And mind the cache.' },
+  });
+
+  // As listed: nothing written, the agent's keys and words left in its file.
+  let res = await put('with-agent', { steps: [build] });
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.deepEqual(((await res.json()) as WorkflowSaved).kept, ['build.md']);
+
+  // A key changed, which the board makes the node's own, and the note: written, and nothing else of the agent's.
+  const edited = { ...build!, spec: { ...build!.spec, effort: 'low' }, own: { keys: [...build!.own!.keys, 'effort'], body: 'And mind the index.' } };
+  res = await put('with-agent', { steps: [edited] });
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), '---\nagent: coder\neffort: low\ncheck: npm test\n---\nAnd mind the index.\n');
+  const [read] = await listedSteps('with-agent');
+  assert.deepEqual([read!.spec.model, read!.spec.effort, read!.body], ['opus', 'low', 'You write code.\n\nAnd mind the index.']);
+
+  // Sent without `own`, as a step drafted by hand: every key it sets is its own, and its body is its note.
+  res = await put('with-agent', { steps: [{ name: 'build', spec: { agent: 'coder', check: 'npm test' }, body: 'Mind nothing.' }] });
+  assert.equal(res.status, 200, await res.clone().text());
+  assert.equal(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), '---\nagent: coder\ncheck: npm test\n---\nMind nothing.\n');
+});
+
+test("REFUSED at shipped defaults: a step's `own` that is not the listing's shape is a 400 naming the step, and a step naming an agent agents/ does not have is the package's 422 — and nothing is written", async () => {
+  const dir = attached('own-refused');
+  const before = snapshot(dir);
+  for (const own of [{ keys: 'check', body: '' }, { keys: ['check'] }, 'check', { keys: [1], body: '' }]) {
+    const res = await put('own-refused', { steps: [{ name: 'build', spec: spec({ agent: 'coder' }), body: '', own }] });
+    assert.equal(res.status, 400, JSON.stringify(own));
+    const { error } = (await res.json()) as { error: string };
+    assert.ok(error.startsWith("PUT /api/workflows/yours/own-refused: step 1 (build)'s `own` is "), error);
+  }
+  const res = await put('own-refused', { steps: [{ name: 'build', spec: spec({ agent: 'coderr' }), body: '', own: { keys: [], body: '' } }] });
+  assert.equal(res.status, 422);
+  const refused = (await res.json()) as BuildRefused;
+  assert.ok(refused.error.startsWith('build: `agent: coderr` is not an agent here.'), refused.error);
+  assert.deepEqual(refused.steps, ['build']);
+  assert.deepEqual(snapshot(dir), before);
+});
+
+test("versionOf covers the agents a folder's steps name: an edit of one changes it, and an agent no step names does not", () => {
+  const dir = attached('versioned');
+  const at = versionOf(dir);
+  write(path.join(STORE, 'agents', 'unnamed.md'), '---\nmodel: sonnet\n---\nNobody names me.\n');
+  assert.equal(versionOf(dir), at, 'an agent no step names');
+  fs.appendFileSync(path.join(STORE, 'agents', 'coder.md'), 'Write tests first.\n');
+  assert.notEqual(versionOf(dir), at, 'the agent build names');
+  fs.rmSync(path.join(STORE, 'agents', 'unnamed.md'));
+});
+
+test("versionOf reads `agent:` as the parser does — indented, or with a space before its colon — and covers the schema the agent's output: names", () => {
+  for (const [folder, line] of [['indented', '  agent: critic'], ['spaced', 'agent : critic']] as const) {
+    const dir = path.join(STORE, `version-${folder}`);
+    write(path.join(STORE, 'agents', 'critic.md'), '---\nharness: claude\noutput: critique.schema.json\n---\nFind what is wrong.\n');
+    write(path.join(STORE, 'agents', 'critique.schema.json'), JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false }));
+    write(path.join(dir, 'judge.md'), `---\n${line}\n---\n`);
+    const listing = listWorkflows(repo, root).find((w) => w.name === `version-${folder}`);
+    assert.equal(listing?.steps[0]?.spec.agent, 'critic', `${folder}: the load reads the agent — ${JSON.stringify(listing?.error ?? listing)}`);
+    const at = versionOf(dir);
+    fs.appendFileSync(path.join(STORE, 'agents', 'critic.md'), 'Say where.\n');
+    assert.notEqual(versionOf(dir), at, `${folder}: an edit of the agent it names`);
+    const again = versionOf(dir);
+    write(path.join(STORE, 'agents', 'critique.schema.json'), JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' }, line: { type: 'number' } }, required: ['verdict', 'line'], additionalProperties: false }));
+    assert.notEqual(versionOf(dir), again, `${folder}: an edit of the schema its agent declares`);
+  }
 });
 
 test('PUT /api/workflows/yours/:name writes the folder the steps make — a step added, an edge drawn, a key set, a step gone, the README — and answers it read back from disk', async () => {
@@ -349,7 +444,7 @@ test("REFUSED at shipped defaults: a new folder whose name is not a folder's (40
   for (const [name, said] of [
     [undefined, /^A workflow has no name/], ['', /^A workflow has no name/], [42, /^A workflow has no name/], ['a/b', /a slash names a folder inside another/],
     ['..', /a folder whose name starts with a dot is hidden/], ['.hidden', /is hidden/], [' spaced ', /spaces around it/], ['tab\tbed', /control character/],
-    ['x'.repeat(256), /255 bytes/],
+    ['x'.repeat(256), /255 bytes/], ['agents', /agents\/ is the folder of the agents the workflows beside it name/],
   ] as const) {
     const res = await post({ name, step });
     assert.equal(res.status, 400, String(name));

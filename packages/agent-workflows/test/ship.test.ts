@@ -23,6 +23,8 @@ const { advance, approve, cancel, decide, forget, isShipped, list, readRun, retr
 const { main } = await import('../src/cli.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
+// The shipped agents, beside every folder this file makes under ROOT: the shipped ship.md names `agent: shipper`, and its recipe is there.
+fs.cpSync(path.join(REPO_ROOT, 'workflows', 'agents'), path.join(ROOT, 'agents'), { recursive: true });
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** A repository with one file committed on main. */
@@ -136,7 +138,7 @@ test('`wf start` on a folder with an ending says so: nothing of that step runs u
   const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
   try { await main(['start', 'add sub', '--repo', repo, '--workflows', folder()], {} as Engine); } finally { log.mock.restore(); }
   const id = printed[0]!.split(' ')[0]!;
-  assert.equal(printed[0], `${id}  2 step(s): implement → ship`);
+  assert.equal(printed[0], `${id}  2 step(s): implement → ship (shipper)`, "the shipped ship.md names its agent");
   assert.ok(printed.includes(`ends at: ship — nothing of it runs until wf approve ${id} ship, which is what files it`), printed.join('\n'));
   assert.ok(!printed.some((l) => l.startsWith('gated at:')), 'an ending is not a handoff waiting to be let through');
 });

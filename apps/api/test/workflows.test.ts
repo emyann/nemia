@@ -53,6 +53,8 @@ write(path.join(repo, 'workflows', 'NOTES.txt'), 'Ideas for workflows.\n');
 // Hidden, so not a workflow either: an editor's folder, and one that even has a step in it.
 write(path.join(repo, 'workflows', '.vscode', 'settings.json'), '{}\n');
 write(path.join(repo, 'workflows', '.draft', 'implement.md'), 'Implement it.\n');
+// The agents the workflows beside it name: files that look like steps, and not a workflow.
+write(path.join(repo, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nImplement what you are asked.\n');
 
 /** Yours, in the store: one step, and no README — kept in git, as a person's own workflows may be. */
 const mine = path.join(root, 'workflows', 'mine');
@@ -61,7 +63,7 @@ write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields`. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -99,8 +101,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       name: 'good', from: 'repo', dir: good, description: 'Implement it, then review it, two rounds at most.',
       // The README is not among the steps.
       steps: [
-        { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check: 'npm test' }), body: 'Implement it.' },
-        { name: 'review', spec: spec({ harness: 'claude', after: ['implement'], tools: ['Read', 'Grep'], permissionMode: 'dontAsk', output: 'review.json', loop: 'implement', rounds: 2 }), body: 'Review it.' },
+        { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check: 'npm test' }), body: 'Implement it.', own: null },
+        { name: 'review', spec: spec({ harness: 'claude', after: ['implement'], tools: ['Read', 'Grep'], permissionMode: 'dontAsk', output: 'review.json', loop: 'implement', rounds: 2 }), body: 'Review it.', own: null },
       ],
       // `graphOf` the steps, as a run of it is drawn.
       graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 2 }] },
@@ -110,7 +112,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
     },
     {
       name: 'mine', from: 'yours', dir: mine, description: null,
-      steps: [{ name: 'plan', spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }), body: 'Write PLAN.md.' }],
+      steps: [{ name: 'plan', spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }), body: 'Write PLAN.md.', own: null }],
       graph: { roots: ['plan'], edges: [] },
       schemas: [],
       version: versionOf(mine),
@@ -223,8 +225,9 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
   const { error } = await unknown.json();
   assert.ok(error.startsWith("No workflow 'nope' in "), error);
   assert.ok(error.includes('The workflows there are: broken (repo), good (repo), mine (yours).'), error);
-  // Found among the folders, never joined onto a path: `..` names none of them. Nor does a hidden folder, one with a step in it included.
-  for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode']) assert.equal((await post({ workflow, brief: 'Do it.' })).status, 404, workflow);
+  // Found among the folders, never joined onto a path: `..` names none of them. Nor does a hidden folder, one with a step in it included,
+  // nor `agents/`, whose files read as steps.
+  for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode', 'agents']) assert.equal((await post({ workflow, brief: 'Do it.' })).status, 404, workflow);
 
   for (const brief of [undefined, '', '  \n', 42]) {
     const res = await post({ workflow: 'good', brief });
@@ -348,13 +351,13 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
     assert.deepEqual(w.steps.map((s) => s.body), loadWorkflows(w.dir).map((s) => s.body), name);
     assert.deepEqual(w.steps.map(({ name: step, spec: keys }) => ({ name: step, spec: keys })), [
       // Denied by name what no step needs and an unattended session otherwise has.
-      { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', effort: 'high', context: 200_000, check, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
+      { name: 'implement', spec: spec({ agent: 'implementer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, check, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
       {
         name: 'review',
-        spec: spec({ harness: 'claude', model: 'opus', effort: 'high', context: 200_000, after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
+        spec: spec({ agent: 'reviewer', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
       },
       // The run's ending, gated: it merges in the repository's own checkout, which is why it has no check of its own.
-      { name: 'ship', spec: spec({ harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, after: ['review'], workspace: 'main', gate: true, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
+      { name: 'ship', spec: spec({ agent: 'shipper', harness: 'claude', model: 'opus', effort: 'medium', context: 200_000, after: ['review'], workspace: 'main', gate: true, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;
     assert.ok(review.body.startsWith(`${reviewer.body}\n\n`), `${name}/review.md is the package's review body, then more`);

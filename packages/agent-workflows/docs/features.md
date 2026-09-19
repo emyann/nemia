@@ -3308,6 +3308,45 @@ invalidates everything after it.
   `replies`, whose words no longer say "from round 2". api 210, web 259 and agent-engine 340 (331 passed,
   9 skipped) unchanged in count. `npm run typecheck` clean in all four.
 
+## Shipped: an agent is written once — `agents/` and `agent:`
+
+An agent is a node's attachment, and we pass it a brief. A step stays a node of its workflow, with its wiring and its typed data
+in and out (`input:`, `output:`); what is attached to it does the work, and `agent:` names one kind of attachment, never required.
+The README's *An agent is a node's attachment* says the rules; this is what the run changed.
+
+- **`agents/` beside the workflow folders** (`agentsDir`), for a repository's `workflows/` and the store's alike. An agent file's
+  frontmatter is a role — `description` and `AGENT_KEYS` — and its body its instructions (`parseAgent`, `loadAgents`). Refused by name at
+  shipped defaults, each with a test: a wiring key in an agent (saying it belongs on the step), `agent:` in an agent, a key no agent has, a
+  value no step could run with, a link in `agents/`, a step naming an agent not there (listing those there are), and a workflow named
+  `agents`, loaded, named bare or written. A broken agent refuses only the steps that name it.
+- **Resolution at load time.** `parseWorkflow` merges the agent's raw keys under the step's before any value is read, so a
+  harness-dependent refusal sees the merged keys and names the step; the body is the agent's instructions, a blank line, then the
+  step's own note. The step carries `agent: { name, keys, body, given }` — its own keys, its own note, and the agent's keys as read — and
+  `renderStep` writes a resolved step back as its file was, so the round trip over every shipped folder holds. `start()` freezes the
+  resolved steps: an agent edited after `wf start` changes no step of the run.
+- **The shipped folders, migrated with a fixture.** Commit `0a46a18` wrote every shipped step as today's loader resolved it
+  (`test/fixtures/resolved-before.json`) before a folder moved. After the move — `implementer`, `reviewer`, `planner`, `shipper`,
+  `ui-implementer`, `ui-reviewer`, their schemas beside them — every resolved key of every shipped step is deep-equal to it, and the steps
+  whose body moved are exactly eight, listed: implement and ship in `dev`, `dev-build`, `dev-planned` and `dev-planned-build`
+  (`agents-before-after.test.ts` prints each diff). The implementer's plan paragraph became conditional on a plan being below; the ship
+  recipe's item 3 runs "the command named under *Where to look*", and `composeBrief` names there each check the run's work was judged by
+  (`039055a`), so the four `ship.md` files are one file and each ship brief names its own folder's check — proven by a test, not by prose.
+  No shipped step keeps words of its own. The supervisor, the package's codex `workflows/` and `wf-examples` stay without `agent:`.
+- **`wf start` names each node's agent**: `implement (implementer) → review (reviewer) → ship (shipper)`; a node with none by its name.
+- **The board edits the node.** The listing's `spec` is resolved, so `ListedStep.own` carries the keys and note the step writes itself,
+  and a PUT carries it back: without it a step saved as listed would write its agent's keys into its file. The builder picks the agent
+  (`KINDS.agent`, from `agents/` beside the store's workflows), edits the node's own keys and note, and shows the agent's values as
+  placeholders — "opus — agent's". A node names its agent before what it runs on. `versionOf` hashes the agents a folder names, so an
+  agent edited under an open builder is a conflict, not an overwrite.
+
+What it leaves:
+
+- **Editing an agent from the board.** The builder edits the node and shows the agent's values; the agent is edited in its file. A
+  page for `agents/` — list, read, write — is its own change, with `writeWorkflow`'s refusals for a folder that is not a workflow.
+- **Other attachments.** A script, an HTTP call, a typed judgement, a remote agent: `agent:` is the one kind built.
+- **Teams and dispatch.** Which agent takes a card, or a team of agents chosen per brief (`docs/pivot-2026-09-18.md`), is not here: a
+  folder still names its agents by hand.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

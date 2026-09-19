@@ -162,7 +162,22 @@ export type Workflow = {
   loop?: string;
   /** How many rounds a `loop:` may run, the first included — then a person decides. Set to `DEFAULT_ROUNDS` when a loop does not say. */
   rounds?: number;
+  /**
+   * The agent attached to the step (`agent:`), and what the step said itself: the keys its own file set — never `agent` — and its own note.
+   * The step's keys and body above are already resolved: the agent's role keys where the step sets none, and its instructions before the
+   * note. What the rest of the run reads is those; this says where each came from, which is what the step's file is written back from
+   * (`renderStep`). Absent on a step that names no agent.
+   */
+  agent?: StepAgent;
 };
+
+/**
+ * Where an agent-attached step's keys and words came from: the agent's name, the keys the step set itself, and its own note — and, for each
+ * key the step did not set, the value it read as, as its line would write it (`given`): the agent's, or what the parser makes of the step's
+ * other keys (`after:` from `resume:`, `rounds:` from `loop:`). A key whose value is no longer its given one was changed on the step since
+ * it was read, and is the step's own from then on (`renderStep`).
+ */
+export type StepAgent = { name: string; keys: StepKey[]; body: string; given: Partial<Record<StepKey, string>> };
 
 /** The rounds a `loop:` runs when its step does not say. */
 export const DEFAULT_ROUNDS = 3;
@@ -188,7 +203,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -211,6 +226,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   input: "the steps whose declared output (`output:`) this one is handed in its brief, as data: each one it waits on",
   workspace: "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
   slot: "`none`: the run takes no run slot (`WF_MAX_RUNS`) — a session that watches the other runs rather than doing a run's work, on a workflow of one step",
+  agent: "what is attached to this node to do its work: an agent in agents/, whose role keys are this step's defaults and whose instructions come before this step's own note; the step's own keys win",
   harness: 'what runs the session: `claude` (the default), `codex` or `claude-detached`',
   model: "the model the harness runs the session on: the harness's own default when unset",
   effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
@@ -336,12 +352,47 @@ export function splitFrontmatter(name: string, text: string): { block: string | 
  *
  * `read` answers for a file beside the step — the folder's, relative to it — or `undefined` when there
  * is none. Only `output:` names one, and a step parsed without a folder cannot have it read.
+ *
+ * `agents` are the agents `agent:` may name (`loadAgents`). A step that names one is resolved here, once: each role key the agent sets is
+ * the step's unless the step sets it too, and what the step is told is the agent's instructions, a blank line, then the step's own note —
+ * the agent's alone when the step has none. A schema the agent's `output:` names is read beside the agent. Everything downstream of the
+ * parser sees the resolved step; `agent` on it says what was the step's own.
  */
-export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined): Workflow {
-  const { block, body } = splitFrontmatter(name, text);
-  const meta: Partial<Record<StepKey, string>> = block === null ? {} : readKeys(name, block);
-  if (!body) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
+export function parseWorkflow(name: string, text: string, read?: (file: string) => string | undefined, agents?: Agents): Workflow {
+  const { block, body: own } = splitFrontmatter(name, text);
+  const { agent: attached, ...meta }: Partial<Record<StepKey, string>> = block === null ? {} : readKeys(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
+  if (attached === undefined) {
+    if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
+    return stepFrom(name, meta, own, read);
+  }
+  const agent = agentOf(name, attached, agents);
+  const body = [agent.body, own].filter(Boolean).join('\n\n');
+  if (!body) throw new WorkflowError(`${name}: the body is empty, and so is ${AGENTS_FOLDER}/${agent.name}.md's — a step with nothing to say is not a step. Write what the agent is told in its file, or this step's own note below its frontmatter.`);
+  // The agent's schema is read beside the agent, and one the step names itself beside the step.
+  const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
+  const step = stepFrom(name, { ...agent.keys, ...meta }, body, fromAgent ? agent.read : read);
+  const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
+  const given = Object.fromEntries(STEP_KEYS.flatMap((key) => {
+    const value = key === 'agent' || keys.includes(key) ? undefined : writtenValue(name, key, step[key]);
+    return value === undefined ? [] : [[key, value]];
+  }));
+  return { ...step, agent: { name: agent.name, keys, body: own, given } };
+}
 
+/** The agent `agent:` names, or why not: one there is not, listing those there are, or one whose file is refused, in its words. */
+function agentOf(step: string, name: string, agents: Agents | undefined): Agent {
+  const found = agents?.get(name);
+  if (found instanceof WorkflowError) refuse(`${step}: \`agent: ${name}\` names an agent whose file is refused — ${found.message}`);
+  if (found) return found;
+  const there = [...(agents?.keys() ?? [])].sort();
+  return refuse(`${step}: \`agent: ${name}\` is not an agent here. `
+    + (there.length
+      ? `The agents are: ${there.join(', ')} — name one, or write ${AGENTS_FOLDER}/${name}.md beside them.`
+      : `There are none: an agent is a file in ${AGENTS_FOLDER}/, beside the workflow's folder — write ${AGENTS_FOLDER}/${name}.md, or delete the line.`));
+}
+
+/** A step from its keys as written and its body: each value read into the form the run uses, or refused in `name`'s words. */
+function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: string, read: ((file: string) => string | undefined) | undefined): Workflow {
   const after = (meta.after ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   // `resume: x` implies `after: x` — continuing a session that has not run is not a thing.
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
@@ -378,9 +429,10 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
 
 /**
  * A step as it is written back: what `renderStep` takes. A `Workflow` is one, and so is a step whose `output:` names its file without the
- * schema, which is read from beside the step when the file is parsed, never from here.
+ * schema, which is read from beside the step when the file is parsed, never from here — and one whose `agent` is only the agent's name, a
+ * step drafted with its own keys and note alone, which the parser resolves.
  */
-export type StepDraft = Omit<Workflow, 'output'> & { output?: Pick<StepOutput, 'file'> };
+export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<StepOutput, 'file'>; agent?: string | StepAgent | null };
 
 /** The keys whose empty list says what no line says: nothing to wait on, to read, to deny. Not `tools:`, where none reads as every tool to one person. */
 const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow'];
@@ -395,6 +447,12 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow'];
  * has it, the default included, and `after:` lists the step `resume:` names too, as the parser read it. A file's comments are not on
  * the step, so a render has none.
  *
+ * A step whose `agent` says where its keys came from (`StepAgent`, as the parser resolves one) is written as its file was: `agent:`, the
+ * keys the step set itself and its own note — never what the agent gave it, which would pin the agent's words in every step's file. A key
+ * it did not set but whose value was changed since it was read is written too, as the step's own: a change is never dropped. Its body is
+ * its own note, whatever `body` says. A step whose `agent` is a name is a draft of the step's own: every key it sets is written, after
+ * `agent:`, and its body is its own note.
+ *
  * It judges nothing the parser judges: a value the parser would refuse is written as given, and the parser refuses it in its own words
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
  * see: a key no step has, in the parser's words, since it would be dropped; a line break in a value, which ends the line and makes what
@@ -403,11 +461,14 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow'];
 export function renderStep(step: StepDraft): string {
   const unknown = Object.keys(step).find((key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null);
   if (unknown !== undefined) refuse(unknownKey(step.name, unknown));
+  const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const lines = STEP_KEYS.flatMap((key) => {
-    const value = writtenValue(step.name, key, step[key]);
+    const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);
+    // A key the step did not set is left to its agent — unless it was changed since, and is the step's now.
+    if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key]) return [];
     return value === undefined ? [] : [`${key}: ${value}`];
   });
-  const body = String(step.body ?? '').trim();
+  const body = String((provenance ? provenance.body : step.body) ?? '').trim();
   if (lines.length) return `---\n${lines.map((line) => `${line}\n`).join('')}---\n${body}\n`;
   // A body that opens on `---` would be read as the frontmatter, were there none before it — and as its block, were that block empty.
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : `${body}\n`;
@@ -472,9 +533,9 @@ const unknownKey = (step: string, key: string): string => (Object.hasOwn(REFUSED
   ? `${step}: a step may not set \`${key}\` — ${REFUSED[key]}.`
   : `${step}: \`${key}\` is not a key a step has. A step's keys are: ${STEP_KEYS.join(', ')}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`);
 
-/** The frontmatter as key → value: every line a key a step has, set once, to something. */
-function readKeys(step: string, block: string): Partial<Record<StepKey, string>> {
-  const meta: Partial<Record<StepKey, string>> = {};
+/** The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. */
+function readKeys<K extends string>(step: string, block: string, refusal: (key: string) => string | undefined): Partial<Record<K, string>> {
+  const meta: Partial<Record<K, string>> = {};
   for (const raw of block.split('\n')) {
     const line = raw.trim();
     // Blank lines group a long frontmatter; `#` is the comment character every reader expects.
@@ -486,7 +547,8 @@ function readKeys(step: string, block: string): Partial<Record<StepKey, string>>
     const key = line.slice(0, i).trim();
     const value = line.slice(i + 1).trim();
 
-    if (!isStepKey(key)) refuse(unknownKey(step, key));
+    const refused = refusal(key);
+    if (refused !== undefined) refuse(refused);
     // Refused rather than last-one-wins: both values are something the author meant, and picking
     // one silently is how a step ends up waiting on half of what it was written to wait on.
     if (Object.hasOwn(meta, key)) {
@@ -503,7 +565,7 @@ function readKeys(step: string, block: string): Partial<Record<StepKey, string>>
               ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
               : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
     }
-    meta[key] = value;
+    meta[key as K] = value;
   }
   return meta;
 }
@@ -799,15 +861,17 @@ function checkOf(step: string, check: string | undefined): string | undefined {
 function outputOf(step: string, file: string | undefined, read: ((file: string) => string | undefined) | undefined): StepOutput | undefined {
   if (file === undefined) return undefined;
   const named = `${step}: \`output: ${file}\``;
+  // An agent is named by its file, `agents/reviewer.md`; a step by its name, `review`.
+  const beside = step.endsWith('.md') ? step : `${step}.md`;
   // Refused before it is read: a folder is what a run freezes and the builder writes back, and a schema outside it is part of the step
   // that neither carries. Read through the api, a file outside it would also answer a refusal with the start of whatever it holds.
   if (path.isAbsolute(file) || path.normalize(file).split(/[\\/]/)[0] === '..') {
-    refuse(`${named} names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside ${step}.md and name it from there — \`output: ${step}.schema.json\` — or delete the line, and the step declares no output.`);
+    refuse(`${named} names a file outside the workflow folder. A schema is part of what the step is judged by, and lives in the folder with it: write it beside ${beside} and name it from there — \`output: ${path.basename(beside, '.md')}.schema.json\` — or delete the line, and the step declares no output.`);
   }
   if (!read) refuse(`${named} names a file beside the step, and this step was read without its folder. Load it with \`loadWorkflows(<folder>)\`, which reads the file.`);
   const text = read(file);
   if (text === undefined) {
-    refuse(`${named} is not there. It is a JSON Schema file, relative to the workflow folder — write it beside ${step}.md, correct the path, or delete the line and the step declares no output.`);
+    refuse(`${named} is not there. It is a JSON Schema file, relative to the workflow folder — write it beside ${beside}, correct the path, or delete the line and the step declares no output.`);
   }
   let schema: unknown;
   try { schema = JSON.parse(text); } catch (e) {
@@ -914,16 +978,40 @@ export function stepNameRefusal(name: unknown): string | undefined {
   return undefined;
 }
 
+/**
+ * The folder of agents, beside the workflows that name them: `agents/`. A workflow may not have its name — `workflowsIn` never lists it, and
+ * `loadWorkflows`, `workflowFolder` and `writeWorkflow` refuse it (`agentsFolderRefusal`).
+ */
+export const AGENTS_FOLDER = 'agents';
+
+/** Where the agents a workflow's steps name are: `agents/`, beside the workflow's folder — `workflows/agents` for `workflows/dev`. */
+export const agentsDir = (workflowDir: string): string => path.join(path.dirname(path.resolve(workflowDir)), AGENTS_FOLDER);
+
+/** Why `dir` is not a workflow because it is the folder of agents, or `undefined` for a folder with another name. */
+export function agentsFolderRefusal(dir: string): string | undefined {
+  if (path.basename(path.resolve(dir)) !== AGENTS_FOLDER) return undefined;
+  return `${dir} is ${AGENTS_FOLDER}/, the folder of the agents the workflows beside it name — its files are agents, not steps, so no workflow has its name. Name a workflow beside it, or give yours another name.`;
+}
+
+/**
+ * The refusal of a file that is a link, where a folder's files are meant to be its own: `what` says whose, and what following it would do.
+ * `writeWorkflow`'s words for a linked step, and `loadAgents`' for a linked agent.
+ */
+export const linkRefusal = (file: string, what: string): string =>
+  `${file} is a link, and ${what} Replace the link with a file of its own — remove the link and copy what it pointed at into its place, rm <file> && cp <target> <file> — or take it out of the folder.`;
+
 /** The files of a folder that are steps: every `.md` but its README, sorted. */
 const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 
 /**
  * Read a folder of steps and check that they form a workflow rather than a wish. A `README.md` in the folder
  * describes the workflow (`workflowDescription`) and is not a step. The steps come back in the order they run
- * (`orderSteps`), not the folder's.
+ * (`orderSteps`), not the folder's, each resolved against the agent it names (`agentsDir`).
  */
 export function loadWorkflows(dir: string): Workflow[] {
   if (!fs.existsSync(dir)) throw new WorkflowError(`no workflow folder at ${dir}`);
+  const agents = agentsFolderRefusal(dir);
+  if (agents) throw new WorkflowError(agents);
   const entries = fs.readdirSync(dir);
   const files = stepFiles(entries);
   if (!files.length) throw new WorkflowError(`${dir} has no .md steps in it${noStepsBecause(dir, entries)}`);
@@ -931,20 +1019,20 @@ export function loadWorkflows(dir: string): Workflow[] {
   const read = (file: string): string | undefined => {
     try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
   };
-  return parseFolder(files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]), read);
+  return parseFolder(files.map((f) => [path.basename(f, '.md'), fs.readFileSync(path.join(dir, f), 'utf8')]), read, loadAgents(agentsDir(dir)));
 }
 
 /**
  * A folder's steps from the text of their files, `[name, text]` a step, checked as a folder on disk is checked: each step parsed, in the order
  * of its file's name as a folder lists them, then the ways the steps do not form a workflow (`validate`), and in the order they run. Pure:
- * `read` answers for a file beside the steps, as `parseWorkflow`'s does.
+ * `read` answers for a file beside the steps, and `agents` are those `agent:` may name, as `parseWorkflow`'s are.
  *
  * What `loadWorkflows` reads a folder with, and what `writeWorkflow` checks one with before a byte of it is written: one reading, so a folder
  * written is refused for what a folder read would be, in the same words.
  */
-export function parseFolder(files: ReadonlyArray<readonly [name: string, text: string]>, read?: (file: string) => string | undefined): Workflow[] {
+export function parseFolder(files: ReadonlyArray<readonly [name: string, text: string]>, read?: (file: string) => string | undefined, agents?: Agents): Workflow[] {
   const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
-  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read));
+  const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents));
   validate(steps);
   return orderSteps(steps);
 }
@@ -967,6 +1055,7 @@ export function workflowsIn(dir: string, entries?: readonly string[]): string[] 
   let names: readonly string[];
   try { names = entries ?? fs.readdirSync(dir); } catch { return []; }
   return names.filter((name) => {
+    if (name === AGENTS_FOLDER) return false;
     try {
       return stepFiles(fs.readdirSync(path.join(dir, name))).length > 0;
     } catch {
@@ -989,6 +1078,7 @@ export function workflowFolder(given: string, from: string, repo: string): strin
   const at = path.resolve(from, given);
   if (isFolder(at)) return at;
   const bare = !/[\\/]/.test(given) && given !== '.' && given !== '..';
+  if (bare && given === AGENTS_FOLDER) refuse(agentsFolderRefusal(path.join(repo, 'workflows', given))!);
   const workflows = path.join(repo, 'workflows');
   if (bare && isFolder(path.join(workflows, given))) return path.join(workflows, given);
   const theirs = workflowsIn(workflows);
@@ -996,6 +1086,89 @@ export function workflowFolder(given: string, from: string, repo: string): strin
     + (theirs.length
       ? `The repository's workflows are: ${theirs.join(', ')} — name one, or give the path to a workflow folder.`
       : `Give the path to a workflow folder, or the name of a folder of steps under ${workflows}.`));
+}
+
+/**
+ * The keys an agent file sets: what it is for, in a line, and who does the work and how. A step that names the agent (`agent:`) takes these
+ * as its own defaults, and a key it sets itself wins. Everything else a step sets is wiring — where the step sits in its workflow, what it
+ * reads, how it is judged and for how long — and belongs on the step: an agent file that sets one is refused by name.
+ */
+export const AGENT_KEYS = ['description', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'output'] as const;
+export type AgentKey = (typeof AGENT_KEYS)[number];
+/** The keys a step takes from its agent: every agent key but its description, which is the agent's own. */
+export type RoleKey = Exclude<AgentKey, 'description'>;
+const isAgentKey = (key: string): key is AgentKey => (AGENT_KEYS as readonly string[]).includes(key);
+
+/**
+ * An agent: a file in `agents/`, its frontmatter the role keys it sets (`AGENT_KEYS`) and its body its instructions — what every step that
+ * names it is told first. `keys` are as written, each judged when the file was read; `read` answers for a file beside the agent, the schema
+ * its `output:` names.
+ */
+export type Agent = {
+  name: string;
+  description?: string;
+  keys: Partial<Record<RoleKey, string>>;
+  body: string;
+  read: (file: string) => string | undefined;
+};
+
+/** The agents a folder of workflows has, by name: each read, or why it cannot be — thrown only at a step that names it. */
+export type Agents = ReadonlyMap<string, Agent | WorkflowError>;
+
+/** Why an agent file may not set `key`, or `undefined` for a key it may. `file` is what the refusal calls it: `agents/<name>.md`. */
+function agentKeyRefusal(file: string, key: string): string | undefined {
+  if (isAgentKey(key)) return undefined;
+  if (key === 'agent') {
+    return `${file}: \`agent\` is a step's key, which attaches an agent to the step, and an agent does not name another. Write here what this agent is told and runs with, or give the step the other agent.`;
+  }
+  const roles = AGENT_KEYS.join(', ');
+  if (isStepKey(key)) {
+    return `${file}: \`${key}\` is wiring, and belongs on the step: an agent says who does the work and how — ${roles} — and a step says where it sits in its workflow, what it reads and how it is judged. Move the line to each step that names this agent.`;
+  }
+  if (Object.hasOwn(REFUSED, key)) return `${file}: an agent may not set \`${key}\` — ${REFUSED[key]}.`;
+  return `${file}: \`${key}\` is not a key an agent has. An agent's keys are: ${roles}. Correct the spelling or delete the line — a key the run does not read is a constraint nobody enforces.`;
+}
+
+/**
+ * One agent, from its file's text: `name` is the file's, minus `.md`. Each value is judged as a step's would be, in the file's name, so a
+ * line no step could run with is refused where it is written — a step that sets a key of its own is judged again with it. The body may be
+ * empty: an agent that only sets how its steps run.
+ */
+export function parseAgent(name: string, text: string, read?: (file: string) => string | undefined): Agent {
+  const file = `${AGENTS_FOLDER}/${name}.md`;
+  const { block, body } = splitFrontmatter(file, text);
+  const meta: Partial<Record<AgentKey, string>> = block === null ? {} : readKeys<AgentKey>(file, block, (key) => agentKeyRefusal(file, key));
+  const { description, ...keys } = meta;
+  stepFrom(file, keys, body, read);
+  return { name, ...(description !== undefined && { description }), keys, body, read: read ?? (() => undefined) };
+}
+
+/**
+ * The agents in `dir` — a workflow's are in `agentsDir(<workflow>)` — by name: every `.md` but a README, each read (`parseAgent`) or the
+ * refusal of it, which is thrown only at a step that names it, so a broken agent stops no workflow that does not use it. A file that is a
+ * link is refused by name: an agent's file is its own, as a step's is. None for a folder that is not there.
+ */
+export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
+  const agents = new Map<string, Agent | WorkflowError>();
+  let entries: fs.Dirent[];
+  try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return agents; }
+  const read = (file: string): string | undefined => {
+    try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
+  };
+  for (const file of stepFiles(entries.map((e) => e.name))) {
+    const name = path.basename(file, '.md');
+    const at = path.join(dir, file);
+    try {
+      if (entries.find((e) => e.name === file)!.isSymbolicLink()) {
+        refuse(linkRefusal(at, `an agent's file is its own: read through a link, what every step naming ${AGENTS_FOLDER}/${file} is told would be whatever the link points at, outside the folder, and would change with it.`));
+      }
+      agents.set(name, parseAgent(name, fs.readFileSync(at, 'utf8'), read));
+    } catch (err) {
+      if (!(err instanceof WorkflowError)) throw err;
+      agents.set(name, err);
+    }
+  }
+  return agents;
 }
 
 /**

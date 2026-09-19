@@ -599,6 +599,8 @@ export type WorkflowStepSpec = {
   after: string[];
   resume: string | null;
   input: string[];
+  /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
+  agent: string | null;
   permissionMode: string | null;
   tools: string[] | null;
   /** What the session may not have (`disallow:`): empty where the step denies nothing. */
@@ -619,8 +621,14 @@ export type WorkflowStepSpec = {
   rounds: number | null;
 };
 
-/** Mirrors `ListedStep` in apps/api/src/workflows.ts: a step as a workflow's listing has it — and as the builder puts it back. */
-export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string };
+/**
+ * Mirrors `ListedStep` in apps/api/src/workflows.ts: a step as a workflow's listing has it — and as the builder puts it back. `spec` and `body`
+ * are the step resolved; `own` is what a step with an agent sets itself, null for a step with none.
+ */
+export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null };
+
+/** Mirrors `StepOwn` in apps/api/src/workflows.ts: the keys a step with an agent sets itself — the rest are its agent's — and its own note. */
+export type StepOwn = { keys: Array<keyof WorkflowStepSpec>; body: string };
 
 /**
  * Mirrors `WorkflowListing` in apps/api/src/workflows.ts: a folder of steps, where it is read from — the repository's
@@ -678,8 +686,11 @@ export type KeyField = {
   byHarness: Record<string, string[]> | null;
 };
 
-/** Mirrors `KeyForm` in apps/api/src/builder.ts: every key a step may set, in the package's order, and the harness a step runs on when it names none. */
-export type KeyForm = { keys: KeyField[]; defaultHarness: string };
+/**
+ * Mirrors `KeyForm` in apps/api/src/builder.ts: every key a step may set, in the package's order, the harness a step runs on when it names none,
+ * the keys a step with an agent takes from it (`roleKeys`), and what each agent of yours gives a step (`agents`).
+ */
+export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: Array<keyof WorkflowStepSpec>; agents: Record<string, Partial<WorkflowStepSpec>> };
 
 /** What a step's form is drawn from. It changes with the package, so once a visit. */
 export const keyFormQuery = queryOptions({

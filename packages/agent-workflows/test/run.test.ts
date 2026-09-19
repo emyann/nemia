@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -290,6 +290,26 @@ test("an ending step is told where the work is — the branches, not the workspa
   assert.match(brief, /git diff main\.\.\.wf\/r-1\/implement/);
   assert.match(brief, /the run commits nothing here for you/);
   assert.doesNotMatch(brief, /This workspace has already been worked in by/, 'the work is not here');
+});
+
+test("an ending step is told the check the work was judged by, one line for each distinct check, and none when no step has one", () => {
+  const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'main', gate: true };
+  const r = run({ implement: 't1', review: 't2', ship: null }, {
+    steps: { implement: { taskId: 't1', workspace: '/wt/implement', branch: 'wf/r-1/implement' }, review: { taskId: 't2', workspace: '/wt/implement', branch: 'wf/r-1/implement' }, ship: { taskId: null } },
+  });
+  const checked = [{ ...step('implement'), check: 'npm test && npm run build' }, { ...step('review', ['implement']), check: 'npm test && npm run build' }, ending];
+  assert.deepEqual(workChecks(checked), ['npm test && npm run build'], 'the same check twice is one');
+  const brief = composeBrief(ending, r, checked);
+  assert.equal(brief.split("This workflow's check, which its work was judged by: `npm test && npm run build`").length, 2, brief);
+
+  const two = [{ ...step('implement'), check: 'npm test' }, { ...step('review', ['implement']), check: 'npm run e2e' }, ending];
+  assert.deepEqual(workChecks(two), ['npm test', 'npm run e2e'], 'in the order the steps run');
+  const both = composeBrief(ending, r, two);
+  assert.match(both, /This workflow's check, which its work was judged by: `npm test`\n\nThis workflow's check, which its work was judged by: `npm run e2e`/);
+
+  assert.deepEqual(workChecks([step('implement'), step('review', ['implement']), ending]), []);
+  assert.doesNotMatch(composeBrief(ending, r, [step('implement'), step('review', ['implement']), ending]), /This workflow's check/, 'no check, no line');
+  assert.doesNotMatch(composeBrief(step('review', ['implement']), r, checked), /This workflow's check/, 'a step that is not an ending is not told it');
 });
 
 test("a step in the checkout whose run cut no branch — the whole workflow is that step — is told so, and is given no empty fence to read", () => {

@@ -18,7 +18,7 @@ export function NewWorkflow({ onCreated }: { onCreated: (name: string) => void }
   const [body, setBody] = useState('');
   const ids = { name: useId(), step: useId(), body: useId() };
   const create = useMutation({
-    mutationFn: () => createWorkflow(name, { name: step, spec: { ...UNSET }, body }),
+    mutationFn: () => createWorkflow(name, { name: step, spec: { ...UNSET }, body, own: null }),
     onSuccess: (made) => {
       onCreated(made.workflow.name);
       queryClient.setQueryData(workflowsQuery.queryKey, (list) => listedWith(list, made.workflow));

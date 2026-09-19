@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
-import { parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
+import { agentsDir, loadAgents, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -329,7 +329,8 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 
 test('every key a step has is read — none is accepted and then dropped', () => {
   // Every key but `workspace:`, which no step may set beside a `check:`, and `slot:`, which is a workflow of one step's: both are read below.
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot'>, string> = {
+  // And `agent:`, which names an agent the step is resolved with: read below, and in test/agents.test.ts.
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '150000', permissionMode: 'dontAsk',
     tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
@@ -340,7 +341,9 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(ending.workspace, 'main');
   const watching = fm('supervise', 'slot: none');
   assert.equal(watching.slot, 'none');
-  const all = { ...w, workspace: ending.workspace, slot: watching.slot };
+  const attached = parseWorkflow('build', '---\nagent: implementer\n---\nBuild it.\n', undefined, new Map([['implementer', { name: 'implementer', keys: {}, body: '', read: () => undefined }]]));
+  assert.equal(attached.agent?.name, 'implementer');
+  const all = { ...w, workspace: ending.workspace, slot: watching.slot, agent: attached.agent };
   for (const key of STEP_KEYS) assert.notEqual(all[key], undefined, `${key} is on the list and never read`);
   assert.equal(w.deadlineSeconds, 900);
   assert.equal(w.retries, 1);
@@ -380,7 +383,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, slot, harness, model, effort, context, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -1004,7 +1007,7 @@ const shippedFolders = (): string[] => {
   const pkg = path.join(import.meta.dirname, '..');
   const examples = path.join(pkg, 'wf-examples');
   return [
-    ...fs.readdirSync(root).map((name) => path.join(root, name)),
+    ...fs.readdirSync(root).filter((name) => name !== 'agents').map((name) => path.join(root, name)),
     path.join(pkg, 'workflows'),
     path.join(pkg, 'workflows', 'ui'),
     ...fs.readdirSync(examples).map((name) => path.join(examples, name)),
@@ -1029,18 +1032,19 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
   for (const dir of folders) {
     const steps = loadWorkflows(dir);
     const read = readIn(dir);
+    const agents = loadAgents(agentsDir(dir));
     for (const step of steps) {
       const text = renderStep(step);
-      assert.deepEqual(parseWorkflow(step.name, text, read), step, `${path.relative(root, dir)}/${step.name}.md, rendered:\n${text}`);
-      assert.equal(renderStep(parseWorkflow(step.name, text, read)), text, 'and renders to the same text again');
+      assert.deepEqual(parseWorkflow(step.name, text, read, agents), step, `${path.relative(root, dir)}/${step.name}.md, rendered:\n${text}`);
+      assert.equal(renderStep(parseWorkflow(step.name, text, read, agents)), text, 'and renders to the same text again');
     }
-    assert.deepEqual(parseFolder(steps.map((step) => [step.name, renderStep(step)]), read), steps, dir);
+    assert.deepEqual(parseFolder(steps.map((step) => [step.name, renderStep(step)]), read, agents), steps, dir);
   }
-  // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then the body.
+  // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then its own note — none. The keys
+  // its agent gives it are the agent's file's, and are not written into the step's.
   const review = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'review')!;
-  assert.ok(renderStep(review).startsWith([
-    '---', 'after: implement', 'harness: claude', 'model: opus', 'effort: high', 'context: 200k', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
-  ].join('\n')), renderStep(review));
+  assert.equal(renderStep(review), ['---', 'after: implement', 'agent: reviewer', 'budget: 20', 'loop: implement', 'rounds: 3', '---', '', ''].join('\n'));
+  assert.equal(review.model, 'opus', "and the step runs with the agent's keys all the same");
   assert.doesNotMatch(renderStep(review).split('\n---\n')[0]!, /^#/m, 'the file has comments in its frontmatter, and the step does not carry them');
   assert.match(fs.readFileSync(path.join(root, 'dev', 'review.md'), 'utf8'), /^# /m);
 });
@@ -1048,13 +1052,14 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
 test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
   // Every key but `workspace:`, which the parser refuses beside a `check:`, and `slot:`, which is a workflow of one step's: both render below.
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot'>, string> = {
+  // `agent:` renders in test/agents.test.ts, which has agents to resolve it with.
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '200000', permissionMode: 'dontAsk',
     tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
-  for (const key of STEP_KEYS) if (key !== 'workspace' && key !== 'slot') assert.notEqual(step[key], undefined, key);
+  for (const key of STEP_KEYS) if (key !== 'workspace' && key !== 'slot' && key !== 'agent') assert.notEqual(step[key], undefined, key);
   const text = renderStep(step);
   assert.equal(text, [
     '---',

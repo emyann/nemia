@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
+import type { KeyForm, ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
 import {
   addStep, connect, contextText, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, schemasOf, setBody,
   setKey, setSchema, tokensOf, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
@@ -8,7 +8,7 @@ import {
 import { COLUMN_WIDTH } from '../src/lib/layout.ts';
 
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({ ...UNSET, after: [], input: [], disallow: [], ...fields });
-const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${name} it.`): ListedStep => ({ name, spec: spec(fields), body });
+const listed = (name: string, fields: Partial<WorkflowStepSpec> = {}, body = `${name} it.`): ListedStep => ({ name, spec: spec(fields), body, own: null });
 
 /** implement ⇄ review, as the listing has a folder of yours. */
 const folder: Pick<WorkflowListing, 'steps'> = {
@@ -69,7 +69,7 @@ test('an edge taken away takes its key: `after` — and `resume`, which after li
 test('a step added has a name and a body and sets nothing; a name there is none of or one taken is refused and adds nothing', () => {
   const draft = draftOf(folder);
   const added = addStep(draft, 'ship', 'Ship it.');
-  assert.deepEqual(added.at(-1), { name: 'ship', spec: spec(), body: 'Ship it.', schema: null });
+  assert.deepEqual(added.at(-1), { name: 'ship', spec: spec(), body: 'Ship it.', own: null, schema: null });
   assert.equal(unsaved(added, folder), true);
   assert.deepEqual(unsavedSteps(added, folder), ['ship']);
   assert.equal(nameRefusal(draft, ''), 'A step needs a name: its file is <name>.md.');
@@ -147,4 +147,60 @@ test("a folder written goes into the page's listing in the listing's order: the 
   assert.deepEqual(listedWith(list, w('built', 'yours')).map((x) => `${x.from}:${x.name}`), ['repo:dev', 'repo:ui', 'yours:built', 'yours:mine']);
   assert.deepEqual(listedWith(list, { ...w('mine', 'yours'), description: 'Mine.' }).map((x) => x.description), [null, null, 'Mine.']);
   assert.deepEqual(listedWith(undefined, w('built', 'yours')).map((x) => x.name), ['built']);
+});
+
+/** `build`, whose agent `coder` gives it its harness, model and effort, with a check and a note of its own — as the listing has it. */
+const attached: Pick<WorkflowListing, 'steps'> = {
+  steps: [{
+    name: 'build', spec: spec({ agent: 'coder', harness: 'claude', model: 'opus', effort: 'high', check: 'npm test' }),
+    body: 'You write code.\n\nMind the cache.', own: { keys: ['check'], body: 'Mind the cache.' },
+  }],
+};
+
+test("a step with an agent: a key changed is its own, one unset is its agent's again, and its body is its own note — each a change, put back with what it sets itself", () => {
+  const draft = draftOf(attached);
+  assert.deepEqual(toPut(draft), attached.steps, 'as listed');
+  assert.equal(unsaved(draft, attached), false);
+
+  const lower = setKey(draft, 'build', 'effort', 'low');
+  assert.deepEqual(lower[0]!.own, { keys: ['check', 'effort'], body: 'Mind the cache.' });
+  assert.deepEqual(unsavedSteps(lower, attached), ['build']);
+  // Unset, the check is left to the agent — which sets none — and the effort changed back to the agent's is the agent's again.
+  const back = setKey(setKey(lower, 'build', 'check', null), 'build', 'effort', null);
+  assert.deepEqual(back[0]!.own!.keys, []);
+
+  const noted = setBody(draft, 'build', 'Mind the index.');
+  assert.deepEqual([noted[0]!.body, noted[0]!.own!.body], ['You write code.\n\nMind the cache.', 'Mind the index.'], 'the note, not the agent\'s words');
+  assert.deepEqual(unsavedSteps(noted, attached), ['build']);
+
+  const pasted = setSchema(draft, 'build', { file: 'build.schema.json', text: '{}' });
+  assert.ok(pasted[0]!.own!.keys.includes('output'), 'a schema pasted is its own output');
+});
+
+test("an agent attached to a step makes what it has its own; taken away, the step keeps what its agent gave it, words and all", () => {
+  const plain = draftOf({ steps: [listed('build', { model: 'sonnet', check: 'npm test' }, 'Build it.')] });
+  const given = setKey(plain, 'build', 'agent', 'coder');
+  assert.deepEqual([given[0]!.spec.agent, given[0]!.own], ['coder', { keys: ['model', 'check'], body: 'Build it.' }]);
+
+  const taken = setKey(draftOf(attached), 'build', 'agent', null);
+  assert.deepEqual([taken[0]!.spec.agent, taken[0]!.own, taken[0]!.body, taken[0]!.spec.model], [null, null, 'You write code.\n\nMind the cache.', 'opus']);
+});
+
+/** What the api says each agent gives a step: `coder` as `attached` has it, and `reviewer`, which sets a model and nothing else. */
+const agents: Pick<KeyForm, 'roleKeys' | 'agents'> = {
+  roleKeys: ['harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'output'],
+  agents: { coder: { harness: 'claude', model: 'opus', effort: 'high' }, reviewer: { model: 'sonnet' } },
+};
+
+test("a step moved to another agent shows what that agent gives it, and nothing the last one gave; its own keys stay its own", () => {
+  const moved = setKey(draftOf(attached), 'build', 'agent', 'reviewer', agents);
+  assert.deepEqual([moved[0]!.spec.model, moved[0]!.spec.effort, moved[0]!.spec.harness], ['sonnet', null, null], "reviewer's model, not coder's opus and high");
+  assert.deepEqual([moved[0]!.spec.check, moved[0]!.own], ['npm test', { keys: ['check'], body: 'Mind the cache.' }]);
+
+  const plain = draftOf({ steps: [listed('build', { model: 'sonnet' }, 'Build it.')] });
+  const given = setKey(plain, 'build', 'agent', 'coder', agents);
+  assert.deepEqual([given[0]!.spec.model, given[0]!.spec.effort, given[0]!.spec.harness], ['sonnet', 'high', 'claude'], 'its own model, the rest the agent\'s');
+
+  const unset = setKey(setKey(draftOf(attached), 'build', 'effort', 'low', agents), 'build', 'effort', null, agents);
+  assert.deepEqual([unset[0]!.spec.effort, unset[0]!.own!.keys], ['high', ['check']], "an own key unset shows the agent's value again");
 });

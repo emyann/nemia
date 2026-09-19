@@ -1,5 +1,6 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute, Link } from '@tanstack/react-router';
+import { AgentLink } from '../components/AgentParts';
 import { AsWritten, KeyTable } from '../components/FilePage';
 import { Markdown } from '../components/Markdown';
 import { stepQuery } from '../lib/api';
@@ -17,12 +18,14 @@ export const Route = createFileRoute('/workflows_/$from/$workflow/$step')({
 });
 
 /**
- * One step of a workflow, to read: what its agent is told, rendered, then every key a step may set with its value and what it means — or,
+ * One step of a workflow, to read: what it is told, rendered, and the agent attached to it, if one is, linked, then every key a step may set with its value and what it means — or,
  * with Source, its file as written. It starts nothing: the Workflows page does.
  */
 function StepPage() {
   const { from, workflow, step } = Route.useParams();
   const { data: page } = useSuspenseQuery(stepQuery(from, workflow, step));
+  // The agent attached to this node, if one is: read from the agents/ beside its workflow, so its page is in the step's own place.
+  const agent = page.keys.find((row) => row.key === 'agent')?.value ?? null;
 
   return (
     <article className="space-y-6">
@@ -45,6 +48,11 @@ function StepPage() {
             {page.from === 'yours' ? 'yours' : 'this repository'}
           </span>
         </div>
+        {agent && (
+          <p data-step-agent className="text-xs text-neutral-500">
+            Its agent: <AgentLink from={page.from} name={agent} className="text-neutral-700 dark:text-neutral-300" />, whose instructions it is told first.
+          </p>
+        )}
       </header>
 
       <AsWritten file={`${page.dir}/${page.step}.md`} source={page.source}>

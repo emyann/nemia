@@ -88,7 +88,7 @@ export function nameRefusal(steps: readonly DraftStep[], name: string): string |
   return null;
 }
 
-/** A step added: its name and what its agent is told, every key unset. The draft as it was, for a name refused (`nameRefusal`). */
+/** A step added: its name and what it is told, every key unset. The draft as it was, for a name refused (`nameRefusal`). */
 export function addStep(steps: readonly DraftStep[], name: string, body: string): DraftStep[] {
   if (nameRefusal(steps, name)) return [...steps];
   return [...steps, { name, spec: { ...UNSET, after: [], input: [], disallow: [] }, body, own: null, schema: null }];

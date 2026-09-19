@@ -10,18 +10,26 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AgentsRouteImport } from './routes/agents'
 import { Route as CapabilitiesRouteImport } from './routes/capabilities'
 import { Route as InboxRouteImport } from './routes/inbox'
 import { Route as WorkflowsRouteImport } from './routes/workflows'
+import { Route as AgentsNewRouteImport } from './routes/agents_.new'
 import { Route as InboxNameRouteImport } from './routes/inbox_.$name'
 import { Route as RunsIndexRouteImport } from './routes/runs.index'
 import { Route as RunsRunIdRouteImport } from './routes/runs.$runId'
+import { Route as AgentsFromAgentRouteImport } from './routes/agents_.$from.$agent'
 import { Route as RunsRunIdStepsStepRouteImport } from './routes/runs.$runId_.steps.$step'
 import { Route as WorkflowsFromWorkflowStepRouteImport } from './routes/workflows_.$from.$workflow.$step'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsRoute = AgentsRouteImport.update({
+  id: '/agents',
+  path: '/agents',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CapabilitiesRoute = CapabilitiesRouteImport.update({
@@ -39,6 +47,11 @@ const WorkflowsRoute = WorkflowsRouteImport.update({
   path: '/workflows',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AgentsNewRoute = AgentsNewRouteImport.update({
+  id: '/agents_/new',
+  path: '/agents/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const InboxNameRoute = InboxNameRouteImport.update({
   id: '/inbox_/$name',
   path: '/inbox/$name',
@@ -52,6 +65,11 @@ const RunsIndexRoute = RunsIndexRouteImport.update({
 const RunsRunIdRoute = RunsRunIdRouteImport.update({
   id: '/runs/$runId',
   path: '/runs/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AgentsFromAgentRoute = AgentsFromAgentRouteImport.update({
+  id: '/agents_/$from/$agent',
+  path: '/agents/$from/$agent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RunsRunIdStepsStepRoute = RunsRunIdStepsStepRouteImport.update({
@@ -68,35 +86,44 @@ const WorkflowsFromWorkflowStepRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRoute
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/workflows': typeof WorkflowsRoute
+  '/agents/new': typeof AgentsNewRoute
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs/': typeof RunsIndexRoute
+  '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRoute
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/workflows': typeof WorkflowsRoute
+  '/agents/new': typeof AgentsNewRoute
   '/inbox/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs': typeof RunsIndexRoute
+  '/agents/$from/$agent': typeof AgentsFromAgentRoute
   '/runs/$runId/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/agents': typeof AgentsRoute
   '/capabilities': typeof CapabilitiesRoute
   '/inbox': typeof InboxRoute
   '/workflows': typeof WorkflowsRoute
+  '/agents_/new': typeof AgentsNewRoute
   '/inbox_/$name': typeof InboxNameRoute
   '/runs/$runId': typeof RunsRunIdRoute
   '/runs/': typeof RunsIndexRoute
+  '/agents_/$from/$agent': typeof AgentsFromAgentRoute
   '/runs/$runId_/steps/$step': typeof RunsRunIdStepsStepRoute
   '/workflows_/$from/$workflow/$step': typeof WorkflowsFromWorkflowStepRoute
 }
@@ -104,46 +131,58 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/agents'
     | '/capabilities'
     | '/inbox'
     | '/workflows'
+    | '/agents/new'
     | '/inbox/$name'
     | '/runs/$runId'
     | '/runs/'
+    | '/agents/$from/$agent'
     | '/runs/$runId/steps/$step'
     | '/workflows/$from/$workflow/$step'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/agents'
     | '/capabilities'
     | '/inbox'
     | '/workflows'
+    | '/agents/new'
     | '/inbox/$name'
     | '/runs/$runId'
     | '/runs'
+    | '/agents/$from/$agent'
     | '/runs/$runId/steps/$step'
     | '/workflows/$from/$workflow/$step'
   id:
     | '__root__'
     | '/'
+    | '/agents'
     | '/capabilities'
     | '/inbox'
     | '/workflows'
+    | '/agents_/new'
     | '/inbox_/$name'
     | '/runs/$runId'
     | '/runs/'
+    | '/agents_/$from/$agent'
     | '/runs/$runId_/steps/$step'
     | '/workflows_/$from/$workflow/$step'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AgentsRoute: typeof AgentsRoute
   CapabilitiesRoute: typeof CapabilitiesRoute
   InboxRoute: typeof InboxRoute
   WorkflowsRoute: typeof WorkflowsRoute
+  AgentsNewRoute: typeof AgentsNewRoute
   InboxNameRoute: typeof InboxNameRoute
   RunsRunIdRoute: typeof RunsRunIdRoute
   RunsIndexRoute: typeof RunsIndexRoute
+  AgentsFromAgentRoute: typeof AgentsFromAgentRoute
   RunsRunIdStepsStepRoute: typeof RunsRunIdStepsStepRoute
   WorkflowsFromWorkflowStepRoute: typeof WorkflowsFromWorkflowStepRoute
 }
@@ -155,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/agents': {
+      id: '/agents'
+      path: '/agents'
+      fullPath: '/agents'
+      preLoaderRoute: typeof AgentsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/capabilities': {
@@ -178,6 +224,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WorkflowsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents_/new': {
+      id: '/agents_/new'
+      path: '/agents/new'
+      fullPath: '/agents/new'
+      preLoaderRoute: typeof AgentsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/inbox_/$name': {
       id: '/inbox_/$name'
       path: '/inbox/$name'
@@ -199,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RunsRunIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/agents_/$from/$agent': {
+      id: '/agents_/$from/$agent'
+      path: '/agents/$from/$agent'
+      fullPath: '/agents/$from/$agent'
+      preLoaderRoute: typeof AgentsFromAgentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/runs/$runId_/steps/$step': {
       id: '/runs/$runId_/steps/$step'
       path: '/runs/$runId/steps/$step'
@@ -218,12 +278,15 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AgentsRoute: AgentsRoute,
   CapabilitiesRoute: CapabilitiesRoute,
   InboxRoute: InboxRoute,
   WorkflowsRoute: WorkflowsRoute,
+  AgentsNewRoute: AgentsNewRoute,
   InboxNameRoute: InboxNameRoute,
   RunsRunIdRoute: RunsRunIdRoute,
   RunsIndexRoute: RunsIndexRoute,
+  AgentsFromAgentRoute: AgentsFromAgentRoute,
   RunsRunIdStepsStepRoute: RunsRunIdStepsStepRoute,
   WorkflowsFromWorkflowStepRoute: WorkflowsFromWorkflowStepRoute,
 }

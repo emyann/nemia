@@ -50,7 +50,7 @@ const INPUT =
 /**
  * A folder of yours, built on the board: its steps as blocks with handles, drawn left to right by `after`. Drag from a block's right-hand dot
  * to another's left-hand dot and that one waits on it; from the violet dot underneath, and the block runs the other again (`loop:`, with its
- * rounds). An edge's button takes its key away. A block is added with a name and what its agent is told, and a block clicked opens its form.
+ * rounds). An edge's button takes its key away. A block is added with a name and what it is told, and a block clicked opens its form.
  *
  * Nothing is written until Save, which puts the whole folder with any schema pasted for an `output:` (`PUT /api/workflows/yours/:name`), at
  * the version the draft was read from. The api answers the folder read back from disk, which the draft starts again from; or the package's
@@ -327,7 +327,7 @@ function fileLine({ written, kept, removed }: WorkflowSaved): string {
   return said.join('; ') || 'nothing to change';
 }
 
-/** A block added: a name — its file's, without .md — and what its agent is told. */
+/** A block added: a name — its file's, without .md — and what it is told. */
 function AddStep({ steps, onAdd, onCancel }: { steps: readonly DraftStep[]; onAdd: (name: string, body: string) => void; onCancel: () => void }) {
   const [name, setName] = useState('');
   const [body, setBody] = useState('');
@@ -354,7 +354,7 @@ function AddStep({ steps, onAdd, onCancel }: { steps: readonly DraftStep[]; onAd
         </div>
         <div className="space-y-1">
           <label htmlFor={bodyId} className="block text-xs font-medium">
-            What its agent is told
+            What it is told
           </label>
           <textarea id={bodyId} value={body} rows={3} onChange={(event) => setBody(event.target.value)} className={`${INPUT} resize-y`} />
         </div>

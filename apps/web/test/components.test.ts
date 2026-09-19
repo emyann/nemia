@@ -844,7 +844,7 @@ const textsOf = (html: string): string[] => html.split(/<[^>]+>/).map((text) => 
 const tookAt = '2026-09-13T00:12:30.000Z';
 const ranOnce = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: tookAt, reason: 'harness' } };
 const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}): StepCloseout => ({
-  outcome: 'done', summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, ...more,
+  outcome: 'done', summary, needs: null, artifacts: [], output: {}, missing: [], replies: null, schema: {}, raw: { outcome: 'done', summary }, ...more,
 });
 
 /** implement on its third try, as the api gives it: refused by its check on the first, tried again by `retries:`, then sent round by review's loop. */
@@ -894,24 +894,47 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
   assert.match(once, />attempts<\/dt>/);
 });
 
-test("the Output tab shows the selected try's closeout — its declared output, and its replies as `finding → answer · why`, each text markdown — and every other try's folded beneath it", () => {
+test("the Output tab opens on the outcome and who said it, then draws each field by its shape — findings a table, replies with badges, a yes or no with what it means, anything else JSON — and every other try's folded beneath it", () => {
   const replies = [
     { finding: '`src/cache.ts:12` — the cache never expires', answer: 'fixed', why: 'Entries expire after the **TTL** now.' },
     { finding: 'src/cache.ts:40 — a miss is counted twice', answer: "won't fix", why: 'Once per layer, on purpose.' },
   ];
-  const tries = threeTries.map((t) => (t.current ? { ...t, closeout: closeoutSaying('Answered the review.', { replies, output: { again: false, risk: 'low' }, missing: ['notes'] }) } : t));
+  const findings = [{ file: 'src/cache.ts', line: 12, what: 'It never **expires**.' }, { file: 'test/cache.test.ts', line: null, what: 'No test waits out the TTL.' }];
+  const schema = {
+    findings: { type: 'array', items: { type: 'object', properties: { file: { type: 'string' }, line: { type: ['integer', 'null'] }, what: { type: 'string' } } } },
+    again: { type: 'boolean', description: 'true when a finding is worth another round.' },
+    matrix: { type: 'array' },
+    notes: { type: 'string' },
+  };
+  const output = { findings, again: false, matrix: [[1, 2], [3]] };
+  const tries = threeTries.map((t) => (t.current ? { ...t, closeout: closeoutSaying('Answered the review.', { replies, output, missing: ['notes'], schema }) } : t));
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
   assert.deepEqual(textsOf(/<p data-shown-try="3"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['round 2 · try 3 (round) · current']);
+
+  // First the outcome, in words, and who said it; then the summary.
+  assert.deepEqual(textsOf(/<p data-outcome="done" data-by="agent"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['done', 'said by the agent']);
+  assert.ok(html.indexOf('data-outcome') < html.indexOf('Answered the review.'), 'the outcome before the summary');
+  assert.match(html, /<label for="[^"]+"[^>]*>Raw<\/label>/, 'the Raw switch, named by a label of its own');
+
+  // Each field under its name, drawn as its shape says, in the schema's order, then the replies.
+  assert.deepEqual([...html.matchAll(/<section data-field="([^"]+)" data-kind="([^"]+)"/g)].map((m) => [m[1], m[2]]), [
+    ['findings', 'findings'], ['again', 'yesno'], ['matrix', 'json'], ['replies', 'replies'],
+  ]);
+  const table = /<table data-kind="findings"[\s\S]*?<\/table>/.exec(html)![0];
+  assert.deepEqual([...table.matchAll(/<th scope="row" data-place="true"[^>]*>([^<]*)<\/th>/g)].map((m) => m[1]), ['src/cache.ts:12', 'test/cache.test.ts'], 'a null line is the file alone');
+  assert.match(table, /<td[^>]*><div data-cell="what"><div data-markdown="true"[^>]*><p[^>]*>It never <strong>expires<\/strong>\.<\/p>/, 'its text is markdown, unnamed: the one field beside the place');
+  assert.deepEqual(textsOf(/<section data-field="again"[\s\S]*?<\/section>/.exec(html)![0]), ['again', 'no', '— true when a finding is worth another round.']);
+  assert.match(/<section data-field="matrix"[\s\S]*?<\/section>/.exec(html)![0], /<pre[^>]*>\[\n {2}\[\n {4}1,/);
+  assert.match(html, /<p data-missing="true"[^>]*>declared and not given: notes<\/p>/);
+
+  // Replies read as they did, `finding → answer · why`, each text markdown, and the answer a badge.
   assert.deepEqual([...html.matchAll(/<li data-answer="[^"]*"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => textsOf(m[1]!).join(' ')), [
     'src/cache.ts:12 — the cache never expires → fixed · Entries expire after the TTL now.',
     "src/cache.ts:40 — a miss is counted twice → won't fix · Once per layer, on purpose.",
   ]);
-  // The finding and why as markdown, the answer as the word it is.
   assert.match(html, /<li data-answer="fixed"[^>]*><div data-markdown="true"[^>]*><p[^>]*><code[^>]*>src\/cache\.ts:12<\/code> — the cache never expires<\/p><\/div>/);
-  assert.match(html, /<span class="font-medium[^"]*">fixed<\/span><\/span> <span aria-hidden="true">·<\/span> <div data-markdown="true"[^>]*><p[^>]*>Entries expire after the <strong>TTL<\/strong> now\.<\/p>/);
-  const declared = /<section aria-label="Declared output"[\s\S]*?<\/section>/.exec(html)![0];
-  assert.deepEqual([...declared.matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map((m) => [m[1], textsOf(m[2]!).join(' ')]), [['again', 'false'], ['risk', 'low']]);
-  assert.match(declared, />declared and not given: notes</);
+  assert.match(html, /→ <span data-slot="badge"[^>]*emerald[^>]*>fixed<\/span><\/span> <span aria-hidden="true">·<\/span> <div data-markdown="true"[^>]*><p[^>]*>Entries expire after the <strong>TTL<\/strong> now\.<\/p>/);
+  assert.match(html, /<span data-slot="badge"[^>]*>won&#x27;t fix<\/span>/);
 
   // The others, latest first, each folded: its summary is inside its fold, and the fold is closed.
   const folds = (markup: string) => [...markup.matchAll(/<details data-try="(\d+)"([^>]*)><summary[^>]*>([\s\S]*?)<\/summary>/g)].map((m) => [m[1], /\bopen\b/.test(m[2]!), textsOf(m[3]!).join('')]);
@@ -925,11 +948,39 @@ test("the Output tab shows the selected try's closeout — its declared output, 
   assert.deepEqual(folds(earlier), [['3', false, 'round 2 · try 3 (round) · current — done'], ['2', false, 'round 1 · try 2 (retries) — done']]);
   assert.ok(earlier.indexOf('Added the cache.') < earlier.indexOf('<details'), earlier);
 
-  // A try that gave none says what it was told to, and a step on its first try has no folds and no label.
+  // A try still running says what it was told to, by nobody; a step on its first try has no folds and no label.
   const none = renderToStaticMarkup(createElement(TryCloseouts, { tries: threeTries, selected: threeTries[2]!, none: 'No closeout yet.' }));
-  assert.match(none, /<p class="text-neutral-500">No closeout yet\.<\/p>/);
+  assert.match(none, /<p data-outcome="no closeout" data-by="nobody"/);
+  assert.match(none, /<p data-reason="true"[^>]*>No closeout yet\.<\/p>/);
   const first = renderToStaticMarkup(createElement(TryCloseouts, { tries: [tries[2]!], selected: tries[2]!, none: 'No closeout yet.' }));
   assert.doesNotMatch(first, /<details|data-shown-try/);
+});
+
+test("a plan's files are a table, its path over its change; its steps a list; a long approach markdown; a screenshot a field names, the image", () => {
+  const shot = '/wf/runs/r-1/artifacts/implement/runs-light.png';
+  const artifacts = [{ path: shot, name: 'runs-light.png', url: '/api/runs/r-1/steps/implement/artifacts/runs-light.png', kind: 'image' as const, size: 2048 }];
+  const approach = `Cache it.\n\nThen **expire** it: ${'a reason '.repeat(10)}`;
+  const output = { approach, files: [{ path: 'src/cache.ts', change: 'New.' }], steps: ['Write it.', 'Test it.'], screenshots: [shot] };
+  const tries = [{ ...threeTries[2]!, attempts: ranOnce, closeout: closeoutSaying('A plan.', { output, artifacts }) }];
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: '-' }));
+  assert.deepEqual([...html.matchAll(/<section data-field="([^"]+)" data-kind="([^"]+)"/g)].map((m) => [m[1], m[2]]), [
+    ['approach', 'markdown'], ['files', 'table'], ['steps', 'list'], ['screenshots', 'list'],
+  ]);
+  assert.match(html, /<th scope="row" data-place="true"[^>]*>src\/cache\.ts<\/th><td[^>]*><div data-cell="change">/);
+  assert.match(html, /<p[^>]*>Then <strong>expire<\/strong> it:/);
+  const screenshots = /<section data-field="screenshots"[\s\S]*?<\/section>/.exec(html)![0];
+  assert.match(screenshots, /<figure data-artifact="image"[\s\S]*<img src="\/api\/runs\/r-1\/steps\/implement\/artifacts\/runs-light\.png" alt="runs-light\.png"/);
+});
+
+test("a try that ended with no statement says the machine's reason, unsigned, in a sentence — and its fold says the reason, where it said `no closeout`", () => {
+  const unsigned = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned' } };
+  const tries = threeTries.map((t) => (t.try === 1 ? { ...t, attempts: unsigned, closeout: null } : t));
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'unused' }));
+  assert.deepEqual(textsOf(/<p data-outcome="unsigned" data-by="machine"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['unsigned', 'no statement: the machine’s reason']);
+  assert.match(html, /<p data-reason="true"[^>]*>The session ended without the closing statement it was asked for\. It may have finished; it did not say so\.<\/p>/);
+  assert.doesNotMatch(html.slice(0, html.indexOf('<section aria-label="Other tries"')), /data-closeout|Raw/, 'no statement, so nothing to draw nor show raw');
+  const current = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
+  assert.match(current, /<details data-try="1"[^>]*><summary[^>]*>round 1 · try 1 — unsigned<\/summary>/);
 });
 
 test("a closeout's image is drawn inline, its name its alt, opening full-size in a new tab; a text file is a link, anything else a link with its size, and a bare path the path", () => {

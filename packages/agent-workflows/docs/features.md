@@ -68,7 +68,7 @@ What it leaves:
 - **A size cap.** A declared output travels whole into the next brief. hkb capped a result at 4 KB,
   and no cap is stated here yet.
 - **The board's Output tab** (apps, not this package) can render the declared output from the
-  engine's record, the same way `wf decide` does.
+  engine's record, the same way `wf decide` does. (Taken up by *a node's outcome drawn, not printed*, below.)
 - **Files as inputs** (plan §4b). `wf start --input <file>` would copy into `runs/<id>/inputs/`, and
   every brief would name the directory. A closeout carries text, not a screenshot.
 
@@ -3513,7 +3513,8 @@ What it leaves:
   it — the agent, the machine, a check's process — as a field, not inferred from the node's kind; the payload validated against the
   node's `output:` wherever it came from, as only an agent's is now (by its harness); a check's exit code mapped to a reason (0
   passed, a number refused, none unfinished) once, in one place, instead of in `refusedCheck`; and the schema it answered carried
-  with it, so the board can render a payload without reading the folder frozen on the run.
+  with it, so the board can render a payload without reading the folder frozen on the run. (The board's side is taken up by *a
+  node's outcome drawn, not printed*, below: the api reads the schema off the frozen folder for now.)
 - **The web app's mirror of `EarlierTry.then`** (`apps/web/src/lib/api.ts`) does not name `signoff`. The api sends it, and the board's
   words come from `tryNote`; the type is a mirror only. Owned by apps/, not changed here.
 
@@ -3574,6 +3575,49 @@ What a run-level guard ("do not start a run above 90%") would need — out of sc
 2. The quota read level-triggered at each admission, beside the cap — a pure judgement in `assess`, the ask made by the runner or
    read from the api, bounded by the same keep.
 3. A refusal a person can act on, with the window, its reset and a way past it (a flag of `wf start`, say), shown on the queued card.
+
+## Shipped: a node's outcome drawn, not printed — the Output tab
+
+The step inspector's Output tab printed a closeout: the summary, then each declared field as the JSON it came as. Now it opens on how
+the try ended, in words, and draws each field by its shape (`apps/web/src/lib/outcome.ts`, `apps/web/src/components/Outcome.tsx`).
+
+- **The head.** `done` or `blocked`, `said by the agent`, with what it needs; or, for an attempt that ended with no statement, the
+  machine's reason in a sentence: `unsigned`, `lost`, `unstartable`, `budget`, `operator`, `deadline` (the engine's `EndReason`), or a
+  harness that ended it `failed` or `stopped`. An agent that spoke and was then cut says so under the badge. Then the summary, as markdown.
+- **One drawing per known shape.** `outputKind(schema, value, images)` answers a closed set: `findings` (records with a `file` and a
+  `line`: a table, the place over the text, a null line the file alone), `replies` (a `finding` and an `answer`: a list with fixed /
+  won't fix badges), `table` (flat records: a plan's `files`, the first field the heading), `yesno` (a boolean, beside its schema's
+  `description`), `list` (strings), `image` (a string that is the path of one of the try's image artifacts), `markdown` (a string with a
+  newline or longer than 120), `text`, and `json`. It is given no name, of the field or of the step (`outputKind.length === 3` is a
+  test). A value its schema does not describe is `json`, and so is anything no rule knows: an object, an array of arrays, a mixed array.
+- **Nothing hidden.** A field that is `json` is shown under its name. A **Raw** switch shows the whole statement as the engine recorded
+  it, in place of the drawing: `parseCloseout` reads forgivingly (an outcome that is not `blocked` reads `done`, an artifact that is not
+  a string is dropped), so the parsed closeout is not the statement.
+- **Two api fields the tab lacked** (`StepCloseout` in `apps/api/src/app.ts`): `schema`, each declared field's schema off the workflow
+  the run froze, for a boolean's description and an empty array's item type; and `raw`, the statement as it came. Nothing else changed
+  in the api, and nothing in this package.
+- **Tests.** `apps/web/test/outcome.test.ts`, a test per kind and one that unknown shapes are `json`; `components.test.ts` draws the
+  tab; the e2e's `outcome` page (`pages/250-outcome.ts`) writes a run whose six steps each end another way — a review with findings, a
+  plan, a loop target's replies and a screenshot, a blocked step, an unsigned attempt, and a matrix and an object — photographs each
+  step's tab and Raw in both themes, and takes the run back.
+
+**The seam.** `outputKind` is the one place a closeout meets its drawing. A generic renderer (JSON Render, say) or a judgment choosing a
+component would replace that function: the same three inputs, the same closed set, `json` when nothing fits.
+
+**What was learned about a generic renderer.** The shipped schemas (`workflows/agents/*.schema.json`: plan, review, implement) declare
+nine fields; with a loop's `replies` and the base fields they come to seven kinds, and nothing yet falls through to `json`. Where the
+drawing is written by hand it is clearly better than a generic one would be in a 320-pixel column: a finding's place stacked over its
+text instead of two columns, a null `line` read as the file alone, an answer as a badge, a boolean beside what it means. A generic
+renderer would be worth its dependency once schemas declare nested objects (records within records, which fall to `json` here), or once
+a string must be told apart as prose or a path without a newline to go by — neither has happened.
+
+What it leaves:
+
+- **A finding's place is link-like, not a link.** Nothing on the board opens a file at a line; the place is drawn underlined, and is text.
+- **An image the agent named but did not list among its artifacts** is text: only the artifacts say a path is an image the api serves.
+
+These take up the board's part of *Shipped: declared outputs and inputs* ("The board's Output tab can render the declared output") and
+the tab's side of P0.5's "the schema it answered carried with it": the api carries it, off the frozen workflow, not the outcome record.
 
 ## 1. A run that grows steps from a plan
 

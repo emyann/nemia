@@ -188,7 +188,16 @@ function StringList({ items, artifacts }: { items: string[]; artifacts: readonly
     <ul className="list-disc space-y-1 pl-4 marker:text-neutral-400">
       {items.map((item, i) => {
         const artifact = artifacts.find((a) => a.path === item && 'url' in a && a.kind === 'image');
-        return <li key={i}>{artifact ? <ArtifactView artifact={artifact} /> : <Markdown>{item}</Markdown>}</li>;
+        // An image is its own mark: a bullet would sit beside its caption, under it.
+        return artifact ? (
+          <li key={i} className="-ml-4 list-none">
+            <ArtifactView artifact={artifact} />
+          </li>
+        ) : (
+          <li key={i}>
+            <Markdown>{item}</Markdown>
+          </li>
+        );
       })}
     </ul>
   );

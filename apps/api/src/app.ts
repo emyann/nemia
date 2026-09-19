@@ -299,6 +299,12 @@ export type StepCheck = {
 };
 
 /**
+ * A closing statement that `parseCloseout` could not read: its words for why, and the statement as it came. On the step and on each
+ * try (`StepTry.unreadable`), where `closeout` is null.
+ */
+export type StepUnreadable = { error: string; raw: unknown };
+
+/**
  * One try of a step, as the run's record keeps it: the tries behind the current one (`StepRecord.tries`), then the current.
  *
  * `try` counts from 1, and `round` is the round of its loop the try was filed in (`roundIn`). `then` is what replaced it —
@@ -307,9 +313,6 @@ export type StepCheck = {
  * the step; on an earlier one, the engine's own word for its task — `succeeded`, `failed` — since `wf ls` words only the try
  * that decides the step. `attempts`, `check` and `closeout` are the try's own, in the step's shapes.
  */
-/** A closing statement that `parseCloseout` could not read: its words for why, and the statement as it came. */
-export type StepUnreadable = { error: string; raw: unknown };
-
 export type StepTry = {
   try: number;
   round: number;

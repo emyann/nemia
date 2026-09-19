@@ -19,7 +19,7 @@ import path from 'node:path';
 export const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-api-harness-'));
 /** What `claude agents` lists: a JSON array of sessions, as Claude Code's registry lists them. None until a test writes some. */
 export const registry = path.join(bin, 'registry.json');
-/** Every call the fake answered, a line each: its arguments. An ask for the quota adds a line of what it ran in, and one when it ended. */
+/** Every call the fake answered, a line each: its arguments. An ask for the quota adds a line of what it ran in, and one when it ended, each with its pid. */
 export const calls = path.join(bin, 'calls');
 /**
  * What the fake prints to a `get_usage` request (`claude -p`, the api's `askUsage`): lines of stream-json, `@ID@` in them replaced by the
@@ -52,7 +52,7 @@ fs.writeFileSync(path.join(bin, 'claude'), [
   `  id=$(printf '%s' "$line" | sed -n 's/.*"request_id":"\\([^"]*\\)".*/\\1/p')`,
   `  sed "s/@ID@/$id/g" '${answer}'`,
   '  cat > /dev/null',
-  `  echo 'usage-ended' >> '${calls}'`,
+  `  echo "usage-ended pid=$$" >> '${calls}'`,
   'fi',
   '',
 ].join('\n'), { mode: 0o755 });
@@ -72,8 +72,11 @@ export const stops = (): number => callsOf('stop');
 /** How many times the quota has been asked of the fake: a `claude -p` each. */
 export const asks = (): number => callsOf('-p');
 
-/** How many asks ended once their stdin was closed. */
-export const asksEnded = (): number => callsOf('usage-ended');
+/**
+ * Whether the ask whose process is `pid` ended once its stdin was closed. By pid, not by a count: an ask an earlier test started may end
+ * after a later test has read a count, and move it by two.
+ */
+export const askEnded = (pid: number): boolean => fs.readFileSync(calls, 'utf8').split('\n').includes(`usage-ended pid=${pid}`);
 
 /** What the last ask ran in: `{ CLAUDECODE, CLAUDE_CODE_ENTRYPOINT, CLAUDE_CONFIG_DIR, CLAUDE_CODE_OAUTH_TOKEN, CLAUDE_CODE_USE_BEDROCK, cwd, pid }`, `unset` for a variable it did not have. */
 export function lastAskEnv(): Record<string, string> {

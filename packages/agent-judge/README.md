@@ -238,7 +238,9 @@ $ judge card docs/pivot-2026-09-18/experiments/jev/cards/card-agents-board.md --
 → dev-planned-build
 ```
 
-On the second asking both print `all on record · 0 requests`, with the same properties.
+On the second asking both print `all on record · 0 requests`, with the same properties, and the
+first line reads `4653 characters, not sent`: it says `sent` only when a request was made, so with
+every answer on record, or with the judge off, it says the card's text went nowhere.
 
 The thresholds are 0.8 and 0.2 for a noul, and 2.5 and 1.5 of 3 for clarity (`src/card.ts`). They
 **have not been measured on held-out cards.** They were chosen by eye on the cards of the pivot plan's §2

@@ -52,6 +52,8 @@ test('the card is sent without its frontmatter, beside the fixed repository text
   const again = await run(['card', cardFile(), '--record', record]);
   assert.equal(again.calls.length, 0);
   assert.match(again.text, /^all on record · 0 requests$/m);
+  // Nothing left the machine this time, and the first line says so.
+  assert.match(again.text, new RegExp(`^judge card: .*card\\.md · ${sent.card.length} characters, not sent, frontmatter stripped · jev-1\\.13\\.0$`, 'm'));
   assert.match(again.text, /^→ dev-build$/m);
 });
 
@@ -82,6 +84,7 @@ test('with no key it asks nothing, records nothing, says the judge is off, and t
   const { code, calls, text } = await run(['card', '--text', 'x', '--record', record], [answering({})], {});
   assert.equal(code, 0);
   assert.equal(calls.length, 0);
+  assert.match(text, /^judge card: .* · 1 characters, not sent, frontmatter stripped · /m, 'with the judge off the card went nowhere, and the first line says so');
   assert.match(text, /^ {2}web {4}no-key/m);
   assert.match(text, /^ {2}no-key: no TYPESAFE_API_KEY in the environment — the judge is off; set the key and run again$/m);
   assert.ok(!text.includes('--reask'), 'a missing key is not a failure to re-ask');

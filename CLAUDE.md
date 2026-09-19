@@ -6,6 +6,11 @@ tasks into runs of steps — a folder of markdown is a workflow (the `wf` CLI). 
 workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list, never up. Read
 `README.md` and each package's README for the model before changing behaviour.
 
+Beside them, and optional: `packages/agent-judge` asks TypeSafe's Jev a typed question once and records the
+answer (the `judge` CLI; Effect inside, plain Promises out). It imports nothing from the workspace and nothing
+imports it — `test/boundary.test.ts` refuses both — with no `TYPESAFE_API_KEY` every question reads `unsure`,
+and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *Never in a tick*).
+
 ## Check your work
 
 - `npm test` — from the root, turbo runs `node --test test/*.test.ts` in every package
@@ -63,6 +68,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   escapes, wrote a raw NUL and DEL into a regular expression's class in `apps/api/src/builder.ts`: ripgrep then took the whole file for
   binary, and a search of `apps/api/src` did not find it. Each app's `test/source.test.ts` refuses a raw control character in its `src` and
   `test`; a script that needs one builds it with `String.fromCharCode` (learned by the run that built the workflow builder, round 2).
+  The same happened to a byte order mark: writing `\uFEFF` through the file tools put a raw BOM into `agent-judge`'s `card.ts` and
+  `card.test.ts`, twice — and into this very line as it was written, caught only by looking for one — and that package's
+  `test/source.test.ts` refuses one too (learned by the run that built the judge package).
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).

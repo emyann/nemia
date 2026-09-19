@@ -79,7 +79,8 @@ const shown = (j: Judgment) => {
 /** What `judge card` prints. */
 export const report = (source: string, sent: number, record: string, asked: Asked<typeof QUESTIONS>): string[] => {
   const ids = Object.keys(QUESTIONS) as (keyof typeof QUESTIONS)[];
-  const lines = [`judge card: ${source} · ${sent} characters sent, frontmatter stripped · ${MODEL}`];
+  // `sent` only when a request was made: with the judge off, or every answer on record, the card's text went nowhere.
+  const lines = [`judge card: ${source} · ${sent} characters${asked.requests > 0 ? ' sent' : ', not sent'}, frontmatter stripped · ${MODEL}`];
   for (const id of ids) {
     const j = asked.answers[id];
     lines.push(`  ${id.padEnd(6)} ${shown(j).padEnd(16)} ${verdictOf(id, j).padEnd(7)} ${WHAT[id]}`);

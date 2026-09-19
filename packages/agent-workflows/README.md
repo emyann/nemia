@@ -1139,7 +1139,7 @@ screen shows what the branch touched, read out of git:
   implement
     check  npm test  →  exit 0 ✓
     used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s
-    cost  $3.01 · budget $5
+    cost  $3.01 · read 21.4M · wrote 412k · peak 167k · budget $5
     timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 turns · …  cost $3.01
               try 1 check  filed 08:19:56Z  spawned 08:19:57Z  ended 08:20:55Z  queued 1s  ran 58s
 
@@ -1171,7 +1171,14 @@ screen shows what the branch touched, read out of git:
   harness counted waiting on the model and running tools, once either was measured (`api 8m06s · tools 2s`).
   The cost is the harness's own figure, to the cent (three figures under one); for a step whose tries ran more
   than one session, also what they cost together (`$1.19 this try · $4.20 over 3 tries`); then the cap in force
-  (`· budget $5`). After the steps, the run's (`cost  run $12.40`): every step's tries together, saying how many
+  (`· budget $5`). Between the two, what the try's sessions read, by price, where the harness counted it
+  (the engine's *What a session read, by price*): tokens read from the cache (`read 21.4M`, the cheapest input)
+  and written to it (`wrote 412k`, twenty times dearer a token), and the largest context any one response read (`peak 167k`),
+  marked where it reached the step's `context:` cap (`, at its 200k cap`) or passed 200k with no cap
+  (`, past 200k with no cap`). A resumed attempt that wrote to the cache more than half its peak rebuilt the cache it
+  should have read, and the line says so (`resumed, it wrote its context to the cache again instead of reading it`).
+  An attempt that measured none of it says nothing, and nothing here is priced: the cost is still the harness's.
+  After the steps, the run's (`cost  run $12.40`): every step's tries together, saying how many
   ended attempts had no cost on them.
 - **timeline** is where the step's time went (`timeline` in `src/run.ts`, pure): a row for each try's
   session and each try's check, in UTC — filed, spawned, ended; *queued*, filed → spawned, which is the wait

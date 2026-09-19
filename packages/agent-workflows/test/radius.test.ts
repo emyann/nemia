@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   AGENT_FACING, CHECK_AFFECTING, LESSON, ROOT_GROUP, branchesToRead, count, deepWorkspaces, groupOf, inFullLines, isLesson, lessonGlobs, lessonLine, matches,
   parseGlobs, parseNumstat, radius, radiusLines, sensitiveHeading, sensitivePaths, sumUsage, touchedLines, usedLines, budgetWord, dollars,
+  peakMark, readWords, rebuiltCache,
 } from '../src/radius.ts';
 
 const WORKSPACES = ['packages/*', 'apps/*'];
@@ -249,4 +250,39 @@ test('what a session used, with the api and tool time its harness counted — be
   assert.deepEqual([budgetWord(3), budgetWord(2.5), budgetWord(0.25)], ['$3', '$2.50', '$0.25']);
   // Summed as every count is: only where every attempt measured it.
   assert.deepEqual(sumUsage([{ apiMs: 1_000, toolMs: 5, costUsd: 1 }, { apiMs: 2_000, costUsd: 0.5 }]), { apiMs: 3_000, costUsd: 1.5 });
+});
+
+test("what a session read, by price: its classes add up, its peak is the largest, and nothing is said where nobody counted", () => {
+  const a = { cacheReadTokens: 20_000_000, cacheWriteTokens: 300_000, uncachedTokens: 12, peakContextTokens: 150_000 };
+  const b = { cacheReadTokens: 1_400_000, cacheWriteTokens: 100_000, uncachedTokens: 3, peakContextTokens: 167_000 };
+  assert.deepEqual(sumUsage([a, b]), { cacheReadTokens: 21_400_000, cacheWriteTokens: 400_000, uncachedTokens: 15, peakContextTokens: 167_000 }, 'a peak is not a sum');
+  assert.equal('peakContextTokens' in sumUsage([a, { cacheReadTokens: 1 }])!, false, 'an attempt with no peak may have been the largest');
+  assert.equal(sumUsage([{ ...a, rebuiltCaches: 1 }, b, { ...b, rebuiltCaches: 1 }])!.rebuiltCaches, 2);
+
+  assert.equal(readWords(sumUsage([a, b])), 'read 21.4M · wrote 400k · peak 167k');
+  assert.equal(readWords({ turns: 3, inputTokens: 1_000, outputTokens: 20, costUsd: 1 }), '', 'a journal from before the classes: nothing, not 0');
+  assert.equal(readWords(undefined), '');
+  assert.equal(readWords({ cacheReadTokens: 900, cacheWriteTokens: 0, uncachedTokens: 5 }), 'read 900 · wrote 0', 'claude -p and codex: classes, no peak');
+  assert.deepEqual(usedLines({ costUsd: 4.87, ...a }), ['used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured', 'cost  $4.87 · read 20M · wrote 300k · peak 150k']);
+});
+
+test("a peak is marked where it reached a step's context: cap, or passed 200k with none — and only there", () => {
+  assert.equal(peakMark({ peakContextTokens: 200_000 }, 200_000), 'cap');
+  assert.equal(peakMark({ peakContextTokens: 167_000 }, 200_000), null, 'the cap held');
+  assert.equal(peakMark({ peakContextTokens: 440_000 }, 500_000), null, 'under a larger cap, past 200k is what was asked for');
+  assert.equal(peakMark({ peakContextTokens: 200_001 }, undefined), 'large');
+  assert.equal(peakMark({ peakContextTokens: 200_000 }, undefined), null);
+  assert.equal(peakMark({ cacheReadTokens: 900_000 }, undefined), null, 'no peak measured, nothing marked');
+  assert.equal(readWords({ peakContextTokens: 204_000 }, 200_000), 'peak 204k, at its 200k cap');
+  assert.equal(readWords({ peakContextTokens: 831_000 }), 'peak 831k, past 200k with no cap');
+});
+
+test('a resumed attempt that wrote more to the cache than half its peak rebuilt its cache, and says so in words', () => {
+  const rebuilt = { cacheReadTokens: 183_000, cacheWriteTokens: 184_500, peakContextTokens: 184_501 };
+  assert.equal(rebuiltCache(rebuilt, true), true);
+  assert.equal(rebuiltCache(rebuilt, false), false, 'a cold start writes its cache once: that is not a rebuild');
+  assert.equal(rebuiltCache({ ...rebuilt, cacheWriteTokens: 92_250 }, true), false, 'half its peak is not more than half');
+  assert.equal(rebuiltCache({ cacheWriteTokens: 184_500 }, true), false, 'no peak, no reading');
+  assert.equal(readWords({ ...rebuilt, rebuiltCaches: 1 }), 'read 183k · wrote 185k · peak 185k · resumed, it wrote its context to the cache again instead of reading it');
+  assert.match(readWords({ ...rebuilt, rebuiltCaches: 2 }), / · 2 resumed sessions wrote their context to the cache again instead of reading it$/);
 });

@@ -248,7 +248,7 @@ test('a journal written before the classes were measured folds as it did: inputT
   const [a] = fold('t', journal).attempts;
   assert.deepEqual(a!.usage, { turns: 85, toolCalls: 40, inputTokens: 21861234, outputTokens: 40100, costUsd: 14.72, apiMs: 679931, toolMs: 29305 });
   for (const key of ['uncachedTokens', 'cacheWriteTokens', 'cacheReadTokens', 'peakContextTokens']) assert.equal(key in a!.usage!, false, key);
-  assert.equal(usageLine(a!.usage), '85 turns · 40 tool calls · 21.9M in · 40.1k out · $14.72', 'and prints as it did');
+  assert.equal(usageLine(a!.usage), '85 turns · 40 tool calls · 21.9M in · 40.1k out · $14.72 · cache not measured · peak not measured', 'and ae show names what it did not count');
 });
 
 test('a session that used a model its harness could not price has no cost — a total too low reads as the whole — and says why', () => {
@@ -306,7 +306,12 @@ test('an attempt its runner measured nothing about records null, and a person re
 test('a measured attempt prints what was measured, and names what was not', () => {
   assert.equal(
     usageLine({ turns: 12, toolCalls: 31, inputTokens: 1_234_567, outputTokens: 20_400 }),
-    '12 turns · 31 tool calls · 1.2M in · 20.4k out · cost not measured',
+    '12 turns · 31 tool calls · 1.2M in · 20.4k out · cost not measured · cache not measured · peak not measured',
+  );
+  assert.equal(
+    usageLine({ turns: 85, toolCalls: 40, inputTokens: 21_861_234, uncachedTokens: 1_234, cacheWriteTokens: 412_000, cacheReadTokens: 21_448_000, peakContextTokens: 167_012, outputTokens: 40_100, costUsd: 14.72 }),
+    '85 turns · 40 tool calls · 21.9M in · 40.1k out · $14.72 · read 21.4M · wrote 412.0k · uncached 1.2k · peak 167.0k',
+    'the classes and the peak beside the cost',
   );
   assert.equal(usageLine({ turns: 4, toolCalls: 2, costUsd: 0.1054 }), '4 turns · 2 tool calls · tokens not measured · $0.11');
   const [a] = fold('t', [
@@ -356,9 +361,9 @@ test('ae ls shows a task\'s priority when it was filed with one, and nothing whe
 test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {
   assert.equal(
     usageLine({ toolCalls: 12, inputTokens: 373_710, outputTokens: 1_082 }),
-    'turns not measured · 12 tool calls · 373.7k in · 1.1k out · cost not measured',
+    'turns not measured · 12 tool calls · 373.7k in · 1.1k out · cost not measured · cache not measured · peak not measured',
   );
-  assert.equal(usageLine({ inputTokens: 10, outputTokens: 5 }), 'turns not measured · tool calls not measured · 10 in · 5 out · cost not measured');
+  assert.equal(usageLine({ inputTokens: 10, outputTokens: 5 }), 'turns not measured · tool calls not measured · 10 in · 5 out · cost not measured · cache not measured · peak not measured');
 });
 
 // ─── Codex: its exec --json stream ──────────────────────────────────────────

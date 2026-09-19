@@ -804,10 +804,10 @@ the session's `startedAt` in `claude agents --json` is counted; a row with no st
 usage rather than a wrong one. A count read from a finished session is kept as its statement is: for
 that start, while the transcript is unchanged. `ae show` prints one line per attempt — when it ran, then what it
 consumed, naming what was not measured, and its cost to the cent (`<$0.01` under one: `$0.00` would read as free) — and an
-attempt still running as `running since <start>`. `ae ls` prints the latest attempt's cost beside its turns, `$3.01 · 12t`:
+attempt still running as `running since <start>`. After the cost, what the attempt read by class and its peak context, each named not measured where its runner could not see it. `ae ls` prints the latest attempt's cost beside its turns, `$3.01 · 12t`:
 
 ```
-attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · $4.87
+attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · $4.87 · read <r> · wrote <w> · uncached <u> · peak <p>
 attempt 2  failed  09:05:02 → 09:05:40 (38s)  exit 1  usage not measured
 attempt 3  failed (budget)  09:05:41 → 09:05:44 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02
 ```
@@ -821,7 +821,7 @@ them, so whether `input_tokens` counts it is unknown, and a stream where it is n
 count:
 
 ```
-attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  turns not measured · <calls> tool calls · <in> in · <out> out · cost not measured
+attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  turns not measured · <calls> tool calls · <in> in · <out> out · cost not measured · read <r> · wrote 0 · uncached <u> · peak not measured
 ```
 
 ## Following a session: `transcript`

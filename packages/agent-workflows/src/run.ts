@@ -14,7 +14,7 @@
 import path from 'node:path';
 import { checkContract, refusalSection, verdictWord, type CheckRefusal, type Verdict } from './check.ts';
 import { depsLines, inside, type Provisioned } from './deps.ts';
-import { budgetWord, dollars, durationWord, sumUsage, usedLines, type Consumed } from './radius.ts';
+import { budgetWord, dollars, durationWord, readWords, rebuiltCache, sumUsage, usedLines, type Consumed } from './radius.ts';
 
 export { durationWord };
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, LOOP_REPLIES, loopSpan, outputFields, terminalSteps, upstreamOf, type Workflow } from './workflow.ts';
@@ -3398,18 +3398,20 @@ export const onYouWords = (l: Pick<Listing, 'steps' | 'waitingOnYou'>): string[]
   l.waitingOnYou.map((name) => (l.steps.find((s) => s.name === name)?.status === 'awaiting approval' ? `approve ${name}` : name));
 
 /**
- * A step's `cost` line on `wf decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) — and for a step whose
- * tries ran more than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where
- * nobody measured, never $0.
+ * A step's `cost` line on `wf decide`, under its `used`: what its current try cost (`used`, as `consumption` reads it) and what it read, by
+ * price (`readWords`: `read 21.4M · wrote 412k · peak 167k`, its peak against the step's `context:`) — and for a step whose tries ran more
+ * than one session, what they have cost together (`stepSpend`) — then the cap in force on it. Pure. `not measured` where nobody measured,
+ * never $0, and nothing of what it read where nobody counted that.
  */
 export function costLine(step: Workflow | undefined, run: Run, name: string, used: Consumed | undefined, spendOf: SpendOf): string {
-  const current = usedLines(used)[1]!.replace(/^cost\s+/, '');
+  const current = used?.costUsd !== undefined ? dollars(used.costUsd) : 'not measured';
+  const read = readWords(used, step?.context);
   const record = run.steps[name];
   const sessions = sessionTasks(record).length;
   const all = stepSpend(run, name, spendOf);
   const spent = sessions > 1
-    ? `${current === 'not measured' ? 'this try not measured' : `${current} this try`} · ${all.measured ? spentWord(all) : 'not measured'} over ${tryOf(run, name)} tries`
-    : current;
+    ? `${current === 'not measured' ? 'this try not measured' : `${current} this try`}${read ? ` · ${read}` : ''} · ${all.measured ? spentWord(all) : 'not measured'} over ${tryOf(run, name)} tries`
+    : `${current}${read ? ` · ${read}` : ''}`;
   const cap = step ? budgetOf(step, record) : undefined;
   return `cost  ${spent}${cap !== undefined ? ` · budget ${budgetWord(cap)}` : ''}`;
 }
@@ -4009,17 +4011,21 @@ export function workspacePlan(steps: readonly Workflow[], step: Workflow): Works
  * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the
  * engine. runner.ts hands `timeline` the engine's views, which have this shape.
  */
-export type AttemptClock = { startedAt: string; spawnedAt: string | null; endedAt: string | null; reason: string | null; usage: Consumed | null };
+export type AttemptClock = { startedAt: string; spawnedAt: string | null; endedAt: string | null; reason: string | null; usage: Consumed | null; resumeFrom?: string };
 
 /** A task as the timeline reads it off the engine's view: its brief, its attempts, whether it settled, and what the attempt in flight has consumed so far. */
 export type TaskClock = { state: { brief: string; attempts: readonly AttemptClock[]; settled: string | null }; usage?: Consumed };
 
 /**
  * What one task's session consumed, summed over its attempts (`sumUsage`): a settled attempt's usage off the engine's record, the one in
- * flight off the view, and an attempt that never started left out. Undefined where nobody measured it.
+ * flight off the view, and an attempt that never started left out. Undefined where nobody measured it. An attempt that continued a session
+ * and rebuilt its cache is counted in `rebuiltCaches` (`rebuiltCache`): only the attempt knows it was resumed.
  */
 export const taskUsage = (view: TaskClock | undefined): Consumed | undefined =>
-  view ? sumUsage(view.state.attempts.filter((a) => a.reason !== 'unstartable').map((a) => (a.endedAt ? a.usage : view.usage))) : undefined;
+  view ? sumUsage(view.state.attempts.filter((a) => a.reason !== 'unstartable').map((a) => {
+    const u = a.endedAt ? a.usage : view.usage;
+    return u && rebuiltCache(u, a.resumeFrom !== undefined) ? { ...u, rebuiltCaches: 1 } : u;
+  })) : undefined;
 
 /**
  * One task on the clock: a try's session, or its check.

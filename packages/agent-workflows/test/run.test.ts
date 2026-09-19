@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -2785,10 +2785,28 @@ test("`costLine`: a step's cost on `wf decide` — its current try's, and where 
   const rechecked = onTry([{ taskId: 't1', check: { taskId: 'c0' }, then: 'recheck' }], 'c1');
   assert.equal(costLine(step('implement'), rechecked, 'implement', { costUsd: 2 }, spends({ t1: 2 })), 'cost  $2.00');
 
+  // What the try read, by price, after what it cost — its peak against the step's `context:` — and nothing where nobody counted it.
+  const read = { costUsd: 1.19, cacheReadTokens: 21_400_000, cacheWriteTokens: 412_000, uncachedTokens: 9, peakContextTokens: 167_000 };
+  assert.equal(costLine({ ...B, context: 200_000 }, three, 'implement', read, all), 'cost  $1.19 this try · read 21.4M · wrote 412k · peak 167k · $4.20 over 3 tries · budget $10');
+  assert.equal(costLine({ ...B, context: 150_000 }, one, 'implement', read, all), 'cost  $1.19 · read 21.4M · wrote 412k · peak 167k, at its 150k cap · budget $5');
+  assert.equal(costLine(step('implement'), one, 'implement', { cacheReadTokens: 5, cacheWriteTokens: 0, uncachedTokens: 1 }, () => undefined), 'cost  not measured · read 5 · wrote 0');
+
   assert.deepEqual(runCostLines(three, all), ['cost  run $4.20']);
   assert.deepEqual(runCostLines(three, partly), ['cost  run $1.50 measured · 1 attempt not measured']);
   assert.deepEqual(runCostLines(three, spends({}, ['t1'])), ['cost  run not measured']);
   assert.deepEqual(runCostLines(three, () => undefined), [], 'nothing has ended');
+});
+
+test("a step's usage counts the resumed attempts that rebuilt their cache, off the attempt that knows it was resumed", () => {
+  const at = (n: number) => `2026-09-18T09:0${n}:00Z`;
+  const attempt = (n: number, usage: object, resumeFrom?: string) => ({ startedAt: at(n), spawnedAt: at(n), endedAt: at(n + 1), reason: 'harness', usage, ...(resumeFrom ? { resumeFrom } : {}) });
+  const cold = { cacheReadTokens: 900_000, cacheWriteTokens: 180_000, peakContextTokens: 180_000 };
+  const rewrote = { cacheReadTokens: 183_000, cacheWriteTokens: 184_500, peakContextTokens: 184_501 };
+  const read = { cacheReadTokens: 2_100_000, cacheWriteTokens: 9_000, peakContextTokens: 190_000 };
+  const view = (...attempts: object[]): TaskClock => ({ state: { brief: 'b', attempts: attempts as TaskClock['state']['attempts'], settled: 'succeeded' } });
+  assert.equal(taskUsage(view(attempt(1, cold), attempt(2, rewrote, 'sess-1')))!.rebuiltCaches, 1);
+  assert.equal('rebuiltCaches' in taskUsage(view(attempt(1, rewrote)))!, false, 'a first attempt, cold, wrote its cache once');
+  assert.equal('rebuiltCaches' in taskUsage(view(attempt(1, cold), attempt(2, read, 'sess-1')))!, false, 'resumed and read it: nothing to say');
 });
 
 test('a try on the timeline says what its session cost beside what it used, where the engine measured it', () => {

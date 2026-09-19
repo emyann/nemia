@@ -918,6 +918,15 @@ export function resultSteps(steps: readonly Workflow[]): Workflow[] {
 }
 
 /**
+ * The checks the run's work was judged by: each distinct `check:` of a step that is not an ending, in the order the steps run. What an
+ * ending step is told to run again on the merge, so a shipper written once reads its folder's check off its brief rather than carrying
+ * one in its words. Pure.
+ */
+export function workChecks(steps: readonly Workflow[]): string[] {
+  return [...new Set(steps.filter((s) => s.workspace !== 'main' && s.check).map((s) => s.check!))];
+}
+
+/**
  * The branches whose tips this pass records (`tipsSeen`): a finished run's result branches — succeeded or failed, so neither running nor
  * cancelled — when it cut worktrees and did not work on its base branch itself. What `wf decide` offers to ship. None for any other run,
  * so git is not asked about it.
@@ -3539,6 +3548,8 @@ export function composeBrief(
       // because what a result branch was cut from does not move.
       parts.push(`This run cut no branch of its own — it is this step, and nothing else — so there is no work of its to read: what you act on is what you find, here and wherever you were told to look.`, '');
     }
+    // The check is the folder's, not the ending's words: one shipper serves every folder, and each is told the check its work was judged by.
+    for (const check of workChecks(steps)) parts.push(`This workflow's check, which its work was judged by: \`${check}\``, '');
     parts.push(
       'What you do here a person sees in their own checkout: it is theirs, and this step is the run doing what they would do by hand.',
       'Leave it as you found it but for what you were asked to do — the run commits nothing here for you.',

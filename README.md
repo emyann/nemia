@@ -37,7 +37,7 @@ or TanStack Start server.
 The Factory's header shows how much of the subscription's five-hour window and week is used, each with its
 reset in your own time zone, and how old the reading is. Nothing to install: `GET /api/quota` asks Claude Code
 itself, with its `get_usage` control request, and serves the answer. It asks the `claude` on the api's PATH, at
-most once every 3 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
+most once every 10 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
 asks on every read). An ask is a short `claude -p` that makes no model turn and spends nothing:
 
 ```bash
@@ -59,10 +59,26 @@ curl -s localhost:8787/api/quota   # state "fresh", with its windows; the Factor
 ```
 
 Every other state is a sentence on the header saying what to do, and never a number read as the quota:
-`asking` (the first ask, still out), `no-plan` (not signed in to a subscription), `no-claude` (none on the api's
-PATH), `timeout` (no answer in 15 s), `failed` (claude stopped first; its last line of stderr is quoted) and
-`unknown` (an answer this board does not read — `get_usage` is experimental in Claude Code, and a new version may
-change it). The last answer that had windows is on hover.
+`asking` (the first ask, still out), `no-plan` (not signed in to a subscription), `unanswered` (see below),
+`no-claude` (none on the api's PATH), `timeout` (no answer in 15 s), `failed` (claude stopped first; its last line
+of stderr is quoted) and `unknown` (an answer this board does not read — `get_usage` is experimental in Claude
+Code, and a new version may change it). Under the sentence, the last good reading stays in sight, dimmed and
+dated (`as of 11:20, 25 min ago`), for up to six hours; past that it goes.
+
+**`unanswered`: the usage service gave nothing.** Claude Code signed in to a subscription answers
+`rate_limits_available: true` with `rate_limits: null` when Anthropic's usage service did not give it the windows:
+2.1.278's `--debug` log then says `Usage fetch returned a fieldless or non-object body (in-band error)`. The service
+may be limiting how often the account asks — that cannot be told from outside, and the board does not claim it —
+so the board asks less often: 20 minutes after the first such answer, then 40, 80, 160, and every 4 hours for as
+long as it lasts; the first good reading begins it again. `HKB_QUOTA_BACKOFF_MS` sets the first wait (`0` asks on
+every read). The waits are kept in the api's memory, as the rest is: a restart costs one ask.
+
+**Why not the Agent SDK.** `@anthropic-ai/claude-agent-sdk` (0.3.270) has the same request as
+`query.usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET({ skipBehaviors })`, typed
+`SDKControlGetUsageResponse`: it writes the same control request to the same `claude`, and would get the same
+answers, `rate_limits: null` included (its type says "or null when unavailable"). The api asks the CLI itself and
+does not take the SDK's type either: the SDK is the engine's dependency, not the api's, and the api reads the
+answer defensively, as `unknown`, should a version change it.
 
 If you installed the statusline an earlier version of this board asked for, take its `statusLine` block out of
 `~/.claude/settings.json` and delete `~/.agent-workflows/quota.json`: nothing reads either now.

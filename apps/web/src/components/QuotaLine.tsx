@@ -1,16 +1,16 @@
 import { TriangleAlert } from 'lucide-react';
 import type { Quota } from '@/lib/api';
-import { agoWord, quotaTitle, windowWords } from '@/lib/quota';
+import { agoWord, lastWords, quotaTitle, type WindowWords, windowWords } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
 
 /**
  * The subscription's quota over the Factory's floor: each window Claude Code answered with, as a percentage used with its reset in the
- * person's own time, and how old the answer is — or, when there is nothing to show as now, the api's sentence saying why and what to do. A window
- * used past the api's mark is marked. A row of its own under the counts, since it never fits beside them. Nothing until it is read;
- * why, when it cannot be.
+ * person's own time, and how old the answer is — or, when there is nothing to show as now, the api's sentence saying why and what to do,
+ * with the last good reading under it, dimmed and dated, so that nobody takes it for now. A window used past the api's mark is marked. A
+ * row of its own under the counts, since it never fits beside them. Nothing until it is read; why, when it cannot be.
  */
 export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: Error | null }) {
-  // The age moves between reads: the api is read again every minute, and answers from an ask up to three minutes old.
+  // The age moves between reads: the api is read again every minute, and answers from an ask up to ten minutes old — or hours, for the last.
   const now = new Date(useNow(30_000));
   if (error) {
     return (
@@ -22,36 +22,40 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
   if (!quota) return null;
   const title = quotaTitle(quota, now);
   if (quota.state !== 'fresh') {
+    const last = lastWords(quota, now);
     return (
-      <p data-quota={quota.state} title={title} className="max-w-2xl basis-full text-xs text-muted-foreground">
-        {quota.said}
-      </p>
+      <div data-quota={quota.state} title={title} className="max-w-2xl basis-full text-xs text-muted-foreground">
+        <p>{quota.said}</p>
+        {last && (
+          <p data-quota-last className="mt-0.5 flex flex-wrap items-baseline gap-x-3 opacity-60">
+            {last.windows.map((w) => <Window key={w.key} words={w} markAt={quota.markAt} data={{ 'data-quota-last-window': w.key }} />)}
+            <span data-quota-last-age>{last.asOf}</span>
+          </p>
+        )}
+      </div>
     );
   }
   const age = quota.askedAt ? agoWord(now.getTime() - Date.parse(quota.askedAt)) : null;
   return (
     <p data-quota="fresh" title={title} className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-muted-foreground">
-      {quota.windows.map((w) => {
-        const words = windowWords(w, now);
-        return (
-          <span
-            key={w.key}
-            data-quota-window={w.key}
-            data-marked={words.marked || undefined}
-            className={words.marked ? 'text-amber-700 dark:text-amber-400' : undefined}
-          >
-            {words.marked && <TriangleAlert aria-label={`${quota.markAt}% or more used`} className="mr-1 inline size-3.5 -translate-y-px" />}
-            {words.label}{' '}
-            <span className={words.marked ? 'font-semibold tabular-nums' : 'font-medium text-foreground tabular-nums'}>{words.used}</span>
-            {words.resets && <span className="text-xs"> · {words.resets}</span>}
-          </span>
-        );
-      })}
+      {quota.windows.map((w) => <Window key={w.key} words={windowWords(w, now)} markAt={quota.markAt} data={{ 'data-quota-window': w.key }} emphasis />)}
       {age && (
         <span data-quota-age className="text-xs">
           read {age}
         </span>
       )}
     </p>
+  );
+}
+
+/** One window's words: its label, the percentage — in the text's own colour when `emphasis` is off, as for the last reading — and its reset. */
+function Window({ words, markAt, data, emphasis = false }: { words: WindowWords; markAt: number; data: Record<string, string>; emphasis?: boolean }) {
+  return (
+    <span {...data} data-marked={words.marked || undefined} className={words.marked ? 'text-amber-700 dark:text-amber-400' : undefined}>
+      {words.marked && <TriangleAlert aria-label={`${markAt}% or more used`} className="mr-1 inline size-3.5 -translate-y-px" />}
+      {words.label}{' '}
+      <span className={words.marked ? 'font-semibold tabular-nums' : emphasis ? 'font-medium text-foreground tabular-nums' : 'font-medium tabular-nums'}>{words.used}</span>
+      {words.resets && <span className="text-xs"> · {words.resets}</span>}
+    </span>
   );
 }

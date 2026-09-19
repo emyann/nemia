@@ -5,5 +5,10 @@ packages/agent-workflows/docs/features.md merge=union
 
 # The root CLAUDE.md is a list too: every run that learns something appends a lesson to it, at the end of the same section, so two runs side by
 # side conflict in it though neither touched a line of the other's. A union merge keeps both lessons. The cost is the same as above: two
-# edits of one existing line keep both versions, so whoever merges reads the merged file and tidies it (apps/web/test/e2e/merge.test.ts).
+# edits of one existing line keep both versions, so whoever merges reads the merged file and tidies it (apps/web/test/e2e-merge.test.ts).
 /CLAUDE.md merge=union
+
+# The e2e's list of its pages, a name a line (apps/web/test/e2e/pages.ts). Every run that adds a page adds its line at the end, so two runs
+# side by side would conflict there as they did on the one array of pages this replaced. Union keeps both lines; the order of the lines means
+# nothing, and the loader refuses the list and the page files when they differ (apps/web/test/e2e-merge.test.ts).
+/apps/web/test/e2e/pages/NAMES merge=union

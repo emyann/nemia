@@ -6,6 +6,10 @@
  *
  * The order matters: the pages share one seeded store, and each takes back what it wrote before the next is visited. A new page's number
  * says where it goes, and the numbers go in tens to leave room.
+ *
+ * Beside the pages, `pages/NAMES` says which pages there are, a name a line, in no order that matters. The directory alone cannot tell a page
+ * deleted by mistake from one never written, so the load refuses a page with no line and a line with no page. The file is merged by union
+ * (`.gitattributes`): two runs that each add a page and its line merge.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -14,25 +18,52 @@ import type { PageSpec } from './visit.ts';
 
 export const PAGES_DIR = path.join(import.meta.dirname, 'pages');
 
+/** The file in `pages/` that says which pages there are. */
+export const NAMES = 'NAMES';
+
 /** A page's file name: three digits, a dash, and the page's name — what its screenshots are called. */
 const PAGE_FILE = /^(\d{3})-([a-z0-9]+(?:-[a-z0-9]+)*)\.ts$/;
 
 /** The order the pages are visited in: their file names, compared as plain strings. */
 export const orderOf = (names: readonly string[]): string[] => [...names].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
+/** The page a file is: its name without its number. */
+const nameOf = (file: string): string => PAGE_FILE.exec(file)![2]!;
+
+/** The pages `dir`'s NAMES says there are: its lines, trimmed, the blank ones left out. */
+export function namesIn(dir = PAGES_DIR): Set<string> {
+  const file = path.join(dir, NAMES);
+  if (!fs.existsSync(file)) throw new Error(`${file} is not there, and it says which pages the e2e visits: write it, the name of each page on a line of its own.`);
+  return new Set(fs.readFileSync(file, 'utf8').split('\n').map((line) => line.trim()).filter(Boolean));
+}
+
 /**
- * The page files in `dir`, in the order they are visited. Refuses anything else there — a helper, a page without its number, a folder or a
- * link — since the runner would never visit it: a page that is not visited checks nothing, and says nothing about it. `list` is how the
- * directory is read, for a test to hand it one that lists its files in an order of its own.
+ * The page files in `dir`, in the order they are visited. Refuses anything else there but NAMES — a helper, a page without its number, a
+ * folder or a link — since the runner would never visit it: a page that is not visited checks nothing, and says nothing about it. And refuses
+ * when the pages and NAMES differ either way. `list` is how the directory is read, for a test to hand it one that lists its files in an order
+ * of its own.
  */
 export function pageFiles(dir = PAGES_DIR, list: (dir: string) => fs.Dirent[] = (d) => fs.readdirSync(d, { withFileTypes: true })): string[] {
-  const entries = list(dir);
+  const entries = list(dir).filter((entry) => !(entry.name === NAMES && entry.isFile()));
   const strays = entries.filter((entry) => !entry.isFile() || !PAGE_FILE.test(entry.name)).map((entry) => entry.name);
   if (strays.length) {
-    throw new Error(`${dir} holds only pages, each a file NNN-<name>.ts, and the e2e would never visit ${orderOf(strays).join(', ')}. ` +
+    throw new Error(`${dir} holds only pages, each a file NNN-<name>.ts, and ${NAMES}, and the e2e would never visit ${orderOf(strays).join(', ')}. ` +
       'Name a page for its place and its name (250-<name>.ts); put a helper beside pages.ts (board.ts, canvas.ts), not in pages/.');
   }
-  return orderOf(entries.map((entry) => entry.name));
+  const files = orderOf(entries.map((entry) => entry.name));
+  const names = namesIn(dir);
+  const unlisted = files.filter((file) => !names.has(nameOf(file)));
+  if (unlisted.length) {
+    throw new Error(`${unlisted.join(', ')} ${unlisted.length > 1 ? 'are pages' : 'is a page'} ${path.join(dir, NAMES)} does not name: ` +
+      `add a line for each (${unlisted.map(nameOf).join(', ')}), or the e2e cannot tell it went missing.`);
+  }
+  const pages = new Set(files.map(nameOf));
+  const missing = [...names].filter((name) => !pages.has(name)).sort();
+  if (missing.length) {
+    throw new Error(`${path.join(dir, NAMES)} names ${missing.join(', ')}, and ${dir} has no page file for ${missing.length > 1 ? 'them' : 'it'}, ` +
+      'so the e2e would not visit it: restore the file (NNN-<name>.ts, from git), or, if the page was deleted on purpose, delete its line from NAMES.');
+  }
+  return files;
 }
 
 const isPageSpec = (spec: unknown): spec is PageSpec =>
@@ -46,7 +77,7 @@ export async function loadPages(dir = PAGES_DIR): Promise<PageSpec[]> {
   for (const file of pageFiles(dir)) {
     const { default: spec } = (await import(pathToFileURL(path.join(dir, file)).href)) as { default?: unknown };
     if (!isPageSpec(spec)) throw new Error(`${file} default-exports its page: export default { name, route, expect } satisfies PageSpec.`);
-    const name = PAGE_FILE.exec(file)![2]!;
+    const name = nameOf(file);
     if (spec.name !== name) throw new Error(`${file} is the ${name} page, which its screenshots are named for, and it says it is ${spec.name}: make the two the same.`);
     const other = from.get(spec.name);
     if (other) throw new Error(`${other} and ${file} are both the ${spec.name} page, which would be visited twice and photographed over itself: rename one.`);

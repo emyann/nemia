@@ -12,5 +12,5 @@
     "erasableSyntaxOnly": true,
     "types": ["node"]
   },
-  "include": ["*.ts", "pages/*.ts"]
+  "include": ["*.ts", "pages/*.ts", "../e2e-*.test.ts"]
 }

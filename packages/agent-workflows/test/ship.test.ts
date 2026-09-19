@@ -572,6 +572,29 @@ test("REFUSED at shipped defaults: `wf round` at an ending's gate says the run i
   assert.ok(!fs.existsSync(path.join(ROOT, 'runs', `${run.id}.asks`, 'round-review-2')), 'and no ask was written');
 });
 
+test("REFUSED at shipped defaults: a step is handed off once — a person's edit in the reviewed worktree while the run waits at its ending's gate is not committed under review's name, pass after pass", async () => {
+  // The incident's path: the work sent back, review hands on (`again: false`) with no commit of its own, so the branch's tip is the one
+  // the run already recorded and the pass that hands review off writes nothing else — the mark must be written for itself.
+  const { id, e, settle } = await stoppedOnBase();
+  await retry(e, id, 'review', { mode: 'nudge', message: 'take main' });
+  await advance(e, readRun(id));
+  settle(`${id}-review-try2`, 'succeeded', { ...SIGNED, again: false });
+  const tipsBefore = readRun(id).tips;
+  const handing = await advance(e, readRun(id));
+  assert.deepEqual([handing.filed, handing.looped, handing.tried], [[], [], []], 'the pass that hands review off files nothing: the ending waits at its gate');
+  assert.deepEqual(readRun(id).tips, tipsBefore, 'and no tip moved, so nothing else of the pass wrote the record');
+  const review = readRun(id).steps.review!;
+  assert.equal(review.handedOff, `${id}-review-try2`, 'the mark is on the record on disk, not only in the pass that set it');
+
+  // A person edits the reviewed worktree while the run waits for their approval.
+  const tip = git(review.workspace!, 'rev-parse', 'HEAD');
+  fs.writeFileSync(path.join(review.workspace!, 'NOTES.md'), "a person's notes\n");
+  await advance(e, readRun(id));
+  await advance(e, readRun(id));
+  assert.equal(git(review.workspace!, 'rev-parse', 'HEAD'), tip, "no commit under review's name");
+  assert.match(git(review.workspace!, 'status', '--porcelain'), /NOTES\.md/, "the edit is still the person's, uncommitted");
+});
+
 test("a check that refuses leaves the checkout clean: the abort the ending's prose names takes the trial merge back, and the run says what happened", async () => {
   const { repo, id, branch, e, settle, base } = await atTheGate();
   await approve(e, id, 'ship');

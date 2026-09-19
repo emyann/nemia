@@ -1857,6 +1857,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   //
   // Only while the record is there, read at the moment of each: a run `wf rm` forgot after this pass read it is not handed off — a
   // `--no-worktree` run's workspace is a person's checkout — and its files directory is not made again.
+  // Whether a step's hand-off was marked on this pass: a mark nobody writes is lost, and the next pass commits a person's edits as the step's.
+  let markedHandedOff = false;
   const collected = handOffDue(steps, run, phaseOf).flatMap((name) => {
     if (!fs.existsSync(runFile(run.id))) return [];
     const record = run.steps[name]!;
@@ -1864,7 +1866,10 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
     if (isGitRun(run)) handed = handOff(record.workspace!, name);
     else folderPlace(runsDir()).handOff(run, name);
     // Once for the try, unless git refused the commit — a hook, a signature — which the next pass tries again.
-    if (!(handed && 'error' in handed)) run.steps[name] = { ...record, handedOff: record.taskId! };
+    if (!(handed && 'error' in handed)) {
+      run.steps[name] = { ...record, handedOff: record.taskId! };
+      markedHandedOff = true;
+    }
     return collectArtifacts(run, name, signedOff(name));
   });
 
@@ -2163,7 +2168,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   const tips = tipped.length && isGitRun(run) ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
   if (tips) run.tips = tips;
   // Only to a record that is still there: a run `wf rm` forgot while this pass was at work stays forgotten (`rewriteRun`).
-  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst) rewriteRun(run);
+  if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst || markedHandedOff) rewriteRun(run);
   // After the record is written, never before: an ask is consumed once the record holds its try or its round — this
   // pass's, or one a pass that died before consuming it wrote down.
   consumeAsks(run, asks, roundAsks);

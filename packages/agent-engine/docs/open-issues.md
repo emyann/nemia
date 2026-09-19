@@ -801,3 +801,25 @@ door to this bug, through `state: done` rather than quiet. `test/live.test.ts` f
 and not run (`AE_LIVE` was not set). And a transcript with no user line gives no `lastModified` through the SDK's
 `getSessionInfo`, so its session is never measured quiet and ends only at its deadline: found writing the test, whose
 first fixture had no prompt line. Every `--bg` transcript seen starts with its prompt.
+
+**The second door, closed (2026-09-19, P0.5).** It was not hypothetical. Of the 344 tasks filed with a schema in this
+machine's store on 2026-09-19, 5 had a last end journalled `observed: done`, `reason: harness`, no closeout, and settled
+`succeeded` (implement steps of four runs, among them `the-web-app-s-components-on-3xq9` and
+`the-workflow-builder-on-the-4ifo`). `decide` now reads a `done` sighting with no statement, on a task that asked for one,
+as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`test/decide.test.ts`, and a fake `claude`
+listing the session `done` in `test/unsigned.test.ts`; both fail with it reverted). A journal written before keeps what
+it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-workflows', not the
+engine's: the run continues an unsigned session once a round (`signoff`, agent-workflows' features.md, P0.5), and the engine's
+own allowance stays `maxAttempts`, which agent-workflows leaves at 1.
+
+**Ends that carried neither statement nor reason, closed (2026-09-19, P0.5).** Every ended attempt now carries the agent's
+statement or the machine's reason (README, *Every ended attempt carries its statement or the reason it has none*). Measured
+over this machine's store that day: of 511 settled tasks, 4 settled with their last attempt still open — all `stopped`,
+note `operator`, all on tasks with a schema — so no `ended`, no reason, and a statement given before the stop, had there
+been one, dropped. A deadline did the same (none on the record). `decide` now ends such an attempt `operator` (recorded
+`stopped`) or `deadline` (recorded `failed`) before its task settles, or as its harness ended it if it had, statement
+untouched. The contract test in `test/decide.test.ts` walks every sighting × schema × statement × budget × cut to its
+settle; it found a third: an attempt cut at its budget and listed `done` (or quiet) was recorded `done`, reason `budget`,
+and settled `succeeded`. None of the 507 ends on the record is `budget`, so it was not seen live; it is `failed` now.
+Each of the three fails the contract test when reverted. agent-workflows reads a check ended `deadline` or `operator` as
+`unfinished` whatever exit code its end carries, as it read one left open.

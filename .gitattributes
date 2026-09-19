@@ -1,0 +1,4 @@
+# Every run adds a section to this file at the same place, so two runs that worked side by side always conflicted in it and
+# nowhere else (2026-09-19: three times in one morning). A union merge keeps both sides' lines. If two runs ever edit the same
+# existing sentence, both versions are kept and a person tidies them.
+packages/agent-workflows/docs/features.md merge=union

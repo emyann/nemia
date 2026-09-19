@@ -138,7 +138,7 @@ test('a task that asked for a closeout, whose session goes quiet without one, do
     v = await engine.view(id);
     assert.equal(v.state.settled, 'failed');
     assert.equal(v.state.attempts[1]?.reason, 'unsigned');
-    assert.equal(await settledNote(engine, id), '2 attempt(s), none succeeded: the last went quiet without the closing statement it was asked for');
+    assert.equal(await settledNote(engine, id), '2 attempt(s), none succeeded: the last ended without the closing statement it was asked for');
     assert.deepEqual(claude.rows(), [], 'and its session let go');
   });
 });
@@ -190,6 +190,32 @@ test('quiet after a statement of its own succeeds with it; quiet after only a st
     assert.equal(w.state.settled, 'failed', "a parent's statement is not this attempt's: unsigned, not succeeded");
     assert.equal(w.state.attempts[0]?.reason, 'unsigned');
     assert.equal(w.state.attempts[0]?.closeout, undefined);
-    assert.equal(await settledNote(engine, inherited), '1 attempt(s), none succeeded: the last went quiet without the closing statement it was asked for');
+    assert.equal(await settledNote(engine, inherited), '1 attempt(s), none succeeded: the last ended without the closing statement it was asked for');
+  });
+});
+
+test("THE HARNESS'S `done` without a statement is unsigned too, for a task that asked for one: the second door, closed — and a task that asked for nothing still succeeds on it", async () => {
+  // Measured on 2026-09-19 over this machine's journals: 5 of 344 tasks filed with a schema were journalled `observed: done`,
+  // `reason: harness`, with no closeout, and settled `succeeded`. The registry said `done`, not quiet, and only quiet was read.
+  const claude = fakeClaude();
+  await onPath(claude.bin, async () => {
+    const engine = createEngine({ root: tmp('root') });
+    const asked = await engine.file({ brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA });
+    const nothing = await engine.file({ brief: 'the prompt', cwd: tmp('cwd') });
+    await engine.tick();
+    for (const row of claude.rows()) {
+      wrote(row.sessionId, 0, prompt('the prompt'), says('msg_1', 'I have finished.'));
+      claude.set(row.name, { state: 'done' });
+    }
+    await engine.tick();
+
+    const v = await engine.view(asked);
+    assert.equal(v.state.settled, 'failed', 'not a success: it never said it had finished');
+    assert.deepEqual(v.state.attempts.map((a) => [a.ended, a.reason, a.closeout]), [['failed', 'unsigned', undefined]]);
+    assert.equal(await settledNote(engine, asked), '1 attempt(s), none succeeded: the last ended without the closing statement it was asked for');
+
+    const w = await engine.view(nothing);
+    assert.equal(w.state.settled, 'succeeded', "the harness's word is the only end a task that asked for nothing has");
+    assert.deepEqual(w.state.attempts.map((a) => [a.ended, a.reason]), [['done', 'harness']]);
   });
 });

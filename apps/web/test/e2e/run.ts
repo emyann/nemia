@@ -27,7 +27,7 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { CELL_HEIGHT } from '../../src/lib/factory.ts';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { AGENTS, arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, ENDING, FAKE, GATED, HELD, INBOX, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, QUOTA, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedQueue, seedQuota, seedWorkflows, SESSION, SHIPPED, UNMERGED, WORKFLOWS } from './seed.ts';
+import { AGENTS, arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, ENDING, FAKE, GATED, HELD, INBOX, LONG_NAMES, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, QUOTA, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedLongNames, seedQueue, seedQuota, seedWorkflows, SESSION, SHIPPED, UNMERGED, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -452,9 +452,9 @@ const PAGES: PageSpec[] = [
       // in the folder's own words with the command that approves it; or with a branch nobody merged, which git ends.
       const ending = cardOf(page, ENDING.id);
       await expectVisible(ending, `a run at its ending's gate keeps its card on the floor with no Show finished (${ENDING.id})`);
-      // What approving does and where a send-back goes, in a line that fits; the folder's own words for the ending on hover.
+      // What approving does and where a send-back goes, in a row; the line whole, and the folder's own words for the ending, on hover.
       await expectVisible(
-        ending.locator(`[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="${ENDING.says}"]`, { hasText: `approve to run ${ENDING.ending} on main, or send ${ENDING.back} back` }),
+        ending.locator(`[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="approve to run ${ENDING.ending} on main"][title$="${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}"]`, { hasText: `approve to run ${ENDING.ending} on main, or send ${ENDING.back} back` }),
         `its card says what approving its ending does and where a send-back goes, the folder's words on hover`,
       );
       await expectVisible(ending.getByRole('button', { name: 'Approve', exact: true }), 'and answers it on the card: Approve');
@@ -877,6 +877,46 @@ const PAGES: PageSpec[] = [
       await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);
       await expectClearOfEachOther(page);
+    },
+  },
+  {
+    // The gate's card with the names the seed never has: a gated step, a send-back step and a base branch that do not fit a line, four
+    // steps, one asking. Its gate line holds one row, the rest on hover, and the card stays clear of the card beneath it after a Reset
+    // layout. The run is written for this page and taken back before it ends, the floor laid out again as seeded.
+    name: 'factory-gate-long-names',
+    route: '/',
+    expect: async (page) => {
+      const { id, ending, back, onto } = LONG_NAMES;
+      // Dated between ENDING and UNMERGED, which the grid puts in the last column, so it lands above one of them: a card one cell beneath it.
+      const dated = (run: string) => Date.parse(JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${run}.json`), 'utf8')).createdAt);
+      const written = seedLongNames(store!, new Date((dated(ENDING.id) + dated(UNMERGED.id)) / 2).toISOString());
+      const card = cardOf(page, id);
+      try {
+        await page.reload({ waitUntil: 'networkidle' });
+        await expectVisible(card, `the run with the long names is on the floor (${id})`);
+        await page.getByRole('button', { name: 'Reset layout' }).click();
+        await settled(page);
+        await expectVisible(card.locator(`[data-need="asks"][data-step="${LONG_NAMES.steps[1]}"]`), 'and the step that asks says so on the card');
+        // Measured against a card beneath it, or the measure proves nothing: the grid puts one there on this floor.
+        const cards = await cardsDrawn(page);
+        const mine = cards.find((c) => c.id === id)!;
+        if (!cards.some((c) => Math.abs(c.x - mine.x) < 1 && c.y > mine.y)) throw new Refused(`a card lies beneath ${id} in its column, to measure it against`);
+        await expectClearOfEachOther(page);
+        const line = card.locator(`[data-gate-line="${ending}"]`);
+        const whole = `approve to run ${ending} on ${onto}, or send ${back} back`;
+        await expectVisible(line, `the card has ${ending}'s gate line`);
+        const title = await line.getAttribute('title');
+        if (!title?.includes(whole)) throw new Refused(`the gate line is whole on hover — its title is ${JSON.stringify(title)}`);
+        const rows = await line.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+        if (rows !== 1) throw new Refused(`the gate line holds one row whatever the names — it is ${rows} rows`);
+        await page.screenshot({ path: path.join(OUT, `factory-gate-long-names-card-${await themeOf(page)}.png`), fullPage: true });
+      } finally {
+        for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+      }
+      await page.reload({ waitUntil: 'networkidle' });
+      await expectCount(card, 0, 'with the run taken back, its card is gone');
+      await page.getByRole('button', { name: 'Reset layout' }).click();
+      await settled(page);
     },
   },
   {

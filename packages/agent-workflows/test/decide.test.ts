@@ -54,7 +54,7 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
  */
 const board = () => {
   type Filed = { id: string; closeoutSchema?: object; priority?: number; remoteControl?: boolean };
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; filedAt: number }>();
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; reason?: string; filedAt: number }>();
   const T0 = Date.parse('2026-09-13T00:00:00Z');
   const iso = (ms: number) => new Date(ms).toISOString();
   const logs = new Map<string, string>();
@@ -74,7 +74,7 @@ const board = () => {
           ...(t && carries.on ? { priority: t.spec.priority, remoteControl: t.spec.remoteControl } : {}),
           attempts: !t || t.phase === 'pending' ? [] : [{
             n: 1, startedAt: iso(t.filedAt + 5_000), spawnedAt: iso(t.filedAt + 12_000),
-            endedAt: settled ? iso(t.filedAt + 300_000) : null, reason: settled ? 'harness' : null,
+            endedAt: settled ? iso(t.filedAt + 300_000) : null, reason: settled ? t.reason ?? 'harness' : null,
             nativeId: `native-${id}`, closeout: t.closeout, usage: t.usage ?? null, exitCode: null,
           }],
         },
@@ -85,7 +85,7 @@ const board = () => {
     stop: async () => {},
     logs: async (id: string) => logs.get(id) ?? '(no output yet)',
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object) => Object.assign(tasks.get(id)!, { phase, closeout, usage });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object, reason?: string) => Object.assign(tasks.get(id)!, { phase, closeout, usage, reason });
   const filed = (id: string): Filed | undefined => tasks.get(id)?.spec;
   return { e, settle, logs, viewed, carries, filed };
 };
@@ -411,6 +411,23 @@ test("REFUSED to hide why a step stopped past its budget: `wf decide` on a step 
     indexOf(lines, '    cost  $3.40 · budget $3');
     assert.ok(!lines.some((l) => /its tries have cost its budget: or more/.test(l)), 'the shared reason is gone');
   }
+});
+
+test("UNSIGNED after the run's own nudge: `wf decide` and `wf ls` say the run nudged it to sign off once, and that it ended unsigned again — the nudge spent, the step yours", async (t) => {
+  const run = start({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false });
+  const { e, settle } = board();
+  await advance(e, readRun(run.id));
+  // As the engine records a session that ended without calling StructuredOutput: failed, its last attempt `unsigned`.
+  settle(`${run.id}-implement`, 'failed', undefined, undefined, 'unsigned');
+  assert.deepEqual((await advance(e, readRun(run.id))).notes.filter((n) => n.startsWith('implement:')), ['implement: try 2 — a nudge to sign off, once a round']);
+  settle(`${run.id}-implement-try2`, 'failed', undefined, undefined, 'unsigned');
+  await advance(e, readRun(run.id));
+  const lines = await screen(t, e, run.id);
+  indexOf(lines, '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares; nothing after it ran');
+  const out: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { out.push(args.map(String).join(' ')); });
+  try { await main(['ls', run.id], e); } finally { log.mock.restore(); }
+  assert.ok(out.some((l) => /^ {3}implement +unsigned .*try 2, nudged to sign off by the run/.test(l)), out.join('\n'));
 });
 
 test("the branch's standing against the base is a fact on every screen — on it, ahead by N, gone", async (t) => {

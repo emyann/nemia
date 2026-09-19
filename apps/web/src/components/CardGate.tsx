@@ -15,8 +15,8 @@ const SMALL = 'h-6 rounded px-2 text-[11px] font-medium outline-none focus-visib
 const POPOVER = 'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-neutral-900 shadow-lg outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100';
 
 /**
- * A gate on the Factory's card: what approving does and where a send-back goes, in two lines that fit (`gateCardLine`), whole in the
- * inspector; and the answer beside it — Approve and Send back, each a popover over the card, through the same api as the run page's gate
+ * A gate on the Factory's card: what approving does and where a send-back goes, in a row (`gateCardLine`), cut short where the names are
+ * long and whole on hover and in the inspector; and the answer beside it — Approve and Send back, each a popover over the card, through the same api as the run page's gate
  * (`useApprove`, `useAsk`). The popover is the second press: nothing is sent by the button on the card. At an ending the approval's button
  * says what it runs (`Run ship now`), and a send-back needs words, as `wf retry --message` does. A refusal shows in the popover in the
  * api's words, the words kept in the box.
@@ -27,7 +27,7 @@ const POPOVER = 'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 tex
 export function CardGate({ runId, gate, title, stamp, onTaken }: {
   runId: string;
   gate: GateAsk;
-  /** The gate's words in full, on hover: the folder's own for an ending, `wf ls`'s for a step's hand-off. */
+  /** The gate's words in full, on hover under the line: the folder's own for an ending, `wf ls`'s for a step's hand-off. */
   title: string;
   stamp: string;
   onTaken: (taken: Taken) => void;
@@ -35,12 +35,14 @@ export function CardGate({ runId, gate, title, stamp, onTaken }: {
   const approval = useApprove(runId, gate.step, () => undefined);
   const [to, setTo] = useState(gate.back[0] ?? gate.step);
   const sendBack = useAsk(runId, gate.step, () => undefined);
+  const line = gateCardLine(gate);
 
   return (
     // The stop keeps a press on the gate, or in its popovers, from toggling the card, which listens to clicks anywhere on it.
     <div className="nodrag space-y-1.5 px-3" onClick={(event) => event.stopPropagation()} onDoubleClick={(event) => event.stopPropagation()}>
-      <p data-to-decide={gate.ends ? 'approve' : undefined} data-gate-line={gate.step} title={title} className="text-[11px] break-words text-amber-800 dark:text-amber-300">
-        {gateCardLine(gate)}
+      {/* One row whatever the names: a card taller than its cell reaches over the card beneath it (`CELL_HEIGHT`). */}
+      <p data-to-decide={gate.ends ? 'approve' : undefined} data-gate-line={gate.step} title={`${line}\n${title}`} className="truncate text-[11px] text-amber-800 dark:text-amber-300">
+        {line}
       </p>
       <div className="flex items-center gap-1.5">
         <Answer label="Approve" name={`Approve ${gate.step}`} primary>

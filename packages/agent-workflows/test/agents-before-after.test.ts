@@ -4,7 +4,7 @@
  * `fixtures/resolved-before.json` is what today's loader read every shipped folder as, written from the loader of 6c4e57b before any
  * folder moved a line into an agent. It is never regenerated: a difference is a finding, not a fixture to refresh.
  *
- * Every key of every step is held equal, field for field, with no exception but the new `agent` and the keys `KEYS_ADDED` names. The bodies are compared too, and the
+ * Every key of every step is held equal, field for field, with no exception but the new `agent` and the keys `KEYS_ADDED` and `KEYS_CHANGED` name. The bodies are compared too, and the
  * steps whose body moved must be exactly `BODIES_REWORDED`: the reworded briefs of the change that wrote the agents, each printed as a
  * diff for the person who reads the run.
  */
@@ -63,6 +63,19 @@ const KEYS_ADDED: Record<string, Record<string, unknown>> = {
   'workflows/supervisor/supervise': { context: 200_000 },
 };
 
+/**
+ * The keys of a shipped step whose value moved after the snapshot, as `<folder>/<step>` and each key with its new value: nothing an agent
+ * moved, and each held to that value, and to having been in the snapshot with another. The `dev` folders' implement check runs the build
+ * and the e2e when, and only when, the work touched the web app (docs/pivot-2026-09-18.md §6, P0.6): three runs changed `apps/web/src` on
+ * `dev`, whose check was the suite and the types, and no build and no e2e ever ran on them. The line is `dev`'s own, read here rather than
+ * copied, and held equal between the two folders; web-check.test.ts runs it against real git.
+ */
+const DEV_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev')).find((s) => s.name === 'implement')!.check!;
+const KEYS_CHANGED: Record<string, Record<string, unknown>> = {
+  'workflows/dev/implement': { check: DEV_CHECK },
+  'workflows/dev-planned/implement': { check: DEV_CHECK },
+};
+
 /** A step as JSON has it — no `undefined` — without the fields the proof sets aside. */
 const keysOf = (step: Record<string, unknown>): Record<string, unknown> => {
   const { body: _body, agent: _agent, ...keys } = JSON.parse(JSON.stringify(step)) as Record<string, unknown>;
@@ -96,7 +109,7 @@ test('every shipped folder resolves to the keys it had before agents, and only t
     assert.deepEqual(after.map((s) => s.name), before.map((s) => s.name), `${folder}: the same steps, in the same order`);
     for (const [i, step] of after.entries()) {
       const was = before[i]!;
-      assert.deepEqual(keysOf(step), { ...keysOf(was), ...KEYS_ADDED[`${folder}/${String(step.name)}`] }, `${folder}/${String(step.name)}: every key as it resolved before`);
+      assert.deepEqual(keysOf(step), { ...keysOf(was), ...KEYS_ADDED[`${folder}/${String(step.name)}`], ...KEYS_CHANGED[`${folder}/${String(step.name)}`] }, `${folder}/${String(step.name)}: every key as it resolved before`);
       const agent = step.agent as { name: string; body: string } | undefined;
       if (agent) {
         named[`${folder}/${String(step.name)}`] = agent.name;
@@ -118,6 +131,15 @@ test('every shipped folder resolves to the keys it had before agents, and only t
     const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
     const was = BEFORE[folder]!.find((s) => s.name === name)!;
     for (const key of Object.keys(keys)) assert.equal(Object.hasOwn(keysOf(was), key), false, `${at}: ${key} was in the snapshot`);
+  }
+  // Each key changed is one the snapshot had, with another value: a key added is never passed off as one changed.
+  for (const [at, keys] of Object.entries(KEYS_CHANGED)) {
+    const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
+    const was = keysOf(BEFORE[folder]!.find((s) => s.name === name)!);
+    for (const [key, value] of Object.entries(keys)) {
+      assert.equal(Object.hasOwn(was, key), true, `${at}: ${key} was not in the snapshot`);
+      assert.notDeepEqual(was[key], value, `${at}: ${key} is as the snapshot had it`);
+    }
   }
   assert.deepEqual(moved.sort(), [...BODIES_REWORDED].sort(), 'the bodies that moved are exactly the reworded ones');
   assert.deepEqual(named, AGENTS, 'each shipped step names the agent it was written from');

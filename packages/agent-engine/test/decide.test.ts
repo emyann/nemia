@@ -115,6 +115,28 @@ test('a QUIET session asked for a statement that gave none ends UNSIGNED: failed
   assert.equal(said.do === 'record-end' && said.observed, 'done', 'with a statement, done');
 });
 
+test("the HARNESS'S `done` without a statement ends UNSIGNED too, for a task that asked for one — not only quiet", () => {
+  // The second door (open issue 25's neighbour, measured 2026-09-19: 5 of 344 schema'd tasks settled `succeeded` this way).
+  const done = (extra: Partial<Sighting> = {}): Map<string, Sighting> => new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'done' as const, ...extra }]]);
+  assert.deepEqual(decide(fold(TASK, inFlight(true)), done(), now(5)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1', closeout: undefined });
+  // The controls: a statement given, and a task that asked for none, end `done` on the harness's word as they did.
+  assert.deepEqual(decide(fold(TASK, inFlight(true)), done({ closeout: { payload: { ok: true }, at: 3 } }), now(5)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: { ok: true } });
+  assert.deepEqual(decide(fold(TASK, inFlight(false)), done(), now(5)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1', closeout: undefined });
+  // A harness's `failed` is its verdict, statement or not, and a budget spent keeps its own reason.
+  assert.equal((decide(fold(TASK, inFlight(true)), done({ state: 'failed' }), now(5)) as { reason?: string }).reason, 'harness');
+  assert.equal((decide(fold(TASK, inFlight(true)), done({ budgetSpent: true }), now(5)) as { reason?: string }).reason, 'budget');
+});
+
+test('an old journal that recorded a `done` end with no statement on a schema task folds, and settles, as it did', () => {
+  // Written before the rule: `fold` reads the end as recorded and never re-derives it.
+  const old = fold(TASK, [...inFlight(true), { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'n1' }]);
+  assert.deepEqual(old.attempts.map((a) => [a.ended, a.reason, a.closeout]), [['done', 'harness', undefined]]);
+  assert.deepEqual(decide(old, seen(), now(9)), { do: 'settle', outcome: 'succeeded' });
+});
+
 test('quiet ends only a WORKING session: not a blocked one, and no session its runner has not called quiet', () => {
   assert.equal(decide(fold(TASK, inFlight(true)), quiet({ state: 'blocked' }), now(5)).do, 'nothing', 'blocked waits on a person, however quiet');
   assert.equal(decide(fold(TASK, inFlight(true)), quiet({ quietMs: undefined }), now(5)).do, 'nothing', 'idle, but not quiet for long enough');
@@ -150,7 +172,7 @@ test("UNSIGNED under `resume: never` starts clean, and a clean start is told the
 
 test('UNSIGNED with no attempt left settles failed, and says why', () => {
   assert.deepEqual(decide(fold(TASK, unsigned(1)), quiet(), now(9)),
-    { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded: the last went quiet without the closing statement it was asked for' });
+    { do: 'settle', outcome: 'failed', note: '1 attempt(s), none succeeded: the last ended without the closing statement it was asked for' });
 });
 
 test('a nudge is on the attempt it started, from the journal', () => {
@@ -191,10 +213,13 @@ test('a session stopped by hand settles as stopped, and costs no retry', () => {
   assert.equal(a.do === 'settle' && a.outcome, 'stopped');
 });
 
-test('a stop request stops a live session, then settles', () => {
+test('a stop request stops a live session, ends its attempt OPERATOR, then settles', () => {
   const live: Event[] = [filed(), { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 }, { kind: 'stop-requested', at: at(3) }];
   assert.deepEqual(decide(fold(TASK, live), seen([N1, 'working']), now(9)), { do: 'stop', sessionId: 's0', why: 'operator' });
-  assert.equal(decide(fold(TASK, live), seen([N1, 'stopped']), now(9)).do, 'settle');
+  assert.deepEqual(decide(fold(TASK, live), seen([N1, 'stopped']), now(9)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'stopped', reason: 'operator', nativeId: undefined, closeout: undefined });
+  const ended = fold(TASK, [...live, { kind: 'ended', at: at(10), attempt: 1, sessionId: 's0', observed: 'stopped', reason: 'operator' }]);
+  assert.deepEqual(decide(ended, seen([N1, 'stopped']), now(11)), { do: 'settle', outcome: 'stopped', note: 'operator' });
 });
 
 test('a stop request on a task that never started settles it immediately', () => {
@@ -246,9 +271,12 @@ test('a BLOCKED session past its deadline is stopped too — the only thing that
   assert.deepEqual(decide(s, seen([N1, 'blocked']), now(20_000)), { do: 'stop', sessionId: 's0', why: 'deadline' });
 });
 
-test('once the session is gone, the deadline settles the task as failed', () => {
+test('once the session is gone, the deadline ends its attempt DEADLINE, then settles the task as failed', () => {
   const s = fold(TASK, [withDeadline(10), ...started()]);
-  const a = decide(s, seen([N1, 'stopped']), now(20_000));
+  assert.deepEqual(decide(s, seen([N1, 'stopped']), now(20_000)),
+    { do: 'record-end', attempt: 1, sessionId: 's0', observed: 'failed', reason: 'deadline', nativeId: undefined, closeout: undefined });
+  const ended = fold(TASK, [withDeadline(10), ...started([{ kind: 'ended', at: at(20_001), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'deadline' }])]);
+  const a = decide(ended, seen([N1, 'stopped']), now(20_002));
   assert.equal(a.do, 'settle');
   assert.equal(a.do === 'settle' && a.outcome, 'failed');
   assert.match(a.do === 'settle' ? a.note ?? '' : '', /deadline exceeded/);
@@ -380,4 +408,49 @@ test('the fold keeps every `said` in order, each with the attempt it was said to
     { kind: 'said', at: at(6), attempt: 2, text: 'second' },
   ]);
   assert.deepEqual(s.said.map((x) => [x.attempt, x.text]), [[1, 'first'], [2, 'second']]);
+});
+
+// ─── the contract: every ended attempt carries its statement or the reason it has none ──────────
+
+test('CONTRACT: every attempt a task settles over is ended — with the statement its session gave, untouched, or the reason it has none', () => {
+  // Every sighting, with and without a statement, a schema, a spent budget, and a cut — a person's stop, or the
+  // deadline — walked to its settle. Before 2026-09-19 a cut settled the task over an open attempt: neither.
+  const STATEMENT = { summary: 'the agent\'s words' };
+  const states = [undefined, 'quiet', 'working', 'blocked', 'done', 'failed', 'stopped'] as const;
+  let walked = 0;
+  for (const state of states) for (const schema of [false, true]) for (const said of [false, true])
+  for (const budgetSpent of [false, true]) for (const cut of ['none', 'operator', 'deadline'] as const) {
+    const at_ = `${state} schema=${schema} said=${said} budget=${budgetSpent} cut=${cut}`;
+    const events: Event[] = [
+      { kind: 'filed', at: at(0), brief: 'b', cwd: '/r', maxAttempts: 1, ...(schema ? { closeoutSchema: { type: 'object' } } : {}), ...(cut === 'deadline' ? { deadlineSeconds: 10 } : {}) },
+      { kind: 'starting', at: at(1), attempt: 1 }, { kind: 'spawned', at: at(2), attempt: 1 },
+      ...(cut === 'operator' ? [{ kind: 'stop-requested', at: at(3) } as Event] : []),
+    ];
+    let sighting: Sighting | undefined = state === undefined ? undefined : {
+      sessionId: 's0', nativeId: 'native-1', state: state === 'quiet' ? 'working' : state, ...(state === 'quiet' ? { quietMs: 60_000 } : {}),
+      ...(said ? { closeout: { payload: STATEMENT, at: T0.getTime() + 30_000 } } : {}), ...(budgetSpent ? { budgetSpent: true as const } : {}),
+    };
+    let settled = false;
+    for (let step = 0; step < 6 && !settled; step++) {
+      const a = decide(fold(TASK, events), new Map(sighting ? [[N1, sighting]] : []), now(60_000));
+      if (a.do === 'settle') settled = true;
+      else if (a.do === 'stop') sighting = { ...sighting!, state: 'stopped' };
+      else if (a.do === 'record-end') events.push({ kind: 'ended', at: at(4 + step), attempt: a.attempt, sessionId: a.sessionId, observed: a.observed, reason: a.reason, nativeId: a.nativeId, closeout: a.closeout });
+      else break;
+    }
+    if (!settled) {
+      assert.ok(cut === 'none' && (state === 'working' || state === 'blocked'), `${at_}: only a live, uncut session stays unsettled`);
+      continue;
+    }
+    walked++;
+    const [attempt] = fold(TASK, events).attempts;
+    assert.notEqual(attempt!.ended, null, `${at_}: settled over an open attempt — neither statement nor reason`);
+    assert.equal(attempt!.closeout, sighting?.closeout?.payload, `${at_}: the statement is the session's, untouched, or none`);
+    if (state === 'done' || state === 'failed') assert.ok(!['operator', 'deadline'].includes(attempt!.reason!), `${at_}: its harness ended it before the cut, and that end is recorded`);
+    if (budgetSpent && state !== undefined) assert.deepEqual([attempt!.ended, attempt!.reason], ['failed', 'budget'], `${at_}: a spent budget is failed, never done`);
+    if (attempt!.closeout === undefined && schema) {
+      assert.ok(attempt!.ended !== 'done', `${at_}: a task that asked for a statement is never done without one`);
+    }
+  }
+  assert.ok(walked > 100, `walked ${walked}`);
 });

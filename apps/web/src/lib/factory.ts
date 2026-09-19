@@ -123,16 +123,20 @@ export const inFlightFirst = <T extends Pick<RunSummary, 'id' | 'createdAt' | 's
 /** A cell on the Factory's grid: room for one card and the gap beside and below it. Cards are drawn to fit. */
 export const CELL_WIDTH = 320;
 /**
- * A cell holds the cards the board draws and the gap under one, as its width holds a card and the gap beside it: four or five steps with a line
- * of what one of them asks stands about 235 tall — the e2e's floor measures 233 and 234 — and at 220 the grid put the card beneath under its
- * bottom edge on every layout.
+ * A cell holds the cards the board draws and the gap under one, as its width holds a card and the gap beside it: the tallest card a person
+ * is asked to act on is a gate's with four steps, one of them asking — each step a row, the ask two, the gate's line one and its buttons
+ * under it — and it stands 291 tall whatever the names, the e2e's `factory-gate-long-names` measures, which a cell of 260 did not hold. At
+ * 320 the cell is square and the gap under that card about the one beside every card; five such steps still fit. Every other card pays for
+ * it in room: a row of the floor is 60 taller, so a floor of three rows is 180 taller and Fit view draws it a little smaller. At 220 the
+ * grid put the card beneath under the bottom edge of the cards of the day.
  *
- * It is not a bound, and nothing here can make it one: a card draws a line per ask and per step blocked (`needsOf`, two lines each) and a word
- * for what the run waits on, so a run whose steps each ask outgrows any cell, and the card beneath is under its foot again. The board takes that
- * over capping the card, which would cut what a person has to act on — the ask itself — and the cards that outgrow it are the rare ones.
+ * Names cost no height: the card cuts a long name to its line (the title, the gate's line) or cuts the status beside it (a step), whole on
+ * hover. Counts do, and nothing here makes the cell a bound on them: a card draws a line per ask and per step blocked (`needsOf`, two lines
+ * each), so a run whose steps each ask outgrows any cell, and the card beneath is under its foot again. The board takes that over capping
+ * the card, which would cut what a person has to act on — the ask itself — and the cards that outgrow it are the rare ones.
  * `expectClearOfEachOther` in the e2e measures the floor it seeds against this number; it does not stand for a bound there is none of.
  */
-export const CELL_HEIGHT = 260;
+export const CELL_HEIGHT = 320;
 export const GRID_COLUMNS = 4;
 /** How wide a card is drawn (`w-72`): the rest of its cell is the gap to the next card. */
 export const CARD_WIDTH = 288;

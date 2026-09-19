@@ -222,8 +222,8 @@ test('a session ended by quiet is stopped before it goes — its end is on the r
 });
 
 test('no session is released while its attempt runs; one a person stopped is released once its task settles, its id recorded for logs', async () => {
-  // A task a person stops settles with no `ended`, so its session's id goes on its `settled` entry: once
-  // left listed for want of that id (found in review), the session is now released and still read.
+  // A task a person stops ends its attempt `operator` before it settles, its session's id on that end: once settled
+  // with no end, and left listed for want of that id (found in review), the session is now released and still read.
   const claude = fakeClaude();
   await onPath(claude.bin, async () => {
     const engine = createEngine({ root: tmp('root') });
@@ -239,8 +239,8 @@ test('no session is released while its attempt runs; one a person stopped is rel
     for (let i = 0; i < 3; i++) await engine.tick();
     const v = await engine.view(id);
     assert.equal(v.state.settled, 'stopped');
-    assert.equal(v.state.attempts[0]?.ended, null, 'settled with no end written');
-    assert.equal(v.state.attempts[0]?.nativeId, row!.sessionId, 'its session id, recorded as it settled');
+    assert.deepEqual([v.state.attempts[0]?.ended, v.state.attempts[0]?.reason], ['stopped', 'operator'], 'ended, saying why it has no statement');
+    assert.equal(v.state.attempts[0]?.nativeId, row!.sessionId, 'its session id, recorded as it ended');
     assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], "the person's stop, then — stopped by then — only rm");
     assert.deepEqual(claude.rows(), []);
     assert.equal(v.sessionId, row!.sessionId);
@@ -259,7 +259,7 @@ test('a session stopped at its deadline is released once its task settles, as on
     for (let i = 0; i < 3; i++) await engine.tick();
     const v = await engine.view(id);
     assert.equal(v.state.settled, 'failed');
-    assert.equal(v.state.attempts[0]?.ended, null, 'settled with no end written');
+    assert.deepEqual([v.state.attempts[0]?.ended, v.state.attempts[0]?.reason], ['failed', 'deadline'], 'ended, saying why it has no statement');
     assert.deepEqual(claude.releases(), [['stop', short(row!)], ['rm', short(row!)]], 'stopped by the deadline, then removed');
   });
 });

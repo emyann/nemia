@@ -185,6 +185,8 @@ async function main(): Promise<void> {
     ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
     // The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written.
     HKB_QUOTA_KEEP_MS: '0',
+    // And after an answer the usage service gave nothing for, so the page that draws one reads the good answer it puts back.
+    HKB_QUOTA_BACKOFF_MS: '0',
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
   });
   const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API, apiEnv, /api listening on http:\/\/127\.0\.0\.1:(\d+)/);

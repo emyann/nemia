@@ -506,9 +506,10 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setFits((n) => n + 1);
   }, [laned]);
   // The quota over the floor, read in the route's loader so the floor is fitted beside it once. Should it come, go, or change what it says —
-  // a sentence in place of the numbers, which may wrap the header to another line — the floor is fitted again to its new height.
+  // a sentence in place of the numbers, which may wrap the header to another line, or the dimmed last reading under it — the floor is fitted
+  // again to its new height.
   const quota = useQuery(quotaQuery);
-  const quotaShown = quota.error ? 'error' : (quota.data?.state ?? 'none');
+  const quotaShown = quota.error ? 'error' : `${quota.data?.state ?? 'none'}${quota.data?.last ? ' with the last reading' : ''}`;
   const wasQuota = useRef(quotaShown);
   useEffect(() => {
     if (wasQuota.current === quotaShown) return;

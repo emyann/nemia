@@ -1,7 +1,8 @@
 /**
- * Two runs that change the board side by side merge without a hand, in a throwaway repository: two that each add a page to the e2e, and two
- * that each add a lesson to CLAUDE.md. Each beside what the old shape did — one array of pages, CLAUDE.md merged as code — which conflicts,
- * so the test shows the structure is what stops it. Git with no config of this machine's: no hooks, no signing, no one's defaults.
+ * Two runs that change the board side by side merge without a hand, in a throwaway repository: two that each add a page to the e2e (its
+ * file and its line in `pages/NAMES`), and two that each add a lesson to CLAUDE.md. Each beside what the old shape did — one array of
+ * pages, NAMES and CLAUDE.md merged as code — which conflicts, so the test shows the structure is what stops it. No browser: `npm test` runs
+ * it. Git with no config of this machine's: no hooks, no signing, no one's defaults.
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -9,9 +10,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
-import { PAGES_DIR, pageFiles } from './pages.ts';
+import { NAMES, namesIn, PAGES_DIR, pageFiles } from './e2e/pages.ts';
 
-const REPO = path.resolve(import.meta.dirname, '..', '..', '..', '..');
+const REPO = path.resolve(import.meta.dirname, '..', '..', '..');
 
 const temps: string[] = [];
 after(() => {
@@ -58,13 +59,33 @@ function mergeOf(base: Record<string, string>, one: Record<string, string>, othe
 const pageFile = (name: string): string =>
   `import type { PageSpec } from '../visit.ts';\n\nexport default {\n  name: '${name}',\n  route: '/',\n  expect: async () => {},\n} satisfies PageSpec;\n`;
 
-test('two branches that each add a page under pages/, with the same number, merge cleanly, and both are visited', () => {
-  const base = Object.fromEntries(fs.readdirSync(PAGES_DIR).map((file) => [`pages/${file}`, fs.readFileSync(path.join(PAGES_DIR, file), 'utf8')]));
-  const { repo, clean, said } = mergeOf(base, { 'pages/250-alpha.ts': pageFile('alpha') }, { 'pages/250-beta.ts': pageFile('beta') });
+/** Where the pages sit in the repository, and so in a throwaway one: `.gitattributes` names NAMES by this path. */
+const PAGES = path.relative(REPO, PAGES_DIR);
+
+/** The repository's pages and NAMES, and its .gitattributes, at their paths. */
+const shippedPages = (): Record<string, string> => ({
+  ...Object.fromEntries(fs.readdirSync(PAGES_DIR).map((file) => [path.join(PAGES, file), fs.readFileSync(path.join(PAGES_DIR, file), 'utf8')])),
+  '.gitattributes': fs.readFileSync(path.join(REPO, '.gitattributes'), 'utf8'),
+});
+
+/** A page added as a run adds one: its file, and its line at the end of NAMES. */
+const added = (base: Record<string, string>, file: string, name: string): Record<string, string> =>
+  ({ [path.join(PAGES, file)]: pageFile(name), [path.join(PAGES, NAMES)]: `${base[path.join(PAGES, NAMES)]}${name}\n` });
+
+test('two branches that each add a page and its line in NAMES, with the same number, merge cleanly, and both are visited', () => {
+  const base = shippedPages();
+  const { repo, clean, said } = mergeOf(base, added(base, '250-alpha.ts', 'alpha'), added(base, '250-beta.ts', 'beta'));
   assert.ok(clean, `the merge is clean — git said:\n${said}`);
-  const merged = pageFiles(path.join(repo, 'pages'));
+  const merged = pageFiles(path.join(repo, PAGES));
   assert.deepEqual(merged.slice(-3), ['240-capabilities.ts', '250-alpha.ts', '250-beta.ts']);
-  assert.equal(merged.length, Object.keys(base).length + 2);
+  assert.equal(merged.length, fs.readdirSync(PAGES_DIR).length - 1 + 2);
+  assert.ok(['alpha', 'beta'].every((name) => namesIn(path.join(repo, PAGES)).has(name)), 'NAMES keeps both lines');
+});
+
+test('without the union rule for NAMES, the same two pages conflict on their lines', () => {
+  const base = { ...shippedPages(), '.gitattributes': '' };
+  const { clean } = mergeOf(base, added(base, '250-alpha.ts', 'alpha'), added(base, '250-beta.ts', 'beta'));
+  assert.equal(clean, false, 'two lines added at the end of NAMES conflict');
 });
 
 test('the old shape — one array of pages every run appends to — conflicts on the same two adds', () => {

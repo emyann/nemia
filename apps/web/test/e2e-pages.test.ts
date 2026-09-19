@@ -1,38 +1,44 @@
 /**
- * The e2e's list of pages is the directory `pages/` (pages.ts): every file there visited, each once, in the order of their names, and
- * anything else there refused, since the runner would never visit it. No browser: `npm run e2e` runs this before it builds anything.
+ * The e2e's list of pages is the directory `e2e/pages/` (pages.ts): every file there visited, each once, in the order of their names, and
+ * anything else there refused, since the runner would never visit it; and `pages/NAMES` says which pages there are, so one deleted by
+ * mistake is refused too. No browser, so `npm test` runs it; the tests in `e2e/` are the ones that need Chromium.
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { after, test } from 'node:test';
-import { loadPages, orderOf, PAGES_DIR, pageFiles } from './pages.ts';
+import { loadPages, NAMES, namesIn, orderOf, PAGES_DIR, pageFiles } from './e2e/pages.ts';
 
 const temps: string[] = [];
 after(() => {
   for (const dir of temps) fs.rmSync(dir, { recursive: true, force: true });
 });
 
-/** A directory of pages: each file's name and what it holds — a page named as given, or any text. */
+/**
+ * A directory of pages: each file's name and what it holds — a page named as given, or any text. And a NAMES naming each file that is named
+ * as a page is, unless `files` gives one of its own.
+ */
 function dirOf(files: Record<string, string>): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-pages-'));
   temps.push(dir);
-  for (const [name, text] of Object.entries(files)) fs.writeFileSync(path.join(dir, name), text);
+  const names = Object.keys(files).flatMap((file) => /^\d{3}-(.+)\.ts$/.exec(file)?.[1] ?? []);
+  for (const [name, text] of Object.entries({ [NAMES]: names.map((name) => `${name}\n`).join(''), ...files })) fs.writeFileSync(path.join(dir, name), text);
   return dir;
 }
 const page = (name: string): string => `export default { name: ${JSON.stringify(name)}, route: '/', expect: async () => {} };\n`;
 
-test('every file in pages/ is a page the e2e visits, once, named as its file is', async () => {
-  const files = fs.readdirSync(PAGES_DIR);
+test('every file in pages/ but NAMES is a page the e2e visits, once, named as its file is, and NAMES names each', async () => {
+  const files = fs.readdirSync(PAGES_DIR).filter((file) => file !== NAMES);
   const pages = await loadPages();
   assert.equal(pages.length, files.length, 'one page per file');
+  assert.deepEqual([...namesIn()].sort(), pages.map((p) => p.name).sort(), 'NAMES names the pages there are, and no other');
   assert.deepEqual(pages.map((p) => p.name), pageFiles().map((file) => file.replace(/^\d{3}-/, '').replace(/\.ts$/, '')));
   assert.equal(new Set(pages.map((p) => p.name)).size, pages.length, 'no page twice');
 });
 
 test('the runner visits what loadPages reads, and no list of its own', () => {
-  const runner = fs.readFileSync(path.join(import.meta.dirname, 'run.ts'), 'utf8');
+  const runner = fs.readFileSync(path.join(import.meta.dirname, 'e2e', 'run.ts'), 'utf8');
   assert.match(runner, /visitAll\(browser, base, pages, OUT\)/);
   assert.match(runner, /const pages = await loadPages\(\);/);
   assert.doesNotMatch(runner, /from '\.\/pages\//, 'run.ts imports no page by its file');
@@ -71,11 +77,49 @@ for (const [what, files, refusal] of [
   });
 }
 
+test('a page deleted by mistake is refused: its line in NAMES is still there', async () => {
+  const dir = dirOf({ '010-a.ts': page('a'), '020-b.ts': page('b'), '030-c.ts': page('c') });
+  fs.rmSync(path.join(dir, '020-b.ts'));
+  const refusal = (e: Error) => /NAMES names b, and .* has no page file for it, .*: restore the file .*, or, if the page was deleted on purpose, delete its line from NAMES\.$/.test(e.message);
+  assert.throws(() => pageFiles(dir), refusal);
+  await assert.rejects(loadPages(dir), refusal);
+});
+
+test('the shipped pages are refused with one of theirs deleted', () => {
+  // The real NAMES, over a copy of the real pages less one: the list is what knows it is gone.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-pages-'));
+  temps.push(dir);
+  fs.cpSync(PAGES_DIR, dir, { recursive: true });
+  const gone = pageFiles(dir)[0]!;
+  fs.rmSync(path.join(dir, gone));
+  assert.throws(() => pageFiles(dir), (e: Error) => new RegExp(`NAMES names ${gone.slice(4, -3)}, and .* has no page file for it`).test(e.message));
+});
+
+test('a page NAMES does not name is refused', async () => {
+  const dir = dirOf({ '010-a.ts': page('a'), '020-b.ts': page('b'), [NAMES]: 'a\n' });
+  const refusal = (e: Error) => /^020-b\.ts is a page .*NAMES does not name: add a line for each \(b\)/.test(e.message);
+  assert.throws(() => pageFiles(dir), refusal);
+  await assert.rejects(loadPages(dir), refusal);
+});
+
+test('pages/ without NAMES is refused', () => {
+  const dir = dirOf({ '010-a.ts': page('a') });
+  fs.rmSync(path.join(dir, NAMES));
+  assert.throws(() => pageFiles(dir), (e: Error) => /NAMES is not there, and it says which pages the e2e visits/.test(e.message));
+});
+
+test('NAMES is read a name a line, in any order, blank lines and spaces aside', () => {
+  const dir = dirOf({ '010-a.ts': page('a'), '020-b.ts': page('b'), [NAMES]: '\n  b \n\na\n' });
+  assert.deepEqual(pageFiles(dir), ['010-a.ts', '020-b.ts']);
+});
+
 test('pages/ refuses a folder, and a link, however they are named', () => {
   const dir = dirOf({ '010-a.ts': page('a') });
   fs.mkdirSync(path.join(dir, '020-more.ts'));
   fs.symlinkSync(path.join(dir, '010-a.ts'), path.join(dir, '030-again.ts'));
-  assert.throws(() => pageFiles(dir), (e: Error) => /would never visit 020-more\.ts, 030-again\.ts\./.test(e.message));
+  fs.rmSync(path.join(dir, NAMES));
+  fs.symlinkSync(path.join(dir, '010-a.ts'), path.join(dir, NAMES));
+  assert.throws(() => pageFiles(dir), (e: Error) => /would never visit 020-more\.ts, 030-again\.ts, NAMES\./.test(e.message));
 });
 
 test('a page is refused when its file exports none', async () => {

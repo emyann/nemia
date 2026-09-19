@@ -2,7 +2,7 @@
  * The live layer over a stub `fetch`: what is sent, and each way an asking fails, made to happen. Every failure is a fact
  * on the record and reads as `unsure`; none rejects the caller.
  */
-import { answering, ENV, files, KEY, reached, stub, tmp, type Reply } from './hermetic.ts';
+import { answering, ENV, files, KEY, reached, stub, tmp } from './hermetic.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -12,7 +12,7 @@ import { decide, judge, noul, score, type FailureKind } from '../src/facade.ts';
 const state = { card: 'Sort the inbox by date.' };
 const questions = { web: noul('Does `card` touch the web app?', { true: 'yes', false: 'no' }), size: score('How large is `card`?', ['small', 'large']) };
 
-const ask = async (replies: Reply[], options: { env?: Record<string, string>; attemptMs?: number; deadlineMs?: number; retries?: number } = {}) => {
+const ask = async (replies: Parameters<typeof stub>, options: { env?: Record<string, string>; attemptMs?: number; deadlineMs?: number; retries?: number } = {}) => {
   const record = tmp('live');
   const s = stub(...replies);
   const j = judge({ model: 'jev-1.13.0', record, env: ENV, fetch: s.fetch, retries: 0, ...options });

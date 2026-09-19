@@ -62,14 +62,28 @@ test('TYPESAFE_BASE_URL and TYPESAFE_LOG_LEVEL in the environment move nothing: 
   assert.deepEqual(logged, []);
 });
 
-test('no key: nothing is built or sent, and every question reads no-key', async () => {
-  const { asked, calls } = await ask([answering({})], { env: {} });
+test('no key: nothing is built, sent, claimed or written, and every question reads no-key', async () => {
+  const { asked, calls, record } = await ask([answering({})], { env: {} });
   assert.equal(calls.length, 0);
   assert.equal(asked.requests, 0);
   failedAs(asked, 'no-key');
+  assert.deepEqual(files(record), [], 'no claim, no failure: the record is empty');
   const blank = await ask([answering({})], { env: { TYPESAFE_API_KEY: '  ' } });
   assert.equal(blank.calls.length, 0);
   failedAs(blank.asked, 'no-key');
+  assert.deepEqual(files(blank.record), []);
+});
+
+test('no key, then a key: the same questions are sent and answered, with no reask', async () => {
+  const record = tmp('live');
+  const s = stub(answering({ web: 0.93, size: 0.4 }));
+  const off = await judge({ model: 'jev-1.13.0', record, env: {}, fetch: s.fetch, retries: 0 }).ask(state, questions);
+  failedAs(off, 'no-key');
+  const on = await judge({ model: 'jev-1.13.0', record, env: ENV, fetch: s.fetch, retries: 0 }).ask(state, questions);
+  assert.equal(s.calls.length, 1);
+  assert.equal(on.requests, 1);
+  assert.equal(decide(on.answers.web, { yes: 0.8, no: 0.2 }), 'yes');
+  assert.equal(on.answers.size.status === 'answered' && on.answers.size.answer.score, 0.4);
 });
 
 for (const [status, kind] of [[400, 'refused'], [401, 'refused'], [403, 'refused'], [422, 'refused'], [429, 'rate-limited'], [529, 'rate-limited'], [500, 'unreachable'], [503, 'unreachable']] as const) {

@@ -1,5 +1,5 @@
 /** `judge card`: what it sends, the folder it prints, and what it refuses. Over a stub fetch and a record in a temp dir. */
-import { answering, ENV, stub, tmp } from './hermetic.ts';
+import { answering, ENV, files, stub, tmp } from './hermetic.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -77,15 +77,18 @@ test('an unsure property keeps it in the inbox, and says which', async () => {
   assert.match(three.text, /^→ stays in the inbox: unsure about the web app, planning first and what done looks like$/m);
 });
 
-test('with no key it asks nothing, says no-key, and the card stays in the inbox', async () => {
-  const { code, calls, text } = await run(['card', '--text', 'x', '--record', tmp('card')], [answering({})], {});
+test('with no key it asks nothing, records nothing, says the judge is off, and the card stays in the inbox', async () => {
+  const record = tmp('card');
+  const { code, calls, text } = await run(['card', '--text', 'x', '--record', record], [answering({})], {});
   assert.equal(code, 0);
   assert.equal(calls.length, 0);
   assert.match(text, /^ {2}web {4}no-key/m);
-  assert.match(text, /^ {2}no-key: no TYPESAFE_API_KEY in the environment — once that is fixed, run again with --reask$/m);
+  assert.match(text, /^ {2}no-key: no TYPESAFE_API_KEY in the environment — the judge is off; set the key and run again$/m);
+  assert.ok(!text.includes('--reask'), 'a missing key is not a failure to re-ask');
   assert.equal(text.match(/no-key:/g)!.length, 1, 'one line for the kind, not one per question');
   assert.match(text, /^0 requests$/m);
   assert.match(text, /^→ stays in the inbox: unsure about the web app, planning first and what done looks like$/m);
+  assert.deepEqual(files(record), [], 'nothing is recorded');
 });
 
 test('--reask asks the failed questions again', async () => {

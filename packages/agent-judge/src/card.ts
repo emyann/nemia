@@ -87,11 +87,14 @@ export const report = (source: string, sent: number, record: string, asked: Aske
   const failed = ids.map((id) => asked.answers[id]).filter((j) => j.status === 'failed');
   for (const kind of new Set(failed.map((j) => (j.status === 'failed' ? j.kind : '')))) {
     const j = failed.find((f) => f.status === 'failed' && f.kind === kind)!;
-    lines.push(`  ${why(j)}${kind === 'in-flight' ? '' : ' — once that is fixed, run again with --reask'}`);
+    // A missing key is not on record: the judge is off, and the next run with a key asks as if for the first time.
+    const next = kind === 'in-flight' ? '' : kind === 'no-key' ? ' — the judge is off; set the key and run again' : ' — once that is fixed, run again with --reask';
+    lines.push(`  ${why(j)}${next}`);
   }
+  const off = failed.some((j) => j.status === 'failed' && j.kind === 'no-key');
   lines.push(asked.requests > 0
     ? `1 request · ${asked.sent} questions · ${asked.usage ? `${asked.usage.input_tokens} input tokens` : 'no answer'} · ${asked.ms} ms`
-    : asked.ms === undefined ? 'all on record · 0 requests' : '0 requests');
+    : asked.ms === undefined && !off ? 'all on record · 0 requests' : '0 requests');
   lines.push(`record: ${record}`);
   const d = dispatch(asked.answers);
   lines.push('folder' in d ? `→ ${d.folder}` : `→ stays in the inbox: ${d.inbox}`);

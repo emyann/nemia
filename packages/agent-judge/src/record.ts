@@ -6,12 +6,14 @@
  *   <record>/<key>/<n>.asked.json    a claim: this asker is asking, until its deadline
  *   <record>/<key>/<n>.answer.json   what came back, raw, exactly as it came
  *   <record>/<key>/<n>.failed.json   why nothing came back
+ *   <record>/<key>/answer.json       the key's answer: a link to the first whole answer to land, and then never another
  *
  * `n` is the asking: 1 the first time, one more each time a person re-asks a failure. One writer per file: a claim is made
  * with `wx`, which only one process can do, and only the claimer writes that asking's answer or failure, through a temp
- * file and `link`, which is atomic and refuses to replace. Nothing is ever rewritten or removed. A crash between the
- * claim and the answer leaves a claim alone, which reads as `interrupted` once its deadline has passed: never a silent
- * re-ask.
+ * file and `link`, which is atomic and refuses to replace. `answer.json` is made the same way, by `link`: the first whole
+ * answer to reach it is the key's answer for ever, and an answer that lands after is kept as a fact of its asking and
+ * never read as the key's. Nothing is ever rewritten or removed. A crash between the claim and the answer leaves a claim
+ * alone, which reads as `interrupted` once its deadline has passed: never a silent re-ask.
  */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -54,14 +56,15 @@ export type AnswerFact = Common & {
 export type FailedFact = Common & {
   readonly request: string;
   readonly ms: number;
-  readonly kind: Exclude<FailureKind, 'malformed' | 'wrong-model' | 'interrupted' | 'in-flight'>;
+  /** `no-key` is never written: with no key nothing is asked, so there is no asking to say anything of. */
+  readonly kind: Exclude<FailureKind, 'no-key' | 'malformed' | 'wrong-model' | 'interrupted' | 'in-flight'>;
   readonly message: string;
 };
 
 export type Asking = { claim?: Claim; answer?: AnswerFact; failed?: FailedFact };
 
-/** Every asking under a key, by `n`. */
-export type Facts = ReadonlyMap<number, Asking>;
+/** Every asking under a key, by `n`, and the key's answer once one has landed. */
+export type Facts = { readonly askings: ReadonlyMap<number, Asking>; readonly answer?: AnswerFact };
 
 /** The record could not be read or written. A bug or a disk, not weather: it rejects, and says which file. */
 export class RecordError extends Error {
@@ -70,6 +73,7 @@ export class RecordError extends Error {
 }
 
 const FILE = /^(\d+)\.(asked|answer|failed)\.json$/;
+const ANSWER = 'answer.json';
 
 const failRecord = (what: string, file: string, e: unknown): never => {
   throw new RecordError(`judge: cannot ${what} ${file}: ${(e as Error).message}. Check the record directory, or pass another with --record.`);
@@ -84,13 +88,14 @@ export const readFacts = (root: string, key: string): Facts => {
   try {
     names = fs.readdirSync(dir);
   } catch (e) {
-    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return new Map();
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return { askings: new Map() };
     return failRecord('read', dir, e);
   }
-  const facts = new Map<number, Asking>();
+  const askings = new Map<number, Asking>();
+  let answer: AnswerFact | undefined;
   for (const name of names) {
     const m = FILE.exec(name);
-    if (!m) continue; // a temp file on its way in
+    if (!m && name !== ANSWER) continue; // a temp file on its way in
     const file = path.join(dir, name);
     let fact: unknown;
     try {
@@ -98,17 +103,23 @@ export const readFacts = (root: string, key: string): Facts => {
     } catch (e) {
       failRecord('read', file, e);
     }
-    if (typeof fact !== 'object' || fact === null || (fact as Common).key !== key || (fact as Common).n !== Number(m[1])) {
+    const ok = typeof fact === 'object' && fact !== null && (fact as Common).key === key;
+    if (!m) {
+      if (!ok || !Number.isInteger((fact as Common).n)) failRecord('read', file, new Error(`it is not an answer of key ${key.slice(0, 12)}…`));
+      answer = fact as AnswerFact;
+      continue;
+    }
+    if (!ok || (fact as Common).n !== Number(m[1])) {
       failRecord('read', file, new Error(`it is not a record of key ${key.slice(0, 12)}…, asking ${m[1]}`));
     }
     const n = Number(m[1]);
-    const asking = facts.get(n) ?? {};
+    const asking = askings.get(n) ?? {};
     if (m[2] === 'asked') asking.claim = fact as Claim;
     else if (m[2] === 'answer') asking.answer = fact as AnswerFact;
     else asking.failed = fact as FailedFact;
-    facts.set(n, asking);
+    askings.set(n, asking);
   }
-  return facts;
+  return answer ? { askings, answer } : { askings };
 };
 
 /** Claim asking `n` of `key`. False when another asker holds it already. */
@@ -139,6 +150,36 @@ export const writeFact = (root: string, kind: 'answer' | 'failed', fact: AnswerF
   }
 };
 
+/**
+ * Make asking `n`'s answer the key's, unless the key has one: `link`, which only one answer can ever win. True when this
+ * one won. The caller links only a whole answer to the question it asked.
+ */
+export const settle = (root: string, key: string, n: number): boolean => {
+  const dir = keyDir(root, key);
+  try {
+    fs.linkSync(path.join(dir, `${n}.answer.json`), path.join(dir, ANSWER));
+    return true;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'EEXIST') return false;
+    return failRecord('write', path.join(dir, ANSWER), e);
+  }
+};
+
+/**
+ * Every fact on record under `key`, with the key's answer settled first when a whole answer is on record and none is the
+ * key's yet: an asker that crashed between writing its answer and linking it. The lowest such asking is linked; whichever
+ * link lands first is the answer from then on. Only the recorded judge calls this: a replay never writes.
+ */
+export const readSettled = (root: string, key: string, q: Question, model: string): Facts => {
+  const facts = readFacts(root, key);
+  if (facts.answer) return facts;
+  const whole = [...facts.askings.keys()].sort((a, b) => a - b)
+    .find((n) => { const a = facts.askings.get(n)!.answer; return a !== undefined && !notAnAnswer(a, q, model); });
+  if (whole === undefined) return facts;
+  settle(root, key, whole);
+  return readFacts(root, key);
+};
+
 export const host = os.hostname();
 
 // ─── reading a key ──────────────────────────────────────────────────────────────────────────────
@@ -166,27 +207,34 @@ export const notAnAnswer = (fact: AnswerFact, q: Question, model: string): { kin
   return null;
 };
 
-/** What a key's facts say, read at `now`: a judgment, nothing yet, or a claim still inside its deadline. */
+/**
+ * What a key's facts say, read at `now`: a judgment, nothing yet, a claim still inside its deadline, or a whole answer on
+ * record that is not yet the key's (`unsettled`: only a replay, which never links, reads that).
+ */
 export type Reading =
   | { readonly status: 'none' }
   | { readonly status: 'waiting'; readonly n: number; readonly deadline: number }
+  | { readonly status: 'unsettled'; readonly n: number }
   | Judgment;
 
 /**
- * Pure. The lowest asking with a whole answer wins: an answer is used for ever, even one that came late, after a person
- * re-asked. Without one, the last asking says what there is: its failure, its bad answer, or its claim.
+ * Pure. The key's answer, `answer.json`, is the answer for ever: no asking's answer is read but that one, so an answer
+ * that lands late, at any asking, never moves what was read. Without it, the last asking says what there is: its
+ * failure, its bad answer, or its claim.
  */
 export const reading = (key: string, facts: Facts, q: Question, model: string, now: number): Reading => {
-  const ns = [...facts.keys()].sort((a, b) => a - b);
-  for (const n of ns) {
-    const answer = facts.get(n)!.answer;
-    if (answer && !notAnAnswer(answer, q, model)) {
-      return { status: 'answered', answer: answer.raw as never, key, at: answer.at, model: answer.answeredBy as string };
-    }
+  if (facts.answer) {
+    const bad = notAnAnswer(facts.answer, q, model);
+    return bad
+      ? { status: 'failed', key, at: facts.answer.at, ...bad }
+      : { status: 'answered', answer: facts.answer.raw as never, key, at: facts.answer.at, model: facts.answer.answeredBy as string };
   }
+  const ns = [...facts.askings.keys()].sort((a, b) => a - b);
+  const whole = ns.find((n) => { const a = facts.askings.get(n)!.answer; return a !== undefined && !notAnAnswer(a, q, model); });
+  if (whole !== undefined) return { status: 'unsettled', n: whole };
   if (ns.length === 0) return { status: 'none' };
   const n = ns[ns.length - 1]!;
-  const { claim: c, answer, failed } = facts.get(n)!;
+  const { claim: c, answer, failed } = facts.askings.get(n)!;
   if (answer) return { status: 'failed', key, at: answer.at, ...notAnAnswer(answer, q, model)! };
   if (failed) return { status: 'failed', key, at: failed.at, kind: failed.kind, message: failed.message };
   const deadline = Date.parse(c!.deadline);
@@ -198,4 +246,4 @@ export const reading = (key: string, facts: Facts, q: Question, model: string, n
 };
 
 /** The next asking's number. */
-export const nextN = (facts: Facts) => Math.max(0, ...facts.keys()) + 1;
+export const nextN = (facts: Facts) => Math.max(0, ...facts.askings.keys()) + 1;

@@ -37,9 +37,9 @@ test('a question replay has no record of rejects, naming it, and writes nothing'
 
 test('replay reads a failure as the failure, and a claim inside its deadline as in-flight, without waiting', async () => {
   const record = tmp('replay');
-  await judge({ model: MODEL, record, env: {} }).ask(state, { web });
+  await judge({ model: MODEL, record, env: ENV, fetch: stub({ status: 500 }).fetch, retries: 0 }).ask(state, { web });
   const failed = await judge({ model: MODEL, record, mode: 'replay' }).ask(state, { web });
-  assert.equal(failed.answers.web.status === 'failed' && failed.answers.web.kind, 'no-key');
+  assert.equal(failed.answers.web.status === 'failed' && failed.answers.web.kind, 'unreachable');
   const key = keyOf(MODEL, plan, state);
   fs.mkdirSync(path.join(record, key));
   fs.writeFileSync(path.join(record, key, '1.asked.json'), JSON.stringify({

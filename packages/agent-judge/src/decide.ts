@@ -8,8 +8,9 @@ import type { NoulQuestion, Question, ResultFor, ScoreQuestion } from '@typesafe
 import { refuse } from './key.ts';
 
 /**
- * Why there is no answer. Every kind but the last two is a fact on the record, written once:
- * - `no-key`: no `TYPESAFE_API_KEY` in the environment; no request was made.
+ * Why there is no answer. `no-key` is read, never written: the judge is off, and nothing is claimed, written or sent.
+ * - `no-key`: no `TYPESAFE_API_KEY` in the environment. Set one and ask again: no re-ask is needed.
+ * The next six are facts on the record, written once:
  * - `refused`: the service read the request and said no (400, 401, 403, 404, 422). Asking again changes nothing.
  * - `rate-limited`: 429 or 529, after the SDK's own retries.
  * - `timed-out`: no whole answer inside the deadline.

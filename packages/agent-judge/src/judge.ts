@@ -19,14 +19,14 @@ import {
 import type { FailureKind, Judgment } from './decide.ts';
 import { keyOf, questionOf, stateHash, type State } from './key.ts';
 import {
-  claim, host, nextN, readFacts, reading, RecordError as PlainRecordError, writeFact,
+  claim, host, nextN, notAnAnswer, readFacts, readSettled, reading, RecordError as PlainRecordError, settle, writeFact,
   type AnswerFact, type Common, type FailedFact, type Reading,
 } from './record.ts';
 
 // ─── the error channel ──────────────────────────────────────────────────────────────────────────
 
 const fields = { message: Schema.String };
-/** No `TYPESAFE_API_KEY` in the environment. Checked before the SDK is built: no request is made. */
+/** No `TYPESAFE_API_KEY` in the environment. The judge is off: nothing is claimed, written, built or sent. */
 export class NoKey extends Schema.TaggedError<NoKey>()('NoKey', fields) {}
 /** The service read the request and said no. Asking the same again changes nothing. */
 export class Refused extends Schema.TaggedError<Refused>()('Refused', { ...fields, status: Schema.Number }) {}
@@ -37,7 +37,7 @@ export class TimedOut extends Schema.TaggedError<TimedOut>()('TimedOut', fields)
 /** DNS, TLS, a closed socket, a 5xx, after the SDK's own retries. */
 export class Unreachable extends Schema.TaggedError<Unreachable>()('Unreachable', fields) {}
 
-/** What an asking can come to, short of an answer. Each is written as a fact. */
+/** What an asking can come to, short of an answer. Each is written as a fact, but `NoKey`, which is no asking at all. */
 export type AskFailure = NoKey | Refused | RateLimited | TimedOut | Unreachable;
 
 /** A replay was asked what nobody recorded. A test that would reach the network is a bug; this is how it says so. */
@@ -59,6 +59,8 @@ export type AskerOps = {
   readonly ask: (model: string, state: State, questions: Questions) => Effect.Effect<Reply, AskFailure>;
   /** How long a claim holds, from the moment it is made: the asker's deadline, and a grace for writing what came of it. */
   readonly holdMs: number;
+  /** Whether there is a key to ask with. Without one the judge is off, and `recorded` claims and writes nothing. */
+  readonly keyed: () => boolean;
 };
 
 export class Asker extends Context.Service<Asker, AskerOps>()('judge/Asker') {
@@ -72,9 +74,10 @@ export class Asker extends Context.Service<Asker, AskerOps>()('judge/Asker') {
     const { env = process.env, fetch, attemptMs = 5_000, deadlineMs = 20_000, retries = 2 } = options;
     return Asker.layer({
       holdMs: deadlineMs + GRACE_MS,
+      keyed: () => Boolean(env.TYPESAFE_API_KEY?.trim()),
       ask: (model, state, questions) => {
         const key = env.TYPESAFE_API_KEY?.trim();
-        if (!key) return Effect.fail(new NoKey({ message: 'no TYPESAFE_API_KEY in the environment' }));
+        if (!key) return Effect.fail(new NoKey({ message: NO_KEY }));
         const scrub = (text: string) => text.split(key).join('[key]').replace(/Bearer\s+\S+/g, 'Bearer [key]').slice(0, 300);
         return Effect.tryPromise({
           try: async (signal) => {
@@ -111,6 +114,7 @@ export type LiveOptions = {
 };
 
 export const BASE_URL = 'https://api.typesafe.ai';
+const NO_KEY = 'no TYPESAFE_API_KEY in the environment';
 const GRACE_MS = 5_000;
 
 const classify = (scrub: (s: string) => string) => (cause: unknown): AskFailure => {
@@ -127,7 +131,7 @@ const classify = (scrub: (s: string) => string) => (cause: unknown): AskFailure 
   return new Unreachable({ message });
 };
 
-const kindOf: { readonly [T in AskFailure['_tag']]: FailedFact['kind'] } = {
+const kindOf: { readonly [T in Exclude<AskFailure['_tag'], 'NoKey'>]: FailedFact['kind'] } & { readonly NoKey: 'no-key' } = {
   NoKey: 'no-key', Refused: 'refused', RateLimited: 'rate-limited', TimedOut: 'timed-out', Unreachable: 'unreachable',
 };
 
@@ -177,7 +181,10 @@ const keyed = (model: string, state: State, questions: Questions) =>
 const onRecord = <A>(f: () => A) =>
   Effect.try({ try: f, catch: (e) => new RecordError({ message: e instanceof PlainRecordError ? e.message : String(e) }) });
 
-const read = (root: string, k: Keyed, model: string) => onRecord(() => reading(k.key, readFacts(root, k.key), k.question, model, Date.now()));
+/** The recorded judge's read: a whole answer left unlinked by a crash is settled as the key's first. */
+const read = (root: string, k: Keyed, model: string) => onRecord(() => reading(k.key, readSettled(root, k.key, k.question, model), k.question, model, Date.now()));
+/** A replay's read: it links nothing, so an unsettled answer stays unsettled. */
+const look = (root: string, k: Keyed, model: string) => onRecord(() => reading(k.key, readFacts(root, k.key), k.question, model, Date.now()));
 
 /** Retryable is a failure of the asking, not of the words: a person may ask it again. `in-flight` is someone else's. */
 const failedAsking = (r: Reading) => r.status === 'failed' && r.kind !== 'in-flight';
@@ -185,10 +192,13 @@ const failedAsking = (r: Reading) => r.status === 'failed' && r.kind !== 'in-fli
 const WAIT_MS = 50;
 
 /** A judgment from a key's reading, once it is one. */
-const settled = (r: Reading, k: Keyed): Judgment =>
-  r.status === 'none' || r.status === 'waiting'
-    ? { status: 'failed', key: k.key, at: new Date().toISOString(), kind: 'in-flight', message: `asking ${r.status === 'waiting' ? r.n : '?'} is still in flight` }
-    : r;
+const settled = (r: Reading, k: Keyed): Judgment => {
+  const flying = (message: string): Judgment => ({ status: 'failed', key: k.key, at: new Date().toISOString(), kind: 'in-flight', message });
+  if (r.status === 'none') return flying('asking ? is still in flight');
+  if (r.status === 'waiting') return flying(`asking ${r.n} is still in flight`);
+  if (r.status === 'unsettled') return flying(`asking ${r.n}'s answer is on record and is not yet the key's; the recorded judge settles it when it next reads it`);
+  return r;
+};
 
 const answersOf = <Q extends Questions>(keyed: readonly Keyed[], judgments: ReadonlyMap<string, Judgment>) =>
   Object.fromEntries(keyed.map((k) => [k.id, judgments.get(k.key)!])) as Answers<Q>;
@@ -206,6 +216,13 @@ export const recorded = (options: { readonly model: string; readonly record: str
     const { model, record } = options;
     const ask: JudgeOps['ask'] = (state, questions, opts = {}) => Effect.gen(function* () {
       const { state: hash, keyed: all } = yield* keyed(model, state, questions);
+      // No key is no asking: the judge is off. Nothing is claimed or written, so a key set later asks these as if for the
+      // first time, with no re-ask, and a record read by replay never holds a missing key as a fact about the words.
+      if (!asker.keyed()) {
+        const at = new Date().toISOString();
+        const off = new Map(all.map((k): [string, Judgment] => [k.key, { status: 'failed', key: k.key, at, kind: 'no-key', message: NO_KEY }]));
+        return { answers: answersOf(all, off), requests: 0, sent: 0 };
+      }
       const unique = [...new Map(all.map((k) => [k.key, k])).values()];
       const judgments = new Map<string, Judgment>();
       const mine: { k: Keyed; n: number }[] = [];
@@ -215,7 +232,7 @@ export const recorded = (options: { readonly model: string; readonly record: str
       const common = (k: Keyed, n: number): Common => ({ v: 1, key: k.key, n, id: k.id, model, question: questionOf(k.question) as Question, state: hash, at: new Date().toISOString() });
 
       for (const k of unique) {
-        const facts = yield* onRecord(() => readFacts(record, k.key));
+        const facts = yield* onRecord(() => readSettled(record, k.key, k.question, model));
         const r = reading(k.key, facts, k.question, model, Date.now());
         if (r.status === 'answered' || (r.status === 'failed' && !(opts.reask === 'failed' && failedAsking(r)))) {
           judgments.set(k.key, r);
@@ -237,9 +254,12 @@ export const recorded = (options: { readonly model: string; readonly record: str
         ms = Date.now() - started;
         if (result._tag === 'Failure') {
           const e = result.failure;
+          // The key was there when the keys were claimed and is gone now: still no request, and still a fact of this asking.
           requests = e._tag === 'NoKey' ? 0 : 1;
+          const kind = e._tag === 'NoKey' ? 'unreachable' : kindOf[e._tag];
+          const message = e._tag === 'NoKey' ? `${e.message} by the time of the request, though there was one when it was claimed; no request was made` : e.message;
           for (const { k, n } of mine) {
-            yield* onRecord(() => writeFact(record, 'failed', { ...common(k, n), request, ms: ms!, kind: kindOf[e._tag], message: e.message }));
+            yield* onRecord(() => writeFact(record, 'failed', { ...common(k, n), request, ms: ms!, kind, message }));
           }
         } else {
           requests = 1;
@@ -254,6 +274,8 @@ export const recorded = (options: { readonly model: string; readonly record: str
               usage: { ...(typeof b.usage === 'object' ? b.usage : {}), questions: mine.length },
             };
             yield* onRecord(() => writeFact(record, 'answer', fact));
+            // The first whole answer to land is the key's; a later one, even at a lower asking, is kept and never read.
+            if (!notAnAnswer(fact, k.question, model)) yield* onRecord(() => settle(record, k.key, n));
           }
         }
         for (const { k } of mine) judgments.set(k.key, settled(yield* read(record, k, model), k));
@@ -286,7 +308,7 @@ export const replay = (options: { readonly model: string; readonly record: strin
       const { keyed: all } = yield* keyed(model, state, questions);
       const judgments = new Map<string, Judgment>();
       for (const k of all) {
-        const r = yield* read(record, k, model);
+        const r = yield* look(record, k, model);
         if (r.status === 'none') {
           const words = JSON.stringify(k.question.instructions ?? null).slice(0, 120);
           return yield* Effect.fail(new ReplayMiss({

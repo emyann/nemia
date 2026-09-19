@@ -10,7 +10,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { decide, judge, noul, score } from '../src/facade.ts';
 import { keyOf, questionOf, stateHash } from '../src/key.ts';
-import { writeFact, type AnswerFact } from '../src/record.ts';
+import { settle, writeFact, type AnswerFact } from '../src/record.ts';
 
 const MODEL = 'jev-1.13.0';
 const state = { card: 'Sort the inbox by date.' };
@@ -91,7 +91,8 @@ test('reask: failed asks exactly the failed keys again, as the next asking', asy
   assert.deepEqual(Object.keys(s.calls[2]!.body.questions), ['plan']);
   assert.equal(decide(asked.answers.plan, T), 'no');
   const planKey = asked.answers.plan.key;
-  assert.deepEqual(files(path.join(record, planKey)), ['1.asked.json', '1.failed.json', '2.answer.json', '2.asked.json']);
+  assert.deepEqual(files(path.join(record, planKey)), ['1.asked.json', '1.failed.json', '2.answer.json', '2.asked.json', 'answer.json']);
+  assert.equal(fs.readFileSync(path.join(record, planKey, 'answer.json'), 'utf8'), fs.readFileSync(path.join(record, planKey, '2.answer.json'), 'utf8'));
   const none = await judgeOver(record, s.fetch).ask(state, { web, plan }, { reask: 'failed' });
   assert.equal(none.requests, 0, 'nothing failed is left to re-ask');
 });
@@ -148,22 +149,63 @@ test('two askers at once: one request, one answer file, the same answer for both
   const both = await Promise.all([judgeOver(record, s.fetch).ask(state, { web }), judgeOver(record, s.fetch).ask(state, { web })]);
   assert.equal(s.calls.length, 1);
   assert.deepEqual(both[0].answers.web, both[1].answers.web);
-  assert.deepEqual(files(path.join(record, both[0].answers.web.key)), ['1.answer.json', '1.asked.json']);
+  assert.deepEqual(files(path.join(record, both[0].answers.web.key)), ['1.answer.json', '1.asked.json', 'answer.json']);
   assert.equal(both[0].requests + both[1].requests, 1);
 });
 
-test('an answer that comes late, at an earlier asking, is the one read', async () => {
+// Every asking of `web` under `state`, written by hand the way an asker writes them.
+const webKey = keyOf(MODEL, web, state);
+const common = (n: number) => ({ v: 1 as const, key: webKey, n, id: 'web', model: MODEL, question: questionOf(web) as never, state: stateHash(state), at: new Date().toISOString() });
+/** A claim whose asker stalled: its deadline has passed, and nothing came of it yet. */
+const stalled = (record: string, n: number) => {
+  fs.mkdirSync(path.join(record, webKey), { recursive: true });
+  fs.writeFileSync(path.join(record, webKey, `${n}.asked.json`), JSON.stringify({ ...common(n), deadline: new Date(Date.now() - 1_000).toISOString(), pid: 4242, host: 'elsewhere' }));
+};
+/** A stalled asker's answer landing at last, as the asker writes it: the fact, then its link to the key's answer. */
+const lands = (record: string, n: number, noul: number) => {
+  writeFact(record, 'answer', { ...common(n), request: `r${n}`, requestId: null, ms: 5, answeredBy: MODEL, raw: { type: 'noul', noul }, usage: {} });
+  return settle(record, webKey, n);
+};
+const readWeb = async (record: string) => decide((await judgeOver(record, stub().fetch).ask(state, { web })).answers.web, T);
+
+test('asking 2 answered and read, then asking 1\'s late answer lands: the read stays asking 2\'s', async () => {
   const record = tmp('record');
-  const s = stub({ status: 500 }, answering({ web: 0.9 }));
-  await judgeOver(record, s.fetch).ask(state, { web });
-  const key = keyOf(MODEL, web, state);
-  // Asking 1 failed and asking 2 answered yes; then asking 1's answer lands after all, saying no. The lowest whole answer
-  // wins, so the reading does not move with every re-ask.
-  await judgeOver(record, s.fetch).ask(state, { web }, { reask: 'failed' });
-  const common = { v: 1 as const, key, n: 1, id: 'web', model: MODEL, question: questionOf(web) as never, state: stateHash(state), at: new Date().toISOString() };
-  writeFact(record, 'answer', { ...common, request: 'r', requestId: null, ms: 5, answeredBy: MODEL, raw: { type: 'noul', noul: 0.05 }, usage: {} });
-  const read = await judgeOver(record, s.fetch).ask(state, { web });
-  assert.equal(decide(read.answers.web, T), 'no');
+  stalled(record, 1);
+  assert.equal(await readWeb(record), 'unsure', 'asking 1 reads interrupted');
+  const s = stub(answering({ web: 0.9 }));
+  const reasked = await judgeOver(record, s.fetch).ask(state, { web }, { reask: 'failed' });
+  assert.equal(s.calls.length, 1);
+  assert.equal(decide(reasked.answers.web, T), 'yes');
+  assert.equal(await readWeb(record), 'yes');
+  assert.equal(lands(record, 1, 0.05), false, 'the late answer does not become the key\'s');
+  assert.equal(await readWeb(record), 'yes');
+  assert.equal(await readWeb(record), 'yes');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(record, webKey, '1.answer.json'), 'utf8')).raw.noul, 0.05, 'the late answer is kept as a fact of its asking');
+});
+
+test('asking 1 stalls, asking 2 is claimed and stalls, asking 1\'s answer lands and is read, then asking 2\'s lands: the read stays asking 1\'s', async () => {
+  const record = tmp('record');
+  stalled(record, 1);
+  stalled(record, 2);
+  assert.equal(lands(record, 1, 0.9), true);
+  assert.equal(await readWeb(record), 'yes');
+  assert.equal(lands(record, 2, 0.05), false);
+  assert.equal(await readWeb(record), 'yes');
+  assert.equal(await readWeb(record), 'yes');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(record, webKey, '2.answer.json'), 'utf8')).raw.noul, 0.05, 'the late answer is kept as a fact of its asking');
+});
+
+test('an answer its asker wrote and never linked is settled by the next recorded read; a replay reads it in-flight and writes nothing', async () => {
+  const record = tmp('record');
+  stalled(record, 1);
+  writeFact(record, 'answer', { ...common(1), request: 'r', requestId: null, ms: 5, answeredBy: MODEL, raw: { type: 'noul', noul: 0.9 }, usage: {} });
+  const before = files(record);
+  const replayed = await judge({ model: MODEL, record, mode: 'replay' }).ask(state, { web });
+  assert.equal(replayed.answers.web.status === 'failed' && replayed.answers.web.kind, 'in-flight');
+  assert.deepEqual(files(record), before, 'replay linked nothing');
+  assert.equal(await readWeb(record), 'yes');
+  assert.ok(fs.existsSync(path.join(record, webKey, 'answer.json')));
+  assert.equal(decide((await judge({ model: MODEL, record, mode: 'replay' }).ask(state, { web })).answers.web, T), 'yes');
 });
 
 test('a fact is never written over: a second answer for the same asking is refused', () => {
@@ -186,6 +228,9 @@ test('a file on record that is not a fact is refused by name', async () => {
   await rejects(judgeOver(record, stub(answering({})).fetch).ask(state, { web }), /it is not a record of key/);
   fs.writeFileSync(path.join(record, key, '1.answer.json'), JSON.stringify({ key, n: 2 }));
   await rejects(judgeOver(record, stub(answering({})).fetch).ask(state, { web }), /asking 1/);
+  fs.rmSync(path.join(record, key, '1.answer.json'));
+  fs.writeFileSync(path.join(record, key, 'answer.json'), JSON.stringify({ key: 'another', n: 1 }));
+  await rejects(judgeOver(record, stub(answering({})).fetch).ask(state, { web }), new RegExp(`^judge: cannot read .*${key}/answer\\.json: it is not an answer of key`));
 });
 
 test('a record it cannot write is refused, and nothing is asked', { skip: os.userInfo().uid === 0 && 'root writes anywhere' }, async () => {

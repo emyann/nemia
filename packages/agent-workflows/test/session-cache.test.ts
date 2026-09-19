@@ -1,0 +1,189 @@
+/**
+ * A continued session keeps its prompt cache: every task the run files with `resumeFrom` carries what the task whose session it continues
+ * was filed with — its closeout schema, byte for byte as JSON, its model, effort, tools, disallowed tools and permission mode. Each of those
+ * is part of the cached prompt: the schema is Claude Code's `StructuredOutput` tool, a tool sits at the front, and a changed one rewrites the
+ * whole conversation at twenty times the price of reading it. Measured 2026-09-18: 43 continuations filed with another schema than the one
+ * they continued rewrote 200k to 640k tokens each (docs/pivot-2026-09-18.md §1, Finding 2).
+ *
+ * Walked at shipped defaults, over every shipped folder with a loop: a first try, a nudge, an answer to a blocked step (`wf retry
+ * --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:` of its own.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import type { Engine } from 'agent-engine';
+import { CLOSEOUT_SCHEMA, closeoutSchemaOf, type TaskPhase } from '../src/run.ts';
+import type { Workflow } from '../src/workflow.ts';
+
+const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-cache-'));
+fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
+// WF_ROOT is read as the module loads, so it is set before the import rather than after it.
+process.env.WF_ROOT = ROOT;
+const { advance, readRun, retry, start, stepsOf } = await import('../src/runner.ts');
+
+const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
+const LOOPED = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'];
+
+/** What a task is filed with that the harness puts in the cached prompt, beside the conversation itself. */
+const CACHED = ['closeoutSchema', 'model', 'effort', 'tools', 'disallowedTools', 'permissionMode'] as const;
+
+type Filed = { id: string; resumeFrom?: string; closeoutSchema?: object } & Record<string, unknown>;
+
+/**
+ * Each continuation, against the task whose session it continues, named by the field that differs. A session is `native-<task id>` on
+ * the board below, so a `resumeFrom` names the task it came from. A continuation of a session nobody here filed is a difference too.
+ */
+function chainDifferences(filed: readonly Filed[]): string[] {
+  const byId = new Map(filed.map((f) => [f.id, f]));
+  const out: string[] = [];
+  for (const f of filed) {
+    if (!f.resumeFrom) continue;
+    const from = byId.get(f.resumeFrom.replace(/^native-/, ''));
+    if (!from) { out.push(`${f.id}: continues ${f.resumeFrom}, which no task here was`); continue; }
+    for (const key of CACHED) {
+      if (JSON.stringify(f[key]) !== JSON.stringify(from[key])) out.push(`${f.id}: ${key} is not ${from.id}'s`);
+    }
+  }
+  return out;
+}
+
+/** A repository with one commit, so `wf start` has a base to record. */
+const aRepo = (): string => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: 'ignore' });
+  git('init', '-q');
+  git('commit', '-q', '--allow-empty', '-m', 'base');
+  return repo;
+};
+
+/** An engine board the walk settles by hand, keeping each task as it was filed. Each task's session is its own, `native-<id>`. */
+const board = () => {
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
+  const e = {
+    view: async (id: string) => {
+      const t = tasks.get(id);
+      const settled = t && ['succeeded', 'failed', 'stopped'].includes(t.phase) ? t.phase : null;
+      return {
+        id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
+        state: {
+          brief: (t?.spec.brief as string | undefined) ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: [],
+          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: null }],
+        },
+      };
+    },
+    file: async (spec: Filed) => { tasks.set(spec.id, { spec, phase: 'pending' }); return spec.id; },
+    stop: async () => {},
+    logs: async () => '',
+  } as unknown as Engine;
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
+  return { e, tasks, settle };
+};
+
+/** A value a strict schema accepts: the first of each choice, one item in each array. What a step says matters to the walk only by its shape. */
+function valueOf(schema: Record<string, unknown>): unknown {
+  if (Array.isArray(schema.anyOf)) return valueOf(schema.anyOf[0] as Record<string, unknown>);
+  if (Array.isArray(schema.enum)) return schema.enum[0];
+  const type = Array.isArray(schema.type) ? schema.type[0] : schema.type;
+  if (type === 'object') {
+    const properties = (schema.properties ?? {}) as Record<string, Record<string, unknown>>;
+    return Object.fromEntries(Object.entries(properties).map(([k, v]) => [k, valueOf(v)]));
+  }
+  if (type === 'array') return [valueOf(schema.items as Record<string, unknown>)];
+  return type === 'boolean' ? false : type === 'integer' || type === 'number' ? 1 : type === 'null' ? null : 'x';
+}
+
+const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
+
+/**
+ * A run of `dir` through a loop's first try, a nudge, an answer to its blocked try, round 2 and round 3, every other step signing off with
+ * what its schema asks for — and the tasks it filed, in order.
+ */
+async function walk(dir: string): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
+  const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir });
+  const steps = stepsOf(run);
+  const looping = steps.find((s) => s.loop)!;
+  const target = looping.loop!;
+  const b = board();
+  const order: string[] = [];
+  const tryOfId = (id: string, step: string) => (id === `${run.id}-${step}` ? 1 : Number(new RegExp(`^${run.id}-${step}-try(\\d+)$`).exec(id)?.[1] ?? NaN));
+
+  for (let pass = 0; pass < 60; pass++) {
+    const p = await advance(b.e, readRun(run.id));
+    const pending = [...b.tasks.entries()].filter(([, t]) => t.phase === 'pending');
+    if (!pending.length && !p.looped.length && !p.tried.length) break;
+    for (const [id, t] of pending) {
+      order.push(id);
+      if (id.endsWith('-check')) { b.settle(id, 'succeeded', undefined, 0); continue; }
+      const schema = t.spec.closeoutSchema as { properties: Record<string, Record<string, unknown>> } | undefined;
+      const said: Record<string, unknown> = { ...SIGNED, ...(schema ? valueOf({ ...schema, properties: Object.fromEntries(Object.entries(schema.properties).filter(([k]) => !(k in SIGNED))) }) as object : {}) };
+      const n = tryOfId(id, target);
+      if (n === 1) { b.settle(id, 'succeeded'); continue; }                                        // unsigned: a nudge follows
+      if (n === 2) { b.settle(id, 'succeeded', { ...said, outcome: 'blocked', needs: 'which flag?' }); continue; }   // blocked: an answer follows
+      if (n === 3) said.replies = [];                                                              // round 1: handed nothing
+      const r = tryOfId(id, looping.name);
+      if (r) said.again = r < 3;                                                                   // rounds 1 and 2 ask again; 3 is done
+      b.settle(id, 'succeeded', said);
+    }
+    if (pending.some(([id]) => tryOfId(id, target) === 1)) await retry(b.e, run.id, target, { mode: 'nudge' });
+    if (pending.some(([id]) => tryOfId(id, target) === 2)) await retry(b.e, run.id, target, { mode: 'nudge', message: 'the --dry-run flag' });
+  }
+  return { id: run.id, filed: order.map((id) => b.tasks.get(id)!.spec), target, looping: looping.name, steps };
+}
+
+for (const name of LOOPED) {
+  test(`${name}, at shipped defaults: every continued session is filed with what the session it continues was — schema, model, effort, tools — through a nudge, an answer, round 2 and round 3`, async () => {
+    const { id, filed, target, looping, steps } = await walk(path.join(SHIPPED, name));
+    const resumed = filed.filter((f) => f.resumeFrom).map((f) => f.id.slice(id.length + 1));
+    // The walk reached what it claims to: a nudge (try 2), an answer (try 3), round 2 (try 4), round 3 (try 5), and review's third round.
+    assert.deepEqual(resumed, [2, 3, 4, 5].map((n) => `${target}-try${n}`), filed.map((f) => f.id).join('\n'));
+    assert.ok(filed.some((f) => f.id.endsWith(`-${looping}-try3`)), 'round 3 was reviewed');
+    assert.deepEqual(chainDifferences(filed), []);
+    // And the chain is the one the frozen workflow gives the target, `replies` and all, from its first try.
+    for (const f of filed.filter((x) => x.id.includes(`-${target}`) && !x.id.endsWith('-check'))) {
+      assert.equal(JSON.stringify(f.closeoutSchema), JSON.stringify(closeoutSchemaOf(steps.find((s) => s.name === target)!, steps)), f.id);
+      assert.ok((f.closeoutSchema as { required: string[] }).required.includes('replies'), f.id);
+    }
+  });
+}
+
+test("a loop's target that declares an `output:` of its own keeps one schema too: its fields, then `replies`, on every try", async () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  const notes = { type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false };
+  const looping = {
+    type: 'object',
+    properties: { findings: { type: 'array', items: { type: 'string' } }, again: { type: 'boolean' } },
+    required: ['findings', 'again'], additionalProperties: false,
+  };
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\nmodel: opus\neffort: high\noutput: implement.schema.json\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'implement.schema.json'), JSON.stringify(notes));
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(looping));
+  const { filed } = await walk(dir);
+  assert.deepEqual(chainDifferences(filed), []);
+  assert.deepEqual((filed[0]!.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'notes', 'replies'], 'the first try');
+});
+
+test('REFUSED by the check: a chain that changes its schema — round 1 without `replies`, round 2 with them, as it was filed before — or its model, effort, tools, fence or mode', () => {
+  // The opposite first: the target's round-1 session filed as it was until 2026-09-18, and round 2 continuing it with `replies`.
+  const target: Workflow = { name: 'implement', after: [], body: 'implement it' };
+  const steps: Workflow[] = [target, { name: 'review', after: ['implement'], body: 'review it', loop: 'implement' }];
+  const was = { ...closeoutSchemaOf(target, steps), properties: CLOSEOUT_SCHEMA.properties, required: CLOSEOUT_SCHEMA.required };
+  const chain: Filed[] = [
+    { id: 'r-implement', closeoutSchema: was, model: 'opus', effort: 'high' },
+    { id: 'r-implement-try2', resumeFrom: 'native-r-implement', closeoutSchema: closeoutSchemaOf(target, steps), model: 'opus', effort: 'high' },
+  ];
+  assert.deepEqual(chainDifferences(chain), ["r-implement-try2: closeoutSchema is not r-implement's"]);
+  // Byte for byte: the same fields in another order is another tool.
+  const reordered = { ...closeoutSchemaOf(target, steps), required: [...closeoutSchemaOf(target, steps).required].reverse() };
+  assert.deepEqual(chainDifferences([{ ...chain[1]!, id: 'r-implement' }, { ...chain[1]!, closeoutSchema: reordered, resumeFrom: 'native-r-implement' }]), ["r-implement-try2: closeoutSchema is not r-implement's"]);
+
+  const same = { closeoutSchema: CLOSEOUT_SCHEMA, model: 'opus', effort: 'high', tools: ['Read'], disallowedTools: ['SendMessage'], permissionMode: 'dontAsk' };
+  for (const [key, value] of [['model', 'sonnet'], ['effort', 'medium'], ['tools', ['Read', 'Bash']], ['disallowedTools', []], ['permissionMode', 'auto']] as const) {
+    assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same, [key]: value }]), [`a-try2: ${key} is not a's`], key);
+  }
+  assert.deepEqual(chainDifferences([{ id: 'a-try2', resumeFrom: 'native-a', ...same }]), ['a-try2: continues native-a, which no task here was']);
+  assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same }]), []);
+});

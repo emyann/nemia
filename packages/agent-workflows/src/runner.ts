@@ -1858,8 +1858,12 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // `--no-worktree` run's workspace is a person's checkout — and its files directory is not made again.
   const collected = handOffDue(steps, run, phaseOf).flatMap((name) => {
     if (!fs.existsSync(runFile(run.id))) return [];
-    if (isGitRun(run)) handOff(run.steps[name]!.workspace!, name);
+    const record = run.steps[name]!;
+    let handed: ReturnType<typeof handOff>;
+    if (isGitRun(run)) handed = handOff(record.workspace!, name);
     else folderPlace(runsDir()).handOff(run, name);
+    // Once for the try, unless git refused the commit — a hook, a signature — which the next pass tries again.
+    if (!(handed && 'error' in handed)) run.steps[name] = { ...record, handedOff: record.taskId! };
     return collectArtifacts(run, name, signedOff(name));
   });
 

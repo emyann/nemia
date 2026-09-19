@@ -1340,7 +1340,10 @@ export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskI
     // Never a step that works in the repository's own checkout (`workspace: main`): what is lying in a person's checkout is
     // not the run's to commit under a step's name, and such a step commits its own work there, as a person would.
     .filter(([name]) => steps.find((s) => s.name === name)?.workspace !== 'main')
-    .filter(([name, s]) => s.taskId && s.workspace && !s.check && finished.includes(phaseOf(s.taskId))
+    // Once for each try (`handedOff`): what is in the workspace after the step's hand-off is a person's, or the next step's, and not
+    // this step's to sign. Measured: a person's edits in a reviewed worktree, left while its ending ran, were committed on the next pass
+    // as `review: hand off what was left uncommitted`.
+    .filter(([name, s]) => s.taskId && s.workspace && !s.check && s.handedOff !== s.taskId && finished.includes(phaseOf(s.taskId))
       && ![...downstreamOf(steps, name)].some((later) => run.steps[later]?.taskId && run.steps[later]?.workspace === s.workspace))
     .map(([name]) => name);
 }
@@ -1385,7 +1388,11 @@ export type EarlierTry = {
 };
 
 /** One step on the run's record: its current try's task and check, where it works, and the tries before (`Run.steps`). */
-export type StepRecord = { taskId: string | null; workspace?: string; branch?: string; check?: { taskId: string }; tries?: EarlierTry[] };
+export type StepRecord = {
+  taskId: string | null; workspace?: string; branch?: string; check?: { taskId: string }; tries?: EarlierTry[];
+  /** The task whose leftovers the run has committed (`handOffDue`): once for each try, so what a person leaves in the workspace after is theirs. */
+  handedOff?: string;
+};
 
 /**
  * A person's `wf retry`, as its ask file says it: the step, the try it asks for, how, and when — and `message`, what they said
@@ -1627,7 +1634,7 @@ const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
  * its place — the re-filed step's task, or for a recheck the same task, with its check still to file. Pure.
  */
 export function nextTry(record: StepRecord, retry: Retry, taskId?: string): StepRecord {
-  const { check, tries = [], ...rest } = record;
+  const { check, tries = [], handedOff: _, ...rest } = record;
   const over: EarlierTry = {
     taskId: record.taskId!,
     ...(check ? { check } : {}),
@@ -2109,7 +2116,7 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
   const looping = steps.find((s) => s.name === r.step);
   const next = { ...run.steps };
   for (const name of looping ? loopSpan(steps, looping) : []) {
-    const { check, tries = [], ...rest } = run.steps[name] ?? { taskId: null };
+    const { check, tries = [], handedOff: _, ...rest } = run.steps[name] ?? { taskId: null };
     // A cap a person raised with the round is kept on each step it was raised for, in force from its next try (`budgetOf`).
     const raised = r.budget !== undefined && r.raise?.includes(name) ? { budget: r.budget } : {};
     const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then: 'round', ...raised }] : [];

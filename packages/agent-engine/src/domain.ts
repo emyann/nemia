@@ -227,6 +227,12 @@ export type Event =
        */
       budgetUsd?: number;
       /**
+       * The context window the session is given, in tokens: past about it, the harness compacts the conversation and carries
+       * on. Carried, never read here: a runner hands it to its harness (Claude Code's `--autocompact`), and `decide` never
+       * learns what a context is.
+       */
+      contextTokens?: number;
+      /**
        * Bridge the session to claude.ai, where it is listed in the agents view and can be driven — from a browser or a
        * phone — not only seen. Never a default, for that reason. Carried, never read here: the Claude runner passes
        * `--remote-control`, and `decide` never learns what a bridge is.
@@ -333,6 +339,8 @@ export type State = {
   mcp?: Record<string, McpServer>;
   /** The spend cap, per attempt. See the `filed` event. `decide` never reads it. */
   budgetUsd?: number;
+  /** The context window its sessions are given, in tokens. See the `filed` event. `decide` never reads it. */
+  contextTokens?: number;
   /** Whether its sessions are bridged to claude.ai. See the `filed` event. `decide` never reads it. */
   remoteControl?: boolean;
   /** Which waiting task a free slot goes to first. See the `filed` event. `decide` never reads it. */
@@ -360,6 +368,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
         s.resumeFrom = e.resumeFrom;
         s.worktree = e.worktree; s.closeoutSchema = e.closeoutSchema;
         s.tools = e.tools; s.disallowedTools = e.disallowedTools; s.effort = e.effort; s.mcp = e.mcp; s.budgetUsd = e.budgetUsd;
+        s.contextTokens = e.contextTokens;
         s.remoteControl = e.remoteControl; s.priority = e.priority;
         break;
       case 'starting':

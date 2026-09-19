@@ -519,6 +519,17 @@ test('a budget reaches claude-detached as --max-budget-usd, and REFUSED on codex
   assert.equal(codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', budgetUsd: 0.25 }).args.some((a) => a.includes('budget')), false, 'a direct caller is given no flag codex does not have');
 });
 
+test('a context window reaches claude -p as --autocompact, which it keeps — and codex declares none, so file() refuses one there', async () => {
+  const { codex, claudeDetached } = await import('../src/runner-detached.ts');
+  const d = claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r', contextTokens: 150000, tools: ['Read'], resumeFrom: 'abc' }).args;
+  assert.equal(d[d.indexOf('--autocompact') + 1], '150000');
+  assert.ok(d.indexOf('--autocompact') > d.indexOf('--permission-mode'), 'past the variadic lists');
+  assert.equal(claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r' }).args.includes('--autocompact'), false, 'no window, no flag');
+  assert.deepEqual(claudeDetached.contextTokens, { least: 100_000, most: 1_000_000 });
+  assert.equal(codex.contextTokens, undefined, 'codex exec has no such knob');
+  assert.equal(codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', contextTokens: 200000 }).args.some((a) => a.includes('compact') || a === '200000'), false);
+});
+
 test('claude -p that stopped at its budget says so in its result, and one that failed another way does not', () => {
   // Measured on 2.1.272 with `--max-budget-usd 0.01` and haiku: exit 1, and this result (keys trimmed).
   const spent = resultLine({ subtype: 'error_max_budget_usd', is_error: true, terminal_reason: 'budget_exhausted', errors: ['Reached maximum budget ($0.01)'], total_cost_usd: 0.01804, duration_api_ms: 718 });

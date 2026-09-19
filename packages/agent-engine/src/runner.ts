@@ -60,6 +60,8 @@ export type SpawnRequest = {
   mcp?: Record<string, McpServer>;
   /** The most the session may spend, in dollars. Absent: no cap. */
   budgetUsd?: number;
+  /** The context window the session is given, in tokens: past about it, the harness compacts. Absent: the harness's own. */
+  contextTokens?: number;
   /** Bridge the session to claude.ai, where it can be seen and driven. Absent or false: not bridged. */
   remoteControl?: boolean;
 };
@@ -428,15 +430,41 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number): Transcri
   });
 };
 
-/** One `cost-state` line: the session's totals as its process exited, and when that count began. */
-type CostState = { costUsd?: number; apiMs?: number; toolMs?: number; startTime?: number; unpriced: boolean };
+/**
+ * One `cost-state` line: the session's totals as its process exited, and when that count began. Its tokens are every model's
+ * in `modelUsage` together, input as a response's are counted (`transcriptUsage`): uncached, cache writes and cache reads.
+ */
+type CostState = {
+  costUsd?: number; apiMs?: number; toolMs?: number; inputTokens?: number; outputTokens?: number; startTime?: number; unpriced: boolean;
+};
+
+/** The tokens of a `cost-state`'s `modelUsage`, every model's together — or none, when any model's count is not all there. */
+const tokensOf = (modelUsage: unknown): { inputTokens?: number; outputTokens?: number } => {
+  if (typeof modelUsage !== 'object' || modelUsage === null || Array.isArray(modelUsage)) return {};
+  let input = 0;
+  let output = 0;
+  for (const m of Object.values(modelUsage as Record<string, unknown>)) {
+    const n = (key: string) => {
+      const v = (m as Record<string, unknown> | null)?.[key];
+      return typeof v === 'number' && Number.isFinite(v) ? v : undefined;
+    };
+    const counts = [n('inputTokens'), n('cacheReadInputTokens'), n('cacheCreationInputTokens'), n('outputTokens')];
+    if (counts.some((c) => c === undefined)) return {};
+    input += counts[0]! + counts[1]! + counts[2]!;
+    output += counts[3]!;
+  }
+  return { inputTokens: input, outputTokens: output };
+};
 
 const costStateOf = (line: string): CostState | undefined => {
   let e: Record<string, unknown> | null;
   try { e = JSON.parse(line); } catch { return undefined; }
   if (e?.type !== 'cost-state') return undefined;
   const n = (key: string) => (typeof e[key] === 'number' && Number.isFinite(e[key]) ? (e[key] as number) : undefined);
-  return { costUsd: n('totalCostUSD'), apiMs: n('totalAPIDuration'), toolMs: n('totalToolDuration'), startTime: n('startTime'), unpriced: e.hasUnknownModelCost === true };
+  return {
+    costUsd: n('totalCostUSD'), apiMs: n('totalAPIDuration'), toolMs: n('totalToolDuration'), ...tokensOf(e.modelUsage),
+    startTime: n('startTime'), unpriced: e.hasUnknownModelCost === true,
+  };
 };
 
 /**
@@ -460,13 +488,15 @@ const COST_START_SLACK_MS = 5_000;
  * Absent, never 0: while no line has been written since the attempt began (its process has not exited); when the count
  * was carried on from a total this transcript does not show; and, for `costUsd`, when the harness could not price a
  * model the session used — a total too low reads as the whole cost, so none is given, and `unpricedModel` says why.
+ *
+ * `tokens`: its tokens too, the same way — for an attempt whose transcript cannot count them (`transcriptUsage`).
  */
-const costOf = (before: CostState | undefined, after: CostState | undefined, since: number): Usage => {
+const costOf = (before: CostState | undefined, after: CostState | undefined, since: number, tokens = false): Usage => {
   if (after?.startTime === undefined) return {};
   const carried = after.startTime < since - COST_START_SLACK_MS;
   const base = carried && before?.startTime === after.startTime ? before : undefined;
   if (carried && !base) return {};
-  const own = (key: 'costUsd' | 'apiMs' | 'toolMs') => {
+  const own = (key: 'costUsd' | 'apiMs' | 'toolMs' | 'inputTokens' | 'outputTokens') => {
     const total = after[key];
     const was = base ? base[key] : 0;
     if (total === undefined || was === undefined || total < was) return undefined;
@@ -474,7 +504,9 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
   };
   const unpriced = after.unpriced || base?.unpriced === true;
   const [costUsd, apiMs, toolMs] = [own('costUsd'), own('apiMs'), own('toolMs')];
+  const [inputTokens, outputTokens] = tokens ? [own('inputTokens'), own('outputTokens')] : [];
   return {
+    ...(inputTokens !== undefined && outputTokens !== undefined ? { inputTokens, outputTokens } : {}),
     ...(costUsd !== undefined && !unpriced ? { costUsd } : {}),
     ...(apiMs !== undefined ? { apiMs } : {}),
     ...(toolMs !== undefined ? { toolMs } : {}),
@@ -496,6 +528,11 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * The attempt's lines begin at the first line whose own time is at or after `since`, and end where the session was
  * continued under another name (an `agent-name` line naming another): a session its registry still lists after it
  * ended can have been resumed by a later task since, and what that task spent is not this attempt's.
+ *
+ * An attempt that compacted its conversation — a `compact_boundary` among its lines — made a call for each summary that
+ * writes no `assistant` line, so its responses undercount it: 408,348 input tokens counted against the 601,367 its
+ * `cost-state` said, over three compactions (2.1.278, open issue 26). Its tokens are the `cost-state`'s instead, its own
+ * share as its cost is, and none until one is written.
  */
 export const transcriptUsage = (jsonl: string, since: number): Usage => {
   const responses = new Map<string, { input: number; output: number } | null>();
@@ -503,6 +540,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
   let before: CostState | undefined;
   let after: CostState | undefined;
   let begun = false;
+  let compacted = false;
   let name: string | undefined;
   for (const line of jsonl.split('\n')) {
     if (line.includes('"cost-state"')) {
@@ -523,6 +561,10 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
     }
     if (!begun && line.includes('"timestamp"')) {
       try { begun = Date.parse((JSON.parse(line) as { timestamp?: unknown } | null)?.timestamp as string) >= since; } catch { /* not a line */ }
+    }
+    // A resumed transcript carries its parent's last boundary, before this attempt began: that summary is not this attempt's.
+    if (begun && line.includes('"compact_boundary"')) {
+      try { compacted ||= (JSON.parse(line) as { subtype?: unknown } | null)?.subtype === 'compact_boundary'; } catch { /* not a line */ }
     }
     if (!line.includes('"assistant"')) continue;
     let entry: { type?: string; timestamp?: string; message?: { id?: string; usage?: Record<string, unknown>; content?: unknown } };
@@ -545,10 +587,10 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
   return {
     turns: responses.size,
     toolCalls: toolCalls.size,
-    ...(measured.length === counted.length
+    ...(measured.length === counted.length && !compacted
       ? { inputTokens: measured.reduce((t, c) => t + c.input, 0), outputTokens: measured.reduce((t, c) => t + c.output, 0) }
       : {}),
-    ...costOf(before, after, since),
+    ...costOf(before, after, since, compacted),
   };
 };
 
@@ -568,6 +610,14 @@ export const CLAUDE_PERMISSION_MODES: readonly string[] = ['acceptEdits', 'auto'
  * a knob that silently does nothing.
  */
 export const CLAUDE_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+
+/**
+ * The context windows Claude Code takes, in tokens: `--autocompact`'s range, both ends included. The CLI refuses any other
+ * value while it parses its arguments ("It must be 'auto', or between 100k and 1M"), so a `--bg` spawn given one would fail
+ * on every pass; `file()` asks first. Measured on 2.1.278: 99999 and 1000001 refused, 100000 and 1000000 taken. A value is
+ * handed over as its digits, never `200k` — and never below 1000, which the CLI reads as thousands (`200` is 200k).
+ */
+export const CLAUDE_CONTEXT_TOKENS: { least: number; most: number } = { least: 100_000, most: 1_000_000 };
 
 /**
  * The pool Claude Code's sessions are counted in under the concurrency ceiling, whichever of the engine's runners starts
@@ -1030,6 +1080,11 @@ export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
       ...mcpArgs,
       ...(r.model ? ['--model', r.model] : []),
       ...(r.effort ? ['--effort', r.effort] : []),
+      // The context window: past about it, the session compacts its conversation and carries on — on `--bg` too, and it still
+      // signs off (measured on 2.1.278, open issue 26). Takes a required value, so it can neither swallow the prompt nor be taken
+      // for a `--tools` entry, which the `--permission-mode` above has ended. The same window on every attempt: a resumed
+      // copy keeps only the flags it is given, so a continuation given none would run on the model's whole window again.
+      ...(r.contextTokens !== undefined ? ['--autocompact', String(r.contextTokens)] : []),
       // `--resume` continues that conversation in the background. The NAME is still ours and
       // still new, so a resumed attempt is a distinct row on the board from the one it continues.
       ...(r.resumeFrom ? ['--resume', r.resumeFrom] : []),

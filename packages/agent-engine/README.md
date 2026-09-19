@@ -38,7 +38,7 @@ Definition of done — a closed list, and it is closed:
 
 **The engine is finished.** The next thing to build is a consumer of it, not more of it. If a
 change seems to belong in here, check it against the boundary above first: it almost certainly
-knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp`, `budgetUsd`, `remoteControl` — is a field
+knows about a second workload. A knob on the workload — `model`, `tools`, `disallowedTools`, `effort`, `mcp`, `budgetUsd`, `contextTokens`, `remoteControl` — is a field
 carried on the task and read by a runner, never a callback into `decide`; so is `priority`, read by the pass that orders the board.
 
 ### The one real decision in here: resume policy
@@ -235,12 +235,13 @@ after a space starts a comment. The keys are a closed list:
 | `tools` | `Read, Grep, Glob` — the only tools the session has; see below |
 | `effort` | how hard the harness thinks, in its own words — see below |
 | `budgetUsd` | the most one attempt may spend, in dollars, digits only — `claude-detached` only; see below |
+| `contextTokens` | the session's context window, in tokens, digits only — `claude` and `claude-detached`, 100000 to 1000000; see below |
 
 **Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
 of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
-and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `resume` that is not a policy, a `cwd` or schema file that
+and stop its task on the first pass), a `budgetUsd` that is not dollars in digits (`$5` is refused), a `contextTokens` that is not tokens in digits (`200k` is refused, and written back as `200000`), a `resume` that is not a policy, a `cwd` or schema file that
 is not there, and a brief with no prompt.
 
 **`file()` refuses the same values at the API**, so the CLI is not the only door that checks:
@@ -248,7 +249,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, an unknown policy, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `priority` that is not a finite number (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `priority` that is not a finite number (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -405,6 +406,34 @@ the harness's verdict, or lost — is retried under the same cap, so `maxAttempt
 before one is reached.
 
 `ae start` takes `budgetUsd: 0.25` in a brief, digits only.
+
+## How much a session keeps in mind: `contextTokens`
+
+`contextTokens: 200000` is the context window a task's sessions are given, in tokens: past about it, Claude Code compacts
+the conversation — a summary in place of what the session read — and carries on. Absent, the session runs on the model's
+whole window, which on this machine was a million tokens, and none of 234 worker sessions ever compacted: every token that
+entered one was read again on every call after it (the pivot measurement of 2026-09-18, open issue 26). A field on the task like
+`budgetUsd`, carried on the `filed` event and `State` and read only by a runner, on every attempt's spawn — a continuation
+included, since a resumed session keeps only the flags it is given. `decide` never reads it. The Kubernetes neighbour is
+`resources.limits`: what a workload may hold, set by whoever files it and kept by the node, not the scheduler.
+
+| harness | given | refused at `file()` |
+|---|---|---|
+| `claude` | `--autocompact 200000` | outside 100000 to 1000000, which the CLI refuses while it parses: a spawn would fail on every pass |
+| `claude-detached` | `--autocompact 200000` | the same |
+| `codex` | — | any: `codex exec` has no such knob |
+| a `HarnessSpec` | its `command` is handed `contextTokens` | any, unless it declares the windows it takes (`contextTokens: { least, most }`), and outside them |
+
+**Measured before it was built** (Claude Code 2.1.278, sonnet, open issue 26). A `--bg` session at `--autocompact 100k`
+compacted at 64k to 84k tokens of context, wrote a `compact_boundary` line and the summary into its transcript, read on
+from where it was, and — continued with the same flag — signed off through `StructuredOutput`; `claude -p` did the same
+and gave its `structured_output`. The window is not part of the cached prompt: a resume given the same one, another or none
+read the whole prompt from the cache. **A window too small for one turn's reads stalls a session**: reading 22k tokens a
+call on a 100k window, Claude Code said "Autocompact is thrashing" after three compactions in a row and ended the turn,
+and the session was listed `blocked`, which the engine leaves to a person. An attempt that compacted takes its tokens from
+the `cost-state` Claude Code writes as it exits, which counts the summary's calls its transcript does not.
+
+`ae start` takes `contextTokens: 200000` in a brief, digits only, and `ae show` prints it.
 
 ## Reachable from a phone: `remoteControl`
 

@@ -487,7 +487,15 @@ does anything to a background session, since workers run on the model's whole wi
   no `assistant` line in the transcript. On the first session, `transcriptUsage` counted 408,348 input and 1,625 output
   tokens; the `cost-state` Claude Code wrote as it stopped said 601,367 and 13,138 — the difference its three compactions.
   The control, a session that never compacted, agreed to the token (34,869 and 365). Its `costUsd` was right throughout: it
-  is the `cost-state`'s own.
+  is the `cost-state`'s own. **Fixed**: an attempt whose lines hold a `compact_boundary` takes its tokens from the
+  `cost-state` the way it takes its cost — its own share of the total — and has none while no `cost-state` is written,
+  rather than a count missing its compactions (`transcriptUsage` in `src/runner.ts`). The `claude -p` session's transcript
+  then read 1,327,896 input tokens, what its result's `modelUsage` said.
+
+**What the engine does with it.** A task's `contextTokens` is handed to both Claude runners as `--autocompact <digits>` on
+every attempt, refused at `file()` outside 100000 to 1000000 — the CLI refuses any other value while it parses, so a spawn
+would fail on every pass — and on a harness with no such knob (`codex`, a `HarnessSpec` that declares no `contextTokens`
+range). A window small enough to thrash is the task's author's to avoid: the engine sees only a `blocked` session.
 
 **Not measured.** A window of 200k on real work: where it compacts (about 20 to 35k tokens under the window, if a 100k
 window is anything to go by), what a session loses in the summary, and whether a turn's tool output ever refills 200k in three

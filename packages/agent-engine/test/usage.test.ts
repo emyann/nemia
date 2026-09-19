@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { transcriptUsage } from '../src/runner.ts';
 import { codexOutput } from '../src/runner-detached.ts';
-import { attemptLine, taskLine, usageLine, usd } from '../src/cli.ts';
+import { attemptLine, limitLines, taskLine, usageLine, usd } from '../src/cli.ts';
 import { fold, type Event } from '../src/domain.ts';
 
 const line = (o: object) => JSON.stringify(o);
@@ -134,6 +134,59 @@ test('a count carried on from a total the transcript does not show is no cost', 
   assert.equal('costUsd' in transcriptUsage(otherCount, since), false, 'a line before it from a count that began at another time is not what this one carried on from');
 });
 
+// ─── a compacted conversation: the summary's call writes no response ─────────
+
+/** A `cost-state` with its `modelUsage`, as 2.1.278 writes one: per model, uncached input, cache reads and writes, output. */
+const costStateWith = (totalCostUSD: number, startTime: number, models: Record<string, [number, number, number, number]>) =>
+  line({
+    type: 'cost-state', sessionId: 's-1', totalCostUSD, totalAPIDuration: 1000, totalToolDuration: 10, totalDuration: 1, startTime, hasUnknownModelCost: false,
+    modelUsage: Object.fromEntries(Object.entries(models).map(([model, [inputTokens, cacheReadInputTokens, cacheCreationInputTokens, outputTokens]]) =>
+      [model, { inputTokens, outputTokens, cacheReadInputTokens, cacheCreationInputTokens, costUSD: 0 }])),
+  });
+/** The boundary Claude Code writes where it compacted a conversation (2.1.278), trimmed. */
+const boundary = (at: string) =>
+  line({ type: 'system', subtype: 'compact_boundary', timestamp: at, content: 'Conversation compacted', compactMetadata: { trigger: 'auto', preTokens: 83770, postTokens: 17465 } });
+
+test("a compacted attempt's tokens are its cost-state's, which counts the summary's call its responses do not — and none until one is written", () => {
+  // Measured (open issue 26): three compactions, 408,348 input tokens in the responses and 601,367 in the cost-state.
+  const since = Date.parse('2026-09-19T03:55:58Z');
+  const lines = [
+    prompt('2026-09-19T03:55:59Z'),
+    response('2026-09-19T03:56:01Z', 'msg_1', [{ type: 'tool_use', id: 'tu_1', name: 'Read' }]),
+    boundary('2026-09-19T03:56:49Z'),
+    line({ type: 'user', timestamp: '2026-09-19T03:56:49Z', isCompactSummary: true, message: { content: 'This session is being continued…' } }),
+    response('2026-09-19T03:56:51Z', 'msg_2', [{ type: 'tool_use', id: 'tu_2', name: 'Read' }]),
+  ];
+  const running = transcriptUsage(lines.join('\n'), since);
+  assert.deepEqual(running, { turns: 2, toolCalls: 2 }, 'no tokens rather than a count missing the summary');
+
+  const exited = [...lines, costStateWith(1.248613, since - 300, { 'claude-sonnet-5': [77091, 298435, 225841, 13138] })].join('\n');
+  assert.deepEqual(transcriptUsage(exited, since), { turns: 2, toolCalls: 2, inputTokens: 601367, outputTokens: 13138, costUsd: 1.248613, apiMs: 1000, toolMs: 10 });
+
+  const twoModels = [...lines, costStateWith(1, since, { 'claude-sonnet-5': [10, 20, 30, 4], 'claude-haiku-4-5': [1, 2, 3, 5] })].join('\n');
+  assert.deepEqual([transcriptUsage(twoModels, since).inputTokens, transcriptUsage(twoModels, since).outputTokens], [66, 9], 'every model the session used');
+  const partial = [...lines, line({ type: 'cost-state', sessionId: 's-1', totalCostUSD: 1, startTime: since, modelUsage: { m: { inputTokens: 5, outputTokens: 1 } } })].join('\n');
+  assert.equal('inputTokens' in transcriptUsage(partial, since), false, 'a model whose count is not all there: no tokens, not a part of them');
+});
+
+test("a boundary its session wrote before the attempt began is not the attempt's — a resumed copy carries its parent's last", () => {
+  const first = Date.parse('2026-09-19T03:55:58Z');
+  const since = Date.parse('2026-09-19T04:00:46Z');
+  const jsonl = [
+    response('2026-09-19T03:57:19Z', 'msg_parent', []),
+    boundary('2026-09-19T03:57:52Z'),
+    costStateWith(1.248613, first, { 'claude-sonnet-5': [77091, 298435, 225841, 13138] }),
+    prompt('2026-09-19T04:00:47Z'),
+    response('2026-09-19T04:01:24Z', 'msg_child', []),
+  ].join('\n');
+  assert.deepEqual(transcriptUsage(jsonl, since), { turns: 1, toolCalls: 0, inputTokens: 1110, outputTokens: 5 }, 'its own responses, counted as ever');
+
+  const compactedToo = [...jsonl.split('\n').slice(0, 4), boundary('2026-09-19T04:01:18Z'), jsonl.split('\n')[4]!,
+    costStateWith(1.6757343, first, { 'claude-sonnet-5': [100000, 500000, 375784, 19745] })].join('\n');
+  const u = transcriptUsage(compactedToo, since);
+  assert.deepEqual([u.inputTokens, u.outputTokens, u.costUsd], [975784 - 601367, 19745 - 13138, 0.427121], 'compacted itself: its share of the carried count, tokens as cost');
+});
+
 test('a session that used a model its harness could not price has no cost — a total too low reads as the whole — and says why', () => {
   const since = Date.parse('2026-09-12T09:00:00Z');
   const jsonl = [prompt('2026-09-12T09:00:01Z'), costState(0.05, 900, 10, since, true)].join('\n');
@@ -219,6 +272,12 @@ test('ae show and ae ls print what an attempt cost to the cent — never $0.00 f
   assert.match(shown(measured), /  1\/1  \$3\.01 · 12t  read the notes$/, 'measured once its session was let go');
   assert.match(shown(fold('t-1', base), { turns: 3 }), /  1\/1  cost not measured · 3t  read the notes$/, 'running: no cost written yet');
   assert.match(shown(fold('t-1', base.slice(0, 1))), /  0\/1  read the notes$/, 'no attempt, nothing to cost');
+});
+
+test('ae show prints the budget and the context window a task was filed with, and nothing for either it was not', () => {
+  const filed = (extra: object): Event => ({ kind: 'filed', at: '2026-09-19T09:00:00Z', brief: 'b', cwd: '/r', maxAttempts: 1, ...extra });
+  assert.deepEqual(limitLines(fold('t-1', [filed({ contextTokens: 200000, budgetUsd: 0.25 })])), ['budget: $0.25 an attempt', 'context: 200000 tokens a session, compacted past about it']);
+  assert.deepEqual(limitLines(fold('t-1', [filed({})])), []);
 });
 
 test('ae ls shows a task\'s priority when it was filed with one, and nothing when it was not', () => {

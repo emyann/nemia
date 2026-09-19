@@ -1,0 +1,117 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { sidebar, themeOf } from '../board.ts';
+import { expectCount, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { HELD } from '../seed.ts';
+import type { PageSpec } from '../visit.ts';
+import { OUT, store } from '../world.ts';
+
+export default {
+  // The board continues a session the harness blocked, as `wf retry` does: refused first, in a page of its own, in the package's words
+  // beside the button; then taken — the ask written, and what the tick does with it said in the banner and in the Decide section. The ask
+  // is taken back, so every page after this one, in either theme, reads the store as seeded.
+  name: 'held',
+  route: `/runs/${HELD.id}`,
+  expect: async (page) => {
+    await sidebar(page);
+    const said = `blocked by the harness: ${HELD.line}`;
+    const banner = page.locator('section[aria-label="Waiting on you"]');
+    const need = banner.locator(`[data-need="harness"][data-step="${HELD.blocked}"]`);
+    await expectVisible(need.getByText(`${HELD.blocked} is ${said}`), 'the banner names the harness, and what the session said last');
+    await expectCount(banner.getByText(/^Waiting on you:/), 0, "nobody is waiting on you in the package's words: the step asked nothing");
+
+    const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
+    const node = graph.locator(`.react-flow__node[data-id="${HELD.blocked}"]`);
+    await expectVisible(node.locator('[data-state="needs-human"]', { hasText: 'needs-human' }), "the step's chip is the engine's word, needs-human");
+    await expectVisible(node.locator('[data-need="harness"]', { hasText: said }), 'its node says the harness blocked it, and what the session said last');
+    await expectCount(node.getByText('waiting on you'), 0, 'and is no human gate: nothing was asked of a person');
+
+    const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
+      r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${HELD.id}/steps/${HELD.blocked}/retry`;
+    const asks = path.join(store!, 'runs', `${HELD.id}.asks`);
+    const file = path.join(asks, `retry-${HELD.blocked}-2`);
+    // The tick stops the session, never the api: the engine's journal of the step's task stays as seeded, refused or taken.
+    const journal = path.join(store!, 'engine', 'tasks', `${HELD.id}-${HELD.blocked}.jsonl`);
+    const seeded = fs.readFileSync(journal, 'utf8');
+
+    // Refused first, in a page of its own whose one refusal is the point, as the `answer` page makes one: a file at try 2's ask name that
+    // `wf retry` did not write, which the package will not write over (`strayAsk`). Its sentence must be beside the button, word for word,
+    // and nothing written.
+    fs.mkdirSync(asks, { recursive: true });
+    fs.writeFileSync(file, '{}\n');
+    const refused = await page.context().newPage();
+    try {
+      const { problems } = watch(refused);
+      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      const refusedNeed = refused.locator(`section[aria-label="Waiting on you"] [data-need="harness"][data-step="${HELD.blocked}"]`);
+      const refusedButton = refusedNeed.getByRole('button', { name: 'Continue' });
+      await expectVisible(refusedButton, `Continue for ${HELD.blocked}, with a file that is no ask at its try's name`);
+      const [answered] = await Promise.all([
+        refused.waitForResponse(retried, { timeout: WAIT_MS }),
+        refusedButton.click(),
+      ]);
+      const { error } = (await answered.json()) as { error?: string };
+      if (answered.status() !== 409 || !error?.startsWith(`try 2 of ${HELD.blocked} cannot be asked for: `) || !error.includes('it is not an ask')) {
+        throw new Refused(`the package refuses to write over the file at try 2's name — the api answered ${answered.status()}: ${JSON.stringify(error)}`);
+      }
+      await expectVisible(refusedNeed.locator('[data-refused]'), 'the refusal is shown beside Continue, not swallowed');
+      const shown = await refusedNeed.locator('[data-refused] p.font-mono').textContent();
+      if (shown !== error) throw new Refused(`the refusal beside Continue is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+      await expectVisible(refusedButton, 'and Continue stays, to press again');
+      const there = fs.readdirSync(asks);
+      if (there.length !== 1 || fs.readFileSync(file, 'utf8') !== '{}\n') throw new Refused(`nothing is written on a refusal — ${asks} holds ${there.join(', ')}`);
+      if (fs.readFileSync(journal, 'utf8') !== seeded) throw new Refused(`nothing is stopped on a refusal — ${journal} changed`);
+      await settled(refused);
+      await refused.screenshot({ path: path.join(OUT, `held-refused-${await themeOf(refused)}.png`), fullPage: true });
+      await refused.waitForLoadState('networkidle');
+      // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
+      const expected = `request answered 409: POST ${answered.url()}`;
+      const seen = problems();
+      const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+      if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+    } finally {
+      await refused.close();
+      fs.rmSync(file, { force: true });
+    }
+
+    // Continue, where the commands to copy were: a nudge, and a box for anything to tell it that may stay empty. No Decide section yet:
+    // nothing to decide while the run runs, and no try asked.
+    const button = need.getByRole('button', { name: 'Continue' });
+    await expectVisible(button, 'the banner offers Continue for a session the harness blocked');
+    await expectVisible(need.getByRole('textbox', { name: `What to tell ${HELD.blocked}, if anything` }), 'and a box for anything to tell it');
+    if (!(await button.isEnabled())) throw new Refused('Continue is enabled with nothing written: a nudge needs no message');
+    await expectCount(banner.locator('[data-copy], [data-unblock]'), 0, 'no command to copy: the board continues the session itself');
+    await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'no Decide section before the try is asked: nothing to decide while the run runs');
+
+    const [response] = await Promise.all([
+      page.waitForResponse(retried, { timeout: WAIT_MS }),
+      button.click(),
+    ]);
+    if (response.status() !== 202) throw new Refused(`the api takes Continue, through the board's proxy — it answered ${response.status()}: ${await response.text()}`);
+    const took = (await response.json()) as { try?: unknown; file?: unknown; stopFirst?: unknown };
+    if (took.try !== 2 || took.file !== file || took.stopFirst !== true) {
+      throw new Refused(`the api answers with the try, its ask file and the package's stopFirst — it answered ${JSON.stringify(took)}`);
+    }
+    // The ask is the package's file, as `wf retry` writes a nudge with nothing said; the api stopped nothing.
+    const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+    if (written?.step !== HELD.blocked || written?.try !== 2 || written?.mode !== 'nudge' || 'message' in written) {
+      throw new Refused(`the ask is written as wf retry writes a nudge — ${file} holds ${JSON.stringify(written)}`);
+    }
+    if (fs.readFileSync(journal, 'utf8') !== seeded) throw new Refused(`the api stops no session, the tick does — ${journal} changed`);
+
+    const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';
+    await expectVisible(need.locator('[data-note]', { hasText: note }), `the banner says the session is stopped, then the try filed, in wf ls's words (${note})`);
+    await expectCount(need.getByRole('button', { name: 'Continue' }), 0, 'and offers Continue no more: the try is asked');
+    const decide = page.locator('section[aria-label="Decide"]');
+    await expectVisible(decide.locator(`[data-offer="asked"][data-step="${HELD.blocked}"] [data-note]`, { hasText: note }), 'the Decide section is drawn, as for any run with a try asked, and says it too');
+    const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: HELD.blocked, exact: true }) });
+    await expectVisible(section.locator('[data-note]', { hasText: note }), `and ${HELD.blocked}'s own section`);
+    await settled(page);
+    await page.screenshot({ path: path.join(OUT, `held-asked-${await themeOf(page)}.png`), fullPage: true });
+
+    fs.rmSync(asks, { recursive: true, force: true });
+    await expectVisible(need.getByRole('button', { name: 'Continue' }), 'with the ask taken back, Continue is back once the run is read again');
+    await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'and the Decide section goes with the try');
+    await settled(page);
+  },
+} satisfies PageSpec;

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
-import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
+import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type GitRun, isGitRun, placeOf, type PlaceKind, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
@@ -22,7 +22,10 @@ export type RunStatus = Assessment['status'];
 /** A run as the web app lists it: what was asked, where, and what each step is doing. */
 export type RunSummary = {
   id: string;
-  repo: string;
+  /** The repository a git run is about; null for a folder run (`place`), which has none. */
+  repo: string | null;
+  /** The kind of workspace its steps work in: `git`, or `folder` for a team whose every step says `workspace: folder`. */
+  place: PlaceKind;
   brief: string;
   /** The workflow folder the run was started from, as `wf start` resolved it: its last segment names the workflow. */
   workflowDir: string;
@@ -81,7 +84,7 @@ export type RunSummary = {
  * the run's result is on its way to. Neither asks git anything, so the list the Factory polls can carry them.
  */
 export type RunToDecide = (
-  | (Extract<ToDecide, { kind: 'approve' }> & { back: string[]; onto: string })
+  | (Extract<ToDecide, { kind: 'approve' }> & { back: string[]; onto: string | null })
   | Extract<ToDecide, { kind: 'git' }>
 ) & { said: string; command: string };
 
@@ -94,7 +97,7 @@ function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[
   const said = toDecideWords(run, t);
   if (t.kind === 'git') return { ...t, said, command: `wf decide ${run.id}` };
   const step = steps.find((s) => s.name === t.step);
-  return { ...t, back: step ? sendBackTo(step, run) : [t.step], onto: run.branch, said, command: `wf approve ${run.id} ${t.step}` };
+  return { ...t, back: step ? sendBackTo(step, run) : [t.step], onto: run.branch ?? null, said, command: `wf approve ${run.id} ${t.step}` };
 }
 
 /**
@@ -320,11 +323,13 @@ export type StepTry = {
 export type RunDetail = {
   id: string;
   brief: string;
-  repo: string;
+  /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run, which has none of them. */
+  repo: string | null;
+  place: PlaceKind;
   workflowDir: string;
-  baseRef: string;
-  branch: string;
-  isolate: boolean;
+  baseRef: string | null;
+  branch: string | null;
+  isolate: boolean | null;
   createdAt: string;
   cancelledAt: string | null;
   /** As on `RunSummary`. */
@@ -829,6 +834,8 @@ const workFiled = (run: Run, steps: readonly Workflow[]): string =>
  * The branches left out of the answer are the ones known to be on the base, which say nothing: `toDecide` reads the ones ahead of it.
  */
 function standingsOf(run: Run, steps: readonly Workflow[], status: RunStatus): BranchStanding[] {
+  // A folder run has no branch to stand anywhere.
+  if (!isGitRun(run)) return [];
   const filed = workFiled(run, steps);
   const branches = toDecideBranches(run, steps, status).filter((branch) => onTheBase.get(`${run.id}/${branch}`) !== filed);
   if (!branches.length) return [];
@@ -990,7 +997,8 @@ async function summarize(run: Run, views: Views): Promise<RunSummary> {
   const judged = judge(run, names, folder, views, await waitsIn(run, seenBy(views)), (status, steps) => standingsOf(run, steps, status));
   return {
     id: run.id,
-    repo: run.repo,
+    repo: run.repo ?? null,
+    place: placeOf(run),
     brief: run.brief,
     workflowDir: run.workflowDir,
     createdAt: run.createdAt,
@@ -1140,11 +1148,12 @@ async function detail(run: Run): Promise<RunDetail> {
   return {
     id: run.id,
     brief: run.brief,
-    repo: run.repo,
+    repo: run.repo ?? null,
+    place: placeOf(run),
     workflowDir: run.workflowDir,
-    baseRef: run.baseRef,
-    branch: run.branch,
-    isolate: run.isolate,
+    baseRef: run.baseRef ?? null,
+    branch: run.branch ?? null,
+    isolate: run.isolate ?? null,
     createdAt: run.createdAt,
     cancelledAt: run.cancelledAt ?? null,
     after: run.after ?? [],
@@ -1411,7 +1420,7 @@ function diffPath(lines: readonly string[]): string {
 }
 
 /** A branch's check-affecting diff, as `inFullLines` reads what `sensitiveDiff` gave: an error, none, or the files. */
-function sensitiveOf(run: Run, t: Touched): SensitiveDiff {
+function sensitiveOf(run: GitRun, t: Touched): SensitiveDiff {
   if ('error' in t.radius) return { branch: t.branch, files: [], error: t.radius.error };
   const diff = sensitiveDiff(run, t, CHECK_AFFECTING);
   if (diff === undefined) return { branch: t.branch, files: [], error: `git could not diff ${t.branch}` };
@@ -1515,7 +1524,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   // With the harness's word, as `wf decide` reads it: a person's try of a session the harness blocked is waited on too. And what each
   // task's sessions cost (`spendReader`): a step over its budget, or ended at it, is waited on, and offered its try or round with `--budget`.
   const { spendOf } = judged;
-  const d = decision(steps, run, phase, (branch) => isShipped(run, branch), reader, asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
+  const d = decision(steps, run, phase, (branch) => isGitRun(run) && isShipped(run, branch), reader, asked, verdicts, asks, rounds, harnessBlocked(views), spendOf);
   if (d.kind === 'cancelled') return { nothing: `cancelled at ${d.at} — nothing to decide` };
   if (d.kind === 'shipped') return { nothing: `shipped — ${d.branches.join(', ')} is already on ${run.branch}` };
 
@@ -1523,12 +1532,14 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   // the terminal steps, and for a terminal step that works in the repository's own checkout, the steps it waits on, whose work it acts on.
   const results = [...new Set(resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b)))];
   const result = d.kind === 'awaiting' ? d.branches : results;
-  const touched: Touched[] = branchesToRead(result, Object.values(run.steps).map((s) => s.branch), run.isolate ? run.branch : undefined)
-    .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
+  // None of it for a folder run, which has no repository to ask: what its steps made is in their artifacts.
+  const git = isGitRun(run) ? run : undefined;
+  const touched: Touched[] = !git ? [] : branchesToRead(result, Object.values(git.steps).map((s) => s.branch), git.isolate ? git.branch : undefined)
+    .map((branch) => ({ branch, radius: touchedBy(git, branch) }));
   // Where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run — none for a run
   // that worked on its base branch itself, whose standing would read `main is on main` and whose own line says so instead.
-  const standings: Standing[] = run.isolate
-    ? branchStandings(run, results).map((s) => ({ ...s, said: branchWord(run, s), stat: diffStat(run, s.branch).trim() || null, merge: mergeOf(run, s) }))
+  const standings: Standing[] = git?.isolate
+    ? branchStandings(git, results).map((s) => ({ ...s, said: branchWord(git, s), stat: diffStat(git, s.branch).trim() || null, merge: mergeOf(git, s) }))
     : [];
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
@@ -1542,7 +1553,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     standings,
     touched,
     lesson: lessonOf(touched),
-    sensitive: touched.map((t) => sensitiveOf(run, t)),
+    sensitive: git ? touched.map((t) => sensitiveOf(git, t)) : [],
     used: Object.fromEntries(filed.map((name) => [name, usedOf(consumed[name], steps.find((s) => s.name === name)?.context)])),
     total: totalOf(steps, filed.map((name) => [name, consumed[name]] as const)),
     cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
@@ -1552,7 +1563,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
 }
 
 /** Whether a branch ahead of the base still merges onto it (`StandingMerge`); null for one that is not ahead, which nothing would merge. */
-function mergeOf(run: Run, standing: BranchStanding): StandingMerge | null {
+function mergeOf(run: GitRun, standing: BranchStanding): StandingMerge | null {
   if (standing.where !== 'ahead') return null;
   const merge = mergesOnto(run.repo, run.branch, standing.branch);
   return { ...merge, said: mergeWord(merge, run.branch) };

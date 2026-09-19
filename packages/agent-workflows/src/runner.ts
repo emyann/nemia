@@ -17,7 +17,9 @@ import { depsPlan, inside, isModuleKey, lockfilePackages, lockfileParting, refus
 export { verdictWord } from './check.ts';
 export { AGENT_FACING, CHECK_AFFECTING, LARGE_CONTEXT, LESSON, branchesToRead, budgetWord, dollars, inFullLines, lessonLine, parseGlobs, peakMark, readWords, rebuiltCache, sumUsage, touchedLines, usedLines } from './radius.ts';
 import { radius, sensitivePaths, sumUsage, type Consumed, type Radius, type Touched } from './radius.ts';
+export { isGitRun, placeOf } from './run.ts';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, signoffsSpent, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
+export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
 import { agentNameRefusal, agentsDir, agentsFolderRefusal, agentUsers, agentVersion, AGENTS_FOLDER, fansOut, frontmatterKey, parseAgent, renderAgent, type Agent, type AgentDraft, isReadme, linkRefusal, loadAgents, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
@@ -26,8 +28,9 @@ export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLin
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
+import { folderPlace } from './places.ts';
 import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -854,8 +857,10 @@ async function workspaceFor(
   run: Run,
   steps: readonly Workflow[],
   step: Workflow,
-): Promise<{ workspace: string; branch: string; conflicted: boolean; deps?: Provisioned; notes: string[] }> {
+): Promise<{ workspace: string; branch?: string; conflicted: boolean; deps?: Provisioned; notes: string[] }> {
   const plan = workspacePlan(steps, step);
+  // A folder run's steps work in folders the run makes, and nothing here is git's (`places.ts`).
+  if (!isGitRun(run)) return { ...folderPlace(runsDir()).make(run, plan, step.name), conflicted: false };
   const of = (name: string) => {
     const s = run.steps[name];
     if (!s?.workspace || !s.branch) throw new Error(`${step.name}: ${name} has no workspace yet`);
@@ -1709,7 +1714,7 @@ export async function checkoutHold(e: Engine, run: Run, steps: readonly Workflow
   if (!mine || mine.holds) return undefined;
   const claims: MainClaim[] = [mine];
   for (const other of runs) {
-    if (other.id === run.id || path.resolve(other.repo) !== mine.repo) continue;
+    if (other.id === run.id || !isGitRun(other) || path.resolve(other.repo) !== mine.repo) continue;
     const claim = await mainClaim(e, other, slots.get(other.id));
     if (claim) claims.push(claim);
   }
@@ -1736,7 +1741,7 @@ async function mainClaim(e: Engine, run: Run, slot: RunSlot | undefined): Promis
   let steps: Workflow[];
   try { steps = stepsOf(run); } catch { return undefined; }   // a record whose workflow no longer reads files nothing
   const ending = steps.find((s) => s.workspace === 'main');
-  if (!ending) return undefined;
+  if (!ending || !isGitRun(run)) return undefined;
   const repo = path.resolve(run.repo);
   const taskId = run.steps[ending.name]?.taskId;
   const phase = taskId ? phaseOfView(await e.view(taskId)) : 'unknown';
@@ -1821,7 +1826,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // `--no-worktree` run's workspace is a person's checkout — and its files directory is not made again.
   const collected = handOffDue(steps, run, phaseOf).flatMap((name) => {
     if (!fs.existsSync(runFile(run.id))) return [];
-    handOff(run.steps[name]!.workspace!, name);
+    if (isGitRun(run)) handOff(run.steps[name]!.workspace!, name);
+    else folderPlace(runsDir()).handOff(run, name);
     return collectArtifacts(run, name, signedOff(name));
   });
 
@@ -2008,7 +2014,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         harness: 'check',
         // The command from the workflow this run froze — never from the workspace it is about to judge.
         brief: checkBrief(step.check!, {
-          WF_RUN: run.id, WF_STEP: name, WF_BASE_REF: run.baseRef, WF_WORKSPACE: workspace, WF_STDERR: checkStderr(taskId),
+          WF_RUN: run.id, WF_STEP: name, ...(isGitRun(run) ? { WF_BASE_REF: run.baseRef } : {}), WF_WORKSPACE: workspace, WF_STDERR: checkStderr(taskId),
           WF_ARTIFACTS: files,
         }),
         cwd: workspace,
@@ -2035,7 +2041,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // A run that waited on runs starts from its base branch as it stands now, with their work on it — not as it stood at `wf start`,
   // before they shipped. Read once, in the pass that files its roots, and written with them; every worktree and diff of the run is cut
   // from it. A run with no `after` keeps the base `wf start` recorded, as before.
-  if (ready.length && starting && run.after?.length) run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
+  if (ready.length && starting && run.after?.length && isGitRun(run)) run.baseRef = gitSays(run.repo, 'rev-parse', '--verify', `${run.branch}^{commit}`)?.trim() || run.baseRef;
   // What those runs concluded, for the roots' briefs (`## From run <id>`): read on the same pass, and never again.
   const parents = ready.length && starting && run.after?.length ? await parentCloseouts(e, run.after) : undefined;
 
@@ -2104,8 +2110,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   }
   // A finished run's result branches, as git has them now: the commits `wf decide` offers to ship, kept so that git can still be asked
   // whether they are on the base once a person has deleted the branch after the merge (`isShipped`). Written only when a tip moved.
-  const tipped = tipBranches(run, steps, status);
-  const tips = tipped.length ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
+  const tipped = isGitRun(run) ? tipBranches(run, steps, status) : [];
+  const tips = tipped.length && isGitRun(run) ? tipsSeen(run, tipped, refsOf(run.repo, tipped)) : undefined;
   if (tips) run.tips = tips;
   // Only to a record that is still there: a run `wf rm` forgot while this pass was at work stays forgotten (`rewriteRun`).
   if (filed.length || checked.length || tried.length || looped.length || adopted.length || adoptedTries.length || adoptedRounds.length || tips || heldFirst) rewriteRun(run);
@@ -2220,9 +2226,11 @@ export async function forget(e: Engine, id: string, how: ForgetHow = {}): Promis
   const others = listRuns().filter((o) => o.id !== id);
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
   // Where the result stands against the base branch, for an ending that has not run: one whose result git already has holds nothing.
-  const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? branchStandings(run, resultBranches(run)) : [];
+  const standings = steps?.some((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId) ? standingsOf(run) : [];
   const refusal = forgetRefusal(steps, run, phaseOf, others, reader, asked, verdictOf, asks, rounds, spendOf, askAt, standings);
   if (refusal) return { ...said, kind: 'refused', refusal, ...nothing };
+  // A folder run's folders are under its own directory, which goes with its record: no worktree, no branch, and no git asked.
+  if (!isGitRun(run)) return { ...said, folder: true, kind: 'forgotten', ...nothing, files: removeKeyed(id, Object.keys(run.steps)) };
 
   // 1. The worktrees, through git — which lists each by its real path, so the run's directory and the record's are read the same way.
   const within = resolved(dir);
@@ -2401,7 +2409,7 @@ export async function list(e: Engine, run: Run, slot?: RunSlot): Promise<Listing
     return v?.state.brief ? v.phase : 'unknown';
   };
   // And where the run's result stands against the base branch, read off git on this pass: what says a finished run is one nobody has decided.
-  const standings = branchStandings(run, resultBranches(run));
+  const standings = standingsOf(run);
   // And which run's ending step has the repository's own checkout, when this run's waits for it: read of the store, as the pass that would file it reads it.
   const checkout = await checkoutHold(e, run, steps);
   return listing(steps, run, wordOf, (name) => closeoutOf(views, run, name), closeoutAsked(views), (name) => refused.get(name)?.verdict, asks, rounds, readAnswers(run.id), waitsOf(run, await parentsOf(e, run)), saidCount(views, run), spendReader(views), slot, standings, checkout);
@@ -2483,7 +2491,7 @@ export async function approve(e: Engine, id: string, stepName: string, message?:
   const { views, phaseOf } = await taskPhases(e, run);
   // Where the result stands against the base branch, read off git, for an ending that merges: one whose result is already on the base has
   // nothing to merge. Asked of git only for such a step — no other gate's approval turns on it.
-  const standings = steps.some((s) => s.name === stepName && approvedFirst(s, run)) ? branchStandings(run, resultBranches(run)) : [];
+  const standings = steps.some((s) => s.name === stepName && approvedFirst(s, run)) ? standingsOf(run) : [];
   const refusal = (now: Run) => approvalRefusal(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), exitVerdicts(views, now), readAsks(id).asks, spendReader(views), standings);
   const refused = refusal(run);
   if (refused) refuse(refused);
@@ -2682,7 +2690,7 @@ function workspaceArtifact(run: Run, stepName: string, file: string, dir: string
   if (at.kind === 'outside') return 'escapes';
   if (at.kind === 'directory') return 'directory';
   if (at.kind === 'file' && copyBlocked(dir, rel)) return 'not collected';
-  const onBranch = branch ? gitSays(run.repo, 'cat-file', '-t', `${branch}:${rel}`)?.trim() : undefined;
+  const onBranch = branch && isGitRun(run) ? gitSays(run.repo, 'cat-file', '-t', `${branch}:${rel}`)?.trim() : undefined;
   if (at.kind === 'file') return onBranch === 'blob' ? undefined : 'not collected';
   return onBranch === 'blob' ? undefined : onBranch === 'tree' ? 'directory' : 'not there';
 }
@@ -2802,7 +2810,7 @@ export function artifactFiles(run: Pick<Run, 'id'>, stepName: string): ArtifactF
  * keeps no trace of it otherwise: a merge carries any message, and `git branch -d` needs the worktree
  * removed first. With no tip recorded, a branch that is gone has not landed as far as anyone can tell.
  */
-export function isShipped(run: Run, branch: string): Shipped {
+export function isShipped(run: GitRun, branch: string): Shipped {
   const within = (commit: string, base: string) => execFileSync('git', ['merge-base', '--is-ancestor', commit, base], { cwd: run.repo, stdio: 'ignore' });
   // On the base branch already: with commits past the run's base, or none. Exit 1 is git's no — the commit is not within the run's base.
   const landed = (commit: string): Shipped => {
@@ -2836,7 +2844,13 @@ export function isShipped(run: Run, branch: string): Shipped {
  * Read on the pass that asks and never stored, for the reason `shipped` is asked rather than stored: a person merging by hand changes the
  * answer, and nothing tells the run. A branch git cannot count reads as ahead by none rather than as shipped.
  */
-export function branchStandings(run: Run, branches: readonly string[]): BranchStanding[] {
+/** Where a run's result branches stand, as `branchStandings` says: none for a folder run, which has no branch. */
+const standingsOf = (run: Run): BranchStanding[] => (isGitRun(run) ? branchStandings(run, resultBranches(run)) : []);
+
+/** Whether a branch of the run is on its base (`isShipped`): never, for a folder run, which has no branch to ask about. */
+const shippedOf = (run: Run) => (branch: string): Shipped => (isGitRun(run) ? isShipped(run, branch) : false);
+
+export function branchStandings(run: GitRun, branches: readonly string[]): BranchStanding[] {
   return [...new Set(branches)].map((branch): BranchStanding => {
     if (isShipped(run, branch) !== false) return { branch, where: 'on' };
     if (gitSays(run.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${branch}`) === undefined) return { branch, where: 'gone' };
@@ -2855,7 +2869,8 @@ export function parentRecord(id: string): Pick<ParentRun, 'record' | 'gone'> {
   try { record = readRun(id); } catch { return {}; }
   let branches: string[];
   try { branches = resultBranches(record); } catch { branches = []; }   // a pre-freeze record whose folder is gone names no steps
-  const gone = branches.filter((b) => gitSays(record.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`) === undefined && !isShipped(record, b));
+  const git = isGitRun(record) ? record : undefined;
+  const gone = git ? branches.filter((b) => gitSays(git.repo, 'rev-parse', '--verify', '--quiet', `refs/heads/${b}`) === undefined && !isShipped(git, b)) : [];
   return { record, ...(gone.length ? { gone } : {}) };
 }
 
@@ -2884,10 +2899,10 @@ export async function parentOf(e: Engine, id: string): Promise<ParentRun> {
   let steps: Workflow[];
   try { steps = stepsOf(record); } catch { return { ...known, shipped: false }; }
   const branches = resultSteps(steps).map((s) => record.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
-  if (!branches.length || !branches.every((b) => isShipped(record, b))) return { ...known, shipped: false };
+  if (!branches.length || !branches.every(shippedOf(record))) return { ...known, shipped: false };
   const { views, phaseOf } = await taskPhases(e, record);
   const { asks, rounds } = readAsks(id);
-  const said = decision(steps, record, phaseOf, (b) => isShipped(record, b), closeoutReader(views, record), closeoutAsked(views), exitVerdicts(views, record), asks, rounds, () => false, spendReader(views));
+  const said = decision(steps, record, phaseOf, shippedOf(record), closeoutReader(views, record), closeoutAsked(views), exitVerdicts(views, record), asks, rounds, () => false, spendReader(views));
   return { ...known, shipped: said.kind === 'shipped' };
 }
 
@@ -2970,7 +2985,7 @@ function refsOf(repo: string, branches: readonly string[]): Record<string, strin
  * way it tells the next step — so the artifacts are the new files, and no frontmatter key has to
  * be invented to declare them.
  */
-export function artifacts(run: Run, branch: string): string[] {
+export function artifacts(run: GitRun, branch: string): string[] {
   try {
     return git(run.repo, 'diff', '--diff-filter=A', '--name-only', `${run.baseRef}...${branch}`)
       .split('\n').map((l) => l.trim()).filter(Boolean);
@@ -2978,12 +2993,12 @@ export function artifacts(run: Run, branch: string): string[] {
 }
 
 /** One artifact's text, out of the branch. */
-export function readArtifact(run: Run, branch: string, file: string): string {
+export function readArtifact(run: GitRun, branch: string, file: string): string {
   try { return git(run.repo, 'show', `${branch}:${file}`); } catch { return ''; }
 }
 
 /** How much the run changed, in one line. */
-export function diffStat(run: Run, branch: string): string {
+export function diffStat(run: GitRun, branch: string): string {
   try { return git(run.repo, 'diff', '--shortstat', `${run.baseRef}...${branch}`); } catch { return ''; }
 }
 
@@ -3000,7 +3015,7 @@ const gitSays = (repo: string, ...args: string[]): string | undefined => {
  * whatever the repository's config says. An error when git cannot say, or says what `radius` cannot
  * read: a branch that is gone is not a branch that changed nothing.
  */
-export function touchedBy(run: Run, branch: string): Radius | { error: string } {
+export function touchedBy(run: GitRun, branch: string): Radius | { error: string } {
   const numstat = gitSays(run.repo, '-c', 'core.quotePath=false', 'diff', '--numstat', '--find-renames', `${run.baseRef}...${branch}`);
   if (numstat === undefined) return { error: `git could not diff ${run.baseRef.slice(0, 12)}...${branch}` };
   try { return radius(numstat, workspacesOf(run)); } catch (err) { return { error: (err as Error).message }; }
@@ -3010,7 +3025,7 @@ export function touchedBy(run: Run, branch: string): Radius | { error: string } 
  * The base's npm `workspaces`, which `radius` groups a change by — read at the base, where no step could have edited them, and handed on
  * as written: `radius` reads `./packages/*` as `packages/*`, and names a glob with `**` on the screen (`workspaceGlob`, `deepWorkspaces`).
  */
-function workspacesOf(run: Run): string[] {
+function workspacesOf(run: GitRun): string[] {
   try {
     const { workspaces } = JSON.parse(gitSays(run.repo, 'show', `${run.baseRef}:package.json`) ?? '{}');
     const globs: unknown = Array.isArray(workspaces) ? workspaces : workspaces?.packages;
@@ -3023,7 +3038,7 @@ function workspacesOf(run: Run): string[] {
  * what a check means. Both ends of a rename are asked for, so git shows it as one. Empty when no changed
  * file is named; undefined when the branch could not be read, or git cannot say.
  */
-export function sensitiveDiff(run: Run, t: Touched, globs: readonly string[]): string | undefined {
+export function sensitiveDiff(run: GitRun, t: Touched, globs: readonly string[]): string | undefined {
   if ('error' in t.radius) return undefined;
   const paths = sensitivePaths(t.radius.changes, globs);
   if (!paths.length) return '';
@@ -3121,9 +3136,9 @@ export async function decide(e: Engine, id: string): Promise<{
   const spendOf = spendReader(views);
   // Which run's ending step has the repository's own checkout, when this run's waits for it: a run still running for that, and nothing else.
   const checkout = await checkoutHold(e, run, steps);
-  const d = decision(steps, run, phaseOf, (b) => isShipped(run, b), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
+  const d = decision(steps, run, phaseOf, shippedOf(run), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
   // Where the result stands against the base branch, read off git now — and what that leaves a person to decide (`assess`, on the same facts).
-  const standings = branchStandings(run, resultBranches(run));
+  const standings = standingsOf(run);
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
   // What a person said to a step's current try, off their ask file, and what the try before it needed, off the engine's record of that
   // try: the run's record keeps neither.

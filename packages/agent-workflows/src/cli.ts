@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -800,15 +800,17 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // full, because a check that passed says nothing about a check that was changed to pass.
       // Never the run's own base branch on a run that cut worktrees: a step that recorded it worked in the repository's checkout, and
       // what that branch holds against the run's frozen base is every other run's merge since, not this run's work (`branchesToRead`).
-      const touched = branchesToRead(decision.branches, namesInOrder(run, steps).map((name) => run.steps[name]!.branch), run.isolate ? run.branch : undefined)
-        .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
+      // A folder run has no branch, and nothing here to read: what its steps made is in their artifacts.
+      const git = isGitRun(run) ? run : undefined;
+      const touched = !git ? [] : branchesToRead(decision.branches, namesInOrder(git, steps).map((name) => git.steps[name]!.branch), git.isolate ? git.branch : undefined)
+        .map((branch) => ({ branch, radius: touchedBy(git, branch) }));
       if (touched.length) {
         console.log();
         for (const line of touchedLines(touched)) console.log(`  ${line}`);
         console.log(`  ${lessonLine(touched)}`);
         for (const t of touched) {
           console.log();
-          for (const line of inFullLines(t, sensitive, sensitiveDiff(run, t, sensitive ?? CHECK_AFFECTING), touched.length > 1)) console.log(`  ${line}`);
+          for (const line of inFullLines(t, sensitive, sensitiveDiff(git!, t, sensitive ?? CHECK_AFFECTING), touched.length > 1)) console.log(`  ${line}`);
         }
       }
 
@@ -872,15 +874,15 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         console.log();
       }
 
-      for (const branch of decision.branches) {
-        const stat = diffStat(run, branch);
+      for (const branch of git ? decision.branches : []) {
+        const stat = diffStat(git!, branch);
         console.log(`  ${branch}${stat ? `  —${stat}` : ''}`);
 
         // Markdown a step ADDED is a message written for whoever reads next, and today that is
         // you. Source it added is in the diff, where source belongs.
-        const notes = artifacts(run, branch).filter((f) => f.endsWith('.md') && !f.includes('/'));
+        const notes = artifacts(git!, branch).filter((f) => f.endsWith('.md') && !f.includes('/'));
         for (const file of notes) {
-          const text = readArtifact(run, branch, file).trimEnd();
+          const text = readArtifact(git!, branch, file).trimEnd();
           const lines = text.split('\n');
           console.log(`\n  ── ${file} ${'─'.repeat(Math.max(0, 64 - file.length))}`);
           for (const l of lines.slice(0, 120)) console.log(`  ${l}`);

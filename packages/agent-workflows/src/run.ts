@@ -29,18 +29,48 @@ export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stoppe
  */
 export type CloseoutAsked = boolean | 'unsigned';
 
-export type Run = {
-  id: string;
+/**
+ * A run record: a git run (`GitRun`), whose steps work on branches of one repository, or a folder run (`FolderRun`), whose steps work
+ * in folders the run makes and which needs no repository. Which is `place`, frozen at start: absent on a git run — every record from
+ * before there were kinds is one, and reads as it always did — and `{ kind: 'folder' }` on a folder run, an object so that a later kind
+ * can say which workspace it is.
+ */
+export type Run = GitRun | FolderRun;
+
+export type GitRun = RunBase & {
+  place?: undefined;
   /** The repository the work is about. */
   repo: string;
-  /** Where the run's first step works. Later steps inherit, fork or merge from it. */
-  workspace: string;
   /** The commit the workspace started from, so a reviewer can diff against it. */
   baseRef: string;
   /** The repository's branch when the run started. */
   branch: string;
   /** Whether each step gets a worktree of its own. False only for `--no-worktree`. */
   isolate: boolean;
+};
+
+/** A run of a team whose every step says `workspace: folder`: no repository, no base, no branch, no worktrees. */
+export type FolderRun = RunBase & {
+  place: { kind: 'folder' };
+  repo?: undefined;
+  baseRef?: undefined;
+  branch?: undefined;
+  isolate?: undefined;
+};
+
+/** The kinds of workspace a run's steps work in: `git`, which a record without `place` is, and `folder`. */
+export type PlaceKind = 'git' | 'folder';
+
+/** Which kind of workspace a run's steps work in. Pure. */
+export const placeOf = (run: Pick<Run, 'place'>): PlaceKind => run.place?.kind ?? 'git';
+
+/** Whether a run is a git run: what reading its repository, base and branches needs. */
+export const isGitRun = (run: Run): run is GitRun => placeOf(run) === 'git';
+
+type RunBase = {
+  id: string;
+  /** Where the run's first step works: its repository's checkout, or a folder run's own folder. Later steps inherit, fork or merge from it. */
+  workspace: string;
   /** What the person actually asked for. This travels to EVERY step; it is the spec. */
   brief: string;
   workflowDir: string;
@@ -876,7 +906,7 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
  */
 export function afterRefusal(
   after: readonly string[],
-  child: Pick<Run, 'repo' | 'branch'>,
+  child: Pick<Run, 'repo' | 'branch' | 'place'>,
   parentOf: (runId: string) => Pick<ParentRun, 'record' | 'gone'>,
 ): string | null {
   const seen = new Set<string>();
@@ -886,6 +916,13 @@ export function afterRefusal(
     seen.add(id);
     const { record, gone } = parentOf(id);
     if (!record) return `--after ${id}: the store has no run ${id}. --after takes a run this one waits on, by its id — wf ls lists them.`;
+    // A run waits for another to SHIP, onto its base branch: a folder run has neither, so it is refused on either side of --after.
+    if (child.repo === undefined) {
+      return `--after ${id}: this run's team works in folders (workspace: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`;
+    }
+    if (record.repo === undefined) {
+      return `--after ${id}: ${id} is a folder run (workspace: folder), which never ships onto a branch, so this run would wait for ever. When ${id}'s work is done, ${without}.`;
+    }
     if (path.resolve(record.repo) !== path.resolve(child.repo)) {
       return `--after ${id}: ${id} works on ${record.repo}, and this run on ${child.repo}. A run waits for another to ship onto its own base branch, which a run on another repository never does: start it with --repo ${record.repo}, or ${without}.`;
     }
@@ -2564,6 +2601,8 @@ export type Forgot = {
   repo?: string;
   base?: string;
   isolate?: boolean;
+  /** A folder run's (`place`): no repository, worktree or branch to say anything of — its folders were under its own directory. */
+  folder?: true;
   /** Worktrees git removed. */
   removed: string[];
   /** What a worktree held uncommitted, committed first under its step's name: on which branch, as which commit. */
@@ -2598,6 +2637,8 @@ export function forgetLine(f: Forgot): string {
   if (f.kind === 'held') {
     return `${f.id}  not forgotten:${leftWords(f)}${worktrees.length ? `; ${worktrees.join(', ')}` : ''}. Its record, files and branches are kept until every worktree is gone: wf rm ${f.id} again then.`;
   }
+
+  if (f.folder) return [`${f.id}  forgotten: a folder run, whose steps worked in its own directory — no worktrees, no branches`, files, f.unfrozen ? `its workflow was never frozen, and ${f.unfrozen}` : ''].filter(Boolean).join('; ');
 
   const base = f.base ?? 'its base branch';
   const deleted = f.branches.filter((b) => b.deleted);
@@ -3151,7 +3192,7 @@ export function decision(
   // A run that worked directly on its base branch is never asked whether it shipped. Git's answer
   // is `main is an ancestor of main` — always yes — and it was read before the steps were
   // classified, so a failed or blocked `--no-worktree` run printed "shipped" with no closeout.
-  const direct = branches.includes(run.branch);
+  const direct = run.branch !== undefined && branches.includes(run.branch);
 
   // Every terminal branch, not some: a fan-out that ends in two branches is not shipped because
   // one of them landed. Each is asked once, and none after the first that is not on the base branch.

@@ -3,8 +3,11 @@
  *
  * `fixtures/git-runs-before.json` is what the code of the commit before folder workspaces read them as (`git-runs-pin.ts`): each step's
  * brief and workspace plan, and the run's decision, listing and offer to decide while running, once every step succeeded and once its
- * last steps failed — with worktrees and without — and a forget's line. It is never regenerated: a difference is a finding, not a fixture
- * to refresh.
+ * last steps failed — with worktrees and without — and a forget's line. A difference is a finding, not a fixture to refresh — with one
+ * exception, because the fixture holds the shipped briefs' own words: a reword of a shipped folder or agent moves it too. Then write
+ * `everything()` of `git-runs-pin.ts` over it, and read the fixture's diff: every changed line must be the sentence that was reworded,
+ * and nothing else. (Done once, on 2026-09-19: main reworded the ui implementer's line about where a new e2e page goes while this
+ * branch was in flight, and the ship step's check refused the merged tree.)
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

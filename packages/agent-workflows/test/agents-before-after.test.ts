@@ -28,8 +28,15 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = JSON.parse(fs.rea
  *
  * All four ship bodies moved again when the shipper's fourth item stopped committing git's default `Merge branch '…'` and began writing a
  * message of what shipped, committed with `-F` from a file outside the checkout. The list is the same: those steps were already in it.
+ *
+ * The ui implementer's body moved when the e2e's pages left the one array `PAGES` in `apps/web/test/e2e/run.ts` for a file each under
+ * `apps/web/test/e2e/pages/`: its brief said to add a new page to that array, which no longer exists. Both ui folders name that agent.
  */
-const BODIES_REWORDED: string[] = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]);
+const BODIES_REWORDED: string[] = [
+  ...['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]),
+  'workflows/ui/implement',
+  'packages/agent-workflows/workflows/ui/implement',
+];
 
 /**
  * The shipped steps that keep words of their own after the agent's, as `<folder>/<step>` and a phrase of the note: the ship of each build

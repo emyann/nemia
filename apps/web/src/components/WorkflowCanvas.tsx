@@ -29,9 +29,9 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
     steps: workflow.steps.map(({ name }) => ({
       name, spec: null, filed: null, body: null, told: null, taskId: null, workspace: null, branch: null, status: 'waiting', note: null,
       needs: null, blockedByHarness: false, approve: null, gate: null, lastLine: null, said: [], asked: null,
-      closeout: null, check: null, attempts: { count: 0, latest: null },
+      closeout: null, unreadable: null, check: null, attempts: { count: 0, latest: null },
       used: null, spent: null, budget: null, raise: null,
-      tries: [{ try: 1, round: 1, then: null, current: true, taskId: null, note: null, status: 'waiting', attempts: { count: 0, latest: null }, check: null, closeout: null, answer: null }],
+      tries: [{ try: 1, round: 1, then: null, current: true, taskId: null, note: null, status: 'waiting', attempts: { count: 0, latest: null }, check: null, closeout: null, unreadable: null, answer: null }],
       timeline: [],
     })),
     timeline: { rounds: [], run: { loop: null, round: null, tasks: 0, inFlight: 0, queuedMs: 0, ranMs: 0, wallMs: null, queued: '—', ran: '—', wall: 'not known', cost: null } },

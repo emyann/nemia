@@ -304,6 +304,9 @@ export type StepCheck = {
  * the step; on an earlier one, the engine's own word for its task — `succeeded`, `failed` — since `wf ls` words only the try
  * that decides the step. `attempts`, `check` and `closeout` are the try's own, in the step's shapes.
  */
+/** A closing statement that `parseCloseout` could not read: its words for why, and the statement as it came. */
+export type StepUnreadable = { error: string; raw: unknown };
+
 export type StepTry = {
   try: number;
   round: number;
@@ -315,6 +318,11 @@ export type StepTry = {
   attempts: StepAttempts;
   check: StepCheck | null;
   closeout: StepCloseout | null;
+  /**
+   * A statement the try gave that could not be read — why, and the statement as the engine recorded it — or null. `closeout` is null
+   * then, and this is the only place what the agent said reaches the board.
+   */
+  unreadable: StepUnreadable | null;
   /**
    * What a person said to this try when they asked for it (`answerOf`, off their ask file): the answer `wf decide` prints under the
    * `needs` of the try before as `your answer`. Null for a try nobody answered — and for every first try, which nobody asked for.
@@ -1176,8 +1184,8 @@ async function detail(run: Run): Promise<RunDetail> {
       const current = {
         status: judged.words.get(name)!,
         check: checks.get(name) ?? null,
-        // An unreadable closeout is already in `status`; there is nothing here to show of it.
         closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
+        unreadable: unreadableIn(taskId, views),
         attempts: attemptsIn(taskId, views),
       };
       return {
@@ -1277,7 +1285,7 @@ function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
 /**
  * How one try of a step signed off, off the engine's record of its task's last attempt — as `closeoutOf` reads the current try's —
  * with what it gave of the fields its step declares, its `replies`, and each file it named as `artifactOf` reads it. Null for a
- * try that gave none, and for one whose closeout could not be read, which the step's `status` says of its current try.
+ * try that gave none, and for one whose closeout could not be read, which `unreadableIn` answers for.
  */
 function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | null, views: Views): StepCloseout | null {
   const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
@@ -1302,6 +1310,14 @@ function closeoutIn(run: Run, name: string, step: Workflow, taskId: string | nul
   };
 }
 
+/** A try's statement that could not be read, off the same record as `closeoutIn`'s: why, and what it said, untouched. */
+function unreadableIn(taskId: string | null, views: Views): StepUnreadable | null {
+  const said = taskId ? views.get(taskId)?.state.attempts.at(-1)?.closeout : undefined;
+  if (said === undefined) return null;
+  const c = parseCloseout(said);
+  return 'error' in c ? { error: c.error, raw: said } : null;
+}
+
 /** One of a closeout's `replies`, forgivingly: the harness held it to its schema, and an agent filled it in. */
 function replyOf(item: unknown): StepReply {
   const text = (value: unknown) => (typeof value === 'string' ? value : value === undefined ? '' : JSON.stringify(value));
@@ -1321,7 +1337,7 @@ function triesOf(
   name: string,
   steps: readonly Workflow[],
   views: Views,
-  current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'attempts'>,
+  current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'unreadable' | 'attempts'>,
   answers: readonly RetryAsk[],
 ): StepTry[] {
   const step = steps.find((s) => s.name === name) ?? bare(name);
@@ -1345,6 +1361,7 @@ function triesOf(
       attempts: attemptsIn(t.taskId, views),
       check: step.check ? checkIn(step.check, t.check?.taskId, views) : null,
       closeout: closeoutIn(run, name, step, t.taskId, views),
+      unreadable: unreadableIn(t.taskId, views),
       answer: answerAt(i + 1),
     })),
     {

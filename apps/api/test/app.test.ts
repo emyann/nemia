@@ -87,9 +87,9 @@ const blocked = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Wh
 const blockedCloseout = { outcome: 'blocked', summary: 'Half of it is done.', needs: 'Which database?', artifacts: [{ path: 'NOTES.md' }], output: {}, missing: [], replies: null, schema: {}, raw: blocked };
 
 /** What a step on its first try says of it, as its one entry in `tries`: the current try, reached by nothing. */
-const firstTry = (step: { taskId: string | null; status: string; attempts: object; check: object | null; closeout: object | null }) => [{
+const firstTry = (step: { taskId: string | null; status: string; attempts: object; check: object | null; closeout: object | null; unreadable?: null }) => [{
   try: 1, round: 1, then: null, current: true, note: null,
-  taskId: step.taskId, status: step.status, attempts: step.attempts, check: step.check, closeout: step.closeout, answer: null,
+  taskId: step.taskId, status: step.status, attempts: step.attempts, check: step.check, closeout: step.closeout, unreadable: null, answer: null,
 }];
 
 /** The engine's record of a task `filed` journals: a codex task with one attempt allowed, and nothing else said — which Codex runs in `workspace-write`. */
@@ -189,7 +189,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   });
 
   const implementTry = {
-    taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout,
+    taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout, unreadable: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   };
   assert.deepEqual(implement, {
@@ -212,7 +212,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     timeline: settledTimeline('t-2'),
   });
 
-  const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, attempts: { count: 0, latest: null } };
+  const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, unreadable: null, attempts: { count: 0, latest: null } };
   assert.deepEqual({ ...review, told: undefined }, {
     name: 'review',
     spec: { harness: null, model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: 2, loop: null, rounds: null },
@@ -284,10 +284,10 @@ test('a run whose workflow folder is gone still answers, from its record', async
   assert.deepEqual(run.graph, { roots: ['implement', 'review'], edges: [] });
   assert.deepEqual(run.waitingOnYou, ['implement']);
   const implementTry = {
-    taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout,
+    taskId: 't-2', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout, unreadable: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   };
-  const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, attempts: { count: 0, latest: null } };
+  const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, unreadable: null, attempts: { count: 0, latest: null } };
   assert.deepEqual(run.steps, [
     {
       name: 'implement', spec: null, filed: filedBare, body: null, told: filedBrief('t-2'),
@@ -342,7 +342,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
 
   const [original, review, replacement] = run.steps;
   const originalTry = {
-    taskId: 't-6', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout,
+    taskId: 't-6', status: 'succeeded · BLOCKED', check: null, closeout: blockedCloseout, unreadable: null,
     attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
   };
   assert.deepEqual(original, {
@@ -1057,16 +1057,16 @@ test('a step on its third try, in the second round of its loop, carries every tr
         command: 'npm test', taskId: 'r-50-implement-check', verdict: 'exit 1',
         refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['npm error Test failed.'], truncated: false }, unreadable: null },
       },
-      closeout: closeout(said.implement),
+      closeout: closeout(said.implement), unreadable: null,
       answer: null,
     },
     {
       try: 2, round: 1, then: 'round', current: false, taskId: 'r-50-implement-try2', note: 'try 2, by retries: 1', status: 'succeeded', attempts: once,
-      check: passed('r-50-implement-try2-check'), closeout: closeout(said.implement2), answer: null,
+      check: passed('r-50-implement-try2-check'), closeout: closeout(said.implement2), unreadable: null, answer: null,
     },
     {
       try: 3, round: 2, then: null, current: true, taskId: 'r-50-implement-try3', note: 'round 2 of 3', status: 'verified ✓', attempts: once,
-      check: passed('r-50-implement-try3-check'), closeout: closeout(said.implement3, { replies }), answer: null,
+      check: passed('r-50-implement-try3-check'), closeout: closeout(said.implement3, { replies }), unreadable: null, answer: null,
     },
   ]);
   // The current try is where it was: the step's own check and closeout are its.
@@ -1076,12 +1076,12 @@ test('a step on its third try, in the second round of its loop, carries every tr
     {
       try: 1, round: 1, then: 'round', current: false, taskId: 'r-50-review', note: null, status: 'succeeded', attempts: once, check: null,
       // What it declared, in its schema's order: the findings implement was handed, and each field's schema off the frozen workflow.
-      closeout: closeout(said.review, { output: { again: true, findings }, schema: reviewOutput.properties }),
+      closeout: closeout(said.review, { output: { again: true, findings }, schema: reviewOutput.properties }), unreadable: null,
       answer: null,
     },
     {
       try: 2, round: 2, then: null, current: true, taskId: 'r-50-review-try2', note: 'round 2 of 3', status: review.status, attempts: once, check: null,
-      closeout: closeout(said.review2, { output: { again: false, findings: [] }, schema: reviewOutput.properties }),
+      closeout: closeout(said.review2, { output: { again: false, findings: [] }, schema: reviewOutput.properties }), unreadable: null,
       answer: null,
     },
   ]);
@@ -1111,6 +1111,29 @@ test("a closeout carries each declared field's schema off the workflow the run f
   // The folder is gone: the schema is the record's, a field's own, `files` among them though it was not given.
   assert.deepEqual(closeout.schema, schema.properties);
   assert.deepEqual(closeout.raw, said);
+});
+
+test('a statement that could not be read reaches the board as it came, with why — and a readable one has nothing unreadable', async () => {
+  // Cut off mid-string, and an array: neither is a closeout; each is what the agent said, and the board shows it whole.
+  const cut = '{"outcome": "done", "summary": "Cut off';
+  for (const [id, said] of [['r-52-cut', cut], ['r-52-list', ['done']]] as const) {
+    settledTask(id, said as unknown as object);
+  }
+  settledTask('r-52-fine', { outcome: 'done', summary: 'Fine.' });
+  writeRun({
+    ...r2, id: 'r-52', workflowDir: gone,
+    workflow: [{ name: 'cut', after: [], body: 'Say it.' }, { name: 'list', after: [], body: 'Say it.' }, { name: 'fine', after: [], body: 'Say it.' }],
+    steps: { cut: { taskId: 'r-52-cut' }, list: { taskId: 'r-52-list' }, fine: { taskId: 'r-52-fine' } },
+  });
+  const [c, l, f] = (await (await app.request('/api/runs/r-52')).json()).steps;
+  assert.equal(c.closeout, null);
+  assert.equal(c.unreadable.raw, cut);
+  assert.match(c.unreadable.error, /\S/);
+  assert.deepEqual(c.tries.at(-1).unreadable, c.unreadable, 'the try carries it too');
+  assert.equal(l.closeout, null);
+  assert.deepEqual(l.unreadable.raw, ['done']);
+  assert.equal(f.unreadable, null);
+  assert.equal(f.closeout.summary, 'Fine.');
 });
 
 test('a step says what it runs with: the workflow\'s effort, context window and tools, and what the engine filed its try with where the workflow says nothing', async () => {

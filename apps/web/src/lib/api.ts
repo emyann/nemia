@@ -210,6 +210,9 @@ export type StepCheck = {
  * try, which `current` marks; `note` how it was reached, in `wf ls`'s words. `status` is the step's word on the current try, and
  * the engine's word for the task on an earlier one.
  */
+/** A closing statement the api could not read: its words for why, and the statement as it came. */
+export type StepUnreadable = { error: string; raw: unknown };
+
 export type StepTry = {
   try: number;
   round: number;
@@ -221,6 +224,8 @@ export type StepTry = {
   attempts: StepAttempts;
   check: StepCheck | null;
   closeout: StepCloseout | null;
+  /** A statement it gave that could not be read: why, and the statement as it came. `closeout` is null then. */
+  unreadable: StepUnreadable | null;
   /** What a person said to this try when they asked for it — `wf decide`'s `your answer` — or null. */
   answer: string | null;
 };
@@ -284,6 +289,7 @@ export type RunDetail = {
     /** The try a person asked for that the next tick files; null when none is. */
     asked: StepAsked | null;
     closeout: StepCloseout | null;
+    unreadable: StepUnreadable | null;
     /** Null for a step with no `check:`. */
     check: StepCheck | null;
     attempts: StepAttempts;

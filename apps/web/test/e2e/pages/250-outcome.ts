@@ -8,13 +8,14 @@ import type { PageSpec } from '../visit.ts';
 import { OUT, REPO, store } from '../world.ts';
 
 /**
- * A run of six steps, each ending another way, written for this page's visit and taken back before it ends: every page shares the
+ * A run of seven steps, each ending another way, written for this page's visit and taken back before it ends: every page shares the
  * store, and a run seeded for all of them would move their counts. Its schemas are the shipped agents' (`workflows/agents`), read as
  * they are, so the tab is shown what a real run of them would give it.
  */
 const OUTCOME = {
   id: 'draw-each-outcome-e2e',
   title: 'Draw each outcome',
+  garbled: '{"outcome": "done", "summary": "Drew every kind, and',
   plan: { approach: 'Draw the statement by its shape.\n\nOne pure function chooses the drawing from the value and its schema, and **JSON** is what it answers when nothing fits.' },
   findings: [
     { file: 'apps/web/src/components/conversation/ToolContent.tsx', line: 142, what: 'A tool result longer than the fold is cut **without an ellipsis**, so a person reads a truncated path as the whole of it.' },
@@ -56,6 +57,7 @@ function writeRun(root: string): string[] {
     { name: 'ask' },
     { name: 'quiet' },
     { name: 'odd', output: { file: 'odd.schema.json', schema: odd } },
+    { name: 'garbled' },
   ];
   const tasks: string[] = [];
   const taskOf = (step: string) => {
@@ -64,12 +66,12 @@ function writeRun(root: string): string[] {
     return task;
   };
   /** A task that ran once: ended as `end` says, with the statement it gave, or none. */
-  const ran = (step: string, end: { observed: string; reason: string; settled: string }, closeout?: object) =>
+  const ran = (step: string, end: { observed: string; reason: string; settled: string }, closeout?: object | string) =>
     write(taskOf(step), lines([
       { kind: 'filed', at: ago(9), brief: `Do ${step}.`, cwd: REPO_SAID, maxAttempts: 1, harness: 'claude' },
       { kind: 'starting', at: ago(8.9), attempt: 1 },
       { kind: 'spawned', at: ago(8.9), attempt: 1 },
-      { kind: 'ended', at: ago(4), attempt: 1, sessionId: `ae/${id}-${step}/1`, observed: end.observed, reason: end.reason, ...(closeout ? { closeout } : {}) },
+      { kind: 'ended', at: ago(4), attempt: 1, sessionId: `ae/${id}-${step}/1`, observed: end.observed, reason: end.reason, ...(closeout !== undefined ? { closeout } : {}) },
       { kind: 'settled', at: ago(4), outcome: end.settled },
     ]));
   const signed = { observed: 'done', reason: 'harness', settled: 'succeeded' };
@@ -97,6 +99,8 @@ function writeRun(root: string): string[] {
   ran('ask', signed, said('Half of it is drawn.', { needs: OUTCOME.needs }, 'blocked'));
   ran('quiet', { observed: 'failed', reason: 'unsigned', settled: 'failed' });
   ran('odd', signed, said('Gave what its schema asked, in shapes nothing draws.', { matrix: [[1, 2, 3], [4, 5, 6]], weights: { plan: 0.2, review: { findings: 0.7 } } }));
+  // A statement cut off mid-string: no closeout, and still what the agent said.
+  ran('garbled', signed, OUTCOME.garbled);
 
   for (const step of steps) {
     const output = 'output' in step && step.output ? `output: ${step.output.file}\n` : '';
@@ -118,7 +122,7 @@ function writeRun(root: string): string[] {
 
 /** The step's inspector, on its Output tab: what a click on its node opens. */
 async function outputOf(page: Page, step: string) {
-  // Six steps side by side put one under the graph's legend, which takes the pointer: a click the node is sent, where it is.
+  // Seven steps side by side put one under the graph's legend, which takes the pointer: a click the node is sent, where it is.
   await page.locator(`section[aria-label="The run's steps as a graph"] .react-flow__node[data-id="${step}"]`).dispatchEvent('click');
   const inspector = page.locator(`aside[aria-label="Step ${step}"]`);
   await inspector.getByRole('tab', { name: 'Output' }).click();
@@ -202,6 +206,12 @@ export default {
       await expectVisible(odd.locator('section[data-field="matrix"][data-kind="json"] pre'), 'an array of arrays is shown as the JSON it came as, under its name');
       await expectVisible(odd.locator('section[data-field="weights"][data-kind="json"] pre', { hasText: '"findings": 0.7' }), 'and so is an object');
       await photograph(page, odd, 'odd');
+
+      const garbled = await outputOf(page, 'garbled');
+      await expectVisible(garbled.locator('[data-outcome="unreadable"][data-by="unreadable"]'), 'garbled opens on unreadable, said by the agent');
+      await expectVisible(garbled.locator('[data-reason]', { hasText: 'could not be read' }), 'and why, in a sentence');
+      await expectVisible(garbled.locator('section[aria-label="As it came"] pre[data-raw]', { hasText: OUTCOME.garbled }), 'then the statement whole, as it came');
+      await photograph(page, garbled, 'garbled');
     } finally {
       // Off the run first, so no poll of it asks for a run that is gone.
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'networkidle' });

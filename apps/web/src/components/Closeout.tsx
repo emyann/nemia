@@ -128,6 +128,16 @@ export function TryCloseouts({ tries, selected, none }: { tries: readonly StepTr
 
 const EARLIER_NONE = "No closeout on the engine's record of this try.";
 
+/** A statement whole, as the engine recorded it: what Raw shows, and all there is of one that could not be read. */
+function AsItCame({ raw }: { raw: unknown }) {
+  return (
+    <section aria-label="As it came" className="space-y-1">
+      <h4 className="text-xs text-neutral-500">the statement as it came</h4>
+      <Json data-raw value={raw} />
+    </section>
+  );
+}
+
 /** What a person said to a try when they asked for it, as `wf decide` prints it under the question of the try before: `your answer`. */
 function YourAnswer({ answer }: { answer: string }) {
   return (
@@ -140,6 +150,15 @@ function YourAnswer({ answer }: { answer: string }) {
 /** How a try ended, said first — by its agent, or by the machine for it — then its statement drawn, when there is one. */
 function TryOutcome({ t, none }: { t: StepTry; none: string }) {
   const outcome = outcomeOf(t, none);
+  if (t.unreadable) {
+    // Nothing to draw, and nothing hidden: the statement whole, as the engine recorded it.
+    return (
+      <div data-closeout className="space-y-3">
+        <OutcomeHead outcome={outcome} />
+        <AsItCame raw={t.unreadable.raw} />
+      </div>
+    );
+  }
   if (!t.closeout) return <OutcomeHead outcome={outcome} />;
   return <CloseoutView closeout={t.closeout} outcome={outcome} />;
 }
@@ -171,10 +190,7 @@ export function CloseoutView({ closeout, outcome }: { closeout: StepCloseout; ou
       {closeout.needs && <ClosedNeeds needs={closeout.needs} />}
       <Markdown>{closeout.summary}</Markdown>
       {raw ? (
-        <section aria-label="As it came" className="space-y-1">
-          <h4 className="text-xs text-neutral-500">the statement as it came</h4>
-          <Json data-raw value={closeout.raw} />
-        </section>
+        <AsItCame raw={closeout.raw} />
       ) : (
         <>
           {declared.map(([name, value]) => field(name, value))}

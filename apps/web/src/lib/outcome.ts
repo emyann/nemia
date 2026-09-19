@@ -77,12 +77,13 @@ export const descriptionOf = (schema: unknown): string | null =>
   isRecord(schema) && typeof schema.description === 'string' ? schema.description : null;
 
 /**
- * Who said how a try ended, and what: the agent, in its statement; the machine, in the reason its attempt ended without one; or
- * nobody yet — still running, not filed, or a statement that could not be read — in the words the inspector has for that.
+ * Who said how a try ended, and what: the agent, in its statement, or in one that could not be read; the machine, in the reason its
+ * attempt ended without one; or nobody yet — still running, or not filed — in the words the inspector has for that.
  */
 export type Outcome =
   | { by: 'agent'; outcome: 'done' | 'blocked'; cut: string | null }
   | { by: 'machine'; reason: string; words: string }
+  | { by: 'unreadable'; words: string }
   | { by: 'nobody'; words: string };
 
 /**
@@ -106,18 +107,20 @@ const CUT_WORDS: Readonly<Record<string, string>> = {
 };
 
 /** How a try ended and who said so. `none` is what the inspector says of a try with no statement and no reason on the record. */
-export function outcomeOf(t: Pick<StepTry, 'closeout' | 'attempts'>, none: string): Outcome {
+export function outcomeOf(t: Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>, none: string): Outcome {
   const latest = t.attempts.latest;
   if (t.closeout) return { by: 'agent', outcome: t.closeout.outcome, cut: (latest?.reason && CUT_WORDS[latest.reason]) || null };
+  if (t.unreadable) return { by: 'unreadable', words: `It gave a closing statement that could not be read (${t.unreadable.error}). Here it is as it came.` };
   if (!latest?.ended || !latest.reason) return { by: 'nobody', words: none };
   const words = MACHINE_WORDS[latest.reason];
   if (words) return { by: 'machine', reason: latest.reason, words };
   if (latest.reason === 'harness' && (latest.ended === 'failed' || latest.ended === 'stopped')) {
     return { by: 'machine', reason: latest.ended, words: `Its harness ended the session ${latest.ended}, and it said nothing of how it went.` };
   }
-  // A harness's `done` with no statement is `unsigned` since 2026-09-19, and a statement that could not be read is the inspector's to say.
+  // A harness's `done` with no statement is `unsigned` since 2026-09-19.
   return { by: 'nobody', words: none };
 }
 
-/** An outcome in the word a fold's summary and the head's badge give it: `done`, `blocked`, the machine's reason, or `no closeout`. */
-export const outcomeWord = (o: Outcome): string => (o.by === 'agent' ? o.outcome : o.by === 'machine' ? o.reason : 'no closeout');
+/** An outcome in the word a fold's summary and the head's badge give it: `done`, `blocked`, `unreadable`, the machine's reason, or `no closeout`. */
+export const outcomeWord = (o: Outcome): string =>
+  o.by === 'agent' ? o.outcome : o.by === 'machine' ? o.reason : o.by === 'unreadable' ? 'unreadable' : 'no closeout';

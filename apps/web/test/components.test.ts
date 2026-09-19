@@ -983,6 +983,17 @@ test("a try that ended with no statement says the machine's reason, unsigned, in
   assert.match(current, /<details data-try="1"[^>]*><summary[^>]*>round 1 · try 1 — unsigned<\/summary>/);
 });
 
+test("a try whose statement could not be read says so, why, and shows it whole as it came — its fold says `unreadable`", () => {
+  const said = '{"outcome": "done", "summary": "Cut off';
+  const tries = threeTries.map((t) => (t.try === 1 ? { ...t, closeout: null, unreadable: { error: 'unparseable: Unterminated string in JSON', raw: said } } : t));
+  const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0]!, none: 'unused' }));
+  assert.deepEqual(textsOf(/<p data-outcome="unreadable" data-by="unreadable"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), ['unreadable', 'said by the agent, not readable']);
+  assert.match(html, /<p data-reason="true"[^>]*>It gave a closing statement that could not be read \(unparseable: Unterminated string in JSON\)\. Here it is as it came\.<\/p>/);
+  assert.match(html, /<section aria-label="As it came"[^>]*>[\s\S]*?<pre data-raw="true"[^>]*>\{&quot;outcome&quot;: &quot;done&quot;, &quot;summary&quot;: &quot;Cut off<\/pre>/, 'the statement, untouched');
+  const current = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[2]!, none: 'No closeout yet.' }));
+  assert.match(current, /<details data-try="1"[^>]*><summary[^>]*>round 1 · try 1 — unreadable<\/summary>/);
+});
+
 test("a closeout's image is drawn inline, its name its alt, opening full-size in a new tab; a text file is a link, anything else a link with its size, and a bare path the path", () => {
   const url = (name: string) => `/api/runs/r-1/steps/shoot/artifacts/${name}`;
   const dir = '/wf/runs/r-1/artifacts/shoot';

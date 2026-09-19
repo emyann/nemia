@@ -10,10 +10,16 @@ const BADGE: Record<Outcome['by'] | 'blocked', string> = {
   agent: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300',
   blocked: 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300',
   machine: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-300',
+  unreadable: 'bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-300',
   nobody: 'bg-neutral-100 text-neutral-700 dark:bg-neutral-800 dark:text-neutral-300',
 };
 
-const BY: Record<Outcome['by'], string> = { agent: 'said by the agent', machine: 'no statement: the machine’s reason', nobody: 'no statement' };
+const BY: Record<Outcome['by'], string> = {
+  agent: 'said by the agent',
+  unreadable: 'said by the agent, not readable',
+  machine: 'no statement: the machine’s reason',
+  nobody: 'no statement',
+};
 
 /**
  * How a try ended, first, in words: the agent's `done` or `blocked`, or the machine's reason it has no statement — and who said it.

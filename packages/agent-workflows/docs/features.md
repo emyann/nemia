@@ -3592,13 +3592,16 @@ the try ended, in words, and draws each field by its shape (`apps/web/src/lib/ou
   test). A value its schema does not describe is `json`, and so is anything no rule knows: an object, an array of arrays, a mixed array.
 - **Nothing hidden.** A field that is `json` is shown under its name. A **Raw** switch shows the whole statement as the engine recorded
   it, in place of the drawing: `parseCloseout` reads forgivingly (an outcome that is not `blocked` reads `done`, an artifact that is not
-  a string is dropped), so the parsed closeout is not the statement.
-- **Two api fields the tab lacked** (`StepCloseout` in `apps/api/src/app.ts`): `schema`, each declared field's schema off the workflow
-  the run froze, for a boolean's description and an empty array's item type; and `raw`, the statement as it came. Nothing else changed
-  in the api, and nothing in this package.
+  a string is dropped), so the parsed closeout is not the statement. A statement `parseCloseout` refuses outright — JSON cut off, an
+  array — has no closeout at all: the head says `unreadable`, said by the agent, with the parser's reason, and shows the statement whole
+  beneath it (review, round 2: it had said only that a closeout could not be read, and hid what was said).
+- **Three api fields the tab lacked** (`apps/api/src/app.ts`): on `StepCloseout`, `schema`, each declared field's schema off the
+  workflow the run froze, for a boolean's description and an empty array's item type, and `raw`, the statement as it came; and on each
+  try, `unreadable`, the parser's error and the statement, where there is a statement and no closeout. Nothing else changed in the api,
+  and nothing in this package.
 - **Tests.** `apps/web/test/outcome.test.ts`, a test per kind and one that unknown shapes are `json`; `components.test.ts` draws the
-  tab; the e2e's `outcome` page (`pages/250-outcome.ts`) writes a run whose six steps each end another way — a review with findings, a
-  plan, a loop target's replies and a screenshot, a blocked step, an unsigned attempt, and a matrix and an object — photographs each
+  tab; the e2e's `outcome` page (`pages/250-outcome.ts`) writes a run whose seven steps each end another way — a review with findings, a
+  plan, a loop target's replies and a screenshot, a blocked step, an unsigned attempt, a matrix and an object, and a statement cut off — photographs each
   step's tab and Raw in both themes, and takes the run back.
 
 **The seam.** `outputKind` is the one place a closeout meets its drawing. A generic renderer (JSON Render, say) or a judgment choosing a

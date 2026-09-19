@@ -170,3 +170,21 @@ test('wf start from a directory that is no repository: a folder team starts, and
   }
   assert.deepEqual(gitAsked(), []);
 });
+
+test('the shipped note team is a folder team: it starts with no repository, and review continues write\'s folder, handed its title and gist', async () => {
+  const shipped = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'note');
+  const run = start({ brief: 'a note on how tides work', repo: NOT_A_REPO, workflowDir: shipped });
+  assert.deepEqual(readRun(run.id).place, { kind: 'folder' });
+  const { e, tasks, settle } = board();
+  await advance(e, readRun(run.id));
+  const write = tasks.get(`${run.id}-write`)!.spec;
+  fs.writeFileSync(path.join(write.cwd, 'note.md'), '# Tides\n');
+  settle(`${run.id}-write`, 'succeeded', { ...SIGNED, title: 'Tides', gist: 'The moon pulls the sea.' });
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['review']);
+  const review = tasks.get(`${run.id}-review`)!.spec;
+  assert.equal(review.cwd, write.cwd);
+  assert.match(review.brief, /The moon pulls the sea\./);
+  for (const brief of [write.brief, review.brief]) assert.doesNotMatch(brief, /\bgit\b|branch|commit|worktree/i);
+  await forget(e, run.id);
+  assert.deepEqual(gitAsked(), []);
+});

@@ -48,9 +48,10 @@ and an absolute path to `node` (`which node`; under nvm, Claude Code's own PATH 
 }
 ```
 
-It prints its own line, `5h 38% · 7d 86% · resets 16:40`. To keep a statusline you already have, put its
-command after the script's path, quoted as one argument: the script runs it with the same payload and prints its
-output first — `"command": "node …/quota.ts 'bash ~/.claude/my-statusline.sh'"`.
+It prints its own line, `5h 38% · 7d 86% · resets 16:40`, and writes the file only after an answer, so the
+reading's age is the age of your last turn in any session, not of the last repaint. To keep a statusline you
+already have, put its command after the script's path, quoted as one argument: the script runs it with the same
+payload and prints its output first — `"command": "node …/quota.ts 'bash ~/.claude/my-statusline.sh'"`.
 
 To check it:
 

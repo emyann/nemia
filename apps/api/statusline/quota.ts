@@ -8,10 +8,18 @@
  * absent for an API-key session, before a session's first answer, and for a window whose reset has passed. The script:
  *
  *  1. runs the command given after it, if any — a person's own statusline, wrapped — with the same stdin, and prints its output first;
- *  2. writes `{ written_at, claude_code_version, rate_limits }` to `$WF_ROOT/quota.json` (`~/.agent-workflows` without it, as the package
- *     finds its store), through a hidden file beside it renamed over it, so a reader never reads half of it. `rate_limits` is Claude Code's
- *     object as it came, or null when a session that has had an answer has none. Before a session's first answer it writes nothing: a
- *     session just opened would say no limits over the last reading;
+ *  2. writes `{ written_at, claude_code_version, rate_limits, heard }` to `$WF_ROOT/quota.json` (`~/.agent-workflows` without it, as the
+ *     package finds its store), through a hidden file beside it renamed over it, so a reader never reads half of it. `rate_limits` is
+ *     Claude Code's object as it came, or null when a session that has had an answer has none. It writes only numbers just heard, so that
+ *     `written_at` is when they were: Claude Code runs a statusline on events that are no answer too — a repaint, a resize, and of its own
+ *     accord at a window's reset, where it drops the window gone by and repeats the week as it last heard it, hours ago perhaps. So it
+ *     writes nothing
+ *       - before a session's first answer, which would say no limits over the last reading;
+ *       - when the session has had no answer since it last wrote: `heard` keeps, for the last sessions to write, their
+ *         `cost.total_api_duration_ms`, which moves with each answer and with nothing else. An idle session's repaint neither stamps its
+ *         old numbers as new nor puts them over a busier session's newer ones;
+ *       - of no limits over a reading that has them: a subscriber's session has limits after every answer, so a session without them is
+ *         another sign-in (an API key), and says nothing of the subscription's;
  *  3. prints a line of its own: `5h 38% · 7d 71% · resets 16:40`, the nearer reset in this machine's time.
  *
  * It must never fail a session: any error of its own prints nothing of its own and exits 0. Node only, no dependency: Claude Code runs it,
@@ -28,8 +36,18 @@ process.on('uncaughtException', () => process.exit(0));
 /** How long a wrapped statusline may take before its output is given up on. */
 const WRAPPED_MS = 3_000;
 
+/** How many sessions' last answers `heard` keeps: more than a person has open at once. */
+const SESSIONS_KEPT = 32;
+
 type Window = { used_percentage?: unknown; resets_at?: unknown };
-type Payload = { version?: unknown; rate_limits?: Record<string, Window> | null; context_window?: { current_usage?: unknown } };
+type Payload = {
+  session_id?: unknown;
+  version?: unknown;
+  rate_limits?: Record<string, Window> | null;
+  context_window?: { current_usage?: unknown };
+  cost?: { total_api_duration_ms?: unknown };
+};
+type Written = { rate_limits?: unknown; heard?: unknown };
 
 /** The wrapped command's output, or nothing when there is none, it failed to start, or it took too long. */
 function wrapped(command: string, input: string): string {
@@ -45,21 +63,43 @@ function wrapped(command: string, input: string): string {
 /** Where the package keeps its store: `$WF_ROOT`, or `~/.agent-workflows`. */
 const store = (): string => process.env.WF_ROOT || path.join(os.homedir(), '.agent-workflows');
 
-/** Write the quota part of the payload, or nothing before the session's first answer. */
+/** What the script last wrote, or null when there is nothing it can read. */
+function previous(file: string): Written | null {
+  try {
+    const parsed: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return parsed && typeof parsed === 'object' ? (parsed as Written) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Write the quota part of the payload when it is news: see 2. above. */
 function record(payload: Payload): void {
   const limits = payload.rate_limits && typeof payload.rate_limits === 'object' ? payload.rate_limits : null;
   if (!limits && !payload.context_window?.current_usage) return;
   const root = store();
+  const file = path.join(root, 'quota.json');
+  const last = previous(file);
+  const session = typeof payload.session_id === 'string' ? payload.session_id : '';
+  const answered = payload.cost?.total_api_duration_ms;
+  const heard: Record<string, unknown> = last?.heard && typeof last.heard === 'object' ? { ...last.heard } : {};
+  // Without the counter — another version's payload — every run is taken as news, as before there was one.
+  if (typeof answered === 'number' && heard[session] === answered) return;
+  if (!limits && last?.rate_limits && typeof last.rate_limits === 'object') return;
+  delete heard[session];
+  if (typeof answered === 'number') heard[session] = answered;
+  const kept = Object.entries(heard).slice(-SESSIONS_KEPT);
   fs.mkdirSync(root, { recursive: true });
   const hidden = path.join(root, `.quota.json.${process.pid}`);
   const text = JSON.stringify({
     written_at: new Date().toISOString(),
     claude_code_version: typeof payload.version === 'string' ? payload.version : null,
     rate_limits: limits,
+    heard: Object.fromEntries(kept),
   }, null, 2);
   try {
     fs.writeFileSync(hidden, `${text}\n`);
-    fs.renameSync(hidden, path.join(root, 'quota.json'));
+    fs.renameSync(hidden, file);
   } catch (err) {
     fs.rmSync(hidden, { force: true });
     throw err;

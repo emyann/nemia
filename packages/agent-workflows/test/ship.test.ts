@@ -80,10 +80,10 @@ const board = () => {
  * `implement ⇄ review → ship`, as the dev folders are, with the shipped `workflows/dev/ship.md` as its ending, whose `after: review` is
  * what this folder has: what a person types `wf round` at once the loop has handed on.
  */
-const loopingFolder = (): string => {
+const loopingFolder = (rounds = 3): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), `---\nafter: implement\noutput: review.schema.json\nloop: implement\nrounds: ${rounds}\n---\nreview it\n`);
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify({
     type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false,
   }, null, 2));
@@ -700,6 +700,35 @@ test("an ending that stopped on the base branch sends the work back through the 
   assert.deepEqual([approval.step, approval.try], ['ship', 2]);
   assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
   assert.equal(tasks.get(`${id}-ship-try2`)!.spec.cwd, repo);
+});
+
+test("a send-back composes with `wf round` in a loop out of rounds, as the incident's was: review's `again: true` reads exhausted, a round takes it once more, and ship waits at its gate for a new approval", async () => {
+  // `rounds: 1`: the loop's only round was spent before ship ran, so the send-back's round is one the loop does not have.
+  const { id, e, filings, settle } = await stoppedOnBase(loopingFolder(1));
+  await retry(e, id, 'review', { mode: 'nudge', message: 'take main' });
+  await advance(e, readRun(id));
+  settle(`${id}-review-try2`, 'succeeded', { ...SIGNED, again: true });
+  const spent = await advance(e, readRun(id));
+  assert.deepEqual([spent.looped, spent.filed], [[], []], 'no round is left, so nothing goes round on its own');
+  const listed = await list(e, readRun(id));
+  assert.deepEqual(['review', 'ship'].map((n) => listed.steps.find((s) => s.name === n)!.status), ['rounds exhausted', 'waiting'],
+    'review asked for a round the loop does not have, and ship still waits for the work');
+  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2, 'and no approval is taken while the work is out');
+
+  // A person takes the loop once more; the round goes to implement, and review hands on after it.
+  const { ask: asked } = await round(e, id, 'review');
+  assert.equal(asked.round, 2);
+  assert.deepEqual((await advance(e, readRun(id))).looped, ['review']);
+  assert.ok(filings.includes(`${id}-implement-try2`), filings.join(', '));
+  settle(`${id}-implement-try2`, 'succeeded', { ...SIGNED, replies: [{ finding: 'take main', answer: 'fixed', why: 'merged main into the branch' }] });
+  await advance(e, readRun(id));
+  settle(`${id}-review-try3`, 'succeeded', { ...SIGNED, again: false });
+  assert.deepEqual((await advance(e, readRun(id))).filed, [], 'the loop has settled, and nothing of ship runs');
+  assert.equal((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.status, 'awaiting approval');
+
+  const { approval } = await approve(e, id, 'ship', 'Merge it, now it takes main.');
+  assert.deepEqual([approval.step, approval.try], ['ship', 2], 'a new approval, of the try ship is now on');
+  assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
 });
 
 test("REFUSED at shipped defaults: a send-back from a stopped ending with no words, to a step that is not the loop's, a round of the loop, or while the ending's own try is asked for — and the ending's try while a send-back is", async () => {

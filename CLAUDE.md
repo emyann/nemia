@@ -20,6 +20,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   biome, on purpose, until one replaces more code than it adds.
 - Run both before you commit. Green is the floor, not the bar: a change that makes the suite
   pass by weakening a test is a finding to report, not a fix.
+- **Turbo does not see `workflows/`.** A change to a shipped folder replays every package's cached pass (`FULL TURBO`)
+  though three tests pin those folders: the round trip in `agent-workflows/test/workflow.test.ts`, the package's `ui`
+  copy, file for file, and the api's picture of `dev` and `dev-build` (`apps/api/test/workflows.test.ts`). After touching
+  `workflows/`, run `npx turbo run test --force`, and copy a `workflows/ui` change into
+  `packages/agent-workflows/workflows/ui` (learned by the change that gave every shipped step an `effort:`).
 - `npm run build` too when you touch `apps/web`: the router plugin regenerates
   `src/routeTree.gen.ts` only in a vite build, so a new route file fails `typecheck` until
   `build` has run once (learned by the run that added `/runs/$runId`).

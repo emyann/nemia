@@ -978,7 +978,7 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
   // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then the body.
   const review = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'review')!;
   assert.ok(renderStep(review).startsWith([
-    '---', 'after: implement', 'harness: claude', 'model: opus', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
+    '---', 'after: implement', 'harness: claude', 'model: opus', 'effort: high', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
   ].join('\n')), renderStep(review));
   assert.doesNotMatch(renderStep(review).split('\n---\n')[0]!, /^#/m, 'the file has comments in its frontmatter, and the step does not carry them');
   assert.match(fs.readFileSync(path.join(root, 'dev', 'review.md'), 'utf8'), /^# /m);

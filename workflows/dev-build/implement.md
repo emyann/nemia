@@ -1,6 +1,9 @@
 ---
 harness: claude
 model: opus
+# Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
+# `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). Every token a session writes it reads again on each later call.
+effort: high
 # `npm run build` regenerates the web app's route tree, and `npm run e2e` visits every page in both themes.
 check: npm test && npm run typecheck && npm run build && npm run e2e
 # Denied by name what no step needs and an unattended session otherwise has: messaging other sessions, scheduling cron

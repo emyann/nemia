@@ -1,6 +1,9 @@
 ---
 harness: claude
 model: opus
+# Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
+# `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). Every token a session writes it reads again on each later call.
+effort: high
 after: plan
 # The plan reaches this step as data, under `## From plan`: what plan declared in its closeout, and never its summary.
 input: plan

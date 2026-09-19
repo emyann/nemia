@@ -1,6 +1,9 @@
 ---
 harness: claude
 model: opus
+# Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
+# `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). Every token a session writes it reads again on each later call.
+effort: high
 after: implement
 # Fenced by machinery: only these tools — no Edit, no Write — and in dontAsk every Bash command .claude/settings.json does
 # not allow is denied without a prompt. The suite and git reads are allowed.

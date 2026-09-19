@@ -342,13 +342,13 @@ test("this repository's workflows read as workflows: dev and dev-build are imple
     assert.deepEqual(w.steps.map((s) => s.body), loadWorkflows(w.dir).map((s) => s.body), name);
     assert.deepEqual(w.steps.map(({ name: step, spec: keys }) => ({ name: step, spec: keys })), [
       // Denied by name what no step needs and an unattended session otherwise has.
-      { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', check, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
+      { name: 'implement', spec: spec({ harness: 'claude', model: 'opus', effort: 'high', check, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
       {
         name: 'review',
-        spec: spec({ harness: 'claude', model: 'opus', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
+        spec: spec({ harness: 'claude', model: 'opus', effort: 'high', after: ['implement'], tools: ['Read', 'Grep', 'Glob', 'Bash', 'Skill', 'WebFetch', 'WebSearch'], disallow: ['Bash(npm run build)', 'Bash(npm run e2e)'], permissionMode: 'dontAsk', budget: 20, output: 'review.schema.json', loop: 'implement', rounds: 3 }),
       },
       // The run's ending, gated: it merges in the repository's own checkout, which is why it has no check of its own.
-      { name: 'ship', spec: spec({ harness: 'claude', model: 'opus', after: ['review'], workspace: 'main', gate: true, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
+      { name: 'ship', spec: spec({ harness: 'claude', model: 'opus', effort: 'medium', after: ['review'], workspace: 'main', gate: true, disallow: ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'] }) },
     ], name);
     const review = loadWorkflows(w.dir).find((s) => s.name === 'review')!;
     assert.ok(review.body.startsWith(`${reviewer.body}\n\n`), `${name}/review.md is the package's review body, then more`);

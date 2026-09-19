@@ -1,6 +1,9 @@
 ---
 harness: claude
 model: opus
+# Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
+# `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). Every token a session writes it reads again on each later call.
+effort: high
 # Fenced by machinery, as dev's review is: only these tools — no Edit, no Write — and in dontAsk every Bash command
 # .claude/settings.json does not allow is denied without a prompt. A plan reads the repository and writes nothing.
 tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch

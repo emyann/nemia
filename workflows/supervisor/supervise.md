@@ -7,6 +7,9 @@ workspace: main
 slot: none
 harness: claude
 model: opus
+# Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
+# `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). Every token a session writes it reads again on each later call.
+effort: high
 # Bridged to claude.ai, so the person who has to answer can answer from a phone.
 remote: true
 # Denied by name what no step needs and an unattended session otherwise has, as implement is: messaging other

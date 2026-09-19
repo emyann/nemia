@@ -534,12 +534,13 @@ test('a statement made BEFORE the attempt began was inherited, not said', async 
   await b.run(tick());
   assert.equal((await b.run(view(id, new Map()))).state.settled, null, 'the parent finishing is not the child finishing');
 
-  // When the harness does end it, the inherited statement is not written down as this attempt's.
+  // When the harness does end it, the inherited statement is not written down as this attempt's — and this attempt,
+  // having said nothing of its own, ended unsigned: `done` without a statement is not a success (P0.5; it was until then).
   b.sessions.set(name, { ...b.sessions.get(name)!, state: 'done' });
   await b.run(tick());
   const v = await b.run(view(id, new Map()));
-  assert.equal(v.state.settled, 'succeeded');
-  assert.equal(v.state.attempts[0]?.closeout, undefined);
+  assert.equal(v.state.settled, 'failed');
+  assert.deepEqual(v.state.attempts.map((a) => [a.ended, a.reason, a.closeout]), [['failed', 'unsigned', undefined]]);
 });
 
 test('a statement from a session that is still busy is not final', async () => {
@@ -599,9 +600,10 @@ test('blocked with an inherited statement still needs a person, and the statemen
   const action = await b.run(step(id, new Map(b.sessions)));
   assert.ok(action.do === 'record-end');
   assert.equal(action.closeout, undefined);
+  assert.equal(action.reason, 'unsigned', 'nothing of its own was said');
   await b.run(tick());
   const v = await b.run(view(id, new Map()));
-  assert.equal(v.state.settled, 'succeeded');
+  assert.equal(v.state.settled, 'failed');
   assert.equal(v.state.attempts[0]?.closeout, undefined);
 });
 

@@ -1337,7 +1337,7 @@ What it leaves:
 
 - **A step's line does not say which way it went unsigned.** `wf ls` and `wf decide` say `unsigned` for a session settled
   `succeeded` with nothing said and for one that went quiet and settled `failed`. The engine's note on the task says which
-  (`1 attempt(s), none succeeded: the last went quiet without the closing statement it was asked for`), and nothing here prints it.
+  (`1 attempt(s), none succeeded: the last ended without the closing statement it was asked for`; the note read *went quiet* until 2026-09-19), and nothing here prints it.
 - **At defaults the engine's nudge is not spent on a step.** agent-workflows files one attempt unless a step declares
   `maxAttempts`, so a quiet session's task settles `failed` at once, and a person's `wf retry --nudge` is the nudge.
 

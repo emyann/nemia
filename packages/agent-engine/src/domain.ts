@@ -169,9 +169,10 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  * --message` saying "you ended in prose instead of calling the StructuredOutput tool; change nothing; sign off now" got
  * each within thirty seconds. So this says that, and the unfinished case keeps its sentence at the end.
  *
- * The tool's name is Claude Code's, which is the only harness a nudge can reach: `unsigned` needs quiet, and only the
- * `claude --bg` runner reports it. A harness with another word for its closing statement would need its own nudge, and
- * that would be a value on the task rather than a branch in here.
+ * The tool's name is Claude Code's. `unsigned` has two doors — quiet, which only the `claude --bg` runner reports, and the
+ * harness's `done` with no statement, which any runner can — but every harness that takes a schema today is Claude Code's.
+ * A harness with another word for its closing statement would need its own nudge, and that would be a value on the task
+ * rather than a branch in here.
  */
 const NUDGE = 'You ended without calling StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you cannot finish it, call it anyway, saying what stops you.';
 
@@ -182,8 +183,9 @@ const NUDGE = 'You ended without calling StructuredOutput, and this task asks fo
  *                  closing statement, so quiet is the only end it has. It ran, and this is what it concluded.
  *   `lost`         we never heard: the session vanished, or a detached worker stopped beating.
  *                  The work in the transcript is real; nobody said it was finished.
- *   `unsigned`     the session went quiet without the closing statement its task asked for. It stopped; it may
- *                  have finished, and it did not say so, which is all a statement is for. Recorded `failed`.
+ *   `unsigned`     the session ended without the closing statement its task asked for — went quiet, or its harness
+ *                  said `done` — and did not say so. It stopped; it may have finished, and it did not say so, which is
+ *                  all a statement is for. Recorded `failed`: a task that asked for a statement never succeeds without one.
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
  *   `budget`       the harness ended the session at the spend cap its task gave it. It was cut off, not concluded. The
  *                  cap is the task's, once: the task settles `failed`, and no attempt follows, resumed or clean.
@@ -498,7 +500,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     // A budget spent is spent: the cap is the task's, once. No attempt follows, whatever `maxAttempts` or `resume` says.
     if (last?.reason === 'budget') return { do: 'settle', outcome: 'failed', note: `attempt ${last.n} spent its budget. File the task again with a larger one to run it again` };
     if (state.attempts.length >= state.maxAttempts) {
-      const why = last?.reason === 'unsigned' ? ': the last went quiet without the closing statement it was asked for' : '';
+      const why = last?.reason === 'unsigned' ? ': the last ended without the closing statement it was asked for' : '';
       return { do: 'settle', outcome: 'failed', note: `${state.attempts.length} attempt(s), none succeeded${why}` };
     }
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
@@ -519,12 +521,13 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // so it is adopted rather than started a second time. That is the whole reason the name is ours.
   if (sighting) {
     // Quiet and working: its runner holds it has stopped. The end of a task that asked for no statement; for one that
-    // asked and was told none, an UNSIGNED end — it never said it had finished, and that is not a success.
+    // asked and was told none, an UNSIGNED end — it never said it had finished, and that is not a success. Nor is the
+    // harness's `done` without one: by either door, a task that asked for a statement succeeds only on one.
     const quiet = sighting.state === 'working' && sighting.quietMs !== undefined;
     if (isLive(sighting.state) && !quiet) {
       return { do: 'nothing', why: NEEDS_HUMAN.has(sighting.state) ? 'blocked — needs a person' : `running (${sighting.state})` };
     }
-    const unsigned = quiet && state.closeoutSchema !== undefined && sighting.closeout === undefined;
+    const unsigned = (quiet || sighting.state === 'done') && !sighting.budgetSpent && state.closeoutSchema !== undefined && sighting.closeout === undefined;
     return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: unsigned ? 'failed' : quiet ? 'done' : sighting.state,
       reason: unsigned ? 'unsigned' : sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
   }

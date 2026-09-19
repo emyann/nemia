@@ -47,7 +47,7 @@ carried on the task and read by a runner, never a callback into `decide`; so is 
 
 | | continues when |
 |---|---|
-| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating — or **unsigned**: it went quiet without the closing statement it was asked for |
+| `interrupted` *(default)* | the last attempt was **lost** — the session vanished, or a worker stopped beating — or **unsigned**: it ended — quiet, or `done` by its harness — without the closing statement it was asked for |
 | `always` | any failure, including one the harness reported — but a session that spent its budget |
 | `never` | nothing; every attempt starts clean |
 
@@ -639,6 +639,13 @@ reports how long a session has been quiet, and `decide` says what that means:
 | asked for one, and this attempt gave one | `done`, with the statement | `succeeded` |
 | asked for one, and none came — or only one made before the attempt began | `failed`, reason **`unsigned`** | the resume policy: continued with a nudge while attempts remain, `failed` when they run out |
 
+**The harness's `done` is the second door, and it is shut the same way.** A session its harness lists `done` with no
+statement was journalled `done`, reason `harness`, and settled `succeeded` until 2026-09-19: of the 344 tasks filed with a
+schema in this machine's store that day, 5 had ended so. For a task that asked for a statement, `done` without one is
+now `unsigned` too, recorded `failed` — one condition in `decide`, held by `test/decide.test.ts` and a fake `claude`
+listing the session `done` in `test/unsigned.test.ts`. A task that asked for nothing still succeeds on `done`, and a
+journal written before the rule folds as it did: `fold` reads an end as recorded, never re-derives it.
+
 `unsigned` is continued under `interrupted` and `always`, as `lost` is: the work in the transcript is real, and nobody
 has judged it, the session included. Its session is stopped first if it still runs — quiet is not gone — and the next
 attempt `--resume`s it, told why it is back instead of the brief it already has: *"You ended without calling
@@ -646,13 +653,14 @@ StructuredOutput, and this task asks for a closing statement. Change nothing: th
 being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then
 call it; if you cannot finish it, call it anyway, saying what stops you."* The nudge is journalled on the attempt's
 `starting` entry, and read as `state.attempts[n].nudge`. Out of attempts, the task settles `failed` with the note
-`N attempt(s), none succeeded: the last went quiet without the closing statement it was asked for`.
+`N attempt(s), none succeeded: the last ended without the closing statement it was asked for`.
 
 **The nudge names the tool, and its words are pinned by a test.** It asked for "your closing statement" and named
 nothing until 2026-09-17, and twice that did not get a finished step to sign off: each had done all its work and ended
 its turn with a prose summary, and each signed off within thirty seconds of a person's `wf retry --message` naming
 `StructuredOutput` and saying to change nothing (issue 25). The tool's name is Claude Code's, and that is the only
-harness a nudge reaches — `unsigned` needs quiet, which only the `claude --bg` runner reports. Whether the wording
+harness a quiet end reaches — quiet is reported by the `claude --bg` runner alone, though `done` without a statement is
+`unsigned` on any runner. Whether the wording
 alone closes the next such session is not measured.
 
 Quiet is counted from the later of the transcript's last write and the session's own start in `claude agents`: a

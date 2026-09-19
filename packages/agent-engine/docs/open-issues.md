@@ -801,3 +801,11 @@ door to this bug, through `state: done` rather than quiet. `test/live.test.ts` f
 and not run (`AE_LIVE` was not set). And a transcript with no user line gives no `lastModified` through the SDK's
 `getSessionInfo`, so its session is never measured quiet and ends only at its deadline: found writing the test, whose
 first fixture had no prompt line. Every `--bg` transcript seen starts with its prompt.
+
+**The second door, closed (2026-09-19, P0.5).** It was not hypothetical. Of the 344 tasks filed with a schema in this
+machine's store on 2026-09-19, 5 had a last end journalled `observed: done`, `reason: harness`, no closeout, and settled
+`succeeded` (implement steps of four runs, among them `the-web-app-s-components-on-3xq9` and
+`the-workflow-builder-on-the-4ifo`). `decide` now reads a `done` sighting with no statement, on a task that asked for one,
+as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`test/decide.test.ts`, and a fake `claude`
+listing the session `done` in `test/unsigned.test.ts`; both fail with it reverted). A journal written before keeps what
+it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two.

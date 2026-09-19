@@ -1017,32 +1017,36 @@ export const ceilingsQuery = queryOptions({
 });
 
 /**
- * Mirrors `QuotaWindow` in apps/api/src/quota.ts: one limit of the subscription as Claude Code last reported it — `key` Claude Code's, `label`
- * the board's word, `resetsAt` ISO, `reset` whether that time has passed since the reading, `marked` whether it is used past `Quota.markAt`.
+ * Mirrors `QuotaWindow` in apps/api/src/quota.ts: one limit of the subscription as Claude Code reported it — `key` Claude Code's, `label`
+ * the board's word, `resetsAt` ISO, `reset` whether that time has passed since the answer, `marked` whether it is used past `Quota.markAt`.
  */
 export type QuotaWindow = { key: string; label: string; usedPercentage: number; resetsAt: string | null; reset: boolean; marked: boolean };
 
 /**
- * Mirrors `Quota` in apps/api/src/quota.ts: what the statusline script last wrote to `$WF_ROOT/quota.json`, judged by the api at the request —
- * `fresh` to show, or `stale`, `none`, `missing` or `unreadable`, each with `said`, the sentence to show in its place.
+ * Mirrors `Quota` in apps/api/src/quota.ts: the plan's usage as the api last asked Claude Code for it (`get_usage`), judged at the request —
+ * `fresh` to show, `asking`, or `no-plan`, `no-claude`, `timeout`, `failed` or `unknown`, each with `said`, the sentence to show in its
+ * place. `last` is the last answer with windows, for the hover only; `keepMs` how long an ask is kept.
  */
 export type Quota = {
-  state: 'fresh' | 'stale' | 'none' | 'missing' | 'unreadable';
-  file: string;
-  writtenAt: string | null;
+  state: 'fresh' | 'asking' | 'no-plan' | 'no-claude' | 'timeout' | 'failed' | 'unknown';
+  askedAt: string | null;
   ageMs: number | null;
-  version: string | null;
+  subscription: string | null;
   windows: QuotaWindow[];
-  staleAfterMs: number;
+  last: { askedAt: string; windows: QuotaWindow[] } | null;
+  keepMs: number;
   markAt: number;
   said: string | null;
 };
 
-/** The subscription's quota, read again every 30 s: it moves no faster than a person's interactive turns. */
+/**
+ * The subscription's quota, read again every minute — the api asks Claude Code at most once a keep, however often it is read — and every
+ * 2 s while the api is still asking.
+ */
 export const quotaQuery = queryOptions({
   queryKey: ['quota'],
   queryFn: () => get<Quota>('/api/quota'),
-  refetchInterval: 30_000,
+  refetchInterval: (query) => (query.state.data?.state === 'asking' ? 2_000 : 60_000),
 });
 
 /**

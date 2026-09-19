@@ -41,13 +41,23 @@ test('a window: its percentage rounded, when it resets, marked past the mark —
   assert.equal(windowWords(win({ resetsAt: null }), NOW, 'UTC').resets, null);
 });
 
-test('the hover says where the reading came from and by what rule it is shown, and a stale one what it last said', () => {
-  const q: Quota = {
-    state: 'stale', file: '/store/quota.json', writtenAt: '2026-09-19T01:00:00Z', ageMs: 9 * 3_600_000, version: '2.1.278',
-    windows: [win(), win({ key: 'seven_day', label: 'week', usedPercentage: 71 })], staleAfterMs: 5 * 3_600_000, markAt: 80, said: 'old',
+test('the hover says where the reading came from and by what rule it is shown, and with nothing to show as now, the last answer', () => {
+  const windows = [win(), win({ key: 'seven_day', label: 'week', usedPercentage: 71 })];
+  const fresh: Quota = {
+    state: 'fresh', askedAt: '2026-09-19T09:58:00Z', ageMs: 120_000, subscription: 'max', windows, last: null, keepMs: 180_000, markAt: 80, said: null,
   };
   assert.equal(
-    quotaTitle(q, NOW, 'UTC'),
-    "Read by Claude Code 2.1.278's statusline at 01:00, into /store/quota.json. The numbers are as fresh as your last turn in an interactive claude session; past 5 h they are not shown, and a window 80% used or more is marked. Last read: 5-hour 38%, week 71%.",
+    quotaTitle(fresh, NOW, 'UTC'),
+    'Asked of Claude Code (get_usage, max plan) at 09:58; asked again at most every 3 min while a board is open. A window 80% used or more is marked.',
   );
+  const failed: Quota = {
+    ...fresh, state: 'timeout', askedAt: '2026-09-19T09:59:00Z', subscription: null, windows: [], said: 'late',
+    last: { askedAt: '2026-09-19T09:40:00Z', windows },
+  };
+  assert.equal(
+    quotaTitle(failed, NOW, 'UTC'),
+    'Asked of Claude Code (get_usage); asked again at most every 3 min while a board is open. A window 80% used or more is marked. Last answer, at 09:40: 5-hour 38%, week 71%.',
+  );
+  assert.match(quotaTitle({ ...failed, keepMs: 0, last: null }, NOW, 'UTC'), /^Asked of Claude Code \(get_usage\); asked again on every read\. A window 80% used or more is marked\.$/);
+  assert.match(quotaTitle({ ...fresh, keepMs: 90_000 }, NOW, 'UTC'), /at most every 90 s /);
 });

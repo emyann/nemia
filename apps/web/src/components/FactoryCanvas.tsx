@@ -122,7 +122,7 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  * step was dragged, are kept in this browser with the layout.
  *
  * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says the
- * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as Claude Code last reported it (`QuotaLine`). The
+ * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as the api last asked Claude Code for it (`QuotaLine`). The
  * first two are read again every 5 s, as the runs are: the daemon starts a card
  * when a run slot frees, and nothing on the board asks it to.
  */

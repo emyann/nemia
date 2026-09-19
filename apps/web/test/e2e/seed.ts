@@ -267,6 +267,17 @@ export const COSTLY = {
   sessions: { implement: ['$1.20', '$0.90'], review: ['not measured', 'not measured'], tokens: ['$1.75', '$2.50'], palette: ['$1.50'] },
   /** What each round of review's loop cost: implement's session and review's, which has no cost on it. */
   rounds: ['≥$1.20', '≥$0.90'],
+  /**
+   * What the sessions read, by price. The run's, in its header: every try's classes, and no peak, since Codex reports none — and tokens'
+   * second try, which continued its first, wrote its context to the cache again. tokens' own, under its `context: 200k`: its peak at the cap,
+   * and the rebuild. palette's, with no cap, past 200k.
+   */
+  read: {
+    run: 'read 5.9M · wrote 690k',
+    rebuilt: 'a resumed session wrote its context to the cache again instead of reading it',
+    tokens: { counts: 'read 1.32M · wrote 210k · peak 204k, at its 200k cap', peak: 'peak 204k, at its 200k cap' },
+    palette: { counts: 'read 820k · wrote 160k · peak 231k, past 200k with no cap', peak: 'peak 231k, past 200k with no cap' },
+  },
 } as const;
 
 /**
@@ -1206,7 +1217,7 @@ export function seed(root: string, now = Date.now()): void {
         name: 'review', after: ['implement'], body: 'Review it, and say whether it needs another round.', harness: 'codex',
         loop: 'implement', rounds: 3, output: { file: 'review.json', schema: again },
       },
-      { name: 'tokens', after: [], body: 'Pick the colour tokens.', harness: 'claude', budget: 3, check: 'npm test' },
+      { name: 'tokens', after: [], body: 'Pick the colour tokens.', harness: 'claude', budget: 3, check: 'npm test', context: 200_000 },
       { name: 'palette', after: [], body: 'Pick the palette for the dark theme.', harness: 'claude', budget: 1 },
     ],
     createdAt: ago(1.5),
@@ -1220,11 +1231,14 @@ export function seed(root: string, now = Date.now()): void {
       palette: { taskId: cost('palette'), workspace: paletteLane, branch: `wf/${COSTLY.id}/palette` },
     },
   }, null, 2));
-  /** A session that ran once — filed, spawned and ended `at` minutes ago — and signed off with `closeout`, with the usage the engine read. */
-  const priced = (task: string, harness: string, cwd: string, brief: string, at: readonly [number, number, number], closeout: object, usage: object): void =>
+  /**
+   * A session that ran once — filed, spawned and ended `at` minutes ago — and signed off with `closeout`, with the usage the engine read: a
+   * continuation of the session `resumeFrom`, where one is given.
+   */
+  const priced = (task: string, harness: string, cwd: string, brief: string, at: readonly [number, number, number], closeout: object, usage: object, resumeFrom?: string): void =>
     write(path.join(root, 'engine', 'tasks', `${task}.jsonl`), lines([
       { kind: 'filed', at: ago(at[0]), brief, cwd, maxAttempts: 1, harness },
-      { kind: 'starting', at: ago(at[1]), attempt: 1 },
+      { kind: 'starting', at: ago(at[1]), attempt: 1, ...(resumeFrom ? { resumeFrom } : {}) },
       { kind: 'spawned', at: ago(at[1]), attempt: 1 },
       { kind: 'ended', at: ago(at[2]), attempt: 1, sessionId: `ae/${task}/1`, observed: 'done', reason: 'harness', closeout, usage },
       { kind: 'settled', at: ago(at[2]), outcome: 'succeeded' },
@@ -1245,28 +1259,30 @@ export function seed(root: string, now = Date.now()): void {
     write(path.join(root, 'checks', `${task}.stderr`), 'npm error Lifecycle script `test` failed with error:\nnpm error code 1\n');
   };
   const done = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], ...more });
-  const unpriced = { toolCalls: 12, inputTokens: 210_000, outputTokens: 3_100 };
+  // Codex reports its input's reads from the cache, and writes none: its classes, and no peak.
+  const unpriced = { toolCalls: 12, inputTokens: 210_000, cacheReadTokens: 180_000, cacheWriteTokens: 0, uncachedTokens: 30_000, outputTokens: 3_100 };
   priced(cost('implement-1'), 'claude', costLane, 'Implement it.', [1.49, 1.48, 1.35], done('Implemented it.'), {
-    turns: 22, toolCalls: 48, inputTokens: 1_840_000, outputTokens: 21_400, costUsd: 1.2, apiMs: 312_000, toolMs: 41_000,
+    turns: 22, toolCalls: 48, inputTokens: 1_840_000, cacheReadTokens: 1_700_000, cacheWriteTokens: 139_990, uncachedTokens: 10, peakContextTokens: 142_000, outputTokens: 21_400, costUsd: 1.2, apiMs: 312_000, toolMs: 41_000,
   });
   priced(cost('review-1'), 'codex', costLane, 'Review it, and say whether it needs another round.', [1.35, 1.34, 1.25], done('Two findings.', { again: true }), unpriced);
   // From round 2, a loop's target owes its answers to the findings it was handed: implement gives them, and signs off done.
   priced(cost('implement-2'), 'claude', costLane, 'Implement it.', [1.25, 1.24, 1.1], done('Answered the review.', {
     replies: [{ finding: 'apps/web/src/lib/cost.ts — a cost nobody measured reads $0.00', answer: 'fixed', why: 'It reads not measured now.' }],
-  }), { turns: 9, toolCalls: 17, inputTokens: 760_000, outputTokens: 8_900, costUsd: 0.9, apiMs: 118_000, toolMs: 12_000 });
+  }), { turns: 9, toolCalls: 17, inputTokens: 760_000, cacheReadTokens: 700_000, cacheWriteTokens: 59_995, uncachedTokens: 5, peakContextTokens: 150_000, outputTokens: 8_900, costUsd: 0.9, apiMs: 118_000, toolMs: 12_000 });
   priced(cost('review-2'), 'codex', costLane, 'Review it, and say whether it needs another round.', [1.1, 1.09, 1.0], done('One finding is still open.', { again: true }), unpriced);
   priced(cost('tokens'), 'claude', tokensLane, 'Pick the colour tokens.', [1.49, 1.48, 1.3], done('Picked the colour tokens.'), {
-    turns: 14, toolCalls: 31, inputTokens: 1_120_000, outputTokens: 16_000, costUsd: 1.75, apiMs: 402_000, toolMs: 22_000,
+    turns: 14, toolCalls: 31, inputTokens: 1_120_000, cacheReadTokens: 1_000_000, cacheWriteTokens: 119_990, uncachedTokens: 10, peakContextTokens: 180_000, outputTokens: 16_000, costUsd: 1.75, apiMs: 402_000, toolMs: 22_000,
   });
   refused(cost('tokens-check'), tokensLane, [1.3, 1.25]);
   priced(cost('tokens-try2'), 'claude', tokensLane, 'Pick the colour tokens.', [1.24, 1.23, 1.0], done('Picked them again.'), {
-    turns: 18, toolCalls: 36, inputTokens: 1_530_000, outputTokens: 19_700, costUsd: 2.5, apiMs: 560_000, toolMs: 31_000,
-  });
+    turns: 18, toolCalls: 36, inputTokens: 1_530_000, cacheReadTokens: 1_320_000, cacheWriteTokens: 209_990, uncachedTokens: 10, peakContextTokens: 204_000,
+    outputTokens: 19_700, costUsd: 2.5, apiMs: 560_000, toolMs: 31_000,
+  }, `ae/${cost('tokens')}/1`);
   refused(cost('tokens-try2-check'), tokensLane, [1.0, 0.95]);
   // palette signed off blocked, having spent more than its cap to get there: a question for a person, and a budget to raise with the answer.
   priced(cost('palette'), 'claude', paletteLane, 'Pick the palette for the dark theme.', [1.49, 1.48, 1.2], {
     outcome: 'blocked', summary: 'Drafted a warm palette and a cool one, and cannot choose between them.', needs: COSTLY.asks.needs, artifacts: [],
-  }, { turns: 11, toolCalls: 19, inputTokens: 980_000, outputTokens: 12_300, costUsd: 1.5, apiMs: 290_000, toolMs: 9_000 });
+  }, { turns: 11, toolCalls: 19, inputTokens: 980_000, cacheReadTokens: 820_000, cacheWriteTokens: 159_995, uncachedTokens: 5, peakContextTokens: 231_000, outputTokens: 12_300, costUsd: 1.5, apiMs: 290_000, toolMs: 9_000 });
 
   // The three runs whose result is a decision, in FAKE's repository: at an ending's gate, shipped by an approved ending, and a branch
   // nobody took. Last, and newest: their cards take the cells after every other run's.

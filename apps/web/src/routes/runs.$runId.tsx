@@ -5,7 +5,7 @@ import { Artifacts, ClosedNeeds } from '../components/Closeout';
 import { Decide } from '../components/Decide';
 import { Markdown } from '../components/Markdown';
 import { NeedsBanner, ToDecideBanner } from '../components/Needs';
-import { Check, code, Facts, specRows, spentRows, Told, when } from '../components/Facts';
+import { Check, code, Facts, Read, readRows, specRows, spentRows, Told, when } from '../components/Facts';
 import { ActsOn, Approved, endsTheRun, Gate, gateWord } from '../components/Gate';
 import { RunCanvas } from '../components/RunCanvas';
 import { StatusChip, StepNote } from '../components/StatusChip';
@@ -71,6 +71,12 @@ function Run({ run }: { run: RunDetail }) {
             <p data-run-cost title={spentTitle(run.cost, "the run's tries")} className="text-sm">
               <span className="text-neutral-500">cost </span>
               <span className="font-mono">{run.cost.said}</span>
+            </p>
+          )}
+          {/* Beside it, what the same sessions read, by price — where every one of them measured it. */}
+          {run.read && (
+            <p data-run-read className="text-sm" title="What every try of every step read: from the cache, written to it, and the largest context one response carried.">
+              <Read said={run.read.said} peak={run.read.peak} rebuilt={run.read.rebuilt} />
             </p>
           )}
           <WorkflowLink dir={run.workflowDir} />
@@ -169,6 +175,8 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
           // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0.
           ['used', step.used?.used],
           ['cost', step.used?.cost],
+          // What its sessions read, by price, where anything measured it: the peak and a rebuilt cache marked.
+          ...readRows(step.used),
           // What every try has cost together, and of its cap where it has one: red once past it.
           ...spentRows(step),
         ]}

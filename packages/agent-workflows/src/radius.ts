@@ -363,7 +363,7 @@ export function readWords(u: Consumed | null | undefined, cap?: number): string 
   const rebuilt = u.rebuiltCaches
     ? u.rebuiltCaches > 1
       ? `${u.rebuiltCaches} resumed sessions wrote their context to the cache again instead of reading it`
-      : 'resumed, it wrote its context to the cache again instead of reading it'
+      : 'a resumed session wrote its context to the cache again instead of reading it'
     : undefined;
   return [
     ...(u.cacheReadTokens !== undefined ? [`read ${count(u.cacheReadTokens)}`] : []),

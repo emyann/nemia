@@ -75,7 +75,7 @@ test("a step's reads: its classes summed over its attempts, its peak at its `con
   const { cost, read, peak, rebuilt } = implement.used!;
   // The cost alone, as it was: what the sessions read is beside it, not in it.
   assert.equal(cost, '$5.30');
-  assert.equal(read, 'read 4.4M · wrote 355k · peak 204k, at its 200k cap · resumed, it wrote its context to the cache again instead of reading it');
+  assert.equal(read, 'read 4.4M · wrote 355k · peak 204k, at its 200k cap · a resumed session wrote its context to the cache again instead of reading it');
   assert.equal(peak, 'cap');
   assert.equal(rebuilt, 1);
 });
@@ -89,4 +89,23 @@ test('a runner that counted the input as one number says nothing of what it read
   const plan = await stepOf('plan');
   assert.deepEqual([plan.used!.read, plan.used!.peak, plan.used!.rebuilt], [null, null, 0]);
   assert.deepEqual(plan.timeline.map((t) => t.used?.read), [null]);
+});
+
+test("the run's reads are every try's of every step, beside its cost — no class or peak where one session measured none of them", async () => {
+  const run = await (await app.request(`/api/runs/${R}`)).json();
+  // `plan` counted its input as one number: a sum over the others would read as the whole run's. The rebuilt cache is still a fact.
+  assert.deepEqual(run.read, { said: 'a resumed session wrote its context to the cache again instead of reading it', peak: null, rebuilt: 1 });
+
+  const R2 = 'r-read-all';
+  const record = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'));
+  write(path.join(root, 'runs', `${R2}.json`), JSON.stringify({
+    ...record, id: R2, workflow: record.workflow.slice(0, 2),
+    steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' } },
+  }));
+  const all = await (await app.request(`/api/runs/${R2}`)).json();
+  // The largest peak is review's, which had no cap: the run's is marked as review's is, not as implement's 200k would mark it.
+  assert.deepEqual(all.read, {
+    said: 'read 7.3M · wrote 455k · peak 250k, past 200k with no cap · a resumed session wrote its context to the cache again instead of reading it',
+    peak: 'large', rebuilt: 1,
+  });
 });

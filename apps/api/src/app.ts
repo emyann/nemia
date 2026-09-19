@@ -324,6 +324,11 @@ export type RunDetail = {
   moving: boolean;
   /** As on `RunSummary`. */
   cost: Spent | null;
+  /**
+   * What the sessions of every try of every step read, by price, beside `cost`, which is theirs too (`RunRead`): each class only where every
+   * session measured it, and the largest peak against the cap of the step that reached it. Null where none of it was measured.
+   */
+  read: RunRead | null;
   waitingOnYou: string[];
   /** As on `RunSummary`. */
   onYou: string[];
@@ -429,6 +434,9 @@ export type StepUsed = {
   /** How many resumed sessions wrote their context to the cache again instead of reading it (`rebuiltCache`); 0 where none did, or nobody could tell. */
   rebuilt: number;
 };
+
+/** What a run's sessions read, as `StepUsed` has it: the words, where the peak stands, and how many resumed sessions rebuilt their cache. */
+export type RunRead = { said: string; peak: StepUsed['peak']; rebuilt: number };
 
 /** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
 export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
@@ -1121,6 +1129,7 @@ async function detail(run: Run): Promise<RunDetail> {
     status: judged.status,
     moving: judged.moving,
     cost: judged.cost,
+    read: readOf(totalOf(steps, names.flatMap((name) => (clock.steps[name] ?? []).flatMap((t) => (t.session ? [[name, t.used] as const] : []))))),
     waitingOnYou: judged.waitingOnYou,
     onYou: judged.onYou,
     toDecide: judged.toDecide,
@@ -1330,14 +1339,16 @@ function usedOf(usage: Usage | undefined, cap?: number): StepUsed {
 }
 
 /**
- * Every filed step's usage as one (`sumUsage`), its peak read against the cap of the step it is the peak of: two steps' caps are not one
- * cap, and the largest peak was reached under its own.
+ * Several steps' usage as one (`sumUsage`), each usage with the name of the step it is of, its peak read against the cap of the step it
+ * is the peak of: two steps' caps are not one cap, and the largest peak was reached under its own.
  */
-function totalOf(steps: readonly Workflow[], usages: Record<string, Usage | undefined>, names: readonly string[]): StepUsed {
-  const total = sumUsage(names.map((name) => usages[name]));
-  const peakOf = names.find((name) => total?.peakContextTokens !== undefined && usages[name]?.peakContextTokens === total.peakContextTokens);
+function totalOf(steps: readonly Workflow[], usages: ReadonlyArray<readonly [name: string, usage: Usage | undefined]>): StepUsed {
+  const total = sumUsage(usages.map(([, u]) => u));
+  const peakOf = usages.find(([, u]) => total?.peakContextTokens !== undefined && u?.peakContextTokens === total.peakContextTokens)?.[0];
   return usedOf(total, steps.find((s) => s.name === peakOf)?.context);
 }
+
+const readOf = (u: StepUsed): RunRead | null => (u.read === null ? null : { said: u.read, peak: u.peak, rebuilt: u.rebuilt });
 
 /** How many lines of one file's check-affecting diff the board is given. `wf decide` prints them all. */
 export const DIFF_LINES = 400;
@@ -1505,7 +1516,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     lesson: lessonOf(touched),
     sensitive: touched.map((t) => sensitiveOf(run, t)),
     used: Object.fromEntries(filed.map((name) => [name, usedOf(consumed[name], steps.find((s) => s.name === name)?.context)])),
-    total: totalOf(steps, consumed, filed),
+    total: totalOf(steps, filed.map((name) => [name, consumed[name]] as const)),
     cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
     overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
     commands: commandsOf(run, d, offers, gates, merges(steps)),

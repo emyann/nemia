@@ -283,6 +283,6 @@ test('a resumed attempt that wrote more to the cache than half its peak rebuilt 
   assert.equal(rebuiltCache(rebuilt, false), false, 'a cold start writes its cache once: that is not a rebuild');
   assert.equal(rebuiltCache({ ...rebuilt, cacheWriteTokens: 92_250 }, true), false, 'half its peak is not more than half');
   assert.equal(rebuiltCache({ cacheWriteTokens: 184_500 }, true), false, 'no peak, no reading');
-  assert.equal(readWords({ ...rebuilt, rebuiltCaches: 1 }), 'read 183k · wrote 185k · peak 185k · resumed, it wrote its context to the cache again instead of reading it');
+  assert.equal(readWords({ ...rebuilt, rebuiltCaches: 1 }), 'read 183k · wrote 185k · peak 185k · a resumed session wrote its context to the cache again instead of reading it');
   assert.match(readWords({ ...rebuilt, rebuiltCaches: 2 }), / · 2 resumed sessions wrote their context to the cache again instead of reading it$/);
 });

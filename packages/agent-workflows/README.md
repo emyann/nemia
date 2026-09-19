@@ -1176,7 +1176,7 @@ screen shows what the branch touched, read out of git:
   and written to it (`wrote 412k`, twenty times dearer a token), and the largest context any one response read (`peak 167k`),
   marked where it reached the step's `context:` cap (`, at its 200k cap`) or passed 200k with no cap
   (`, past 200k with no cap`). A resumed attempt that wrote to the cache more than half its peak rebuilt the cache it
-  should have read, and the line says so (`resumed, it wrote its context to the cache again instead of reading it`).
+  should have read, and the line says so (`a resumed session wrote its context to the cache again instead of reading it`).
   An attempt that measured none of it says nothing, and nothing here is priced: the cost is still the harness's.
   After the steps, the run's (`cost  run $12.40`): every step's tries together, saying how many
   ended attempts had no cost on them.

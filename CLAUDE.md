@@ -30,9 +30,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   `build` has run once (learned by the run that added `/runs/$runId`).
 - For `apps/web` changes, run `npm run e2e` and read the PNGs it writes before you sign off (`.e2e/`,
   or `$WF_ARTIFACTS` in a run). A new page is a file of its own, `apps/web/test/e2e/pages/NNN-<name>.ts`, whose default
-  export is its `PageSpec` named `<name>`, the name its screenshots take; add the file and touch nothing else. The pages are
+  export is its `PageSpec` named `<name>`, the name its screenshots take; add the file, add `<name>` as a line at the end of
+  `pages/NAMES`, and touch nothing else. NAMES is merged by union, and the load refuses a page with no line and a line with no
+  page, so a page deleted by mistake fails `npm test` (delete its line too when you mean it). The pages are
   visited in the order of their file names, the number first (in tens, to leave room); they share one store, so give a page
-  a number after any page whose leavings it reads. `pages.ts` refuses anything else in `pages/`: a helper two pages use goes
+  a number after any page whose leavings it reads. `pages.ts` refuses anything else in `pages/` but NAMES: a helper two pages use goes
   in `board.ts` or `canvas.ts`, the runner's state is `world.ts`'s, a run a page writes during its visit and takes back sits
   in its page's file, and what `main` seeds before the first visit is `seed.ts`'s, since every page sees that store (learned
   by two runs that each added a page to one array, and conflicted every time). Once per machine, install a browser for each
@@ -42,6 +44,10 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   deletes every build whose playwright is not listed alive in `~/.cache/ms-playwright/.links`, so
   install through the checkout's own `node_modules`, never from an `npx` download. (Learned by the run
   that added the browser, whose install deleted the e2e's builds.)
+- **`npm test` runs `test/*.test.ts` and nothing under `test/e2e/`.** A web test that needs no browser sits in `test/` (the e2e's
+  own, `e2e-pages.test.ts` and `e2e-merge.test.ts`, typechecked by `test/e2e/tsconfig.json`); `test/e2e/*.test.ts` are the ones that
+  launch Chromium, and only `npm run e2e` runs them. The two sat in `test/e2e/`, so the check of a run that touches nothing under
+  `apps/` stayed green with CLAUDE.md's union line gone (learned by the run that put the e2e's page names in `pages/NAMES`).
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.

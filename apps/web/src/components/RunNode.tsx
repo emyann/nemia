@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
@@ -48,10 +48,15 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
   // The gate the card answers, and the needs besides it: the gate's own `approve <step>` is its line, not a need said twice.
   const gate = gateOfSummary(run);
   const needs = needsOf(run).filter((need) => !(need.kind === 'approve' && need.step === gate?.step));
-  // What the card said when a person answered its gate, until the run moves: the steps' states, which the next tick changes.
+  // What the card said when a person answered its gate: through the state the answer was given in and the one it moved the run to (the
+  // step approved, or the try asked), until the run moves on from that — the tick filing it — or back, the answer taken back.
   const stamp = run.steps.map((step) => `${step.name}:${step.status}`).join('|');
   const [taken, setTaken] = useState<Taken | null>(null);
-  const said = taken?.stamp === stamp ? taken.said : null;
+  useEffect(() => {
+    if (!taken || stamp === taken.stamp || stamp === taken.next) return;
+    setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
+  }, [stamp, taken]);
+  const said = taken && (stamp === (taken.next ?? taken.stamp)) ? taken.said : null;
   const since = duration(now - Date.parse(run.createdAt));
 
   return (

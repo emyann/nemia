@@ -3412,6 +3412,42 @@ What it leaves:
 - **Teams, dispatch, capabilities, other attachments.** Out of this change, as the pivot orders them.
 - **Renaming across the nodes.** A rename is refused while a node names the agent; moving each node to the new name is by hand.
 
+## Shipped: a gate on the Factory says what it asks, and takes the answer
+
+The owner's complaint: on the board nothing said what was asked of them at a gate, and nothing answered it. Apps only: nothing in
+`packages/` changed but this file.
+
+- **Words, off the record** (`apps/web/src/lib/gate.ts`, pure). The card says a gate in a line that fits: `approve to run ship on main,
+  or send review back` for an ending, `approve what plan handed on, or send it back` for §6's gate; the folder's own words on hover. The
+  gate's node says `approve ship to run it`, or `approve plan's hand-off`. The inspector of a gated step opens on *Waiting on you*: which
+  step waits, what approving does (for an ending, the folder's first line, quoted), and what sending back does, and to which step
+  (`sendBackTo`, which the api now puts on `toDecide` as `back`, with the base as `onto`). Under it, the facts: the round of the loop's cap
+  and the cost, each looping step's last word (no further round, or N findings, linked to its section), each check's verdict, and, off
+  the run's decision, what it touched and whether each branch still merges onto the base (`mergesOnto`, `git merge-tree`, new on the
+  api's `Standing.merge`). All of it is read on the detail the inspector has; the list the Factory polls carries only `back` and `onto`.
+- **Answers.** The card has Approve and Send back…, each a React Aria popover over the card: the approval's words are optional, a
+  send-back's are needed, and an ending's approval is a second press that says what it runs (`Run ship now`). The inspector has the run
+  page's gate (`Gate`, unframed), whose ending approval is two presses too. Refusals show in the api's words, the words kept. Once
+  answered, the card says what happened and what comes next — `approved — the next pass files ship`, `sent back to review — try 2
+  asked — the next tick files it` — through the state the answer moved the run to, and not after the next.
+- **Other waits.** A question or a blocked session says so in the inspector, with a link to the step's section on the run's page; a
+  result nobody decided says `decide its result: …` on the card, linked to the Decide section. Answers inline are for gates alone.
+- **A step not filed** says `not filed yet: it waits at its gate` (or `not filed yet`) in place of its facts table of dashes.
+- **The e2e** reads the card's lines on the Factory page, and a new `factory-gate` page: an approval refused on a page of its own (the
+  list held, an approval already written: the 409 in the popover, verbatim), the inspector's brief and facts, an approval confirmed, and
+  a send-back with words, each file taken back, and every card clear of its neighbour after Reset layout with finished runs shown and not.
+
+What it leaves — the inspector is still a mess, and was left so on purpose (the change was to say what a gate asks, not to redesign it):
+
+- **Three tables under the brief.** Facts, Spec and Told each list keys in their own grid, with different label widths and several rows a
+  person never reads at a gate (task id, harness, model). They were left because each row is pinned by a test, and which rows matter at
+  which state is a design question of its own.
+- **The gate twice.** The inspector's answer is the run page's `Gate`, a box per answer, taller than the brief above it; the card's
+  popovers are smaller. One component for both waits on that redesign.
+- **Tabs.** Details, Output and Activity split one step's story three ways; the closeout a person approves is under Output, not beside
+  the gate as on the run page.
+- **Cost per round.** The round's fact says the run's cost so far, not the round's.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

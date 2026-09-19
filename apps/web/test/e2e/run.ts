@@ -452,20 +452,24 @@ const PAGES: PageSpec[] = [
       // in the folder's own words with the command that approves it; or with a branch nobody merged, which git ends.
       const ending = cardOf(page, ENDING.id);
       await expectVisible(ending, `a run at its ending's gate keeps its card on the floor with no Show finished (${ENDING.id})`);
+      // What approving does and where a send-back goes, in a line that fits; the folder's own words for the ending on hover.
       await expectVisible(
-        ending.locator('[data-to-decide="approve"]', { hasText: `to decide: ${ENDING.says} — wf approve ${ENDING.id} ${ENDING.ending}` }),
-        `its card says what its ending would do and the command that approves it, in wf ls's words`,
+        ending.locator(`[data-to-decide="approve"][data-gate-line="${ENDING.ending}"][title^="${ENDING.says}"]`, { hasText: `approve to run ${ENDING.ending} on main, or send ${ENDING.back} back` }),
+        `its card says what approving its ending does and where a send-back goes, the folder's words on hover`,
       );
+      await expectVisible(ending.getByRole('button', { name: 'Approve', exact: true }), 'and answers it on the card: Approve');
+      await expectVisible(ending.getByRole('button', { name: 'Send back…', exact: true }), 'and Send back…');
       await expectVisible(ending.getByText('to decide', { exact: true }), 'and is marked to decide');
       await expectVisible(ending.locator(`[data-state="awaiting-approval"]`, { hasText: 'awaiting approval' }), `and shows ${ENDING.ending} as awaiting approval`);
       await expectCount(
         ending.locator(`[data-need="approve"][data-step="${ENDING.ending}"]`),
         0,
-        'and does not ask for the same step twice: the to-decide line names it and the command, as wf ls prints it',
+        'and does not ask for the same step twice: the gate line names it',
       );
       const unmerged = cardOf(page, UNMERGED.id);
       await expectVisible(unmerged, `a finished run whose branch nobody merged keeps its card on the floor too (${UNMERGED.id})`);
-      await expectVisible(unmerged.locator('[data-to-decide="git"]', { hasText: `to decide: ${UNMERGED.said}` }), 'its card says the branch is ahead, and the command that reads it');
+      await expectVisible(unmerged.locator('[data-to-decide="git"]', { hasText: 'decide its result: a branch ahead of the base that nothing merges' }), 'its card says the branch is ahead, a link to where it is decided');
+      await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");
       await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
       // Decided: its ending merged the branch, so there is nothing to decide and its card is off the floor with the finished.
       await expectCount(cardOf(page, SHIPPED.id), 0, `a run whose ending merged it is decided: no card on the floor by default (${SHIPPED.id})`);
@@ -499,9 +503,10 @@ const PAGES: PageSpec[] = [
       // A run at its gate: its card says what is asked of you, in wf ls's words, and its step's chip is amber.
       const gated = cardOf(page, GATED.id);
       await expectVisible(
-        gated.locator(`[data-need="approve"][data-step="${GATED.gated}"]`, { hasText: new RegExp(`^approve ${GATED.gated}$`) }),
-        `the card of a run at its gate says approve ${GATED.gated} (${GATED.id})`,
+        gated.locator(`[data-gate-line="${GATED.gated}"]`, { hasText: `approve what ${GATED.gated} handed on, or send it back` }),
+        `the card of a run at its gate says what approving ${GATED.gated} does (${GATED.id})`,
       );
+      await expectVisible(gated.getByRole('button', { name: 'Approve', exact: true }), 'and answers it on the card');
       await expectVisible(gated.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }), 'and shows the step as awaiting approval, an amber chip');
       await expectVisible(gated.getByText('waiting on you', { exact: true }), 'and waits on you');
       await expectVisible(card.getByText(FAKE.title), `the card says what was asked (${FAKE.title})`);
@@ -673,6 +678,144 @@ const PAGES: PageSpec[] = [
       await expectDiamond(page, "with the run beside it unfolded too");
       await expectLeftOf(cardOf(page, DIAMOND.cancelled.id), cardOf(page, DIAMOND.orphan.id), `${DIAMOND.cancelled.id} is still left of ${DIAMOND.orphan.id}`);
       await settled(page);
+    },
+  },
+  {
+    // A gate answered on the Factory: the ending's card says what approving does and where a send-back goes, and answers it; the ending's
+    // inspector says it in full, first, with the facts to decide on; the step not filed says so rather than a table of dashes. Refused
+    // first, in a page of its own whose one refusal is the point; then approved on the card, confirmed; then sent back with words. Each
+    // file is taken back, and the floor laid out again, so every page after this one reads the store and the floor as seeded.
+    name: 'factory-gate',
+    route: '/',
+    expect: async (page) => {
+      const { id, ending, back } = ENDING;
+      const asks = path.join(store!, 'runs', `${id}.asks`);
+      const approved = (r: Response) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${ending}/approve`;
+      const retried = (r: Response) => r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${id}/steps/${back}/retry`;
+      const lineOf = (p: Page) => cardOf(p, id).locator(`[data-gate-line="${ending}"]`);
+      const answerOf = (p: Page, label: 'Approve' | 'Send back') => cardOf(p, id).locator(`[data-answer="${label}"]`);
+      const approval = (p: Page) => p.getByRole('dialog', { name: `Approve ${ending}` });
+      const runNow = (p: Page) => approval(p).getByRole('button', { name: `Run ${ending} now`, exact: true });
+      // The floor as the grid lays it out, whatever the page before left open.
+      await page.getByRole('button', { name: 'Reset layout' }).click();
+      await settled(page);
+      const card = cardOf(page, id);
+      await expectVisible(lineOf(page).filter({ hasText: `approve to run ${ending} on main, or send ${back} back` }), `the card says what approving ${ending} does`);
+      await expectCount(card.locator('[data-taken]'), 0, 'and nothing is answered yet');
+
+      // Refused, in a page of its own: the card read the gate, and the ending was approved elsewhere — `wf approve` in a terminal — before the
+      // press here. The list as the card read it is held, so the button is there to press; the package refuses it, in its words, in the
+      // popover, verbatim; the words stay in the box.
+      const refused = await page.context().newPage();
+      try {
+        const { problems } = watch(refused);
+        await refused.goto(page.url(), { waitUntil: 'networkidle' });
+        await expectVisible(answerOf(refused, 'Approve'), 'Approve on the card, on a page of its own');
+        const listed = await (await refused.request.get(new URL('/api/runs', refused.url()).href)).text();
+        await refused.route((url) => url.pathname === '/api/runs', (route) => route.fulfill({ status: 200, contentType: 'application/json', body: listed }));
+        fs.mkdirSync(asks, { recursive: true });
+        fs.writeFileSync(path.join(asks, `approve-${ending}-1`), JSON.stringify({ step: ending, try: 1, at: new Date().toISOString() }));
+        await answerOf(refused, 'Approve').click();
+        await expectVisible(approval(refused), 'Approve opens a popover to confirm it in');
+        await approval(refused).getByRole('textbox', { name: `Words to approve ${ending} with, if any` }).fill(ENDING.objection);
+        const [answered] = await Promise.all([refused.waitForResponse(approved, { timeout: WAIT_MS }), runNow(refused).click()]);
+        const { error } = (await answered.json()) as { error?: string };
+        if (answered.status() !== 409 || !error) throw new Refused(`the package refuses a second approval — the api answered ${answered.status()}: ${JSON.stringify(error)}`);
+        const refusal = approval(refused).locator('[data-refused]');
+        await expectVisible(refusal.getByText('Not approved. The api refused it:'), 'the refusal is shown in the popover, not swallowed');
+        const shown = await refusal.locator('p.font-mono').textContent();
+        if (shown !== error) throw new Refused(`the refusal is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+        const kept = await approval(refused).getByRole('textbox').inputValue();
+        if (kept !== ENDING.objection) throw new Refused('the words stay in the box after a refusal');
+        await expectCount(cardOf(refused, id).locator('[data-taken]'), 0, 'and the card says nothing was taken');
+        await settled(refused);
+        await refused.screenshot({ path: path.join(OUT, `factory-gate-refused-${await themeOf(refused)}.png`), fullPage: true });
+        const expected = `request answered 409: POST ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+        // Taken back before the close: the first page, focused again, reads the list again.
+        fs.rmSync(asks, { recursive: true, force: true });
+      } finally {
+        fs.rmSync(asks, { recursive: true, force: true });
+        await refused.close();
+      }
+      await expectVisible(answerOf(page, 'Approve'), 'the gate is on the card again once the approval is taken back');
+
+      // The inspector of the ending, opened from the card: what it asks, first, in full, and the facts to decide on — the round and the
+      // cost, the review's word, and whether the branch still merges onto main — then Approve and Send back. It is not filed: it says so.
+      await card.locator('time').click();
+      const node = page.locator(`.react-flow__node[data-id="${id}/${ending}"]`);
+      await expectVisible(node, `the card opens into its steps, ${ending} among them`);
+      await expectVisible(node.locator('[data-need="approve"]', { hasText: `approve ${ending} to run it` }), `${ending}'s node says approving runs it`);
+      await node.click();
+      const inspector = page.locator(`aside[aria-label="Step ${ending}"]`);
+      const asked = inspector.locator(`section[aria-label="What ${ending} asks of you"]`);
+      await expectVisible(asked, `the inspector of ${ending} opens on what it asks of you`);
+      await expectVisible(asked.locator('[data-brief="waits"]', { hasText: `${ending} waits at its gate: it has not run, and it runs only on your approval.` }), 'which step waits');
+      await expectVisible(asked.locator('[data-brief="approving"]', { hasText: `Approving runs ${ending} in the repository's own checkout, on main` }), 'what approving does');
+      await expectVisible(asked.locator('[data-brief="approving"]', { hasText: `“${ENDING.says}”` }), "in the folder's own words");
+      await expectVisible(asked.locator('[data-brief="sending-back"]', { hasText: `Sending back asks ${back} for a new try` }), `and that a send-back goes to ${back}`);
+      const facts = asked.locator('dl[aria-label="What to decide on"]');
+      await expectVisible(facts.locator('[data-fact="round"]', { hasText: /^round \d/ }), 'the round, and its cost');
+      await expectVisible(facts.locator('[data-fact="merges"]'), 'and whether the branch still merges onto main, off the decision');
+      await expectVisible(inspector.locator('[data-unfiled]', { hasText: 'not filed yet: it waits at its gate' }), `${ending} is not filed, and its inspector says so`);
+      await expectCount(inspector.locator('dt', { hasText: /^attempts$/ }), 0, 'rather than a table of dashes');
+      await expectVisible(asked.getByRole('button', { name: 'Approve', exact: true }), "the inspector answers it too, the run page's gate");
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `factory-gate-inspector-${await themeOf(page)}.png`), fullPage: true });
+      await page.getByRole('button', { name: "Close the step's panel" }).click();
+      await card.getByRole('button', { name: 'Hide steps' }).click();
+
+      // Approved on the card: a second deliberate press, in the popover, and the approval written as `wf approve` writes it. The card says
+      // what happened and what comes next.
+      await answerOf(page, 'Approve').click();
+      await expectVisible(approval(page).getByText(`This runs ${ending} in the repository's own checkout on main, and it cannot be taken back.`), 'the popover says what approving runs');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `factory-gate-confirm-${await themeOf(page)}.png`), fullPage: true });
+      const [response] = await Promise.all([page.waitForResponse(approved, { timeout: WAIT_MS }), runNow(page).click()]);
+      if (response.status() !== 202) throw new Refused(`the api takes the approval — it answered ${response.status()}: ${await response.text()}`);
+      const file = path.join(asks, `approve-${ending}-1`);
+      const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
+      if (written?.step !== ending || written?.try !== 1 || 'message' in written || fs.readdirSync(asks).length !== 1) {
+        throw new Refused(`the approval is written as wf approve writes it, with no words, and nothing else — ${file} ${JSON.stringify(written)}`);
+      }
+      await expectCount(approval(page), 0, 'the popover closes');
+      await expectVisible(card.locator('[data-taken]', { hasText: `approved — the next pass files ${ending}` }), 'the card says it is approved, and what comes next');
+      await expectCount(answerOf(page, 'Approve'), 0, 'and offers the gate no more');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `factory-gate-approved-${await themeOf(page)}.png`), fullPage: true });
+      fs.rmSync(asks, { recursive: true, force: true });
+      await expectVisible(answerOf(page, 'Approve'), 'with the approval taken back, the card offers the gate again');
+      await expectCount(card.locator('[data-taken]'), 0, 'and says nothing of the answer taken back');
+
+      // Sent back from the card: words needed, and the ask written for the work, as `wf retry --message` writes it.
+      await answerOf(page, 'Send back').click();
+      const sending = page.getByRole('dialog', { name: `Send ${back} back` });
+      const send = sending.getByRole('button', { name: 'Send back', exact: true });
+      await expectVisible(send, `the popover sends it to ${back}`);
+      if (await send.isEnabled()) throw new Refused('Send back is disabled while there are no words — it was enabled with none');
+      await sending.getByRole('textbox', { name: `What to change, sent back to ${back}` }).fill(ENDING.objection);
+      const [sent] = await Promise.all([page.waitForResponse(retried, { timeout: WAIT_MS }), send.click()]);
+      if (sent.status() !== 202) throw new Refused(`the api takes the send-back to ${back} — it answered ${sent.status()}: ${await sent.text()}`);
+      const ask = path.join(asks, `retry-${back}-2`);
+      const retry = fs.existsSync(ask) ? JSON.parse(fs.readFileSync(ask, 'utf8')) : undefined;
+      if (retry?.step !== back || retry?.mode !== 'nudge' || retry?.message !== ENDING.objection) {
+        throw new Refused(`the send-back is written as wf retry --message writes it — ${ask} holds ${JSON.stringify(retry)}`);
+      }
+      await expectVisible(card.locator('[data-taken]', { hasText: `sent back to ${back} — try 2 asked` }), 'the card says it is sent back, and what comes next');
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `factory-gate-sent-back-${await themeOf(page)}.png`), fullPage: true });
+      fs.rmSync(asks, { recursive: true, force: true });
+      await expectVisible(answerOf(page, 'Approve'), 'with the send-back taken back, the card offers the gate again, and the page ends as it began');
+
+      // Every card still clear of the one beneath it, the gate's line and its buttons on the ending's card.
+      await page.getByRole('button', { name: 'Reset layout' }).click();
+      await settled(page);
+      await expectClearOfEachOther(page);
+      await showFinished(page);
+      await settled(page);
+      await expectClearOfEachOther(page);
     },
   },
   {

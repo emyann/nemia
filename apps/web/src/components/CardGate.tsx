@@ -5,8 +5,11 @@ import { cn } from '../lib/utils';
 import { BUTTON, Refusal, TEXTAREA, useAsk } from './Decide';
 import { SECONDARY, useApprove } from './Gate';
 
-/** What a card says once a person's word is taken there, and the run's state it was taken in: said until the run moves. */
-export type Taken = { said: string; stamp: string };
+/**
+ * What a card says once a person's word is taken there, the run's state it was taken in, and the state the answer moved it to once the
+ * card reads it (`next`): said through both.
+ */
+export type Taken = { said: string; stamp: string; next?: string };
 
 const SMALL = 'h-6 rounded px-2 text-[11px] font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring/50';
 const POPOVER = 'z-50 w-72 rounded-lg border border-neutral-200 bg-white p-3 text-sm text-neutral-900 shadow-lg outline-none dark:border-neutral-800 dark:bg-neutral-900 dark:text-neutral-100';

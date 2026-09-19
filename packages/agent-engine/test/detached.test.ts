@@ -538,6 +538,17 @@ test('claude -p that stopped at its budget says so in its result, and one that f
   assert.equal(claudeResultOutput(resultLine({ terminal_reason: 'budget_exhausted' })).budgetSpent, undefined, 'the subtype says it, as the SDK documents it');
 });
 
+test("claude -p's tokens are its result's usage, in their three classes, and none from a usage that counted nothing", () => {
+  // Measured on 2.1.278: a resumed `claude -p` printed this `usage` — its own process's, a cache rebuilt from nothing —
+  // beside a `modelUsage` that carried its parent's counts on.
+  const resumed = { input_tokens: 10, cache_creation_input_tokens: 21392, cache_read_input_tokens: 0, output_tokens: 36, iterations: [{ input_tokens: 10 }] };
+  assert.deepEqual(claudeResultOutput(resultLine({ usage: resumed, modelUsage: { 'claude-haiku-4-5': { inputTokens: 36, cacheCreationInputTokens: 42481, cacheReadInputTokens: 21875, outputTokens: 569 } } })).usage,
+    { inputTokens: 21402, uncachedTokens: 10, cacheWriteTokens: 21392, cacheReadTokens: 0, outputTokens: 36 }, 'no peak: iterations holds the last response alone');
+  assert.equal('usage' in claudeResultOutput(resultLine({ usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } })), false,
+    'a usage whose input is 0 counted nothing: every response reads its prompt');
+  assert.equal('usage' in claudeResultOutput(resultLine({ usage: { input_tokens: 10, output_tokens: 5 } })), false, 'a class it left out: none of them, not a 0');
+});
+
 test("what claude -p cost is its result's total_cost_usd, and its API time duration_api_ms — measured or absent, never 0", () => {
   // Measured on 2.1.272: a result carries both, beside a `usage` whose token counts read 0 where `modelUsage` counted thousands.
   assert.deepEqual(claudeResultOutput(resultLine({ total_cost_usd: 0.01804, duration_api_ms: 718, usage: { input_tokens: 0, output_tokens: 0 } })), { usage: { costUsd: 0.01804, apiMs: 718 } });
@@ -714,7 +725,7 @@ test('codex at shipped defaults: what the attempt consumed is read from its exec
     }
     const { state } = await engine.view(id);
     assert.equal(state.settled, 'succeeded');
-    assert.deepEqual(state.attempts[0]?.usage, { toolCalls: 1, inputTokens: 1200, outputTokens: 80 }, 'measured, and nothing it did not measure');
+    assert.deepEqual(state.attempts[0]?.usage, { toolCalls: 1, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 }, 'measured, and nothing it did not measure');
     assert.equal(state.attempts[0]?.exitCode, 0);
     assert.equal(state.attempts[0]?.nativeId, '01a09996-d343-7932-8971-b2f209ba315b');
   } finally {

@@ -9,8 +9,8 @@
  *     proxying `/api` to it (`HKB_API_URL`, vite.config.ts): the same two processes and the same proxy
  *     as `npm run dev`, never on :8787 or :5173, so it runs beside a person's dev servers and beside
  *     another worktree's e2e.
- *  4. Visits every page in PAGES in headless Chromium, in a light and a dark theme: no console error, no
- *     failed request, the page in the theme asked for, and the elements the page must have.
+ *  4. Visits every page in pages/ in headless Chromium, in the order of their file names (pages.ts), in a light and a
+ *     dark theme: no console error, no failed request, the page in the theme asked for, and the elements the page must have.
  *  5. Screenshots each page in each theme into $WF_ARTIFACTS when a run gives one — the step's files
  *     directory — and into `.e2e/` at the repository root otherwise.
  *
@@ -24,64 +24,13 @@ import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
-import factory from './pages/010-factory.ts';
-import factoryGate from './pages/020-factory-gate.ts';
-import quota from './pages/030-quota.ts';
-import factoryGateLongNames from './pages/040-factory-gate-long-names.ts';
-import runs from './pages/050-runs.ts';
-import run from './pages/060-run.ts';
-import answer from './pages/070-answer.ts';
-import held from './pages/080-held.ts';
-import gate from './pages/090-gate.ts';
-import decide from './pages/100-decide.ts';
-import shipped from './pages/110-shipped.ts';
-import session from './pages/120-session.ts';
-import say from './pages/130-say.ts';
-import loop from './pages/140-loop.ts';
-import cost from './pages/150-cost.ts';
-import moving from './pages/160-moving.ts';
-import waits from './pages/170-waits.ts';
-import workflows from './pages/180-workflows.ts';
-import builder from './pages/190-builder.ts';
-import inbox from './pages/200-inbox.ts';
-import card from './pages/210-card.ts';
-import workflowStep from './pages/220-workflow-step.ts';
-import agents from './pages/230-agents.ts';
-import capabilities from './pages/240-capabilities.ts';
 import { arrivalLine, DRAFT_TRANSCRIPT, INBOX, QUOTA, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedQueue, seedQuota, seedWorkflows } from './seed.ts';
-import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
+import { loadPages } from './pages.ts';
+import { exitOn, launch, visitAll } from './visit.ts';
 import { API, apiEnv, heard, OUT, setApiEnv, setStore, store, WEB } from './world.ts';
 
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
-
-/** The pages, and what each must have. A new page gets a line here, or the check never looks at it. */
-const PAGES: PageSpec[] = [
-  factory,
-  factoryGate,
-  quota,
-  factoryGateLongNames,
-  runs,
-  run,
-  answer,
-  held,
-  gate,
-  decide,
-  shipped,
-  session,
-  say,
-  loop,
-  cost,
-  moving,
-  waits,
-  workflows,
-  builder,
-  inbox,
-  card,
-  workflowStep,
-  agents,
-  capabilities,
-];
 
 // ─── the servers, and stopping them ─────────────────────────────────────────
 
@@ -179,6 +128,8 @@ function fromNodeModules(file: string): string {
 // ─── the run ────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
+  // First: a stray in pages/ is refused before the build, not after it.
+  const pages = await loadPages();
   const vite = fromNodeModules(path.join('vite', 'bin', 'vite.js'));
 
   console.log('e2e: building the web app');
@@ -245,7 +196,7 @@ async function main(): Promise<void> {
   const browser = await launch();
   let shots: string[];
   try {
-    shots = await visitAll(browser, base, PAGES, OUT);
+    shots = await visitAll(browser, base, pages, OUT);
   } finally {
     await browser.close();
   }

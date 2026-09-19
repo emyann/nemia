@@ -32,6 +32,41 @@ The engine must also **not be bundled**: it finds its detached worker (`bin/ae-w
 relative to its own source file. That is why the API is a plain Node process and not a Next.js
 or TanStack Start server.
 
+## The quota on the board
+
+The Factory's header shows how much of the subscription's five-hour window and week is used, each with its
+reset in your own time zone, and how old the reading is. Claude Code tells only a statusline command, so the
+reading comes from one: `apps/api/statusline/quota.ts` writes the quota part of the statusline's payload to
+`~/.agent-workflows/quota.json` (`$WF_ROOT/quota.json` when that is set), and `GET /api/quota` serves what the
+file says. Nothing installs it for you: add this to `~/.claude/settings.json`, with the path to your checkout
+and an absolute path to `node` (`which node`; under nvm, Claude Code's own PATH may not find it):
+
+```json
+"statusLine": {
+  "type": "command",
+  "command": "/home/you/.nvm/versions/node/v24.20.0/bin/node /home/you/projects/hkb-v2/apps/api/statusline/quota.ts"
+}
+```
+
+It prints its own line, `5h 38% · 7d 86% · resets 16:40`. To keep a statusline you already have, put its
+command after the script's path, quoted as one argument: the script runs it with the same payload and prints its
+output first — `"command": "node …/quota.ts 'bash ~/.claude/my-statusline.sh'"`.
+
+To check it:
+
+```bash
+# The script alone, into a store of its own: a line, then the file.
+echo '{"version":"2.1.278","rate_limits":{"five_hour":{"used_percentage":38,"resets_at":'$(( $(date +%s) + 3600 ))'},"seven_day":{"used_percentage":86,"resets_at":'$(( $(date +%s) + 86400 ))'}}}' \
+  | WF_ROOT=/tmp/quota-check node apps/api/statusline/quota.ts
+cat /tmp/quota-check/quota.json
+# Installed: send a message in an interactive claude session signed in to the subscription, then
+cat ~/.agent-workflows/quota.json
+curl -s localhost:8787/api/quota    # state "fresh", with its windows; the Factory's header shows them
+```
+
+A reading older than 5 hours is not shown as the quota, and neither is a session with no limits (an API key):
+the header says which, and what to do.
+
 ## History
 
 Both packages keep their git history, imported from the standalone repositories at

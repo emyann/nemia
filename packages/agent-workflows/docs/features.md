@@ -3582,14 +3582,16 @@ changed but this file. It asks TypeSafe's Jev (`jev-1.13.0`) a typed question on
 is the account.
 
 - **Optional.** It imports nothing from the workspace, and nothing imports it or `@typesafe-ai/sdk`: `test/boundary.test.ts`
-  refuses either. Without `TYPESAFE_API_KEY`, no request is made and every question reads `unsure`. `judge status` prints
+  refuses either. Without `TYPESAFE_API_KEY`, every question reads `unsure` and nothing is claimed,
+  written or sent, so a key set later asks with no `--reask`. `judge status` prints
   `ready` or `off: …`, and exits 0 either way.
 - **Never in a tick.** Nothing in a tick, in `assess`, in `wf decide` or in a gate calls it. Before anything does, three things
   must hold: the owner has adopted §5's proposed wording, the ask is filed from the pass as a task (as a check is), and the
   key is kept out of `wf up`'s environment.
 - **Asked once.** A key is sha256 over the pinned model, the question's words and options, and the state's hash. Each key and
-  asking is a write-once file: a claim with `wx`, then an answer or failure written through `link`. A failure is a fact, and
-  only `--reask` asks it again.
+  asking is a write-once file: a claim with `wx`, then an answer or failure written through `link`. The first whole answer to
+  land is linked as the key's `answer.json` and read alone, so a late answer never changes what was read. A failure is a
+  fact, and only `--reask` asks it again.
 - **The judgment.** `decide` gives `yes`, `no` or `unsure`, and every failure kind reads `unsure`.
 - **Effect** is inside the package only. The facade is plain Promises.
 - **`judge card <file>`** asks four properties of a card: web, plan, clear and size. It prints the shipped `dev*` folder they

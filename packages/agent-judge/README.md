@@ -15,8 +15,9 @@ The package is optional.
 - It imports nothing from the workspace, and nothing in the workspace imports it or its SDK
   (`test/boundary.test.ts` holds both). If you delete the folder, every other package still builds
   and passes.
-- Without a `TYPESAFE_API_KEY`, no client is built and no request is made. Every question reads
-  `unsure`, as the `no-key` failure.
+- Without a `TYPESAFE_API_KEY` the judge is off. Every question reads `unsure`, as the `no-key`
+  failure, and nothing is claimed, written, built or sent: the record stays as it was. Once a key is
+  set, the same questions are asked as if for the first time, with no `reask`.
 - `available()` says whether a key is present. `judge status` prints `ready`, or
   `off: no TYPESAFE_API_KEY in the environment`, and exits 0 either way. Neither one checks that
   the key is good.
@@ -66,12 +67,14 @@ do. The cases:
 - no questions at all;
 - a state that is not JSON.
 
-Weather never rejects: no key, a refusal, a rate limit or a timeout is written down as a fact, and
-reads as `unsure`. `why(judgment)` says in a few words what a judgment is: `P 0.74`,
+Weather never rejects: a refusal, a rate limit or a timeout is written down as a fact, and reads as
+`unsure`. No key reads as `unsure` too, and is written nowhere. `why(judgment)` says in a few words what a judgment is: `P 0.74`,
 `score 2.97`, or `rate-limited: …`.
 
-`ask(state, questions, { reask: 'failed' })` asks again only the questions whose answer is on
-record as a failure. It is the one way to re-ask something.
+`ask(state, questions, { reask: 'failed' })` asks again only the questions that have no answer on
+record and whose last asking failed. It is the one way to re-ask something. A question with an
+answer is never asked again, and an answer that comes back later from an earlier asking does not
+replace it.
 
 ## What happens underneath
 
@@ -81,13 +84,15 @@ record as a failure. It is the one way to re-ask something.
    share one key, and the question is sent once. Changing the model, the words, the options or the
    state changes the key.
 2. Each key is looked up in the record.
+   - Without a key, nothing is looked up: every question reads `no-key`, and the ask ends there.
    - A key with an answer, or with a failure and no `reask`, is used as it is.
    - A key with nothing on record is claimed.
    - A key another asker has claimed is waited on until that claim's deadline.
 3. Every claimed question goes out in **one** request, over the live layer. The state is billed once
    for the lot.
 4. What came back is written down, one file per question. That is either the answer exactly as it
-   came, or the failure and why.
+   came, or the failure and why. A whole answer is then linked as the key's answer, unless the key
+   has one already.
 5. Each key is read again from the record, and the answers are built from that. So the answer a
    caller gets is always the answer on record.
 
@@ -113,7 +118,7 @@ ask hands the judge a stub `fetch`, and each failure kind is made to happen thro
 | Test file | Covers |
 |---|---|
 | `test/live.test.ts` | The request body and headers, every status and every timeout, a key echoed back in an error, and a malformed reply. |
-| `test/record.test.ts` | Asked once, a partial fan-out, reask, a stale claim, two askers at once, a late answer, and a record that is bad or unwritable. |
+| `test/record.test.ts` | Asked once, a partial fan-out, reask, a stale claim, two askers at once, late answers in both orders, an answer never linked, and a record that is bad or unwritable. |
 | `test/replay.test.ts` | Replay. |
 | `test/facade.test.ts` | The facade's refusals, `available()` and `judge status`. |
 | `test/card.test.ts` | The command. |
@@ -154,6 +159,7 @@ pure `reading`, and `src/judge.ts` wraps them in `Effect.try`.
 <record>/<key>/<n>.asked.json    a claim: this asker is asking, until its deadline
 <record>/<key>/<n>.answer.json   what came back, raw, exactly as it came
 <record>/<key>/<n>.failed.json   why nothing came back
+<record>/<key>/answer.json       the key's answer: the first whole answer to land, and never another
 ```
 
 `n` is the asking: 1 the first time, and one more each time a person re-asks a failure.
@@ -161,9 +167,13 @@ pure `reading`, and `src/judge.ts` wraps them in `Effect.try`.
 - A claim is made with `wx`, so only one process can make it.
 - An answer or a failure is written through a temp file and `link`, which is atomic and never
   replaces an existing file.
+- `answer.json` is made with `link` from the asking's own answer. `link` never replaces a file, so
+  the first whole answer to land is the key's answer for ever. A read looks at `answer.json` alone.
+  An answer that lands after, from any asking, stays on disk as a fact of its asking and is never
+  read as the key's. So once a read has returned an answer, every later read returns that answer.
+- If an asker crashes between writing its answer and linking it, the next recorded read links it.
+  A replay never writes: it reads that answer as `in-flight` until then.
 - Nothing is rewritten or removed.
-- When several askings under a key have a whole answer, the lowest wins. An answer that comes late
-  does not change what was read.
 - The record holds the state's hash and never its text.
 
 One real line: the `plan` question about `card-p06.md`, asked on 2026-09-19.
@@ -174,11 +184,12 @@ One real line: the `plan` question about `card-p06.md`, asked on 2026-09-19.
 
 ## Failure kinds
 
-Every kind reads as `unsure`. The first seven are facts, written once.
+Every kind reads as `unsure`. `no-key` is read and never written. The next six are facts, written
+once.
 
 | Kind | Meaning | Asking again |
 |---|---|---|
-| `no-key` | No `TYPESAFE_API_KEY` in the environment. No request was made. | After a key is set, with `reask` |
+| `no-key` | No `TYPESAFE_API_KEY` in the environment: the judge is off. Nothing is claimed, written or sent. Read, never written. | Once a key is set, with no `reask` |
 | `refused` | 400, 401, 403, 404, 422: the service read the request and said no. | Only after the request or the key is fixed |
 | `rate-limited` | 429 or 529, after the SDK's retries. | With `reask`, later |
 | `timed-out` | No whole answer inside the deadline. | With `reask` |

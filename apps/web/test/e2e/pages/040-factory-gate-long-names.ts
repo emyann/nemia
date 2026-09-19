@@ -1,0 +1,113 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { themeOf } from '../board.ts';
+import { cardOf, cardsDrawn, expectClearOfEachOther } from '../canvas.ts';
+import { expectCount, expectVisible, Refused, settled } from '../checks.ts';
+import { ENDING, lines, UNMERGED, write } from '../seed.ts';
+import type { PageSpec } from '../visit.ts';
+import { OUT, store } from '../world.ts';
+
+/**
+ * A run no seed keeps: an ending whose gated step, the step a send-back goes to and the base branch all have long names, four steps and
+ * one of them asking — the card the seeded names never draw, whose gate line would wrap to three rows and reach over the card beneath. The
+ * `factory-gate-long-names` page writes it (`seedLongNames`), lays the floor out, measures, and takes it back (the paths returned).
+ */
+const LONG_NAMES = {
+  id: 'the-long-names-reach-e2e15',
+  title: 'The long names reach',
+  ending: 'ship-onto-the-release-branch-once-approved',
+  back: 'review-the-whole-change-once-more',
+  onto: 'release/2026-09-the-long-autumn-train-of-fixes',
+  steps: ['implement-the-change', 'write-the-migration-notes', 'review-the-whole-change-once-more', 'ship-onto-the-release-branch-once-approved'],
+  asks: 'Should the migration notes go in the README, or a page of their own?',
+} as const;
+
+/**
+ * Write LONG_NAMES into the store at `root`, dated `createdAt`: its folder, its record and its three tasks. Returns every path written, to take
+ * back.
+ */
+function seedLongNames(root: string, createdAt: string, now = Date.now()): string[] {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const { id, ending, back, onto, asks } = LONG_NAMES;
+  const [implement, notes] = LONG_NAMES.steps;
+  const dir = path.join(root, 'workflow-long-names');
+  const says = 'Merge this run onto the release branch, or abort on any failure.';
+  const workflow = [
+    { name: implement, after: [], body: 'Implement what was asked.', harness: 'claude' },
+    { name: notes, after: [implement], body: 'Write the migration notes.', harness: 'claude' },
+    { name: back, after: [implement], body: 'Review the change.', harness: 'claude' },
+    { name: ending, after: [back], body: says, harness: 'claude', workspace: 'main', gate: true },
+  ];
+  for (const step of workflow) {
+    const keys = [`harness: ${step.harness}`, ...(step.after.length ? [`after: ${step.after.join(', ')}`] : []), ...(step.workspace ? ['workspace: main', 'gate: true'] : [])];
+    write(path.join(dir, `${step.name}.md`), `---\n${keys.join('\n')}\n---\n${step.body}\n`);
+  }
+  const lane = path.join(root, 'worktrees', id, implement);
+  const branch = `wf/${id}/${implement}`;
+  const task = (step: string) => path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`);
+  const signedOff = (step: string, began: number, ended: number, closeout: object) =>
+    write(task(step), lines([
+      { kind: 'filed', at: ago(began), brief: step, cwd: lane, maxAttempts: 1, harness: 'claude' },
+      { kind: 'starting', at: ago(began - 0.01), attempt: 1 },
+      { kind: 'spawned', at: ago(began - 0.01), attempt: 1 },
+      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${id}-${step}/1`, observed: 'done', reason: 'harness', closeout },
+      { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
+    ]));
+  signedOff(implement, 3, 2.5, { outcome: 'done', summary: 'Implemented it.', needs: null, artifacts: [] });
+  signedOff(notes, 2.4, 2, { outcome: 'blocked', summary: 'Wrote half the notes.', needs: asks, artifacts: [] });
+  signedOff(back, 2.4, 1.5, { outcome: 'done', summary: 'Reviewed it: nothing to change.', needs: null, artifacts: [] });
+  const record = path.join(root, 'runs', `${id}.json`);
+  write(record, JSON.stringify({
+    id, repo: '/code/hkb-v2', workspace: '/code/hkb-v2', baseRef: '19c9365', branch: onto, isolate: true,
+    brief: `${LONG_NAMES.title}\n\nA run the factory-gate-long-names page writes and takes back: its names are long, one step asks, and the ending waits at its gate.`,
+    workflowDir: dir, workflow, createdAt,
+    steps: {
+      [implement]: { taskId: `${id}-${implement}`, workspace: lane, branch },
+      [notes]: { taskId: `${id}-${notes}`, workspace: path.join(root, 'worktrees', id, notes), branch: `wf/${id}/${notes}` },
+      [back]: { taskId: `${id}-${back}`, workspace: lane, branch },
+      [ending]: { taskId: null },
+    },
+  }, null, 2));
+  return [record, dir, ...[implement, notes, back].map(task)];
+}
+
+export default {
+  // The gate's card with the names the seed never has: a gated step, a send-back step and a base branch that do not fit a line, four
+  // steps, one asking. Its gate line holds one row, the rest on hover, and the card stays clear of the card beneath it after a Reset
+  // layout. The run is written for this page and taken back before it ends, the floor laid out again as seeded.
+  name: 'factory-gate-long-names',
+  route: '/',
+  expect: async (page) => {
+    const { id, ending, back, onto } = LONG_NAMES;
+    // Dated between ENDING and UNMERGED, which the grid puts in the last column, so it lands above one of them: a card one cell beneath it.
+    const dated = (run: string) => Date.parse(JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${run}.json`), 'utf8')).createdAt);
+    const written = seedLongNames(store!, new Date((dated(ENDING.id) + dated(UNMERGED.id)) / 2).toISOString());
+    const card = cardOf(page, id);
+    try {
+      await page.reload({ waitUntil: 'networkidle' });
+      await expectVisible(card, `the run with the long names is on the floor (${id})`);
+      await page.getByRole('button', { name: 'Reset layout' }).click();
+      await settled(page);
+      await expectVisible(card.locator(`[data-need="asks"][data-step="${LONG_NAMES.steps[1]}"]`), 'and the step that asks says so on the card');
+      // Measured against a card beneath it, or the measure proves nothing: the grid puts one there on this floor.
+      const cards = await cardsDrawn(page);
+      const mine = cards.find((c) => c.id === id)!;
+      if (!cards.some((c) => Math.abs(c.x - mine.x) < 1 && c.y > mine.y)) throw new Refused(`a card lies beneath ${id} in its column, to measure it against`);
+      await expectClearOfEachOther(page);
+      const line = card.locator(`[data-gate-line="${ending}"]`);
+      const whole = `approve to run ${ending} on ${onto}, or send ${back} back`;
+      await expectVisible(line, `the card has ${ending}'s gate line`);
+      const title = await line.getAttribute('title');
+      if (!title?.includes(whole)) throw new Refused(`the gate line is whole on hover — its title is ${JSON.stringify(title)}`);
+      const rows = await line.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+      if (rows !== 1) throw new Refused(`the gate line holds one row whatever the names — it is ${rows} rows`);
+      await page.screenshot({ path: path.join(OUT, `factory-gate-long-names-card-${await themeOf(page)}.png`), fullPage: true });
+    } finally {
+      for (const file of written) fs.rmSync(file, { recursive: true, force: true });
+    }
+    await page.reload({ waitUntil: 'networkidle' });
+    await expectCount(card, 0, 'with the run taken back, its card is gone');
+    await page.getByRole('button', { name: 'Reset layout' }).click();
+    await settled(page);
+  },
+} satisfies PageSpec;

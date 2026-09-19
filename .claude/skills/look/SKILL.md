@@ -31,8 +31,8 @@ picture goes outside it.
 
 ## 1. Read the pictures the e2e takes
 
-`npm run e2e` builds the web app, serves it against a seeded store, visits every page in `PAGES`
-(`apps/web/test/e2e/run.ts`) in headless Chromium in a light and a dark theme, and screenshots each as
+`npm run e2e` builds the web app, serves it against a seeded store, visits every page in
+`apps/web/test/e2e/pages/` in headless Chromium in a light and a dark theme, and screenshots each as
 `<page>-<theme>.png` into `$WF_ARTIFACTS`. Its last lines list them. A page that failed leaves
 `<page>-<theme>-failed.png` instead, and the e2e exits non-zero.
 

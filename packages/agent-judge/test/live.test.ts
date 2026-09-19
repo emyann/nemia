@@ -137,3 +137,12 @@ test('an answer from a model other than the pinned one is wrong-model', async ()
   failedAs(asked, 'wrong-model');
   assert.match(text, /"answeredBy":"jev-1\.14\.0"/);
 });
+
+test('a question the SDK refuses before any request is refused, and nothing is sent', async () => {
+  const s = stub(answering({}));
+  const one = { type: 'score', instructions: 'How large?', criteria: ['only'] } as unknown as ReturnType<typeof score>;
+  const asked = await judge({ model: 'jev-1.13.0', record: tmp('live'), env: ENV, fetch: s.fetch, retries: 0 }).ask(state, { one });
+  assert.equal(s.calls.length, 0);
+  assert.equal(asked.answers.one.status === 'failed' && asked.answers.one.kind, 'refused');
+  assert.match(asked.answers.one.status === 'failed' ? asked.answers.one.message : '', /at least two scores/);
+});

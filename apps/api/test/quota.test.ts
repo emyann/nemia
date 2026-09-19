@@ -3,7 +3,7 @@
  * as Claude Code 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can fail said
  * in a sentence; and the pure judgement under it (`quotaOf`).
  */
-import { answer, asks, asksEnded, lastAskEnv, recorded, usageAnswer } from './harness.ts';
+import { answer, asks, asksEnded, calls, lastAskEnv, recorded, usageAnswer } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -195,6 +195,9 @@ test('REFUSED: the ask runs without what a Claude Code session hands its childre
   assert.equal(ran.CLAUDE_CODE_ENTRYPOINT, 'unset');
   assert.equal(ran.CLAUDE_CONFIG_DIR, process.env.CLAUDE_CONFIG_DIR);
   assert.equal(ran.cwd, fs.realpathSync(os.tmpdir()));
+  // Started without the user's settings — their plugins, hooks and skills' sync — without MCP servers, and writing no session.
+  const started = fs.readFileSync(calls, 'utf8').split('\n').filter((l) => l.startsWith('-p ')).pop();
+  assert.equal(started, '-p --input-format stream-json --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ');
 });
 
 test('an answered ask closes its stdin, and the process ends of its own', async () => {

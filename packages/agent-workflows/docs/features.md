@@ -3587,7 +3587,8 @@ the git words are not renamed. No change to `packages/agent-engine`: a task's `c
   caller says what a folder run gets. `places.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
 - **Start** (`runner.ts`, `cli.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
   `--no-worktree` and `--after` (both sides) are refused with exit 2. The careful reading: only a repository a person *named* is
-  refused; the cwd default and the repo an inbox card, a plan or the api pass are not looked at.
+  refused — on a brief or an inbox card (`startFromInbox`, found by review); the cwd default, a card's own `repo:` (the board writes one on
+  every card it files) and the repo a plan or the api pass are not looked at.
 - **Briefs** say folder words and never git's (a test holds them to none of `git`, `branch`, `commit`, `worktree`, `repositor`).
 - **Deciding and forgetting.** `wf decide` names the folders and offers `wf rm`; `wf start` says a folder per step; `wf rm`
   removes `runs/<id>/`.

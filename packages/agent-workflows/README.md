@@ -1329,7 +1329,8 @@ agent: note-writer
 - **The record says so.** `wf start` freezes `place: { kind: 'folder' }` on the run, with no `repo`, `baseRef`, `branch`
   or `isolate`; a record without `place` is a git run, as every record before it was. Its workspace is
   `runs/<id>/work`, in the store, and nothing reads the directory `wf start` was typed in.
-- **Refused at start**, exit 2, before anything is written: `--repo` named on the command line, `--no-worktree` (there is
+- **Refused at start**, exit 2, before anything is written: `--repo` named on the command line, on a brief or an inbox card
+  (a card's own `repo:` is not looked at, as the directory typed in is not), `--no-worktree` (there is
   no branch to work on in place), and `--after`, on either side — a folder run ships nothing git could see merged.
 - **Each step works in a folder of its own**, `runs/<id>/work/<step>`, made empty as it is filed — except a step that
   continues another's session (a chain, `inherit`), which works in that step's folder, since a harness session belongs to

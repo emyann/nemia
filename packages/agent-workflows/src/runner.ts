@@ -1548,7 +1548,11 @@ export type InboxStart = {
   workflow?: string;
   /** Where a relative `workflow` is read from: where `wf start` was typed. The current directory when left out. */
   from?: string;
-  /** The repository, over the card's `repo:`. */
+  /**
+   * The repository, over the card's `repo:`: named by a person at start (`wf start <card> --repo`), and refused as `start()` refuses it for a
+   * team that says `workspace: folder`. The card's own `repo:` is not: the board writes one on every card it files, so a folder team takes
+   * it as it takes the directory `wf start` is typed in, and never looks at it.
+   */
   repo?: string;
   /** The repository when neither `repo` nor the card names one: `wf start`'s `.`, or the board's own. */
   callerRepo: string;
@@ -1617,6 +1621,7 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
   const run = start({
     brief: opts.brief?.trim() ?? card.body,
     repo,
+    repoNamed: opts.repo !== undefined,
     workflowDir,
     isolate: opts.isolate,
     after: opts.after,

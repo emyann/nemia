@@ -28,7 +28,7 @@ const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT
 
 // WF_ROOT is read as the module loads, so it is set before the import rather than after it.
 process.env.WF_ROOT = ROOT;
-const { advance, decide, forget, list, readRun, start } = await import('../src/runner.ts');
+const { addToInbox, advance, decide, forget, list, readRun, start } = await import('../src/runner.ts');
 const { forgetLine } = await import('../src/run.ts');
 const { main } = await import('../src/cli.ts');
 
@@ -165,6 +165,25 @@ test('wf start from a directory that is no repository: a folder team starts, and
     assert.ok(out.includes(`workspace: ${path.join(ROOT, 'runs', id, 'work')} — a folder per step, made as each is filed, with no git repository`), out.join('\n'));
     await assert.rejects(main(['start', 'a note on tides', '--workflows', TEAM, '--repo', '.']),
       (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`workspace: folder\``));
+  } finally {
+    process.chdir(cwd);
+  }
+  assert.deepEqual(gitAsked(), []);
+});
+
+test('an inbox card of a folder team: --repo named at its start is refused, as on a brief, and the card\'s own repo: is not looked at', async () => {
+  const cwd = process.cwd();
+  process.chdir(NOT_A_REPO);
+  try {
+    // As the board files one: with the repository it was about, which a folder team never reads.
+    const { card, file } = addToInbox({ text: 'a note on tides', workflow: TEAM, repo: NOT_A_REPO });
+    await assert.rejects(main(['start', file, '--repo', '.']),
+      (err: Error & { exitCode?: number }) => err.exitCode === 2 && err.message.startsWith(`--repo ${NOT_A_REPO}: this workflow's steps say \`workspace: folder\``));
+    assert.ok(fs.existsSync(file), 'refused before anything is written: the card is still in the inbox');
+    const out = await printed(['start', file]);
+    const run = readRun(out[0]!.split(' ')[0]!);
+    assert.deepEqual([run.place?.kind, run.from?.inbox, 'repo' in run], ['folder', card.name, false]);
+    assert.ok(!fs.existsSync(file), 'started, the card leaves the inbox');
   } finally {
     process.chdir(cwd);
   }

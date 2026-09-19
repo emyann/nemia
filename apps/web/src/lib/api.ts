@@ -210,14 +210,14 @@ export type StepCheck = {
   refused: { exit: string; stdout: StepLog | null; stderr: StepLog; unreadable: string | null } | null;
 };
 
+/** Mirrors `StepUnreadable` in apps/api/src/app.ts: a closing statement the api could not read, its words for why, and the statement as it came. */
+export type StepUnreadable = { error: string; raw: unknown };
+
 /**
  * Mirrors `StepTry` in apps/api/src/app.ts: one try of a step, earliest first. `then` is what replaced it, null on the current
  * try, which `current` marks; `note` how it was reached, in `wf ls`'s words. `status` is the step's word on the current try, and
  * the engine's word for the task on an earlier one.
  */
-/** A closing statement the api could not read: its words for why, and the statement as it came. */
-export type StepUnreadable = { error: string; raw: unknown };
-
 export type StepTry = {
   try: number;
   round: number;

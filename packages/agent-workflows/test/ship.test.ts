@@ -257,20 +257,29 @@ test('an approved ending is filed, in the repository\'s own checkout, and the me
   assert.match(spec.brief, /## Approved\n\nA person approved this step before it was filed/);
   assert.match(spec.brief, /Merge it\./);
 
-  // The step, played as its own prose says: trial merge, the check, the commit.
+  // The step, played as its own prose says: trial merge, the check, the commit — with a message it writes, into the directory its brief
+  // names under *Files for the person who decides*, outside the checkout, and commits with `-F`. Not git's `Merge branch '…'`.
   git(repo, 'merge', '--no-ff', '--no-commit', branch);
-  git(repo, 'commit', '--no-edit');
-  settle(`${id}-ship`, 'succeeded', SIGNED);
+  const files = spec.brief.match(/## Files for the person who decides\n\nA report, a log or a screenshot reaches them one way: put it in `([^`]+)`/)?.[1];
+  assert.ok(files && path.isAbsolute(files) && !files.startsWith(repo), `the brief names a directory outside the checkout\n\n${spec.brief}`);
+  const message = path.join(files, 'merge-message.txt');
+  fs.writeFileSync(message, `Add sub\n\nadd.ts exports sub beside add.\nRun ${id}, ${branch}: 1 commit; the check passed on the merged tree.\n`);
+  git(repo, 'commit', '-F', message);
+  const merged = git(repo, 'rev-parse', 'HEAD');
+  settle(`${id}-ship`, 'succeeded', { ...SIGNED, artifacts: [message] });
   await advance(e, readRun(id));
 
   const record = readRun(id);
   assert.notEqual(git(repo, 'rev-parse', 'HEAD'), base, 'the base branch has moved');
-  assert.equal(git(repo, 'status', '--porcelain'), '', 'and nothing is left in the checkout');
+  assert.equal(git(repo, 'log', '-1', '--format=%s'), 'Add sub', 'under the subject the step wrote');
+  assert.equal(git(repo, 'log', '-1', '--format=%(trailers)'), '', 'with no trailer');
+  assert.equal(git(repo, 'status', '--porcelain'), '', 'and nothing is left in the checkout, the message included');
   assert.equal(isShipped(record, branch), true);
   const { decision, toDecide, standings } = await decide(e, id);
   assert.deepEqual([decision.kind, toDecide, standings], ['shipped', undefined, [{ branch, where: 'on' }]]);
   // The run committed nothing of its own in that checkout: the merge commit is the step's, and the only one.
-  assert.equal(git(repo, 'log', '-1', '--format=%s'), `Merge branch '${branch}'`);
+  assert.equal(git(repo, 'rev-parse', 'HEAD'), merged);
+  assert.equal(git(repo, 'log', '-1', '--format=%P').split(' ').length, 2, 'a merge, of the base and the branch');
 });
 
 /**

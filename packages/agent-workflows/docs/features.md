@@ -3359,6 +3359,32 @@ Two of its leftovers were taken up after it (`docs/pivot-2026-09-18.md` §6, P1,
   names it as the one key a shipped step gained (`KEYS_ADDED`). The supervisor's README says what a thrash looks like — the step
   `blocked`, its log ending on Claude Code's *"Autocompact is thrashing"* — and what to do: answer it, or raise the cap and start a fresh one.
 
+## Shipped: the shipper says what it shipped
+
+Every run the shipper merged read `Merge branch 'wf/<run>/implement'` and nothing else (56e7d40, 6c4e57b, f937d12, f1db95c on main): its
+recipe's fourth item said `git commit --no-edit`, and it did as told. What it merged and what the check said reached its closeout, not
+git, where the owner and anyone reading history later look.
+
+- **Item 4 writes the message.** Once the check exits 0, the merge is committed with a subject that says what shipped — the run's own
+  title, the first line under *What was asked for*, trimmed — and a body of two to six lines: what was built, then one line naming the run,
+  its branch, how many commits it brought, and the check that passed on the merged tree. It is read off the checkout (`git log
+  --format='%s'`, `git diff --stat`, `git rev-list --count`, base to branch), never off an account of the work. No trailers of any kind;
+  `--no-edit` is named only to be forbidden.
+- **Written to a file outside the checkout, committed with `-F`.** The file goes in the directory the brief names under *Files for the
+  person who decides* — the step's artifacts directory, by absolute path. The brief of a `workspace: main` step does not name it as
+  `WF_ARTIFACTS`, and the step's session is not given that variable (only a check is, `checkBrief`), so the recipe points at the heading
+  rather than at `$WF_ARTIFACTS`, which would be empty in the shipper's shell. Item 5 is unchanged in effect: on anything but a green check
+  the merge is aborted, nothing is committed, and no message reaches git.
+- **Tests.** `ui-workflow.test.ts` pins the new sentences of the recipe in every dev folder's ship body, that `git commit --no-edit` is
+  gone, and that the ship brief carries both headings the recipe points at. `ship.test.ts` plays the merge as the prose now says — the
+  message written into the directory the brief names, `git commit -F` — and checks the subject, no trailer, and a clean checkout, where it
+  used to pin git's default subject. `agents-before-after.test.ts` holds every resolved key and the same eight moved bodies: the four ship
+  bodies were already among them.
+
+What it leaves: nothing refuses a bare default message; this is prose. The cheapest refusal is where a settled `workspace: main` step's
+closeout is read as `done` (`isShipped` and the ending's decision): a merge commit on the base with the result branch as a parent whose
+subject matches `^Merge branch '` reads as not signed off well — a finding for the person, not a revert.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

@@ -25,6 +25,9 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = JSON.parse(fs.rea
  *
  * The two build folders' ship bodies moved once more afterwards, and stay in this list: their ship.md got back, as a team's note after
  * the shipper's instructions (`NOTES`), the reason their old recipe gave for running the build and the e2e on the merged tree.
+ *
+ * All four ship bodies moved again when the shipper's fourth item stopped committing git's default `Merge branch '…'` and began writing a
+ * message of what shipped, committed with `-F` from a file outside the checkout. The list is the same: those steps were already in it.
  */
 const BODIES_REWORDED: string[] = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]);
 

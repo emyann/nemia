@@ -3042,9 +3042,12 @@ const PAGES: PageSpec[] = [
         const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
         if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
       } finally {
-        await refused.close();
+        // Removed before the page closes: the list, focused again, reads the store once more, and must read it as seeded.
         fs.rmSync(namingDir, { recursive: true, force: true });
+        await refused.close();
       }
+      await page.reload({ waitUntil: 'networkidle' });
+      await expectTexts(card(page, 'yours', seeded.name).locator('[data-used-by]'), ['No node names it yet.'], `back on the list, no node names ${seeded.name} again`);
       if (JSON.stringify(filesIn(agentsDir)) !== JSON.stringify(before)) throw new Refused(`the page puts the store back — ${agentsDir} holds ${filesIn(agentsDir).map(([n]) => n).join(', ')}`);
     },
   },

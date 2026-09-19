@@ -40,7 +40,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
   const changed = edited(form, listing);
   const harness = form.keys.harness;
 
-  const text = (key: AgentRoleKey, placeholder?: string) => (
+  const text = (key: AgentRoleKey) => (
     <Field
       key={key}
       label={KEY_LABELS[key]}
@@ -49,7 +49,6 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
       onChange={(v) => setKey(key, v)}
       readOnly={readOnly}
       mono
-      placeholder={placeholder}
     />
   );
   const choice = (key: AgentRoleKey) => {
@@ -88,7 +87,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
           onChange={(name) => setForm((f) => ({ ...f, name }))}
           readOnly={readOnly}
           mono
-          placeholder="scribe"
+          placeholder={listing ? undefined : 'scribe'}
         />
         <Field
           label="Description"
@@ -96,7 +95,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
           value={form.description}
           onChange={(description) => setForm((f) => ({ ...f, description }))}
           readOnly={readOnly}
-          placeholder="Use this when a change needs its notes written."
+          placeholder={listing ? undefined : 'Use this when a change needs its notes written.'}
         />
       </div>
 
@@ -106,11 +105,11 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
           {choice('harness')}
           {text('model')}
           {choice('effort')}
-          {text('context', '200k')}
+          {text('context')}
           {choice('permissionMode')}
           {choice('remote')}
-          {text('tools', 'Read, Grep, Bash(npm test)')}
-          {text('disallow', 'WebFetch')}
+          {text('tools')}
+          {text('disallow')}
         </div>
       </fieldset>
 
@@ -124,7 +123,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
             onChange={(v) => setKey('output', v)}
             readOnly={readOnly}
             mono
-            placeholder={schemaFileFor(form.name)}
+            placeholder={listing ? undefined : schemaFileFor(form.name)}
           />
           <Field
             className="sm:col-span-2"
@@ -135,7 +134,6 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
             readOnly={readOnly}
             mono
             area="min-h-24"
-            placeholder={'{ "type": "object", "properties": { "notes": { "type": "string" } }, "required": ["notes"], "additionalProperties": false }'}
           />
         </div>
       </fieldset>
@@ -148,7 +146,7 @@ export function AgentForm({ listing, keyForm, readOnly = false, saving, refusal,
         readOnly={readOnly}
         mono
         area="min-h-72"
-        placeholder="You write the notes of a change…"
+        placeholder={listing ? undefined : 'You write the notes of a change…'}
       />
 
       {!readOnly && (
@@ -184,13 +182,15 @@ function Field({ label, hint, value, onChange, readOnly, mono = false, area, pla
   className?: string;
 }) {
   const font = mono ? 'font-mono text-xs md:text-xs' : '';
+  // Read-only, a field is drawn as text on a quiet ground, not as a box waiting for words.
+  const quiet = readOnly ? 'border-dashed bg-neutral-50 dark:bg-neutral-900/60 focus-visible:ring-0' : '';
   return (
     <TextField value={value} onChange={onChange} isReadOnly={readOnly} className={`space-y-1.5 ${className ?? ''}`}>
       <Label className="text-xs">{label}</Label>
       {area ? (
-        <Textarea placeholder={readOnly ? undefined : placeholder} className={`${font} ${area} leading-relaxed`} />
+        <Textarea placeholder={readOnly ? undefined : placeholder} className={`${font} ${area} ${quiet} leading-relaxed`} />
       ) : (
-        <Input placeholder={readOnly ? undefined : placeholder} className={font} />
+        <Input placeholder={readOnly ? undefined : placeholder} className={`${font} ${quiet}`} />
       )}
       {hint && (
         <Text slot="description" className="block text-[11px] leading-snug text-muted-foreground">

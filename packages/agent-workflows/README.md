@@ -183,7 +183,8 @@ set itself, and its own note, never the agent's. `wf start` names each node's ag
 
 The repository's shipped folders are written this way (`workflows/agents/README.md` lists who does what), and the
 board's builder edits the node — which agent, its own keys and its note — showing the agent's values as placeholders.
-The agent is edited in its file.
+The board's Agents page edits the agent itself (`writeAgent`, `removeAgent`): yours only, against the version it was read at, its result
+schema with it, and never removed or renamed while a step beside it names it — the refusal names the steps.
 
 ### What a step may have: `tools:` and `effort:`
 

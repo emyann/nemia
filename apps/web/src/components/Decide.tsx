@@ -36,7 +36,7 @@ export function Decide({ run }: { run: RunDetail }) {
 /** The Decide section's frame: its heading, and what the board does from it and what it leaves to you. */
 function DecideFrame({ runId, children }: { runId: string; children: ReactNode }) {
   return (
-    <section aria-label="Decide" className="space-y-5 rounded border border-neutral-200 p-4 dark:border-neutral-800">
+    <section aria-label="Decide" id="decide" className="scroll-mt-4 space-y-5 rounded border border-neutral-200 p-4 dark:border-neutral-800">
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
         <p className="text-xs text-neutral-500">
@@ -444,6 +444,8 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
       // (`exact`), never its decisions: those are keyed by the state of the run they were read for (`decisionStamp`), and a refetch of the
       // key the page is on would fill it with the answer for the state after this write — which is what the next key is for.
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
+      // And the list the Factory's card reads, which answers a gate from the board.
+      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
     },
   });
 }

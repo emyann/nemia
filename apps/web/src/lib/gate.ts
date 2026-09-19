@@ -158,9 +158,12 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
  */
 export type Waits = { said: string; step: string | null };
 
-/** The card's line for a result nobody decided, which fits: `decide wf/r/implement: ahead of main, and nothing merges it`. */
+/**
+ * The card's line for a result nobody decided, which fits whatever the branch is called: `decide its result: a branch ahead of the base
+ * that nothing merges`. `wf ls`'s own words, with the branch and the command, are the card's title and the run page's Decide section.
+ */
 export const decideLine = (branches: readonly string[]): string =>
-  `decide ${branches.length === 1 ? branches[0] : `${branches.length} branches`}: ahead of the base, and nothing merges ${branches.length === 1 ? 'it' : 'them'}`;
+  `decide its result: ${branches.length === 1 ? 'a branch' : `${branches.length} branches`} ahead of the base that nothing merges`;
 
 /** A step's need, for the inspector, in full: what it asks, or what the harness's session said last. */
 export const needWords = (need: Need): string =>

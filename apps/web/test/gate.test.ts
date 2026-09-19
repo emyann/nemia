@@ -123,6 +123,6 @@ test('what else a run waits on a person for, in full words for the inspector and
   assert.equal(needWords({ step: 'implement', kind: 'asks', needs: 'Which database?' }), 'implement asks: Which database?');
   assert.equal(needWords({ step: 'held', kind: 'harness', lastLine: 'Try again in a minute' }), 'held is blocked by the harness; its session said last: Try again in a minute');
   assert.equal(needWords({ step: 'held', kind: 'harness', lastLine: null }), 'held is blocked by the harness');
-  assert.equal(decideLine(['wf/r/implement']), 'decide wf/r/implement: ahead of the base, and nothing merges it');
-  assert.equal(decideLine(['a', 'b']), 'decide 2 branches: ahead of the base, and nothing merges them');
+  assert.equal(decideLine(['wf/r/implement']), 'decide its result: a branch ahead of the base that nothing merges');
+  assert.equal(decideLine(['a', 'b']), 'decide its result: 2 branches ahead of the base that nothing merges');
 });

@@ -25,11 +25,20 @@ import { when } from './Facts';
  * there is to say. `acts` says the gate is an ending's: approving runs it rather than letting what follows be filed, and the words given
  * with the approval are the terms it acts on (`approvedSection`), not something handed to steps after it.
  */
-export function Gate({ runId, step, back = [step], acts = false }: { runId: string; step: string; back?: readonly string[]; acts?: boolean }) {
+export function Gate({ runId, step, back = [step], acts = false, framed = true }: {
+  runId: string;
+  step: string;
+  back?: readonly string[];
+  acts?: boolean;
+  /** False where what the gate asks is said above it already (the inspector's brief): no sentence of its own, and no box around it. */
+  framed?: boolean;
+}) {
   const [words, setWords] = useState('');
   const [objection, setObjection] = useState('');
   const [mode, setMode] = useState<RetryMode>('nudge');
   const [to, setTo] = useState(back[0] ?? step);
+  // An ending's approval runs it where nothing can be taken back, so it takes a second, deliberate press: Approve, then Run <step>.
+  const [confirming, setConfirming] = useState(false);
   const field = useId();
   const approval = useApprove(runId, step, () => setWords(''));
   const sendBack = useAsk(runId, step, () => setObjection(''));
@@ -56,20 +65,23 @@ export function Gate({ runId, step, back = [step], acts = false }: { runId: stri
     <section
       aria-label={`The gate of ${step}`}
       data-gate="awaiting"
-      className="space-y-4 rounded border border-amber-300 bg-amber-50/60 p-3 text-sm dark:border-amber-900 dark:bg-amber-950/30"
+      className={cn('space-y-4 text-sm', framed && 'rounded border border-amber-300 bg-amber-50/60 p-3 dark:border-amber-900 dark:bg-amber-950/30')}
     >
-      <p className="break-words">
-        <strong>{step}</strong> waits at its gate:{' '}
-        {acts
-          ? `nothing of it runs until you approve it — your approval is what files it${back.length ? ` — or you send ${backName} back` : ''}.`
-          : 'nothing after it is filed until you approve what it handed on, or send it back.'}
-      </p>
+      {framed && (
+        <p className="break-words">
+          <strong>{step}</strong> waits at its gate:{' '}
+          {acts
+            ? `nothing of it runs until you approve it — your approval is what files it${back.length ? ` — or you send ${backName} back` : ''}.`
+            : 'nothing after it is filed until you approve what it handed on, or send it back.'}
+        </p>
+      )}
 
       <form
         aria-label={`Approve ${step}`}
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
+          if (acts && !confirming) return setConfirming(true);
           // Words go as they were typed, as `--message` takes them; none when nothing was written.
           approval.mutate(words.trim() ? { message: words } : {});
         }}
@@ -89,12 +101,22 @@ export function Gate({ runId, step, back = [step], acts = false }: { runId: stri
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <button type="submit" disabled={busy} className={BUTTON}>
-            {approval.isPending ? 'Approving…' : 'Approve'}
+            {approval.isPending ? 'Approving…' : confirming ? `Run ${step} now` : 'Approve'}
           </button>
+          {confirming && !approval.isPending && (
+            <button type="button" onClick={() => setConfirming(false)} className={cn(BUTTON, SECONDARY)}>
+              Not yet
+            </button>
+          )}
           <p className="text-xs">
             as <code>{`wf approve ${runId} ${step}`}</code> approves it: the next tick files {acts ? 'it' : 'what waits on it'}
           </p>
         </div>
+        {confirming && (
+          <p data-confirm className="text-xs font-medium text-amber-900 dark:text-amber-200">
+            {`This runs ${step} in the repository's own checkout, and it cannot be taken back: press Run ${step} now to approve it.`}
+          </p>
+        )}
         {approval.isError && <Refusal error={approval.error} not="Not approved" />}
       </form>
 
@@ -123,7 +145,7 @@ export function Gate({ runId, step, back = [step], acts = false }: { runId: stri
             className={TEXTAREA}
           />
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <button type="submit" disabled={busy || !objection.trim()} className={cn(BUTTON, 'bg-white text-neutral-900 ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900')}>
+            <button type="submit" disabled={busy || !objection.trim()} className={cn(BUTTON, SECONDARY)}>
               {sendBack.isPending ? 'Sending back…' : 'Send back'}
             </button>
             <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
@@ -286,8 +308,15 @@ export function Approved({ step, approval, ends = false }: { step: string; appro
   );
 }
 
-/** An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it. */
-function useApprove(runId: string, step: string, onApproved: () => void) {
+/** The look of a gate's second button: outlined, beside the filled one that answers. */
+export const SECONDARY =
+  'bg-white text-neutral-900 ring-1 ring-neutral-300 ring-inset hover:bg-neutral-100 disabled:hover:bg-white dark:bg-neutral-900 dark:text-neutral-100 dark:ring-neutral-700 dark:hover:bg-neutral-800 dark:disabled:hover:bg-neutral-900';
+
+/**
+ * An approval of a step at its gate through the api (`approveStep`), and the run read again once the api has it — its detail, and the
+ * list the Factory's card reads, each by its own key (`exact`).
+ */
+export function useApprove(runId: string, step: string, onApproved: () => void) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (how: { message?: string }) => approveStep(runId, step, how),
@@ -296,6 +325,7 @@ function useApprove(runId: string, step: string, onApproved: () => void) {
       // The run as the api has it now: the step's approval under it, and the step waiting on nobody. Its record alone (`exact`): a decision
       // is keyed by the state it was read for, and refetching the key the page is on would fill it with the answer for the state after this.
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
+      void queryClient.invalidateQueries({ queryKey: ['runs'], exact: true });
     },
   });
 }

@@ -8,6 +8,7 @@ import { useStepTranscript } from '../lib/useStepTranscript';
 import { cn } from '../lib/utils';
 import { Rounds, TryCloseouts, tryLabel } from './Closeout';
 import { Check, code, Facts, readRows, specRows, spentRows, Told, when } from './Facts';
+import { Asked } from './GateBrief';
 
 // Loaded when the Activity tab is first opened: the scroller and the tool views are not needed to read the canvas the inspector sits beside.
 const Conversation = lazy(() => import('./conversation/Conversation').then((m) => ({ default: m.Conversation })));
@@ -100,7 +101,7 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
       </div>
 
       <div role="tabpanel" className={`min-h-0 flex-1 p-3 ${tab === 'Activity' ? 'flex flex-col gap-2' : 'space-y-4 overflow-auto'}`}>
-        {tab === 'Details' && <Details step={step} state={state} runCancelled={runCancelled} current={current} selected={selected} onSelect={select} />}
+        {tab === 'Details' && <Details run={run} step={step} state={state} runCancelled={runCancelled} current={current} selected={selected} onSelect={select} />}
         {tab === 'Output' && <Output step={step} state={state} selected={selected} />}
         {/* Keyed by run and step, so a conversation never stands in for another step's while that one is read. */}
         {tab === 'Activity' && <Activity key={`${run.id}/${step.name}`} run={run} step={step} />}
@@ -109,38 +110,48 @@ export function StepInspector({ run, step, onClose, runTitle, className }: Props
   );
 }
 
-type DetailsProps = { step: Step; state: StepState; runCancelled: boolean; current: StepTry; selected: StepTry; onSelect: (n: number) => void };
+type DetailsProps = { run: RunDetail; step: Step; state: StepState; runCancelled: boolean; current: StepTry; selected: StepTry; onSelect: (n: number) => void };
 
-function Details({ step, state, runCancelled, current, selected, onSelect }: DetailsProps) {
+function Details({ run, step, state, runCancelled, current, selected, onSelect }: DetailsProps) {
   const { spec, attempts, tries } = step;
   const latest = attempts.latest;
+  const gated = Boolean(step.approve) && !runCancelled;
 
   return (
     <>
+      {/* What the run asks of you here, first: above the step's own state, which is the reason it waits and not what to do about it. */}
+      <Asked run={run} step={step} />
       <div className="space-y-1">
         <StatusChip status={step.status} runCancelled={runCancelled} />
         <StepNote note={step.note} />
       </div>
-      <Facts
-        rows={[
-          // Which try the attempts are of, once there is more than one: each round, and each try within one, is a task of its own.
-          ...(tries.length > 1 ? ([['try', tryLabel(current, tries)]] satisfies Array<[string, string]>) : []),
-          ['attempts', attempts.count],
-          ['latest began', latest && when(latest.startedAt)],
-          ['latest ended', latest && (latest.ended ? <Ended at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
-          // Only with an end on the record: one from before the engine kept it says how, and not when.
-          ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
-          // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0. A dash for a step not filed.
-          ['used', step.used?.used],
-          ['cost', step.used?.cost],
-          // What its sessions read, by price, where anything measured it: the peak and a rebuilt cache marked.
-          ...readRows(step.used),
-          // What every try has cost together, and of its cap where it has one: `$4.25 of $3`, red once past it.
-          ...spentRows(step),
-          ['branch', code(step.branch)],
-          ['task', step.taskId ? code(step.taskId) : 'not filed'],
-        ]}
-      />
+      {/* A step not filed has run nothing, so every row of its facts would be a dash: said once instead, and its spec below. */}
+      {step.taskId === null ? (
+        <p data-unfiled className="text-neutral-500">
+          {gated ? 'not filed yet: it waits at its gate' : 'not filed yet'}
+        </p>
+      ) : (
+        <Facts
+          rows={[
+            // Which try the attempts are of, once there is more than one: each round, and each try within one, is a task of its own.
+            ...(tries.length > 1 ? ([['try', tryLabel(current, tries)]] satisfies Array<[string, string]>) : []),
+            ['attempts', attempts.count],
+            ['latest began', latest && when(latest.startedAt)],
+            ['latest ended', latest && (latest.ended ? <Ended at={latest.endedAt} how={`${latest.ended} · ${latest.reason ?? 'no reason given'}`} /> : isLive(state) ? 'still running' : null)],
+            // Only with an end on the record: one from before the engine kept it says how, and not when.
+            ['latest took', latest?.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : null],
+            // What its current try consumed, in `wf decide`'s words: `not measured` where nobody counted, never 0. A dash for a step not filed.
+            ['used', step.used?.used],
+            ['cost', step.used?.cost],
+            // What its sessions read, by price, where anything measured it: the peak and a rebuilt cache marked.
+            ...readRows(step.used),
+            // What every try has cost together, and of its cap where it has one: `$4.25 of $3`, red once past it.
+            ...spentRows(step),
+            ['branch', code(step.branch)],
+            ['task', code(step.taskId)],
+          ]}
+        />
+      )}
       {tries.length > 1 && <Rounds tries={tries} selected={selected.try} onSelect={onSelect} />}
       {step.check && <Check check={step.check} />}
       {spec ? (

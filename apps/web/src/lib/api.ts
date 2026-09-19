@@ -48,7 +48,11 @@ export type RunSummary = {
  * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it. The board runs neither.
  */
 export type RunToDecide =
-  | { kind: 'approve'; step: string; says: string | null; said: string; command: string }
+  /**
+   * `back` are the steps a send-back goes to (`sendBackTo`): the step itself once it has a task, the work an ending waits on before it
+   * is filed. `onto` is the base branch the run's result is on its way to. What the Factory's card answers the gate with, off the list.
+   */
+  | { kind: 'approve'; step: string; says: string | null; back: string[]; onto: string; said: string; command: string }
   | { kind: 'git'; branches: string[]; said: string; command: string };
 
 /**
@@ -391,7 +395,13 @@ export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once m
  * `--shortstat`); `stat` is null where git said nothing of it.
  */
 export type Standing = ({ branch: string; where: 'on' } | { branch: string; where: 'ahead'; commits: number } | { branch: string; where: 'gone' })
-  & { said: string; stat: string | null };
+  & { said: string; stat: string | null; merge: StandingMerge | null };
+
+/**
+ * Mirrors `StandingMerge` in apps/api/src/app.ts: whether a branch ahead of the base still merges onto it as the base is now, as git's
+ * `merge-tree` answers it — clean, the files it conflicts in, or why git could not say — and that in words. Null for a branch not ahead.
+ */
+export type StandingMerge = ({ clean: true } | { clean: false; conflicts: string[] } | { error: string }) & { said: string };
 
 /** Mirrors `Decidable` in apps/api/src/app.ts. */
 export type Decidable = {

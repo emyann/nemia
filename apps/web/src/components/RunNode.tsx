@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
@@ -5,12 +6,15 @@ import { ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { decisionQuery, type RunSummary } from '@/lib/api';
-import { needLine, needsOf } from '@/lib/asks';
+import { needLine, needsOf, stepAnchor } from '@/lib/asks';
 import { duration } from '@/lib/canvas';
 import { spentTitle } from '@/lib/cost';
 import { decisionStamp, isDecidable, touchedSummary } from '@/lib/decide';
 import { repoName, titleOf, toDecideOf, waitsOnYou } from '@/lib/factory';
+import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
+import { RouteLink } from './AgentParts';
+import { CardGate, type Taken } from './CardGate';
 import { StatusChip } from './StatusChip';
 
 /**
@@ -40,8 +44,19 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
   const now = useNow(finished ? 30_000 : 1_000);
   const cancelled = run.cancelledAt !== null;
   const title = titleOf(run);
-  const needs = needsOf(run);
   const decide = toDecideOf(run);
+  // The gate the card answers, and the needs besides it: the gate's own `approve <step>` is its line, not a need said twice.
+  const gate = gateOfSummary(run);
+  const needs = needsOf(run).filter((need) => !(need.kind === 'approve' && need.step === gate?.step));
+  // What the card said when a person answered its gate: through the state the answer was given in and the one it moved the run to (the
+  // step approved, or the try asked), until the run moves on from that — the tick filing it — or back, the answer taken back.
+  const stamp = run.steps.map((step) => `${step.name}:${step.status}`).join('|');
+  const [taken, setTaken] = useState<Taken | null>(null);
+  useEffect(() => {
+    if (!taken || stamp === taken.stamp || stamp === taken.next) return;
+    setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
+  }, [stamp, taken]);
+  const said = taken && (stamp === (taken.next ?? taken.stamp)) ? taken.said : null;
   const since = duration(now - Date.parse(run.createdAt));
 
   return (
@@ -105,32 +120,55 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
         ))}
       </ul>
 
-      {/* What a person has to know to act: a step's question, its approval at its gate, or a session the harness blocked. Two lines each, whole on hover. */}
+      {/* What a person has to know to act: a step's question, or a session the harness blocked. Two lines each, whole on hover, each a link
+          to its step on the run's page, where it is answered. */}
       {needs.length > 0 && (
         <ul aria-label="Needs" className="space-y-0.5 px-3 text-[11px]">
           {needs.map((need) => (
-            <li
-              key={need.step}
-              data-need={need.kind}
-              data-step={need.step}
-              title={needLine(need)}
-              className={`line-clamp-2 break-words ${need.kind === 'harness' ? 'text-orange-800 dark:text-orange-300' : 'text-amber-800 dark:text-amber-300'}`}
-            >
-              {needLine(need)}
+            <li key={need.step} title={needLine(need)} className="line-clamp-2 break-words">
+              <RouteLink
+                to="/runs/$runId"
+                params={{ runId: run.id }}
+                hash={stepAnchor(need.step)}
+                data-need={need.kind}
+                data-step={need.step}
+                className={`nodrag hover:underline ${need.kind === 'harness' ? 'text-orange-800 dark:text-orange-300' : 'text-amber-800 dark:text-amber-300'}`}
+              >
+                {needLine(need)}
+              </RouteLink>
             </li>
           ))}
         </ul>
       )}
 
-      {/* What a person has to decide about the result, in `wf ls`'s own words (`toDecideWords`): the ending step's gate, with the command
-          that approves it, or a branch nobody has merged. Two lines, whole on hover; the step's own `approve <step>` is not said twice. */}
-      {decide && (
-        <p
-          data-to-decide={decide.kind}
-          title={decide.said}
-          className="line-clamp-2 px-3 text-[11px] break-words text-emerald-800 dark:text-emerald-300"
-        >
-          to decide: {decide.said}
+      {/* A gate, answered here: what approving does and where a send-back goes, and Approve and Send back. Once answered, what happened and
+          what comes next, until the run moves. */}
+      {said ? (
+        <p data-taken className="px-3 text-[11px] break-words text-emerald-800 dark:text-emerald-300">
+          {said}
+        </p>
+      ) : gate ? (
+        <CardGate
+          runId={run.id}
+          gate={gate}
+          title={decide?.kind === 'approve' && decide.step === gate.step ? decide.said : `approve ${gate.step}`}
+          stamp={stamp}
+          onTaken={setTaken}
+        />
+      ) : null}
+
+      {/* A result nobody decided: said in a line that fits, whole on hover in `wf ls`'s words, decided on the run's page. */}
+      {decide?.kind === 'git' && !cancelled && (
+        <p title={decide.said} className="line-clamp-2 px-3 text-[11px] break-words">
+          <RouteLink
+            to="/runs/$runId"
+            params={{ runId: run.id }}
+            hash="decide"
+            data-to-decide="git"
+            className="nodrag text-emerald-800 hover:underline dark:text-emerald-300"
+          >
+            {decideLine(decide.branches)}
+          </RouteLink>
         </p>
       )}
 

@@ -816,9 +816,16 @@ test("the inspector's Details say what a step used and what it cost beside its a
   const measured = { ...run.steps[0]!, used: { usage: { turns: 12, costUsd: 0.004 }, used: '12 turns · tool calls not measured · tokens in not measured · tokens out not measured', cost: '$0.004' } };
   const said = Object.fromEntries(rows(measured));
   assert.deepEqual([said.used, said.cost], ['12 turns · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004']);
-  // A step not filed consumed nothing: a dash, not a count.
-  const unfiled = Object.fromEntries(rows({ ...run.steps[0]!, taskId: null, used: null }));
-  assert.deepEqual([unfiled.used, unfiled.cost], ['—', '—']);
+  // A step not filed has run nothing: said once, never a table of dashes — and what its spec says still below (none, on this fixture).
+  const unfiledStep = { ...run.steps[0]!, taskId: null, used: null };
+  const unfiled = Object.fromEntries(rows(unfiledStep));
+  assert.deepEqual([unfiled.attempts, unfiled.used, unfiled.cost, unfiled.task], [undefined, undefined, undefined, undefined]);
+  const html = renderToStaticMarkup(createElement(StepInspector, { run, step: unfiledStep, onClose: () => {} }));
+  assert.match(html, /<p data-unfiled="true"[^>]*>not filed yet<\/p>/);
+  assert.match(html, /data-unfiled="true"[^>]*>not filed yet<\/p><p[^>]*>No spec:/);
+  // At its gate: said so (the brief above it, which reads the run's decision, is the e2e's: waiting on nobody here draws none).
+  const gated = renderToStaticMarkup(createElement(StepInspector, { run: { ...run, waitingOnYou: [] }, step: { ...unfiledStep, approve: 'approve implement' }, onClose: () => {} }));
+  assert.match(gated, /<p data-unfiled="true"[^>]*>not filed yet: it waits at its gate<\/p>/);
 });
 
 // ─── what each round did, what a step runs with, and its files ──────────────
@@ -1185,7 +1192,12 @@ test("a step at its gate is a human gate on the canvas, and its node says what i
   assert.match(html, /data-state="awaiting-approval"/);
   const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
   assert.ok(footer, html);
-  assert.equal(footer[2], '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review</span>');
+  // What approving does, in a line that names the step as `wf ls` does: a step that ran hands on; an ending not filed runs.
+  assert.equal(footer[2], '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review&#x27;s hand-off</span>');
+  const spec = { ...(atGate().steps[0]!.spec ?? {}), workspace: 'main' } as RunDetail['steps'][number]['spec'];
+  const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } as RunDetail['steps'][number]['attempts'] }));
+  assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/);
+  assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no attempt yet`');
   assert.doesNotMatch(html, /running now/, 'no spinner: nobody runs a step at its gate');
   assert.equal(gateDrawn(nodeMarkup(atGate({ approve: null }, { waitingOnYou: [], onYou: [], cancelledAt: at }))), false);
 });

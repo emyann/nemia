@@ -29,6 +29,7 @@ process.env.PATH = `${bin}${path.delimiter}${process.env.PATH}`;
 const gitCount = () => (fs.existsSync(gitCalls) ? fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).length : 0);
 
 const { app } = await import('../src/app.ts');
+const { mergesOnto } = await import('../src/merge.ts');
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', ...args], { cwd: repo, encoding: 'utf8' });
@@ -96,12 +97,12 @@ function writeRun(run: { id: string; repo: string; baseRef: string } & Record<st
 }
 
 const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as {
-  status: string; waitingOnYou: string[]; onYou: string[]; toDecide: { kind: string; step?: string; says?: string | null; branches?: string[]; said: string; command: string } | null;
+  status: string; waitingOnYou: string[]; onYou: string[]; toDecide: { kind: string; step?: string; says?: string | null; back?: string[]; onto?: string; branches?: string[]; said: string; command: string } | null;
   steps: Array<{ name: string; status: string; spec: { workspace: string | null } | null }>;
 };
 const listedOf = async (id: string) => ((await (await app.request('/api/runs')).json()) as Array<{ id: string }>).find((r) => r.id === id) as Awaited<ReturnType<typeof detailOf>>;
 const decisionOf = async (id: string) => (await (await app.request(`/api/runs/${id}/decision`)).json()) as {
-  standings?: Array<{ branch: string; where: string; commits?: number; said: string; stat: string | null }>;
+  standings?: Array<{ branch: string; where: string; commits?: number; said: string; stat: string | null; merge: Record<string, unknown> | null }>;
   commands?: Array<{ label: string; command: string }>;
   nothing?: string;
   running?: true;
@@ -127,6 +128,8 @@ test("a run at its ending's gate: `to decide` says what the ending would do and 
   // The ending has not run, so what there is to decide is what it would do, in the folder's own first line — and the command that runs it.
   assert.deepEqual(detail.toDecide, {
     kind: 'approve', step: 'ship', says: SHIPS,
+    // What the card answers it with: a send-back goes to the work, which ship waits on (`sendBackTo`), and the result is on its way to main.
+    back: ['implement'], onto: 'main',
     said: `${SHIPS} — wf approve ${id} ship`,
     command: `wf approve ${id} ship`,
   });
@@ -144,6 +147,34 @@ test("the decision of a run at its ending's gate offers the approval and the sen
   // The result it would act on is the work's branch, not the ending step's own — which has none, working in the repository's checkout
   // (`resultSteps`). Read for the facts under the run, whatever the list is spared.
   assert.deepEqual(standings?.map((b) => [b.branch, b.where]), [['wf/r-ending/implement', 'ahead']]);
+});
+
+test("whether the result still merges onto the base, as the base is now: clean, then the file it conflicts in once main has moved under it — and read on the decision, never on the list", async () => {
+  const id = 'r-ending';
+  const clean = await decisionOf(id);
+  assert.deepEqual(clean.standings?.map((s) => s.merge), [{ clean: true, said: 'merges cleanly onto main' }]);
+
+  // main moves under the branch: the same file, written otherwise. The branch is as it was; what it would find is not.
+  const tip = git(repo, 'rev-parse', 'HEAD').trim();
+  write(path.join(repo, 'src/a.ts'), 'export const a = 2;\n');
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'main writes a.ts too');
+  try {
+    const before = gitCount();
+    await listedOf(id);
+    const listed = fs.readFileSync(gitCalls, 'utf8').split('\n').filter(Boolean).slice(before);
+    assert.deepEqual(listed.filter((call) => call.startsWith('merge-tree')), [], 'the list the Factory polls asks git no merge');
+    const conflicted = await decisionOf(id);
+    assert.deepEqual(conflicted.standings?.map((s) => s.merge), [{ clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' }]);
+    // A trial in git's object store alone: the checkout, its index and main are as they were.
+    assert.equal(git(repo, 'status', '--porcelain'), '');
+    assert.equal(git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main');
+  } finally {
+    git(repo, 'reset', '-q', '--hard', tip);
+  }
+  // And a branch git no longer has is not called clean, nor conflicted: git's own word for why it cannot say.
+  const gone = mergesOnto(repo, 'main', 'wf/no-such-run/implement');
+  assert.ok('error' in gone && /no-such-run/.test(gone.error), JSON.stringify(gone));
 });
 
 test("an ending that waits on several steps offers a send-back to each, and one that waits on nothing offers only the approval — the gate's commands are never empty", async () => {
@@ -211,6 +242,7 @@ test('a finished run whose folder says nothing about shipping: `to decide` is it
   assert.deepEqual(standings, [{
     branch, where: 'ahead', commits: 1, said: `${branch} is ahead of main by 1 commit`,
     stat: '1 file changed, 1 insertion(+)',
+    merge: { clean: true, said: 'merges cleanly onto main' },
   }]);
   // And the commands a person runs by hand, which this folder leaves to them.
   assert.deepEqual(commands?.map((c) => c.label), ['ship it', 'drop it']);

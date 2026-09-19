@@ -1,6 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { RunDetail, WorkflowStepSpec } from '../lib/api';
-import { needOf, needText } from '../lib/asks';
+import { needOf, needText, type Need } from '../lib/asks';
+import { gateNodeLine } from '../lib/gate';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
@@ -84,7 +85,7 @@ export function StepNode({
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-neutral-200 px-3 py-1.5 dark:border-neutral-800">
         <StatusChip status={step.status} runCancelled={runCancelled} note={step.note} />
         <span className="font-mono text-[11px] text-neutral-500 dark:text-neutral-400">
-          {attemptLine(step.attempts, live, now) ?? 'no attempt yet'}
+          {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no attempt yet')}
         </span>
       </div>
 
@@ -105,14 +106,14 @@ export function StepNode({
       */}
       {gate && (
         <p
-          title={need ? needText(need) : undefined}
+          title={need ? nodeNeed(need, step) : undefined}
           className="truncate border-t border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300"
         >
           <span className="font-semibold">waiting on you</span>
           {need && (
             <span data-need={need.kind}>
               {' · '}
-              {needText(need)}
+              {nodeNeed(need, step)}
             </span>
           )}
         </p>
@@ -310,3 +311,10 @@ function BuildingNode({ name, index, lines, spec, build, sourcePosition, targetP
     </div>
   );
 }
+
+/**
+ * What a gate's node says after `waiting on you`: what approving does in a line (`approve ship to run it`, `approve plan's hand-off`), whose
+ * whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
+ */
+const nodeNeed = (need: Need, step: StepNodeData['step']): string =>
+  (need.kind === 'approve' ? gateNodeLine({ step: step.name, ends: step.spec?.workspace === 'main' && step.taskId === null }) : needText(need));

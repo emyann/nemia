@@ -126,6 +126,8 @@ test('a finished run: what its result branch touched, the lesson, the check-affe
   assert.deepEqual(body.standings, [{
     branch, where: 'ahead', commits: 1, said: `${branch} is ahead of main by 1 commit`,
     stat: '4 files changed, 456 insertions(+), 2 deletions(-)',
+    // And whether it still merges onto the base as the base is now: git's `merge-tree`, a merge in the object store alone.
+    merge: { clean: true, said: 'merges cleanly onto main' },
   }]);
 
   // The package and the root, each once, with the files an agent reads and those a check is decided by named.

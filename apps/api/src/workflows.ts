@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
+import { contextText, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -102,10 +102,14 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
  */
 export type WorkflowStepPage = { workflow: string; from: WorkflowSource; dir: string; step: string; body: string; source: string; keys: KeyRow[] };
 
-/** A step's value for `key`, as a row says it: a list joined, a count in digits, `output:` as the file it names, and null for none. */
+/**
+ * A step's value for `key`, as a row says it: a list joined, a count in digits, a context window in the package's one form (`200k`, as
+ * `renderStep` writes it), `output:` as the file it names, and null for none.
+ */
 function keyValue(step: Workflow, key: StepKey): string | null {
   const value = key === 'output' ? step.output?.file : step[key];
   if (value === undefined) return null;
+  if (key === 'context' && typeof value === 'number') return contextText(value);
   if (Array.isArray(value)) return value.length ? value.join(', ') : null;
   return String(value);
 }

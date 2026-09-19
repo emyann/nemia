@@ -152,6 +152,12 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   assert.deepEqual([notes.body, notes.keys], ['Take notes.', rows({})]);
   fs.rmSync(path.join(mine, 'notes.md'));
 
+  // A context window, however the file writes it, in the package's one form — the one `renderStep` writes.
+  write(path.join(mine, 'notes.md'), '---\ncontext: 150000\n---\nTake notes.\n');
+  const windowed: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
+  assert.deepEqual(windowed.keys, rows({ context: '150k' }));
+  fs.rmSync(path.join(mine, 'notes.md'));
+
   assert.deepEqual([filesOf(good), filesOf(mine)], before, 'read, and nothing written');
 });
 

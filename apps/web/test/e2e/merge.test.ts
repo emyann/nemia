@@ -60,10 +60,13 @@ const pageFile = (name: string): string =>
 
 test('two branches that each add a page under pages/, with the same number, merge cleanly, and both are visited', () => {
   const base = Object.fromEntries(fs.readdirSync(PAGES_DIR).map((file) => [`pages/${file}`, fs.readFileSync(path.join(PAGES_DIR, file), 'utf8')]));
-  const { repo, clean, said } = mergeOf(base, { 'pages/250-alpha.ts': pageFile('alpha') }, { 'pages/250-beta.ts': pageFile('beta') });
+  // The number after the last page there is, as two runs would each take it: a page added since does not move the test.
+  const last = pageFiles(PAGES_DIR).at(-1)!;
+  const next = String(Number(last.slice(0, 3)) + 10).padStart(3, '0');
+  const { repo, clean, said } = mergeOf(base, { [`pages/${next}-alpha.ts`]: pageFile('alpha') }, { [`pages/${next}-beta.ts`]: pageFile('beta') });
   assert.ok(clean, `the merge is clean — git said:\n${said}`);
   const merged = pageFiles(path.join(repo, 'pages'));
-  assert.deepEqual(merged.slice(-3), ['240-capabilities.ts', '250-alpha.ts', '250-beta.ts']);
+  assert.deepEqual(merged.slice(-3), [last, `${next}-alpha.ts`, `${next}-beta.ts`]);
   assert.equal(merged.length, Object.keys(base).length + 2);
 });
 

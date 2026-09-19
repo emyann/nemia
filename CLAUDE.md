@@ -42,6 +42,9 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   deletes every build whose playwright is not listed alive in `~/.cache/ms-playwright/.links`, so
   install through the checkout's own `node_modules`, never from an `npx` download. (Learned by the run
   that added the browser, whose install deleted the e2e's builds.)
+- **A test that names the last e2e page fails on the next page added.** `merge.test.ts` wrote `240-capabilities.ts` as the last
+  page and `250` as the number two runs would both take, so the page after it failed `npm run e2e` before a browser opened. It
+  reads both off `pages/` now; a test about the pages reads the pages that exist (learned by the run that added the `outcome` page).
 - **`assert.throws(fn, /^…/)` matches `String(err)`, which starts with `Error: `.** An anchored
   pattern never matches a message; assert on `err.message` (`assert.throws(fn, (e) => /^…/.test(e.message))`).
   Learned by R, whose refusal tests passed for the wrong reason until anchored right.

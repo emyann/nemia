@@ -2,6 +2,7 @@ import { Handle, Position, type Node, type NodeProps } from '@xyflow/react';
 import type { RunDetail, WorkflowStepSpec } from '../lib/api';
 import { needOf, needText } from '../lib/asks';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
+import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
 import { isGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
@@ -160,8 +161,8 @@ const TOOLS_WRITTEN_OUT = 3;
 export const HARNESS_OWN = "harness's own";
 
 /**
- * What a step is set to do beyond what it runs on, as its node lists it: its check, its effort, its tools, its permission mode and
- * its loop. The check, the mode and the loop only when the step sets them; the effort and the tools always, `harness's own` where
+ * What a step is set to do beyond what it runs on, as its node lists it: its check, its effort, its context window, its tools, its
+ * permission mode and its loop. The check, the window, the mode and the loop only when the step sets them; the effort and the tools always, `harness's own` where
  * it sets none — what a session runs with is the thing a person reads a workflow for, and a step that says nothing gets the most.
  * The rest of its keys are on the step's file. A line's `title`, when it has one, is what its value stands for — the tools' names,
  * where the value counts them — and is the value itself otherwise.
@@ -170,6 +171,7 @@ export function specLines(spec: WorkflowStepSpec): Array<[label: string, value: 
   const lines: Array<[string, string, string?]> = [];
   if (spec.check) lines.push(['check', spec.check]);
   lines.push(['effort', spec.effort ?? HARNESS_OWN]);
+  if (spec.context !== null && spec.context !== undefined) lines.push(['context', contextText(spec.context)]);
   if (!spec.tools) lines.push(['tools', HARNESS_OWN]);
   else if (!spec.tools.length) lines.push(['tools', 'none']);
   else {

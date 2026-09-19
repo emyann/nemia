@@ -575,7 +575,7 @@ async function specMarkup(spec: WorkflowStepSpec, build?: { unsaved: boolean; re
 }
 
 const unset: WorkflowStepSpec = {
-  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 
@@ -661,6 +661,11 @@ test('a step with more than three tools counts them on its node, named in the ti
   // The effort a step sets, and the harness's own where it sets none.
   assert.deepEqual(specLines({ ...unset, effort: 'high' }).find(([label]) => label === 'effort'), ['effort', 'high']);
   assert.deepEqual(specLines(unset).find(([label]) => label === 'effort'), ['effort', "harness's own"]);
+  // The context window, under the effort, as the package writes it — and no line where the step sets none, the model's whole window.
+  const lines = specLines({ ...unset, effort: 'high', context: 200_000 });
+  assert.deepEqual(lines.slice(0, 2), [['effort', 'high'], ['context', '200k']]);
+  assert.deepEqual(specLines({ ...unset, context: 123_456 }).find(([label]) => label === 'context'), ['context', '123456']);
+  assert.equal(specLines(unset).some(([label]) => label === 'context'), false);
 
   /** The tools line as drawn: what it shows, and its title. */
   const toolsLine = (html: string) => {
@@ -950,13 +955,13 @@ test("the spec says what a step runs with: the workflow's word where it sets one
       .map((m) => [m[1], textsOf(m[2]!).join(' ')]),
   );
   const ranWith = (rows: Record<string, string>) => [rows.model, rows.effort, rows['permission mode'], rows.tools, rows.deadline, rows['max attempts']];
-  const unset: StepSpec = { harness: 'claude', model: null, effort: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null };
+  const unset: StepSpec = { harness: 'claude', model: null, effort: null, context: null, after: [], resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null };
 
   // Filed as a step that sets none of them is, on a harness the api could not ask: one attempt, the engine's default, and nothing else said.
-  const bare: StepFiled = { model: null, askedModel: null, effort: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, maxAttempts: 1 };
+  const bare: StepFiled = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: null, tools: null, deadlineSeconds: null, maxAttempts: 1 };
   assert.deepEqual(ranWith(rowsOf(unset, bare)), ["harness's own · default", "harness's own · default", "harness's own · default", "harness's own · default", 'no limit · default', '1 · default']);
   const given: StepFiled = {
-    model: 'opus', askedModel: null, effort: 'high', permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600, maxAttempts: 3,
+    model: 'opus', askedModel: null, effort: 'high', contextTokens: null, permissionMode: 'auto', runsIn: { mode: 'auto', by: 'filed' }, tools: ['Read', 'Grep'], deadlineSeconds: 3600, maxAttempts: 3,
   };
   assert.deepEqual(ranWith(rowsOf(unset, given)), ['opus · default', 'high · default', 'auto · default', 'Read, Grep · default', '3600 s · default', '3 · default']);
 
@@ -973,14 +978,22 @@ test("the spec says what a step runs with: the workflow's word where it sets one
   assert.equal(rowsOf(unset, { ...bare, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
 
   // The workflow's words, unmarked; and a try filed on another model than the workflow's says so.
-  const set: StepSpec = { ...unset, model: 'opus', effort: 'high', permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600, maxAttempts: 2 };
+  const set: StepSpec = { ...unset, model: 'opus', effort: 'high', context: 200_000, permissionMode: 'dontAsk', tools: [], deadlineSeconds: 600, maxAttempts: 2 };
   const asSet: StepFiled = {
-    model: 'opus', askedModel: null, effort: 'high', permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600, maxAttempts: 2,
+    model: 'opus', askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: 'dontAsk', runsIn: { mode: 'dontAsk', by: 'filed' }, tools: [], deadlineSeconds: 600, maxAttempts: 2,
   };
   assert.deepEqual(ranWith(rowsOf(set, asSet)), ['opus', 'high', 'dontAsk', 'none', '600 s', '2']);
   assert.doesNotMatch(renderToStaticMarkup(createElement(Facts, { rows: specRows(set, asSet) })), /data-mark/);
   assert.equal(rowsOf(set, { ...asSet, model: 'sonnet' }).model, 'sonnet · this try');
   assert.equal(rowsOf(set, { ...asSet, model: 'sonnet', askedModel: 'sonnet' }).model, 'sonnet · this try');
+
+  // The context window, as the step writes it: the model's whole window where neither the step nor the try has one.
+  assert.equal(rowsOf(unset, bare).context, "model's whole window · default");
+  assert.equal(rowsOf(unset, { ...bare, contextTokens: 200_000 }).context, '200k · default');
+  assert.equal(rowsOf(set, asSet).context, '200k');
+  assert.equal(rowsOf(set, { ...asSet, contextTokens: 150_000 }).context, '150k · this try');
+  assert.equal(rowsOf(set, null).context, '200k');
+  assert.equal(rowsOf(unset, null).context, '—');
 
   // Not filed: the workflow's words, or a dash.
   assert.deepEqual(ranWith(rowsOf(unset, null)), ['—', '—', '—', '—', '—', '—']);

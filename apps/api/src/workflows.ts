@@ -35,6 +35,8 @@ export type WorkflowStepSpec = {
   harness: string | null;
   model: string | null;
   effort: string | null;
+  /** The session's context window, in tokens (`context:`, written `200k`, read into the number): null for the model's whole window. */
+  context: number | null;
   after: string[];
   resume: string | null;
   input: string[];
@@ -173,6 +175,7 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
   harness: step.harness ?? null,
   model: step.model ?? null,
   effort: step.effort ?? null,
+  context: step.context ?? null,
   after: step.after,
   resume: step.resume ?? null,
   input: step.input ?? [],

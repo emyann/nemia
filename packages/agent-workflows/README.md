@@ -113,7 +113,7 @@ The run's record is keyed in that order, and `wf ls`, `wf decide` and the board 
 keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf decide`; one whose order already runs forward
 reads as it was written.
 
-A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `harness`, `model`, `effort`,
+A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `harness`, `model`, `effort`, `context`,
 `permissionMode`, `tools`, `disallow`, `remote`, `deadlineSeconds`, `maxAttempts`, `budget`, `check`, `retries`, `gate`, `output`, `loop`,
 `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow.ts`). `guide` is refused with a reason of its own.
@@ -162,6 +162,30 @@ not know, and runs at its default.
 
 Both go to the engine on every filing of the step: the first, each try and each round. Without them, the
 step has the harness's own tools at its own effort.
+
+### How much a session keeps in mind: `context:`
+
+```md
+---
+# Compact past about 200k tokens rather than read the whole conversation again on every call.
+context: 200k
+---
+```
+
+`context:` is the session's context window, in tokens, written as a person writes it — `200k`, `150000`, `1M` — and
+read once into the number, which the engine is handed as `contextTokens` and Claude Code as `--autocompact`. Past about
+the window the session compacts its conversation, a summary in place of what it read, and carries on; without the line it
+runs on the model's whole window, and a long session reads everything it ever read again on every call. `renderStep`
+writes it back in one canonical form, not as it was written: thousands with `k` (`150000` is `150k`, `1M` is `1000k`),
+and digits for a number that is not a whole thousand. Refused at load: a value that is not a number of tokens (`200 k`,
+`1.5M`, `200,000`); one outside what the harness takes, 100k to 1000k on Claude Code — and a bare `200`, which Claude
+Code's own flag would read as thousands, is refused saying to write `200k`; and any `context:` on codex, whose `codex
+exec` has no such knob. The range is a copy of the engine's `CLAUDE_CONTEXT_TOKENS`, held to it by
+`test/vocabulary.test.ts`.
+
+It goes to the engine on every filing of the step, as `effort:` does. A window small enough that one turn's reads refill
+it stops the session: Claude Code says the autocompact is thrashing, and the session waits, `blocked` (agent-engine's open
+issue 26, measured on a 100k window with 22k-token reads).
 
 ### What a step may not have: `disallow:`
 

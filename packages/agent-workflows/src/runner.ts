@@ -1755,6 +1755,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // after a `--model` try continues that session as it cached it.
         model: r.mode === 'fresh' ? r.model ?? step.model : sessionModel(step, record),
         effort: step.effort,
+        contextTokens: step.context,
         permissionMode: step.permissionMode,
         // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
         tools: step.tools,
@@ -1807,6 +1808,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // The model the session it continues runs on: a `wf retry --model` within the round before is kept (`sessionModel`).
         model: sessionModel(target, record),
         effort: target.effort,
+        contextTokens: target.context,
         permissionMode: target.permissionMode,
         tools: target.tools,
         disallowedTools: target.disallow,
@@ -1903,6 +1905,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       harness: step.harness,
       model: step.model,
       effort: step.effort,
+      // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on.
+      contextTokens: step.context,
       // Left to the engine's default (`auto`) unless the step says otherwise: a workflow runs
       // unattended by definition, and a mode that prompts is a mode that stalls.
       permissionMode: step.permissionMode,

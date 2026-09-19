@@ -1,6 +1,6 @@
 import { useId, useState, type ReactNode } from 'react';
 import type { KeyField, KeyForm, WorkflowStepSpec } from '../lib/api';
-import { listOf, numberOf, removeStep, setBody, setKey, setSchema, type DraftStep } from '../lib/builder';
+import { contextText, listOf, numberOf, removeStep, setBody, setKey, setSchema, tokensOf, type DraftStep } from '../lib/builder';
 import { Markdown } from './Markdown';
 
 /** A change to the whole draft, made in one step so a key and what comes with it land together. */
@@ -175,6 +175,21 @@ function KeyInput({ field, step, others, form, schemas, update }: {
         />
       );
       break;
+    case 'tokens': {
+      // Written as a person writes it, `200k`, and put in the draft as the number; a word it cannot read is left unset.
+      const tokens = value as number | null;
+      control = (
+        <Typed
+          id={id}
+          mono
+          value={tokens === null ? '' : contextText(tokens)}
+          placeholder="the model's whole window"
+          canon={(typed) => { const n = tokensOf(typed); return n === null ? '' : contextText(n); }}
+          commit={(typed) => set(key, tokensOf(typed) as never)}
+        />
+      );
+      break;
+    }
     case 'flag':
       control = (field.choices ?? []).length === 1 ? (
         <label className="flex items-center gap-1.5 text-xs">

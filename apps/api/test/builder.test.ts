@@ -89,7 +89,7 @@ const post = (body: unknown, from = 'yours', headers: Record<string, string> = j
 
 /** A spec with every key unset but `fields`, as the listing has one. */
 const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, after: [], resume: null, input: [], workspace: null, slot: null, permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, permissionMode: null, tools: null, disallow: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -164,6 +164,12 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
   assert.equal(saved.workflow.description, 'Plan, build, review.');
   assert.deepEqual(saved.workflow, listWorkflows(repo, root).find((w) => w.name === 'drawn'), 'answered as the listing reads it');
 
+  // A context window, sent as its tokens, is written in the package's one form, and listed back as the number.
+  const windowed = await put('drawn', { steps: [plan, { ...build, spec: { ...build.spec, retries: 1, context: 150_000 } }, review] });
+  assert.equal(windowed.status, 200, await windowed.clone().text());
+  assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^context: 150k$/m);
+  assert.equal((await windowed.json() as WorkflowSaved).workflow.steps.find((s) => s.name === 'build')?.spec.context, 150_000);
+
   // An edge deleted takes its key; a step gone takes its file. A key the listing leaves out is unset.
   const gone = await put('drawn', { steps: [plan, { name: 'build', spec: { check: 'npm test' }, body: 'Build it.' }] });
   assert.equal(gone.status, 200, await gone.clone().text());
@@ -188,6 +194,8 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
     ["a name that is not a file's", [plan, { ...build, name: 'build/it' }], ['build/it']],
     ['a name twice', [plan, build, { ...build }], ['build']],
     ['no tools', [plan, { ...build, spec: { ...build.spec, tools: [] } }], ['build']],
+    ['a context window below what Claude Code takes', [plan, { ...build, spec: { ...build.spec, context: 50_000 } }], ['build']],
+    ['a context window on codex', [plan, { ...build, spec: { ...build.spec, harness: 'codex', context: 200_000 } }], ['build']],
     ['a line break in a check', [plan, { ...build, spec: { ...build.spec, check: 'npm test\nharness: codex' } }], ['build']],
     ['an empty body', [plan, { ...build, body: '  ' }], ['build']],
     ['no steps', [], []],
@@ -268,6 +276,7 @@ test("REFUSED at shipped defaults: a body not in the listing's shape is a 400 na
     [{ steps: [{ ...plan, spec: { after: 'build' } }] }, /step 1 \(plan\)'s `after` is a list of strings, such as \["implement"\], or null for unset, and this request's was "build"\./],
     [{ steps: [{ ...plan, spec: { deadlineSeconds: '5m' } }] }, /`deadlineSeconds` is a number, or null for unset, and this request's was "5m"/],
     [{ steps: [{ ...plan, spec: { budget: '$5' } }] }, /`budget` is a number/],
+    [{ steps: [{ ...plan, spec: { context: '200k' } }] }, /`context` is a number, or null for unset, and this request's was "200k"/],
     [{ steps: [{ ...plan, spec: { remote: 'yes' } }] }, /`remote` is true or false/],
     [{ steps: [{ ...plan, spec: { gate: 'true' } }] }, /`gate` is true or false/],
     [{ steps: [{ ...plan, spec: { output: { file: 'x.json' } } }] }, /`output` is a string, the schema file's name/],

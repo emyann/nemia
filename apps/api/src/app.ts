@@ -176,6 +176,8 @@ export type StepSpec = {
   model: string | null;
   /** How hard the harness is told to think, in its own words. */
   effort: string | null;
+  /** The session's context window, in tokens (`context:`): null for the model's whole window. */
+  context: number | null;
   after: string[];
   /**
    * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's (`workspace: main`): the step that
@@ -209,6 +211,8 @@ export type StepFiled = {
    */
   askedModel: string | null;
   effort: string | null;
+  /** The context window the try was filed with, in tokens (`contextTokens`): null for the model's whole window. */
+  contextTokens: number | null;
   permissionMode: string | null;
   /**
    * The permission mode the session runs in, which the engine files as given and its harness decides (`runsInOf`): the mode filed
@@ -1053,6 +1057,7 @@ const specOf = (step: Workflow): StepSpec => ({
   harness: step.harness ?? null,
   model: step.model ?? null,
   effort: step.effort ?? null,
+  context: step.context ?? null,
   after: step.after,
   workspace: step.workspace ?? null,
   resume: step.resume ?? null,
@@ -1158,11 +1163,12 @@ async function detail(run: Run): Promise<RunDetail> {
 function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null {
   const view = record?.taskId ? views.get(record.taskId) : undefined;
   if (!view || phaseOfView(view) === 'unknown') return null;
-  const { model, effort, permissionMode, tools, deadlineSeconds, maxAttempts } = view.state;
+  const { model, effort, contextTokens, permissionMode, tools, deadlineSeconds, maxAttempts } = view.state;
   return {
     model: model ?? null,
     askedModel: askedModelOf(record),
     effort: effort ?? null,
+    contextTokens: contextTokens ?? null,
     permissionMode: permissionMode ?? null,
     runsIn: runsInOf(view.state),
     tools: tools ?? null,

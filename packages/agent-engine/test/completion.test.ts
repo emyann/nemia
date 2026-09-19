@@ -393,6 +393,20 @@ test('at shipped defaults Claude Code is given neither --tools nor --effort', as
   assert.equal(args.includes('--effort'), false, "no effort: the harness's own");
   assert.equal(args.includes('--max-budget-usd'), false, 'no budget: no cap');
   assert.equal(args.includes('--remote-control'), false, 'no Remote Control: never a default');
+  assert.equal(args.includes('--autocompact'), false, "no window: the model's own");
+});
+
+test('a context window reaches Claude Code as --autocompact and its digits, where no variadic flag can take it and it takes nothing', async () => {
+  // Beside every flag that could swallow or be swallowed: `--tools` and `--disallowedTools` are variadic, `--remote-control`
+  // and `--worktree` take an optional value, and the prompt is last.
+  const args = await argvOf({ contextTokens: 200000, tools: ['Read'], disallowedTools: ['SendMessage'], remoteControl: true, worktree: true, effort: 'high' });
+  const i = args.indexOf('--autocompact');
+  assert.notEqual(i, -1, args.join(' '));
+  assert.equal(args[i + 1], '200000', 'digits, never `200k`, and never below 1000, which the CLI reads as thousands');
+  assert.ok(i > args.indexOf('--permission-mode'), 'after the flag that ends the variadic lists');
+  assert.ok(i < args.indexOf('--worktree'), 'before the optional value that must never meet the prompt');
+  assert.equal(args.at(-1), 'the prompt');
+  assert.equal(args.filter((a) => a === '--autocompact').length, 1);
 });
 
 test('remoteControl reaches Claude Code as --remote-control, and a flag follows it so it cannot take the prompt as its name', async () => {

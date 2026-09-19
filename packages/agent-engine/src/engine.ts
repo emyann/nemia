@@ -41,7 +41,8 @@ export const file = Effect.fn('file')(function* (spec: {
   brief: string; cwd: string; maxAttempts?: number; model?: string; permissionMode?: string;
   harness?: string; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
   worktree?: string | boolean; closeoutSchema?: object; tools?: string[]; disallowedTools?: string[];
-  effort?: string; mcp?: Record<string, McpServer>; budgetUsd?: number; remoteControl?: boolean; priority?: number; id?: string;
+  effort?: string; mcp?: Record<string, McpServer>; budgetUsd?: number; contextTokens?: number;
+  remoteControl?: boolean; priority?: number; id?: string;
 }) {
   const journal = yield* Journal;
   // Long enough that two tasks filed in the same millisecond cannot share a journal file.
@@ -52,7 +53,7 @@ export const file = Effect.fn('file')(function* (spec: {
     harness: spec.harness, deadlineSeconds: spec.deadlineSeconds, resume: spec.resume,
     resumeFrom: spec.resumeFrom, worktree: spec.worktree, closeoutSchema: spec.closeoutSchema,
     tools: spec.tools, disallowedTools: spec.disallowedTools, effort: spec.effort, mcp: spec.mcp, budgetUsd: spec.budgetUsd,
-    remoteControl: spec.remoteControl, priority: spec.priority,
+    contextTokens: spec.contextTokens, remoteControl: spec.remoteControl, priority: spec.priority,
   });
   return id;
 });
@@ -157,7 +158,7 @@ export const step = Effect.fn('step')(function* (
         model: state.model, permissionMode: state.permissionMode, harness: state.harness,
         worktree: state.worktree, closeoutSchema: state.closeoutSchema,
         tools: state.tools, disallowedTools: state.disallowedTools, effort: state.effort, mcp: state.mcp,
-        budgetUsd: state.budgetUsd, remoteControl: state.remoteControl, resumeFrom: attempt?.resumeFrom,
+        budgetUsd: state.budgetUsd, contextTokens: state.contextTokens, remoteControl: state.remoteControl, resumeFrom: attempt?.resumeFrom,
       }).pipe(
         Effect.as(undefined),
         Effect.catchTag('RunnerError', (e) => Effect.succeed(e)),

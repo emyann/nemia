@@ -1881,6 +1881,8 @@ const PAGES: PageSpec[] = [
       await expectVisible(node('review').getByText(good.loop, { exact: true }), `review's node shows its loop and its rounds (${good.loop})`);
       // The effort each runs at, and its tools: what it sets, or its harness's own.
       await expectVisible(node('review').locator('dd', { hasText: new RegExp(`^${good.effort}$`) }), `review's node says the effort it runs at (${good.effort})`);
+      await expectVisible(node('review').locator('dd', { hasText: new RegExp(`^${good.context}$`) }), `review's node says its context window (${good.context})`);
+      await expectCount(node('implement').locator('dt', { hasText: /^context$/ }), 0, 'implement sets no window: its node has no line for one');
       await expectCount(node('implement').getByText("harness's own", { exact: true }), 2, "implement sets neither effort nor tools: its node says both are its harness's own");
       // Chips only: since B5 an edge's path carries `data-state` too, so the count is taken inside the nodes.
       await expectCount(graph.locator('.react-flow__node [data-state]'), 0, 'a step no run has started has no status chip');

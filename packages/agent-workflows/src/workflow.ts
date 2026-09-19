@@ -80,6 +80,13 @@ export type Workflow = {
   model?: string;
   /** How hard the harness should think, in its own words: one of `EFFORTS` for the harness the step runs on. */
   effort?: string;
+  /**
+   * The context window the step's sessions are given, in tokens — written `context: 200k` or `context: 150000`, read once into the
+   * number. Past about it Claude Code compacts the conversation and carries on (`--autocompact`, the engine's `contextTokens`); absent,
+   * a session runs on the model's whole window. Refused outside the range the harness takes (`CONTEXT_WINDOWS`), and on a harness with
+   * no such knob: codex. A step that continues another's session (`resume:`) keeps that session's window (`sessionContext`).
+   */
+  context?: number;
   permissionMode?: string;
   /**
    * The only tools the session may have, in the harness's names — `tools: Read, Grep, Glob, Bash`. Absent: the
@@ -181,7 +188,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'harness', 'model', 'effort', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -207,6 +214,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   harness: 'what runs the session: `claude` (the default), `codex` or `claude-detached`',
   model: "the model the harness runs the session on: the harness's own default when unset",
   effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
+  context: "the session's context window, in tokens — `200k`: past about it Claude Code compacts the conversation and carries on; the model's whole window when unset",
   permissionMode: "the harness's permission mode — on codex, its sandbox — checked against the harness the step runs on",
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
   disallow: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
@@ -284,6 +292,17 @@ export const EFFORTS: Readonly<Record<string, readonly string[]>> = {
   'claude-detached': CLAUDE_EFFORTS,
 };
 
+/**
+ * The context windows each harness takes, in tokens, both ends included: `context:`. Copied from the engine — `CLAUDE_CONTEXT_TOKENS` in
+ * agent-engine's `src/runner.ts`, which `claudeDetached` declares too — for the reason the words above are, and held to it by
+ * `test/vocabulary.test.ts`. A harness not listed has no such knob: `codex exec` runs on its model's own window.
+ */
+const CLAUDE_CONTEXT = { least: 100_000, most: 1_000_000 };
+export const CONTEXT_WINDOWS: Readonly<Record<string, { least: number; most: number }>> = {
+  claude: CLAUDE_CONTEXT,
+  'claude-detached': CLAUDE_CONTEXT,
+};
+
 export class WorkflowError extends Error {
   /** A step that is wrong is its author's to fix, and the message says how. */
   readonly exitCode = 2;
@@ -339,6 +358,7 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
     harness,
     model: meta.model,
     effort: wordOf(name, 'effort', meta.effort, harness),
+    context: contextOf(name, meta.context, harness),
     permissionMode: wordOf(name, 'permissionMode', meta.permissionMode, harness),
     tools: toolsOf(name, meta.tools, harness),
     disallow: disallowOf(name, meta.disallow, harness),
@@ -367,7 +387,8 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow'];
 
 /**
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as
- * `a, b`, a count and a budget as the number, `output:` as the file it names — then the body. The inverse of `parseWorkflow`: a step it
+ * `a, b`, a count and a budget as the number, a context window in its one canonical form (`contextText`: `200k`, however it was written),
+ * `output:` as the file it names — then the body. The inverse of `parseWorkflow`: a step it
  * read renders to a file it reads back as the same step, which `test/workflow.test.ts` holds over every shipped folder. Pure.
  *
  * Unset is `undefined` or `null`, and an empty list where no line says the same (`EMPTY_IS_UNSET`). `rounds:` is written where the step
@@ -404,6 +425,8 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
       refuse(`${step}: \`${key}\` lists \`${split}\`, and a list is split on every comma, so it would be read as ${split.split(',').map((s) => `\`${s.trim()}\``).join(', ')}. A step's name has no comma: give each step an entry of its own.`);
     }
     text = entries.join(', ');
+  } else if (key === 'context' && typeof value === 'number') {
+    text = contextText(value);
   } else if (key === 'output' && typeof value === 'object') {
     // The file it names: the schema is the folder's. An `output` naming no file is written with no value, which the parser refuses.
     text = writtenValue(step, key, (value as { file?: unknown }).file) ?? '';
@@ -608,6 +631,65 @@ function countOf(step: string, key: keyof typeof COUNTS, value: string | undefin
   const unit = key === 'deadlineSeconds' ? /^(\d+)\s*([smh])$/.exec(value) : null;
   const instead = unit ? `\`${key}: ${Math.max(least, Number(unit[1]) * { s: 1, m: 60, h: 3600 }[unit[2] as 's' | 'm' | 'h'])}\`` : `for example \`${key}: ${example}\``;
   return refuse(`${step}: \`${key}: ${value}\` is not a count. \`${key}\` is ${counts}: a whole number ${least ? 'above zero' : 'of zero or more'}, in digits${unit ? ' with no unit' : ''} — ${instead}.`);
+}
+
+const CONTEXT_EXAMPLE = '`context: 200k`, or `context: 150000`';
+
+/**
+ * Tokens as a person writes them — `200k`, `150000`, `1M` — or undefined for anything else: digits, and thousands (`k`) or millions (`m`)
+ * after them, either case. What `context:` takes.
+ */
+export function tokensOf(written: string): number | undefined {
+  const m = /^(\d+)([km])?$/i.exec(written.trim());
+  if (!m) return undefined;
+  const n = Number(m[1]) * (m[2] ? (m[2].toLowerCase() === 'k' ? 1_000 : 1_000_000) : 1);
+  return Number.isSafeInteger(n) && n > 0 ? n : undefined;
+}
+
+/** A context window as `renderStep` writes it, whatever the file said: thousands with `k` when it is a whole number of them, digits otherwise. */
+export const contextText = (tokens: number): string => (Number.isSafeInteger(tokens) && tokens > 0 && tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens));
+
+/**
+ * `context:` as tokens, refused unless a number of them (`tokensOf`) in the range the step's harness takes (`CONTEXT_WINDOWS`), and on a
+ * harness with no such knob. A bare `200` is what Claude Code's own flag reads as thousands, and a person may mean that: the refusal says
+ * so, rather than read it either way.
+ */
+function contextOf(step: string, context: string | undefined, harness: string | undefined): number | undefined {
+  if (context === undefined) return undefined;
+  const named = `${step}: \`context: ${context}\``;
+  const on = harness ?? DEFAULT_HARNESS;
+  const range = CONTEXT_WINDOWS[on];
+  if (!range) {
+    const windowed = HARNESSES.filter((h) => CONTEXT_WINDOWS[h]);
+    return refuse(`${named} sets the session's context window, and ${on} has no such knob: \`codex exec\` runs on its model's own window, whatever the step says. Delete the line, or run the step on ${windowed.join(' or ')}.`);
+  }
+  const tokens = tokensOf(context);
+  if (tokens === undefined) {
+    return refuse(`${named} is not a number of tokens. \`context\` is the session's context window, in tokens: digits, or thousands with \`k\` — for example ${CONTEXT_EXAMPLE}.`);
+  }
+  if (tokens < range.least || tokens > range.most) {
+    const thousands = tokens * 1_000 >= range.least && tokens * 1_000 <= range.most && /^\d+$/.test(context.trim());
+    return refuse(`${named} is ${tokens} tokens, and ${on} takes a window from ${contextText(range.least)} to ${contextText(range.most)} tokens${harness ? '' : ` (there is no \`harness:\` line, so the step runs on ${on})`}.`
+      + (thousands ? ` For ${tokens} thousand, write \`context: ${tokens}k\`.` : ` Give one in that range — ${CONTEXT_EXAMPLE} — or delete the line for the model's whole window.`));
+  }
+  return tokens;
+}
+
+/**
+ * The context window a step's sessions run on: its own, or — for a step that continues another's session (`resume:`) — the window that
+ * session was started with, since Claude Code's resumed copy keeps only the flags it is given, and one given another window would compact
+ * where the session it continues did not. `validate` refuses a `resume:` step whose own `context:` differs; one without the line inherits.
+ */
+export function sessionContext(step: Pick<Workflow, 'name' | 'resume' | 'context'>, steps: readonly Pick<Workflow, 'name' | 'resume' | 'context'>[]): number | undefined {
+  const seen = new Set<string>();
+  let at: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = step;
+  while (at?.resume && !seen.has(at.name)) {
+    seen.add(at.name);
+    const next: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = steps.find((s) => s.name === at!.resume);
+    if (!next) break;
+    at = next;
+  }
+  return at?.context;
 }
 
 const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
@@ -970,6 +1052,11 @@ export function validate(steps: readonly Workflow[]): void {
       // it is a different agent claiming someone else's memory.
       if ((target.harness ?? 'claude') !== (s.harness ?? 'claude')) {
         throw new WorkflowError(`${s.name}: resumes ${target.name}, which runs on a different harness (${target.harness ?? 'claude'})`);
+      }
+      // One window for a session's whole chain: the continuation is filed with the one its session was started with (`sessionContext`).
+      const window = sessionContext(target, steps);
+      if (s.context !== undefined && s.context !== window) {
+        throw new WorkflowError(`${s.name}: \`context: ${contextText(s.context)}\`, and it continues ${target.name}'s session, which runs on ${window === undefined ? "the model's whole window" : `\`context: ${contextText(window)}\``}. A session keeps one window: delete the line, and ${s.name} continues on ${target.name}'s${window === undefined ? '' : `, or give ${target.name} the window you meant for both`}.`);
       }
     }
   }

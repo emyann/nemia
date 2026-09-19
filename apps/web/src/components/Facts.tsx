@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type { RunDetail, StepCheck, StepFiled, StepLog, StepSpec } from '../lib/api';
+import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
 
 /** Label and value, one per row. A value that is not set reads as a dash. */
@@ -27,6 +28,8 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
   ['harness', code(spec.harness)],
   ['model', modelRow(spec.model, filed)],
   ['effort', ranWith(spec.effort, filed, (f) => f.effort)],
+  // The session's context window, as the step writes it — `200k` — and the model's whole window where neither the step nor the try has one.
+  ['context', ranWith(tokensWord(spec.context), filed, (f) => tokensWord(f.contextTokens), "model's whole window")],
   ['after', spec.after.length ? code(spec.after.join(', ')) : null],
   // Only where the step says it: `main`, the repository's own checkout rather than a worktree of the run's. A detail from an api that does
   // not carry the key says nothing, rather than an empty row.
@@ -40,6 +43,7 @@ export const specRows = (spec: StepSpec, filed: StepFiled | null = null): Array<
   ['max attempts', ranWith(spec.maxAttempts === null ? null : String(spec.maxAttempts), filed, (f) => String(f.maxAttempts))],
 ];
 
+const tokensWord = (tokens: number | null | undefined) => (tokens === null || tokens === undefined ? null : contextText(tokens));
 const toolsWord = (tools: string[] | null) => (tools === null ? null : tools.join(', ') || 'none');
 const secondsWord = (seconds: number | null) => (seconds === null ? null : `${seconds} s`);
 

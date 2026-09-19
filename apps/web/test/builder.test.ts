@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
 import {
-  addStep, connect, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, schemasOf, setBody,
-  setKey, setSchema, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
+  addStep, connect, contextText, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, schemasOf, setBody,
+  setKey, setSchema, tokensOf, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
 } from '../src/lib/builder.ts';
 import { COLUMN_WIDTH } from '../src/lib/layout.ts';
 
@@ -135,6 +135,10 @@ test('what is typed into a list or a number field, as the listing has it', () =>
   assert.equal(numberOf(' 900 '), 900);
   assert.equal(numberOf('2.50'), 2.5);
   assert.equal(numberOf('-1'), -1, 'the package refuses it on save, in its words');
+  // A context window, as a person writes it and as the package reads it — `200k`, `150000`, `1M` — and back in the package's one form.
+  for (const [typed, tokens] of [['200k', 200_000], [' 150000 ', 150_000], ['100K', 100_000], ['1M', 1_000_000], ['50k', 50_000]] as const) assert.equal(tokensOf(typed), tokens, typed);
+  for (const typed of ['', 'lots', '200 k', '1.5M', '200,000', '0', '-1']) assert.equal(tokensOf(typed), null, typed);
+  assert.deepEqual([contextText(150_000), contextText(1_000_000), contextText(123_456)], ['150k', '1000k', '123456']);
 });
 
 test("a folder written goes into the page's listing in the listing's order: the repository's, then yours, each by name — once", () => {

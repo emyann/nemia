@@ -14,7 +14,7 @@ export const DEFAULT_ROUNDS = 3;
 
 /** A step that sets nothing, as the listing has one. */
 export const UNSET: Readonly<WorkflowStepSpec> = {
-  harness: null, model: null, effort: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 
@@ -183,6 +183,20 @@ export const schemasOf = (steps: readonly DraftStep[]): SchemaFile[] => steps.fl
 export const listOf = (typed: string): string[] => typed.split(',').map((s) => s.trim()).filter(Boolean);
 
 /** A count or an amount typed into the form, as the listing has it: null for nothing typed, and otherwise the number, which the package judges. */
+/**
+ * Tokens as a person types them — `200k`, `150000`, `1M` — or null for none, or for anything else: the package's `tokensOf`, which the page
+ * cannot import. Whether the harness takes the number is the package's to say when the draft is saved.
+ */
+export function tokensOf(typed: string): number | null {
+  const m = /^(\d+)([km])?$/i.exec(typed.trim());
+  if (!m) return null;
+  const n = Number(m[1]) * (m[2] ? (m[2].toLowerCase() === 'k' ? 1_000 : 1_000_000) : 1);
+  return Number.isSafeInteger(n) && n > 0 ? n : null;
+}
+
+/** A context window as the package's `renderStep` writes it: thousands with `k` when it is a whole number of them, digits otherwise. */
+export const contextText = (tokens: number): string => (tokens % 1_000 === 0 ? `${tokens / 1_000}k` : String(tokens));
+
 export function numberOf(typed: string): number | null {
   if (!typed.trim()) return null;
   const n = Number(typed);

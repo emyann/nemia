@@ -448,6 +448,67 @@ person. The harness's `[structured-output-enforce]` message, seen on a step with
 `the-queue-on-the-board-queue-ppu1`), did get a call; whether a step without a schema is given that enforcement is not
 known.
 
+### 26. A session's context window: `--autocompact` works on `--bg`, and a small one can stall a session
+
+**Measured** (2026-09-19, Claude Code 2.1.278, by hand, `--model sonnet`, about $6 in all). The question was whether a
+cap on a session's context — `claude --autocompact <auto|tokens>`, "Auto-compact window size (auto, or 100k–1M tokens)" —
+does anything to a background session, since workers run on the model's whole window and none of 234 ever compacted
+(repository `docs/pivot-2026-09-18.md` §1, Finding 1).
+
+- **The flag takes effect on `--bg`.** `claude --bg --tools Read,StructuredOutput --permission-mode dontAsk
+  --strict-mcp-config --no-chrome --model sonnet --autocompact 100k --json-schema … "<read eight source files in full>"`
+  compacted three times in two minutes. The environment variable `CLAUDE_CODE_AUTO_COMPACT_WINDOW` was not needed, and was
+  not tried.
+- **The transcript shows it**: a `system` line, `subtype: compact_boundary`, `compactMetadata: { trigger: "auto",
+  preTokens: 83770, postTokens: 17465, durationMs: 36991, … }`, and a `user` line with `isCompactSummary: true` holding the
+  summary ("This session is being continued from a previous conversation that ran out of context…"). The session read on
+  from the next offset each time: nothing it had read was read twice. On a 100k window it compacted at 63,651 to 83,770
+  tokens of context (eight compactions across three sessions), each taking 22 to 42 seconds.
+- **A window too small for what a turn reads stops the session, `blocked`.** Its reads were 800 lines, about 22k tokens
+  each; after the third compaction Claude Code said *"Autocompact is thrashing: the context refilled to the limit within 3
+  turns of the previous compact, 3 times in a row. A file being read or a tool output is likely too large for the context
+  window. Try reading in smaller chunks, or use /clear to start fresh."*, ended the turn, and `claude agents` listed the
+  session `blocked`, idle, unsigned. The engine reads that as waiting on a person (`NEEDS_HUMAN`), and so does a workflow
+  step. It is Claude Code's guard, not a crash: continued, the session carried on.
+- **Continued with the same flag, it carried on and signed off.** Resumed as the engine resumes (`--bg --resume <id>`, every
+  flag given again, so Claude Code starts a copy — *"background session fa75207c keeps its own saved options, so the flags
+  you passed started a copy"*), told to read in 300-line chunks, it compacted once more before its first call, read two
+  more files, and called `StructuredOutput` with an answer that matched the schema. The same brief on `claude -p --output-format
+  json --autocompact 100k`, 500-line reads, compacted five times and ended `subtype: success` with its
+  `structured_output`, for $1.94: `claude -p` takes the flag too.
+- **At 200k, unattended, it compacted twice and signed off.** The first brief again — eight files, 800-line reads, about
+  22k tokens a call — at `--autocompact 200000`, and nothing said to it: it compacted at 173,584 and 173,254 tokens of
+  context (to 15,870 and 12,875, 54 and 59 seconds), read every file, and called `StructuredOutput` with all eight files
+  counted and the right answer to what it had read before either compaction. $2.18; 2,156,626 input tokens, which the fixed
+  reading below counts as the `cost-state` does. So at 200k a session compacts about 27k tokens under its window, and a
+  refill takes seven or eight such reads — the thrash above needs one in three.
+- **The window is not part of the cached prompt.** A small session started with `--autocompact 200000` and resumed three
+  times — with `200000`, with no flag, with `500000` — read 19,721 to 19,990 of about 20k tokens from the cache on each
+  resumed call, and wrote 0 to 269. So a resume reuses the cache whatever window it is given, and a changed window costs
+  nothing there. What it does change: a copy keeps the flags it was started with and no others (its `respawnFlags` in
+  `~/.claude/jobs/<id>/state.json`), so a continuation filed without the flag runs on the model's whole window again. A
+  resume that compacts before its first call rebuilds the cache after the summary, as any compaction does: the resumed copy
+  above read 0 tokens from the cache on its first call.
+- **The engine's usage reading undercounts a compacted attempt's tokens.** The summarising call is an API call that leaves
+  no `assistant` line in the transcript. On the first session, `transcriptUsage` counted 408,348 input and 1,625 output
+  tokens; the `cost-state` Claude Code wrote as it stopped said 601,367 and 13,138 — the difference its three compactions.
+  The control, a session that never compacted, agreed to the token (34,869 and 365). Its `costUsd` was right throughout: it
+  is the `cost-state`'s own. **Fixed**: an attempt whose lines hold a `compact_boundary` takes its tokens from the
+  `cost-state` the way it takes its cost — its own share of the total — and has none while no `cost-state` is written,
+  rather than a count missing its compactions (`transcriptUsage` in `src/runner.ts`). The `claude -p` session's transcript
+  then read 1,327,896 input tokens, what its result's `modelUsage` said.
+
+**What the engine does with it.** A task's `contextTokens` is handed to both Claude runners as `--autocompact <digits>` on
+every attempt, refused at `file()` outside 100000 to 1000000 — the CLI refuses any other value while it parses, so a spawn
+would fail on every pass — and on a harness with no such knob (`codex`, a `HarnessSpec` that declares no `contextTokens`
+range). A window small enough to thrash is the task's author's to avoid: the engine sees only a `blocked` session.
+
+**Not measured.** A window of 200k on real work: what a session loses in the summary, and whether a turn's tool output ever
+refills 200k in three turns — several large reads in parallel in one turn could. The shipped workflows of work give every
+agent step `context: 200k` on the strength of the unattended run above; a step that stalls `blocked` on a thrash is the sign
+to widen it. What the summarising call costs next to the reading it saves. A `claude -p` attempt's tokens across a compaction
+under the engine.
+
 ## Verified live, once
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,

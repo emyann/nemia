@@ -23,7 +23,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { Observed, Sighting, Usage } from './domain.ts';
 import {
-  CLAUDE_POOL, checkoutMcpConfig, claudeMcpArgs, claudeRefuses, claudeTranscriptEvents, claudeTranscriptFile, isoTime, readTranscript, RunnerError,
+  CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, checkoutMcpConfig, claudeMcpArgs, claudeRefuses, claudeTranscriptEvents, claudeTranscriptFile, isoTime, readTranscript, RunnerError,
   worktreeName, writeMcpConfig, type McpServer, type RunnerOps, type SpawnRequest, type TranscriptEvent,
 } from './runner.ts';
 
@@ -81,6 +81,12 @@ export type HarnessSpec = {
    * engine's.
    */
   noChannel?: string;
+  /**
+   * The context windows this harness can be given, in tokens, both ends included: a task's `contextTokens` is handed to
+   * `command`, and `file()` refuses one outside the range. Absent: the harness has no such knob, and `file()` refuses a
+   * task that sets one rather than let it run on a window it did not ask for.
+   */
+  contextTokens?: { least: number; most: number };
 };
 
 /**
@@ -712,6 +718,8 @@ export const claudeDetached: HarnessSpec = {
       ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
       ...(r.model ? ['--model', r.model] : []),
       ...(r.effort ? ['--effort', r.effort] : []),
+      // The context window, as for `claude --bg`: `claude -p` compacts past it and still gives its `structured_output` (2.1.278).
+      ...(r.contextTokens !== undefined ? ['--autocompact', String(r.contextTokens)] : []),
       // The closing statement's shape, as for `claude --bg`; the answer comes back as the result's
       // `structured_output`. It used to be dropped, so a task on this harness never gave a closeout.
       ...(r.closeoutSchema ? ['--json-schema', JSON.stringify(r.closeoutSchema)] : []),
@@ -733,6 +741,7 @@ export const claudeDetached: HarnessSpec = {
     return found ? { checkoutMcpConfig: found } : {};
   },
   refuses: claudeRefuses,
+  contextTokens: CLAUDE_CONTEXT_TOKENS,
   // Claude Code, as `claude --bg` is: one subscription, one ceiling, whatever either harness is called.
   pool: CLAUDE_POOL,
 };

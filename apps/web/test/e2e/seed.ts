@@ -545,6 +545,8 @@ export const WORKFLOWS = {
     tools: 'Read, Grep, Glob, Bash',
     /** The effort review sets; implement sets none, and runs at its harness's own. */
     effort: 'high',
+    /** The context window review sets, as a step writes it; implement sets none, and its node says nothing of it. */
+    context: '200k',
     /** What implement disallows, which the Capabilities page takes from the set it has. */
     disallow: 'SendMessage',
     loop: 'implement · 3 rounds',
@@ -554,7 +556,7 @@ export const WORKFLOWS = {
       heading: 'How to review',
       items: ['Read the diff against the brief.', 'Run the check yourself.'],
       /** Each key review sets, as the loader reads it: what its page's key table says. */
-      keys: { after: 'implement', harness: 'claude', model: 'opus', effort: 'high', permissionMode: 'dontAsk', tools: 'Read, Grep, Glob, Bash', output: 'review.schema.json', loop: 'implement', rounds: '3' },
+      keys: { after: 'implement', harness: 'claude', model: 'opus', effort: 'high', context: '200k', permissionMode: 'dontAsk', tools: 'Read, Grep, Glob, Bash', output: 'review.schema.json', loop: 'implement', rounds: '3' },
     },
   },
   broken: { name: 'broken', error: 'review: `afer` is not a key a step has.' },
@@ -567,7 +569,7 @@ export function seedWorkflows(repo: string, root: string): void {
   const dev = path.join(repo, 'workflows', good.name);
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
   write(path.join(dev, 'implement.md'), `---\nharness: claude\nmodel: opus\ncheck: ${good.check}\ndisallow: ${good.disallow}\n---\nImplement what was asked.\n`);
-  write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`);
+  write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ncontext: ${good.context}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`);
   write(path.join(dev, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }, null, 2));
   const bad = path.join(repo, 'workflows', broken.name);
   write(path.join(bad, 'README.md'), `# ${broken.name}\n\nA reviewer whose after is misspelt.\n`);

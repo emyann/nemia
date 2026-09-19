@@ -16,7 +16,7 @@ import os from 'node:os';
 import { fold, nameFor, type Event, type ResumePolicy, type Said, type Sighting, type State, type Usage } from './domain.ts';
 import { Journal, type Cursor, type FeedEntry, JournalError } from './journal.ts';
 import {
-  CLAUDE_POOL, claudeBgRefuses, claudeOps, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
+  CLAUDE_CONTEXT_TOKENS, CLAUDE_POOL, claudeBgRefuses, claudeOps, claudeSayRefuses, isTranscriptCursor, mcpRefuses, noTranscript, Runner, RunnerError,
   type McpServer, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor,
 } from './runner.ts';
 import { claudeDetached, codex, detachedOps, type HarnessSpec } from './runner-detached.ts';
@@ -169,6 +169,16 @@ export type TaskSpec = {
    */
   budgetUsd?: number;
   /**
+   * The context window the session is given, in tokens — `200000`. Given to Claude Code as `--autocompact`: past about it
+   * the session compacts its conversation, a summary in place of what it read, and carries on, on `claude --bg` and
+   * `claude -p` alike. Every attempt gets the same window, a continuation included, so a task's session keeps one. Absent:
+   * the harness's own, which is the model's whole window. Refused unless a whole number of tokens in the range the harness
+   * takes (`CLAUDE_CONTEXT_TOKENS`: 100000 to 1000000 on Claude Code), and on a harness with no such knob: `codex`, and a
+   * `HarnessSpec` that declares no `contextTokens` range. A harness brought as a `PromiseRunner` is handed it and asked
+   * nothing. Resource limits' `limits`, for a session's memory. Carried on the task; `decide` never reads it.
+   */
+  contextTokens?: number;
+  /**
    * Bridge the session to claude.ai: Claude Code's `--bg` session is given `--remote-control`, and is listed in the web's
    * agents view, where anyone signed in to the account can drive it — type into it, answer its prompts, stop it — from a
    * browser or a phone. Never a default, for that reason. Refused unless true or false, and `true` on a harness that has no
@@ -201,7 +211,8 @@ export type Engine = {
    * `disallowedTools` that is not a list of permission rules; an
    * `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
    * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists); a
-   * `budgetUsd` that is not dollars above 0, or one its harness would not keep (`claude`, `codex`); a `remoteControl`
+   * `budgetUsd` that is not dollars above 0, or one its harness would not keep (`claude`, `codex`); a `contextTokens` that
+   * is not a whole number of tokens its harness takes, or any on a harness with no context window to set (`codex`); a `remoteControl`
    * that is not true or false, or `true` on a harness with no such flag (any but one brought as `'claude-bg'` or a
    * `PromiseRunner`); a `priority` that is not a finite number.
    * A harness brought as a `PromiseRunner` is asked nothing.
@@ -403,7 +414,22 @@ const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
   if (spec.remoteControl !== undefined && typeof spec.remoteControl !== 'boolean') {
     return `\`remoteControl: ${JSON.stringify(spec.remoteControl)}\` is not true or false. Give true to bridge the session to claude.ai, or leave it out.`;
   }
+  if (spec.contextTokens !== undefined && !(typeof spec.contextTokens === 'number' && Number.isSafeInteger(spec.contextTokens) && spec.contextTokens > 0)) {
+    return `\`contextTokens: ${typeof spec.contextTokens === 'number' ? spec.contextTokens : JSON.stringify(spec.contextTokens)}\` is not a number of tokens. Give a whole number of tokens, like 200000, or leave it out for the harness's own window.`;
+  }
   const h = harnesses[spec.harness]!;
+  // A window the harness has no knob for would be dropped without a word, and one outside its range fails every spawn: Claude
+  // Code refuses it while it parses its arguments. A `PromiseRunner` is the consumer's own, and is handed it.
+  if (spec.contextTokens !== undefined && (h === 'claude-bg' || isSpec(h))) {
+    const range = h === 'claude-bg' ? CLAUDE_CONTEXT_TOKENS : h.contextTokens;
+    if (!range) {
+      const windowed = Object.keys(harnesses).filter((name) => { const o = harnesses[name]!; return o === 'claude-bg' || (isSpec(o) && o.contextTokens); }).map((name) => `\`${name}\``);
+      return `\`contextTokens: ${spec.contextTokens}\` sets the session's context window, and the \`${spec.harness}\` harness has no such knob: it would run on its own window, whatever the task says. ${windowed.length ? `File the task on ${windowed.join(' or ')}, whose sessions compact past it, or leave \`contextTokens\` off.` : "Leave `contextTokens` off: none of this engine's harnesses sets a session's window."}`;
+    }
+    if (spec.contextTokens < range.least || spec.contextTokens > range.most) {
+      return `\`contextTokens: ${spec.contextTokens}\` is outside the windows the \`${spec.harness}\` harness takes, and it would refuse the session at every spawn. Give a whole number of tokens from ${range.least} to ${range.most}, or leave it out for the harness's own window.`;
+    }
+  }
   // Only Claude Code's background sessions are bridged. A spec's harness runs a prompt and exits — `claude -p` among them,
   // whose help offers Remote Control only to an interactive session — so the flag would be dropped without a word.
   if (spec.remoteControl && isSpec(h)) {

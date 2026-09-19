@@ -90,7 +90,7 @@ const firstTry = (step: { taskId: string | null; status: string; attempts: objec
 }];
 
 /** The engine's record of a task `filed` journals: a codex task with one attempt allowed, and nothing else said — which Codex runs in `workspace-write`. */
-const filedBare = { model: null, askedModel: null, effort: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, tools: null, deadlineSeconds: null, maxAttempts: 1 };
+const filedBare = { model: null, askedModel: null, effort: null, contextTokens: null, permissionMode: null, runsIn: { mode: 'workspace-write', by: 'default' }, tools: null, deadlineSeconds: null, maxAttempts: 1 };
 
 /** A run as GET /api/runs lists it. */
 const listed = async (id: string) =>
@@ -191,7 +191,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   };
   assert.deepEqual(implement, {
     name: 'implement',
-    spec: { harness: 'codex', model: 'gpt-5', effort: null, after: [], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: 600, maxAttempts: null, loop: null, rounds: null },
+    spec: { harness: 'codex', model: 'gpt-5', effort: null, context: null, after: [], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: 600, maxAttempts: null, loop: null, rounds: null },
     // The engine's record, not the folder's words: this journal was written with none of them.
     filed: filedBare,
     body: 'Implement the thing.',
@@ -212,7 +212,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   const reviewTry = { taskId: null, status: 'waiting', check: null, closeout: null, attempts: { count: 0, latest: null } };
   assert.deepEqual({ ...review, told: undefined }, {
     name: 'review',
-    spec: { harness: null, model: null, effort: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: 2, loop: null, rounds: null },
+    spec: { harness: null, model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: 2, loop: null, rounds: null },
     // Not filed: the engine has filed it with nothing yet.
     filed: null,
     body: 'Review what implement did.',
@@ -372,8 +372,8 @@ const frozenLoop = [
 ];
 
 const frozenSpecs = {
-  implement: { harness: 'claude', model: 'opus', effort: null, after: [], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null },
-  review: { harness: 'codex', model: null, effort: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 2 },
+  implement: { harness: 'claude', model: 'opus', effort: null, context: null, after: [], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null },
+  review: { harness: 'codex', model: null, effort: null, context: null, after: ['implement'], workspace: null, resume: null, permissionMode: null, tools: null, deadlineSeconds: null, maxAttempts: null, loop: 'implement', rounds: 2 },
 };
 
 const frozenGraph = {
@@ -1077,23 +1077,23 @@ test('a step on its third try, in the second round of its loop, carries every tr
   assert.equal(review.status, 'unverified · done');
 });
 
-test('a step says what it runs with: the workflow\'s effort and tools, and what the engine filed its try with where the workflow says nothing', async () => {
-  // Filed as the tick files a step — with its effort and tools — and, as a step that sets neither, with no deadline and no max attempts.
-  await engine().file({ id: 'r-51-implement', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', effort: 'high', tools: ['Read', 'Grep'] });
+test('a step says what it runs with: the workflow\'s effort, context window and tools, and what the engine filed its try with where the workflow says nothing', async () => {
+  // Filed as the tick files a step — with its effort, window and tools — and, as a step that sets neither, with no deadline and no max attempts.
+  await engine().file({ id: 'r-51-implement', brief: 'Implement it.', cwd: '/code/app', harness: 'claude', effort: 'high', contextTokens: 200_000, tools: ['Read', 'Grep'] });
   writeRun({
     ...r2, id: 'r-51', workflowDir: gone,
-    workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude', effort: 'high', tools: ['Read', 'Grep'] }, { name: 'review', after: ['implement'], body: 'Review it.' }],
+    workflow: [{ name: 'implement', after: [], body: 'Implement it.', harness: 'claude', effort: 'high', context: 200_000, tools: ['Read', 'Grep'] }, { name: 'review', after: ['implement'], body: 'Review it.' }],
     steps: { implement: { taskId: 'r-51-implement' }, review: { taskId: null } },
   });
 
   const [implement, review] = (await (await app.request('/api/runs/r-51')).json()).steps;
   assert.deepEqual(implement.spec, {
-    harness: 'claude', model: null, effort: 'high', after: [], workspace: null, resume: null, permissionMode: null, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null,
+    harness: 'claude', model: null, effort: 'high', context: 200_000, after: [], workspace: null, resume: null, permissionMode: null, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: null, loop: null, rounds: null,
   });
   // The engine's defaults, off its journal: one attempt, no deadline — which is no limit — and no model, which is the harness's; and the
   // mode Claude Code runs a task filed with none in, `auto`, which is not Claude Code's own.
   assert.deepEqual(implement.filed, {
-    model: null, askedModel: null, effort: 'high', permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: 1,
+    model: null, askedModel: null, effort: 'high', contextTokens: 200_000, permissionMode: null, runsIn: { mode: 'auto', by: 'default' }, tools: ['Read', 'Grep'], deadlineSeconds: null, maxAttempts: 1,
   });
   // Not filed: nothing the engine could say.
   assert.equal(review.filed, null);

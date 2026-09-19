@@ -117,6 +117,8 @@ export type StepSpec = {
   harness: string | null;
   model: string | null;
   effort: string | null;
+  /** The session's context window, in tokens (`context:`): null for the model's whole window. */
+  context: number | null;
   after: string[];
   /**
    * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's: the step that ends the run, whose
@@ -153,6 +155,8 @@ export type StepFiled = {
   model: string | null;
   askedModel: string | null;
   effort: string | null;
+  /** The context window the try was filed with, in tokens: null for the model's whole window. */
+  contextTokens: number | null;
   permissionMode: string | null;
   runsIn: { mode: string; by: 'filed' | 'default' | 'tools' } | null;
   tools: string[] | null;
@@ -590,6 +594,8 @@ export type WorkflowStepSpec = {
   harness: string | null;
   model: string | null;
   effort: string | null;
+  /** The session's context window, in tokens (`context:`, written `200k`): null for the model's whole window. */
+  context: number | null;
   after: string[];
   resume: string | null;
   input: string[];
@@ -661,7 +667,7 @@ export const stepQuery = (from: string, workflow: string, step: string) =>
   });
 
 /** Mirrors `KeyKind` in apps/api/src/builder.ts: how a key is set on a step's form. */
-export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'flag' | 'schema';
+export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
 
 /** Mirrors `KeyField` in apps/api/src/builder.ts: one key of a step's form, its line of meaning, how it is set, and the words it may take. */
 export type KeyField = {

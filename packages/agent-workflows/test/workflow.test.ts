@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
-import { parseFolder, renderStep, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
+import { parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -330,7 +330,7 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 test('every key a step has is read — none is accepted and then dropped', () => {
   // Every key but `workspace:`, which no step may set beside a `check:`, and `slot:`, which is a workflow of one step's: both are read below.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot'>, string> = {
-    after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
+    after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '150000', permissionMode: 'dontAsk',
     tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
   };
@@ -350,6 +350,7 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(w.gate, true);
   assert.equal(w.remote, true);
   assert.deepEqual([w.effort, w.tools, w.disallow], ['xhigh', ['Read', 'Grep', 'Glob', 'Bash'], ['Bash(npm run build)', 'SendMessage']]);
+  assert.equal(w.context, 150000);
 });
 
 /** A table of one line of meaning per key, as the board lays a file's keys out: why `meanings` is not one, or null. */
@@ -379,7 +380,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, slot, harness, model, effort, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, harness, model, effort, context, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -415,6 +416,56 @@ test('tools: is the list of names the harness is given, one name per entry, trim
   assert.deepEqual(fm('look', 'tools: mcp__playwright__browser_take_screenshot').tools, ['mcp__playwright__browser_take_screenshot']);
   const bare = fm('implement', 'harness: claude');
   assert.deepEqual([bare.tools, bare.effort], [undefined, undefined], "absent: the harness's own set, at its own effort");
+});
+
+test('context: is read once into tokens — thousands with `k`, millions with `m`, or digits — on both Claude harnesses, and absent is unset', () => {
+  for (const [written, tokens] of [['200k', 200_000], ['150000', 150_000], ['100K', 100_000], ['1M', 1_000_000], ['1000k', 1_000_000], ['123456', 123_456]] as const) {
+    assert.equal(fm('implement', `context: ${written}`).context, tokens, written);
+  }
+  assert.equal(fm('x', 'harness: claude-detached\ncontext: 300k').context, 300_000);
+  assert.equal(fm('implement', 'harness: claude').context, undefined, "absent: the model's whole window");
+});
+
+test('`renderStep` writes a context window in one canonical form, whatever the file said: thousands with `k`, or digits', () => {
+  for (const [written, rendered] of [['150000', '150k'], ['200K', '200k'], ['1M', '1000k'], ['123456', '123456']] as const) {
+    const step = fm('implement', `context: ${written}`);
+    const text = renderStep(step);
+    assert.match(text, new RegExp(`^context: ${rendered}$`, 'm'), written);
+    assert.deepEqual(parseWorkflow('implement', text), step, 'and it reads back as the same step');
+  }
+});
+
+test('REFUSED: a context: that is not a number of tokens, one outside what the harness takes, and any on codex — by name, saying what to write', () => {
+  for (const bad of ['lots', '200 k', '1.5M', '200,000', '0', '-1', '200kb', '0k']) {
+    assert.throws(() => fm('implement', `context: ${bad}`),
+      refusedWith(new RegExp(`^implement: \`context: ${bad.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\` is not a number of tokens\. \`context\` is the session's context window, in tokens: digits, or thousands with \`k\` — for example \`context: 200k\`, or \`context: 150000\`\.$`)), bad);
+  }
+  assert.throws(() => fm('implement', 'context: 50k'),
+    refusedWith(/^implement: `context: 50k` is 50000 tokens, and claude takes a window from 100k to 1000k tokens \(there is no `harness:` line, so the step runs on claude\)\. Give one in that range — `context: 200k`, or `context: 150000` — or delete the line for the model's whole window\.$/));
+  assert.throws(() => fm('implement', 'harness: claude-detached\ncontext: 2M'), refusedWith(/`context: 2M` is 2000000 tokens, and claude-detached takes a window from 100k to 1000k tokens\. Give one/));
+  assert.throws(() => fm('implement', 'context: 99999'), refusedWith(/is 99999 tokens, and claude takes/));
+  assert.throws(() => fm('implement', 'context: 1000001'), refusedWith(/is 1000001 tokens, and claude takes/));
+  // Claude Code's own flag reads a bare 200 as thousands. The step does not guess: it says what to write.
+  assert.throws(() => fm('implement', 'context: 200'), refusedWith(/`context: 200` is 200 tokens, and claude takes a window from 100k to 1000k tokens .*For 200 thousand, write `context: 200k`\.$/));
+  assert.throws(() => fm('review', 'harness: codex\ncontext: 200k'),
+    refusedWith(/^review: `context: 200k` sets the session's context window, and codex has no such knob: `codex exec` runs on its model's own window, whatever the step says\. Delete the line, or run the step on claude or claude-detached\.$/));
+  assert.throws(() => parseWorkflow('implement', '---\ncontext:\n---\nDo it.\n'), refusedWith(/`context` has no value/));
+});
+
+test("REFUSED: a step that continues another's session with a context window of its own other than that session's — by name, saying what to do", () => {
+  const folder = (implement: string, respond: string, extra: Array<[string, string]> = []) =>
+    parseFolder([['implement', `---\n${implement}\n---\nimplement it\n`], ['respond', `---\nresume: implement\n${respond}\n---\nanswer it\n`], ...extra]);
+  assert.throws(() => folder('context: 200k', 'context: 150k'),
+    refusedWith(/^respond: `context: 150k`, and it continues implement's session, which runs on `context: 200k`\. A session keeps one window: delete the line, and respond continues on implement's, or give implement the window you meant for both\.$/));
+  assert.throws(() => folder('harness: claude', 'context: 150000'),
+    refusedWith(/^respond: `context: 150k`, and it continues implement's session, which runs on the model's whole window\. A session keeps one window: delete the line, and respond continues on implement's\.$/));
+  // Through a chain: a step that continues respond continues implement's session.
+  assert.throws(() => folder('context: 200k', 'harness: claude', [['more', '---\nresume: respond\ncontext: 300k\n---\nmore\n']]), refusedWith(/^more: `context: 300k`, and it continues respond's session, which runs on `context: 200k`/));
+  // The same window, written another way, is the same window; none inherits it.
+  const same = folder('context: 200k', 'context: 200000');
+  assert.deepEqual(same.map((s) => sessionContext(s, same)), [200_000, 200_000]);
+  const inherits = folder('context: 200k', 'harness: claude');
+  assert.deepEqual(inherits.map((s) => [s.context, sessionContext(s, inherits)]), [[200_000, 200_000], [undefined, 200_000]]);
 });
 
 test('REFUSED: an empty tools: — blank, or only commas — is not "every tool", nor "none"', () => {
@@ -960,6 +1011,16 @@ const shippedFolders = (): string[] => {
   ].filter((dir) => fs.statSync(dir).isDirectory());
 };
 
+test("every agent step of the shipped workflows of work runs on a 200k window, the package's own ui copy included", () => {
+  // Measured before it was set (agent-engine open issue 26): a `--bg` session compacts at its window, carries on and signs off.
+  const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
+  const folders = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'].map((name) => path.join(root, name));
+  folders.push(path.join(import.meta.dirname, '..', 'workflows', 'ui'));
+  for (const dir of folders) {
+    for (const step of loadWorkflows(dir)) assert.equal(step.context, 200_000, `${path.relative(root, dir)}/${step.name}.md`);
+  }
+});
+
 test('`renderStep` is the parser run backwards: every step of every shipped folder, loaded, rendered and parsed again, is the step it was — and the folder rendered is the folder', () => {
   const folders = shippedFolders();
   const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
@@ -978,7 +1039,7 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
   // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then the body.
   const review = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'review')!;
   assert.ok(renderStep(review).startsWith([
-    '---', 'after: implement', 'harness: claude', 'model: opus', 'effort: high', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
+    '---', 'after: implement', 'harness: claude', 'model: opus', 'effort: high', 'context: 200k', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
   ].join('\n')), renderStep(review));
   assert.doesNotMatch(renderStep(review).split('\n---\n')[0]!, /^#/m, 'the file has comments in its frontmatter, and the step does not carry them');
   assert.match(fs.readFileSync(path.join(root, 'dev', 'review.md'), 'utf8'), /^# /m);
@@ -988,7 +1049,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
   // Every key but `workspace:`, which the parser refuses beside a `check:`, and `slot:`, which is a workflow of one step's: both render below.
   const values: Record<Exclude<StepKey, 'workspace' | 'slot'>, string> = {
-    after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', permissionMode: 'dontAsk',
+    after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '200000', permissionMode: 'dontAsk',
     tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
@@ -1003,6 +1064,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     'harness: claude-detached',
     'model: opus',
     'effort: xhigh',
+    'context: 200k',
     'permissionMode: dontAsk',
     'tools: Read, Grep, Glob, Bash',
     'disallow: Bash(npm run build), SendMessage',

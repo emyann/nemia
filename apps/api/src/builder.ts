@@ -30,17 +30,18 @@ import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './
  * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`); `step`,
  * one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
  * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallow`); `count`, a whole number;
- * `dollars`, an amount; `flag`, `true` or `false` as `choices` has them (`remote`, `gate`); `schema`, a file beside the step (`output`).
+ * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as
+ * `choices` has them (`remote`, `gate`); `schema`, a file beside the step (`output`).
  * `workspace` is a `choice` of one word, `main`, and `slot` of one word, `none`, since a step either says it or says nothing.
  */
-export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'flag' | 'schema';
+export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
 
 /**
  * Each key's kind, in `STEP_KEYS`' order: a key added to the package without one does not typecheck. `count` is the package's `COUNTS`, which it
  * does not export: `test/builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
-  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', permissionMode: 'harness-word',
+  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
   tools: 'list', disallow: 'list', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
@@ -134,7 +135,7 @@ const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: s
   const number = { is: (v: unknown) => typeof v === 'number', said: 'a number' };
   return {
     steps: strings, list: strings, step: string, choice: string, 'harness-word': string, text: string, schema: { ...string, said: "a string, the schema file's name" },
-    count: number, dollars: number, flag: { is: (v: unknown) => typeof v === 'boolean', said: 'true or false' },
+    count: number, dollars: number, tokens: number, flag: { is: (v: unknown) => typeof v === 'boolean', said: 'true or false' },
   };
 })();
 

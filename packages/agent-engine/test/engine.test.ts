@@ -644,10 +644,10 @@ test('no schema, no statement: a task ends exactly as it did before', async () =
 
 import fs from 'node:fs';
 
-test('tools, disallowedTools, effort, mcp and remoteControl are declared by the task and reach every attempt untouched', async () => {
+test('tools, disallowedTools, effort, mcp, contextTokens and remoteControl are declared by the task and reach every attempt untouched', async () => {
   const b = board();
   const mcp = { browser: { command: 'npx', args: ['@playwright/mcp'] } };
-  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, budgetUsd: 0.5, remoteControl: true }));
+  await b.run(file({ ...spec, maxAttempts: 2, tools: ['Read', 'Grep'], disallowedTools: ['Bash(npm run build)'], effort: 'low', mcp, budgetUsd: 0.5, contextTokens: 200000, remoteControl: true }));
   await b.run(tick());
   for (const [k, v] of b.sessions) b.sessions.set(k, { ...v, state: 'failed' });
   await b.run(tick());
@@ -658,6 +658,7 @@ test('tools, disallowedTools, effort, mcp and remoteControl are declared by the 
     assert.equal(r.effort, 'low');
     assert.deepEqual(r.mcp, mcp, 'and given the same servers');
     assert.equal(r.budgetUsd, 0.5, 'and the same cap');
+    assert.equal(r.contextTokens, 200000, 'and the same window: a continuation given none would run on the whole of it');
     assert.equal(r.remoteControl, true, 'and bridged the same');
   }
 
@@ -669,14 +670,15 @@ test('tools, disallowedTools, effort, mcp and remoteControl are declared by the 
   assert.equal(plain.spawned[0]!.effort, undefined);
   assert.equal(plain.spawned[0]!.mcp, undefined, 'no map, no servers of its own');
   assert.equal(plain.spawned[0]!.budgetUsd, undefined, 'no budget, no cap');
+  assert.equal(plain.spawned[0]!.contextTokens, undefined, "no window: the harness's own");
   assert.equal(plain.spawned[0]!.remoteControl, undefined, 'no Remote Control unless asked');
 });
 
-test('decide never reads tools, effort, MCP servers, a budget, Remote Control, a priority, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
+test('decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority, a filing time, usage, a cost, an exit code, an end time or what a person said — carried on the record, never judged', () => {
   const source = fs.readFileSync(new URL('../src/domain.ts', import.meta.url), 'utf8');
   const body = source.slice(source.indexOf('export function decide('), source.indexOf('function resumeTarget('));
   assert.ok(body.includes('return'), 'found the body of decide');
-  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.costUsd|\.remoteControl|\.priority|\.filedAt/);
+  assert.doesNotMatch(body, /\.tools|\.disallowedTools|\.effort|\.mcp\b|\.usage|\.exitCode|\.endedAt|\.said|\.budgetUsd|\.contextTokens|\.costUsd|\.remoteControl|\.priority|\.filedAt/);
 });
 
 test('a session its harness ended at its budget ends failed, reason budget, with what it cost — and the task settles failed naming it, with an attempt left, even under resume: always', async () => {

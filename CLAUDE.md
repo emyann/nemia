@@ -130,6 +130,10 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **A step key read into another form is shown as the package writes it.** `context: 200k` is read into `200000`, and the step
+  page's key rows (`keyValue` in `apps/api/src/workflows.ts`) printed the number, which the e2e refuses as not what the file says.
+  A key the parser converts gets its written form there and in `renderStep` (`contextText`), one function for both (learned by the
+  run that added `context:`).
 - **`execFileSync` with no `stdio` writes the child's stderr on yours.** It captures stderr for the error's message *and*
   copies it to `process.stderr`, so a command that fails on every pass of a loop prints git's words on every pass, beside
   the line the loop says itself. Pass `stdio: ['ignore', 'pipe', 'pipe']`: the error's message keeps them (`git` in

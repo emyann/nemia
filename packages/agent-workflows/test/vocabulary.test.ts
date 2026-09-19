@@ -9,12 +9,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { claudeDetached, codex } from 'agent-engine';
-import { EFFORTS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
+import { CONTEXT_WINDOWS, EFFORTS, HARNESSES, PERMISSION_MODES } from '../src/workflow.ts';
 
 // The lists are exports of the engine's modules, and not of its root (`agent-engine` exports `.` and `./effect`),
 // so they are read from beside the root this package resolves: the modules `runner.ts` runs, not a second copy.
 const root = import.meta.resolve('agent-engine');
-const runner = await import(new URL('./runner.ts', root).href) as { CLAUDE_PERMISSION_MODES: readonly string[]; CLAUDE_EFFORTS: readonly string[] };
+const runner = await import(new URL('./runner.ts', root).href) as {
+  CLAUDE_PERMISSION_MODES: readonly string[]; CLAUDE_EFFORTS: readonly string[]; CLAUDE_CONTEXT_TOKENS: { least: number; most: number };
+};
 const detached = await import(new URL('./runner-detached.ts', root).href) as {
   CODEX_SANDBOXES: readonly string[]; CODEX_EFFORTS: readonly string[]; codex: unknown; claudeDetached: unknown;
 };
@@ -73,6 +75,13 @@ test('REFUSED: the pin fails on a deliberate drift — a word dropped, a word ad
     'permissionMode on codex: the engine takes bypassPermissions, and the parser refuses it at load',
     'permissionMode on claude-detached: the engine takes manual, and the parser refuses it at load',
   ]);
+});
+
+test("the parser's context windows are the engine's, harness by harness — and codex has none on either side", () => {
+  // `claude` is the engine's `claude-bg`, whose range is `CLAUDE_CONTEXT_TOKENS`; a spec declares its own.
+  const engine: Record<string, unknown> = { claude: runner.CLAUDE_CONTEXT_TOKENS, 'claude-detached': claudeDetached.contextTokens, codex: codex.contextTokens };
+  for (const h of HARNESSES) assert.deepEqual(CONTEXT_WINDOWS[h], engine[h], h);
+  assert.deepEqual(runner.CLAUDE_CONTEXT_TOKENS, { least: 100_000, most: 1_000_000 }, 'and the engine still has the range the CLI was measured to take');
 });
 
 test("every word the parser takes, the engine's own refusal takes too — asked of the harness, not only its list", () => {

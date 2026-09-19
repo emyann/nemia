@@ -45,6 +45,7 @@ test('every key a brief has reaches the spec — none is accepted and then dropp
     tools: ['Read, Grep,Glob', ['Read', 'Grep', 'Glob']],
     effort: ['high', 'high'],
     budgetUsd: ['0.25', 0.25],
+    contextTokens: ['200000', 200000],
   };
   for (const key of BRIEF_KEYS) {
     const [written, read] = samples[key];
@@ -69,6 +70,15 @@ test('a budgetUsd that is not dollars above 0, in digits, is refused', () => {
     refuses(brief(`budgetUsd: ${bad}`), /is not an amount of dollars.*budgetUsd: 5/);
   }
   assert.equal(parse(brief('budgetUsd: .5')).budgetUsd, 0.5);
+});
+
+test('a contextTokens that is not a whole number of tokens, in digits, is refused — and `200k` is written back as its digits', () => {
+  refuses(brief('contextTokens: 200k'), /`contextTokens: 200k` is not a number of tokens\. Write a whole number in digits — `contextTokens: 200000`/);
+  refuses(brief('contextTokens: 1M'), /`contextTokens: 1000000`/);
+  for (const bad of ['0', '-1', '1e5', '200000.5', 'lots', '9'.repeat(400)]) {
+    refuses(brief(`contextTokens: ${bad}`), /is not a number of tokens.*like `contextTokens: 200000`/);
+  }
+  assert.equal(parse(brief('contextTokens: 150000')).contextTokens, 150000, 'the range is file()\'s to check');
 });
 
 test('a maxAttempts that is not a whole number from 1 is refused', () => {

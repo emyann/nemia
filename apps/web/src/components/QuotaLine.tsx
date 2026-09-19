@@ -4,13 +4,13 @@ import { agoWord, quotaTitle, windowWords } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
 
 /**
- * The subscription's quota over the Factory's floor: each window Claude Code reported, as a percentage used with its reset in the person's
- * own time, and how old the reading is — or, when there is nothing to show as now, the api's sentence saying why and what to do. A window
+ * The subscription's quota over the Factory's floor: each window Claude Code answered with, as a percentage used with its reset in the
+ * person's own time, and how old the answer is — or, when there is nothing to show as now, the api's sentence saying why and what to do. A window
  * used past the api's mark is marked. A row of its own under the counts, since it never fits beside them. Nothing until it is read;
  * why, when it cannot be.
  */
 export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: Error | null }) {
-  // The age moves between reads: the file is read again every 30 s, and a reading ages every minute.
+  // The age moves between reads: the api is read again every minute, and answers from an ask up to three minutes old.
   const now = new Date(useNow(30_000));
   if (error) {
     return (
@@ -28,7 +28,7 @@ export function QuotaLine({ quota, error }: { quota: Quota | undefined; error: E
       </p>
     );
   }
-  const age = quota.writtenAt ? agoWord(now.getTime() - Date.parse(quota.writtenAt)) : null;
+  const age = quota.askedAt ? agoWord(now.getTime() - Date.parse(quota.askedAt)) : null;
   return (
     <p data-quota="fresh" title={title} className="flex basis-full flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-muted-foreground">
       {quota.windows.map((w) => {

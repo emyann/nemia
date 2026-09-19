@@ -3519,52 +3519,60 @@ What it leaves:
 
 ## Shipped: the subscription's quota on the board
 
-P0.7 of `docs/pivot-2026-09-18.md`. Apps only: nothing in `packages/` changed but this file.
+P0.7 of `docs/pivot-2026-09-18.md`, then its source changed: the quota comes from the harness. Apps only: nothing in `packages/`
+changed but this file.
 
-- **The script** (`apps/api/statusline/quota.ts`) is Claude Code's `statusLine` command and the one writer of `$WF_ROOT/quota.json`:
-  `{ written_at, claude_code_version, rate_limits }`, `rate_limits` as the payload had it, through a hidden file renamed over the real
-  one. It can wrap a person's own statusline (the command after it, run with the same stdin, printed first), prints its own
-  `5h 38% · 7d 86% · resets 16:40`, and on any error of its own prints nothing of its own and exits 0. It writes only numbers just
-  heard, so `written_at` is when they were (review, round 1). Claude Code runs a statusline with no answer behind it too: on a repaint,
-  and at a window's reset, where it drops that window and repeats the week as it last heard it. So the script writes nothing
-  - before a session's first answer (no `rate_limits`, `context_window.current_usage` null);
-  - when the session's `cost.total_api_duration_ms` has not moved since it last wrote. `heard` in the file keeps that counter for the
-    last 32 sessions to write, so an idle session's repaint does not put its old numbers over a busier session's newer ones. Two
-    sessions writing in the same instant can lose one's entry, which costs at most one repaint taken as news;
-  - no limits over a reading that has them. A subscriber's session has limits after every answer, so a session without them is an API
-    key, and says nothing of the subscription.
+- **The ask** (`apps/api/src/quota.ts`, `askUsage`). The api starts the `claude` on its PATH as `claude -p --input-format stream-json
+  --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ''`, writes one
+  `control_request` with subtype `get_usage`, reads stdout for the `control_response` whose `request_id` is its own, and closes stdin,
+  which ends the process. No model turn, nothing spent. It runs from `os.tmpdir()`, with the variables a Claude Code session around
+  the api hands its children dropped by name (`SESSION_KEYS`) and its sign-in and provider kept, and is killed at 15 s (SIGTERM,
+  SIGKILL 2 s later).
+- **The keep** (`readQuota`). The api holds one answer in memory for `QUOTA_KEEP_MS`, 3 min (`HKB_QUOTA_KEEP_MS`; the e2e sets 0),
+  with at most one ask in flight, which concurrent reads join. Nothing asks unless a board reads: the web polls every 60 s, every
+  2 s while the state is `asking`. 3 min because the header counts the answer's age in minutes and the windows are hours and a week
+  long, while an ask on every poll would start a process a minute for every open board. A read waits 2 s for an ask; past that it answers `asking` and the ask goes on.
+- **The states**, each HTTP 200 with a sentence saying what to do: `fresh` (the windows), `asking`, `no-plan`
+  (`rate_limits_available: false`: an API key, Bedrock, Vertex, or not signed in), `no-claude` (the spawn's ENOENT), `timeout`,
+  `failed` (exit code or signal, and stderr's last line), `unknown` (an error answer, or a shape not read, named). A window is `marked`
+  at `QUOTA_MARK_PERCENT`, 80, and `reset` when its `resets_at` has passed since the answer. Only the known windows are shown —
+  `five_hour`, `seven_day`, `seven_day_sonnet`, `seven_day_opus` — since the answer carries others under codenames, at 0% with no
+  reset. A state other than `fresh` carries the last answer that had windows as `last`, shown on hover only.
+- **The Factory's header** shows each window, its reset in the browser's time zone (a weekday when not today), and the answer's age;
+  a marked window is amber with a warning icon. Every other state shows only its sentence. Loaded in the route's loader, and the
+  floor fitted again when the line comes or goes.
+- **Tests.** `apps/api/test/quota.test.ts` judges answers recorded from 2.1.278 (`test/fixtures/get-usage-*.json`: a plan, no plan,
+  an unsupported subtype) and drives the ask through the harness's fake `claude`: the flags exactly, the scrubbed env and cwd, the id
+  match past decoy lines, stdin closed, one ask for concurrent reads, the keep and its override, no claude on PATH, an exit, and a
+  silence killed at the timeout. No test starts the real claude. The e2e's fake answers from the store, and the quota page draws
+  fresh, no-plan, unknown and failed in both themes.
 
-  Nobody's `~/.claude/settings.json` was touched: the block is in `README.md`, *The quota on the board*.
-- **The api** (`GET /api/quota`, `apps/api/src/quota.ts`) reads the file on each request and keeps nothing: `fresh`, `stale` (older
-  than `QUOTA_STALE_MS`, 5 h — one five-hour window, past which the window it reports has certainly turned over), `none` (a session with no
-  limits), `missing`, `unreadable`, each but `fresh` with a sentence saying what to do. A window is `marked` at `QUOTA_MARK_PERCENT`, 80,
-  and `reset` when its `resets_at` has passed since the reading.
-- **The Factory's header** shows each window, its reset in the browser's time zone (a weekday when not today), and the reading's age; a
-  marked window is amber with a warning icon, a reset one says `reset 09:00, not read since` and is not marked. A stale reading shows only
-  its sentence, its numbers on hover. Loaded in the route's loader, and the floor fitted again when the line comes or goes.
-- **Tests.** `apps/api/test/statusline.test.ts` runs the script on a real-shaped payload, none, a wrapped command and an unwritable store,
-  each exiting 0; `quota.test.ts` the route and each state; `apps/web/test/quota.test.ts` the words across time zones. The e2e seeds the
-  file through the script and draws fresh, stale, missing and none in both themes, then puts the file back.
+**Removed: the statusline.** It was Claude Code's `statusLine` command writing `$WF_ROOT/quota.json`, which the api read. It needed a
+block in the owner's `~/.claude/settings.json` and a node path in it, and the reading was only as fresh as the owner's last
+interactive turn: a factory of `claude -p` workers never repaints a statusline. The script, its test and the README's block are
+gone; the owner takes the block out of their settings and can delete `quota.json`.
 
-What was verified about the payload, in the Claude Code 2.1.278 binary (`~/.local/share/claude/versions/2.1.278`, its strings), not in
-docs:
+What was measured, on Claude Code 2.1.278, before building on it:
 
-- `rate_limits` holds `five_hour` and `seven_day`, each `{ used_percentage, resets_at }`: a percentage 0–100 rounded to 0.1, and
-  `resets_at` in Unix epoch **seconds**. `spend_limit`, of the same shape, only behind a Claude gateway. No `seven_day_sonnet` or
-  `seven_day_opus` in the statusline's payload (the api labels them if a later version adds them), and no `subscription_type`: that and
-  `rate_limits_available` are in the SDK's usage schema, not this one.
-- `rate_limits` is there only for a subscriber, only after the session's first API answer, and each window only while its `resets_at` is
-  still ahead (`resets_at > now`, window by window). The numbers are the process's own, from the last answer's headers. The payload
-  carries `version` and `session_id`; `context_window.current_usage` is null before the first answer; `cost.total_api_duration_ms` is the
-  session's API time, which moves with an answer and nothing else.
-- The setting is `{ type: "command", command, padding?, refreshInterval? (seconds, ≥ 1), hideVimModeIndicator? }`, and Claude Code runs
-  the command again at the nearest `resets_at` of its own accord. So the reading is as fresh as the owner's last interactive turn: a
-  factory of `claude -p` workers never writes it, which is why the bound and the age are on the header.
+- **The answer** (`SDKControlGetUsageResponse` in the Agent SDK's `sdk.d.ts`): `subscription_type`, `rate_limits_available`, and
+  `rate_limits` with each window `{ utilization, resets_at }`, a percentage 0–100 and an ISO time, "from the claude.ai usage
+  endpoint". Null limits and `rate_limits_available: false` with no subscription (measured with an empty `CLAUDE_CONFIG_DIR`). An
+  unsupported subtype answers `{ subtype: "error", error: "Unsupported control request subtype: …" }`. The SDK exposes it as
+  `usage_EXPERIMENTAL_MAY_CHANGE_DO_NOT_RELY_ON_THIS_API_YET`: a later version may change it, which is what `unknown` is for.
+- **What an ask leaves behind.** An answer in 350–650 ms, and the process ends about 0.4 s after stdin closes. No transcript under
+  `~/.claude/projects` (not even without `--no-session-persistence`, kept anyway), no child process or MCP server after 3 s, and no
+  hook in the owner's settings to run. Loading user settings rewrote a synced skill's `manifest.json` under `~/.claude/skills` on
+  every start; `--setting-sources ''` stops it. `~/.claude.json`'s feature-flag cache time is written on every start, flags or not.
+  `--bare` would be tidier and cannot be used: it turns OAuth off, and with it the subscription.
+- **What else could answer, and why not.** The SDK's method is the same request behind a node dependency the api does not need.
+  `rate_limit_event` arrives only with a model turn, which spends. `/usage` is interactive only, and there is no `claude usage`
+  subcommand. The OAuth usage endpoint would mean the api reading Claude Code's credentials itself.
 
 What a run-level guard ("do not start a run above 90%") would need — out of scope here:
 
-1. A freshness rule for admission: a stale or missing reading must either hold every run or allow them, chosen and said, never read as 0%.
-2. The tick reading `quota.json` level-triggered at each admission, beside the cap — a pure judgement in `assess`, the file read by the runner.
+1. A freshness rule for admission: an answer not `fresh` must either hold every run or allow them, chosen and said, never read as 0%.
+2. The quota read level-triggered at each admission, beside the cap — a pure judgement in `assess`, the ask made by the runner or
+   read from the api, bounded by the same keep.
 3. A refusal a person can act on, with the window, its reset and a way past it (a flag of `wf start`, say), shown on the queued card.
 
 ## 1. A run that grows steps from a plan

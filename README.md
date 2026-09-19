@@ -35,38 +35,37 @@ or TanStack Start server.
 ## The quota on the board
 
 The Factory's header shows how much of the subscription's five-hour window and week is used, each with its
-reset in your own time zone, and how old the reading is. Claude Code tells only a statusline command, so the
-reading comes from one: `apps/api/statusline/quota.ts` writes the quota part of the statusline's payload to
-`~/.agent-workflows/quota.json` (`$WF_ROOT/quota.json` when that is set), and `GET /api/quota` serves what the
-file says. Nothing installs it for you: add this to `~/.claude/settings.json`, with the path to your checkout
-and an absolute path to `node` (`which node`; under nvm, Claude Code's own PATH may not find it):
+reset in your own time zone, and how old the reading is. Nothing to install: `GET /api/quota` asks Claude Code
+itself, with its `get_usage` control request, and serves the answer. It asks the `claude` on the api's PATH, at
+most once every 3 minutes, one ask at a time, and only while a board asks (`HKB_QUOTA_KEEP_MS` sets the keep; `0`
+asks on every read). An ask is a short `claude -p` that makes no model turn and spends nothing:
 
-```json
-"statusLine": {
-  "type": "command",
-  "command": "/home/you/.nvm/versions/node/v24.20.0/bin/node /home/you/projects/hkb-v2/apps/api/statusline/quota.ts"
-}
+```bash
+claude -p --input-format stream-json --output-format stream-json --verbose \
+  --no-session-persistence --strict-mcp-config --setting-sources ''
 ```
 
-It prints its own line, `5h 38% · 7d 86% · resets 16:40`, and writes the file only after an answer, so the
-reading's age is the age of your last turn in any session, not of the last repaint. To keep a statusline you
-already have, put its command after the script's path, quoted as one argument: the script runs it with the same
-payload and prints its output first — `"command": "node …/quota.ts 'bash ~/.claude/my-statusline.sh'"`.
+with one `{"type":"control_request","request_id":…,"request":{"subtype":"get_usage"}}` on stdin. It writes no
+transcript, starts no MCP server and loads no settings, so no hook runs; it runs from the temp directory with
+the variables a Claude Code session hands its children taken out, should the api run inside one; how it signs in
+(`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, a provider's switch) is kept, as the engine's workers keep it. That claude must be
+signed in to the subscription under the api's `CLAUDE_CONFIG_DIR` (`claude`, then `/login`): an API key, Bedrock
+or Vertex has no plan limits to show.
 
 To check it:
 
 ```bash
-# The script alone, into a store of its own: a line, then the file.
-echo '{"version":"2.1.278","rate_limits":{"five_hour":{"used_percentage":38,"resets_at":'$(( $(date +%s) + 3600 ))'},"seven_day":{"used_percentage":86,"resets_at":'$(( $(date +%s) + 86400 ))'}}}' \
-  | WF_ROOT=/tmp/quota-check node apps/api/statusline/quota.ts
-cat /tmp/quota-check/quota.json
-# Installed: send a message in an interactive claude session signed in to the subscription, then
-cat ~/.agent-workflows/quota.json
-curl -s localhost:8787/api/quota    # state "fresh", with its windows; the Factory's header shows them
+curl -s localhost:8787/api/quota   # state "fresh", with its windows; the Factory's header shows them
 ```
 
-A reading older than 5 hours is not shown as the quota, and neither is a session with no limits (an API key):
-the header says which, and what to do.
+Every other state is a sentence on the header saying what to do, and never a number read as the quota:
+`asking` (the first ask, still out), `no-plan` (not signed in to a subscription), `no-claude` (none on the api's
+PATH), `timeout` (no answer in 15 s), `failed` (claude stopped first; its last line of stderr is quoted) and
+`unknown` (an answer this board does not read — `get_usage` is experimental in Claude Code, and a new version may
+change it). The last answer that had windows is on hover.
+
+If you installed the statusline an earlier version of this board asked for, take its `statusLine` block out of
+`~/.claude/settings.json` and delete `~/.agent-workflows/quota.json`: nothing reads either now.
 
 ## History
 

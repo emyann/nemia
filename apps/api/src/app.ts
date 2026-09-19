@@ -1898,8 +1898,9 @@ export const app = new Hono()
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
     }
   })
-  // The subscription's quota, as the statusline script last wrote it, judged at this request (quota.ts): what the Factory says over its floor.
-  .get('/api/quota', (c) => c.json(readQuota()))
+  // The subscription's quota, as Claude Code answers its get_usage request — asked at most once a keep, however many boards read (quota.ts):
+  // what the Factory says over its floor. Every case is a 200 with a sentence, the harness's failures included.
+  .get('/api/quota', async (c) => c.json(await readQuota()))
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');
     const run = findRun(id);

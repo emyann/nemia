@@ -2,7 +2,7 @@
  * The api's tests observe the harness `test/harness.ts` installs, and never this machine's registry: every test file imports it first, and
  * the `claude` the api's engine runs is the harness's.
  */
-import { bin, calls, observations, registry, unharnessed } from './harness.ts';
+import { asksEnded, bin, calls, observations, registry, unharnessed } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -52,4 +52,20 @@ test("the `claude` the api's engine runs is the harness's: it resolves there, an
   assert.equal((await app.request('/api/runs')).status, 200);
   assert.ok(observations() > before, "and so did the api's");
   assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
+});
+
+test("the harness's `claude` answers a get_usage request with the request's own id, and ends only once its stdin is closed", async () => {
+  const { spawn } = await import('node:child_process');
+  const child = spawn('claude', ['-p', '--input-format', 'stream-json'], { stdio: ['pipe', 'pipe', 'ignore'] });
+  let out = '';
+  const line = new Promise<string>((resolve) => child.stdout.on('data', (d: Buffer) => { out += d; if (out.includes('\n')) resolve(out.slice(0, out.indexOf('\n'))); }));
+  child.stdin.write(`${JSON.stringify({ type: 'control_request', request_id: 'mine-7', request: { subtype: 'get_usage', skip_behaviors: true } })}\n`);
+  const answered = JSON.parse(await line) as { type: string; response: { request_id: string; subtype: string } };
+  assert.deepEqual([answered.type, answered.response.request_id, answered.response.subtype], ['control_response', 'mine-7', 'success']);
+  await new Promise((r) => setTimeout(r, 100));
+  assert.equal(child.exitCode, null, 'it waits on its stdin, as Claude Code does');
+  const ended = asksEnded();
+  child.stdin.end();
+  await new Promise((r) => child.once('exit', r));
+  assert.equal(asksEnded(), ended + 1);
 });

@@ -36,12 +36,20 @@ export function windowWords(w: QuotaWindow, now: Date, timeZone?: string): Windo
   };
 }
 
-/** What the hover says of a reading: where it came from, and the rule the header shows it by. */
+/** `3 min`, `90 s`: a keep, as the hover says how often the api asks. */
+function keepWord(ms: number): string {
+  return ms % 60_000 === 0 ? `${ms / 60_000} min` : `${Math.round(ms / 1000)} s`;
+}
+
+/** What the hover says of a reading: where it came from, the rule the header shows it by, and — with nothing to show as now — the last answer. */
 export function quotaTitle(q: Quota, now: Date, timeZone?: string): string {
-  const from = q.writtenAt
-    ? `Read by Claude Code${q.version ? ` ${q.version}` : ''}'s statusline at ${clockWord(new Date(q.writtenAt), now, timeZone)}, into ${q.file}.`
-    : `Written by the statusline script into ${q.file}.`;
-  const rule = `The numbers are as fresh as your last turn in an interactive claude session; past ${Math.round(q.staleAfterMs / 3_600_000)} h they are not shown, and a window ${q.markAt}% used or more is marked.`;
-  const last = q.state === 'stale' && q.windows.length ? ` Last read: ${q.windows.map((w) => `${w.label} ${Math.round(w.usedPercentage)}%`).join(', ')}.` : '';
+  const how = q.keepMs > 0 ? `asked again at most every ${keepWord(q.keepMs)} while a board is open` : 'asked again on every read';
+  const from = q.state === 'fresh' && q.askedAt
+    ? `Asked of Claude Code (get_usage${q.subscription ? `, ${q.subscription} plan` : ''}) at ${clockWord(new Date(q.askedAt), now, timeZone)}; ${how}.`
+    : `Asked of Claude Code (get_usage); ${how}.`;
+  const rule = `A window ${q.markAt}% used or more is marked.`;
+  const last = q.state !== 'fresh' && q.last?.windows.length
+    ? ` Last answer, at ${clockWord(new Date(q.last.askedAt), now, timeZone)}: ${q.last.windows.map((w) => `${w.label} ${Math.round(w.usedPercentage)}%`).join(', ')}.`
+    : '';
   return `${from} ${rule}${last}`;
 }

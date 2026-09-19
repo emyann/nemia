@@ -21,8 +21,8 @@ in your commit message rather than stopping to ask.
 Look at the result before you sign off, as a person would. Run the e2e into the directory named under
 *Files for the steps after you* — `WF_ARTIFACTS=<that directory> npm run e2e` — and read every PNG it
 writes with your Read tool, in both themes. A page that passes its assertions and looks wrong is not
-done: fix it and look again. If you add a page, add it to `PAGES` in `apps/web/test/e2e/run.ts`, with
-what it must have, or the check never looks at it.
+done: fix it and look again. If you add a page, add a file for it under `apps/web/test/e2e/pages/`,
+with what it must have (CLAUDE.md says how), or the check never looks at it.
 
 Before you sign off, use the look skill on every page you changed: `.claude/skills/look/SKILL.md`, from
 the workspace root, which your Read tool opens if the skill is not loaded for you. It says how to open

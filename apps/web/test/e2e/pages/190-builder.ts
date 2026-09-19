@@ -1,0 +1,292 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import type { Locator, Page, Response } from 'playwright';
+import { filesIn, sidebar, themeOf } from '../board.ts';
+import { drawEdge } from '../canvas.ts';
+import { expectCount, expectTexts, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
+import { AGENTS, WORKFLOWS } from '../seed.ts';
+import type { PageSpec } from '../visit.ts';
+import { OUT, store } from '../world.ts';
+
+/** The workflow the `builder` page makes, and what its two steps' agents are told. */
+const BUILT = { name: 'built', plan: 'Write PLAN.md.', implement: 'Implement what PLAN.md says.' };
+
+/** The workflow of yours the `builder` page opens a step with an agent on: `build`, whose agent is `agent`, and `other`, the agent it is moved to. */
+const CREWED = { name: 'crew', agent: 'coder', other: 'critic' };
+
+/** The schema the `builder` page pastes for an `output:`: strict, as the parser takes one. */
+const PASTED = JSON.stringify({ type: 'object', properties: { risks: { type: 'array', items: { type: 'string' } } }, required: ['risks'], additionalProperties: false });
+
+/** A schema pasted for `step`'s `output:` in its form, which is open: written beside the steps by the save, under `<step>.schema.json`. */
+async function pasteSchema(builder: Locator, step: string, text: string): Promise<void> {
+  const keys = builder.locator(`[data-step-form="${step}"]`);
+  await expectVisible(keys, `${step}'s form, to paste a schema in`);
+  await keys.locator('[data-field="output"] select').selectOption({ label: 'Paste a schema…' });
+  const box = keys.getByRole('textbox', { name: 'The JSON Schema' });
+  await expectVisible(box, `${step}'s output offers a box for the schema`);
+  await box.fill(text);
+  const file = await keys.getByRole('textbox', { name: 'Written on save as' }).inputValue();
+  if (file !== `${step}.schema.json`) throw new Refused(`a schema pasted for ${step} is written beside it as ${step}.schema.json — the form says ${file}`);
+}
+
+/** A step added on a builder: its name and what it is told. */
+async function addStep(builder: Locator, name: string, body: string): Promise<void> {
+  await builder.getByRole('button', { name: 'Add a step' }).click();
+  const form = builder.getByRole('form', { name: 'Add a step' });
+  await form.getByRole('textbox', { name: 'Step name' }).fill(name);
+  await form.getByRole('textbox', { name: 'What it is told' }).fill(body);
+  await form.getByRole('button', { name: 'Add', exact: true }).click();
+  await expectVisible(builder.locator(`.react-flow__node[data-id="${name}"]`), `the step added, ${name}, is a block on the canvas`);
+}
+
+export default {
+  // The builder, on the store's workflows: a workflow of yours made with a first step, a step added, an edge drawn from one block to the
+  // other, two keys set in the step's form, a schema pasted, saved — and the folder read back through the api and on disk — then taken back, so
+  // every page after this one, in either theme, reads the store as seeded. A cycle drawn and saved, with a schema pasted beside it, is refused in a page of its own, whose one
+  // refusal is the point, and nothing is written; a save of the folder changed by hand since is refused in another. The repository's workflow
+  // has no builder, and says why.
+  name: 'builder',
+  route: '/workflows',
+  expect: async (page) => {
+    await sidebar(page);
+    const { good, yours } = WORKFLOWS;
+    const card = (p: Page, name: string) => p.locator(`section[aria-label="Workflow ${name}"]`);
+    const puts = (name: string) => (r: Response) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/workflows/yours/${name}`;
+
+    await expectVisible(card(page, good.name).locator('[data-no-builder]', { hasText: 'No builder: the board writes only yours, and nothing into this checkout.' }), `${good.name}, the repository's, says why it has no builder`);
+    await expectCount(card(page, good.name).getByRole('button', { name: 'Build', exact: true }), 0, `and offers no Build`);
+    await expectVisible(card(page, yours.name).getByRole('button', { name: 'Build', exact: true }), `${yours.name}, yours, offers Build`);
+
+    // A cycle drawn and saved: refused in the package's words, shown above the canvas and on both steps it names, and nothing written.
+    const mineDir = path.join(store!, 'workflows', yours.name);
+    const before = filesIn(mineDir);
+    const refused = await page.context().newPage();
+    try {
+      const { problems } = watch(refused);
+      await refused.goto(page.url(), { waitUntil: 'networkidle' });
+      const mine = card(refused, yours.name);
+      await mine.getByRole('button', { name: 'Build', exact: true }).click();
+      const builder = mine.locator(`section[data-builder="${yours.name}"]`);
+      await expectVisible(builder, `Build opens ${yours.name}'s builder`);
+      await addStep(builder, 'build', 'Build what PLAN.md says.');
+      // A good schema pasted for build's output, beside the cycle: the save is judged whole, so the refusal writes no schema either.
+      await pasteSchema(builder, 'build', PASTED);
+      await drawEdge(refused, builder, 'plan', 'build');
+      await drawEdge(refused, builder, 'build', 'plan');
+      await expectCount(builder.locator('.react-flow__edge'), 2, 'two edges drawn, each way: build waits on plan, and plan on build');
+      const [answered] = await Promise.all([
+        refused.waitForResponse(puts(yours.name), { timeout: WAIT_MS }),
+        builder.getByRole('button', { name: 'Save', exact: true }).click(),
+      ]);
+      const { error, steps } = (await answered.json()) as { error?: string; steps?: string[] };
+      if (answered.status() !== 422 || error !== 'these steps wait on each other: build, plan' || JSON.stringify(steps) !== JSON.stringify(['build', 'plan'])) {
+        throw new Refused(`the api refuses a cycle in the package's words, naming both steps — it answered ${answered.status()}: ${JSON.stringify({ error, steps })}`);
+      }
+      await expectVisible(builder.locator('[data-refused]'), 'the refusal is shown above the canvas, not swallowed');
+      const shown = await builder.locator('[data-refused] p.font-mono').textContent();
+      if (shown !== error) throw new Refused(`the refusal is the package's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+      for (const step of ['plan', 'build']) {
+        await expectVisible(builder.locator(`.react-flow__node[data-id="${step}"] [data-refused-step]`), `${step}, which the refusal names, is marked on the canvas`);
+      }
+      await expectVisible(builder.locator('[data-step-form] [data-refused-here]', { hasText: error }), "and in the form of the step it names, which it opens");
+      await expectVisible(builder.locator('[data-unsaved]', { hasText: 'Unsaved changes' }), 'the draft is still unsaved');
+      if (JSON.stringify(filesIn(mineDir)) !== JSON.stringify(before)) throw new Refused(`nothing is written on a refusal, the pasted schema included — ${mineDir} holds ${filesIn(mineDir).map(([f]) => f).join(', ')}`);
+      await settled(refused);
+      await refused.screenshot({ path: path.join(OUT, `builder-refused-${await themeOf(refused)}.png`), fullPage: true });
+
+      // Nothing saved, so the draft is still there to change: an edge taken away by its button, and a loop drawn from the violet dot and
+      // taken away, each taking its key with it. None of it is saved.
+      await builder.getByRole('button', { name: 'Remove the edge build → plan' }).click();
+      await expectCount(builder.locator('.react-flow__edge'), 1, "the edge's button takes it away, and plan no longer waits on build");
+      await expectCount(builder.locator('.react-flow__node [data-refused-step]'), 2, 'the refusal stays on the steps it named until the next save');
+      const buildKeys = builder.locator('[data-step-form="build"]');
+      await drawEdge(refused, builder, 'build', 'plan', true);
+      if ((await buildKeys.locator('[data-field="loop"] select').inputValue()) !== 'plan') throw new Refused("the loop drawn sets build's loop: plan in its form");
+      if ((await buildKeys.locator('[data-field="rounds"] input').inputValue()) !== '3') throw new Refused('and its rounds, the default 3');
+      await builder.getByRole('button', { name: "Remove build's loop back to plan" }).click();
+      await expectCount(builder.locator('.react-flow__edge'), 1, "the loop's button takes it away");
+      if ((await buildKeys.locator('[data-field="loop"] select').inputValue()) !== '' || (await buildKeys.locator('[data-field="rounds"] input').inputValue()) !== '') {
+        throw new Refused("and build's loop and rounds with it");
+      }
+      await refused.waitForLoadState('networkidle');
+      // The one refusal made, as the browser reports it — its answer, and the line Chromium writes to the console for one — and nothing else.
+      const expected = `request answered 422: PUT ${answered.url()}`;
+      const seen = problems();
+      const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 422\b/.test(p));
+      if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+    } finally {
+      await refused.close();
+    }
+    if (JSON.stringify(filesIn(mineDir)) !== JSON.stringify(before)) throw new Refused(`${mineDir} is as seeded after the refused page`);
+
+    // The folder changed by hand while the builder has it open: the save is refused (409) rather than written over the change, which is kept,
+    // and Read the folder again starts the draft from what the folder holds now. In a page of its own, whose one refusal is the point.
+    const planFile = path.join(mineDir, 'plan.md');
+    const seeded = fs.readFileSync(planFile, 'utf8');
+    const byHand = seeded.replace('harness: codex\n', 'harness: codex\ncheck: test -f PLAN.md\n');
+    if (byHand === seeded) throw new Refused(`${planFile} is seeded with harness: codex, for the edit by hand to add a check under`);
+    const stale = await page.context().newPage();
+    try {
+      const { problems } = watch(stale);
+      await stale.goto(page.url(), { waitUntil: 'networkidle' });
+      const mine = card(stale, yours.name);
+      await mine.getByRole('button', { name: 'Build', exact: true }).click();
+      const builder = mine.locator(`section[data-builder="${yours.name}"]`);
+      const keys = builder.locator('[data-step-form="plan"]');
+      await expectVisible(keys, "plan's form, open as the builder opens");
+      await keys.getByRole('textbox', { name: 'What it is told' }).fill('Write PLAN.md, briefly.');
+      fs.writeFileSync(planFile, byHand);
+      const [answered] = await Promise.all([
+        stale.waitForResponse(puts(yours.name), { timeout: WAIT_MS }),
+        builder.getByRole('button', { name: 'Save', exact: true }).click(),
+      ]);
+      const { error } = (await answered.json()) as { error?: string };
+      if (answered.status() !== 409 || !error?.startsWith(`${mineDir} has changed since it was read at version `) || !error.includes('Nothing was written. Read the folder again')) {
+        throw new Refused(`the api refuses a save of a folder changed by hand since it was read — it answered ${answered.status()}: ${JSON.stringify(error)}`);
+      }
+      const shown = await builder.locator('[data-refused] p.font-mono').textContent();
+      if (shown !== error) throw new Refused(`the refusal is the api's sentence, verbatim — it shows ${JSON.stringify(shown)}, and the api said ${JSON.stringify(error)}`);
+      if (fs.readFileSync(planFile, 'utf8') !== byHand) throw new Refused(`the change by hand is kept, not written over — ${planFile} holds ${JSON.stringify(fs.readFileSync(planFile, 'utf8'))}`);
+      const again = builder.getByRole('button', { name: 'Read the folder again' });
+      await expectVisible(again, 'the refusal offers to read the folder again');
+      await settled(stale);
+      await stale.screenshot({ path: path.join(OUT, `builder-changed-${await themeOf(stale)}.png`), fullPage: true });
+      await again.click();
+      await expectCount(builder.locator('[data-refused]'), 0, 'read again, the refusal goes');
+      await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'and the draft is the folder as it is now: nothing unsaved');
+      await expectVisible(builder.locator('.react-flow__node[data-id="plan"] dd', { hasText: /^test -f PLAN\.md$/ }), "plan's block shows the check written by hand");
+      const body = await builder.locator('[data-step-form="plan"]').getByRole('textbox', { name: 'What it is told' }).inputValue();
+      if (body !== 'Write PLAN.md.') throw new Refused(`plan's form reads the body on disk, and the change drawn is let go — it shows ${JSON.stringify(body)}`);
+      await stale.waitForLoadState('networkidle');
+      const expected = `request answered 409: PUT ${answered.url()}`;
+      const seen = problems();
+      const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+      if (!seen.includes(expected) || others.length) throw new Refused(`the changed page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+    } finally {
+      await stale.close();
+      fs.writeFileSync(planFile, seeded);
+    }
+
+    // A step with an agent: in a page of its own, over a folder and two agents of yours written for it and taken away after, nothing saved.
+    // Its form says the body is its own note, told after its agent's instructions; each key the agent gives it shows as the agent's; the
+    // picker offers no agent and each agent of yours; moved to another agent, the form shows what that one gives and nothing the last gave;
+    // and with no agent, the body is all it is told again.
+    const { name: crew, agent, other } = CREWED;
+    const crewDir = path.join(store!, 'workflows', crew);
+    const agentsDir = path.join(store!, 'workflows', 'agents');
+    const hadAgents = fs.existsSync(agentsDir);
+    const crewed = await page.context().newPage();
+    try {
+      fs.mkdirSync(agentsDir, { recursive: true });
+      fs.writeFileSync(path.join(agentsDir, `${agent}.md`), '---\nharness: claude\nmodel: opus\neffort: high\n---\nYou write code.\n');
+      fs.writeFileSync(path.join(agentsDir, `${other}.md`), '---\nmodel: sonnet\n---\nYou review code.\n');
+      fs.mkdirSync(crewDir, { recursive: true });
+      fs.writeFileSync(path.join(crewDir, 'build.md'), `---\nagent: ${agent}\ncheck: npm test\n---\nMind the cache.\n`);
+      const { problems } = watch(crewed);
+      await crewed.goto(page.url(), { waitUntil: 'networkidle' });
+      await card(crewed, crew).getByRole('button', { name: 'Build', exact: true }).click();
+      const builder = card(crewed, crew).locator(`section[data-builder="${crew}"]`);
+      const keys = builder.locator('[data-step-form="build"]');
+      await expectVisible(keys, "build's form, open as the builder opens");
+      const note = keys.getByRole('textbox', { name: 'Its own note' });
+      await expectVisible(note, 'its body is its own note');
+      if ((await note.inputValue()) !== 'Mind the cache.') throw new Refused(`the note is the step's own words, not its agent's — it shows ${JSON.stringify(await note.inputValue())}`);
+      await expectTexts(keys.locator('[data-agent-note]'), [`Told after ${agent}'s instructions, agents/${agent}.md.`], 'and says whose instructions it is told after');
+      const picker = keys.locator('[data-field="agent"] select');
+      const offered = await picker.locator('option').allTextContents();
+      if ((await picker.inputValue()) !== agent || JSON.stringify(offered) !== JSON.stringify(['no agent', agent, other, AGENTS.seeded.name])) {
+        throw new Refused(`the picker names ${agent}, and offers no agent and each agent of yours — it offers ${JSON.stringify(offered)} on ${JSON.stringify(await picker.inputValue())}`);
+      }
+      const model = keys.locator('[data-field="model"] input');
+      const effort = keys.locator('[data-field="effort"] select');
+      const unsetEffort = effort.locator('option[value=""]');
+      if ((await model.inputValue()) !== '' || (await model.getAttribute('placeholder')) !== `opus — ${agent}'s`) throw new Refused(`the model ${agent} gives it is shown as ${agent}'s, and the field is empty — it holds ${JSON.stringify(await model.inputValue())} under ${JSON.stringify(await model.getAttribute('placeholder'))}`);
+      if ((await effort.inputValue()) !== '' || (await unsetEffort.textContent()) !== `high — ${agent}'s`) throw new Refused(`and the effort — it reads ${JSON.stringify(await unsetEffort.textContent())}`);
+      if ((await keys.locator('[data-field="check"] input').inputValue()) !== 'npm test') throw new Refused('the check it sets itself is in its field');
+      await settled(crewed);
+      await crewed.screenshot({ path: path.join(OUT, `builder-agent-${await themeOf(crewed)}.png`), fullPage: true });
+
+      await picker.selectOption(other);
+      await expectTexts(keys.locator('[data-agent-note]'), [`Told after ${other}'s instructions, agents/${other}.md.`], `moved to ${other}, the note is told after ${other}'s`);
+      if ((await model.getAttribute('placeholder')) !== `sonnet — ${other}'s`) throw new Refused(`moved to ${other}, the model is ${other}'s — it reads ${JSON.stringify(await model.getAttribute('placeholder'))}`);
+      if ((await unsetEffort.textContent()) !== `not set — nor by ${other}`) throw new Refused(`and ${agent}'s effort is not shown as ${other}'s — it reads ${JSON.stringify(await unsetEffort.textContent())}`);
+      if ((await note.inputValue()) !== 'Mind the cache.' || (await keys.locator('[data-field="check"] input').inputValue()) !== 'npm test') throw new Refused('and what the step sets itself stays');
+
+      await picker.selectOption('');
+      await expectCount(keys.locator('[data-agent-note]'), 0, 'with no agent, nothing is told before its body');
+      await expectVisible(keys.getByRole('textbox', { name: 'What it is told' }), 'and its body is all it is told');
+      await crewed.waitForLoadState('networkidle');
+      if (problems().length) throw new Refused(`the agent's page saw nothing refused — it saw:\n    ${problems().join('\n    ')}`);
+    } finally {
+      await crewed.close();
+      fs.rmSync(crewDir, { recursive: true, force: true });
+      fs.rmSync(hadAgents ? path.join(agentsDir, `${agent}.md`) : agentsDir, { recursive: true, force: true });
+      if (hadAgents) fs.rmSync(path.join(agentsDir, `${other}.md`), { force: true });
+    }
+
+    // A workflow made, built and saved.
+    const { name, plan, implement } = BUILT;
+    const made = path.join(store!, 'workflows', name);
+    try {
+      await page.getByRole('button', { name: 'New workflow' }).click();
+      const form = page.getByRole('form', { name: 'New workflow' });
+      await form.getByRole('textbox', { name: 'Workflow name' }).fill(name);
+      await form.getByRole('textbox', { name: 'First step' }).fill('plan');
+      await form.getByRole('textbox', { name: 'What it is told' }).fill(plan);
+      const [created] = await Promise.all([
+        page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/workflows/yours', { timeout: WAIT_MS }),
+        form.getByRole('button', { name: 'Make it' }).click(),
+      ]);
+      if (created.status() !== 201) throw new Refused(`the api makes the workflow — it answered ${created.status()}: ${await created.text()}`);
+      if (JSON.stringify(filesIn(made)) !== JSON.stringify([['plan.md', `${plan}\n`]])) throw new Refused(`the new folder is its first step — ${made} holds ${JSON.stringify(filesIn(made))}`);
+
+      const builder = card(page, name).locator(`section[data-builder="${name}"]`);
+      await expectVisible(builder, 'the workflow made opens in its builder');
+      await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'with nothing unsaved');
+      await addStep(builder, 'implement', implement);
+      await expectVisible(builder.locator('[data-unsaved]', { hasText: 'Unsaved changes' }), 'a step added is marked unsaved on the card');
+      await expectVisible(builder.locator('.react-flow__node[data-id="implement"] [data-unsaved-step]'), 'and on its block');
+      await expectCount(builder.locator('.react-flow__node[data-id="plan"] [data-unsaved-step]'), 0, 'and not on the step it did not change');
+
+      await drawEdge(page, builder, 'plan', 'implement');
+      await expectCount(builder.locator('.react-flow__edge[data-id="plan->implement"]'), 1, 'the edge drawn from plan to implement');
+      await expectVisible(builder.getByRole('button', { name: 'Remove the edge plan → implement' }), 'with a button that takes it away');
+
+      await builder.locator('.react-flow__node[data-id="implement"]').click();
+      const keys = builder.locator('[data-step-form="implement"]');
+      await expectVisible(keys, "implement's form, once its block is clicked");
+      await expectVisible(keys.locator('[data-field="after"] input[type="checkbox"]:checked'), 'whose after has plan, as the edge drew it');
+      await keys.locator('[data-field="effort"] select').selectOption('high');
+      await keys.locator('[data-field="check"] input').fill('npm test');
+      await expectVisible(builder.locator('.react-flow__node[data-id="implement"] dd', { hasText: /^npm test$/ }), 'the block shows the check set in its form');
+      await pasteSchema(builder, 'implement', PASTED);
+
+      const [saved] = await Promise.all([
+        page.waitForResponse(puts(name), { timeout: WAIT_MS }),
+        builder.getByRole('button', { name: 'Save', exact: true }).click(),
+      ]);
+      if (saved.status() !== 200) throw new Refused(`the api saves the folder — it answered ${saved.status()}: ${await saved.text()}`);
+      await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'once saved, nothing is unsaved');
+      await expectCount(builder.locator('[data-unsaved-step]'), 0, 'on any block');
+      await expectVisible(builder.locator('[data-saved]', { hasText: 'wrote implement.md, implement.schema.json; left plan.md as it was' }), 'and the card says what was written, the pasted schema with it');
+      if ((await keys.locator('[data-field="output"] select').inputValue()) !== 'implement.schema.json') throw new Refused("once saved, implement's output names the schema beside it, as the folder lists it");
+
+      // Read back through the api, as a start would read it, and on disk.
+      const answered = await page.request.get(new URL('/api/workflows', page.url()).href);
+      const listing = ((await answered.json()) as Array<{ name: string; from: string; steps: Array<{ name: string; spec: Record<string, unknown>; body: string }>; graph: { edges: unknown[] }; error: string | null }>)
+        .find((w) => w.name === name && w.from === 'yours');
+      const read = listing && { error: listing.error, steps: listing.steps.map((s) => [s.name, s.spec.after, s.spec.effort, s.spec.check, s.spec.output, s.body]), edges: listing.graph.edges };
+      const want = { error: null, steps: [['plan', [], null, null, null, plan], ['implement', ['plan'], 'high', 'npm test', 'implement.schema.json', implement]], edges: [{ from: 'plan', to: 'implement', kind: 'after' }] };
+      if (JSON.stringify(read) !== JSON.stringify(want)) throw new Refused(`GET /api/workflows reads the folder as it was built — it read ${JSON.stringify(read)}`);
+      const files = [['implement.md', `---\nafter: plan\neffort: high\ncheck: npm test\noutput: implement.schema.json\n---\n${implement}\n`], ['implement.schema.json', `${PASTED}\n`], ['plan.md', `${plan}\n`]];
+      if (JSON.stringify(filesIn(made)) !== JSON.stringify(files)) throw new Refused(`the folder's files are the steps as built — ${made} holds ${JSON.stringify(filesIn(made))}`);
+      const stepPage = await page.request.get(new URL(`/api/workflows/yours/${name}/implement`, page.url()).href);
+      const { source } = (await stepPage.json()) as { source?: string };
+      if (source !== files[0]![1]) throw new Refused(`the step's page reads implement.md as written — it read ${JSON.stringify(source)}`);
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `builder-saved-${await themeOf(page)}.png`), fullPage: true });
+    } finally {
+      fs.rmSync(made, { recursive: true, force: true });
+    }
+  },
+} satisfies PageSpec;

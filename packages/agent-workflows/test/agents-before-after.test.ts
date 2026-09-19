@@ -4,7 +4,7 @@
  * `fixtures/resolved-before.json` is what today's loader read every shipped folder as, written from the loader of 6c4e57b before any
  * folder moved a line into an agent. It is never regenerated: a difference is a finding, not a fixture to refresh.
  *
- * Every key of every step is held equal, field for field, with no exception but the new `agent`. The bodies are compared too, and the
+ * Every key of every step is held equal, field for field, with no exception but the new `agent` and the keys `KEYS_ADDED` names. The bodies are compared too, and the
  * steps whose body moved must be exactly `BODIES_REWORDED`: the reworded briefs of the change that wrote the agents, each printed as a
  * diff for the person who reads the run.
  */
@@ -51,6 +51,15 @@ const AGENTS: Record<string, string> = {
   'packages/agent-workflows/workflows/ui/review': 'ui-reviewer',
 };
 
+/**
+ * The keys a shipped step gained after the snapshot, as `<folder>/<step>` and each key with its value: nothing an agent moved, and each
+ * held to that value. The supervisor, which names no agent, got its `context:` window once the agent refactor had shipped
+ * (docs/pivot-2026-09-18.md §6, P1): the one session here that never ends is the one a cap is for. No other key of it moved.
+ */
+const KEYS_ADDED: Record<string, Record<string, unknown>> = {
+  'workflows/supervisor/supervise': { context: 200_000 },
+};
+
 /** A step as JSON has it — no `undefined` — without the fields the proof sets aside. */
 const keysOf = (step: Record<string, unknown>): Record<string, unknown> => {
   const { body: _body, agent: _agent, ...keys } = JSON.parse(JSON.stringify(step)) as Record<string, unknown>;
@@ -84,7 +93,7 @@ test('every shipped folder resolves to the keys it had before agents, and only t
     assert.deepEqual(after.map((s) => s.name), before.map((s) => s.name), `${folder}: the same steps, in the same order`);
     for (const [i, step] of after.entries()) {
       const was = before[i]!;
-      assert.deepEqual(keysOf(step), keysOf(was), `${folder}/${String(step.name)}: every key as it resolved before`);
+      assert.deepEqual(keysOf(step), { ...keysOf(was), ...KEYS_ADDED[`${folder}/${String(step.name)}`] }, `${folder}/${String(step.name)}: every key as it resolved before`);
       const agent = step.agent as { name: string; body: string } | undefined;
       if (agent) {
         named[`${folder}/${String(step.name)}`] = agent.name;
@@ -100,6 +109,12 @@ test('every shipped folder resolves to the keys it had before agents, and only t
         t.diagnostic(`${folder}/${String(step.name)}.md, its brief before and after:\n${lineDiff(String(was.body), String(step.body))}`);
       }
     }
+  }
+  // Each key added is one the snapshot did not have: a key that moved is never passed off as one added.
+  for (const [at, keys] of Object.entries(KEYS_ADDED)) {
+    const [folder, name] = [at.slice(0, at.lastIndexOf('/')), at.slice(at.lastIndexOf('/') + 1)];
+    const was = BEFORE[folder]!.find((s) => s.name === name)!;
+    for (const key of Object.keys(keys)) assert.equal(Object.hasOwn(keysOf(was), key), false, `${at}: ${key} was in the snapshot`);
   }
   assert.deepEqual(moved.sort(), [...BODIES_REWORDED].sort(), 'the bodies that moved are exactly the reworded ones');
   assert.deepEqual(named, AGENTS, 'each shipped step names the agent it was written from');

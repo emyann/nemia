@@ -752,7 +752,7 @@ another repository and change that line.
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
 | the engine's word: `running (working)`, `needs-human` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
-| `unsigned` | it ended without the closeout it was asked for — its session settled `succeeded`, or went quiet and settled `failed` — or without a field its `output:` declares | **never runs** |
+| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine settled it `failed` (a journal from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares | **never runs** — the run nudges it once a round first, below |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
@@ -784,8 +784,7 @@ and `≥$3.01` where an ended attempt has no cost on it — and on the run's lin
 shows the step's own spend, `over budget $4.20 of $3`, has nothing beside it. A looping step held on another step's
 budget, `over budget — implement $4.25 of $3`, has its own cost beside it.
 
-**`unsigned` blocks every `claude-detached` step** until engine open issue 4 is fixed: that harness
-never hands the closeout schema on, so its steps never sign off. `claude` and `codex` steps do.
+Every harness hands the closeout schema on: `claude`, `codex`, and `claude-detached` since engine `3e44ab6`.
 
 ### Trying again: `retries:` and `wf retry`
 
@@ -807,6 +806,19 @@ retries: 1
   of the last try, and carries the check's verdict as data: the command, the exit code, the last 20 lines of
   stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
   step waits on you, as before.
+- **An unsigned step is nudged once, by the run, before it waits on you.** A session the engine ended `unsigned`
+  — quiet, or `done` by its harness, without calling `StructuredOutput` — that said nothing is continued once:
+  the next tick files the next try as a nudge on no one's word (`then: 'signoff'` on the record), with the same
+  schema, model, effort, context window, tools and permission mode as the session it continues, told in
+  `## Try <n>` that it ended without calling `StructuredOutput`, that the work stands and it should change
+  nothing and sign off now, finishing first if it had not, and signing off anyway saying what stops it if it
+  cannot. Once a round, never in a loop: a nudge that ends unsigned too leaves the step `unsigned`, on you, and
+  `wf ls` says `try 2, nudged to sign off by the run`, `wf decide` `UNSIGNED: implement (nudged to sign off once
+  by the run, and unsigned again)`. A person's ask for that try comes first. Not nudged: a step over its budget,
+  a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
+  engine said `unsigned` for `done`. Why the run and not the engine's `maxAttempts`: an engine allowance is per
+  task, so a person's try would earn another in the same round; each engine attempt gets the whole
+  `budgetUsd`; and `maxAttempts: 2` also restarts a session the harness failed.
 - **A check that did not finish did not refuse.** A check refuses when it runs to its end and exits non-zero:
   the engine settles it `failed`, with an exit code. One that was `stopped` (killed, never started), or
   `failed` without an exit code (stopped at its deadline, or lost), said nothing about the work. `retries`

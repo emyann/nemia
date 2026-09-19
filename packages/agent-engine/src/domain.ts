@@ -169,29 +169,39 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
  * --message` saying "you ended in prose instead of calling the StructuredOutput tool; change nothing; sign off now" got
  * each within thirty seconds. So this says that, and the unfinished case keeps its sentence at the end.
  *
- * The tool's name is Claude Code's, which is the only harness a nudge can reach: `unsigned` needs quiet, and only the
- * `claude --bg` runner reports it. A harness with another word for its closing statement would need its own nudge, and
- * that would be a value on the task rather than a branch in here.
+ * The tool's name is Claude Code's. `unsigned` has two doors — quiet, which only the `claude --bg` runner reports, and the
+ * harness's `done` with no statement, which any runner can — but every harness that takes a schema today is Claude Code's.
+ * A harness with another word for its closing statement would need its own nudge, and that would be a value on the task
+ * rather than a branch in here.
  */
 const NUDGE = 'You ended without calling StructuredOutput, and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it. Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you cannot finish it, call it anyway, saying what stops you.';
 
 /**
- * Why an attempt ended, in the only four categories the engine can tell apart.
+ * Why an attempt ended, in the only categories the engine can tell apart.
  *
  *   `harness`      the harness reported a terminal state — or the session went quiet, and its task asked for no
  *                  closing statement, so quiet is the only end it has. It ran, and this is what it concluded.
  *   `lost`         we never heard: the session vanished, or a detached worker stopped beating.
  *                  The work in the transcript is real; nobody said it was finished.
- *   `unsigned`     the session went quiet without the closing statement its task asked for. It stopped; it may
- *                  have finished, and it did not say so, which is all a statement is for. Recorded `failed`.
+ *   `unsigned`     the session ended without the closing statement its task asked for — went quiet, or its harness
+ *                  said `done` — and did not say so. It stopped; it may have finished, and it did not say so, which is
+ *                  all a statement is for. Recorded `failed`: a task that asked for a statement never succeeds without one.
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
  *   `budget`       the harness ended the session at the spend cap its task gave it. It was cut off, not concluded. The
  *                  cap is the task's, once: the task settles `failed`, and no attempt follows, resumed or clean.
+ *   `operator`     a person asked the task to stop, and the attempt was stopped before its harness ended it. Recorded
+ *                  `stopped`. Journals before 2026-09-19 settled such an attempt without ending it.
+ *   `deadline`     the task ran past its deadline, and the attempt was stopped before its harness ended it. Recorded
+ *                  `failed`, and the task settles `failed`.
+ *
+ * Every ended attempt carries the agent's statement, untouched, or one of these as the reason it has none — never
+ * neither, and never words the machine wrote in the agent's name. (`harness` on a task that asked for no statement:
+ * the harness's own state is all it has, and all it was asked for.)
  *
  * Everything about resume policy hangs on this distinction, which is why it is recorded rather
  * than inferred later.
  */
-export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'budget';
+export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'budget' | 'operator' | 'deadline';
 
 /** What a new attempt does with the one before it. A workload property, not a callback. */
 export type ResumePolicy =
@@ -468,10 +478,18 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   const sighting = last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
   const live = last !== undefined && last.ended === null && sighting !== undefined && isLive(sighting.state);
 
+  // An attempt cut short is ended before its task settles: with its harness's own end, statement untouched, when it
+  // had one before the cut came; otherwise with the cut as its reason. Never settled open, with neither.
+  const cut = (reason: 'operator' | 'deadline'): Action | undefined =>
+    !last || last.ended !== null ? undefined
+      : sighting?.state === 'done' || sighting?.state === 'failed' || sighting?.budgetSpent ? endOf(state, last, sighting)
+      : { do: 'record-end', attempt: last.n, sessionId: sighting?.sessionId ?? '(never seen)', observed: reason === 'operator' ? 'stopped' : 'failed',
+          reason, nativeId: sighting?.nativeId, closeout: sighting?.closeout?.payload };
+
   // The operator's intent outranks everything except a terminal state.
   if (state.stopRequested) {
     if (live) return { do: 'stop', sessionId: sighting!.sessionId, why: 'operator' };
-    return { do: 'settle', outcome: 'stopped', note: 'operator' };
+    return cut('operator') ?? { do: 'settle', outcome: 'stopped', note: 'operator' };
   }
 
   // ---- the deadline, over the time the task has actually been RUNNING.
@@ -487,7 +505,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     const ranFor = now.at.getTime() - new Date(state.attempts[0]!.startedAt).getTime();
     if (ranFor > state.deadlineSeconds * 1000) {
       if (live) return { do: 'stop', sessionId: sighting!.sessionId, why: 'deadline' };
-      return { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
+      return cut('deadline') ?? { do: 'settle', outcome: 'failed', note: `deadline exceeded after ${Math.round(ranFor / 1000)}s` };
     }
   }
 
@@ -498,7 +516,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
     // A budget spent is spent: the cap is the task's, once. No attempt follows, whatever `maxAttempts` or `resume` says.
     if (last?.reason === 'budget') return { do: 'settle', outcome: 'failed', note: `attempt ${last.n} spent its budget. File the task again with a larger one to run it again` };
     if (state.attempts.length >= state.maxAttempts) {
-      const why = last?.reason === 'unsigned' ? ': the last went quiet without the closing statement it was asked for' : '';
+      const why = last?.reason === 'unsigned' ? ': the last ended without the closing statement it was asked for' : '';
       return { do: 'settle', outcome: 'failed', note: `${state.attempts.length} attempt(s), none succeeded${why}` };
     }
     // The ceiling is checked LAST, after every terminal answer. A task that is finished must still
@@ -519,14 +537,13 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   // so it is adopted rather than started a second time. That is the whole reason the name is ours.
   if (sighting) {
     // Quiet and working: its runner holds it has stopped. The end of a task that asked for no statement; for one that
-    // asked and was told none, an UNSIGNED end — it never said it had finished, and that is not a success.
+    // asked and was told none, an UNSIGNED end — it never said it had finished, and that is not a success. Nor is the
+    // harness's `done` without one: by either door, a task that asked for a statement succeeds only on one.
     const quiet = sighting.state === 'working' && sighting.quietMs !== undefined;
     if (isLive(sighting.state) && !quiet) {
       return { do: 'nothing', why: NEEDS_HUMAN.has(sighting.state) ? 'blocked — needs a person' : `running (${sighting.state})` };
     }
-    const unsigned = quiet && state.closeoutSchema !== undefined && sighting.closeout === undefined;
-    return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: unsigned ? 'failed' : quiet ? 'done' : sighting.state,
-      reason: unsigned ? 'unsigned' : sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
+    return endOf(state, last, sighting);
   }
 
   if (!last.spawnedAt) return { do: 'spawn', attempt: last.n, name: nameFor(state.taskId, last.n) };
@@ -537,6 +554,15 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   return age < now.graceMs
     ? { do: 'nothing', why: 'spawned, waiting for the harness to register it' }
     : { do: 'record-end', attempt: last.n, sessionId: '(never seen)', observed: 'failed', reason: 'lost' };
+}
+
+/** The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. */
+function endOf(state: State, last: Attempt, sighting: Sighting): Action {
+  const quiet = sighting.state === 'working';
+  const unsigned = (quiet || sighting.state === 'done') && !sighting.budgetSpent && state.closeoutSchema !== undefined && sighting.closeout === undefined;
+  // A spent budget is `failed` whatever state the harness left it in: cut off, not concluded — `done` would settle it succeeded.
+  return { do: 'record-end', attempt: last.n, sessionId: sighting.sessionId, observed: unsigned || sighting.budgetSpent ? 'failed' : quiet ? 'done' : sighting.state,
+    reason: unsigned ? 'unsigned' : sighting.budgetSpent ? 'budget' : 'harness', nativeId: sighting.nativeId, closeout: sighting.closeout?.payload };
 }
 
 /**

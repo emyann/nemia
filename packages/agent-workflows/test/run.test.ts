@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, workChecks, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, signoffsSpent, SIGNOFF, dueNote, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, taskUsage, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -20,6 +20,9 @@ const run = (steps: Record<string, string | null>, rest: Partial<Run> = {}): Run
 });
 
 const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? 'unknown';
+
+/** A run whose implement is on the try after the run's one sign-off nudge, spent: what `retriesDue` leaves an unsigned step to a person on. */
+const signedOffOnce = (r: Run): Run => ({ ...r, steps: { ...r.steps, implement: { ...r.steps.implement!, tries: [{ taskId: 't0', then: 'signoff' }] } } });
 
 test('a fresh run files only the step with nothing in front of it', () => {
   const a = assess(STEPS, run({ implement: null, review: null }), phases({}));
@@ -802,7 +805,8 @@ test('a task that was never asked for a closeout is not held to one — a run fr
 });
 
 test('UNSIGNED, though the engine settles it `failed`: a session that went quiet without its closeout waits on you and blocks the run, and a nudge is told it gave none — failed for another reason, stopped, still nudged or signed off blocked, it reads as before', () => {
-  const r = run({ implement: 't1', review: null });
+  // Its one sign-off nudge spent (`signoffsSpent`): before it, the run nudges the step itself, and it waits on nobody.
+  const r = signedOffOnce(run({ implement: 't1', review: null }));
   const failed = phases({ t1: 'failed' });
   const none = () => undefined;
   /** The engine's record: asked for a closeout, and its last attempt ended `unsigned`. */
@@ -840,7 +844,7 @@ test("UNSIGNED is the LAST attempt's word: a task of `maxAttempts: 2` whose atte
       })),
     },
   } as unknown as TaskView]]);
-  const r = run({ implement: 't1', review: null });
+  const r = signedOffOnce(run({ implement: 't1', review: null }));
   const failed = phases({ t1: 'failed' });
   const none = () => undefined;
 
@@ -3767,4 +3771,72 @@ test("a gate on the last step of a folder that merges nothing: approving accepts
   // And a folder whose ending merges says nothing once that step has run: the branch is its business, not a person's git.
   const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
   assert.equal(assess(ENDS, ran, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), signedDone, asked, () => undefined, [], [], () => false, () => undefined, AHEAD).toDecide, undefined);
+});
+
+test("UNSIGNED, the run nudges it ITSELF once a round before it waits on you: the session continued, told to sign off — not twice in a round, again after one, never over its budget, on a cancelled run, or on a step that was not ended `unsigned` by the engine; a person's ask first", () => {
+  const failed = phases({ t1: 'failed' });
+  const none = () => undefined;
+  /** The engine's record: asked for a closeout, and its last attempt ended `unsigned` — quiet, or `done`, with nothing said. */
+  const unsignedEnd = () => 'unsigned' as const;
+  const r = run({ implement: 't1', review: null });
+  const due = (x: Run, asks: RetryAsk[] = [], askedCloseout: (id: string) => boolean | 'unsigned' = unsignedEnd, spendOf: SpendOf = () => undefined, steps = STEPS) =>
+    retriesDue(steps, x, failed, none, askedCloseout, () => undefined, asks, () => false, spendOf);
+
+  assert.deepEqual(due(r), [{ step: 'implement', try: 2, mode: 'nudge', by: 'signoff' }]);
+  const a = assess(STEPS, r, failed, none, unsignedEnd);
+  assert.deepEqual([a.retry.map((x) => x.by), a.status], [['signoff'], 'running'], 'the run is moving, and waiting on nobody');
+  assert.deepEqual(listing(STEPS, r, shown({ t1: 'failed' }), none, unsignedEnd).waitingOnYou, [], 'nor does wf ls put it on you');
+  assert.equal(dueNote(STEPS[0]!, r, due(r)[0]!), 'try 2 due — a nudge to sign off, once a round: its session ended without its closeout');
+  assert.equal(retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, failed, none, unsignedEnd),
+    'the run nudges implement itself: its session ended without the closeout it was asked for, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try 2. Wait for it: wf ls r-1.');
+
+  // Filed, the try is behind it as `signoff`, and it continues the session on the model it ran on.
+  const nudged = { ...r, steps: { ...r.steps, implement: nextTry(r.steps.implement!, due(r)[0]!, 't2') } };
+  assert.deepEqual(nudged.steps.implement!.tries, [{ taskId: 't1', then: 'signoff' }]);
+  assert.equal(signoffsSpent(nudged.steps.implement), 1);
+  assert.equal(tryNote(STEPS[0]!, nudged.steps.implement), 'try 2, nudged to sign off by the run');
+
+  // Once a round. The nudge ended unsigned too: the step is yours, and the run says a nudge was tried.
+  const again = phases({ t2: 'failed' });
+  assert.deepEqual(retriesDue(STEPS, nudged, again, none, unsignedEnd), [], 'never twice in a round');
+  assert.deepEqual(listing(STEPS, nudged, shown({ t2: 'failed' }), none, unsignedEnd).waitingOnYou, ['implement']);
+  assert.equal(listing(STEPS, nudged, shown({ t2: 'failed' }), none, unsignedEnd).steps[0]!.note, 'try 2, nudged to sign off by the run');
+  // A person's try in between spends nothing, and does not free another.
+  const byYou = { ...nudged, steps: { implement: { taskId: 't3', tries: [{ taskId: 't1', then: 'signoff' as const }, { taskId: 't2', then: 'nudge' as const }] }, review: { taskId: null } } };
+  assert.deepEqual(retriesDue(STEPS, byYou, phases({ t3: 'failed' }), none, unsignedEnd), [], 'a person tried it since: still spent');
+  // A round is new work: the nudge is due again in it.
+  const round2 = { ...nudged, steps: { implement: { taskId: 't3', tries: [{ taskId: 't1', then: 'signoff' as const }, { taskId: 't2', then: 'round' as const }] }, review: { taskId: null } } };
+  assert.deepEqual(retriesDue(STEPS, round2, phases({ t3: 'failed' }), none, unsignedEnd).map((x) => [x.by, x.try]), [['signoff', 4]]);
+
+  // A person's ask for the same try comes first, their way.
+  assert.deepEqual(due(r, [{ step: 'implement', try: 2, mode: 'fresh', at: 'now' }]).map((x) => [x.by, x.mode]), [['ask', 'fresh']]);
+  // Not ended `unsigned` by the engine: a task that failed for another reason, or a journal from before `done` was unsigned — asked,
+  // settled `succeeded`, nothing said — which still reads `unsigned` and is a person's, as it was.
+  assert.deepEqual(due(r, [], asked), [], 'failed for another reason');
+  assert.deepEqual(retriesDue(STEPS, r, phases({ t1: 'succeeded' }), none, asked), [], "an old journal's `done` without a statement");
+  // Over its budget, it reads `over budget`, and the run spends nothing more on it on its own word.
+  const capped: Workflow[] = [{ ...step('implement'), budget: 3 }, step('review', ['implement'])];
+  assert.deepEqual(due(r, [], unsignedEnd, spends({ t1: 4 }), capped), [], 'over budget');
+  assert.deepEqual(due(r, [], unsignedEnd, spends({ t1: 2 }), capped).map((x) => x.by), ['signoff'], 'under it, nudged');
+  // A cancelled run files nothing.
+  assert.deepEqual(assess(STEPS, { ...r, ...CANCELLED }, failed, none, unsignedEnd).retry, []);
+});
+
+test('the run\'s sign-off nudge is told in its owner\'s words, pinned — the tool named, the work left standing, and what to do if it is not finished or cannot be', () => {
+  assert.equal(SIGNOFF, [
+    'Your last turn ended without calling `StructuredOutput`, and this step asks for a closing statement: nothing that waits',
+    'on it can start without one.',
+    '',
+    'The work you did stands. Change nothing, and sign off now: call `StructuredOutput` with your closeout. If the work is not',
+    'finished, finish it first and then sign off. If it cannot be finished, sign off anyway, saying what stops it.',
+  ].join('\n'));
+  const r = run({ implement: 't1', review: null });
+  const briefing = (resumed: boolean): RetryBriefing => ({ try: 2, by: 'signoff', mode: 'nudge', resumed, status: 'unsigned' });
+  const brief = composeBrief(STEPS[0]!, r, STEPS, undefined, undefined, undefined, briefing(true));
+  assert.ok(brief.startsWith(`## Try 2\n\n${SIGNOFF}\n`), brief);
+  assert.match(brief, /## When you are finished/, 'with the closeout contract after it, as on every try');
+  // With no session to continue, a new one has no last turn to be told of: it is told as any try is, and who filed it.
+  const fresh = retrySection(STEPS[0]!, briefing(false));
+  assert.ok(!fresh.includes(SIGNOFF), fresh);
+  assert.match(fresh, /The last try ended without the closeout the run asked for[^\n]*\nThe run filed this try itself, once in a round, before it waits on a person\.\n\nThis is a new session\./);
 });

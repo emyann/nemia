@@ -1581,8 +1581,13 @@ test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose 
   // Killed at its deadline: the engine settles it `failed`, with no exit code on its attempt and no trailer on its log.
   const killed = await throughCheck('check: npm test\nretries: 1', 'failed');
   killed.logs.set(`${killed.run.id}-implement-check`, 'ok 1 - builds\n');
+  // Cut at its deadline with an exit code on its end — a script that traps the signal and exits — is cut all the same:
+  // the engine ends it `deadline` since P0.5, and the code on that end is how it died, not a verdict on the work.
+  const cut = await throughCheck('check: npm test\nretries: 1', 'failed', 143);
+  cut.settle(`${cut.run.id}-implement-check`, 'failed', undefined, 143, 'deadline');
+  cut.logs.set(`${cut.run.id}-implement-check`, 'ok 1 - builds\n');
 
-  for (const [b, verdict] of [[refused, 1], [killed, 'unfinished']] as const) {
+  for (const [b, verdict] of [[refused, 1], [killed, 'unfinished'], [cut, 'unfinished']] as const) {
     const run = readRun(b.run.id);
     const verdictOf = exitVerdicts(await viewsOf(b.e, run), run);
     assert.equal(verdictOf('implement'), verdict);
@@ -1590,6 +1595,7 @@ test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose 
     assert.equal((await list(b.e, run)).steps[0]!.status, `failed ✗ check (${verdictWord(verdict)})`, "`wf ls`'s word, which it read off the log");
   }
   assert.deepEqual((await advance(killed.e, readRun(killed.run.id))).tried, [], 'a check that did not finish spends no retry');
+  assert.deepEqual((await advance(cut.e, readRun(cut.run.id))).tried, [], 'nor does one cut at its deadline, whatever code it exited with');
   assert.deepEqual((await advance(refused.e, readRun(refused.run.id))).tried, ['implement'], 'a refusal does');
 });
 
@@ -1623,6 +1629,17 @@ test("`phaseOfView` and `closeoutAsked` say what `wf ls` says: `unknown` for a t
   assert.deepEqual([phaseOfView(oldViews.get('t-before')), closeoutAsked(oldViews)('t-before'), (await list(old, before)).steps[0]!.status], ['succeeded', false, 'unverified']);
 });
 
+/**
+ * The run's one sign-off nudge of an unsigned implement, filed by the next pass and ended unsigned in its turn: what leaves the step on a
+ * person at shipped defaults (`retriesDue`, `by: 'signoff'`).
+ */
+async function nudgedUnsigned(b: ReturnType<typeof board>, runId: string): Promise<void> {
+  const pass = await advance(b.e, readRun(runId));
+  assert.deepEqual(pass.tried, ['implement'], 'the run nudges it to sign off, itself');
+  assert.equal(readRun(runId).steps.implement?.tries?.at(-1)?.then, 'signoff');
+  b.settle(`${runId}-implement-try2`, 'failed', undefined, undefined, 'unsigned');
+}
+
 test('UNSIGNED at shipped defaults, now that the engine settles it `failed`: a step whose session went quiet without its closeout waits on you, the run is blocked, and a nudge is told it gave none — a step that failed for another reason still reads `failed`', async () => {
   // Each as the engine records it (agent-engine's open issues, *Quiet without a closeout*): the attempt ended `failed` with its reason, the
   // task settled `failed`, and nothing said.
@@ -1631,13 +1648,17 @@ test('UNSIGNED at shipped defaults, now that the engine settles it `failed`: a s
     const run = started(folder());
     await advance(b.e, readRun(run.id));
     b.settle(`${run.id}-implement`, 'failed', undefined, undefined, reason);
+    // Unsigned, the run nudges it itself first, once (`retriesDue`, `signoff`); this nudge ends unsigned too, and the step is a person's.
+    if (reason === 'unsigned') await nudgedUnsigned(b, run.id);
     return { ...b, run };
   };
   const quiet = await through('unsigned');
   const broke = await through('harness');
   const askedOf = async (b: typeof quiet) => {
-    const views = await viewsOf(b.e, readRun(b.run.id));
-    return [phaseOfView(views.get(`${b.run.id}-implement`)), closeoutAsked(views)(`${b.run.id}-implement`)];
+    // The first try's task, as the engine records it — the step is on the nudge after it when unsigned.
+    const first = `${b.run.id}-implement`;
+    const views = new Map([[first, await b.e.view(first)]]);
+    return [phaseOfView(views.get(first)), closeoutAsked(views)(first)];
   };
   assert.deepEqual(await askedOf(quiet), ['failed', 'unsigned']);
   assert.deepEqual(await askedOf(broke), ['failed', true]);
@@ -1657,7 +1678,7 @@ test('UNSIGNED at shipped defaults, now that the engine settles it `failed`: a s
 
     await retry(b.e, b.run.id, 'implement', { mode: 'nudge' });
     assert.deepEqual((await advance(b.e, readRun(b.run.id))).tried, ['implement'], word);
-    const brief = b.tasks.get(`${b.run.id}-implement-try2`)!.spec.brief;
+    const brief = b.tasks.get(readRun(b.run.id).steps.implement!.taskId!)!.spec.brief;
     assert.ok(brief.includes(told), `${word}: the try is told ${told}`);
   }
 });
@@ -1669,6 +1690,7 @@ test("UNSIGNED is read off the LAST attempt: a step of `maxAttempts: 2` whose at
     await advance(b.e, readRun(run.id));
     assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.maxAttempts, 2, 'filed with two attempts');
     b.settle(`${run.id}-implement`, 'failed', undefined, undefined, reasons);
+    if (reasons.at(-1) === 'unsigned') await nudgedUnsigned(b, run.id);
     return { ...b, run };
   };
   const cases = [
@@ -1678,7 +1700,8 @@ test("UNSIGNED is read off the LAST attempt: a step of `maxAttempts: 2` whose at
   for (const { reasons, asked, word, outcome, onYou, told } of cases) {
     const b = await through(reasons);
     const taskId = `${b.run.id}-implement`;
-    const views = await viewsOf(b.e, readRun(b.run.id));
+    // The first try's task: unsigned, the step is on the run's nudge after it.
+    const views = new Map([[taskId, await b.e.view(taskId)]]);
     assert.deepEqual(views.get(taskId)!.state.attempts.map((a) => a.reason), reasons, 'two attempts on the view');
     assert.deepEqual([phaseOfView(views.get(taskId)), closeoutAsked(views)(taskId)], ['failed', asked], word);
     const l = await list(b.e, readRun(b.run.id));
@@ -1688,7 +1711,8 @@ test("UNSIGNED is read off the LAST attempt: a step of `maxAttempts: 2` whose at
       { outcome, unsigned: word === 'unsigned' ? ['implement'] : [], failed: word === 'failed' ? ['implement'] : [] }, word);
     await retry(b.e, b.run.id, 'implement', { mode: 'nudge' });
     assert.deepEqual((await advance(b.e, readRun(b.run.id))).tried, ['implement'], word);
-    assert.ok(b.tasks.get(`${taskId}-try2`)!.spec.brief.includes(told), `${word}: the try is told ${told}`);
+    const now = readRun(b.run.id).steps.implement!.taskId!;
+    assert.ok(b.tasks.get(now)!.spec.brief.includes(told), `${word}: the try is told ${told}`);
   }
 });
 

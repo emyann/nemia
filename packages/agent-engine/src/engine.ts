@@ -186,9 +186,10 @@ export const step = Effect.fn('step')(function* (
       break;
 
     case 'settle': {
-      // An attempt left open — stopped by a person, or past its deadline — has no `ended` to carry its
-      // session's id, so it is written here, read off the sighting as an ending's facts are: what `logs`
-      // reads once the harness has let the session go. A fact for the record; `decide` never reads it.
+      // An attempt left open has no `ended` to carry its session's id, so it is written here, read off the sighting as an
+      // ending's facts are: what `logs` reads once the harness has let the session go. A fact for the record; `decide`
+      // never reads it. Since P0.5 `decide` ends a stopped or timed-out attempt before it settles, so only a journal
+      // from before settles over an open one; kept for the task that journal is replayed into.
       const last = state.attempts.at(-1);
       const open = last && last.ended === null ? observed.get(nameFor(taskId, last.n))?.nativeId : undefined;
       yield* journal.append(taskId, { kind: 'settled', at: at(), outcome: action.outcome, note: action.note, ...(open ? { nativeId: open } : {}) });

@@ -5,17 +5,39 @@
  *
  * Nothing asks unless a board asks. `readQuota` answers from the last ask while it is younger than `QUOTA_KEEP_MS`, starts one ask
  * otherwise — a request that comes while one is in flight joins it — and waits for it at most `QUOTA_WAIT_MS` before it says `asking`.
- * What it holds is in this process's memory and nowhere else, judged against the time of each request: a restart costs one ask.
+ * An answer in which Anthropic's usage service gave Claude Code nothing (`unanswered`) is kept longer, and longer again each time in a row
+ * (`backoffOf`), until a good reading. What it holds is in this process's memory and nowhere else, judged against the time of each request:
+ * a restart costs one ask.
  */
 import { spawn } from 'node:child_process';
 import os from 'node:os';
 
 /**
- * How long an ask's outcome is kept, a failure's as much as an answer's: three minutes. The usage endpoint behind `get_usage` is reported
- * to refuse a token that asks in bursts, for hours, and every board open on this api shares one ask. `HKB_QUOTA_KEEP_MS` sets it (the
- * e2e's 0 asks on every read).
+ * How long an ask's outcome is kept, a failure's as much as a good reading's: ten minutes, six asks an hour while a board is open. The windows
+ * are five hours and a week long, and a number read ten minutes ago says as much about them as one read three minutes ago; the usage endpoint
+ * behind `get_usage` is reported to refuse an account that asks in bursts, for hours, and every board open on this api shares one ask.
+ * `HKB_QUOTA_KEEP_MS` sets it (the e2e's 0 asks on every read).
  */
-export const QUOTA_KEEP_MS = 3 * 60 * 1000;
+export const QUOTA_KEEP_MS = 10 * 60 * 1000;
+
+/**
+ * How long an `unanswered` outcome is kept the first time in a row: twenty minutes, twice the keep, so that a service limiting how often it
+ * is asked is asked half as often at once; each such answer in a row doubles the wait, to `QUOTA_BACKOFF_CEILING_MS`, and a good reading
+ * begins it again (`backoffOf`). `HKB_QUOTA_BACKOFF_MS` sets it (the e2e's 0 asks on every read).
+ */
+export const QUOTA_BACKOFF_MS = 20 * 60 * 1000;
+
+/**
+ * The longest an `unanswered` outcome is kept: four hours — 20, 40, 80 and 160 minutes, then four hours for as long as it lasts, five asks in
+ * the first five hours and six a day after. Longer, and a service that answers again is not read for most of a five-hour window.
+ */
+export const QUOTA_BACKOFF_CEILING_MS = 4 * 60 * 60 * 1000;
+
+/**
+ * How long the last good reading is shown, dimmed, beside a state that has no windows of its own: six hours. Past that its five-hour window
+ * is certainly one that has begun again, and the week's number is more than a day of steady use behind; it goes.
+ */
+export const QUOTA_LAST_MS = 6 * 60 * 60 * 1000;
 
 /** How long a request waits for an ask before it answers `asking`: the Factory's loader waits on a slow harness this long, no longer. */
 export const QUOTA_WAIT_MS = 2_000;
@@ -64,18 +86,24 @@ export type Asked =
  *   fresh      the plan's windows, from an answer younger than `keepMs`: `windows` are to show
  *   asking     no answer held, and one asked for: said so, and read again soon
  *   no-plan    Claude Code here has no plan limits: it is not signed in to a Claude subscription
+ *   unanswered Claude Code is signed in to a subscription, and Anthropic's usage service gave it nothing: `rate_limits_available` true and
+ *              `rate_limits` null. Claude Code 2.1.278 answers so when the service's body is an error ("Usage fetch returned a fieldless or
+ *              non-object body (in-band error)" in its --debug log), which may be the service limiting how often it is asked: kept by
+ *              `backoffOf`, not the keep
  *   no-claude  there is no `claude` on the api's PATH
  *   timeout    Claude Code did not answer in time
  *   failed     Claude Code ended before it answered
  *   unknown    it answered in a shape this code does not read: an error for the request, or no window it can read
  *
- * `said` is the plain sentence for every case but `fresh`, with what to do. `askedAt` and `ageMs` are the held ask's, null while none is.
- * `last` is the last answer that had windows, when the state is not `fresh`: for the hover, with its time, and never shown as now.
+ * `said` is the plain sentence for every case but `fresh`, with what to do. `askedAt` and `ageMs` are the held ask's, null while none is;
+ * `againAt` is when a read will next ask, null while none is held. `last` is the last answer that had windows, when the state is not
+ * `fresh` and it is younger than `QUOTA_LAST_MS`: shown dimmed, with its time, and never as now.
  */
 export type Quota = {
-  state: 'fresh' | 'asking' | 'no-plan' | 'no-claude' | 'timeout' | 'failed' | 'unknown';
+  state: 'fresh' | 'asking' | 'no-plan' | 'unanswered' | 'no-claude' | 'timeout' | 'failed' | 'unknown';
   askedAt: string | null;
   ageMs: number | null;
+  againAt: string | null;
   subscription: string | null;
   windows: QuotaWindow[];
   last: { askedAt: string; windows: QuotaWindow[] } | null;
@@ -93,14 +121,15 @@ const ORDER = Object.keys(LABELS);
 
 const SEE = 'get_usage is experimental: see README.md, The quota on the board';
 
-/** `15 s`, `4 min`, `3 h`, `2 d`: how long, in the largest unit — a part of a second is a second. */
+/** `15 s`, `4 min`, `3 h`, `1 h 20 min`, `2 d`: how long — a part of a second is a second, and minutes beside hours under two days. */
 export function ageWord(ms: number): string {
   const sec = Math.ceil(Math.max(0, ms) / 1000);
   if (sec < 60) return `${sec} s`;
   const min = Math.floor(sec / 60);
   if (min < 60) return `${min} min`;
   const h = Math.floor(min / 60);
-  return h < 48 ? `${h} h` : `${Math.floor(h / 24)} d`;
+  if (h >= 48) return `${Math.floor(h / 24)} d`;
+  return min % 60 ? `${h} h ${min % 60} min` : `${h} h`;
 }
 
 const isObject = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
@@ -123,13 +152,16 @@ function windowsOf(limits: Record<string, unknown>, now: number): QuotaWindow[] 
   });
 }
 
+const subscriptionOf = (usage: Record<string, unknown>): string | null => typeof usage.subscription_type === 'string' ? usage.subscription_type : null;
+
 /**
- * What an answer says: the plan's windows and its subscription, no plan, or why it cannot be read. Pure, and judged at `now` for the
- * windows' resets.
+ * What an answer says: the plan's windows and its subscription, no plan, a plan the usage service gave nothing for, or why it cannot be read.
+ * Pure, and judged at `now` for the windows' resets.
  */
 export function answerOf(response: unknown, now: number):
   | { kind: 'windows'; windows: QuotaWindow[]; subscription: string | null }
   | { kind: 'no-plan' }
+  | { kind: 'unanswered'; subscription: string | null }
   | { kind: 'unknown'; what: string } {
   if (!isObject(response)) return { kind: 'unknown', what: 'its response is not an object' };
   if (response.subtype === 'error') {
@@ -139,24 +171,39 @@ export function answerOf(response: unknown, now: number):
   const usage = response.response;
   if (usage.rate_limits_available === false) return { kind: 'no-plan' };
   if (usage.rate_limits_available !== true) return { kind: 'unknown', what: 'it has no rate_limits_available' };
+  // The Agent SDK's type for this answer says as much: "or null when unavailable".
+  if (usage.rate_limits === null) return { kind: 'unanswered', subscription: subscriptionOf(usage) };
   if (!isObject(usage.rate_limits)) return { kind: 'unknown', what: 'its rate_limits are not an object' };
   const windows = windowsOf(usage.rate_limits, now);
   if (!windows.length) return { kind: 'unknown', what: `none of its rate_limits (${ORDER.join(', ')}) has a numeric utilization` };
-  return { kind: 'windows', windows, subscription: typeof usage.subscription_type === 'string' ? usage.subscription_type : null };
+  return { kind: 'windows', windows, subscription: subscriptionOf(usage) };
 }
 
-/** An ask's outcome, and when it came: the ms since the epoch. */
-export type Held = { asked: Asked; at: number };
+/**
+ * An ask's outcome, and when it came: the ms since the epoch. `keptMs` is how long it is kept when that is not the keep: an `unanswered`
+ * outcome's wait (`backoffOf`).
+ */
+export type Held = { asked: Asked; at: number; keptMs?: number };
 
 /**
- * The quota, judged at `now` from the ask held — null while none is, and one is being asked — and the last answer that had windows. Pure:
- * `readQuota` holds both and hands them here.
+ * How long the `streak`th `unanswered` outcome in a row is kept: `firstMs`, doubled for each one before it in the row, never past
+ * `QUOTA_BACKOFF_CEILING_MS` — nor under `firstMs`, should it be set higher than the ceiling.
+ */
+export function backoffOf(streak: number, firstMs: number = QUOTA_BACKOFF_MS): number {
+  return Math.min(firstMs * 2 ** Math.max(0, streak - 1), Math.max(firstMs, QUOTA_BACKOFF_CEILING_MS));
+}
+
+/**
+ * The quota, judged at `now` from the ask held — null while none is, and one is being asked — and the last answer that had windows, shown
+ * while younger than `QUOTA_LAST_MS`. Pure: `readQuota` holds both and hands them here.
  */
 export function quotaOf(held: Held | null, last: Held | null, now: number, keepMs: number = QUOTA_KEEP_MS): Quota {
-  const lastWindows = last?.asked.kind === 'answer' ? answerOf(last.asked.response, now) : null;
+  const lastWindows = last?.asked.kind === 'answer' && now - last.at <= QUOTA_LAST_MS ? answerOf(last.asked.response, now) : null;
+  const keptMs = held?.keptMs ?? keepMs;
   const base = {
     askedAt: held && new Date(held.at).toISOString(),
     ageMs: held && Math.max(0, now - held.at),
+    againAt: held && new Date(held.at + keptMs).toISOString(),
     subscription: null,
     windows: [],
     last: lastWindows?.kind === 'windows' ? { askedAt: new Date(last!.at).toISOString(), windows: lastWindows.windows } : null,
@@ -164,7 +211,7 @@ export function quotaOf(held: Held | null, last: Held | null, now: number, keepM
     markAt: QUOTA_MARK_PERCENT,
   };
   if (!held) return { ...base, state: 'asking', said: 'Asking Claude Code for the quota…' };
-  const left = held.at + keepMs - now;
+  const left = held.at + keptMs - now;
   const again = left >= 60_000 ? `Asked again in ${ageWord(left)}.` : 'Asked again on the next read.';
   const { asked } = held;
   switch (asked.kind) {
@@ -195,6 +242,14 @@ export function quotaOf(held: Held | null, last: Held | null, now: number, keepM
           ...base,
           state: 'no-plan',
           said: `No plan limits to show: the Claude Code the api runs is not signed in to a Claude subscription (an API key, or another provider). Run claude, then /login with the subscription's account, under the api's CLAUDE_CONFIG_DIR. ${again}`,
+        };
+      }
+      if (read.kind === 'unanswered') {
+        return {
+          ...base,
+          state: 'unanswered',
+          subscription: read.subscription,
+          said: `Claude Code is signed in to a subscription${read.subscription ? ` (${read.subscription})` : ''}, but Anthropic's usage service gave it nothing this time. The service may be limiting how often it is asked, so the board waits longer before each ask until it answers. ${again}`,
         };
       }
       if (read.kind === 'unknown') {
@@ -291,37 +346,49 @@ export function askUsage({ command = 'claude', timeoutMs = QUOTA_TIMEOUT_MS, env
   });
 }
 
-/** What the api holds: the last ask's outcome, the last with windows, and the ask in flight. This process's, and nobody's file. */
+/**
+ * What the api holds: the last ask's outcome, the last with windows, how many `unanswered` outcomes in a row since it, and the ask in
+ * flight. This process's, and nobody's file.
+ */
 let held: Held | null = null;
 let good: Held | null = null;
+let unanswered = 0;
 let inFlight: Promise<void> | null = null;
 
 /** Forget what is held, as a restart would: for tests. An ask in flight still lands. */
 export function forgetQuota(): void {
   held = null;
   good = null;
+  unanswered = 0;
 }
 
-const keepOf = (env: NodeJS.ProcessEnv): number => {
-  const ms = Number(env.HKB_QUOTA_KEEP_MS);
-  return env.HKB_QUOTA_KEEP_MS !== undefined && env.HKB_QUOTA_KEEP_MS !== '' && Number.isFinite(ms) && ms >= 0 ? ms : QUOTA_KEEP_MS;
+/** A length of time from `env[name]`, in ms: a number 0 or more, or `fallback` for anything else. */
+const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number => {
+  const value = env[name];
+  const ms = Number(value);
+  return value !== undefined && value !== '' && Number.isFinite(ms) && ms >= 0 ? ms : fallback;
 };
 
 /**
- * The quota as this request should say it: from what is held while it is younger than the keep; otherwise from an ask — the one in flight,
- * or one started now — waited for at most `waitMs`, and `asking` past that.
+ * The quota as this request should say it: from what is held while it is younger than its keep — the keep, or an `unanswered` outcome's
+ * wait; otherwise from an ask — the one in flight, or one started now — waited for at most `waitMs`, and `asking` past that.
  */
 export async function readQuota({ waitMs = QUOTA_WAIT_MS, timeoutMs = QUOTA_TIMEOUT_MS, env = process.env, now = () => Date.now() }: {
   waitMs?: number; timeoutMs?: number; env?: NodeJS.ProcessEnv; now?: () => number;
 } = {}): Promise<Quota> {
-  const keepMs = keepOf(env);
-  const current = () => held !== null && now() - held.at < keepMs;
+  const keepMs = msOf(env, 'HKB_QUOTA_KEEP_MS', QUOTA_KEEP_MS);
+  const backoffMs = msOf(env, 'HKB_QUOTA_BACKOFF_MS', QUOTA_BACKOFF_MS);
+  const current = () => held !== null && now() - held.at < (held.keptMs ?? keepMs);
   if (!current()) {
     const started = now();
     inFlight ??= askUsage({ timeoutMs, env }).then((asked) => {
       const at = Math.max(started, now());
-      held = { asked, at };
-      if (asked.kind === 'answer' && answerOf(asked.response, at).kind === 'windows') good = held;
+      const read = asked.kind === 'answer' ? answerOf(asked.response, at).kind : null;
+      // A good reading begins the backoff again; another failure between two `unanswered` answers neither ends it nor adds to it.
+      if (read === 'windows') unanswered = 0;
+      if (read === 'unanswered') unanswered += 1;
+      held = read === 'unanswered' ? { asked, at, keptMs: backoffOf(unanswered, backoffMs) } : { asked, at };
+      if (read === 'windows') good = held;
     }).finally(() => { inFlight = null; });
     let wait: NodeJS.Timeout | undefined;
     await Promise.race([inFlight, new Promise((r) => { wait = setTimeout(r, waitMs); })]);

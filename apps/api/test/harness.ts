@@ -30,7 +30,7 @@ export const answer = path.join(bin, 'usage-answer');
 const mode = path.join(bin, 'usage-mode');
 
 /** Claude Code 2.1.278's answers to `get_usage`, recorded by hand (`fixtures/get-usage-*.json`), their request id made `@ID@`. */
-export const recorded = (name: 'plan' | 'no-plan' | 'unsupported'): string =>
+export const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'): string =>
   fs.readFileSync(path.join(import.meta.dirname, 'fixtures', `get-usage-${name === 'plan' ? '' : `${name}-`}2.1.278.json`), 'utf8')
     .replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 

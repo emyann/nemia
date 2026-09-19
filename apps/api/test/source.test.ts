@@ -33,7 +33,7 @@ test('REFUSED: a raw control character — a NUL, a DEL, an escape — is found,
 });
 
 test("the api's source and tests hold no raw control character", () => {
-  const found = [...sources(path.join(API, 'src')), ...sources(path.join(API, 'test'))]
+  const found = [...sources(path.join(API, 'src')), ...sources(path.join(API, 'statusline')), ...sources(path.join(API, 'test'))]
     .flatMap((file) => {
       const at = controlAt(fs.readFileSync(file, 'utf8'));
       return at ? [`${path.relative(API, file)}:${at}`] : [];

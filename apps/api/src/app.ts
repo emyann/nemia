@@ -11,6 +11,7 @@ import { capabilitiesWithSteps } from './reach.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { inbox } from './inbox.ts';
 import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
+import { readQuota } from './quota.ts';
 import { agents } from './agents.ts';
 import { builder } from './builder.ts';
 import { workflows } from './workflows.ts';
@@ -1897,6 +1898,8 @@ export const app = new Hono()
       return c.json({ error: err instanceof Error ? err.message : String(err) }, 500);
     }
   })
+  // The subscription's quota, as the statusline script last wrote it, judged at this request (quota.ts): what the Factory says over its floor.
+  .get('/api/quota', (c) => c.json(readQuota()))
   .get('/api/runs/:id', async (c) => {
     const id = c.req.param('id');
     const run = findRun(id);

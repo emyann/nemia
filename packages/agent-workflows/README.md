@@ -856,9 +856,11 @@ rounds: 3
   succeeded. It is the rule `blocked` already follows: an agent's word the run routes on, and a count,
   with no condition and no expression.
 - **The loop contract is the run's, not the folder's.** The target is told `respond.md`'s three honest
-  answers: fix it; say why not, in `replies`, which the run adds to its closeout from round 2 (`fixed`
+  answers: fix it; say why not, in `replies`, which the run asks of it from round 2 (`fixed`
   or `won't fix`, and why) and hands the next reviewer as data, under *Replies from implement*; or
-  sign off `blocked`, which stops the run for a person. A target that answers nothing is `unsigned`.
+  sign off `blocked`, which stops the run for a person. A target that answers nothing, or an empty
+  list, is `unsigned`. `replies` is in the target's closeout schema from round 1, where it answers `[]`
+  and nothing reads it: a continued session asked for a changed schema rebuilds its whole prompt cache.
   The looping step is told, every round, what its `again` does and which round it is. A new session of
   the target within a round — `wf retry --fresh`, or a nudge with no session left to continue — is
   handed the round's contract and findings again, off the looping step's try that asked for the round.

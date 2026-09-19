@@ -898,7 +898,7 @@ test('REFUSED at load: a loop a round could not file again as it was — a step 
     /b is in two loops: b's \(`loop: a`\) and c's \(`loop: b`\)\. A round of either would file it again under the other/);
   const replies = { type: 'object', properties: { replies: { type: 'string' } }, required: ['replies'], additionalProperties: false };
   assert.match(refusal(loopFiles('loop: implement', { 'implement.md': '---\noutput: implement.schema.json\n---\nimplement it\n', 'implement.schema.json': replies })),
-    /^implement: `output: implement\.schema\.json` declares `replies`, and review loops back to implement \(`loop: implement`\), so from round 2 the run adds `replies` to its closeout/);
+    /^implement: `output: implement\.schema\.json` declares `replies`, and review loops back to implement \(`loop: implement`\), so the run adds `replies` to its closeout: its answer to each finding\. Rename the field\./);
 });
 
 /** A repository whose workflows/ holds `dev` and `ui`, each a folder of one step, and `notes`, a folder of none. */

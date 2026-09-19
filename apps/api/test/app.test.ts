@@ -816,8 +816,9 @@ function seedLoop(id: string, round: number, again: boolean) {
       tries: Array.from({ length: round - 1 }, (_, i) => ({ taskId: `t-${id}-${name}-${i + 1}`, then: 'round' })),
     };
   }
-  // A declared field is a field of the closeout itself, beside the four every closeout has.
-  settledTask(`t-${id}-implement-${round}`, round > 1 ? { ...done, replies: [] } : done);
+  // A declared field is a field of the closeout itself, beside the four every closeout has. From round 2 an empty `replies` is no answer.
+  const replies = [{ finding: 'src/flag.ts:12', answer: 'fixed', why: 'parsed before it is read' }];
+  settledTask(`t-${id}-implement-${round}`, round > 1 ? { ...done, replies } : done);
   settledTask(`t-${id}-review-${round}`, { ...done, again });
   writeRun({ ...r2, id, workflowDir: path.join(os.tmpdir(), 'hkb-api-no-such-workflow'), workflow: looped, steps });
 }

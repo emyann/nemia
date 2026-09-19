@@ -211,7 +211,7 @@ test("review's schema is the shipped review's, `again` and all, with a finding's
 });
 
 test('REFUSED: a review finding that names neither a file nor a page — nor half of one, nor both at once — in the closeout review is filed with', () => {
-  const validate = new Ajv({ strict: true, allowUnionTypes: true }).compile(closeoutSchemaOf(steps.review!));
+  const validate = new Ajv({ strict: true, allowUnionTypes: true }).compile(closeoutSchemaOf(steps.review!, Object.values(steps)));
   const closeout = (...findings: unknown[]) => ({ outcome: 'done', summary: 'Read and looked.', artifacts: [], needs: null, findings, again: findings.length > 0 });
   const what = 'The legend covers the last row of nodes.';
 
@@ -279,5 +279,5 @@ test("review is handed implement's screenshots and pages, and not its summary, b
   assert.ok(brief.includes(JSON.stringify(shot)), brief);
   assert.doesNotMatch(brief, /IMPLEMENTER-ACCOUNT/);
   assert.match(brief, /\n## Round 1 of 3\n/);
-  assert.deepEqual(closeoutSchemaOf(steps.review!).required, ['outcome', 'summary', 'artifacts', 'needs', 'findings', 'again']);
+  assert.deepEqual(closeoutSchemaOf(steps.review!, Object.values(steps)).required, ['outcome', 'summary', 'artifacts', 'needs', 'findings', 'again']);
 });

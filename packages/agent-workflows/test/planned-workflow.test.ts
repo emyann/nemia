@@ -70,7 +70,7 @@ test('REFUSED by machinery: plan has no tool that writes — read-only tools and
 });
 
 test("plan's closeout is the plan, strict — approach, files with a line each, steps, risks — whether it signs off done or blocked, and nothing short of it", () => {
-  const validate = new Ajv({ strict: true, allowUnionTypes: true }).compile(closeoutSchemaOf(steps.plan!));
+  const validate = new Ajv({ strict: true, allowUnionTypes: true }).compile(closeoutSchemaOf(steps.plan!, Object.values(steps)));
   const plan = {
     approach: 'Carry the answer on the ask file, and compose it into the try’s brief.',
     files: [{ path: 'packages/agent-workflows/src/cli.ts', change: 'parse --message' }],
@@ -80,7 +80,7 @@ test("plan's closeout is the plan, strict — approach, files with a line each, 
   const closeout = (rest: object, outcome = 'done', needs: string | null = null) => ({ outcome, summary: 'for the person', artifacts: [], needs, ...rest });
   assert.equal(validate(closeout(plan)), true, JSON.stringify(validate.errors));
   assert.equal(validate(closeout(plan, 'blocked', 'Carry it on the ask, or on the record?')), true, 'a question, beside the plan for the reading it would take');
-  assert.deepEqual(closeoutSchemaOf(steps.plan!).required, ['outcome', 'summary', 'artifacts', 'needs', 'approach', 'files', 'steps', 'risks']);
+  assert.deepEqual(closeoutSchemaOf(steps.plan!, Object.values(steps)).required, ['outcome', 'summary', 'artifacts', 'needs', 'approach', 'files', 'steps', 'risks']);
 
   for (const field of Object.keys(plan)) {
     const { [field as keyof typeof plan]: _, ...without } = plan;

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
+import { admissionOrder, branchWord, checkoutLine, checkoutWord, heldCheckouts, type MainClaim, endingSteps, firstLine, merges, resultSteps, toDecideWords, unheld, afterRefusal, answerLines, approvalOf, approvalRefusal, approvalWordsRefusal, gateLines, gateRefusal, gatesOf, hasGate, onYouWords, spentApprovals, triedFrom, ceilingLines, heldRuns, roundSpans, runAdmitted, runCapOf, slotNeed, slotWord, branchFates, checkLogsOf, forgetLine, forgetRefusal, heldWorktree, idRefusal, parseWorktrees, runWorktrees, type Forgot, budgetOf, costLine, overBudgetLine, ownStatus, retrySection, runCostLines, type StepStatus, budgetUsdFor, retriesDue, retryable, roundsDue, taskSpend, type SpendOf, answerOf, artifactLines, artifactPlace, artifactsContract, assess, cancelPlan, checkTaskId, CLOSEOUT_SCHEMA, closeoutSchemaOf, composeBrief, decision, declaredOutput, handOffDue, inFlight, listing, inputRefusal, inputsLine, inputsNote, messageRefusal, namesInOrder, nextTry, outputLines, owedFields, parseCloseout, placeText, refusedCheck, askingTry, REPLIES_SCHEMA, retriesSpent, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundOf, saidLines, sessionModel, saidWord, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, timeline, timelineLines, timelineTotalLines, durationWord, tryNote, workspacePlan, gated, hasStarted, runReady, tipBranches, tipsSeen, waitAdvice, waitingOn, waitsOf, waitWord, type Closeout, type Decision, type ParentCloseout, type ParentRun, type EarlierTry, type InputFile, type RetryAsk, type RetryBriefing, type RetryHow, type RoundAsk, type RetryMode, type Run, type Said, type StepRecord, type TaskClock, type TaskPhase } from '../src/run.ts';
 import type { TaskView } from 'agent-engine';
 import type { Verdict } from '../src/check.ts';
 import { CLOSEOUT_FIELDS, type OutputSchema, type Workflow } from '../src/workflow.ts';
@@ -1344,8 +1344,8 @@ const reviewSaid = (extra: Record<string, unknown> = {}): Closeout => ({
 const jsonIn = (brief: string) => JSON.parse(/```json\n([\s\S]*?)\n```/.exec(brief)![1]!);
 
 test('a step is filed with the closeout and the fields it declares, merged — still strict, and the base untouched', () => {
-  assert.equal(closeoutSchemaOf(step('implement')), CLOSEOUT_SCHEMA, 'a step that declares nothing is filed as before');
-  const merged = closeoutSchemaOf(REVIEW);
+  assert.equal(closeoutSchemaOf(step('implement'), []), CLOSEOUT_SCHEMA, 'a step that declares nothing is filed as before');
+  const merged = closeoutSchemaOf(REVIEW, []);
   assert.equal(merged.additionalProperties, false);
   assert.deepEqual(merged.required, ['outcome', 'summary', 'artifacts', 'needs', 'findings']);
   assert.deepEqual([...merged.required].sort(), Object.keys(merged.properties).sort(), 'every property required');
@@ -1504,7 +1504,7 @@ test('a declared field named `__proto__` travels like any other — into the bri
   const brief = composeBrief(reader, r, [producer, reader], (name) => (name === 'review' ? said : undefined));
   assert.equal(JSON.stringify(jsonIn(brief)), '{"__proto__":"product"}');
   assert.deepEqual(outputLines(producer, said), ['__proto__: product']);
-  assert.equal(JSON.stringify(closeoutSchemaOf(producer).required), '["outcome","summary","artifacts","needs","__proto__"]');
+  assert.equal(JSON.stringify(closeoutSchemaOf(producer, []).required), '["outcome","summary","artifacts","needs","__proto__"]');
 });
 
 // ─── files for the steps after it ───────────────────────────────────────────
@@ -1707,8 +1707,7 @@ test("UNSIGNED: from round 2 a loop's target owes `replies`, and is filed asking
   assert.equal(stepStatus(IMPLEMENT, reviewDue(2), ALL_SUCCEEDED, () => answered, asked, LOOP), 'verified');
   assert.equal(stepStatus(IMPLEMENT, inRound(1), ALL_SUCCEEDED, () => signedDone(), asked, LOOP), 'verified', 'round 1 had nothing to answer');
 
-  assert.equal(closeoutSchemaOf(IMPLEMENT), CLOSEOUT_SCHEMA, 'filed as before on round 1');
-  const filed = closeoutSchemaOf(IMPLEMENT, true);
+  const filed = closeoutSchemaOf(IMPLEMENT, LOOP);
   assert.deepEqual(filed.required, ['outcome', 'summary', 'artifacts', 'needs', 'replies']);
   assert.equal(filed.properties.replies, REPLIES_SCHEMA);
   assert.deepEqual([REPLIES_SCHEMA.items.additionalProperties, REPLIES_SCHEMA.items.required], [false, Object.keys(REPLIES_SCHEMA.items.properties)], 'strict');
@@ -1717,6 +1716,65 @@ test("UNSIGNED: from round 2 a loop's target owes `replies`, and is filed asking
   for (const again of ['yes', null, undefined, 1]) {
     assert.equal(stepStatus(LOOPING_REVIEW, inRound(1), ALL_SUCCEEDED, saidIn(1, again), asked, LOOP), 'unsigned', String(again));
   }
+});
+
+test("one schema for a loop's target, every round: `replies` is asked for from round 1, off the frozen workflow and never the round — and owed only from round 2, where an empty list is refused as a missing one is", () => {
+  // The same object, whatever round the run is on: the function is not told the round, so it cannot vary with it.
+  assert.deepEqual(closeoutSchemaOf(IMPLEMENT, LOOP), closeoutSchemaOf(IMPLEMENT, LOOP));
+  assert.equal(JSON.stringify(closeoutSchemaOf(IMPLEMENT, LOOP)), JSON.stringify({ ...CLOSEOUT_SCHEMA, properties: { ...CLOSEOUT_SCHEMA.properties, replies: REPLIES_SCHEMA }, required: [...CLOSEOUT_SCHEMA.required, 'replies'] }));
+  // A step no step loops to is filed as before — the looping step included, and the target in a workflow without the loop.
+  assert.equal(closeoutSchemaOf(LOOP[2]!, LOOP), CLOSEOUT_SCHEMA);
+  assert.deepEqual(closeoutSchemaOf(LOOPING_REVIEW, LOOP).required, ['outcome', 'summary', 'artifacts', 'needs', 'findings', 'again']);
+  assert.equal(closeoutSchemaOf(IMPLEMENT, [IMPLEMENT]), CLOSEOUT_SCHEMA);
+  assert.match(REPLIES_SCHEMA.description, /In the first round you were handed no findings: answer an empty list, \[\]\./, 'said where the agent reads it');
+
+  const said = (replies: unknown): Closeout => ({ outcome: 'done', summary: 'IMPLEMENTER-SUMMARY', artifacts: [], needs: undefined, output: { replies } });
+  const saying = (replies: unknown) => (name: string) => (name === 'implement' ? said(replies) : undefined);
+  // Round 1: the empty list is what it was asked for, and owes nothing.
+  assert.deepEqual(owedFields(IMPLEMENT, inRound(1), LOOP), []);
+  assert.equal(stepStatus(IMPLEMENT, inRound(1), ALL_SUCCEEDED, saying([]), asked, LOOP), 'verified');
+  // Round 2: an empty list is no answer, as none is not — at shipped defaults, `rounds: 3`.
+  assert.deepEqual(owedFields(IMPLEMENT, reviewDue(2), LOOP), ['replies']);
+  assert.equal(stepStatus(IMPLEMENT, reviewDue(2), ALL_SUCCEEDED, saying([]), asked, LOOP), 'unsigned', 'handed findings, it answered an empty list');
+  assert.equal(stepStatus(IMPLEMENT, reviewDue(2), ALL_SUCCEEDED, () => signedDone(), asked, LOOP), 'unsigned', 'and none, as before');
+  assert.deepEqual(assess(LOOP, reviewDue(2), ALL_SUCCEEDED, saying([]), asked).blocked, ['review']);
+  assert.equal(stepStatus(IMPLEMENT, reviewDue(3), ALL_SUCCEEDED, saying([]), asked, LOOP), 'unsigned', 'round 3 too');
+  assert.equal(stepStatus(IMPLEMENT, reviewDue(2), ALL_SUCCEEDED, saying(REPLIES), asked, LOOP), 'verified');
+  assert.deepEqual(outputLines(IMPLEMENT, said([]), owedFields(IMPLEMENT, reviewDue(2), LOOP)), ['!! declared and not given: replies'], 'wf decide names it');
+});
+
+test("`sessionModel`: a continued try runs on the model its session was started on — a `--model` try's, past nudges, rounds and rechecks — and a `--fresh` one goes back to the step's", () => {
+  const OPUS: Workflow = { ...step('implement'), model: 'opus' };
+  const on = (...tries: EarlierTry[]): StepRecord => ({ taskId: 'now', tries });
+  assert.equal(sessionModel(OPUS, undefined), 'opus');
+  assert.equal(sessionModel(step('implement'), on({ taskId: 'a', then: 'nudge' })), undefined, 'a step with no model: the harness default, every try');
+  assert.equal(sessionModel(OPUS, on({ taskId: 'a', then: 'fresh', model: 'sonnet' })), 'sonnet');
+  assert.equal(sessionModel(OPUS, on({ taskId: 'a', then: 'fresh', model: 'sonnet' }, { taskId: 'b', then: 'nudge' }, { taskId: 'c', then: 'round' }, { taskId: 'd', then: 'retries' }, { taskId: 'e', then: 'recheck' })), 'sonnet');
+  assert.equal(sessionModel(OPUS, on({ taskId: 'a', then: 'fresh', model: 'sonnet' }, { taskId: 'b', then: 'fresh' }, { taskId: 'c', then: 'nudge' })), 'opus');
+});
+
+test("round 1's empty `replies` go nowhere: not a declared output, not handed to the looping step nor to any `input:`, and not printed by `wf decide`", () => {
+  const empty: Closeout = { outcome: 'done', summary: 'IMPLEMENTER-SUMMARY', artifacts: [], needs: undefined, output: { replies: [] } };
+  const reads = (name: string): Closeout | undefined => (name === 'implement' ? empty : name === 'review' ? reviewed(false) : undefined);
+  // Not declared, and so not given by the one door a closeout's content passes through.
+  assert.deepEqual(declaredOutput(IMPLEMENT, empty), { given: {}, missing: [] });
+  assert.deepEqual(declaredOutput(IMPLEMENT, empty, ['replies']), { given: {}, missing: ['replies'] }, 'an empty list is no answer, asked or not');
+  // `wf decide` prints a step's output under `owedFields`: on round 1, nothing of it.
+  assert.deepEqual(outputLines(IMPLEMENT, empty, owedFields(IMPLEMENT, inRound(1), LOOP)), []);
+  // The looping step, round 1 and — were it filed on round 1's closeout — round 2: no replies handed.
+  const first = composeBrief(LOOPING_REVIEW, inRound(1), LOOP, reads, FILES);
+  assert.doesNotMatch(first, /## Replies from|"replies"/);
+  const second = composeBrief(LOOPING_REVIEW, reviewDue(2), LOOP, reads, FILES);
+  assert.match(second, /## Replies from implement\n\nimplement has not answered yet\./);
+  assert.doesNotMatch(second, /"replies"/);
+  // A step that reads implement's output (`input: implement`) is handed nothing of it.
+  const reader: Workflow = { ...step('ship', ['review']), input: ['implement'] };
+  const steps = [LOOP[0]!, LOOP[1]!, reader];
+  const brief = composeBrief(reader, inRound(1), steps, reads, FILES);
+  assert.doesNotMatch(brief, /"replies"|IMPLEMENTER-SUMMARY/);
+  // And the target's own round-1 brief says what to answer, where the round-2 brief says what is owed.
+  assert.match(composeBrief(IMPLEMENT, inRound(1), LOOP, () => undefined, FILES), /- `replies`: `\[\]`\. You were handed no findings this round\./);
+  assert.doesNotMatch(composeBrief(step('other'), run({ other: null }), [step('other')], () => undefined, FILES), /`replies`/, 'a step no loop comes back to is told nothing of it');
 });
 
 test('a resumed round is given the findings, as data, and not the summary — with the three honest answers, and `replies` owed', () => {

@@ -27,7 +27,7 @@ export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -1751,7 +1751,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         }, undefined, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
-        model: r.model ?? step.model,
+        // A fresh try on the model it asked for, or the step's; any other the model its session was started on (`sessionModel`), so a nudge
+        // after a `--model` try continues that session as it cached it.
+        model: r.mode === 'fresh' ? r.model ?? step.model : sessionModel(step, record),
         effort: step.effort,
         permissionMode: step.permissionMode,
         // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
@@ -1767,8 +1769,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // A try is never a run's first filing: it goes before a newer run's first step (`MOMENTUM`).
         priority: MOMENTUM,
         resumeFrom,
-        // A loop's target tried again within a round still owes its answers to the findings it was handed.
-        closeoutSchema: closeoutSchemaOf(step, owesReplies(steps, run, r.step)),
+        // The step's one schema, whatever round the run is on: a nudge continues a session, and a changed schema would rebuild its cache.
+        // What a loop's target owes on this try — its answers to the round's findings — is `owedFields`', read when it signs off.
+        closeoutSchema: closeoutSchemaOf(step, steps),
       });
     }
     run.steps[r.step] = nextTry(record, r, taskId);
@@ -1801,7 +1804,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         }, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: target.harness,
-        model: target.model,
+        // The model the session it continues runs on: a `wf retry --model` within the round before is kept (`sessionModel`).
+        model: sessionModel(target, record),
         effort: target.effort,
         permissionMode: target.permissionMode,
         tools: target.tools,
@@ -1812,7 +1816,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
         priority: MOMENTUM,
         resumeFrom,
-        closeoutSchema: closeoutSchemaOf(target, true),
+        // The schema round 1 was filed with, `replies` and all (`closeoutSchemaOf`): the session is continued, and keeps its cache.
+        closeoutSchema: closeoutSchemaOf(target, steps),
       });
     }
     Object.assign(run.steps, roundFiled(steps, run, r, taskId));
@@ -1918,7 +1923,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       // The shape of the step's closing statement, with the fields its `output:` declares — from the
       // workflow this run froze, never the folder. The engine hands it to the harness and records the
       // answer without reading it; what the fields mean is ours — see `Closeout`.
-      closeoutSchema: closeoutSchemaOf(step),
+      // A loop's target is asked for `replies` from its first round, so every round continues its session under this same schema.
+      closeoutSchema: closeoutSchemaOf(step, steps),
     });
     // The tries a round moved behind stay with it.
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };

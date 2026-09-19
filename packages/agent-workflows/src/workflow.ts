@@ -161,8 +161,8 @@ export type Workflow = {
 export const DEFAULT_ROUNDS = 3;
 
 /**
- * The field the run adds to a loop's target's closeout from its second round: its answer to each finding it
- * was handed, which the next round's looping step is given as data. The run's, like the four every closeout
+ * The field the run adds to a loop's target's closeout, and owes from its second round: its answer to each finding
+ * it was handed, which the next round's looping step is given as data. The run's, like the four every closeout
  * has, so a target's `output:` may not declare it. The schema itself is `REPLIES_SCHEMA` in run.ts.
  */
 export const LOOP_REPLIES = 'replies';
@@ -1111,7 +1111,7 @@ function validateLoops(steps: readonly Workflow[]): void {
       throw new WorkflowError(`${named}, but ${s.name} does not wait on ${target}, directly or through the steps between — a loop runs again work that finished before this step. Add ${target} to \`after:\`, or name a step ${s.name} waits on.`);
     }
     if (producer.output && Object.hasOwn(producer.output.schema.properties, LOOP_REPLIES)) {
-      throw new WorkflowError(`${target}: \`output: ${producer.output.file}\` declares \`${LOOP_REPLIES}\`, and ${s.name} loops back to ${target} (\`loop: ${target}\`), so from round 2 the run adds \`${LOOP_REPLIES}\` to its closeout: its answer to each finding. Rename the field.`);
+      throw new WorkflowError(`${target}: \`output: ${producer.output.file}\` declares \`${LOOP_REPLIES}\`, and ${s.name} loops back to ${target} (\`loop: ${target}\`), so the run adds \`${LOOP_REPLIES}\` to its closeout: its answer to each finding. Rename the field.`);
     }
 
     const span = loopSpan(steps, s);

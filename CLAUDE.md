@@ -70,6 +70,11 @@ workflows behind HTTP; `apps/web` talks to it. Dependencies point down that list
   over it on every layout, and no screenshot shows it: the tall cards are finished runs, off the default floor. The e2e measures it
   after a Reset layout (`expectClearOfEachOther` in `apps/web/test/e2e/canvas.ts`); a card that grows a line is measured there, not seen
   (learned by the run that took up the board's review leftovers).
+- **The Factory's fit is padded by the panels over its floor, measured at each fit.** A proportional padding put the bottom row under
+  the legend, which wraps to two lines at 1280 wide, once more runs stayed on the default floor; the card's buttons could not be clicked.
+  `fitClear` in `FactoryCanvas.tsx` pads by what the panels cover, and the e2e's `expectClearOfPanels` refuses a card under one. A size
+  read off a card on the floor is zoomed: measure a row in the card's own pixels (`offsetHeight`), or under half size it rounds to none
+  (learned by the run that kept a run waiting on a person on the floor).
 - **An EventSource closed on the server's last event aborts a request the server has answered.** The api writes `settled` and ends the
   response; closed the moment the event arrives, before the end does, Chromium reports `net::ERR_ABORTED`, and the e2e's watch fails the page
   now and then. Close it on the `error` fired as the response ends, or after a grace (`follow`, learned by the run that drew the queue).

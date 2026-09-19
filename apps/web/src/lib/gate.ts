@@ -51,9 +51,9 @@ export function gateOfStep(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' |
 export const backName = (back: readonly string[]): string => (back.length === 1 ? back[0]! : 'the work');
 
 /**
- * The card's words for a gate, which fit its two lines whole: what approving does, and where a send-back goes. `approve to run ship on main,
- * or send review back`; for a gate that holds after its step ran, `approve what plan handed on, or send it back`. The step's own prose is the
- * inspector's, whole, and the card's title.
+ * The card's words for a gate, in its one row: what approving does, and where a send-back goes. `approve to run ship on main,
+ * or send review back`; for a gate that holds after its step ran, `approve what plan handed on, or send it back`. Long names cut it short on
+ * the card, which has it whole on hover beside the step's own prose; the inspector says it all, whole.
  */
 export function gateCardLine(gate: GateAsk): string {
   const approving = gate.ends ? `approve to run ${gate.step}${gate.onto ? ` on ${gate.onto}` : ''}` : `approve what ${gate.step} handed on`;

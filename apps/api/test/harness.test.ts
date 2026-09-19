@@ -2,7 +2,7 @@
  * The api's tests observe the harness `test/harness.ts` installs, and never this machine's registry: every test file imports it first, and
  * the `claude` the api's engine runs is the harness's.
  */
-import { asksEnded, bin, calls, observations, registry, unharnessed } from './harness.ts';
+import { askEnded, bin, calls, observations, registry, unharnessed } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -64,8 +64,8 @@ test("the harness's `claude` answers a get_usage request with the request's own 
   assert.deepEqual([answered.type, answered.response.request_id, answered.response.subtype], ['control_response', 'mine-7', 'success']);
   await new Promise((r) => setTimeout(r, 100));
   assert.equal(child.exitCode, null, 'it waits on its stdin, as Claude Code does');
-  const ended = asksEnded();
+  assert.equal(askEnded(child.pid!), false);
   child.stdin.end();
   await new Promise((r) => child.once('exit', r));
-  assert.equal(asksEnded(), ended + 1);
+  assert.equal(askEnded(child.pid!), true);
 });

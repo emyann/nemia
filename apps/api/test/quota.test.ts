@@ -3,7 +3,7 @@
  * as Claude Code 2.1.278 did when recorded (`fixtures/get-usage-*.json`) — kept for a while, one ask at a time, and each way it can fail said
  * in a sentence; and the pure judgement under it (`quotaOf`).
  */
-import { answer, asks, asksEnded, calls, lastAskEnv, recorded, usageAnswer } from './harness.ts';
+import { answer, askEnded, asks, calls, lastAskEnv, recorded, usageAnswer } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -311,10 +311,11 @@ test('REFUSED: the ask runs without what a Claude Code session hands its childre
 
 test('an answered ask closes its stdin, and the process ends of its own', async () => {
   fresh();
-  const ended = asksEnded();
-  await askUsage();
-  for (let i = 0; i < 50 && asksEnded() === ended; i++) await new Promise((r) => setTimeout(r, 20));
-  assert.equal(asksEnded(), ended + 1);
+  assert.equal((await askUsage()).kind, 'answer');
+  // This ask's own process, by the pid it wrote as it started: every ask before it has answered, so its line is the last.
+  const pid = Number(lastAskEnv().pid);
+  for (let i = 0; i < 50 && !askEnded(pid); i++) await new Promise((r) => setTimeout(r, 20));
+  assert.ok(askEnded(pid), `the ask's claude (pid ${pid}) ended of its own once its stdin was closed`);
 });
 
 test('REFUSED: no claude on PATH is no-claude', async () => {

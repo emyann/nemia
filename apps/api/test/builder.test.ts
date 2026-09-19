@@ -106,11 +106,18 @@ test('GET /api/workflows/keys is the form a step is drawn in: every key in the p
   assert.deepEqual(form.keys.find((k) => k.key === 'effort')?.byHarness, EFFORTS);
   assert.deepEqual(form.keys.find((k) => k.key === 'permissionMode')?.byHarness, PERMISSION_MODES);
   // The agent is picked from yours' agents/, and the keys a step takes from it are the package's agent keys but the description.
-  write(path.join(STORE, 'agents', 'picked.md'), '---\nmodel: opus\n---\nPick me.\n');
-  const agents = ((await (await app.request('/api/workflows/keys')).json()) as KeyForm).keys.find((k) => k.key === 'agent');
-  assert.deepEqual([agents?.kind, agents?.choices?.includes('picked')], ['choice', true]);
+  // Each that loads comes with its role values as a step's spec gives them — only those it sets — and one the load refuses is picked from
+  // all the same, with no values: a step saved naming it is refused in its words.
+  write(path.join(STORE, 'agents', 'picked.md'), '---\nmodel: opus\ncontext: 200k\ntools: Read, Grep\noutput: picked.schema.json\n---\nPick me.\n');
+  write(path.join(STORE, 'agents', 'picked.schema.json'), JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false }));
+  write(path.join(STORE, 'agents', 'broken.md'), '---\nloop: build\n---\nWired wrong.\n');
+  const withAgents = (await (await app.request('/api/workflows/keys')).json()) as KeyForm;
+  const agents = withAgents.keys.find((k) => k.key === 'agent');
+  assert.deepEqual([agents?.kind, agents?.choices?.includes('picked'), agents?.choices?.includes('broken')], ['choice', true, true]);
   assert.deepEqual(agents?.choices, fs.readdirSync(path.join(STORE, 'agents')).filter((f) => f.endsWith('.md')).map((f) => f.slice(0, -3)).sort());
-  fs.rmSync(path.join(STORE, 'agents', 'picked.md'));
+  assert.deepEqual(withAgents.agents.picked, { model: 'opus', context: 200000, tools: ['Read', 'Grep'], output: 'picked.schema.json' });
+  assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
+  for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
   assert.deepEqual(form.roleKeys, AGENT_KEYS.filter((k) => k !== 'description'));
 
   // The kinds held to the parser. A count is what the parser refuses as "not a count", and nothing else is: in a folder where every key can be

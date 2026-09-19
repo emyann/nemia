@@ -3,7 +3,7 @@
  * added or removed, a value set — and put back in the listing's shape. Pure. What a step may say is the package's to judge when the draft is
  * saved; the draft judges only what it needs to stay a draft: one step per name, and a name to call it by.
  */
-import type { GraphEdge, ListedStep, RunGraph, SchemaFile, WorkflowListing, WorkflowStepSpec } from './api';
+import type { GraphEdge, KeyForm, ListedStep, RunGraph, SchemaFile, WorkflowListing, WorkflowStepSpec } from './api';
 import { COLUMN_WIDTH, layout, stepsOf, type Point } from './layout.ts';
 
 /** A step being built: as the listing has it, and a schema pasted for its `output:`, written beside it on save — null for none. */
@@ -118,23 +118,36 @@ export function removeStep(steps: readonly DraftStep[], name: string): DraftStep
  * edge do; `resume` waits on the step it names, as the parser reads it. Every other key is set as given.
  *
  * `agent` set on a step with none makes what the step has its own — every key it sets, and what it is told as its note after the agent's
- * words — and the agent's keys come in on the next read. Unset, the step keeps what its agent gave it as its own, words and all.
+ * words. Set, from none or from another agent, every role key the step does not set itself takes the new agent's value (`agents`, from the
+ * key form), or none where it sets none: never the agent before's. Unset, the step keeps what its agent gave it as its own, words and all.
  */
-export function setKey<K extends keyof WorkflowStepSpec>(steps: readonly DraftStep[], name: string, key: K, value: WorkflowStepSpec[K]): DraftStep[] {
+export function setKey<K extends keyof WorkflowStepSpec>(
+  steps: readonly DraftStep[], name: string, key: K, value: WorkflowStepSpec[K], form: Pick<KeyForm, 'roleKeys' | 'agents'> = { roleKeys: [], agents: {} },
+): DraftStep[] {
   if (key === 'agent') {
     return steps.map((step) => {
       if (step.name !== name) return step;
       const agent = value as string | null;
       if (agent === null) return { ...step, spec: { ...step.spec, agent }, own: null };
       const keys = (Object.keys(step.spec) as Array<keyof WorkflowStepSpec>).filter((k) => k !== 'agent' && isSet(step.spec[k]));
-      return { ...step, spec: { ...step.spec, agent }, own: step.own ?? { keys, body: step.body } };
+      const own = step.own ?? { keys, body: step.body };
+      const given = form.agents[agent] ?? {};
+      const spec: WorkflowStepSpec = { ...step.spec, agent };
+      for (const k of form.roleKeys) if (!own.keys.includes(k)) (spec as Record<string, unknown>)[k] = given[k] ?? UNSET[k];
+      return { ...step, spec, own };
     });
   }
-  return changed(steps, name, (spec) => {
+  const next = changed(steps, name, (spec) => {
     const next = { ...spec, [key]: value };
     if (key === 'loop') next.rounds = value === null ? null : spec.rounds ?? DEFAULT_ROUNDS;
     if (key === 'resume' && typeof value === 'string' && !spec.after.includes(value)) next.after = [...spec.after, value];
     return next;
+  });
+  // A role key unset on a step with an agent is the agent's again, and shows the agent's value — what the save will read back.
+  if (isSet(value) || !form.roleKeys.includes(key)) return next;
+  return next.map((step) => {
+    const given = step.name === name && step.own && step.spec.agent ? form.agents[step.spec.agent]?.[key] : undefined;
+    return given === undefined ? step : { ...step, spec: { ...step.spec, [key]: given } };
   });
 }
 

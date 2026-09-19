@@ -21,10 +21,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, writeWorkflow } from 'agent-workflows';
-import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, EFFORTS, loadAgents, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
+import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, EFFORTS, loadAgents, HARNESSES, parseFolder, parseWorkflow, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
-import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './workflows.ts';
+import { folderOf, foldersIn, listed, specOf, versionOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
 
 /**
  * How a key is set on a step's form, which is what its value is in JSON: `steps`, a list of the workflow's steps (`after`, `input`); `step`,
@@ -60,14 +60,38 @@ export type KeyField = { key: StepKey; meaning: string; kind: KeyKind; choices: 
  * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, and the default harness.
  * `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with an agent takes from it unless
  * its file sets them itself: the form shows those as the agent's until one is changed.
+ *
+ * `agents` are the role values of each agent of yours that loads, as a step's spec gives them and only those it sets: a step attached to one
+ * on the board shows its values before the save reads them back, and a step moved from one agent to another shows the other's.
  */
-export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: StepKey[] };
+export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: StepKey[]; agents: Record<string, Partial<WorkflowStepSpec>> };
 
 /** The keys a step may take from its agent: the agent's keys but its description, which describes the agent and no step. */
 const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter((key): key is Exclude<typeof key, 'description'> => key !== 'description');
 
 /** The agents a step of yours may name: each file of yours' `agents/`, by name, readable or not — naming a broken one is refused on save, in its words. */
 const agentsOfYours = (home: string): string[] => [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER)).keys()].sort();
+
+/**
+ * What each agent of yours gives a step it is attached to: a step that names it and sets nothing, read by the parser and shown as the listing
+ * shows a step, cut to the keys the agent sets. An agent the load refuses gives nothing, and a step saved naming it is refused in its words.
+ */
+function agentValues(home: string): Record<string, Partial<WorkflowStepSpec>> {
+  const agents = loadAgents(path.join(home, 'workflows', AGENTS_FOLDER));
+  const values: Record<string, Partial<WorkflowStepSpec>> = {};
+  for (const [name, agent] of [...agents].sort(([a], [b]) => a.localeCompare(b))) {
+    if (agent instanceof WorkflowError) continue;
+    let spec: WorkflowStepSpec;
+    try {
+      spec = specOf(parseWorkflow(name, `---\nagent: ${name}\n---\n`, undefined, agents));
+    } catch (err) {
+      if (err instanceof WorkflowError) continue;
+      throw err;
+    }
+    values[name] = Object.fromEntries(ROLE_KEYS.filter((key) => Object.hasOwn(agent.keys, key)).map((key) => [key, spec[key]]));
+  }
+  return values;
+}
 
 export const keyForm = (home: string = HOME): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
@@ -79,6 +103,7 @@ export const keyForm = (home: string = HOME): KeyForm => ({
   })),
   defaultHarness: DEFAULT_HARNESS,
   roleKeys: [...ROLE_KEYS],
+  agents: agentValues(home),
 });
 
 /** What a write answers: the folder read back from disk, as the listing has it, and its files by name — written, left as they were, removed. */

@@ -102,7 +102,7 @@ function KeyInput({ field, step, others, form, schemas, update }: {
   const inherited = step.own !== null && form.roleKeys.includes(key) && !step.own.keys.includes(key);
   const value = inherited ? (Array.isArray(step.spec[key]) ? [] : null) : step.spec[key];
   const given = inherited ? givenText(key, step.spec[key], step.spec.agent) : null;
-  const set = <K extends keyof WorkflowStepSpec>(k: K, v: WorkflowStepSpec[K]) => update((all) => setKey(all, step.name, k, v));
+  const set = <K extends keyof WorkflowStepSpec>(k: K, v: WorkflowStepSpec[K]) => update((all) => setKey(all, step.name, k, v, form));
   const harness = step.spec.harness ?? form.defaultHarness;
 
   let control: ReactNode;
@@ -222,7 +222,7 @@ function KeyInput({ field, step, others, form, schemas, update }: {
       );
       break;
     case 'schema':
-      control = <SchemaInput id={id} step={step} schemas={schemas} update={update} given={given} />;
+      control = <SchemaInput form={form} id={id} step={step} schemas={schemas} update={update} given={given} />;
       break;
   }
 
@@ -307,7 +307,7 @@ function Typed({ id, value, commit, canon, mono = false, type = 'text', step, pl
  * `output:`: a schema beside the step, picked from the folder's — or pasted, with the file it is written to, which is written when the draft is
  * saved and replaces a file of that name. Picking a file or none takes a paste back.
  */
-function SchemaInput({ id, step, schemas, update, given }: { id: string; step: DraftStep; schemas: readonly string[]; update: DraftUpdate; given: string | null }) {
+function SchemaInput({ id, step, form, schemas, update, given }: { id: string; step: DraftStep; form: KeyForm; schemas: readonly string[]; update: DraftUpdate; given: string | null }) {
   const text = useId();
   const file = useId();
   const pasted = step.schema;
@@ -323,7 +323,7 @@ function SchemaInput({ id, step, schemas, update, given }: { id: string; step: D
           update((all) =>
             picked === PASTE
               ? setSchema(all, step.name, { file: `${step.name}.schema.json`, text: '' })
-              : setKey(setSchema(all, step.name, null), step.name, 'output', picked || null),
+              : setKey(setSchema(all, step.name, null), step.name, 'output', picked || null, form),
           );
         }}
         className={INPUT}

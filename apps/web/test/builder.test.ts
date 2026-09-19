@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
+import type { KeyForm, ListedStep, WorkflowListing, WorkflowStepSpec } from '../src/lib/api.ts';
 import {
   addStep, connect, contextText, DEFAULT_ROUNDS, disconnect, draftGraph, draftOf, listedWith, listOf, nameRefusal, numberOf, orderOf, placesOf, removeStep, schemasOf, setBody,
   setKey, setSchema, tokensOf, toPut, UNSET, unsaved, unsavedSteps, type DraftStep,
@@ -184,4 +184,23 @@ test("an agent attached to a step makes what it has its own; taken away, the ste
 
   const taken = setKey(draftOf(attached), 'build', 'agent', null);
   assert.deepEqual([taken[0]!.spec.agent, taken[0]!.own, taken[0]!.body, taken[0]!.spec.model], [null, null, 'You write code.\n\nMind the cache.', 'opus']);
+});
+
+/** What the api says each agent gives a step: `coder` as `attached` has it, and `reviewer`, which sets a model and nothing else. */
+const agents: Pick<KeyForm, 'roleKeys' | 'agents'> = {
+  roleKeys: ['harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'output'],
+  agents: { coder: { harness: 'claude', model: 'opus', effort: 'high' }, reviewer: { model: 'sonnet' } },
+};
+
+test("a step moved to another agent shows what that agent gives it, and nothing the last one gave; its own keys stay its own", () => {
+  const moved = setKey(draftOf(attached), 'build', 'agent', 'reviewer', agents);
+  assert.deepEqual([moved[0]!.spec.model, moved[0]!.spec.effort, moved[0]!.spec.harness], ['sonnet', null, null], "reviewer's model, not coder's opus and high");
+  assert.deepEqual([moved[0]!.spec.check, moved[0]!.own], ['npm test', { keys: ['check'], body: 'Mind the cache.' }]);
+
+  const plain = draftOf({ steps: [listed('build', { model: 'sonnet' }, 'Build it.')] });
+  const given = setKey(plain, 'build', 'agent', 'coder', agents);
+  assert.deepEqual([given[0]!.spec.model, given[0]!.spec.effort, given[0]!.spec.harness], ['sonnet', 'high', 'claude'], 'its own model, the rest the agent\'s');
+
+  const unset = setKey(setKey(draftOf(attached), 'build', 'effort', 'low', agents), 'build', 'effort', null, agents);
+  assert.deepEqual([unset[0]!.spec.effort, unset[0]!.own!.keys], ['high', ['check']], "an own key unset shows the agent's value again");
 });

@@ -223,7 +223,7 @@ function schemasIn(dir: string): string[] {
   }
 }
 
-const specOf = (step: Workflow): WorkflowStepSpec => ({
+export const specOf = (step: Workflow): WorkflowStepSpec => ({
   harness: step.harness ?? null,
   model: step.model ?? null,
   effort: step.effort ?? null,

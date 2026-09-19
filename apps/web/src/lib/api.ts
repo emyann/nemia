@@ -688,9 +688,9 @@ export type KeyField = {
 
 /**
  * Mirrors `KeyForm` in apps/api/src/builder.ts: every key a step may set, in the package's order, the harness a step runs on when it names none,
- * and the keys a step with an agent takes from it (`roleKeys`).
+ * the keys a step with an agent takes from it (`roleKeys`), and what each agent of yours gives a step (`agents`).
  */
-export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: Array<keyof WorkflowStepSpec> };
+export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: Array<keyof WorkflowStepSpec>; agents: Record<string, Partial<WorkflowStepSpec>> };
 
 /** What a step's form is drawn from. It changes with the package, so once a visit. */
 export const keyFormQuery = queryOptions({

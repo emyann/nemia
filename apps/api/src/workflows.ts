@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { AGENTS_FOLDER, agentsDir, contextText, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, agentsDir, contextText, loadWorkflows, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -164,8 +164,9 @@ const listedStep = (step: Workflow): ListedStep => ({
  * save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and `writeWorkflow`
  * removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or removed changes it,
  * and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as what it says, so it
- * changes the word too. So does each agent a step names (`agent:`), its file in `agents/` beside the folder: what the board shows a step
- * with an agent is the agent's keys and words as much as the step's, and an agent edited since is a step the board no longer shows as it is.
+ * changes the word too. So does each agent a step names (`agent:`), its file in `agents/` beside the folder, and the schema that agent's
+ * `output:` names beside it: what the board shows a step with an agent is the agent's keys, words and declared fields as much as the step's,
+ * and an agent edited since is a step the board no longer shows as it is.
  */
 export function versionOf(dir: string): string {
   let names: string[];
@@ -182,16 +183,35 @@ export function versionOf(dir: string): string {
     }
   };
   const files = names.map((name) => [name, read(path.join(dir, name))] as const);
-  const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? agentNamed(text) : [])))].sort();
-  const agents = named.map((agent) => [`${AGENTS_FOLDER}/${agent}.md`, read(path.join(agentsDir(dir), `${agent}.md`))]);
+  const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? frontmatterValue(text, 'agent') : [])))].sort();
+  const agents = named.flatMap((agent) => {
+    const text = read(path.join(agentsDir(dir), `${agent}.md`));
+    const schemas = typeof text === 'string' ? frontmatterValue(text, 'output') : [];
+    return [[`${AGENTS_FOLDER}/${agent}.md`, text], ...schemas.map((schema) => [`${AGENTS_FOLDER}/${schema}`, read(path.resolve(agentsDir(dir), schema))])];
+  });
   return createHash('sha256').update(JSON.stringify([...files, ...agents])).digest('hex').slice(0, 16);
 }
 
-/** The agent a step file's frontmatter names, as its `agent:` line writes it — none for a file with no such line. A name with a slash names no file of agents/. */
-function agentNamed(text: string): string[] {
-  const block = /^---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/.exec(text.replace(/\r\n/g, '\n'))?.[1] ?? '';
-  const name = /^agent:[ \t]*(.*?)[ \t]*$/m.exec(block)?.[1];
-  return name && !/[\\/]/.test(name) ? [name] : [];
+/**
+ * The value a file's frontmatter gives `key`, read as the parser reads it — each line trimmed, the key trimmed before its colon — so
+ * `  agent: coder` and `agent : coder` name the agent they load with. None for a file with no such line, or whose frontmatter never
+ * closes (the load refuses it). A name with a slash names no file of agents/.
+ */
+function frontmatterValue(text: string, key: 'agent' | 'output'): string[] {
+  let block: string | null;
+  try {
+    block = splitFrontmatter('', text).block;
+  } catch {
+    return [];
+  }
+  for (const raw of (block ?? '').split('\n')) {
+    const line = raw.trim();
+    const i = line.indexOf(':');
+    if (line.startsWith('#') || i <= 0 || line.slice(0, i).trim() !== key) continue;
+    const value = line.slice(i + 1).trim();
+    return value && (key === 'output' || !/[\\/]/.test(value)) ? [value] : [];
+  }
+  return [];
 }
 
 /** The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed. */

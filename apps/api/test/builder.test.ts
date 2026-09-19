@@ -218,6 +218,23 @@ test("versionOf covers the agents a folder's steps name: an edit of one changes 
   fs.rmSync(path.join(STORE, 'agents', 'unnamed.md'));
 });
 
+test("versionOf reads `agent:` as the parser does — indented, or with a space before its colon — and covers the schema the agent's output: names", () => {
+  for (const [folder, line] of [['indented', '  agent: critic'], ['spaced', 'agent : critic']] as const) {
+    const dir = path.join(STORE, `version-${folder}`);
+    write(path.join(STORE, 'agents', 'critic.md'), '---\nharness: claude\noutput: critique.schema.json\n---\nFind what is wrong.\n');
+    write(path.join(STORE, 'agents', 'critique.schema.json'), JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false }));
+    write(path.join(dir, 'judge.md'), `---\n${line}\n---\n`);
+    const listing = listWorkflows(repo, root).find((w) => w.name === `version-${folder}`);
+    assert.equal(listing?.steps[0]?.spec.agent, 'critic', `${folder}: the load reads the agent — ${JSON.stringify(listing?.error ?? listing)}`);
+    const at = versionOf(dir);
+    fs.appendFileSync(path.join(STORE, 'agents', 'critic.md'), 'Say where.\n');
+    assert.notEqual(versionOf(dir), at, `${folder}: an edit of the agent it names`);
+    const again = versionOf(dir);
+    write(path.join(STORE, 'agents', 'critique.schema.json'), JSON.stringify({ type: 'object', properties: { verdict: { type: 'string' }, line: { type: 'number' } }, required: ['verdict', 'line'], additionalProperties: false }));
+    assert.notEqual(versionOf(dir), again, `${folder}: an edit of the schema its agent declares`);
+  }
+});
+
 test('PUT /api/workflows/yours/:name writes the folder the steps make — a step added, an edge drawn, a key set, a step gone, the README — and answers it read back from disk', async () => {
   const dir = planned('drawn');
   const [plan, build] = await listedSteps('drawn') as [ListedStep, ListedStep];

@@ -499,13 +499,13 @@ test('the floor is every run in flight, and each finished run one of them waits 
     // Shipped, and waited on by b, in flight: on the floor, so b's edge has a card to leave from.
     run([], { id: 'a', status: 'succeeded', createdAt: at(1) }),
     run([], { id: 'b', moving: true, after: ['a'], createdAt: at(2) }),
-    // Cancelled, and waited on by e, which is not in flight: e waits on you, and neither is on the floor.
+    // Cancelled, and waited on by e, which is not in flight: e waits on you, so its card stays; c brings no card, e's waiting line names it.
     run([], { id: 'c', status: 'cancelled', cancelledAt, createdAt: at(3) }),
     run([], { id: 'e', after: ['c'], waiting: waitingOn(true), createdAt: at(4) }),
     // Finished, after z: a finished run brings no run it waits on.
     run([], { id: 'y', status: 'succeeded', after: ['z'], createdAt: at(5) }),
   ];
-  assert.deepEqual(floorRuns(runs, false).map((r) => r.id), ['a', 'b']);
+  assert.deepEqual(floorRuns(runs, false).map((r) => r.id), ['a', 'b', 'e']);
   assert.deepEqual(floorRuns(runs, true).map((r) => r.id), ['z', 'a', 'b', 'c', 'e', 'y']);
   // One level: a finished parent brings none of its own parents.
   const chain = [
@@ -537,6 +537,47 @@ test('a run nobody has decided stays on the floor, whatever Show finished says, 
   const old = [{ ...runs[1]!, toDecide: undefined as unknown as RunSummary['toDecide'] }];
   assert.deepEqual(floorRuns(old, false).map((r) => r.id), []);
   assert.equal(toDecideOf(old[0]!), null);
+});
+
+test('a run that waits on a person stays on the floor, whatever Show finished says, until the person has answered', () => {
+  const runs = [
+    // Stopped at a gate in the middle, as the api listed a-workspace-is-a-choice-and-f86t on 2026-09-19: nothing moves, nothing to decide.
+    run(['unverified · done', 'awaiting approval', 'waiting'], {
+      id: 'gated', status: 'failed', moving: false, waitingOnYou: ['plan'], onYou: ['approve plan'], toDecide: null, createdAt: at(0),
+    }),
+    // A step signed off blocked and asks the person something; its followers will never be filed without an answer.
+    run(['succeeded · BLOCKED', 'waiting'], { id: 'blocked', status: 'failed', moving: false, waitingOnYou: ['step-0'], onYou: ['step-0'], toDecide: null, createdAt: at(1) }),
+    // Cancelled, with the blocked step still named: a cancelled run waits on nobody, and is off the floor with the finished.
+    run(['succeeded · BLOCKED', 'waiting'], { id: 'called-off', status: 'cancelled', cancelledAt, waitingOnYou: ['step-0'], onYou: ['step-0'], toDecide: null, createdAt: at(2) }),
+    // Failed at a refused check, which asks nobody: finished, and off the floor.
+    run(['failed · check refused'], { id: 'refused', status: 'failed', toDecide: null, createdAt: at(3) }),
+  ];
+  assert.deepEqual(floorRuns(runs, false).map((r) => r.id), ['gated', 'blocked']);
+  assert.deepEqual(floorRuns(runs, true).map((r) => r.id), ['gated', 'blocked', 'called-off', 'refused']);
+  assert.equal(waitsOnYou(runs[2]!), false, 'a cancelled run waits on nobody');
+  assert.equal(standingOf(runs[0]!), 'waiting on you');
+  // Level-triggered: once the plan is approved the run moves again, and once it is finished, answered, it goes with the rest.
+  const approved = { ...runs[0]!, status: 'running' as const, moving: true, waitingOnYou: [], onYou: [] };
+  assert.deepEqual(floorRuns([approved], false).map((r) => r.id), ['gated']);
+  const done = { ...approved, status: 'succeeded' as const, moving: false };
+  assert.deepEqual(floorRuns([done], false).map((r) => r.id), []);
+});
+
+test("the header's `waiting on you` counts the runs whose cards are drawn waiting on you, with Show finished off", () => {
+  const runs = [
+    run(['unverified · done', 'awaiting approval'], { id: 'gated', status: 'failed', waitingOnYou: ['plan'], onYou: ['approve plan'], toDecide: null, createdAt: at(0) }),
+    run(['succeeded · BLOCKED'], { id: 'blocked', status: 'failed', waitingOnYou: ['step-0'], onYou: ['step-0'], createdAt: at(1) }),
+    run(['unverified · done', 'awaiting approval'], { id: 'ends', status: 'failed', waitingOnYou: ['ship'], onYou: ['approve ship'], toDecide: approve('ends', 'ship'), createdAt: at(2) }),
+    run([], { id: 'e', after: ['c'], waiting: waitingOn(true), createdAt: at(3) }),
+    run(['succeeded · BLOCKED'], { id: 'called-off', status: 'cancelled', cancelledAt, waitingOnYou: ['step-0'], onYou: ['step-0'], createdAt: at(4) }),
+    run([], { id: 'shipped', status: 'succeeded', createdAt: at(5) }),
+    run(['running (working)'], { id: 'going', moving: true, createdAt: at(6) }),
+  ];
+  // As FactoryCanvas counts it: `runs.filter(waitsOnYou)` over every run, beside the cards `floorRuns` draws.
+  const counted = runs.filter(waitsOnYou).map((r) => r.id);
+  const drawn = floorRuns(runs, false).filter(waitsOnYou).map((r) => r.id);
+  assert.deepEqual(counted, ['gated', 'blocked', 'ends', 'e']);
+  assert.deepEqual(drawn, counted);
 });
 
 test("the ending step's own gate is not asked for twice: the to-decide line says it, and `waiting on you` leaves it out", () => {

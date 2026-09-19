@@ -489,8 +489,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setFits((n) => n + 1);
   };
   const finished = runs.length - flying.size;
-  // Said beside the counts: a run stopped at a step that needs a person is finished, so off the floor by default — and so is one
-  // waiting on a run that never ships without a person.
+  // Said beside the counts: a run stopped at a step that needs a person, or waiting on a run that never ships without one. Nothing of it
+  // moves, so it is counted finished too, but it stays on the floor whatever "Show finished" says (`floorRuns`): each has its card.
   const waiting = runs.filter(waitsOnYou).length;
   // And the runs nobody has decided, which are finished too and stay on the floor: counted as `wf ls` says them, before who else
   // the run waits on. A run at its ending's gate is in both counts — the decision is what it waits on you for.

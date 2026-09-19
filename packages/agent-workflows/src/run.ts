@@ -2884,7 +2884,7 @@ function itemLines(item: unknown): string[] {
  * metadata at all — Codex keeps it read-only — and a review told its artifacts MUST be committed
  * honestly signed off blocked and stopped two runs, over a file `handOff` then committed anyway.
  */
-export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | false = false): string => {
+export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | false = false, inFolder = false): string => {
   // A step's declared output is part of its closeout, so the step is told of it where it is told of the rest.
   const declared = step?.output ? outputFields(step).map((f) => `\`${f}\``).join(', ') : '';
   return [
@@ -2896,10 +2896,17 @@ export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | fal
     '- `outcome`: `"done"` if you finished the work; `"blocked"` if you cannot honestly finish. A step',
     '  that reports success it did not have is worse than one that stops and says why.',
     '- `summary`: one to three sentences on what you did, for the person who decides what ships.',
-    '- `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this',
-    '  workspace: when you finish, the run commits whatever you left, so the next step receives it.',
-    '  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is',
-    '  **not** a reason to block. A file you list that does not exist is reported as missing.',
+    // A folder run has nothing to commit: what a step names is kept by being collected (`artifactsContract`).
+    ...(inFolder ? [
+      '- `artifacts`: files you wrote for someone else to read, such as `note.md`. The run keeps each one you',
+      '  name when you finish, so the steps after you and the person who decides receive it. A file you list',
+      '  that does not exist is reported as missing.',
+    ] : [
+      '- `artifacts`: files you wrote for someone else to read, such as `RESPONSE.md`. Leave them in this',
+      '  workspace: when you finish, the run commits whatever you left, so the next step receives it.',
+      '  Commit your own work if you can. If you cannot — some sandboxes keep git read-only — that is',
+      '  **not** a reason to block. A file you list that does not exist is reported as missing.',
+    ]),
     '- `needs`: when blocked, what a person has to settle; otherwise `null`.',
     ...(declared ? [
       `- ${declared}: what this step declares (\`output: ${step!.output!.file}\`), in the shape the session`,
@@ -2987,8 +2994,24 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  * and nothing is committed — a file left there stays in their checkout for ever, and the next run's ending step
  * reads `git status --porcelain` as dirty and stops. Such a step has no check to be given `WF_ARTIFACTS` either,
  * since `workspace: main` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
+ *
+ * `inFolder` for a step of a folder run (`workspace: folder`): both ways hold, and neither rides a branch, since there is none — the
+ * words are the same but for git's.
  */
-export const artifactsContract = (dir: string, inMain = false): string => (inMain ? [
+export const artifactsContract = (dir: string, inMain = false, inFolder = false): string => (inFolder ? [
+  '', '## Files for the steps after you', '',
+  'A note, a log or a report reaches the steps after you and the person who decides in either of two ways.',
+  '',
+  `- Put it in \`${dir}\`, and name it in \`artifacts\` by absolute path. The run made that directory for`,
+  '  this step, beside this folder, and keeps what is in it.',
+  '- Or leave it in this folder, and name it in `artifacts` by its path from the folder, such as `note.md`.',
+  '  When you finish, the run copies each such file into that directory, at the same path, before it checks',
+  '  your work.',
+  '',
+  "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
+  'path anywhere else, and a path that climbs out of this folder with `..`. A directory is not collected, nor a',
+  'file that is not there: name each file.',
+] : inMain ? [
   '', '## Files for the person who decides', '',
   `A report, a log or a screenshot reaches them one way: put it in \`${dir}\`, and name it in \`artifacts\` by`,
   'absolute path. The run made that directory for this step, outside every workspace, and a file there is the',
@@ -3548,13 +3571,15 @@ export function composeBrief(
   // where its files for the steps after it go, and then the closeout — last, because it says to give it
   // last. Mechanism, not prose a workflow author has to remember to repeat. A loop's target past its first
   // round answers the findings it was handed, filed as the round or tried again within it.
+  // A folder run's steps are told of folders, and never of git: there is no repository, branch or commit to name (`placeOf`).
+  const inFolder = placeOf(run) === 'folder';
   const contracts = [
     ...(step.check ? [checkContract(step.check)] : []),
-    ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main')] : []),
-    closeoutContract(step, Boolean(round) || owesReplies(steps, run, step.name) ? 'owed' : isLoopTarget(steps, step.name) ? 'none' : false),
+    ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main', inFolder)] : []),
+    closeoutContract(step, Boolean(round) || owesReplies(steps, run, step.name) ? 'owed' : isLoopTarget(steps, step.name) ? 'none' : false, inFolder),
   ].join('\n');
-  const again = retry ? retrySection(step, retry) + retriedInRound(step, run, steps, retry, closeoutOf)
-    : round ? roundSection(step, round, steps, closeoutOf) : '';
+  const again = retry ? retrySection(step, retry, inFolder) + retriedInRound(step, run, steps, retry, closeoutOf)
+    : round ? roundSection(step, round, steps, closeoutOf, inFolder) : '';
   // A try or a round that continues the last session has everything but what became of it.
   if (retry?.resumed || round?.resumed) return again.slice(1) + contracts;
   // What this step reads of the steps it waits on — their declared output, and only if it asked — and, on a
@@ -3583,8 +3608,9 @@ export function composeBrief(
   const request = [run.brief, ...(inputs ? ['', inputs] : [])];
   const parts = [step.body, '', '## What was asked for', '', ...request, ...handed];
 
-  // A fan-in works on a branch with every one of them merged into it — unless it works in the repository's checkout, where nothing is merged.
-  if (step.after.length > 1 && step.workspace !== 'main') {
+  // A fan-in works on a branch with every one of them merged into it — unless it works in the repository's checkout, where nothing is merged,
+  // or in a folder, where nothing is either (`folderPlace`): a folder step is told where the steps before it worked, below.
+  if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
     return [
       step.body, '', '## What was asked for', '', ...request, ...handed, '',
       '## What is in this workspace', '',
@@ -3597,8 +3623,23 @@ export function composeBrief(
     ].join('\n');
   }
 
-  if (earlier.length || tree.length || step.workspace === 'main') parts.push('', '## Where to look', '');
-  if (step.workspace === 'main') {
+  if (earlier.length || tree.length || step.workspace === 'main' || inFolder) parts.push('', '## Where to look', '');
+  if (inFolder) {
+    // A folder step continues its one parent's folder (`inherit`), and any other starts in an empty folder of its own: what came before is
+    // in the folders the record names, which it reads and leaves as they are.
+    parts.push('This step works in a folder the run made for it: what you leave there, and name in `artifacts`, is what the steps after you and the person who decides receive.');
+    const inherited = workspacePlan(steps, step).kind === 'inherit';
+    if (earlier.length && inherited) {
+      parts.push('', `This folder has already been worked in by: ${earlier.join(', ')}. Their work is on disk here.`);
+    } else if (earlier.length) {
+      const where = earlier.map((name) => `- ${name}: \`${run.steps[name]?.workspace ?? 'no folder yet'}\``);
+      parts.push('', 'The steps before you worked in folders of their own, which this one is not:', '', ...where, '',
+        'Read what you need there, and change nothing in them: what you make goes in this folder.');
+    }
+    if (earlier.length) {
+      parts.push('', 'Judge what is there. You have not been given their reasoning, on purpose — read the work,', 'not an account of it.');
+    }
+  } else if (step.workspace === 'main') {
     // The one step that is not where the run's work is. Its directory is the repository as a person left it, and the work is on the
     // run's branches, so it is told those rather than told to read the workspace. What it does here, a person sees in their checkout.
     const results = resultSteps(steps).map((s) => run.steps[s.name]?.branch).filter((b): b is string => Boolean(b));
@@ -3702,6 +3743,10 @@ export const SIGNOFF = [
 const NEW_SESSION = 'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n'
   + 'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
 
+/** `NEW_SESSION` for a step of a folder run, which works in the same folder on every try, and commits nothing. */
+const NEW_SESSION_IN_FOLDER = 'This is a new session. An earlier one worked on this step in this folder, and what it left is still here.\n'
+  + 'You have not been given its reasoning, on purpose: read what it left, not an account of it.';
+
 /**
  * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who
  * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
@@ -3714,7 +3759,7 @@ const NEW_SESSION = 'This is a new session. An earlier one worked on this step i
  * and that the work on the branch is an earlier session's — and, like any step after another, is not given
  * that session's reasoning. What the check printed travels: it is evidence the run gathered, not an account.
  */
-export function retrySection(step: Workflow, r: RetryBriefing): string {
+export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false): string {
   const why: Partial<Record<StepStatus, string>> = {
     'failed (check)': "After the last try signed off, the run executed this step's check, and it did not pass.",
     unsigned: 'The last try ended without the closeout the run asked for, or without a field its `output:` declares, so nothing that waits on this step started.',
@@ -3736,7 +3781,7 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
     : r.by === 'signoff' ? 'The run filed this try itself, once in a round, before it waits on a person.'
     : `A person asked for this try: \`wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ' --message' : ''}\``
       + `${r.budget !== undefined ? `, raising this step's budget to ${budgetWord(r.budget)}` : ''}${r.message !== undefined ? ', with what they said below' : ''}.`;
-  const where = r.resumed ? "This is the last try's session, continued. Finish the work, then sign off again." : NEW_SESSION;
+  const where = r.resumed ? "This is the last try's session, continued. Finish the work, then sign off again." : inFolder ? NEW_SESSION_IN_FOLDER : NEW_SESSION;
   const answer = r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : [];
   // What was said to the session while it ran comes before the answer given now, in the order a person said them.
   const told = r.resumed ? saidSection(r.said) : [];
@@ -3784,7 +3829,7 @@ export type RoundBriefing = {
  * needs of the step: a disagreement said in `replies` travels to the next round's reviewer as data, where it can be weighed; one said
  * nowhere is a finding raised again, round after round, until a person is handed the argument cold.
  */
-export function roundSection(step: Workflow, r: RoundBriefing, steps: readonly Workflow[], closeoutOf: (step: string) => Closeout | undefined): string {
+export function roundSection(step: Workflow, r: RoundBriefing, steps: readonly Workflow[], closeoutOf: (step: string) => Closeout | undefined, inFolder = false): string {
   const looping = steps.find((s) => s.name === r.loop);
   const between = looping ? loopSpan(steps, looping).filter((n) => n !== step.name && n !== r.loop) : [];
   const who = r.by === 'ask'
@@ -3812,7 +3857,11 @@ export function roundSection(step: Workflow, r: RoundBriefing, steps: readonly W
     '',
     `When you have signed off, ${between.length ? `${between.join(', then ')}, then ` : ''}${r.loop} ${between.length ? 'run' : 'runs'} again, a new session, on the change as it stands.`
       + (r.by === 'again' && r.round === r.rounds ? ` This is the last round \`rounds: ${r.rounds}\` allows: if ${r.loop} asks again, a person decides.` : ''),
-    ...(r.resumed ? saidSection(r.said) : [
+    ...(r.resumed ? saidSection(r.said) : inFolder ? [
+      '',
+      'This is a new session: your last one could not be continued. What it left is in this folder.',
+      'You have not been given its reasoning, on purpose: read what it left, not an account of it.',
+    ] : [
       '',
       'This is a new session: your last one could not be continued. What it left is committed on this branch.',
       'You have not been given its reasoning, on purpose: read the change, not an account of it.',

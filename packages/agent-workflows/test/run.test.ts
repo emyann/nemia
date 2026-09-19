@@ -3852,3 +3852,41 @@ test('the run\'s sign-off nudge is told in its owner\'s words, pinned — the to
   assert.ok(!fresh.includes(SIGNOFF), fresh);
   assert.match(fresh, /The last try ended without the closeout the run asked for[^\n]*\nThe run filed this try itself, once in a round, before it waits on a person\.\n\nThis is a new session\./);
 });
+
+// ─── a folder run's briefs ──────────────────────────────────────────────────
+
+test('a folder run is briefed on folders, never on git: a chain continues its parent\'s folder, a fork and a fan-in are told where the steps before them worked, and a new session is told what it left is still here', () => {
+  const f = (name: string, after: string[] = [], rest: Partial<Workflow> = {}): Workflow => ({ ...step(name, after), workspace: 'folder', ...rest });
+  const write = f('write');
+  const review = f('review', ['write']);
+  const a = f('a', ['write']);
+  const b = f('b', ['write']);
+  const join = f('join', ['a', 'b']);
+  const loopTarget = f('draft');
+  const looper = f('critic', ['draft'], { loop: 'draft' });
+  const folder = (steps: Record<string, string | null>): Run => ({
+    id: 'n-1', place: { kind: 'folder' }, workspace: '/store/runs/n-1/work', brief: 'a note on tides', workflowDir: '/wf', createdAt: '2026-01-01T00:00:00Z',
+    steps: Object.fromEntries(Object.entries(steps).map(([k, v]) => [k, { taskId: v, ...(v ? { workspace: `/store/runs/n-1/work/${k}` } : {}) }])),
+  });
+  const briefs = [
+    composeBrief(write, folder({ write: null, review: null }), [write, review], undefined, '/store/runs/n-1/artifacts/write'),
+    composeBrief(review, folder({ write: 't1', review: null }), [write, review], undefined, '/store/runs/n-1/artifacts/review'),
+    composeBrief(a, folder({ write: 't1', a: null, b: null, join: null }), [write, a, b, join], undefined, '/store/runs/n-1/artifacts/a'),
+    composeBrief(join, folder({ write: 't1', a: 't2', b: 't3', join: null }), [write, a, b, join], undefined, '/store/runs/n-1/artifacts/join'),
+    composeBrief(write, folder({ write: 't1', review: null }), [write, review], undefined, '/store/runs/n-1/artifacts/write', undefined,
+      { try: 2, by: 'person', mode: 'fresh', resumed: false, status: 'blocked' }),
+    composeBrief(loopTarget, folder({ draft: 't1', critic: 't2' }), [loopTarget, looper], undefined, '/store/runs/n-1/artifacts/draft', undefined, undefined,
+      { loop: 'critic', round: 2, rounds: 3, by: 'again', resumed: false }),
+  ];
+  for (const brief of briefs) assert.doesNotMatch(brief, /\bgit\b|branch|commit|worktree|repositor/i, brief);
+  assert.match(briefs[0]!, /This step works in a folder the run made for it/);
+  assert.match(briefs[1]!, /This folder has already been worked in by: write\. Their work is on disk here\./);
+  assert.match(briefs[2]!, /The steps before you worked in folders of their own, which this one is not:\n\n- write: `\/store\/runs\/n-1\/work\/write`/);
+  assert.match(briefs[3]!, /- a: `\/store\/runs\/n-1\/work\/a`\n- b: `\/store\/runs\/n-1\/work\/b`/);
+  assert.doesNotMatch(briefs[3]!, /merged/);
+  assert.match(briefs[4]!, /An earlier one worked on this step in this folder, and what it left is still here\./);
+  assert.match(briefs[5]!, /your last one could not be continued\. What it left is in this folder\./);
+  for (const brief of briefs) assert.match(brief, /the run copies each such file into that directory/);
+  // The same shapes on a git run still say git's words: the folder's are said only on a folder run.
+  assert.match(composeBrief(join, run({ write: 't1', a: 't2', b: 't3', join: null }), [write, a, b, join].map((s) => ({ ...s, workspace: undefined }))), /has been merged into this branch/);
+});

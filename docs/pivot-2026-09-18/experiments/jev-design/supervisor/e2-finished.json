@@ -1,0 +1,244 @@
+[
+ {
+  "run": "the-inbox-on-the-board-a-pag-ryny",
+  "at": "2026-09-16T23:25:23.561Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Round 3's fix is correct. `presetOf` now presets nothing when a card names a workflow by bare name but its `repo:` is a different repository than the api's. Trailing slashes are trimmed, and a card that names an absolute folder still gets that folder preset. Tests cover it: unit tests make it refuse, and an e2e page checks the hand-written case, with screenshots taken after the commit in both themes. With the turbo cache off, api 152/152 and web 181/181 pass; typecheck passes from cache. Everything else in the api routes, guard, page and e2e holds, and all that is left is one small stale-list case, not worth another round.",
+  "again": false,
+  "findings": [
+   "The inbox list reloads only after a start succeeds. Say a card was dropped or started in a terminal after the page loaded, and Start is refused: 404 (\"no card X in the inbox. Its cards are: \u2026\") or 409 (started as another run). The card stays listed with Start and Remove until the page reloads. The e2e's `inbox-refused` picture shows exactly this: the 404 text sits under the card it says is not there. Remove has the same gap (apps/web/src/routes/inbox.tsx:176): a 404 there leaves the card listed with the refusal. Small, and the refusal text is clear; reloading the inbox after a 404 or 409 as well would fix it."
+  ]
+ },
+ {
+  "run": "three-small-items-in-agent-e-fiqe",
+  "at": "2026-09-17T00:06:23.523Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "I found no correctness bugs, and all three items are done as asked, one commit each. A view now asks only its task's own harness, and falls back the way `harnessOf` does. The ceiling counts only `working` sessions, and each tick counts them again from scratch. Pools are declared on the harness: `claude-bg` and `claudeDetached` share `claude`'s pool, and `codex` and `check` each have their own. The tests the brief asked for exist, and each fails if its change is undone. I ran six of the engine's test files directly (pool, engine, find, readme, decide, facade: 127 pass, none fail); the root `npm test` and `npm run typecheck` came back green but from turbo's cache, not a fresh run. One file outside the engine changed: `apps/api/test/asks.test.ts` now expects 4 `claude agents` calls instead of 5. That count had to change once item 1 landed, and it's still an exact count (nothing loosened); the commit message explains it. The two findings below are for whoever merges, not worth another round.",
+  "again": false,
+  "findings": [
+   "Text outside the engine that this change made wrong, which the brief kept the implementer from fixing: (1) `wf --help` still says `WF_MAX_CONCURRENT  sessions per harness at once (default 2)`. After this branch the setting counts sessions at work per pool, so someone reading it would expect 2 `claude` plus 2 `claude-detached` sessions, or a blocked session to take a slot. (2) The comments at `apps/api/src/app.ts:439` (\"Each `view` observes every harness \u2014 a `claude agents` call\"), `:209` and `:618` say a `logs` or `view` call observes every harness again. That was the reason for not reading earlier tries' check output, and it's no longer true: a check's `logs` now only reads the check harness's own run files. (3) `packages/agent-workflows/docs/features.md` still describes, as current (\u00a73 'What exists', around line 1898), that a blocked session holds its slot and that `claude` and `claude-detached` are counted apart, and still lists both as work the engine has to do ('Engine-side work', around lines 1925\u20131931). And `docs/plan-hold-the-bar.md` item 27 (lines 1070, 1077) is still open. Whoever merges should update these.",
+   "No test covers the `h === 'claude-bg' ? CLAUDE_POOL` branch of `poolsOf`. The only test that sets up `'claude-bg'` registers it under the name `claude` (`test/pool.test.ts:120`). There, the fallback `h.pool ?? name` also gives `claude`, so deleting the branch leaves every test green. The case that would break is the one `HarnessConfig`'s doc promises ('whatever either is called'): a map like `{ cc: 'claude-bg', 'claude-detached': claudeDetached }`. Without the branch, `cc` and `claude-detached` would be counted as two pools, and a ceiling of 2 would again let four Claude Code sessions run. A single pass with `'claude-bg'` under another name would pin it down."
+  ]
+ },
+ {
+  "run": "make-the-inbox-be-the-first-7vms",
+  "at": "2026-09-17T00:10:36.742Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "The Inbox is now first in the sidebar menu. The menu list was moved out of `__root.tsx` into `apps/web/src/components/nav.ts` with the Inbox first; nothing else about how the menu is shown or which item is highlighted changed. A unit test checks the order and highlighting, and a new e2e check fails any page whose menu is out of order; I confirmed that check fails when the order is wrong. The web tests (183 unit, 14 check-helper) and the typecheck pass, and the implement step's e2e screenshots show Inbox above Factory in light and dark.",
+  "again": false,
+  "findings": []
+ },
+ {
+  "run": "three-small-items-on-the-boa-bmq6",
+  "at": "2026-09-17T00:10:36.742Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "I read all three commits against the brief and found no correctness bugs. `npx turbo run test --force` passes in all 4 packages, and `npm run typecheck` passes (a cached result for the same inputs). I didn't run build or e2e, since they write into the workspace; I read the screenshots the implement step's e2e wrote instead, and the refused inbox, remove-refused, conflict and capabilities pages look right in both themes. I checked the read-only command list against Claude Code's permissions docs and it matches. Two small items are worth a person's attention but not another round: `permissions.ask` is still not read, and one api test ties a dated measurement to the live settings file.",
+  "again": false,
+  "findings": [
+   "The api never reads `permissions.ask`. Claude Code's docs say an ask rule makes one of the read-only commands ask, and in dontAsk anything that asks is denied. So a repository whose `.claude/settings.json` has `ask: [\"Bash(cat:*)\"]` gets a Capabilities page that shows `cat` solid under \"Claude Code's read-only commands do not ask\" on a dontAsk step, and that step's `cat` is denied. This is the reverse of the claim item 30 set out to remove. The gap is written down only in commit 0fba515's body, in no doc a person reads (not features.md, not the plan). Either handle `ask` rules the way deny rules are handled for those commands, or record the gap where the page's other open items live.",
+   "This test checks the dated `READ_ONLY_COMMANDS.measured` list against the repository's current `.claude/settings.json`. Suppose someone later adds `Bash(ls:*)` or `Bash(cat:*)` to `permissions.allow`, which is a harmless change. `npm test` then fails, and the failure says the 2026-09-15 measurement is wrong and should be demoted. It isn't wrong: it was taken under the settings of that day. The guard is only meaningful when someone edits the data, and it will break for an unrelated settings change. Pin the allow list the measurement ran under inside the test or the data, rather than reading the live file."
+  ]
+ },
+ {
+  "run": "the-runs-page-should-sort-th-zdoe",
+  "at": "2026-09-17T00:14:15.199Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "I found nothing that needs changing. The Runs page now lists runs in flight first and the rest below, newest first in each group, with ties broken by id. The runs in flight are the same ones the Factory counts. Each group has a heading that gives its count, its order and how many of its runs wait on you, which answers last round's finding. The full suite passes when run without the cache (183 web, 152 api, 455 workflows, 307 engine tests, none failing; the last two include some skipped tests). Typecheck passes, and both screenshots of the Runs page, light and dark, show the headings and the order.",
+  "again": false,
+  "findings": []
+ },
+ {
+  "run": "four-items-in-agent-workflow-w4eb",
+  "at": "2026-09-17T00:40:59.957Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "The four items do what was asked, and all three fixes from the last round are in with tests. The agent-workflows tests pass without turbo's cache (485 pass, 1 skipped) and typecheck is green. The run cap, item 31 and the queue are consistent across `wf tick`, `wf ls` and `wf decide`. Two small findings on the path where a queued card's start fails without a refusal: git's error is printed on every pass, and a daemon started after the failure never mentions the card. Both are worth a person's attention but not another round.",
+  "again": false,
+  "findings": [
+   "The `git` helper calls `execFileSync` without `stdio`, so Node copies git's stderr to the process's own stderr as well as putting it in the error message. Before this change only a person's `wf start` reached it, once. Now `startQueued` (runner.ts:1244, via `startFromInbox` \u2192 `start` \u2192 `makeWorkspace`) retries a card that failed without a refusal on every pass. A queued card whose `repo:` is a folder with no git prints `fatal: not a git repository (or any of the parent directories): .git` on `wf up`'s terminal every 4 seconds, with no card name, for as long as it holds the queue. That contradicts the README's claim that `wf up` says it once. Running `node --test --test-name-pattern=\"fails without a refusal\" test/queue-store.test.ts` shows four such lines for four passes. The test (queue-store.test.ts:563-577) only captures `console.log`, so it passes. Passing `stdio: ['ignore', 'pipe', 'pipe']` to the helper keeps git's words in the error without the echo; a test that captures `process.stderr.write` over those passes would pin it.",
+   "`wf up` skips a queue line marked `again`, and `again` is judged against the try saved in `$WF_ROOT/queue/<name>.json` (runner.ts:1251), not against what this `wf up` process has printed. So a `wf up` started, or restarted, after the failure was written never names the card holding the queue: its first pass already reads `again: true`. queue-store.test.ts:574 pins exactly that, since its two `wf up` passes print nothing about `no-git-a1b2`, not even once. A person restarting the daemon to see why cards stopped starting gets no line about it; only `wf inbox` shows it. Remembering the last printed line in the `up` loop is presentation, not a decision the tick carries between passes, so it would not break the level-triggered rule."
+  ]
+ },
+ {
+  "run": "two-findings-the-apps-lane-s-1qur",
+  "at": "2026-09-17T01:03:10.925Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Reviewed the four commits against 6886203. Both findings are fixed and tested: ask rules are read, cover read-only commands, allows and server tools, and are denied and struck on dontAsk steps; the read-only list is pinned by shape and date, with a guard proven to refuse. Last round's two fixes hold. Api 161 and web 191 tests pass (forced), typecheck is clean (from turbo's cache), and both theme PNGs show the page right. One small docs inaccuracy, not worth a round.",
+  "again": false,
+  "findings": [
+   "The new note says what an ask rule covers \u2014 \"a read-only command, an allow, a server's tool\" \u2014 is \"struck on a dontAsk step\". A server's tool is not: in capabilities.tsx:326 a dontAsk tool with `asks` and no deny gets ASKS (amber), the same chip as any tool no rule allows, and only its title says \"Asks by \u2026\". A reader of the doc expecting `mcp__fixture__echo` under `ask:` to be struck on a dontAsk step finds it amber. Either word the note as \"marked asking, and denied on a dontAsk step\", or strike the tool chip when `tool.asks` is set in dontAsk."
+  ]
+ },
+ {
+  "run": "markdown-rendered-on-the-boa-699m",
+  "at": "2026-09-17T01:42:27.707Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Round 2 review: all three fixes hold. The step page and its api route moved to /workflows/<repo|yours>/<workflow>/<step>, with no `steps/` address left anywhere. A folder in the inbox no longer gets a link. The 404 names only the .md files and matches DELETE's sentence. `npx turbo run test --force` and `npm run typecheck` pass (the typecheck was a turbo cache hit), and I looked at the round-2 screenshots from the e2e. One gap is left, too rare to need another round: a stray file with no extension that has the same name as a card opens the card's page.",
+  "again": false,
+  "findings": [
+   "Take a stray file `notes` sitting beside a card `notes.md`. The inbox lists both under the name `notes`, and `hasPage` returns true for both, so on the Inbox page the entry reading `notes: not a card` also links to /inbox/notes. The api now picks the .md file first (apps/api/src/inbox.ts:169), so that link opens the card notes.md: it says 'inbox card', shows the card's keys, and Source shows notes.md's text. The stray file's own page (its refusal and its text) can't be reached from anywhere. The api test covers only the api side (`the page is the card's`). No web or e2e test puts a stray file beside a card with the same name. The fix is to give no link to a non-.md entry when a .md entry has the same name, for example by passing the listing to `hasPage`."
+  ]
+ },
+ {
+  "run": "three-small-items-in-agent-e-0uqf",
+  "at": "2026-09-17T02:15:38.634Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Reviewed the three commits: priority-then-filing-order admission in tick, `priority` refused unless finite and shown in `ae ls`, and `remoteControl` passed as `--remote-control` before `--permission-mode` and refused on every harness built like a check. The full suite passed with the cache forced off, and typecheck passed as replayed from cache. Nothing needs another round; one small gap: the equal-times test can't tell whether the id tiebreak exists.",
+  "again": false,
+  "findings": [
+   "The 'two tasks filed at the same instant are admitted in the order of their ids' test passes even with the id tiebreak deleted from `admissionOrder` (engine.ts:282). `Journal.test()` (and facade.test's memoryJournal) return `list` already sorted and Array.prototype.sort is stable, so equal times keep id order without the comparator's third clause. The tiebreak only matters for a PromiseJournal whose `list` is unsorted \u2014 the README's own example (`db.job.findMany()`) is one \u2014 and nothing tests that case: a journal listing ids in reverse would."
+  ]
+ },
+ {
+  "run": "a-gate-a-step-s-handoff-that-18iy",
+  "at": "2026-09-17T02:55:02.070Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "I reviewed the whole gate change against f866d5e: the `gate: true` key, `--gate` and a card's `gate:` saved on the run record at start, the tick holding a step at its gate, `wf approve`, sending a step back with `wf retry --message`, the `## Approved` brief section, the screens, and cancel, rm and `--after`. Both round-2 fixes hold up: an ask with no words is not filed at a gate, and approving a step that has already handed on now says so. Tests pass: 520 in agent-workflows (519 passed, 1 skipped), plus 217/217 when I ran the gate, run and inbox tests directly; typecheck is clean. I found no correctness bug worth another round, only two small wording and doc errors, listed below.",
+  "again": false,
+  "findings": [
+   "`wf approve` always prints `\u2014 the next tick files what waits on it`. That is false for a gated step nothing waits on (`gate: true` or `--gate` on a last step such as review): approving it files nothing, and the run just ends. It is also false when a step after the gate also waits on another step that failed. The refusal text in `approvalRefusal` already tells these cases apart (`steps.some((s) => s.after.includes(name))`); the success line should do the same, e.g. `\u2014 nothing waits on it: its run can be decided` for a last step.",
+   "'What was measured' still gives agent-workflows as 517 tests (516 passed, 1 skipped). The round-3 fixes added tests, and the suite now runs 520 (519 passed, 1 skipped). A count in a measured section that no longer matches the suite says the section was not re-measured after the last change."
+  ]
+ },
+ {
+  "run": "two-small-items-in-agent-wor-5l9e",
+  "at": "2026-09-17T03:42:27.792Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "I found nothing worth changing in either commit. Priority: the first filing of a step with no `after` has no priority, and every other filing has priority 1: steps that wait on another, tries, rounds and checks. Those are the only four places the package files a task. `remote:` is accepted only as `true` or `false` and is carried as `remoteControl` on every session filing, never on a check. `remote: true` on codex or claude-detached is refused at start before anything is written, including through `wf plan` and inbox starts. That refusal uses the same harness rule as the engine, and a test asks the real engine for its wording. `npm test` and `npm run typecheck` pass from the root. I reran agent-workflows (527 pass, 1 skipped: the paid live test) and api (166 pass) with `--force`, because turbo had replayed cached results. The board's workflow list still shows a codex workflow with `remote: true` as valid, since only start refuses it. The brief asked for exactly that.",
+  "again": false,
+  "findings": []
+ },
+ {
+  "run": "the-workflow-builder-s-packa-x2ha",
+  "at": "2026-09-17T04:12:38.859Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "The change does what the request asked, and `npx turbo run test --force` passes: 543 tests in agent-workflows, 1 skipped (a live test skipped before this change too), and 166 in the api. `npm run typecheck` passed as well, though turbo replayed a cached result for it. `renderStep` round-trips every shipped folder. `writeWorkflow` parses the whole folder in memory before it writes anything and checks where it writes, and every new refusal has a test that asserts the folder is unchanged. I found two edge cases in how `writeWorkflow` removes files. Neither is reachable on the Linux (ext4) setup this runs on today, so neither is worth another round.",
+  "again": false,
+  "findings": [
+   "Stale files are removed only after every step's file is written, and a name counts as stale unless it matches exactly. On a case-insensitive filesystem (macOS, or a repo on /mnt/c under WSL), renaming step `Review` to `review` goes wrong. `put('review.md')` reads or writes the existing `Review.md` entry. Then `Review.md` is not in `names`, so `rmSync` deletes that one file. The step's body is lost, the other steps' `after: review` now name no step, so the folder no longer loads, and the returned `steps` say it does. Removing stale files before writing, or comparing names case-folded, would fix it.",
+   "`e.isFile()` on a readdir Dirent is false for a symlink, but `loadWorkflows` reads a symlinked `old.md` as a step. If a folder has a symlinked step file that the save drops, the file is never removed. The folder then still reads that step, even though `steps` in the result leave it out. If that step waits on a step the save removed, the folder no longer loads, though the write reported success. And for a symlinked step file the save keeps, `fs.writeFileSync` (line 1052) writes through the link into whatever file it points at. Nobody links step files today (the api only documents linked folders), so this is low priority. It is still a gap in the promise that the folder reads back as the steps returned."
+  ]
+ },
+ {
+  "run": "the-gate-on-the-board-approv-4t7s",
+  "at": "2026-09-17T04:20:36.582Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Reviewed the gate-on-the-board change against 500e7a2. The api route calls the package's approve() behind the guard, and its refusals were each tested to refuse. `gates`, `gate`, `approve` and `onYou` are on the detail and the list. The web side (Gate beside the rendered closeout, Approved under the step, the banner's `approve plan` link, the card's need, the Runs row) does what was asked. Last round's finding is fixed: withGraph refuses a detail from an older api, gateOffered offers the gate only when `approve` has words, and the Runs row falls back to step names. Tests exist for all three. `npx turbo run test --force` and `npm run typecheck` pass, and the e2e's gate screenshots in light and dark (awaiting, refused, approved) show what the brief asks for. I found nothing worth another round.",
+  "again": false,
+  "findings": []
+ },
+ {
+  "run": "the-queue-on-the-board-queue-ppu1",
+  "at": "2026-09-17T04:31:46.761Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Round 2: both round-1 findings are fixed. Queueing or unqueueing from the board now keeps the card file's modified time: an api test fails without the restore, and the e2e checks list order, the time shown and the file. The cap line now reads `3 of 4 run slots taken`, which departs from the brief's example `2 of 4 runs in flight`; features.md says why. The stream-close fix for the flaky `say` page e2e is confined to following.ts and unit-tested. `npx turbo run test --force` passed in all 4 packages; typecheck was green but replayed from cache; I ran no build or e2e (forbidden). No new findings.",
+  "again": false,
+  "findings": []
+ },
+ {
+  "run": "the-workflow-builder-on-the-4ifo",
+  "at": "2026-09-17T05:44:57.783Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Round 3 review. Both of last round's findings are fixed. `versionOf` now counts hidden `.md` and `.json` files, and the test expects a 409 that keeps the file for `.draft.md` and `.shared.schema.json`, and checks that a note and a subfolder survive a save. With turbo's cache off (`--force`), `npm test` passed in all 4 packages and `npm run typecheck` passed. The e2e screenshots taken after the last commit (saved, refused, changed; light and dark) show the builder working. Two small gaps are left, both on the disk-failure path: a person should see them, but they aren't worth another round.",
+  "again": false,
+  "findings": [
+   "The loop that writes the pasted schemas runs before the `try`, so only a `writeWorkflow` failure puts schemas back. A failure while writing a schema does not. Example: `a.schema.json` is new and `b.schema.json` is read-only on disk. `a.schema.json` gets written, writing `b.schema.json` throws EACCES, and the route returns 500 with `a.schema.json` left in the folder. No step names it, and the folder's version has changed. features.md (\u00a7 The board half, 'or the disk fail, each schema is put back as it was') promises otherwise. The 500 test only covers a failure inside `writeWorkflow`.",
+   "The banner says 'Not saved, and nothing written' for every error, including a 500 and a failed fetch. Neither guarantees that. `writeWorkflow` writes the step files one at a time, so on a disk failure partway (for example `[build, plan]` with `plan.md` a folder, EISDIR) `build.md` is already written. The api puts back only the schemas, and the board still says nothing was written. The same goes for a fetch cut off after the api wrote. Only a 4xx is known to have written nothing, so a 500 or a network error should say the folder may have been written and suggest reading it again."
+  ]
+ },
+ {
+  "run": "each-node-of-the-factory-can-bol3",
+  "at": "2026-09-17T05:59:11.011Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Round 2: nothing I would send back. A dragged card now takes along every card that waits on it, the way a dragged step takes along its followers, and the cards it waits on stay put. The 86 web unit tests the change touches pass when run directly, and the full suite replays green from turbo's cache. I judged the pages from implement's screenshots alone, because serving the app and the browser tools are denied in this mode. All 8 screenshots were taken after the last commit with no `-failed` file beside them, and nothing is cut off, overlapping or unreadable in light or dark. Typecheck was not run, since the brief limits turbo to the test task. Both round 1 won't-fixes hold: their reasons stand, the span limit is written on `spanOf` and pinned by a unit test, and the tall-card overlap predates this diff. One case the e2e never exercises, for the person rather than another round: dragging a node while a step's inspector is open. That is the only time the app hands React Flow a node with `selected: true`. From what I remember of React Flow's drag code, it clears that selection before it picks what to drag, so I expect it to work. I could not read the library source or open a browser to confirm it.",
+  "again": false,
+  "findings": []
+ },
+ {
+  "run": "the-web-app-s-components-on-3xq9",
+  "at": "2026-09-17T07:45:05.742Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Round 2 review: all three findings from the last round are fixed, and I checked each against React Aria's code. `routeLink` drops TanStack's click handler, so React Aria makes no extra click on keyup and the provider navigates once; the new Enter check in the e2e is sound; the menu is a list again and is documented as a local edit. The web app's 234 unit tests pass run directly and typecheck shows no errors (the root `npm test` was a turbo cache replay); `build` and `e2e` are not allowed in this step, so I read the implement step's screenshots instead. One small trap is left for a person, not worth another round.",
+  "again": false,
+  "findings": [
+   "The inner component is typed `P & { onClick?: unknown }`, and TanStack takes a link's props from that component, so `<NavLink onClick={picked}>` (last round's code) still compiles. At run time `routeLink` throws the handler away: on a phone, picking a place would leave the menu open, with no error. No link passes `onClick` today and the comment warns about it. Typing it `onClick?: never` would make typecheck reject it (CLAUDE.md: 'Prose is not a constraint')."
+  ]
+ },
+ {
+  "run": "four-small-items-in-agent-en-ug4p",
+  "at": "2026-09-17T19:22:13.765Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Reviewed all four items against the code and ran the suite: `npx turbo run test --force` green from the root (engine 340 tests, 331 pass, 9 AE_LIVE skipped) and `npm run typecheck` green. The busy-quiet rule traces correctly through `closedOut` and `decide` (no false `unsigned`, the inherited-statement guard is judged against the registry's start, which is strictly later than the journal's), the nudge is pinned word for word, and both new tests for items 3 and 4 genuinely fail without their rule \u2014 the reversed listing defeats the stable sort, and without `poolsOf`'s `claude-bg` branch `cc` becomes a pool of its own. Round 1's two findings are properly fixed: `keptRead` now takes `keep` from its caller with the old default intact, and the pin is still dropped by mtime.",
+  "again": false,
+  "findings": []
+ },
+ {
+  "run": "the-end-of-a-run-is-a-step-o-y1wl",
+  "at": "2026-09-17T21:13:58.985Z",
+  "chosen": "Merge + file the findings (Recommended)",
+  "more_than_merge": true,
+  "summary": "Reviewed the whole change against \u00a78 and ran the suite: `npm run typecheck` clean and `npx turbo run test --force` green at the claimed counts (agent-workflows 575/574+1 skipped, api 200, web 243, engine 326). The four asked-for items are there and genuinely tested \u2014 `workspace: main` with its refusals at parse and at load, the ending's gate held before the step is filed, `to decide` in both kinds, `wf decide`'s facts, and `ship.md` on the four dev folders with a real-git store test. Seven findings, none of which breaks the happy path: the two worth acting on before this is used in anger are that nothing stops two runs' ending steps working in the person's checkout at once, and that the ending step's brief still carries the artifacts contract telling it to leave files in that checkout for a run that collects and commits nothing there. The rest are refusal and screen messages that are wrong or unhelpful at the new gate.",
+  "again": false,
+  "findings": [
+   "Nothing keeps two runs' ending steps out of the same checkout. `validate` refuses a second ending inside one workflow, but `workspaceFor` hands `run.repo` to any approved ending, and `tick` advances every run in one pass: approve two finished `dev` runs (the board's `to decide` list invites exactly that) and the next pass files both `ship` tasks with `cwd` = the repository, and the engine runs both at once (pool cap 2 by default). Both sessions read `git status --porcelain` as clean, both run `git merge --no-ff --no-commit`, and the loser's `git merge --abort` (step 5 of its own prose) throws away the winner's staged trial merge while the winner's `npm test` is running against it \u2014 two opus sessions wasted and the person's checkout rewritten under them. The only thing standing in the way is ship.md's prose, and the house rule is that the machinery refuses the alternative. A level-triggered refusal to file an ending while another run has one unsettled in the same repo (the store's other runs are already read for `forgetRefusal`) is the shape; there is no test for two runs at all.",
+   "The ending step gets the standard artifacts contract, whose second bullet is false for it and invites damage: \"Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root \u2026 the run copies each such file into that directory \u2026 A file left in the workspace is committed with the rest too.\" For a `workspace: main` step \"this workspace\" is the person's checkout, and `handOffDue` (run.ts:1132) now excludes the step, so `collectArtifacts` (runner.ts:1546) never runs and nothing is committed. A ship session that writes `merge-log.md` beside its closeout, as its brief tells it to, leaves an untracked file in the person's checkout for ever \u2014 and the next run's ship step then reads `git status --porcelain` as non-empty and signs off blocked at step 1 of its prose. It also contradicts ship.md's own \"leave the checkout as you found it\". Give a main-workspace step a contract with only the absolute-path bullet.",
+   "The send-back refusal at an ending's gate names the wrong step's gate and a command that is itself refused. On the shipped `dev` folders, `wf retry <run> review` (no --message) at ship's gate reaches the `sendsBack` branch added at run.ts:1317 and prints \"review is awaiting approval: a try of it sends it back from its gate \u2026 \u2014 or approve it: wf approve <run> review.\" review is not awaiting approval (`wf ls` shows it `unverified \u00b7 done`, ship `awaiting approval`), and `wf approve <run> review` is refused by `approvalRefusal` with \"review has no gate \u2026 <run> is gated at ship.\" It should say ship is the step at its gate and name `wf approve <run> ship`. The test at test/run.test.ts:3320 does not catch it: `/^review is awaiting approval|--message/` is an alternation, so it passes whatever the sentence says.",
+   "`decision` does not apply `unheld`, so `wf decide` and the board contradict `wf ls` in the window the round-3 fix was meant to close. Between `wf retry <run> review --message \"\u2026\"` and the pass that files it, `standing` still reads ship as `awaiting approval`: `wf decide` prints \"AWAITING APPROVAL, waiting on you: ship \u2014 your approval is what runs it\" and `gateLines` prints `wf approve <run> ship`, while `wf ls` (which does apply `unheld`) shows ship `waiting` with nothing to decide, and `wf approve <run> ship` is refused with \"try 2 of review is asked for \u2026 approving now would take the result that ask objects to.\" The api's run page reads `decision` and `gateLines` too, so its Approve button is live in the same window. `decision` should take the same `unheld` adjustment `assess` and `listing` take.",
+   "`wf retry <run> ship` at the ending's gate \u2014 the step `wf ls` names on the line above the send-back \u2014 falls through to the default \"ship is awaiting approval, and there is nothing to try again.\" Before this change every `awaiting approval` step had modes (a step with no followers hit the first `sendsBack` clause), so this state is new and lands on a message that names no fix: it should point at `wf approve <run> ship` and `wf retry <run> <the work> --message`, as `sendBackTo` already computes.",
+   "`wf round <run> review` at an ending's gate is refused with \"\u2026its loop is over and there is nothing to go round again. What waits on it has been filed: wf ls <run>.\" Nothing has been filed \u2014 ship is unfiled and waiting for the person's approval, which is the whole state they are standing in. `roundAsk`'s gate check at run.ts:1903 only looks inside `loopSpan`, so the ending's gate is invisible to it; the sentence should say the run is at its ending's gate and name `wf approve` / the send-back.",
+   "The board now tells a person to merge by hand a branch whose run has an ending step waiting to merge it. `commandsOf` offers `ship it  git merge --no-ff <branch>` and `drop it  git branch -D \u2026` for any awaiting decision with branches, and a `dev` run parked at ship's gate is one \u2014 while `wf decide` deliberately suppresses both for a folder that merges (cli.ts:889, `!merges(steps)`). Outside your package, so the fix is one line for the board run (pass `merges(steps)` the way the CLI does); at minimum it belongs in features.md's \"What it leaves\", which does not name it."
+  ]
+ },
+ {
+  "run": "four-leftovers-on-the-board-fmk9",
+  "at": "2026-09-17T21:13:58.985Z",
+  "chosen": "Merge (Recommended)",
+  "more_than_merge": false,
+  "summary": "Reviewed all eleven commits against 3cf06a0 and ran the suite: `npm run typecheck` and `npx turbo run test --force` are green (317/9 engine, 202 api, workflows and web pass), and I read the e2e PNGs implement left in the run's artifacts \u2014 the floor lays out clear of itself in both themes. All four of round 1's findings are genuinely answered: the schema being written is now put back by comparing what the file holds rather than by which writes returned, the status-null banner no longer contradicts its own message, the inbox keys refusals by file, and the CELL_HEIGHT won't-fix holds on its stated reason. I found one small coverage loss, not worth another round; I wrote nothing into the workspace.",
+  "again": false,
+  "findings": [
+   "With CELL_HEIGHT at 260 the diamond's span reads `rows: 2`, which is what line 208 already asserts for the fan-out, so the one assertion that distinguished a three-lane graph from a two-lane one no longer does. A `spanOf` regression that read only the first two lanes' y (max 174 instead of 324) yields ceil((174+150)/260) = 2 and passes both lines; at 220 the diamond line caught it (3 vs 2). The comment above still says \"the diamond's three, which reach further down\", which nothing now measures. A fixture whose lanes reach past two cells \u2014 or a wider fan asserted at rows: 3 \u2014 would put the distinction back. Low value: the CELL_HEIGHT \u2212 ROW_HEIGHT boundary assertions two lines below still pin the row arithmetic exactly."
+  ]
+ },
+ {
+  "run": "the-supervisor-packages-agen-n7c2",
+  "at": "2026-09-17T22:43:15.153Z",
+  "chosen": "Merge + file the findings (Recommended)",
+  "more_than_merge": true,
+  "summary": "Reviewed the whole diff against the brief: the `supervisor` folder and its README, `slot: none` through the parser, `validate` and all three cap readers, the `taskPhases` earlier-tries gate, the `branchesToRead` base drop, the artifacts contract split, and the new tests. Ran `npx turbo run test --force` (agent-workflows 587 / 586 pass 1 skip, api 202, web and engine unchanged) and `npm run typecheck` \u2014 all green. I traced every consumer of `views` inside `advance` and every path to `spendOf` to satisfy myself the earlier-tries gate loses nothing, and confirmed the CLI's `wf decide` never reaches the fallback with a base branch for a run that cut worktrees. Three findings, none a machinery bug: a present-tense claim in the new brief that goes stale, the git prohibition left to prose where `disallow:` is available, and a board state the Shipped section undersells.",
+  "again": false,
+  "findings": [
+   "The new brief for a `workspace: main` step whose run has no result branch ends with \"The checkout is at `<run.baseRef>`\" \u2014 a present-tense claim about the checkout, made from the sha frozen at `wf start`. `baseRef` is only ever rewritten for a run with `--after`, and the supervisor's run never ends in the one checkout every other run's `ship.md` merges into. From the first merge onwards every recomposed brief (one per answer, dozens over a day) names a commit several merges behind, and a session that acts on it \u2014 `git diff <baseRef>`, `git log <baseRef>..HEAD` \u2014 reads other runs' merges as the state it is responsible for: the same mistake round 3 removed from `wf decide`. The other sentence in the block, `results` \"cut from `<baseRef>`\", is a historical fact and stays true; only this one goes false. Nothing tests it: run.test.ts:295 asserts the sentence is present, not that what it says is still so on try 30. Say the base branch by name, or read HEAD where the brief is composed, or drop the clause.",
+   "\"**Never type git for a run.** Not `git merge`, not `git branch -D`, not a push, not a checkout of its branch\" is the most consequential rule in the brief and is enforced by nothing \u2014 against CLAUDE.md's *Prose is not a constraint*, and with no test that makes it refuse. The step works in the person's real checkout with the base branch checked out and has every tool but the four on line 14, so a `git merge <run branch>` lands work on main that no ending step trial-merged and no person approved; a `git checkout <run branch>` leaves the checkout off the base and stops the next `ship.md` at its step 1. `.claude/settings.json` already denies `Bash(git push:*)` and `Bash(git branch -D:*)`, so those two are real; it cannot deny `git merge` because `ship.md` runs in the same checkout and needs it \u2014 which makes this step's own `disallow:` (line 14) the only place the refusal can live. Either add the denies with a test that makes one refuse, or say in the folder's README why prose is the best available guard here.",
+   "\"What it leaves\" says of the board only that \"a run that never ends is drawn as any other ... nothing says 'this one is the supervisor'\". It is worse than that on the operator's first day: a step that signed off `blocked` is in `stopsFollowers`, so `assess` gives the run `failed`, and `RunStatus` on the board is `'running' | 'succeeded' | 'failed' | 'cancelled'` \u2014 the supervisor's normal, healthy, waiting-for-you state draws its card as a failed run for as long as it waits. `wf ls` is unaffected (its run line carries no status word), so the gap is the board's alone. One sentence in this bullet would keep the operator from reading the first question it asks as a crash."
+  ]
+ },
+ {
+  "run": "four-leftovers-in-agent-work-3uyy",
+  "at": "2026-09-17T23:44:48.029Z",
+  "chosen": "Merge + fix the message (Recommended)",
+  "more_than_merge": true,
+  "summary": "Reviewed the four commits against the brief and ran both gates: `npx turbo run test --force` green in all four packages (agent-workflows 593 / 591 passed / 2 skipped, api 202, web 248, agent-engine 340 / 331 / 9 \u2014 the counts features.md claims, matched exactly) and `npm run typecheck` clean. All four items do what was asked, each with a test that fails without it, and round 1's two findings are settled rather than worked around: the `up` loop keys on what this daemon printed (so a pass at a full cap, which reads no queue at all, does not spend the daemon's one chance to name the card), and the write-order test asserts every removal before the write as a partition rather than readdir's sequence. One finding: the refusal for a linked step file names `cp --remove-destination`, a GNU-only flag, on a refusal whose own docstring is about macOS and Windows filesystems. Declared leftovers in features.md \u2014 two steps whose names differ only by case, the api's now-redundant `utimesSync` \u2014 are honestly stated with reasons that hold, so I did not re-raise them.",
+  "again": false,
+  "findings": [
+   "The link refusal tells the person to \"copy what it points at over it, cp --remove-destination\", which is GNU coreutils only. On macOS \u2014 the filesystem family the same function's case-insensitivity fix is written for \u2014 `cp` has no long options at all, so following the message gives `cp: illegal option -- -` and the person is left with a refusal whose named fix does not run. Either drop the flag from the sentence or name a portable pair (`rm <file> && cp <target> <file>`). The same sentence is duplicated in test/write-workflow.test.ts:263, so a fix touches both."
+  ]
+ }
+]

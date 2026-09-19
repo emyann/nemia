@@ -1,0 +1,394 @@
+[
+ {
+  "kind": "file-desc",
+  "id": "a-finished-run-is-a-decision-vjcj",
+  "path": "packages/agent-engine/test/live.test.ts",
+  "before": 0.08,
+  "after": 0.08
+ },
+ {
+  "kind": "file-desc",
+  "id": "a-finished-run-is-a-decision-vjcj",
+  "path": "packages/agent-workflows/src/cli.ts",
+  "before": 0.08,
+  "after": 0.09
+ },
+ {
+  "kind": "file-desc",
+  "id": "a-finished-run-is-a-decision-vjcj",
+  "path": "packages/agent-engine/src/cli.ts",
+  "before": 0.09,
+  "after": 0.08
+ },
+ {
+  "kind": "brief-denies",
+  "id": "a-finished-run-is-a-decision-vjcj",
+  "path": "apps/web",
+  "before": 0.96,
+  "after": 0.4
+ },
+ {
+  "kind": "file-desc",
+  "id": "an-inbox-cards-parked-before-ri7j",
+  "path": "apps/web/src/components/ui/switch.tsx",
+  "before": 0.03,
+  "after": 0.05
+ },
+ {
+  "kind": "file-desc",
+  "id": "an-inbox-cards-parked-before-ri7j",
+  "path": "apps/web/src/hooks/use-mobile.ts",
+  "before": 0.03,
+  "after": 0.05
+ },
+ {
+  "kind": "file-desc",
+  "id": "an-inbox-cards-parked-before-ri7j",
+  "path": "apps/web/src/components/CanvasLegend.tsx",
+  "before": 0.04,
+  "after": 0.05
+ },
+ {
+  "kind": "brief-denies",
+  "id": "an-inbox-cards-parked-before-ri7j",
+  "path": "packages/agent-workflows",
+  "before": 0.98,
+  "after": 0.61
+ },
+ {
+  "kind": "file-desc",
+  "id": "each-node-of-the-factory-can-bol3",
+  "path": "apps/web/src/lib/markdown.ts",
+  "before": 0.03,
+  "after": 0.16
+ },
+ {
+  "kind": "file-desc",
+  "id": "each-node-of-the-factory-can-bol3",
+  "path": "apps/api/test/budget.test.ts",
+  "before": 0.04,
+  "after": 0.34
+ },
+ {
+  "kind": "file-desc",
+  "id": "each-node-of-the-factory-can-bol3",
+  "path": "apps/api/test/fixtures/mcp-server.ts",
+  "before": 0.04,
+  "after": 0.22
+ },
+ {
+  "kind": "brief-denies",
+  "id": "each-node-of-the-factory-can-bol3",
+  "path": "apps/web",
+  "before": 0.71,
+  "after": 0.08
+ },
+ {
+  "kind": "file-desc",
+  "id": "forget-a-run-that-is-over-wf-auru",
+  "path": "apps/web/src/components/ui/card.tsx",
+  "before": 0.02,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "forget-a-run-that-is-over-wf-auru",
+  "path": "apps/web/src/components/ui/separator.tsx",
+  "before": 0.02,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "forget-a-run-that-is-over-wf-auru",
+  "path": "apps/web/src/components/ui/skeleton.tsx",
+  "before": 0.02,
+  "after": 0.04
+ },
+ {
+  "kind": "brief-denies",
+  "id": "forget-a-run-that-is-over-wf-auru",
+  "path": "packages/agent-workflows",
+  "before": 0.98,
+  "after": 0.74
+ },
+ {
+  "kind": "file-desc",
+  "id": "give-a-workflow-the-edge-bac-mmhc",
+  "path": "apps/web/src/components/FactoryCanvas.tsx",
+  "before": 0.04,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "give-a-workflow-the-edge-bac-mmhc",
+  "path": "apps/web/src/components/ui/button.tsx",
+  "before": 0.04,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "give-a-workflow-the-edge-bac-mmhc",
+  "path": "apps/web/src/components/ui/card.tsx",
+  "before": 0.04,
+  "after": 0.05
+ },
+ {
+  "kind": "brief-denies",
+  "id": "give-a-workflow-the-edge-bac-mmhc",
+  "path": "packages/agent-workflows",
+  "before": 0.98,
+  "after": 0.51
+ },
+ {
+  "kind": "file-desc",
+  "id": "give-the-engine-a-structured-9e0d",
+  "path": "apps/web/src/components/ui/badge.tsx",
+  "before": 0.03,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "give-the-engine-a-structured-9e0d",
+  "path": "apps/web/src/components/ui/button.tsx",
+  "before": 0.03,
+  "after": 0.05
+ },
+ {
+  "kind": "file-desc",
+  "id": "give-the-engine-a-structured-9e0d",
+  "path": "apps/web/src/components/ui/separator.tsx",
+  "before": 0.03,
+  "after": 0.05
+ },
+ {
+  "kind": "brief-denies",
+  "id": "give-the-engine-a-structured-9e0d",
+  "path": "packages/agent-engine",
+  "before": 0.98,
+  "after": 0.62
+ },
+ {
+  "kind": "file-desc",
+  "id": "let-a-step-say-which-tools-i-v27t",
+  "path": "apps/web/src/components/ui/separator.tsx",
+  "before": 0.05,
+  "after": 0.06
+ },
+ {
+  "kind": "file-desc",
+  "id": "let-a-step-say-which-tools-i-v27t",
+  "path": "apps/web/src/components/ui/skeleton.tsx",
+  "before": 0.05,
+  "after": 0.06
+ },
+ {
+  "kind": "file-desc",
+  "id": "let-a-step-say-which-tools-i-v27t",
+  "path": "apps/web/src/hooks/use-mobile.ts",
+  "before": 0.05,
+  "after": 0.06
+ },
+ {
+  "kind": "brief-denies",
+  "id": "let-a-step-say-which-tools-i-v27t",
+  "path": "packages/agent-workflows",
+  "before": 0.98,
+  "after": 0.59
+ },
+ {
+  "kind": "file-desc",
+  "id": "make-the-board-draw-the-run-att8",
+  "path": "packages/agent-engine/src/cli.ts",
+  "before": 0.06,
+  "after": 0.07
+ },
+ {
+  "kind": "file-desc",
+  "id": "make-the-board-draw-the-run-att8",
+  "path": "packages/agent-engine/src/engine.ts",
+  "before": 0.07,
+  "after": 0.07
+ },
+ {
+  "kind": "file-desc",
+  "id": "make-the-board-draw-the-run-att8",
+  "path": "packages/agent-engine/src/index.ts",
+  "before": 0.07,
+  "after": 0.07
+ },
+ {
+  "kind": "brief-denies",
+  "id": "make-the-board-draw-the-run-att8",
+  "path": "apps/api",
+  "before": 0.98,
+  "after": 0.54
+ },
+ {
+  "kind": "file-desc",
+  "id": "make-the-inspector-say-what-qpx2",
+  "path": "packages/agent-workflows/src/cli.ts",
+  "before": 0.06,
+  "after": 0.1
+ },
+ {
+  "kind": "file-desc",
+  "id": "make-the-inspector-say-what-qpx2",
+  "path": "packages/agent-engine/src/cli.ts",
+  "before": 0.08,
+  "after": 0.11
+ },
+ {
+  "kind": "file-desc",
+  "id": "make-the-inspector-say-what-qpx2",
+  "path": "packages/agent-engine/src/runner-detached.ts",
+  "before": 0.08,
+  "after": 0.1
+ },
+ {
+  "kind": "brief-denies",
+  "id": "make-the-inspector-say-what-qpx2",
+  "path": "apps/api",
+  "before": 0.99,
+  "after": 0.52
+ },
+ {
+  "kind": "file-desc",
+  "id": "show-a-step-s-session-on-the-8eet",
+  "path": "packages/agent-engine/src/cli.ts",
+  "before": 0.08,
+  "after": 0.11
+ },
+ {
+  "kind": "file-desc",
+  "id": "show-a-step-s-session-on-the-8eet",
+  "path": "packages/agent-workflows/src/cli.ts",
+  "before": 0.08,
+  "after": 0.11
+ },
+ {
+  "kind": "file-desc",
+  "id": "show-a-step-s-session-on-the-8eet",
+  "path": "packages/agent-workflows/src/workflow.ts",
+  "before": 0.08,
+  "after": 0.1
+ },
+ {
+  "kind": "brief-denies",
+  "id": "show-a-step-s-session-on-the-8eet",
+  "path": "apps/api",
+  "before": 0.98,
+  "after": 0.54
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-end-of-a-run-is-a-step-o-y1wl",
+  "path": "apps/web/src/components/ai-elements/shimmer.tsx",
+  "before": 0.03,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-end-of-a-run-is-a-step-o-y1wl",
+  "path": "apps/web/src/components/ui/switch.tsx",
+  "before": 0.03,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-end-of-a-run-is-a-step-o-y1wl",
+  "path": "apps/web/src/components/CanvasLegend.tsx",
+  "before": 0.04,
+  "after": 0.05
+ },
+ {
+  "kind": "brief-denies",
+  "id": "the-end-of-a-run-is-a-step-o-y1wl",
+  "path": "packages/agent-workflows",
+  "before": 0.96,
+  "after": 0.4
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-runs-page-should-sort-th-zdoe",
+  "path": "apps/web/src/components/CanvasLegend.tsx",
+  "before": 0.03,
+  "after": 0.21
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-runs-page-should-sort-th-zdoe",
+  "path": "apps/api/src/port.ts",
+  "before": 0.04,
+  "after": 0.24
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-runs-page-should-sort-th-zdoe",
+  "path": "apps/web/src/hooks/use-mobile.ts",
+  "before": 0.04,
+  "after": 0.19
+ },
+ {
+  "kind": "brief-denies",
+  "id": "the-runs-page-should-sort-th-zdoe",
+  "path": "apps/web",
+  "before": 0.73,
+  "after": 0.08
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-workflow-builder-on-the-4ifo",
+  "path": "packages/agent-engine/src/cli.ts",
+  "before": 0.08,
+  "after": 0.1
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-workflow-builder-on-the-4ifo",
+  "path": "packages/agent-engine/test/release.test.ts",
+  "before": 0.08,
+  "after": 0.12
+ },
+ {
+  "kind": "file-desc",
+  "id": "the-workflow-builder-on-the-4ifo",
+  "path": "apps/web/src/components/conversation/Conversation.tsx",
+  "before": 0.09,
+  "after": 0.1
+ },
+ {
+  "kind": "brief-denies",
+  "id": "the-workflow-builder-on-the-4ifo",
+  "path": "apps/web",
+  "before": 0.98,
+  "after": 0.5
+ },
+ {
+  "kind": "file-desc",
+  "id": "three-small-items-in-agent-e-fiqe",
+  "path": "apps/web/src/components/ui/badge.tsx",
+  "before": 0.03,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "three-small-items-in-agent-e-fiqe",
+  "path": "apps/web/src/components/ui/button.tsx",
+  "before": 0.03,
+  "after": 0.04
+ },
+ {
+  "kind": "file-desc",
+  "id": "three-small-items-in-agent-e-fiqe",
+  "path": "apps/web/src/components/ui/card.tsx",
+  "before": 0.03,
+  "after": 0.04
+ },
+ {
+  "kind": "brief-denies",
+  "id": "three-small-items-in-agent-e-fiqe",
+  "path": "packages/agent-engine",
+  "before": 0.98,
+  "after": 0.7
+ }
+]

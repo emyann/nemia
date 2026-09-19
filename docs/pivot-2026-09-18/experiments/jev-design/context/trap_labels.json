@@ -1,0 +1,33 @@
+{
+ "_note": "Written 2026-09-18 BEFORE any Jev call. A trap 'applies' to a run when any assistant tool_use input (Edit/Write/Bash/browser) in any of the run's sessions matches every regex in 'all'. Bullets 0,1,2,26,27 are universal (always kept, not scored).",
+ "universal": [0,1,2,26,27],
+ "traps": {
+  "3":  {"name":"route-build",        "all":["createFileRoute|routeTree"]},
+  "4":  {"name":"web-e2e",            "all":["npm run e2e|test/e2e/|playwright install"]},
+  "5":  {"name":"assert-throws",      "all":["assert\\.throws|assert\\.rejects"]},
+  "6":  {"name":"e2e-4xx-watch",      "all":["e2e","4xx|refus"]},
+  "7":  {"name":"transcript-inflight","all":["\\.transcript\\b|transcript\\("]},
+  "8":  {"name":"dragTo-handle",      "all":["dragTo|page\\.mouse"]},
+  "9":  {"name":"control-char",       "all":["fromCharCode|\\\\x00|\\\\u0000|control char"]},
+  "10": {"name":"svg-edge-visible",   "all":["toBeVisible","edge"]},
+  "11": {"name":"floor-fit",          "all":["prefetchQuery|fitView|fitFloor"]},
+  "12": {"name":"card-fits-cell",     "all":["CELL_HEIGHT|expectClearOfEachOther"]},
+  "13": {"name":"eventsource-close",  "all":["EventSource"]},
+  "14": {"name":"reactflow-drag",     "all":["page\\.mouse\\.move|browser_drag|onNodeDrag|nodesDraggable"]},
+  "15": {"name":"filing-time-feed",   "all":["readFilings|seedFeed|feed\\.jsonl"]},
+  "16": {"name":"raf-unbound",        "all":["requestAnimationFrame"]},
+  "17": {"name":"hasText-space",      "all":["hasText"]},
+  "18": {"name":"disclosure-panel",   "all":["Disclosure"]},
+  "19": {"name":"aria-link-enter",    "all":["routeLink|createLink|RouterProvider"]},
+  "20": {"name":"aria-switch-click",  "all":["<Switch|getByRole\\('(switch|checkbox|radio)'"]},
+  "21": {"name":"screenshot-path",    "all":["browser_take_screenshot"]},
+  "22": {"name":"encoded-dotdot",     "all":["%2E|%2F"]},
+  "23": {"name":"query-invalidate",   "all":["invalidateQueries"]},
+  "24": {"name":"e2e-midread",        "all":["visit\\.ts|networkidle"]},
+  "25": {"name":"background-shell",   "all":["run_in_background"]},
+  "28": {"name":"step-keys",          "all":["STEP_KEYS"]},
+  "29": {"name":"execFileSync-stdio", "all":["execFileSync|spawnSync"]},
+  "30": {"name":"readdir-symlink",    "all":["readdirSync|symlink|lstatSync"]},
+  "31": {"name":"worktree-deps",      "all":["npm install|npm ci|package-lock"]}
+ }
+}

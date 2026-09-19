@@ -1,0 +1,541 @@
+[
+ {
+  "finding": "a-finished-run-is-a-decision-vjcj#1",
+  "file": "apps/web/src/routes/runs.$runId.tsx",
+  "what": "`acts = atGate && ends` tests only `workspace: main` and never that the step is unfiled, though the package's `sendBackTo` (and the comment on the next line) sends a send-back to the step itself once it has a task. The state is reachable: an ending that ran and failed (ship aborting on a conflict) is retried with `wf retry <run> ship`. Try 2 is filed without waiting at the gate (`waitsAtGate` is false once there is a taskId), and once it signs off, `approvalOf` finds no approval for try 2, so the step is `awaiting approval` with a task. The page then (a) says \"nothing of it runs until you approve it \u2014 your approval is what files it\" of a step that has already run and merged, (b) shows review's closeout in `ActsOn` in place of ship's try-2 closeout, which is what the approval is about, and (c) points Send back at `review`, which the package refuses (review is verified and its follower is filed, so there is no send-back to make). Meanwhile the Decide section on the same page, built from `sendBackTo`, offers `wf retry <run> ship`. Fix: `const acts = atGate && ends && step.taskId === null;`. No component or e2e test covers a filed ending at its gate.",
+  "best": 0,
+  "brief": null
+ },
+ {
+  "finding": "a-gate-a-step-s-handoff-that-18iy#1",
+  "file": "packages/agent-workflows/src/cli.ts",
+  "what": "`wf approve` always prints `\u2014 the next tick files what waits on it`. That is false for a gated step nothing waits on (`gate: true` or `--gate` on a last step such as review): approving it files nothing, and the run just ends. It is also false when a step after the gate also waits on another step that failed. The refusal text in `approvalRefusal` already tells these cases apart (`steps.some((s) => s.after.includes(name))`); the success line should do the same, e.g. `\u2014 nothing waits on it: its run can be decided` for a last step.",
+  "best": 0.14,
+  "brief": "the-end-of-a-run-is-a-step-o-y1wl"
+ },
+ {
+  "finding": "a-gate-a-step-s-handoff-that-18iy#2",
+  "file": "packages/agent-workflows/docs/features.md",
+  "what": "'What was measured' still gives agent-workflows as 517 tests (516 passed, 1 skipped). The round-3 fixes added tests, and the suite now runs 520 (519 passed, 1 skipped). A count in a measured section that no longer matches the suite says the section was not re-measured after the last change.",
+  "best": 0.12,
+  "brief": "the-supervisor-packages-agen-n7c2"
+ },
+ {
+  "finding": "a-plan-as-a-folder-of-cards-o4su#1",
+  "file": "packages/agent-workflows/src/plan.ts",
+  "what": "When a `start()` fails part-way, `planStopped` tells the person to run `wf start <plan>/<card>.md --workflows \u2026 --after \u2026`. But `wf start` (`cli.ts:256`) uses the whole text of a file as the brief, so a card started this way is not the run `wf plan` would have started. Its brief opens with `---`, `workflow: dev`, `after: b, c`, `---` and then the body. Its run id comes from those lines too: d.md becomes `workflow-dev-after-b-c-show-xxxx` instead of `show-the-flag-\u2026`. And a run waiting on it gets `---` as the parent's first line in its `## From run <id>` section. The printed paths are also unquoted, so a plan folder or repo path with a space breaks the command when pasted. This is the one piece of guidance the brief asked a stopped plan to print, and features.md records the fault as left instead of fixing it. Either make the printed command start the card's body (for example, `wf start` drops the settings block of a brief file that parses as a card), or print something that does, and add a test that runs the printed command and compares the run's brief to the card's body.",
+  "best": 0.93,
+  "brief": "six-small-items-in-agent-wor-vrm2"
+ },
+ {
+  "finding": "a-run-that-waits-on-a-run-wf-vaka#1",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "`decision` returns `shipped` for any run that is not running and whose result branches are on the base branch, whatever its steps ended as. A result branch is cut at its run's base, so a terminal step that ended failed, blocked or unsigned with nothing committed leaves that branch on the base. `parentOf` asks `decision`, so the gate opens and the next tick files the child's roots, though no person has merged or decided anything. Example: a one-step parent (like the store tests' `oneStep`) whose harness fails before writing, or whose step signs off `blocked` with a question. Its children start, and in a diamond the failure spreads down the graph, each run reading `shipped`. `wf decide` on that parent also prints `shipped \u2014 \u2026 is already on main` and hides the failure. In the repo's implement \u2192 review workflows this needs implement to succeed with no commits and review to fail, so it is rare there. features.md lists it under 'What it leaves', but the README bullet only says 'one that finished with nothing to commit has [shipped] \u2026 and its child starts', which reads as the success case. No test makes the gate refuse such a parent. A possible fix in `decision`: count a branch with nothing past `baseRef` as shipped only when the outcome is `succeeded`. That keeps the signed-off, nothing-to-commit parent that the store test ships.",
+  "best": 0.97,
+  "brief": "three-small-correctness-item-lz3w"
+ },
+ {
+  "finding": "close-the-fence-by-machinery-ahlx#1",
+  "file": "workflows/ui/review.md",
+  "what": "The new comment ends 'until then the brief keeps review from them', meaning `npx turbo run test build` and `node --test apps/web/test/e2e/run.ts`. The ui brief (the same text in packages/agent-workflows/workflows/ui/review.md:17) never names either one. Only the dev and dev-build briefs gained that sentence, as the package README and features.md correctly say. Worse, the ui brief sends review to the look skill, whose step 2.1 says `npm run build`. That command is now denied, and nothing in the ui brief then stops review from getting the build through the still-allowed `npx turbo run test build`. Either add the dev brief's sentence to both ui briefs, or change the comment to say the ui brief does not cover those two ways in.",
+  "best": 0.05,
+  "brief": "the-end-of-a-run-is-a-step-o-y1wl"
+ },
+ {
+  "finding": "cost-measured-and-a-budget-s-vbfh#1",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "For one tick after a person raises a loop's budget with `wf round --budget`, the screens say the run still waits on them. Take implement with `budget: 3` that has spent $4.25, and review asking `again: true` below its `rounds:`. After `wf round r review --budget 10` and before the next tick, `assess` marks only the looping step (review) as `running`. Implement still reads `over budget`, because it is held on review's request for a round, and that status stops what follows, so the run's status is `failed`. The results in that window: (1) `wf decide` reads awaiting/blocked, prints `OVER BUDGET, waiting on you: implement ($4.25 of $3), review (held: \u2026)`, and offers `wf round r review --budget <amount>` again, which `roundAsk` then refuses as already asked. (2) `wf ls` prints `\u2192 waiting on you: implement`, because `listing` only takes out a step whose own name has a round due. (3) The pass that files the round reports `failed`. An exhausted loop asked for with plain `wf round` reads `running` in the same window, because its target reads `verified`. A `wf retry --budget` does not have this problem, since the retried step itself is marked running. The store test (test/store.test.ts:619\u2013622) never looks between the ask and the pass, so nothing catches this. Possible fix: once a round is due for a loop, treat every step in its `loopSpan` as running, or as not held, in both `assess` and `listing`.",
+  "best": 0.97,
+  "brief": "four-items-in-agent-workflow-w4eb"
+ },
+ {
+  "finding": "cost-on-the-board-what-a-ste-x662#1",
+  "file": "apps/web/src/components/StepNode.tsx",
+  "what": "`budget.over` comes from `overBudget` (apps/api/src/app.ts:208). That only asks whether the spend is at or above the cap, not whether the step is held. Take a `claude` step with `budget: 3` whose one `--bg` session cost $3.20: such a session ignores the cap (issue 17), so this overrun will be common. It signs off done and its check passes. The chip reads `verified \u2713` and what waits on it runs. But the node's cost row is red `$3.20 of $3`, and hovering it says 'the cap or more, so the run spends nothing more on it until a person raises it', which is false because nothing waits on a raise. The doc on `StepBudget.over` (app.ts:44-48) says the same wrong thing: 'what holds the step, where another session of it is the way on'. Red past the cap is what was asked for, but the hover and the doc should only claim the step is held when its word is `over budget` or `budget exhausted`. No test covers a verified step past its cap; components.test.ts only has a verified step within it.",
+  "best": 0.05,
+  "brief": "a-finished-run-is-a-decision-vjcj"
+ },
+ {
+  "finding": "five-leftovers-from-the-revi-c0tl#1",
+  "file": "packages/agent-workflows/docs/features.md",
+  "what": "*What it leaves* does not record a board disagreement that item 4 introduces. Take a run at its ending's gate whose result a person merged by hand. The api's `decisionOf` (apps/api/src/app.ts:1320-1322) now returns `shipped \u2014 <branch> is already on main`. But the api calls `listing` with no standings (app.ts:722), so `waitingOnYou` still contains `ship`, and `needsOf` (app.ts:855-859) still offers `approve ship`. Pressing that Approve button reaches the package's `approve()` and gets the new refusal as a 422. So the run page says the run has shipped and, beside that, asks the person to approve a step whose approval is refused. The counts bullet above presents the api's `decision` change as agreeing with `wf decide`; it should also say that the board's listing and its Approve button do not agree yet. That fits item 5's list of what the board cannot show.",
+  "best": 0,
+  "brief": null
+ },
+ {
+  "finding": "five-leftovers-from-the-revi-c0tl#2",
+  "file": "packages/agent-workflows/docs/features.md",
+  "what": "'An approval given before the hand merge still files ship \u2026 The window is one pass' is only true when nothing holds the checkout. If the approved ending is waiting on the checkout because another run's ship is in it (`heldByCheckout`), the window lasts as long as that run's session holds the checkout. During that time the approved ending also keeps its claim on the checkout (`mainClaim`) and holds other runs' endings back, only to be filed later with nothing to merge and sign off blocked. The sentence should say 'one pass, or as long as the checkout holds it'.",
+  "best": 0,
+  "brief": null
+ },
+ {
+  "finding": "five-small-items-on-the-boar-zle1#1",
+  "file": "apps/web/src/routes/capabilities.tsx",
+  "what": "For a `dontAsk` step the page says \"In dontAsk, a command no rule allows is denied without a prompt. The settings allow it:\" and lists only the settings' Bash allows. For this repo's review steps (dev, dev-build, dev-planned, ui) and dev-planned's plan step, that list is `npm test`, `npm run typecheck`, the `git diff/log/show/status` rules and so on. That is not all such a step runs. Claude Code runs a built-in set of read-only commands (`ls`, `cat`, `grep`, `find`, `head`, `tail`, `wc`, `diff`, read-only `git`) without a prompt in every mode (code.claude.com/docs/en/permissions, \"Read-only commands\"). This review session measured it: running in `dontAsk` under this repo's settings, `cat`, `ls`, `grep` and `head` ran with no allow rule, while `node -e` and a playwright MCP call were denied. So the MCP marking is right, but the Bash sentence is false: the reviewer can read any file with `cat` or `grep` while the page says it can run only the listed commands. The test at apps/api/test/capabilities.test.ts:460 checks only the settings' allows, so it passes either way. Fix: add \"of the commands that ask\" to the sentence, or carry the read-only set as dated data beside MEASURED_TOOLS.",
+  "best": 0.97,
+  "brief": "three-small-items-on-the-boa-bmq6"
+ },
+ {
+  "finding": "fix-the-engine-so-a-resumed-5dub#1",
+  "file": "packages/agent-engine/README.md",
+  "what": "The README says as fact that \"A `view` saw the session listed final thirty seconds before its `StructuredOutput`\", and the runner.ts comment at line 379 says the same (\"some thirty seconds before\"). Nobody recorded that: open-issues.md (around line 278) says the pin was taken between 22:53:25.9Z and 22:53:50.4Z, \"at least ten seconds before the statement\", and calls it \"the reading the evidence allows, not a measurement\". The request said the cause is not known and asked to say only what the code allows. As written, a reader of the README or the code takes an unconfirmed guess, with a made-up number, as the known cause, and may stop looking at the other ways a final sighting reaches the runner. The wording should match open-issues: the code allows this, and it was not observed.",
+  "best": 0.08,
+  "brief": "three-items-in-agent-engine-bt5p"
+ },
+ {
+  "finding": "fix-the-engine-so-a-resumed-5dub#2",
+  "file": "packages/agent-engine/test/resume.test.ts",
+  "what": "The final usage assertion, 'only the responses since its own start', expects {turns 2, toolCalls 2, inputTokens 200, outputTokens 10}. That is exactly the usage the first try recorded at line 110, so it cannot tell the retry's own count from the first try's count carried over, which is the incident's usage failure. Checked by mutation: with usage pinned by session id for good, as before the fix, and the intermediate view step (lines 122-123) removed, this test passes. The refusal rests only on the view assertion at line 123, plus test 2. If the retry wrote a different number of responses (say 3), the recorded end would refuse the carried-over count by itself.",
+  "best": 0.97,
+  "brief": "three-items-in-agent-engine-bt5p"
+ },
+ {
+  "finding": "forget-a-run-that-is-over-wf-auru#1",
+  "file": "packages/agent-workflows/docs/features.md",
+  "what": "The text still says 'a run that files steps from a plan is still \u00a72 below'. Moving item 1 to Shipped renumbered 'A run that grows steps from a plan' to '## 1.' (line 1599), so there is no \u00a72 any more and a reader following the reference finds nothing. It should read \u00a71.",
+  "best": 0.13,
+  "brief": "the-end-of-a-run-is-a-step-o-y1wl"
+ },
+ {
+  "finding": "forget-a-run-that-is-over-wf-auru#2",
+  "file": "packages/agent-workflows/docs/features.md",
+  "what": "It says 'The cancel-then-`wf rm` case is closed: all a pass does after its last re-read is `e.file`'. The code does more than that. In the try loop, after `mayFile()` (runner.ts:1083) the pass still awaits `e.view(taskId)`, `refusalOf(...)` and `e.view(asking.taskId)`, then runs `fs.mkdirSync(artifactsDir, { recursive: true })` (runner.ts:1098), and only then calls `e.file`. The check loop is the same: `mayFile()` at runner.ts:1190, then `await e.view` and two recursive mkdirs (runner.ts:1196-1200). Example: a pass reads a run that has a try or check due, and a scripted `wf cancel x && wf rm x` finishes in that gap. The pass then recreates `runs/<id>/artifacts/<step>/` with no record and files a session into a worktree that is gone. The gap is a few milliseconds of journal reads, so this is unlikely in practice. Either move the `mayFile()` check to just before the mkdir and `e.file`, or soften the sentence.",
+  "best": 0.05,
+  "brief": "three-small-items-on-the-boa-bmq6"
+ },
+ {
+  "finding": "four-items-in-agent-workflow-w4eb#1",
+  "file": "packages/agent-workflows/src/runner.ts",
+  "what": "The `git` helper calls `execFileSync` without `stdio`, so Node copies git's stderr to the process's own stderr as well as putting it in the error message. Before this change only a person's `wf start` reached it, once. Now `startQueued` (runner.ts:1244, via `startFromInbox` \u2192 `start` \u2192 `makeWorkspace`) retries a card that failed without a refusal on every pass. A queued card whose `repo:` is a folder with no git prints `fatal: not a git repository (or any of the parent directories): .git` on `wf up`'s terminal every 4 seconds, with no card name, for as long as it holds the queue. That contradicts the README's claim that `wf up` says it once. Running `node --test --test-name-pattern=\"fails without a refusal\" test/queue-store.test.ts` shows four such lines for four passes. The test (queue-store.test.ts:563-577) only captures `console.log`, so it passes. Passing `stdio: ['ignore', 'pipe', 'pipe']` to the helper keeps git's words in the error without the echo; a test that captures `process.stderr.write` over those passes would pin it.",
+  "best": 0.96,
+  "brief": "four-leftovers-in-agent-work-3uyy"
+ },
+ {
+  "finding": "four-items-in-agent-workflow-w4eb#2",
+  "file": "packages/agent-workflows/src/cli.ts",
+  "what": "`wf up` skips a queue line marked `again`, and `again` is judged against the try saved in `$WF_ROOT/queue/<name>.json` (runner.ts:1251), not against what this `wf up` process has printed. So a `wf up` started, or restarted, after the failure was written never names the card holding the queue: its first pass already reads `again: true`. queue-store.test.ts:574 pins exactly that, since its two `wf up` passes print nothing about `no-git-a1b2`, not even once. A person restarting the daemon to see why cards stopped starting gets no line about it; only `wf inbox` shows it. Remembering the last printed line in the `up` loop is presentation, not a decision the tick carries between passes, so it would not break the level-triggered rule.",
+  "best": 0.9,
+  "brief": "four-leftovers-in-agent-work-3uyy"
+ },
+ {
+  "finding": "four-leftovers-in-agent-work-3uyy#1",
+  "file": "packages/agent-workflows/src/runner.ts",
+  "what": "The link refusal tells the person to \"copy what it points at over it, cp --remove-destination\", which is GNU coreutils only. On macOS \u2014 the filesystem family the same function's case-insensitivity fix is written for \u2014 `cp` has no long options at all, so following the message gives `cp: illegal option -- -` and the person is left with a refusal whose named fix does not run. Either drop the flag from the sentence or name a portable pair (`rm <file> && cp <target> <file>`). The same sentence is duplicated in test/write-workflow.test.ts:263, so a fix touches both.",
+  "best": 0,
+  "brief": null
+ },
+ {
+  "finding": "four-leftovers-on-the-board-fmk9#1",
+  "file": "apps/web/test/factory.test.ts",
+  "what": "With CELL_HEIGHT at 260 the diamond's span reads `rows: 2`, which is what line 208 already asserts for the fan-out, so the one assertion that distinguished a three-lane graph from a two-lane one no longer does. A `spanOf` regression that read only the first two lanes' y (max 174 instead of 324) yields ceil((174+150)/260) = 2 and passes both lines; at 220 the diamond line caught it (3 vs 2). The comment above still says \"the diamond's three, which reach further down\", which nothing now measures. A fixture whose lanes reach past two cells \u2014 or a wider fan asserted at rows: 3 \u2014 would put the distinction back. Low value: the CELL_HEIGHT \u2212 ROW_HEIGHT boundary assertions two lines below still pin the row arithmetic exactly.",
+  "best": 0.01,
+  "brief": "six-findings-the-last-review-6no7"
+ },
+ {
+  "finding": "give-a-workflow-the-edge-bac-mmhc#1",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "A new session of the loop's target in round 2 or later is required to answer findings that nobody gives it. Case: in round 2, implement's resumed session signs off without `replies`, so it reads `unsigned`, and `wf decide` offers `wf retry <run> implement (--fresh, or --model <m>)`. The fresh try's brief comes from `given` (run.ts:1317): implement has no `input:` and no `loop:`, so there is no `## From review`. Nor could there be: `roundFiled` set review's `taskId` to null, and `closeoutReader` reads only the current try, so the findings are unreachable. Yet the brief still demands replies (`closeoutContract(step, \u2026 owesReplies(...))`, run.ts:1310), and the filing puts `replies` in `required` (`closeoutSchemaOf(step, owesReplies(steps, run, r.step))`, runner.ts:807). The only honest answer is `replies: []`, which reads `verified`. The next review is then handed an empty replies list, so the findings are never answered and nothing marks that. The same happens when a `retries:` nudge finds no session to continue. docs/features.md:247 lists this as a known gap, but nothing refuses it: either hand the looping step's closeout from its last try (`tries.at(-1)`, marked `then: 'round'`) to any new session of the target while `owesReplies`, or have `retryRefusal`/`retryLines` refuse `--fresh`/`--model` for that target and say to use `--nudge`. Repro: fresh-retry-repro.ts in this step's artifacts.",
+  "best": 0.14,
+  "brief": "the-supervisor-packages-agen-n7c2"
+ },
+ {
+  "finding": "give-each-step-s-worktree-it-tn5j#1",
+  "file": "packages/agent-workflows/src/runner.ts",
+  "what": "`includeFiles` copies any path `.worktreeinclude` lists, whether or not it is gitignored. `handOff` (runner.ts:467) then runs `git add -A`. Reproduced at shipped defaults: a repo whose `.worktreeinclude` lists an untracked, non-ignored `notes-not-ignored.txt` (holding `TOKEN=...`). After the cut the worktree shows `?? notes-not-ignored.txt`. Once implement settles, the next pass commits it to the run's branch as `implement: hand off what was left uncommitted`, and it ships at merge. The README promises 'one gitignored path per line', and Claude Code copies a listed file only if it is also gitignored; nothing refuses the rest, and no test makes it refuse. A `git check-ignore` before the copy would close it.",
+  "best": 0.05,
+  "brief": "the-end-of-a-run-is-a-step-o-y1wl"
+ },
+ {
+  "finding": "give-each-step-s-worktree-it-tn5j#2",
+  "file": "packages/agent-workflows/src/deps.ts",
+  "what": "A line with a leading `/` is refused as 'is absolute'. In the gitignore syntax Claude Code's `.worktreeinclude` uses, the slash anchors the pattern to the repository root. A `.worktreeinclude` written for Claude Code with `/.env.local` makes `start` (runner.ts:431) throw with exit 2, so every isolated `wf start` on that repo is refused. The README says the file is read the way Claude Code reads it. Globs like `.env*` are not refused; they are skipped with a note and nothing is copied.",
+  "best": 0.03,
+  "brief": "the-supervisor-packages-agen-n7c2"
+ },
+ {
+  "finding": "give-each-step-s-worktree-it-tn5j#3",
+  "file": "packages/agent-workflows/src/runner.ts",
+  "what": "`lockfileDiffers` compares the worktree's lockfile with main's `package-lock.json`, but the links point at main's installed tree (`node_modules/.package-lock.json`). Case: a merge brings in a lockfile that adds a dependency (via `npm install --package-lock-only`, as CLAUDE.md's worktree note prescribes), and `npm install` has not been run in main. The lockfiles are then equal, the worktree gets links, `node_modules/<dep>` does not exist, and the step's check fails with 'Cannot find module' on a dependency its lockfile declares. Comparing against main's hidden lockfile, or also checking it, would catch this. No test covers main's lockfile being ahead of its installed tree.",
+  "best": 0.03,
+  "brief": "the-supervisor-packages-agen-n7c2"
+ },
+ {
+  "finding": "give-each-step-s-worktree-it-tn5j#4",
+  "file": "packages/agent-workflows/src/cli.ts",
+  "what": "Scope: the request limited the change to runner.ts, deps.ts, store.test.ts, deps.test.ts, README.md and features.md. The diff also edits src/cli.ts (printing `notes`) and src/run.ts (a sixth `composeBrief` argument, which the requested brief line does need). It also adds `.worktreeinclude`: copying at the cut, a new exit-2 refusal in `wf start`, and a required `Advanced.notes` field. The request never mentions it; the only record that it was asked for is one sentence in docs/features.md. The two findings above come from that part. The person merging should confirm it was wanted, or split it out, before it lands with the node_modules work.",
+  "best": 0.1,
+  "brief": "five-leftovers-from-the-revi-c0tl"
+ },
+ {
+  "finding": "give-the-board-a-capabilitie-j05l#1",
+  "file": "apps/api/src/capabilities.ts",
+  "what": "`listTools` sends `tools/list` to every server without first checking `client.getServerCapabilities()?.tools`. A valid server that offers only resources or prompts never registers a `tools/list` handler (the SDK's McpServer adds one only in `registerTool`, server/mcp.js:650), so it answers -32601. That server's entry then shows in red: \"did not list its tools: MCP error -32601: Method not found. Run it yourself to see why, or fix its entry in .mcp.json.\" The error is cached for as long as the api runs, and following its advice fixes nothing. The page should show `tools: []` (\"It lists no tools.\"). No test covers a server without the tools capability.",
+  "best": 0.08,
+  "brief": "five-small-items-on-the-boar-zle1"
+ },
+ {
+  "finding": "give-the-board-a-capabilitie-j05l#2",
+  "file": "apps/api/src/capabilities.ts",
+  "what": "Servers are started exactly as `.mcp.json` spells them, but Claude Code expands `${VAR}` and `${VAR:-default}` in `command`, `args`, `env` and `url` first. This code expands nothing, and the child gets only the SDK's six inherited variables (HOME, LOGNAME, PATH, SHELL, TERM, USER). An entry like `\"env\": { \"GITHUB_PERSONAL_ACCESS_TOKEN\": \"${GITHUB_TOKEN}\" }` or `\"args\": [\"${HOME}/tools/mcp.js\"]` starts with the literal text, so the server fails to start or fails to authenticate. The page then reports an error, cached until restart, for a server that works in a session. That is not \"start it as `.mcp.json` says\", and no test covers an entry that uses expansion.",
+  "best": 0.04,
+  "brief": "five-small-items-on-the-boar-zle1"
+ },
+ {
+  "finding": "give-the-board-a-workflows-p-l7po#1",
+  "file": "workflows/dev/review.md",
+  "what": "The comment says review is \"Read-only by machinery, not by its brief\": under dontAsk, any Bash command `.claude/settings.json` doesn't allow is denied. workflows/dev/README.md:12 goes further: review \"cannot write, by machinery rather than by its brief\". dev-build/review.md repeats the comment. It isn't true. `.claude/settings.json` allows `Bash(npm run build)` and `Bash(npm run e2e)`, and the brief two paragraphs down says both write into the workspace. So review can run either one without a prompt, and only the brief stops it. If it does, the build rewrites apps/web/src/routeTree.gen.ts and the e2e writes `.e2e/`, and the run commits those files under review's name. CLAUDE.md's rule is that prose is not a constraint, and this text claims a guard that doesn't cover those two commands. In this change's own files, the fix is to say that only the brief keeps review away from build and e2e: settings.json has to allow them because implement's session runs them. Making it true takes a per-step allow list or a settings change. That is outside the files this change owns, so a person should decide.",
+  "best": 0.51,
+  "brief": "close-the-fence-by-machinery-ahlx"
+ },
+ {
+  "finding": "give-wf-decide-the-screen-a-jdtk#1",
+  "file": "packages/agent-workflows/src/radius.ts",
+  "what": "`lessonGlobs` and `groupOf` (line 131) use the base's `workspaces` strings as globs from the repository root, exactly as written, but npm also accepts `./packages/*` and `packages/**`. With `./packages/*`, `globRegExp` yields `^\\./packages/[^/]*$`, which never matches `packages/x`. Every package's changes then land in one `packages` group, and the lesson glob `./packages/*/docs/` never matches `packages/x/docs/features.md`. A branch that wrote exactly that lesson prints `lesson  nothing written where the next agent reads`. With `packages/**`, the lesson glob becomes `packages/**/docs/`, which matches `packages/x/src/docs/a.md`: the false lesson round 1 fixed comes back. This repo's `packages/*` and `apps/*` are unaffected. The fix is to strip a leading `./` when the workspaces are read, plus a radius test with `['./packages/*']` that makes the lesson line refuse. `**` can at least be noted in `wf decide --help`.",
+  "best": 0.95,
+  "brief": "six-small-items-in-agent-wor-vrm2"
+ },
+ {
+  "finding": "let-a-refused-check-be-retri-4ycf#1",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "`refusedCheck` counts a verdict of `undefined` as a refusal, and `assess` (line 126), `retriesDue` and `decision` default `verdictOf` to `() => undefined`. apps/api/src/app.ts:283 calls `assess` without a verdict, so the board and the tick disagree on the same run. Scenario: a step declares `retries: 1` and its check is settled `failed` at its deadline with no exit code. The tick passes the exit-code verdict `unfinished`, so it reports `failed` and files nothing. The api's `assess` reports `running` with try 2 due, `moving` is false, and the api's own `listing` (app.ts:281, given the exit-code verdict) names the step in `waitingOnYou` in the same response. The board shows the run running and waiting on you until someone acts. A probe script against run.ts confirmed the two answers. docs/features.md:182-185 lists the api's gaps (`moving`, `waitingOnYou`, `note`) but not a wrong `status`. Fix: read a missing verdict as `unfinished`, not as a refusal, or make `verdictOf` a required argument so a caller cannot omit it.",
+  "best": 0.16,
+  "brief": "make-the-api-read-what-the-p-d805"
+ },
+ {
+  "finding": "let-a-step-say-which-tools-i-v27t#1",
+  "file": "packages/agent-workflows/workflows/review.md",
+  "what": "For a person, not another round: the brief says the shipped reviewer 'gets `tools: Read, Grep, Glob, Bash`', but here it is only a comment. That is forced: this reviewer runs on codex, and the same brief says to refuse `tools:` on codex. So plan \u00a74b 'the reviewer cannot run the suite' is still open. The reviewer that hit it runs from the operator folder (~/.agent-workflows/workflows/hold-the-bar-checked/review.md: harness claude, no `tools:`, default `auto`), and this change does not touch that file. It hit it again in this review: `node --test test/*.test.ts` in packages/agent-workflows was refused by the auto classifier. features.md's own bullet says the classifier is not a tool list. So adding `tools: Read, Grep, Glob, Bash` to that folder probably changes nothing unless the step's permission mode changes too (my reading, not tested with a tool list). Someone has to choose that mode, and the change sits outside what implement owns.",
+  "best": 0.14,
+  "brief": "make-looking-a-capability-no-o8rs"
+ },
+ {
+  "finding": "let-a-task-carry-the-mcp-ser-6ve1#1",
+  "file": "packages/agent-engine/src/runner.ts",
+  "what": "For an accepted relative cwd such as `repo`, this returns `repo/.mcp.json`, then launches Claude inside `repo`. Claude resolves the config as `repo/repo/.mcp.json`, so the session fails to load its repository config. Resolve the config path absolutely before passing it to either Claude runner; existing tests use only absolute temporary paths.",
+  "best": 0.1,
+  "brief": "pay-down-four-items-on-the-e-xpv5"
+ },
+ {
+  "finding": "let-a-task-carry-the-mcp-ser-6ve1#2",
+  "file": "packages/agent-engine/src/runner-detached.ts",
+  "what": "A task server sharing a name with an operator-configured Codex server is recursively merged with that server rather than replacing it. If the operator's entry uses `url` and the task supplies `command`, the resulting entry has both transports and Codex rejects it (`url is not supported for stdio`, as the new open-issues entry records). Thus a valid task MCP map can prevent the session from starting. Handle or explicitly refuse collisions, and test against an existing configured server.",
+  "best": 0.04,
+  "brief": "pay-down-four-items-on-the-e-xpv5"
+ },
+ {
+  "finding": "make-the-board-and-the-api-s-1yzq#1",
+  "file": "apps/web/src/components/StepNode.tsx",
+  "what": "`gate = isGate(state, runCancelled)` looks only at the step's state. The api now counts a pending `wf round` or `wf retry` ask when it says who is waited on, so the canvas and the api can disagree. Take a run like the api test's r-31: review is `rounds exhausted` and a person has run `wf round r-31 review`. GET /api/runs/r-31 gives `waitingOnYou: []`, `moving: true`, `status: running`, and the run page shows no \"Waiting on you\" banner. The canvas still draws review with the amber border, \"human gate\" and \"waiting on you\" until the next tick files round 4: up to 4 s under `wf up`, and indefinitely if nobody ticks. A blocked step with a retry ask pending (r-33) has the same problem. Before this change the banner and the canvas agreed there, because neither counted asks. The fix: also require `run.waitingOnYou.includes(step.name)`, passed on `StepNodeData` from RunCanvas. components.test.ts should have a case where a pending ask means no gate is drawn; today its `nodeMarkup` cases only fix the gate by state.",
+  "best": 0.96,
+  "brief": "make-the-api-read-what-the-p-d805"
+ },
+ {
+  "finding": "make-the-board-say-what-the-0np3#1",
+  "file": "apps/web/src/lib/factory.ts",
+  "what": "`inFlight = run.status === 'running'` takes a run off the Factory while one of its agents is still working. `assess` returns `failed` as soon as any step is final without letting its followers run (`all.some(stopsFollowers)`), whether or not a sibling is still going. Case: roots `a` (with a check) and `b`, and `c` after both. `a`'s check refuses while `b` is still `running (working)`. `assess` gives `{ status: 'failed', blocked: ['c'] }`, so the card leaves the floor by default. It also ticks as finished ('started \u2026 ago', every 30 s) while `b`'s session runs. The old rule kept this run on the floor. The same happens when one root signs off blocked, is unsigned, or fails. The brief asked for this rule, so this is a choice for the person deciding, e.g. also keep a run whose steps include a live word, or accept it. `factory.test.ts` covers only a live step on a `running` run or a `cancelled` one. No case pairs a `failed` run with a live step, so the change happened without a test that says so. Repro: fanout-live-sibling.ts in the artifacts directory.",
+  "best": 0.11,
+  "brief": "a-finished-run-is-a-decision-vjcj"
+ },
+ {
+  "finding": "make-the-canvases-edges-say-oykz#1",
+  "file": "apps/web/test/e2e/run.ts",
+  "what": "The assertion message still says \"one dashed edge from the card into ${first}\". Card edges now show their root's state, and the seeded root `tokens` is `unverified \u00b7 done`, so its card edge is solid (factory-light.png and factory-dark.png show it solid). The check only counts the edge, so it still passes. But if it ever fails, the message will call a solid edge dashed. Say \"one edge\", or name the state per root. Wording only; not worth a round.",
+  "best": 0.09,
+  "brief": "four-leftovers-on-the-board-fmk9"
+ },
+ {
+  "finding": "make-the-factory-the-one-can-d6iv#1",
+  "file": "apps/web/src/components/FactoryCanvas.tsx",
+  "what": "Cards are only re-placed when `layoutKey` changes (runs on the floor or spans), never when a drag ends. So if a person drags an open run's card so its graph covers closed cards, or drags a closed card into an open graph, they overlap and stay that way. The next unrelated change then moves the covered cards without anyone touching them: another run starting or finishing on the 5 s poll, any open or close, or a reload once the detail loads. Probe: b is open with span 4 and dragged to row 1, over c at (320,220) and d at (640,220); the next `placeRuns` pass moves c to (0,0) and d to (320,0). How the floor looks depends on whether a transition has happened since the drag, which breaks the level-triggered rule in CLAUDE.md. Either re-place on drag end, or leave dragged positions alone for good.",
+  "best": 0.05,
+  "brief": "four-leftovers-on-the-board-fmk9"
+ },
+ {
+  "finding": "make-the-factory-the-one-can-d6iv#2",
+  "file": "apps/api/src/app.ts",
+  "what": "The brief says \"You own apps/web only; the api already serves everything this needs\". Commits 4e774cb and cb3d018 still change the api response (`attempts.latest.endedAt`, lines 77 and 295, plus app.test.ts), and add attempt durations nobody asked for: a finished step node now reads \"#1 \u00b7 29m 00s\" instead of \"#1 \u00b7 started \u2026 ago\" (canvas.ts:39), and the inspector gains a \"latest took\" row (StepInspector.tsx:111). The commit messages say a person widened the scope through another session, but nothing in this run's request records that. If it's merged as is, an api contract change ships under a brief that ruled out api work. Before merging, a person should confirm that widening or split those two commits off.",
+  "best": 0.09,
+  "brief": "five-small-items-on-the-boar-zle1"
+ },
+ {
+  "finding": "make-the-factory-the-one-can-d6iv#3",
+  "file": "apps/web/src/lib/factory.ts",
+  "what": "`cellsOf` stops a span at `GRID_COLUMNS`, but an open run's graph is drawn past the grid's edge. Opening a run near the right of the grid covers anything a person parked right of the grid, and that card never moves. Probe: b is open at column 3 with span 4 (the e2e's three-step chain), so its graph reaches about x=1860; c, left at x=1280 in the same row, stays where it is. Checked against the stated rule, \"nothing overlaps when a run opens\", this fails. The fake run already takes all four columns, so any run with two or more cards before it in its row reaches past the grid.",
+  "best": 0.06,
+  "brief": "the-factory-as-a-graph-of-ca-x2xs"
+ },
+ {
+  "finding": "make-the-factory-the-one-can-d6iv#4",
+  "file": "apps/web/src/components/FactoryCanvas.tsx",
+  "what": "The brief requires \"Reset layout also closes every run\", but no unit test or e2e step ever clicks Reset layout. The e2e only exercises Collapse all, and canvas.test.ts only tests `forgetFactoryOpen` in isolation. If `setOpen([])` or `forgetFactoryOpen()` were deleted from `resetLayout`, the runs would stay open after a reset and on the next visit, and every check would still pass. An e2e step should click Reset layout on the open fake run, check that zero step nodes remain, and check that a second page also finds it closed.",
+  "best": 0.03,
+  "brief": "the-web-app-s-components-on-3xq9"
+ },
+ {
+  "finding": "markdown-rendered-on-the-boa-699m#1",
+  "file": "apps/web/src/lib/inbox.ts",
+  "what": "Take a stray file `notes` sitting beside a card `notes.md`. The inbox lists both under the name `notes`, and `hasPage` returns true for both, so on the Inbox page the entry reading `notes: not a card` also links to /inbox/notes. The api now picks the .md file first (apps/api/src/inbox.ts:169), so that link opens the card notes.md: it says 'inbox card', shows the card's keys, and Source shows notes.md's text. The stray file's own page (its refusal and its text) can't be reached from anywhere. The api test covers only the api side (`the page is the card's`). No web or e2e test puts a stray file beside a card with the same name. The fix is to give no link to a non-.md entry when a .md entry has the same name, for example by passing the listing to `hasPage`.",
+  "best": 0.97,
+  "brief": "four-leftovers-on-the-board-fmk9"
+ },
+ {
+  "finding": "one-small-item-in-agent-work-tpxb#1",
+  "file": "packages/agent-workflows/src/runner.ts",
+  "what": "No test checks that `closeoutAsked` reads the *last* attempt's reason. The fake engine in store.test.ts only ever makes one attempt, so changing `attempts.at(-1)` to `attempts.some(...)` would still pass every test. The difference is real because a step can declare `maxAttempts` (workflow.ts:205, passed on at runner.ts:1013). Example: with `maxAttempts: 2`, attempt 1 goes quiet unsigned, the engine nudges, and attempt 2 then ends `lost` or `harness`, so the task settles `failed`. Today that correctly reads `failed`. Under the `some` version it would read `unsigned`: the run would be called `blocked` and the brief would say 'gave no closeout' when the nudged session actually broke. The code is right; a two-attempt case in the store test would lock it in.",
+  "best": 0.9,
+  "brief": "four-items-in-agent-workflow-w4eb"
+ },
+ {
+  "finding": "pay-down-four-items-on-the-e-xpv5#1",
+  "file": "packages/agent-engine/src/runner.ts",
+  "what": "`release` decides whether to `claude stop` by `session.state`. That is the state after `claudeOps.observe` has applied its quiescence floor (runner.ts:485), which rewrites a quiet `working/idle` session to `done`. So a session ended by quiescence rather than a closeout seen live is never stopped, though the harness still lists it `working/idle`. This covers any task without a closeoutSchema, and any closeout task whose next pass comes more than 90s after the answer. If the task asked for a worktree, line 512 then returns, and nothing is ever sent: the session sits `working` in `claude agents` forever, which is bug 3 itself. The README and open-issues say such sessions are 'stopped and not removed', which is untrue here. Without a worktree, `claude rm` goes to a session the harness thinks is running with no stop first, a path the live run did not measure. Reproduced with the release.test.ts fake `claude` and a transcript given a 10-minute-old mtime, over 3 ticks. worktree:true gave no release calls and the row stayed `working`; worktree:false gave only `rm`. The repro is the artifact quiescent-release.test.ts. release.test.ts misses this because it ticks right after the closeout, while the session is still `working`. The fix is to decide the stop on the registry's own state (the raw row), not the translated sighting, or to always stop a session that is not already `stopped`/`failed`.",
+  "best": 0.26,
+  "brief": "four-small-items-in-agent-en-ug4p"
+ },
+ {
+  "finding": "pay-down-four-items-on-the-e-xpv5#2",
+  "file": "packages/agent-engine/src/engine.ts",
+  "what": "The request said to release once the engine has recorded `ended`, or `settled`. Only `ended` is released. A task ended by `ae stop`, or stopped at its deadline (how a stalled bug-1 session ends), settles with `ended: null`, so its session stays in `claude agents` (stopped) for good, and every such run still needs clearing by hand. The narrowing is deliberate and documented: the session id is not journalled, so after `rm` `ae logs` would print '(no session yet)'. release.test.ts pins that choice. It is a refusal of part of the ask, for the person deciding to accept or send back. Closing the gap would need the stopped session's id on the record, not a change to `decide`.",
+  "best": 0.1,
+  "brief": "three-small-correctness-item-lz3w"
+ },
+ {
+  "finding": "put-the-decision-on-the-boar-74tn#1",
+  "file": "apps/web/test/api.test.ts",
+  "what": "This assertion checks almost nothing. `get` parses the response with `res.json()`, so no value in `shown` is the same object as `first`. `shown.indexOf(first)` is therefore -1, and `shown.slice(-1)` checks only the last value. So 'from the first answer on, never nothing' is never really tested: if the section went blank for a moment between the placeholder and the new answer, the test would still pass. The regression that matters (no placeholder) is still caught by the `meanwhile` assertion above it. To check what it claims, find the first index where the data is deep-equal to `first` (e.g. `shown.findIndex((d) => d !== undefined)`).",
+  "best": 0.79,
+  "brief": "five-small-items-on-the-boar-zle1"
+ },
+ {
+  "finding": "put-the-decision-on-the-boar-74tn#2",
+  "file": "apps/web/src/lib/decide.ts",
+  "what": "`touchedSummary` adds up `+a \u2212r` over every branch it reads, but a follower in its own worktree starts from its parent's branch (`runner.ts:600`). Take implement \u2192 review-a and review-b, each in its own worktree. Both are result branches, and `git diff base...review-x` includes implement's changes on both. So the Factory card shows implement's lines twice, e.g. `+1958` for 979 lines of work. The package count is deduplicated with a Set; the line counts are not. `wf decide` prints each branch on its own line and never adds them up, so the card disagrees with the CLI here. The seed and the tests only cover the one-branch case.",
+  "best": 0.95,
+  "brief": "five-small-items-on-the-boar-zle1"
+ },
+ {
+  "finding": "show-a-step-s-session-on-the-8eet#1",
+  "file": "apps/web/src/lib/useStepTranscript.ts",
+  "what": "Only a `readable` event clears the retry error, and a new server stream starts with `failing = false`, so it never sends one. Case: a read fails mid-stream, the page shows \"Could not read task \u2026 Reading it again every second.\", then the connection drops (for example the api restarts). The EventSource reconnects and the api's read before opening the stream succeeds. Events flow again, but the red error stays under the header until the task settles. The fix is small: a stream that opened at all means that read worked, so clearing `error` on the EventSource `open` event (or on any `transcript` event) is correct. No test covers a reconnect while the error is showing.",
+  "best": 0.98,
+  "brief": "five-small-items-on-the-boar-zle1"
+ },
+ {
+  "finding": "six-findings-the-last-review-6no7#1",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "A try the checkout holds is filtered out of `retry`, so the `status.set(r.step, 'running')` on the next line never runs and the ending keeps a status that stops followers \u2014 `assess` then calls the whole run `failed`. Take the case the change's own test builds (ship.test.ts, \"a try of an ending step waits for the checkout\u2026\"): ship signed off blocked, the person typed `wf retry <run> ship --message \"\u2026\"`, another run's ship has the checkout. `wf decide <run>` no longer prints \"still running: ship\" \u2014 `decision` never reaches its running branch, so the ended screen prints \"BLOCKED, waiting on you: ship\" and then offers \"ship: blocked. Continue its session, told what happened:  wf retry <run> ship\" (retryLines) plus the same command again under ship's `needs` (answerLines) \u2014 a command `retryRefusal` refuses with \"try 2 of ship is already asked for\". At the same moment `wf ls` of that run lists nobody in `waitingOnYou` and says \"try 2 asked (--nudge) \u2014 waiting on the checkout\": the two screens disagree about whether anything waits on the person. `advance` also returns `status: 'failed'` and `inFlight: false` (slotNeed counts `retry`), so a run merely queued behind another's ending stops counting against the cap on runs in flight and a queued run is admitted in its place. Keeping the held step 'running' in the status map while leaving it out of `retry` gives the first-filing behaviour to the try too: `decision`'s `waitsForCheckout` (run.ts:2983) would say \"still running: ship\", and cli.ts:742's `retrying.filter((r) => !(heldOut && r.step === ending?.name))` \u2014 written for exactly that shape and unreachable today for the same reason \u2014 would become live.",
+  "best": 0.97,
+  "brief": "five-leftovers-from-the-revi-c0tl"
+ },
+ {
+  "finding": "six-findings-the-last-review-6no7#2",
+  "file": "packages/agent-workflows/docs/features.md",
+  "what": "Nothing records that the board cannot see the hold, though the same document records the `commandsOf` gap it does leave. `checkoutHold` is async and lives in runner.ts; apps/api/src/app.ts:722 calls `listing(...)` with no `checkout` and app.ts:730/1319 call `assess`/`decision` without one, so on the Factory an approved ending held behind another run's ship draws the plain word `waiting` \u2014 indistinguishable from an approved ending the next tick will file \u2014 and a held try draws a run still running with a try due. The careful choice of `waiting on the checkout (\u2026)` over `waiting for \u2026`, made so `stepState` draws it as a step with nothing filed, reaches no board today. A person watching the board sees a run stop for minutes with no word for why; `wf ls` is the only place that says it.",
+  "best": 0.56,
+  "brief": "five-leftovers-from-the-revi-c0tl"
+ },
+ {
+  "finding": "the-board-continues-a-sessio-xh9x#1",
+  "file": "apps/web/src/components/Decide.tsx",
+  "what": "This change now draws the Decide section for a run whose only row is a harness-blocked step's asked try. Above that row, the Answer heading (line 103) and the frame's intro (lines 42-43) still say \"the next tick files it\", and the intro says \"copy one to run it yourself\" when there are no commands. The row beneath says \"stopping its blocked session, then the tick files it\". So a person reads, on one screen, that the next tick files a try the tick will not file: it stops the session first. You can see it in held-asked-light.png and held-asked-dark.png. Word the heading so it does not promise the filing (for example, \"and the tick files it\"), or leave the promise to the row.",
+  "best": 0.08,
+  "brief": "a-finished-run-is-a-decision-vjcj"
+ },
+ {
+  "finding": "the-board-continues-a-sessio-xh9x#2",
+  "file": "docs/plan-hold-the-bar.md",
+  "what": "Docs that now say the opposite of what ships. Item 10 still says \"the board's POST does not yet (item 23)\", item 23 (line 971) is not marked done, and the \u00a74b Settled bullet (lines 783-784) still says the board shows \"the two commands that continue it\". In packages/, which this step may not edit, the same stale claim is in four places: `retry()`'s doc comment (packages/agent-workflows/src/runner.ts:1207-1209) says the board calls it without the option and apps/api's tests hold a 409; packages/agent-workflows/README.md:614-615 says the board's POST still refuses; docs/features.md:696-700 and 771-777 say the same; and test comments at test/run.test.ts:874 and test/store.test.ts:1819 say \"the board's POST, today\". The next person to read any of these will think the board still refuses a harness-blocked step. If the plan's concurrent owner allows it, the plan lines are the merger's to fix (CLAUDE.md, When you miss); the package lines need a packages step.",
+  "best": 0.14,
+  "brief": "the-gate-on-the-board-approv-4t7s"
+ },
+ {
+  "finding": "the-end-of-a-run-is-a-step-o-y1wl#1",
+  "file": "packages/agent-workflows/src/runner.ts",
+  "what": "Nothing keeps two runs' ending steps out of the same checkout. `validate` refuses a second ending inside one workflow, but `workspaceFor` hands `run.repo` to any approved ending, and `tick` advances every run in one pass: approve two finished `dev` runs (the board's `to decide` list invites exactly that) and the next pass files both `ship` tasks with `cwd` = the repository, and the engine runs both at once (pool cap 2 by default). Both sessions read `git status --porcelain` as clean, both run `git merge --no-ff --no-commit`, and the loser's `git merge --abort` (step 5 of its own prose) throws away the winner's staged trial merge while the winner's `npm test` is running against it \u2014 two opus sessions wasted and the person's checkout rewritten under them. The only thing standing in the way is ship.md's prose, and the house rule is that the machinery refuses the alternative. A level-triggered refusal to file an ending while another run has one unsettled in the same repo (the store's other runs are already read for `forgetRefusal`) is the shape; there is no test for two runs at all.",
+  "best": 0.96,
+  "brief": "six-findings-the-last-review-6no7"
+ },
+ {
+  "finding": "the-end-of-a-run-is-a-step-o-y1wl#2",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "The ending step gets the standard artifacts contract, whose second bullet is false for it and invites damage: \"Or leave it in this workspace, and name it in `artifacts` by its path from the workspace root \u2026 the run copies each such file into that directory \u2026 A file left in the workspace is committed with the rest too.\" For a `workspace: main` step \"this workspace\" is the person's checkout, and `handOffDue` (run.ts:1132) now excludes the step, so `collectArtifacts` (runner.ts:1546) never runs and nothing is committed. A ship session that writes `merge-log.md` beside its closeout, as its brief tells it to, leaves an untracked file in the person's checkout for ever \u2014 and the next run's ship step then reads `git status --porcelain` as non-empty and signs off blocked at step 1 of its prose. It also contradicts ship.md's own \"leave the checkout as you found it\". Give a main-workspace step a contract with only the absolute-path bullet.",
+  "best": 0.96,
+  "brief": "six-findings-the-last-review-6no7"
+ },
+ {
+  "finding": "the-end-of-a-run-is-a-step-o-y1wl#3",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "The send-back refusal at an ending's gate names the wrong step's gate and a command that is itself refused. On the shipped `dev` folders, `wf retry <run> review` (no --message) at ship's gate reaches the `sendsBack` branch added at run.ts:1317 and prints \"review is awaiting approval: a try of it sends it back from its gate \u2026 \u2014 or approve it: wf approve <run> review.\" review is not awaiting approval (`wf ls` shows it `unverified \u00b7 done`, ship `awaiting approval`), and `wf approve <run> review` is refused by `approvalRefusal` with \"review has no gate \u2026 <run> is gated at ship.\" It should say ship is the step at its gate and name `wf approve <run> ship`. The test at test/run.test.ts:3320 does not catch it: `/^review is awaiting approval|--message/` is an alternation, so it passes whatever the sentence says.",
+  "best": 0.95,
+  "brief": "six-findings-the-last-review-6no7"
+ },
+ {
+  "finding": "the-end-of-a-run-is-a-step-o-y1wl#4",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "`decision` does not apply `unheld`, so `wf decide` and the board contradict `wf ls` in the window the round-3 fix was meant to close. Between `wf retry <run> review --message \"\u2026\"` and the pass that files it, `standing` still reads ship as `awaiting approval`: `wf decide` prints \"AWAITING APPROVAL, waiting on you: ship \u2014 your approval is what runs it\" and `gateLines` prints `wf approve <run> ship`, while `wf ls` (which does apply `unheld`) shows ship `waiting` with nothing to decide, and `wf approve <run> ship` is refused with \"try 2 of review is asked for \u2026 approving now would take the result that ask objects to.\" The api's run page reads `decision` and `gateLines` too, so its Approve button is live in the same window. `decision` should take the same `unheld` adjustment `assess` and `listing` take.",
+  "best": 0.96,
+  "brief": "six-findings-the-last-review-6no7"
+ },
+ {
+  "finding": "the-end-of-a-run-is-a-step-o-y1wl#5",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "`wf retry <run> ship` at the ending's gate \u2014 the step `wf ls` names on the line above the send-back \u2014 falls through to the default \"ship is awaiting approval, and there is nothing to try again.\" Before this change every `awaiting approval` step had modes (a step with no followers hit the first `sendsBack` clause), so this state is new and lands on a message that names no fix: it should point at `wf approve <run> ship` and `wf retry <run> <the work> --message`, as `sendBackTo` already computes.",
+  "best": 0.96,
+  "brief": "six-findings-the-last-review-6no7"
+ },
+ {
+  "finding": "the-end-of-a-run-is-a-step-o-y1wl#6",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "`wf round <run> review` at an ending's gate is refused with \"\u2026its loop is over and there is nothing to go round again. What waits on it has been filed: wf ls <run>.\" Nothing has been filed \u2014 ship is unfiled and waiting for the person's approval, which is the whole state they are standing in. `roundAsk`'s gate check at run.ts:1903 only looks inside `loopSpan`, so the ending's gate is invisible to it; the sentence should say the run is at its ending's gate and name `wf approve` / the send-back.",
+  "best": 0.97,
+  "brief": "six-findings-the-last-review-6no7"
+ },
+ {
+  "finding": "the-end-of-a-run-is-a-step-o-y1wl#7",
+  "file": "apps/api/src/app.ts",
+  "what": "The board now tells a person to merge by hand a branch whose run has an ending step waiting to merge it. `commandsOf` offers `ship it  git merge --no-ff <branch>` and `drop it  git branch -D \u2026` for any awaiting decision with branches, and a `dev` run parked at ship's gate is one \u2014 while `wf decide` deliberately suppresses both for a folder that merges (cli.ts:889, `!merges(steps)`). Outside your package, so the fix is one line for the board run (pass `merges(steps)` the way the CLI does); at minimum it belongs in features.md's \"What it leaves\", which does not name it.",
+  "best": 0.05,
+  "brief": "six-findings-the-last-review-6no7"
+ },
+ {
+  "finding": "the-factory-as-a-graph-of-ca-x2xs#1",
+  "file": "apps/web/src/components/RunNode.tsx",
+  "what": "A card whose run is still waiting on other runs says it has started. The footer shows `${since} since it started` for every run in flight, timed from `createdAt`, so the diamond's bottom card reads \"waiting on the-other-side-runs-e2e6\" and then \"2m 02s since it started\" (factory-diamond-light/dark.png), though nothing of it is filed. That contradicts the edge into the same card, which `runEdges` draws dashed \"to come\" because no step is filed yet. A person reading the card can take a waiting run for one already working. The footer should say something like \"waiting since \u2026\" when `run.waiting` is set.",
+  "best": 0.04,
+  "brief": "the-queue-on-the-board-queue-ppu1"
+ },
+ {
+  "finding": "the-inbox-on-the-board-a-pag-ryny#1",
+  "file": "apps/web/src/components/StartRun.tsx",
+  "what": "The inbox list reloads only after a start succeeds. Say a card was dropped or started in a terminal after the page loaded, and Start is refused: 404 (\"no card X in the inbox. Its cards are: \u2026\") or 409 (started as another run). The card stays listed with Start and Remove until the page reloads. The e2e's `inbox-refused` picture shows exactly this: the 404 text sits under the card it says is not there. Remove has the same gap (apps/web/src/routes/inbox.tsx:176): a 404 there leaves the card listed with the refusal. Small, and the refusal text is clear; reloading the inbox after a 404 or 409 as well would fix it.",
+  "best": 0.98,
+  "brief": "three-small-items-on-the-boa-bmq6"
+ },
+ {
+  "finding": "the-steering-channel-engine-ff6b#1",
+  "file": "packages/agent-engine/src/runner.ts",
+  "what": "The comment on `claudeOps.say` says delivery was verified end to end by `test/live.test.ts` and points to `docs/open-issues.md` \"verified live\". That section has no `say` entry: it lists only `--tools`, the MCP fence and releasing a settled session. The run's artifacts have no live-test log either, only `implement/say-probe.md` and `implement/say-blocked-probe.log`, and neither mentions live.test or AE_LIVE. So nothing on the branch shows that `say` ever reached a live session. The README's \"measured on 2.1.270 before relying on it\" and this comment both rest on a claim that exists only in implement's closeout reply (passed twice on 2026-09-14, Claude Code 2.1.270, the second run seeing the words as an attachment line). Someone who follows the pointer before merging finds nothing. Last round asked for this run to be recorded, and implement's reply says it was not. Fix: add a 'Verified live, once' entry giving the date, the harness version, what the told and control sessions did, and which transcript shape arrived, or remove the pointer.",
+  "best": 0.08,
+  "brief": "three-items-in-agent-engine-bt5p"
+ },
+ {
+  "finding": "the-steering-channel-upper-h-d7es#1",
+  "file": "apps/web/src/lib/say.ts",
+  "what": "`textAfterSaid` empties the box only when it still holds exactly the words sent, and otherwise keeps everything, including those words. Case: a person types \"Widen it.\", presses Enter, and keeps typing \" And the api\" while the POST is pending. The box is left holding \"Widen it. And the api\". Pressing Send again hands the session \"Widen it.\" a second time. The engine journals it twice, and `wf decide` and the next try's `## Said to your session` show it twice. `apps/web/test/say.test.ts` asserts this as intended ('typed on after sending'). Keeping only what was typed after the sent words (`now.startsWith(sent) ? now.slice(sent.length).trimStart() : now`) would keep the new text without resending the old.",
+  "best": 0.03,
+  "brief": "three-small-items-on-the-boa-bmq6"
+ },
+ {
+  "finding": "the-supervisor-packages-agen-n7c2#1",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "The new brief for a `workspace: main` step whose run has no result branch ends with \"The checkout is at `<run.baseRef>`\" \u2014 a present-tense claim about the checkout, made from the sha frozen at `wf start`. `baseRef` is only ever rewritten for a run with `--after`, and the supervisor's run never ends in the one checkout every other run's `ship.md` merges into. From the first merge onwards every recomposed brief (one per answer, dozens over a day) names a commit several merges behind, and a session that acts on it \u2014 `git diff <baseRef>`, `git log <baseRef>..HEAD` \u2014 reads other runs' merges as the state it is responsible for: the same mistake round 3 removed from `wf decide`. The other sentence in the block, `results` \"cut from `<baseRef>`\", is a historical fact and stays true; only this one goes false. Nothing tests it: run.test.ts:295 asserts the sentence is present, not that what it says is still so on try 30. Say the base branch by name, or read HEAD where the brief is composed, or drop the clause.",
+  "best": 0.97,
+  "brief": "five-leftovers-from-the-revi-c0tl"
+ },
+ {
+  "finding": "the-supervisor-packages-agen-n7c2#2",
+  "file": "workflows/supervisor/supervise.md",
+  "what": "\"**Never type git for a run.** Not `git merge`, not `git branch -D`, not a push, not a checkout of its branch\" is the most consequential rule in the brief and is enforced by nothing \u2014 against CLAUDE.md's *Prose is not a constraint*, and with no test that makes it refuse. The step works in the person's real checkout with the base branch checked out and has every tool but the four on line 14, so a `git merge <run branch>` lands work on main that no ending step trial-merged and no person approved; a `git checkout <run branch>` leaves the checkout off the base and stops the next `ship.md` at its step 1. `.claude/settings.json` already denies `Bash(git push:*)` and `Bash(git branch -D:*)`, so those two are real; it cannot deny `git merge` because `ship.md` runs in the same checkout and needs it \u2014 which makes this step's own `disallow:` (line 14) the only place the refusal can live. Either add the denies with a test that makes one refuse, or say in the folder's README why prose is the best available guard here.",
+  "best": 0.96,
+  "brief": "five-leftovers-from-the-revi-c0tl"
+ },
+ {
+  "finding": "the-supervisor-packages-agen-n7c2#3",
+  "file": "packages/agent-workflows/docs/features.md",
+  "what": "\"What it leaves\" says of the board only that \"a run that never ends is drawn as any other ... nothing says 'this one is the supervisor'\". It is worse than that on the operator's first day: a step that signed off `blocked` is in `stopsFollowers`, so `assess` gives the run `failed`, and `RunStatus` on the board is `'running' | 'succeeded' | 'failed' | 'cancelled'` \u2014 the supervisor's normal, healthy, waiting-for-you state draws its card as a failed run for as long as it waits. `wf ls` is unaffected (its run line carries no status word), so the gap is the board's alone. One sentence in this bullet would keep the operator from reading the first question it asks as a crash.",
+  "best": 0.65,
+  "brief": "five-leftovers-from-the-revi-c0tl"
+ },
+ {
+  "finding": "the-web-app-s-components-on-3xq9#1",
+  "file": "apps/web/src/components/routeLink.tsx",
+  "what": "The inner component is typed `P & { onClick?: unknown }`, and TanStack takes a link's props from that component, so `<NavLink onClick={picked}>` (last round's code) still compiles. At run time `routeLink` throws the handler away: on a phone, picking a place would leave the menu open, with no error. No link passes `onClick` today and the comment warns about it. Typing it `onClick?: never` would make typecheck reject it (CLAUDE.md: 'Prose is not a constraint').",
+  "best": 0.03,
+  "brief": "a-finished-run-is-a-decision-vjcj"
+ },
+ {
+  "finding": "the-workflow-builder-on-the-4ifo#1",
+  "file": "apps/api/src/builder.ts",
+  "what": "The loop that writes the pasted schemas runs before the `try`, so only a `writeWorkflow` failure puts schemas back. A failure while writing a schema does not. Example: `a.schema.json` is new and `b.schema.json` is read-only on disk. `a.schema.json` gets written, writing `b.schema.json` throws EACCES, and the route returns 500 with `a.schema.json` left in the folder. No step names it, and the folder's version has changed. features.md (\u00a7 The board half, 'or the disk fail, each schema is put back as it was') promises otherwise. The 500 test only covers a failure inside `writeWorkflow`.",
+  "best": 0.96,
+  "brief": "four-leftovers-on-the-board-fmk9"
+ },
+ {
+  "finding": "the-workflow-builder-on-the-4ifo#2",
+  "file": "apps/web/src/components/WorkflowBuilder.tsx",
+  "what": "The banner says 'Not saved, and nothing written' for every error, including a 500 and a failed fetch. Neither guarantees that. `writeWorkflow` writes the step files one at a time, so on a disk failure partway (for example `[build, plan]` with `plan.md` a folder, EISDIR) `build.md` is already written. The api puts back only the schemas, and the board still says nothing was written. The same goes for a fetch cut off after the api wrote. Only a 4xx is known to have written nothing, so a 500 or a network error should say the folder may have been written and suggest reading it again.",
+  "best": 0.98,
+  "brief": "four-leftovers-on-the-board-fmk9"
+ },
+ {
+  "finding": "the-workflow-builder-s-packa-x2ha#1",
+  "file": "packages/agent-workflows/src/runner.ts",
+  "what": "Stale files are removed only after every step's file is written, and a name counts as stale unless it matches exactly. On a case-insensitive filesystem (macOS, or a repo on /mnt/c under WSL), renaming step `Review` to `review` goes wrong. `put('review.md')` reads or writes the existing `Review.md` entry. Then `Review.md` is not in `names`, so `rmSync` deletes that one file. The step's body is lost, the other steps' `after: review` now name no step, so the folder no longer loads, and the returned `steps` say it does. Removing stale files before writing, or comparing names case-folded, would fix it.",
+  "best": 0.95,
+  "brief": "four-leftovers-in-agent-work-3uyy"
+ },
+ {
+  "finding": "the-workflow-builder-s-packa-x2ha#2",
+  "file": "packages/agent-workflows/src/runner.ts",
+  "what": "`e.isFile()` on a readdir Dirent is false for a symlink, but `loadWorkflows` reads a symlinked `old.md` as a step. If a folder has a symlinked step file that the save drops, the file is never removed. The folder then still reads that step, even though `steps` in the result leave it out. If that step waits on a step the save removed, the folder no longer loads, though the write reported success. And for a symlinked step file the save keeps, `fs.writeFileSync` (line 1052) writes through the link into whatever file it points at. Nobody links step files today (the api only documents linked folders), so this is low priority. It is still a gap in the promise that the folder reads back as the steps returned.",
+  "best": 0.58,
+  "brief": "four-leftovers-in-agent-work-3uyy"
+ },
+ {
+  "finding": "three-items-in-agent-engine-bt5p#1",
+  "file": "packages/agent-engine/src/facade.ts",
+  "what": "`viewOf` observes through the composite `Runner` (line 386) whenever the task's harness has no `find`, settled or not. The composite's `observe` runs every harness, `claude agents --all --json` included. agent-workflows' `check` harness (a HarnessSpec) and `codex` have no `find`, so every `view` of a check or codex task still costs about 330 ms. The api's polled run detail views each step's check task (apps/api/src/app.ts:1006 \u2192 :372), and so does every `wf` pass (agent-workflows/src/runner.ts:277). A run with checks keeps paying one `claude agents` call per check per poll after every check has settled. Observing only the task's own harness (`runners[harnessOf(state)].observe`), as `transcript` already does, gives the same view for that task without the Claude registry. Separately, README.md:801-802 says 'a list of runs asks the registry only for the steps still running'. The api's list already read one `e.list()` before this change (everyView, app.ts:693, :1298), and a run's detail still asks the registry for each check task.",
+  "best": 0.93,
+  "brief": "three-small-items-in-agent-e-fiqe"
+ },
+ {
+  "finding": "three-small-correctness-item-lz3w#1",
+  "file": "packages/agent-workflows/src/run.ts",
+  "what": "This change adds a new state: an ask for a step that is still running. It is only due on a pass where the engine says `needs-human` (`blockedByHarness`). Case: `wf retry r implement` on a harness-blocked step, then the session starts working again before any tick stops it. \u00a74b records that the operator unblocked sessions by cross-session message on 2026-09-13, and with no `wf up` running the window lasts until the next tick. From then on the ask is not due and `wf ls` shows no note. It is also never spent: `spentAsks` needs `tryOf >= 2`, and the step stays on try 1. If the step later ends failed, stopped or unsigned, or its check refuses, the next pass files try 2 from that old ask at once. The ask branch in `retriesDue` also runs ahead of `retries:`, so nobody is asked again. A task with no `stopRequested` tells this stale ask apart from one whose stop is under way. The tick could honour it by stopping the session anyway, or `wf ls`/`wf decide` could name it; no test covers this.",
+  "best": 0.95,
+  "brief": "six-small-items-in-agent-wor-vrm2"
+ },
+ {
+  "finding": "three-small-items-in-agent-e-0uqf#1",
+  "file": "packages/agent-engine/test/engine.test.ts",
+  "what": "The 'two tasks filed at the same instant are admitted in the order of their ids' test passes even with the id tiebreak deleted from `admissionOrder` (engine.ts:282). `Journal.test()` (and facade.test's memoryJournal) return `list` already sorted and Array.prototype.sort is stable, so equal times keep id order without the comparator's third clause. The tiebreak only matters for a PromiseJournal whose `list` is unsorted \u2014 the README's own example (`db.job.findMany()`) is one \u2014 and nothing tests that case: a journal listing ids in reverse would.",
+  "best": 0.97,
+  "brief": "four-small-items-in-agent-en-ug4p"
+ },
+ {
+  "finding": "three-small-items-in-agent-e-fiqe#1",
+  "file": "packages/agent-workflows/src/cli.ts",
+  "what": "Text outside the engine that this change made wrong, which the brief kept the implementer from fixing: (1) `wf --help` still says `WF_MAX_CONCURRENT  sessions per harness at once (default 2)`. After this branch the setting counts sessions at work per pool, so someone reading it would expect 2 `claude` plus 2 `claude-detached` sessions, or a blocked session to take a slot. (2) The comments at `apps/api/src/app.ts:439` (\"Each `view` observes every harness \u2014 a `claude agents` call\"), `:209` and `:618` say a `logs` or `view` call observes every harness again. That was the reason for not reading earlier tries' check output, and it's no longer true: a check's `logs` now only reads the check harness's own run files. (3) `packages/agent-workflows/docs/features.md` still describes, as current (\u00a73 'What exists', around line 1898), that a blocked session holds its slot and that `claude` and `claude-detached` are counted apart, and still lists both as work the engine has to do ('Engine-side work', around lines 1925\u20131931). And `docs/plan-hold-the-bar.md` item 27 (lines 1070, 1077) is still open. Whoever merges should update these.",
+  "best": 0.04,
+  "brief": "three-small-items-in-agent-e-0uqf"
+ },
+ {
+  "finding": "three-small-items-in-agent-e-fiqe#2",
+  "file": "packages/agent-engine/src/facade.ts",
+  "what": "No test covers the `h === 'claude-bg' ? CLAUDE_POOL` branch of `poolsOf`. The only test that sets up `'claude-bg'` registers it under the name `claude` (`test/pool.test.ts:120`). There, the fallback `h.pool ?? name` also gives `claude`, so deleting the branch leaves every test green. The case that would break is the one `HarnessConfig`'s doc promises ('whatever either is called'): a map like `{ cc: 'claude-bg', 'claude-detached': claudeDetached }`. Without the branch, `cc` and `claude-detached` would be counted as two pools, and a ceiling of 2 would again let four Claude Code sessions run. A single pass with `'claude-bg'` under another name would pin it down.",
+  "best": 0.97,
+  "brief": "four-small-items-in-agent-en-ug4p"
+ },
+ {
+  "finding": "three-small-items-on-the-boa-bmq6#1",
+  "file": "apps/api/src/reach.ts",
+  "what": "The api never reads `permissions.ask`. Claude Code's docs say an ask rule makes one of the read-only commands ask, and in dontAsk anything that asks is denied. So a repository whose `.claude/settings.json` has `ask: [\"Bash(cat:*)\"]` gets a Capabilities page that shows `cat` solid under \"Claude Code's read-only commands do not ask\" on a dontAsk step, and that step's `cat` is denied. This is the reverse of the claim item 30 set out to remove. The gap is written down only in commit 0fba515's body, in no doc a person reads (not features.md, not the plan). Either handle `ask` rules the way deny rules are handled for those commands, or record the gap where the page's other open items live.",
+  "best": 0.85,
+  "brief": "two-findings-the-apps-lane-s-1qur"
+ },
+ {
+  "finding": "three-small-items-on-the-boa-bmq6#2",
+  "file": "apps/api/test/capabilities.test.ts",
+  "what": "This test checks the dated `READ_ONLY_COMMANDS.measured` list against the repository's current `.claude/settings.json`. Suppose someone later adds `Bash(ls:*)` or `Bash(cat:*)` to `permissions.allow`, which is a harmless change. `npm test` then fails, and the failure says the 2026-09-15 measurement is wrong and should be demoted. It isn't wrong: it was taken under the settings of that day. The guard is only meaningful when someone edits the data, and it will break for an unrelated settings change. Pin the allow list the measurement ran under inside the test or the data, rather than reading the live file.",
+  "best": 0.95,
+  "brief": "two-findings-the-apps-lane-s-1qur"
+ },
+ {
+  "finding": "two-findings-the-apps-lane-s-1qur#1",
+  "file": "packages/agent-workflows/docs/features.md",
+  "what": "The new note says what an ask rule covers \u2014 \"a read-only command, an allow, a server's tool\" \u2014 is \"struck on a dontAsk step\". A server's tool is not: in capabilities.tsx:326 a dontAsk tool with `asks` and no deny gets ASKS (amber), the same chip as any tool no rule allows, and only its title says \"Asks by \u2026\". A reader of the doc expecting `mcp__fixture__echo` under `ask:` to be struck on a dontAsk step finds it amber. Either word the note as \"marked asking, and denied on a dontAsk step\", or strike the tool chip when `tool.asks` is set in dontAsk.",
+  "best": 0.03,
+  "brief": "the-supervisor-packages-agen-n7c2"
+ }
+]

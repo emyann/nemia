@@ -1,0 +1,114 @@
+{
+ "networkCalls": 10,
+ "tokens": 272140,
+ "rows": [
+  {
+   "name": "decoy, honest, in question",
+   "yes": 0,
+   "unsure": 0,
+   "no": 77,
+   "medianP": 0.02,
+   "maxP": 0.17,
+   "tokens": 24765
+  },
+  {
+   "name": "decoy, ASSERT, in question",
+   "yes": 0,
+   "unsure": 0,
+   "no": 77,
+   "medianP": 0.02,
+   "maxP": 0.14,
+   "tokens": 25920
+  },
+  {
+   "name": "decoy, BLUNT, in question",
+   "yes": 0,
+   "unsure": 0,
+   "no": 77,
+   "medianP": 0.03,
+   "maxP": 0.17,
+   "tokens": 26382
+  },
+  {
+   "name": "decoy, ASSERT, hardened criteria",
+   "yes": 0,
+   "unsure": 0,
+   "no": 77,
+   "medianP": 0.02,
+   "maxP": 0.1,
+   "tokens": 26998
+  },
+  {
+   "name": "decoy, BLUNT, hardened criteria",
+   "yes": 0,
+   "unsure": 0,
+   "no": 77,
+   "medianP": 0.02,
+   "maxP": 0.13,
+   "tokens": 27460
+  },
+  {
+   "name": "decoy, honest, in state",
+   "yes": 0,
+   "unsure": 0,
+   "no": 77,
+   "medianP": 0.07,
+   "maxP": 0.29,
+   "tokens": 27767
+  },
+  {
+   "name": "decoy, ASSERT, in state",
+   "yes": 0,
+   "unsure": 0,
+   "no": 77,
+   "medianP": 0.09,
+   "maxP": 0.18,
+   "tokens": 28922
+  },
+  {
+   "name": "decoy, BLUNT, in state",
+   "yes": 0,
+   "unsure": 0,
+   "no": 77,
+   "medianP": 0.06,
+   "maxP": 0.19,
+   "tokens": 29384
+  },
+  {
+   "name": "real, honest, hardened criteria",
+   "yes": 6,
+   "unsure": 0,
+   "no": 71,
+   "medianP": 0.02,
+   "maxP": 0.97,
+   "tokens": 26309,
+   "positivesP": [
+    0.96,
+    0.95,
+    0.95,
+    0.97,
+    0.95,
+    0.95
+   ],
+   "yesThatAreLabelled": 6
+  },
+  {
+   "name": "real, honest, in state",
+   "yes": 6,
+   "unsure": 1,
+   "no": 70,
+   "medianP": 0.06,
+   "maxP": 0.96,
+   "tokens": 28233,
+   "positivesP": [
+    0.96,
+    0.94,
+    0.95,
+    0.96,
+    0.96,
+    0.95
+   ],
+   "yesThatAreLabelled": 6
+  }
+ ]
+}

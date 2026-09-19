@@ -1,0 +1,554 @@
+[
+ {
+  "id": "a-finished-run-is-a-decision-vjcj",
+  "touched": 96884.0,
+  "untouched": 17685.75,
+  "nopath": 11123.75,
+  "after": 356,
+  "calls": 435
+ },
+ {
+  "id": "a-gate-a-step-s-handoff-that-18iy",
+  "touched": 3608.75,
+  "untouched": 118372.0,
+  "nopath": 83228.0,
+  "after": 100,
+  "calls": 141
+ },
+ {
+  "id": "a-plan-as-a-folder-of-cards-o4su",
+  "touched": 4718.5,
+  "untouched": 54485.0,
+  "nopath": 28277.0,
+  "after": 14,
+  "calls": 24
+ },
+ {
+  "id": "a-run-that-waits-on-a-run-wf-vaka",
+  "touched": 5619.75,
+  "untouched": 64889.5,
+  "nopath": 10841.75,
+  "after": 44,
+  "calls": 53
+ },
+ {
+  "id": "a-step-that-asks-gets-an-ans-v5qd",
+  "touched": 5904.75,
+  "untouched": 16527.75,
+  "nopath": 44112.0,
+  "after": 30,
+  "calls": 40
+ },
+ {
+  "id": "an-inbox-cards-parked-before-ri7j",
+  "touched": 9185.75,
+  "untouched": 11201.5,
+  "nopath": 37219.5,
+  "after": 60,
+  "calls": 88
+ },
+ {
+  "id": "close-the-fence-by-machinery-ahlx",
+  "touched": 17871.75,
+  "untouched": 16540.75,
+  "nopath": 47943.5,
+  "after": 0,
+  "calls": 73
+ },
+ {
+  "id": "cost-measured-and-a-budget-s-eou6",
+  "touched": 318.25,
+  "untouched": 82469.75,
+  "nopath": 53248.75,
+  "after": 46,
+  "calls": 59
+ },
+ {
+  "id": "cost-measured-and-a-budget-s-vbfh",
+  "touched": 50552.0,
+  "untouched": 116701.0,
+  "nopath": 3429.0,
+  "after": 55,
+  "calls": 68
+ },
+ {
+  "id": "cost-on-the-board-what-a-ste-x662",
+  "touched": 56681.75,
+  "untouched": 122164.75,
+  "nopath": 17155.0,
+  "after": 62,
+  "calls": 80
+ },
+ {
+  "id": "each-node-of-the-factory-can-bol3",
+  "touched": 47396.75,
+  "untouched": 41901.0,
+  "nopath": 42668.0,
+  "after": 0,
+  "calls": 77
+ },
+ {
+  "id": "five-leftovers-from-the-revi-c0tl",
+  "touched": 4783.5,
+  "untouched": 18322.75,
+  "nopath": 70355.0,
+  "after": 0,
+  "calls": 119
+ },
+ {
+  "id": "five-small-items-on-the-boar-zle1",
+  "touched": 129329.25,
+  "untouched": 47189.25,
+  "nopath": 18737.25,
+  "after": 0,
+  "calls": 106
+ },
+ {
+  "id": "fix-one-gap-in-agent-engine-h35j",
+  "touched": 12696.25,
+  "untouched": 9582.25,
+  "nopath": 7193.75,
+  "after": 9,
+  "calls": 17
+ },
+ {
+  "id": "fix-the-engine-so-a-resumed-5dub",
+  "touched": 19021.5,
+  "untouched": 26147.25,
+  "nopath": 6351.25,
+  "after": 12,
+  "calls": 26
+ },
+ {
+  "id": "forget-a-run-that-is-over-wf-auru",
+  "touched": 8367.25,
+  "untouched": 14034.75,
+  "nopath": 95081.75,
+  "after": 0,
+  "calls": 108
+ },
+ {
+  "id": "four-items-in-agent-workflow-w4eb",
+  "touched": 7340.5,
+  "untouched": 97395.5,
+  "nopath": 21626.75,
+  "after": 113,
+  "calls": 137
+ },
+ {
+  "id": "four-leftovers-in-agent-work-3uyy",
+  "touched": 0,
+  "untouched": 8138.75,
+  "nopath": 29746.75,
+  "after": 83,
+  "calls": 110
+ },
+ {
+  "id": "four-leftovers-on-the-board-fmk9",
+  "touched": 73133.0,
+  "untouched": 24831.5,
+  "nopath": 15691.0,
+  "after": 0,
+  "calls": 282
+ },
+ {
+  "id": "four-small-items-in-agent-en-ug4p",
+  "touched": 10040.0,
+  "untouched": 10206.25,
+  "nopath": 44473.75,
+  "after": 93,
+  "calls": 137
+ },
+ {
+  "id": "give-a-workflow-the-edge-bac-mmhc",
+  "touched": 5745.25,
+  "untouched": 96484.5,
+  "nopath": 21034.75,
+  "after": 41,
+  "calls": 50
+ },
+ {
+  "id": "give-each-step-s-worktree-it-tn5j",
+  "touched": 2666.0,
+  "untouched": 8408.25,
+  "nopath": 10774.0,
+  "after": 26,
+  "calls": 36
+ },
+ {
+  "id": "give-the-board-a-capabilitie-j05l",
+  "touched": 9113.5,
+  "untouched": 13143.5,
+  "nopath": 10441.5,
+  "after": 33,
+  "calls": 41
+ },
+ {
+  "id": "give-the-board-a-left-hand-m-wncu",
+  "touched": 6895.25,
+  "untouched": 12201.0,
+  "nopath": 50718.25,
+  "after": 0,
+  "calls": 33
+ },
+ {
+  "id": "give-the-board-a-workflows-p-l7po",
+  "touched": 54858.5,
+  "untouched": 14117.5,
+  "nopath": 14111.5,
+  "after": 30,
+  "calls": 40
+ },
+ {
+  "id": "give-the-engine-a-structured-9e0d",
+  "touched": 0,
+  "untouched": 50674.25,
+  "nopath": 30069.0,
+  "after": 20,
+  "calls": 29
+ },
+ {
+  "id": "give-wf-decide-the-screen-a-jdtk",
+  "touched": 4490.0,
+  "untouched": 18434.0,
+  "nopath": 8482.5,
+  "after": 28,
+  "calls": 38
+ },
+ {
+  "id": "keep-the-time-an-attempt-end-bbuw",
+  "touched": 6711.25,
+  "untouched": 9980.25,
+  "nopath": 14956.0,
+  "after": 9,
+  "calls": 16
+ },
+ {
+  "id": "let-a-refused-check-be-retri-4ycf",
+  "touched": 43688.5,
+  "untouched": 43386.0,
+  "nopath": 5758.75,
+  "after": 30,
+  "calls": 41
+ },
+ {
+  "id": "let-a-step-s-product-travel-ec4p",
+  "touched": 11770.5,
+  "untouched": 58372.0,
+  "nopath": 2228.25,
+  "after": 24,
+  "calls": 32
+ },
+ {
+  "id": "let-a-step-say-which-tools-i-v27t",
+  "touched": 2663.5,
+  "untouched": 72740.0,
+  "nopath": 13891.0,
+  "after": 28,
+  "calls": 39
+ },
+ {
+  "id": "let-a-task-carry-the-mcp-ser-6ve1",
+  "touched": 578.0,
+  "untouched": 25400.5,
+  "nopath": 35394.25,
+  "after": 0,
+  "calls": 22
+ },
+ {
+  "id": "make-looking-a-capability-no-o8rs",
+  "touched": 23243.0,
+  "untouched": 24179.5,
+  "nopath": 12501.25,
+  "after": 23,
+  "calls": 37
+ },
+ {
+  "id": "make-the-api-read-what-the-p-d805",
+  "touched": 6176.5,
+  "untouched": 19048.75,
+  "nopath": 13859.25,
+  "after": 27,
+  "calls": 35
+ },
+ {
+  "id": "make-the-board-and-the-api-s-1yzq",
+  "touched": 9521.0,
+  "untouched": 22042.5,
+  "nopath": 36803.5,
+  "after": 25,
+  "calls": 41
+ },
+ {
+  "id": "make-the-board-draw-the-run-att8",
+  "touched": 19501.25,
+  "untouched": 15970.5,
+  "nopath": 44023.5,
+  "after": 25,
+  "calls": 36
+ },
+ {
+  "id": "make-the-board-say-what-the-0np3",
+  "touched": 16024.0,
+  "untouched": 46606.0,
+  "nopath": 19465.75,
+  "after": 36,
+  "calls": 47
+ },
+ {
+  "id": "make-the-canvases-edges-say-oykz",
+  "touched": 18001.25,
+  "untouched": 6115.75,
+  "nopath": 28802.0,
+  "after": 20,
+  "calls": 30
+ },
+ {
+  "id": "make-the-factory-the-one-can-d6iv",
+  "touched": 1294.75,
+  "untouched": 4793.75,
+  "nopath": 62228.25,
+  "after": 0,
+  "calls": 32
+ },
+ {
+  "id": "make-the-inbox-be-the-first-7vms",
+  "touched": 12989.0,
+  "untouched": 3539.75,
+  "nopath": 178.75,
+  "after": 12,
+  "calls": 21
+ },
+ {
+  "id": "make-the-inspector-say-what-qpx2",
+  "touched": 9543.0,
+  "untouched": 28617.75,
+  "nopath": 62432.0,
+  "after": 49,
+  "calls": 60
+ },
+ {
+  "id": "markdown-rendered-on-the-boa-699m",
+  "touched": 1686.5,
+  "untouched": 108612.75,
+  "nopath": 19268.25,
+  "after": 0,
+  "calls": 59
+ },
+ {
+  "id": "one-small-item-in-agent-work-tpxb",
+  "touched": 8475.25,
+  "untouched": 13267.0,
+  "nopath": 23487.25,
+  "after": 0,
+  "calls": 18
+ },
+ {
+  "id": "pay-down-four-items-on-the-e-xpv5",
+  "touched": 5150.75,
+  "untouched": 5374.75,
+  "nopath": 74366.75,
+  "after": 41,
+  "calls": 51
+ },
+ {
+  "id": "put-the-decision-on-the-boar-74tn",
+  "touched": 19565.25,
+  "untouched": 35672.75,
+  "nopath": 26617.0,
+  "after": 40,
+  "calls": 51
+ },
+ {
+  "id": "show-a-step-s-session-on-the-8eet",
+  "touched": 10687.75,
+  "untouched": 36679.75,
+  "nopath": 44427.5,
+  "after": 55,
+  "calls": 69
+ },
+ {
+  "id": "six-findings-the-last-review-6no7",
+  "touched": 13845.75,
+  "untouched": 6837.0,
+  "nopath": 85621.25,
+  "after": 0,
+  "calls": 164
+ },
+ {
+  "id": "six-small-items-in-agent-wor-vrm2",
+  "touched": 16645.75,
+  "untouched": 103012.0,
+  "nopath": 30768.25,
+  "after": 50,
+  "calls": 62
+ },
+ {
+  "id": "the-board-continues-a-sessio-xh9x",
+  "touched": 49119.75,
+  "untouched": 18678.5,
+  "nopath": 10373.0,
+  "after": 13,
+  "calls": 28
+ },
+ {
+  "id": "the-board-says-what-a-step-n-e26v",
+  "touched": 21167.75,
+  "untouched": 34762.25,
+  "nopath": 82692.0,
+  "after": 42,
+  "calls": 57
+ },
+ {
+  "id": "the-end-of-a-run-is-a-step-o-y1wl",
+  "touched": 32531.0,
+  "untouched": 13670.5,
+  "nopath": 113822.75,
+  "after": 0,
+  "calls": 240
+ },
+ {
+  "id": "the-factory-as-a-graph-of-ca-x2xs",
+  "touched": 9048.25,
+  "untouched": 73365.75,
+  "nopath": 59418.75,
+  "after": 60,
+  "calls": 74
+ },
+ {
+  "id": "the-gate-on-the-board-approv-4t7s",
+  "touched": 86078.25,
+  "untouched": 23655.5,
+  "nopath": 22510.75,
+  "after": 83,
+  "calls": 114
+ },
+ {
+  "id": "the-inbox-on-the-board-a-pag-ryny",
+  "touched": 19314.25,
+  "untouched": 5801.0,
+  "nopath": 47758.5,
+  "after": 93,
+  "calls": 121
+ },
+ {
+  "id": "the-queue-on-the-board-queue-ppu1",
+  "touched": 69189.25,
+  "untouched": 36587.75,
+  "nopath": 4260.5,
+  "after": 125,
+  "calls": 163
+ },
+ {
+  "id": "the-runs-page-should-sort-th-zdoe",
+  "touched": 18125.75,
+  "untouched": 5023.5,
+  "nopath": 313.0,
+  "after": 26,
+  "calls": 36
+ },
+ {
+  "id": "the-steering-channel-engine-ff6b",
+  "touched": 19.5,
+  "untouched": 115452.0,
+  "nopath": 25052.25,
+  "after": 0,
+  "calls": 14
+ },
+ {
+  "id": "the-steering-channel-upper-h-d7es",
+  "touched": 27530.25,
+  "untouched": 81656.5,
+  "nopath": 39549.5,
+  "after": 45,
+  "calls": 60
+ },
+ {
+  "id": "the-supervisor-packages-agen-n7c2",
+  "touched": 49826.25,
+  "untouched": 7903.25,
+  "nopath": 10999.25,
+  "after": 149,
+  "calls": 195
+ },
+ {
+  "id": "the-web-app-s-components-on-3xq9",
+  "touched": 1245.5,
+  "untouched": 68240.25,
+  "nopath": 33059.0,
+  "after": 0,
+  "calls": 52
+ },
+ {
+  "id": "the-workflow-builder-on-the-4ifo",
+  "touched": 11233.0,
+  "untouched": 18098.5,
+  "nopath": 53586.25,
+  "after": 152,
+  "calls": 181
+ },
+ {
+  "id": "the-workflow-builder-s-packa-x2ha",
+  "touched": 369.5,
+  "untouched": 22669.5,
+  "nopath": 16905.5,
+  "after": 38,
+  "calls": 50
+ },
+ {
+  "id": "three-items-in-agent-engine-bt5p",
+  "touched": 6636.25,
+  "untouched": 7130.75,
+  "nopath": 91778.0,
+  "after": 33,
+  "calls": 42
+ },
+ {
+  "id": "three-small-correctness-item-lz3w",
+  "touched": 1070.5,
+  "untouched": 101691.75,
+  "nopath": 22074.5,
+  "after": 22,
+  "calls": 36
+ },
+ {
+  "id": "three-small-items-in-agent-e-0uqf",
+  "touched": 1651.25,
+  "untouched": 15841.5,
+  "nopath": 69618.75,
+  "after": 37,
+  "calls": 60
+ },
+ {
+  "id": "three-small-items-in-agent-e-fiqe",
+  "touched": 8306.0,
+  "untouched": 35151.0,
+  "nopath": 22825.25,
+  "after": 36,
+  "calls": 50
+ },
+ {
+  "id": "three-small-items-on-the-boa-bmq6",
+  "touched": 53957.75,
+  "untouched": 5407.25,
+  "nopath": 7744.0,
+  "after": 81,
+  "calls": 112
+ },
+ {
+  "id": "two-findings-the-apps-lane-s-1qur",
+  "touched": 51691.0,
+  "untouched": 6878.75,
+  "nopath": 13256.75,
+  "after": 0,
+  "calls": 96
+ },
+ {
+  "id": "two-small-items-in-agent-wor-5l9e",
+  "touched": 54406.75,
+  "untouched": 11020.5,
+  "nopath": 3458.25,
+  "after": 28,
+  "calls": 63
+ }
+]

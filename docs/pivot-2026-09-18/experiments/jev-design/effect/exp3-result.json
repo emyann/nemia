@@ -1,0 +1,85 @@
+{
+ "timeout: first ask": {
+  "error": "TimedOut",
+  "_tag": "TimedOut",
+  "budgetMs": 5,
+  "networkCalls": 3,
+  "ms": 578
+ },
+ "timeout: asked again": {
+  "error": "TimedOut",
+  "_tag": "TimedOut",
+  "budgetMs": 0,
+  "newNetworkCalls": 0,
+  "ms": 1
+ },
+ "timeout: the fact on record": {
+  "key": "38ca4f273d03094c6da27e175c470f77",
+  "error": {
+   "_tag": "TimedOut",
+   "message": "TimedOut"
+  },
+  "model": "jev-1.13.0"
+ },
+ "timeout: through orUnsure": "unsure",
+ "timeout: asking 2 (a person's)": {
+  "ok": {
+   "verdict": "yes",
+   "p": 0.92
+  },
+  "factsOnRecord": 2
+ },
+ "budget: 10 retries, 400 ms budget": {
+  "error": "TimedOut",
+  "_tag": "TimedOut",
+  "budgetMs": 400,
+  "networkCalls": 2,
+  "ms": 401
+ },
+ "bad key": {
+  "error": "Refused",
+  "_tag": "Refused",
+  "status": 401,
+  "message": "401 Cannot authenticate with the server. Please check your API key and try again.",
+  "networkCalls": 1,
+  "ms": 313
+ },
+ "unknown model": {
+  "error": "Refused",
+  "_tag": "Refused",
+  "status": 400,
+  "message": "400 Unknown model: jev-0.0.0-nope",
+  "networkCalls": 1
+ },
+ "429 twice, then live": {
+  "ok": {
+   "verdict": "yes",
+   "p": 0.92
+  },
+  "networkCalls": 3,
+  "ms": 722
+ },
+ "429 for ever": {
+  "error": "RateLimited",
+  "_tag": "RateLimited",
+  "status": 429,
+  "networkCalls": 3
+ },
+ "network down": {
+  "error": "Unreachable",
+  "_tag": "Unreachable",
+  "message": "Connection error: fetch failed",
+  "networkCalls": 4
+ },
+ "partial fan-out": {
+  "questions": 78,
+  "sent": 1,
+  "networkCalls": 1,
+  "inputTokens": 998,
+  "newAnswer": {
+   "verdict": "yes",
+   "p": 0.92
+  }
+ },
+ "tokens": 998
+}

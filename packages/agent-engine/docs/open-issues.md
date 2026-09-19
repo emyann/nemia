@@ -450,7 +450,7 @@ known.
 
 ### 26. A session's context window: `--autocompact` works on `--bg`, and a small one can stall a session
 
-**Measured** (2026-09-19, Claude Code 2.1.278, by hand, `--model sonnet`, about $3.75 in all). The question was whether a
+**Measured** (2026-09-19, Claude Code 2.1.278, by hand, `--model sonnet`, about $6 in all). The question was whether a
 cap on a session's context — `claude --autocompact <auto|tokens>`, "Auto-compact window size (auto, or 100k–1M tokens)" —
 does anything to a background session, since workers run on the model's whole window and none of 234 ever compacted
 (repository `docs/pivot-2026-09-18.md` §1, Finding 1).
@@ -476,6 +476,12 @@ does anything to a background session, since workers run on the model's whole wi
   more files, and called `StructuredOutput` with an answer that matched the schema. The same brief on `claude -p --output-format
   json --autocompact 100k`, 500-line reads, compacted five times and ended `subtype: success` with its
   `structured_output`, for $1.94: `claude -p` takes the flag too.
+- **At 200k, unattended, it compacted twice and signed off.** The first brief again — eight files, 800-line reads, about
+  22k tokens a call — at `--autocompact 200000`, and nothing said to it: it compacted at 173,584 and 173,254 tokens of
+  context (to 15,870 and 12,875, 54 and 59 seconds), read every file, and called `StructuredOutput` with all eight files
+  counted and the right answer to what it had read before either compaction. $2.18; 2,156,626 input tokens, which the fixed
+  reading below counts as the `cost-state` does. So at 200k a session compacts about 27k tokens under its window, and a
+  refill takes seven or eight such reads — the thrash above needs one in three.
 - **The window is not part of the cached prompt.** A small session started with `--autocompact 200000` and resumed three
   times — with `200000`, with no flag, with `500000` — read 19,721 to 19,990 of about 20k tokens from the cache on each
   resumed call, and wrote 0 to 269. So a resume reuses the cache whatever window it is given, and a changed window costs
@@ -497,9 +503,10 @@ every attempt, refused at `file()` outside 100000 to 1000000 — the CLI refuses
 would fail on every pass — and on a harness with no such knob (`codex`, a `HarnessSpec` that declares no `contextTokens`
 range). A window small enough to thrash is the task's author's to avoid: the engine sees only a `blocked` session.
 
-**Not measured.** A window of 200k on real work: where it compacts (about 20 to 35k tokens under the window, if a 100k
-window is anything to go by), what a session loses in the summary, and whether a turn's tool output ever refills 200k in three
-turns. What the summarising call costs next to the reading it saves. A `claude -p` attempt's tokens across a compaction
+**Not measured.** A window of 200k on real work: what a session loses in the summary, and whether a turn's tool output ever
+refills 200k in three turns — several large reads in parallel in one turn could. The shipped workflows of work give every
+agent step `context: 200k` on the strength of the unattended run above; a step that stalls `blocked` on a thrash is the sign
+to widen it. What the summarising call costs next to the reading it saves. A `claude -p` attempt's tokens across a compaction
 under the engine.
 
 ## Verified live, once

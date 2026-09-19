@@ -4,6 +4,8 @@ model: opus
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,
 # `xhigh` on the owner's machine: docs/pivot-2026-09-18.md §1). Every token a session writes it reads again on each later call.
 effort: high
+# The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-engine open issue 26).
+context: 200k
 after: plan
 # The plan reaches this step as data, under `## From plan`: what plan declared in its closeout, and never its summary.
 input: plan

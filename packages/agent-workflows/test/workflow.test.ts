@@ -1011,6 +1011,16 @@ const shippedFolders = (): string[] => {
   ].filter((dir) => fs.statSync(dir).isDirectory());
 };
 
+test("every agent step of the shipped workflows of work runs on a 200k window, the package's own ui copy included", () => {
+  // Measured before it was set (agent-engine open issue 26): a `--bg` session compacts at its window, carries on and signs off.
+  const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
+  const folders = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'].map((name) => path.join(root, name));
+  folders.push(path.join(import.meta.dirname, '..', 'workflows', 'ui'));
+  for (const dir of folders) {
+    for (const step of loadWorkflows(dir)) assert.equal(step.context, 200_000, `${path.relative(root, dir)}/${step.name}.md`);
+  }
+});
+
 test('`renderStep` is the parser run backwards: every step of every shipped folder, loaded, rendered and parsed again, is the step it was — and the folder rendered is the folder', () => {
   const folders = shippedFolders();
   const root = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
@@ -1029,7 +1039,7 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
   // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then the body.
   const review = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'review')!;
   assert.ok(renderStep(review).startsWith([
-    '---', 'after: implement', 'harness: claude', 'model: opus', 'effort: high', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
+    '---', 'after: implement', 'harness: claude', 'model: opus', 'effort: high', 'context: 200k', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
   ].join('\n')), renderStep(review));
   assert.doesNotMatch(renderStep(review).split('\n---\n')[0]!, /^#/m, 'the file has comments in its frontmatter, and the step does not carry them');
   assert.match(fs.readFileSync(path.join(root, 'dev', 'review.md'), 'utf8'), /^# /m);

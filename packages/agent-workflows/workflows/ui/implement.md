@@ -3,6 +3,8 @@ harness: claude
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings).
 # Every token a session writes it reads again on each later call, so a higher effort is paid for many times over.
 effort: high
+# The session compacts past about 200k tokens rather than read up to a million again on every call (--autocompact; docs/pivot-2026-09-18.md §1, agent-engine open issue 26).
+context: 200k
 # `npm run e2e` builds the web app, serves it against a seeded store, visits every page in headless
 # Chromium in a light and a dark theme, and screenshots each into $WF_ARTIFACTS — the directory the run
 # made for this step — where review reads them.

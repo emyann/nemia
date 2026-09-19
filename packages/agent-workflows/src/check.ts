@@ -39,7 +39,8 @@ export const CHECK_TAIL_LINES = 20;
 export type CheckEnv = {
   WF_RUN: string;
   WF_STEP: string;
-  WF_BASE_REF: string;
+  /** The run's base commit: absent on a folder run's check, which has no repository to diff against. */
+  WF_BASE_REF?: string;
   WF_WORKSPACE: string;
   WF_STDERR: string;
   WF_ARTIFACTS: string;

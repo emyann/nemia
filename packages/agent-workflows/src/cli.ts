@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
+import { AGENT_FACING, CHECK_AFFECTING, LESSON, approve, approvedFirst, branchWord, checkoutLine, endingSteps, merges, sendBackTo, toDecideWords, approvalWordsRefusal, ceilingLines, ceilings, queueInInbox, queueLine, runSlots, slotWord, addToInbox, dropFromInbox, fromNote, gatesOf, inboxDir, inboxLines, inboxNameAt, noCardLine, onYouWords, readInbox, startFromInbox, workflowAt, artifactFiles, budgetRefusal, budgetWord, artifactLines, artifacts, artifactsDir, branchesToRead, cancel, cardToStart, decide, diffStat, dueNote, engine, forget, forgetLine, inFullLines, inputsDir, isGitRun, inputsNote, lessonLine, list, listRuns, messageRefusal, missingArtifacts, namesInOrder, outputLines, owedFields, parseGlobs, planLines, planStopped, readArtifact, readRun, resultBranches, retry, round, roundDueNote, saidLines, say, signoffsSpent, sensitiveDiff, start, startPlan, stepsOf, tick, timelineLines, timelineTotalLines, touchedBy, touchedLines, tryNote, usedLines, verdictWord, waitAdvice, waitWord, type ForgetHow, type RetryHow, type RetryMode } from './runner.ts';
 import { dollarsOf, workflowFolder } from './workflow.ts';
 
 const HELP = `wf — run a workflow of agent steps
@@ -474,7 +474,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         // Each node with what is attached to it: `review (reviewer)`. A node with no agent is its name alone.
         console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.agent ? `${s.name} (${s.agent.name})` : s.name).join(' → ')}`);
         if (from) console.log(from);
-        console.log(`workspace: ${run.workspace}`);
+        console.log(`workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`);
         if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
         if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
         const gates = gatesOf(steps, run);
@@ -513,6 +513,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const run = start({
         brief: card ? card.body : text?.trim() ?? arg,
         repo,
+        // Named or not matters to a team that says `workspace: folder`, which works on no repository and refuses one named.
+        repoNamed: how.repo !== undefined,
         // A folder from here, or one of the repository's by name: `--workflows dev` is <repo>/workflows/dev. Without the flag, a card's
         // `workflow:`, found from its plan folder as `wf plan` finds it.
         workflowDir: how.workflows === undefined && card?.workflow !== undefined
@@ -800,15 +802,17 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // full, because a check that passed says nothing about a check that was changed to pass.
       // Never the run's own base branch on a run that cut worktrees: a step that recorded it worked in the repository's checkout, and
       // what that branch holds against the run's frozen base is every other run's merge since, not this run's work (`branchesToRead`).
-      const touched = branchesToRead(decision.branches, namesInOrder(run, steps).map((name) => run.steps[name]!.branch), run.isolate ? run.branch : undefined)
-        .map((branch) => ({ branch, radius: touchedBy(run, branch) }));
+      // A folder run has no branch, and nothing here to read: what its steps made is in their artifacts.
+      const git = isGitRun(run) ? run : undefined;
+      const touched = !git ? [] : branchesToRead(decision.branches, namesInOrder(git, steps).map((name) => git.steps[name]!.branch), git.isolate ? git.branch : undefined)
+        .map((branch) => ({ branch, radius: touchedBy(git, branch) }));
       if (touched.length) {
         console.log();
         for (const line of touchedLines(touched)) console.log(`  ${line}`);
         console.log(`  ${lessonLine(touched)}`);
         for (const t of touched) {
           console.log();
-          for (const line of inFullLines(t, sensitive, sensitiveDiff(run, t, sensitive ?? CHECK_AFFECTING), touched.length > 1)) console.log(`  ${line}`);
+          for (const line of inFullLines(t, sensitive, sensitiveDiff(git!, t, sensitive ?? CHECK_AFFECTING), touched.length > 1)) console.log(`  ${line}`);
         }
       }
 
@@ -872,15 +876,15 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         console.log();
       }
 
-      for (const branch of decision.branches) {
-        const stat = diffStat(run, branch);
+      for (const branch of git ? decision.branches : []) {
+        const stat = diffStat(git!, branch);
         console.log(`  ${branch}${stat ? `  —${stat}` : ''}`);
 
         // Markdown a step ADDED is a message written for whoever reads next, and today that is
         // you. Source it added is in the diff, where source belongs.
-        const notes = artifacts(run, branch).filter((f) => f.endsWith('.md') && !f.includes('/'));
+        const notes = artifacts(git!, branch).filter((f) => f.endsWith('.md') && !f.includes('/'));
         for (const file of notes) {
-          const text = readArtifact(run, branch, file).trimEnd();
+          const text = readArtifact(git!, branch, file).trimEnd();
           const lines = text.split('\n');
           console.log(`\n  ── ${file} ${'─'.repeat(Math.max(0, 64 - file.length))}`);
           for (const l of lines.slice(0, 120)) console.log(`  ${l}`);
@@ -890,7 +894,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
 
       // Worked on the base branch itself (`--no-worktree`): `merge --no-ff main` into main is nothing, `branch -D main` is not a command
       // to print beside it, and a standing would read `main is on main`. What there is to decide is still said, below.
-      if (decision.direct) {
+      // A folder run has no branch to stand anywhere: its work is in its steps' folders, and what they named is listed above.
+      if (!git) {
+        console.log(`\n  worked in folders, with no git repository: ${run.workspace}, a folder per step; nothing to merge`);
+      } else if (decision.direct) {
         console.log(`\n  worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`);
         console.log(`  read it    git -C ${run.repo} diff ${run.baseRef}...${run.branch}`);
       } else if (standings.length) {
@@ -913,6 +920,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // And where no step of the workflow merges (`merges`), the commands a person runs by hand: this folder says nothing about what
       // happens when the work is done, whether its last step was gated or not, and its branch is still a person's to land or drop.
       // None for a run that worked on the base branch itself: there is nothing to merge, and its own lines are above.
+      // A folder run's work is kept where it is until a person is done with it: there is nothing to land, and forgetting it is the one command.
+      if (!git) return console.log(`\n  done with it   wf rm ${run.id}  — forgets the run with its folders and files`);
       const first = decision.branches[0];
       if (first && !merges(steps) && !decision.direct) {
         console.log(`\n  ship it   git -C ${run.repo} merge --no-ff ${first}`);

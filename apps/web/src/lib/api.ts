@@ -3,10 +3,15 @@ import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 /** Mirrors `RunStatus` in apps/api/src/app.ts: where `assess` puts the run. */
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled';
 
+/** Mirrors `PlaceKind` in agent-workflows' run.ts: the kind of workspace a run's steps work in — git's worktrees, or folders the run makes. */
+export type PlaceKind = 'git' | 'folder';
+
 /** Mirrors `RunSummary` in apps/api/src/app.ts. */
 export type RunSummary = {
   id: string;
-  repo: string;
+  /** The repository a git run is about; null for a folder run (`place`), which has none. */
+  repo: string | null;
+  place: PlaceKind;
   brief: string;
   /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */
   workflowDir: string;
@@ -52,7 +57,7 @@ export type RunToDecide =
    * `back` are the steps a send-back goes to (`sendBackTo`): the step itself once it has a task, the work an ending waits on before it
    * is filed. `onto` is the base branch the run's result is on its way to. What the Factory's card answers the gate with, off the list.
    */
-  | { kind: 'approve'; step: string; says: string | null; back: string[]; onto: string; said: string; command: string }
+  | { kind: 'approve'; step: string; says: string | null; back: string[]; onto: string | null; said: string; command: string }
   | { kind: 'git'; branches: string[]; said: string; command: string };
 
 /**
@@ -224,11 +229,13 @@ export type StepTry = {
 export type RunDetail = {
   id: string;
   brief: string;
-  repo: string;
+  /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run (`place`), which has none. */
+  repo: string | null;
+  place: PlaceKind;
   workflowDir: string;
-  baseRef: string;
-  branch: string;
-  isolate: boolean;
+  baseRef: string | null;
+  branch: string | null;
+  isolate: boolean | null;
   createdAt: string;
   cancelledAt: string | null;
   /** As on `RunSummary`. */

@@ -1311,6 +1311,42 @@ holds its gate on the merge and nothing else, so when git already has its result
 has made that merge by hand: the run has shipped as git reads it, and its children start. Held back, they
 would wait for ever, since the approval that would release them is refused with nothing left to merge.
 
+## A run with no repository: `workspace: folder`
+
+A team whose work is not code needs no git repository, and a run of it runs no git. `workspace:` names a kind of
+workspace; `folder` is the first beside git's worktrees (and `main`, the checkout an ending runs in), and `workflows/note/` is
+the example team:
+
+```md
+---
+workspace: folder
+agent: note-writer
+---
+```
+
+- **A team is of one kind.** Every step says `workspace: folder`, or none does; a folder that mixes them is refused
+  when it is loaded, since the kind is the run's, not the step's.
+- **The record says so.** `wf start` freezes `place: { kind: 'folder' }` on the run, with no `repo`, `baseRef`, `branch`
+  or `isolate`; a record without `place` is a git run, as every record before it was. Its workspace is
+  `runs/<id>/work`, in the store, and nothing reads the directory `wf start` was typed in.
+- **Refused at start**, exit 2, before anything is written: `--repo` named on the command line, on a brief or an inbox card
+  (a card's own `repo:` is not looked at, as the directory typed in is not), `--no-worktree` (there is
+  no branch to work on in place), and `--after`, on either side — a folder run ships nothing git could see merged.
+- **Each step works in a folder of its own**, `runs/<id>/work/<step>`, made empty as it is filed — except a step that
+  continues another's session (a chain, `inherit`), which works in that step's folder, since a harness session belongs to
+  its directory. A fork and a fan-in start empty: nothing is merged, and what came before reaches them as declared output
+  (`input:`), collected artifacts, and the folders' paths, which their brief names to read and leave as they are.
+- **The briefs speak of folders** — where the step works, its files without "committed", its closeout without a hand-off
+  commit — and never of git, a branch or a worktree.
+- **Handing off is collecting.** A finished step's artifacts are copied into `runs/<id>/artifacts/<step>/`, as for any
+  run; there is nothing to commit.
+- **Deciding.** A finished folder run is awaiting with no branches: `wf decide` names its folders and offers `wf rm`,
+  never a git command, and the board reads its repository, base and branch as null. `wf rm` removes `runs/<id>/` with
+  the record, and runs no git.
+
+What is not there yet: an inbox card or the board starting a folder team (a card still names a repository), folders kept
+or cleaned on a lifetime of their own, the Factory drawing a run's workspace, and connections to anything off the machine.
+
 ## A gate: a handoff that waits for a person — `gate:`, `--gate` and `wf approve`
 
 A plan read before anyone implements it was held by prose. `dev-planned`'s plan signs off `blocked` when its brief says to wait,
@@ -1988,7 +2024,7 @@ The store, under `WF_ROOT` (`~/.agent-workflows` unless it is set):
 | path | |
 |---|---|
 | `runs/<id>.json` | a run's record, the tick's to write — `slotHeldAt` among it, once the cap on runs in flight held the run, and `gates` from its start; beside it, a person's facts in files of their own: `<id>.cancelled`, `<id>.asks/` — retry and round asks, and approvals at a gate |
-| `runs/<id>/` | the run's own files, outside every workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/` |
+| `runs/<id>/` | the run's own files, outside every git workspace: `inputs/` (`wf start --input`) and `artifacts/<step>/`; a folder run's (`workspace: folder`) steps work here too, in `work/<step>/` |
 | `inbox/` | cards before they are started, one `<name>.md` each (`wf inbox`); a card started leaves it |
 | `queue/` | a queued card's last start that did not happen, `<name>.json`, the tick's to write: the card's text, the repository tried, why, and whether it was a refusal |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |

@@ -40,8 +40,8 @@ export type WorkflowStepSpec = {
   after: string[];
   resume: string | null;
   input: string[];
-  /** `workspace: main`: the step runs in the repository's own checkout. Null for a step without the line, which is the only other thing a step can say. */
-  workspace: 'main' | null;
+  /** `workspace: main`: the step runs in the repository's own checkout; `folder`: in a folder the run makes, in a run with no repository. Null for a step without the line. */
+  workspace: 'main' | 'folder' | null;
   /** `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can say. */
   slot: 'none' | null;
   /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */

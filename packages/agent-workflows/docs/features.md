@@ -26,7 +26,8 @@ the engine's `priority` and `remoteControl` put to use: a run in flight filed ab
 its package half) — and the workflow builder's package half: a step rendered back to markdown and a folder written from its steps
 (`renderStep`, `writeWorkflow`, §4) — and the builder on the board, which writes a folder of yours from its blocks and edges (§4, its board
 half) — and the web app's components on shadcn's React Aria base (§7) — and the end of a run as a step of its
-workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — have shipped.
+workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — and, since, a run
+with no repository (`workspace: folder`, P2's first slice) — have shipped.
 
 ## Shipped: the check
 
@@ -3616,6 +3617,34 @@ is the account.
 - **Tried live** on 2026-09-19 against two real cards, each asked twice, with the record in a job's temp directory; the
   second asking made 0 requests. `card-p06.md` stayed in the inbox, unsure about planning first (P 0.74).
   `card-agents-board.md` mapped to `dev-planned-build`. The thresholds have not been measured on held-out cards.
+## Shipped: a run with no repository — `workspace: folder` (P2, its first slice)
+
+The first slice of P2 in `docs/pivot-2026-09-18.md`, "a workspace is a choice". The owner's word at the plan gate: `workspace:
+folder`, the first of a family of kinds; the record freezes `place: { kind: 'folder' }`; a record without `place` is a git run, and
+the git words are not renamed. No change to `packages/agent-engine`: a task's `cwd` was all a folder needed.
+
+- **The word** (`workflow.ts`). `workspace: folder` on every step or none, refused at load when mixed; `isFolderTeam`.
+- **The run** (`run.ts`). `Run` is `GitRun | FolderRun`; `placeOf`, `isGitRun`. The git-only readers take a `GitRun`, so every
+  caller says what a folder run gets. `places.ts` holds the folder kind — make a step's folder, hand off — and reads no git.
+- **Start** (`runner.ts`, `cli.ts`). A folder team's record has `place` and `workspace: runs/<id>/work`; `--repo` named,
+  `--no-worktree` and `--after` (both sides) are refused with exit 2. The careful reading: only a repository a person *named* is
+  refused — on a brief or an inbox card (`startFromInbox`, found by review); the cwd default, a card's own `repo:` (the board writes one on
+  every card it files) and the repo a plan or the api pass are not looked at.
+- **Briefs** say folder words and never git's (a test holds them to none of `git`, `branch`, `commit`, `worktree`, `repositor`).
+- **Deciding and forgetting.** `wf decide` names the folders and offers `wf rm`; `wf start` says a folder per step; `wf rm`
+  removes `runs/<id>/`.
+- **`workflows/note/`**: write → review, with `note-writer` and `note-reviewer` in `workflows/agents/` and a schema each.
+- **The board** tolerates a folder run: the api's repo, base, branch and isolate are null with `place`, the web's mirror types
+  them so, and a run card says `folders` where it named a repository (`apps/api/test/folder-run.test.ts`).
+- **Tests.** `test/folder.test.ts` starts, advances, decides and forgets a folder run from a directory that is no repository, with
+  a `git` first on PATH that fails and logs each call, and reads that none was made; one git team shows the stub records. The
+  shipped folders' runs are pinned unchanged (`git-before-after.test.ts`).
+
+Not verified live: a `claude --bg` session filed in a folder that is not a git repository. The engine takes any `cwd`; no real
+session has run in one.
+
+**Next, in order:** (2) the inbox and the board start a folder team — a card needs no `repo:`; (3) a folder's lifetime — kept,
+cleaned, or none at all; (4) the Factory draws a run's workspace; (5) connections (P3), and a GitHub kind beside `folder`.
 
 ## 1. A run that grows steps from a plan
 

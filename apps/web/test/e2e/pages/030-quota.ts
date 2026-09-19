@@ -1,17 +1,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { themeOf } from '../board.ts';
+import { recordedUsage, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
 import { expectCount, expectTexts, expectVisible, settled } from '../checks.ts';
 import { QUOTA } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { API, OUT, store } from '../world.ts';
-
-/** Claude Code 2.1.278's recorded answers to get_usage (the api's `test/fixtures`), with `@ID@` for the request's id. */
-function recordedUsage(name: 'no-plan' | 'unsupported'): string {
-  const file = path.join(API, 'test', 'fixtures', `get-usage-${name}-2.1.278.json`);
-  return fs.readFileSync(file, 'utf8').replace('"request_id":"usage-1"', '"request_id":"@ID@"');
-}
+import { OUT, store } from '../world.ts';
 
 export default {
   // The subscription's quota over the Factory's floor, as the api asked the e2e's `claude` for it (get_usage): each window's percentage

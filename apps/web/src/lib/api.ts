@@ -1024,13 +1024,15 @@ export type QuotaWindow = { key: string; label: string; usedPercentage: number; 
 
 /**
  * Mirrors `Quota` in apps/api/src/quota.ts: the plan's usage as the api last asked Claude Code for it (`get_usage`), judged at the request —
- * `fresh` to show, `asking`, or `no-plan`, `no-claude`, `timeout`, `failed` or `unknown`, each with `said`, the sentence to show in its
- * place. `last` is the last answer with windows, for the hover only; `keepMs` how long an ask is kept.
+ * `fresh` to show, `asking`, or `no-plan`, `unanswered` (signed in, and Anthropic's usage service gave nothing), `no-claude`, `timeout`,
+ * `failed` or `unknown`, each with `said`, the sentence to show in its place. `last` is the last answer with windows, up to six hours old,
+ * shown dimmed with its time; `againAt` when a read will next ask; `keepMs` how long a good reading is kept.
  */
 export type Quota = {
-  state: 'fresh' | 'asking' | 'no-plan' | 'no-claude' | 'timeout' | 'failed' | 'unknown';
+  state: 'fresh' | 'asking' | 'no-plan' | 'unanswered' | 'no-claude' | 'timeout' | 'failed' | 'unknown';
   askedAt: string | null;
   ageMs: number | null;
+  againAt: string | null;
   subscription: string | null;
   windows: QuotaWindow[];
   last: { askedAt: string; windows: QuotaWindow[] } | null;

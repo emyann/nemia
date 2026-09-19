@@ -14,7 +14,7 @@ import { COLUMN_WIDTH, layers, NODE_WIDTH, ROW_HEIGHT, type Point, type StepEdge
  * one step is final without letting its followers run, while a sibling's session still works. A run is
  * finished once it has stopped moving without running: succeeded; failed at a refused check or a step
  * signed off blocked, whose followers read `waiting` and will never be filed; or cancelled, its stop landed.
- * A person such a run waits on finds it under "Show finished", or on Runs.
+ * A run such a stop leaves waiting on a person stays on the Factory all the same (`floorRuns`); the rest are under "Show finished", or on Runs.
  *
  * A run started `--after` runs that have not shipped is in flight while each may still ship: it moves, since the tick files its roots
  * when they do. Not once one never will without a person (`waiting.onYou`) — no such run, a cancelled one, a branch gone — though
@@ -31,11 +31,12 @@ export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & { waiting?
 export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide | null => run.toDecide ?? null;
 
 /**
- * Whether the run waits on a person: a step does (`waitingOnYou`), or a run it waits on never ships without one — what `wf ls` prints
- * `→ waiting on you` for, either way.
+ * Whether the run waits on a person: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
+ * waits on never ships without one — what `wf ls` prints `→ waiting on you` for, either way. Not once it is cancelled: a cancelled run
+ * waits on nobody, whatever its steps last said.
  */
-export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou'> & { waiting?: RunSummary['waiting'] }): boolean =>
-  run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou);
+export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & { waiting?: RunSummary['waiting'] }): boolean =>
+  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou));
 
 /**
  * Who a run waits on, as `wf ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's `onYou`; and for
@@ -59,16 +60,25 @@ export const onYouOf = (run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readon
 export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
   run.cancelledAt ? 'cancelled' : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
 
-type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after'> & { toDecide?: RunToDecide | null };
+type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {
+  toDecide?: RunToDecide | null;
+};
 
 /**
  * The runs on the Factory's floor, oldest first: every run when finished runs are asked for; otherwise every run in flight, every run
- * nobody has decided (`toDecideOf`), and each finished run that a run in flight waits on (`after`), so the edge into it leaves from a card.
+ * nobody has decided (`toDecideOf`), every run that waits on a person (`waitsOnYou`), and each finished run that a run in flight waits on
+ * (`after`), so the edge into it leaves from a card.
  *
  * A run to decide stays on the floor whatever "Show finished" says, and until it is decided. Nothing of it moves, so `inFlight` has it
  * finished and the switch would hide it: a run that finished with its ending waiting for a word, or its branch waiting for a merge, would
  * step off the board the moment it wanted a person most — which is the pain §8 was registered as. Level-triggered, as the api reads it:
  * the card goes when the approval or the merge is given, with nothing told to the board.
+ *
+ * So does a run that waits on a person anywhere else: a step at its gate in the middle of the run, or one that signed off blocked and
+ * asks something. The api reads such a run `failed` — a step stops its followers and nothing runs — with nothing to decide about its
+ * result, so neither `inFlight` nor `toDecideOf` keeps it, and it vanished the moment its plan reached its gate. It stays until the
+ * approval or the answer is given; a cancelled run waits on nobody, and is not kept by this. The header's `waiting on you` counts the
+ * same runs (`waitsOnYou`), so each one it counts has its card on the floor.
  *
  * The finished card, and not a stub: it is dimmed as a finished card is, it says what the run was for and whether it shipped or was
  * called off, and it opens into the run's steps — a stub would say only an id, and send a person to Runs to learn the rest. One level: a
@@ -76,7 +86,7 @@ type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'wai
  */
 export function floorRuns<T extends FloorRun>(runs: readonly T[], showFinished: boolean): T[] {
   const waitedOn = new Set(runs.filter(inFlight).flatMap((run) => run.after));
-  return byAge(runs).filter((run) => showFinished || inFlight(run) || toDecideOf(run) !== null || waitedOn.has(run.id));
+  return byAge(runs).filter((run) => showFinished || inFlight(run) || toDecideOf(run) !== null || waitsOnYou(run) || waitedOn.has(run.id));
 }
 
 /** An edge between two cards on the Factory: from a run to one that waits on it. Dashed, to come, until the child starts; solid once it has. */

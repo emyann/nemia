@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, Refused, watch } from './checks.ts';
 import { DIAMOND } from './seed.ts';
-import { store } from './world.ts';
+import { API, store } from './world.ts';
 
 /** The menu's places, in its order: the Inbox first. */
 export const PLACES = ['Inbox', 'Factory', 'Runs', 'Workflows', 'Agents', 'Capabilities'];
@@ -91,4 +91,10 @@ export async function expectSource(file: Locator, body: Locator, onDisk: string)
   await toggle.click();
   await expectCount(source, 0, 'pressed again, Source gives the rendered page back');
   await expectVisible(body, 'the body rendered again');
+}
+
+/** Claude Code 2.1.278's recorded answers to get_usage (the api's `test/fixtures`), with `@ID@` for the request's id: what the quota pages write. */
+export function recordedUsage(name: 'no-plan' | 'unsupported' | 'unanswered'): string {
+  const file = path.join(API, 'test', 'fixtures', `get-usage-${name}-2.1.278.json`);
+  return fs.readFileSync(file, 'utf8').replace('"request_id":"usage-1"', '"request_id":"@ID@"');
 }

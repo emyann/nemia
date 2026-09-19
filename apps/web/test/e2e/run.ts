@@ -1688,6 +1688,15 @@ const PAGES: PageSpec[] = [
       const { over, held, asks: askingStep } = COSTLY;
       await expectCount(page.getByText(/no longer reads as a workflow|has changed since this run started/), 0, 'no warning about the workflow folder: it reads as the budgets the run froze');
       await expectVisible(page.locator('article header [data-run-cost]', { hasText: `cost ${COSTLY.cost}` }), `the run's header says what it cost (${COSTLY.cost})`);
+      // Beside it, what the same sessions read: the classes every one of them measured, and the resumed session that rebuilt its cache.
+      const runRead = page.locator('article header [data-run-read]');
+      await expectVisible(runRead.locator('.font-mono', { hasText: COSTLY.read.run }), `and what its sessions read, by price (${COSTLY.read.run})`);
+      await expectVisible(runRead.locator('[data-rebuilt="1"]', { hasText: COSTLY.read.rebuilt }), 'and that a resumed session rebuilt its cache, in words that say so');
+      await expectCount(runRead.locator('[data-peak]'), 0, "no peak on the run's: review's Codex sessions measured none");
+      // palette's section: its peak past 200k with no cap, marked.
+      const palette = page.locator(`section#step-${COSTLY.asks.step}`);
+      await expectVisible(palette.locator('dd [data-read]', { hasText: COSTLY.read.palette.counts }), `${COSTLY.asks.step}'s section says what its session read (${COSTLY.read.palette.counts})`);
+      await expectVisible(palette.locator('[data-peak="large"]', { hasText: COSTLY.read.palette.peak }), `and marks its peak, past 200k with no cap`);
       // Whole: implement and review did their work, and are held on implement's budget alone — the reason has to be among those the banner gives.
       const reasons = `Waiting on you: ${COSTLY.steps.join(', ')} — signed off blocked, unsigned, refused by its check, waiting at its gate, out of rounds, or past its budget — wf decide ${COSTLY.id}`;
       await expectVisible(page.locator('section[aria-label="Waiting on you"] > p', { hasText: reasons }), `the banner says every step past its budget waits on you, and why: ${reasons}`);
@@ -1810,6 +1819,9 @@ const PAGES: PageSpec[] = [
       const inspector = page.locator(`aside[aria-label="Step ${over.step}"]`);
       await expectVisible(inspector.locator('[data-spent="over"]', { hasText: over.of }), `the inspector's Details say what ${over.step}'s tries cost of its cap (${over.of}), red past it`);
       await expectVisible(inspector.locator('[data-state="over-budget"]', { hasText: over.status }), `and its word, ${over.status}`);
+      // And what its try read: its peak at its `context: 200k` cap, and its resumed session's rebuilt cache, each marked.
+      await expectVisible(inspector.locator('[data-peak="cap"]', { hasText: COSTLY.read.tokens.peak }), `the inspector marks ${over.step}'s peak at its cap (${COSTLY.read.tokens.peak})`);
+      await expectVisible(inspector.locator('[data-rebuilt="1"]', { hasText: COSTLY.read.rebuilt }), `and says its resumed session rebuilt its cache`);
       await settled(page);
       await expectInside(graph.locator('.react-flow__node'), graph.locator('.react-flow'), 'every step is on the canvas beside the open inspector');
     },

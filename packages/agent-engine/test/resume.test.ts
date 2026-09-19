@@ -109,7 +109,7 @@ test("a session resumed under the same id is read for its new attempt: its own c
     await engine.tick();
     const [was] = (await engine.view(first)).state.attempts;
     assert.deepEqual(was?.closeout, { outcome: 'done', by: 'first' });
-    assert.deepEqual(was?.usage, { turns: 2, toolCalls: 2, inputTokens: 200, outputTokens: 10 });
+    assert.deepEqual(was?.usage, { turns: 2, toolCalls: 2, inputTokens: 200, uncachedTokens: 20, cacheWriteTokens: 0, cacheReadTokens: 180, outputTokens: 10, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 });
 
     // The retry continues that session, and the harness keeps its id.
     const retry = await engine.file({ brief: 'give your closeout', cwd: tmp('cwd'), closeoutSchema: schema, resumeFrom: row!.sessionId });
@@ -120,7 +120,7 @@ test("a session resumed under the same id is read for its new attempt: its own c
 
     // Listed final before it has written a word, to a view: the first try's read is not this attempt's.
     claude.set(resumed!.name, { state: 'done' });
-    assert.deepEqual((await engine.view(retry)).usage, { turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 }, "nothing since its own start — not the first try's count");
+    assert.deepEqual((await engine.view(retry)).usage, { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 }, "nothing since its own start — not the first try's count");
 
     // It carries on, gives a closeout of its own, and is listed done — in three responses, where the first try took two,
     // so a record of the first try's count cannot pass for the retry's.
@@ -133,7 +133,7 @@ test("a session resumed under the same id is read for its new attempt: its own c
     const [is] = v.state.attempts;
     assert.deepEqual(is?.closeout, { outcome: 'done', by: 'retry' }, "its own statement, not the first try's");
     assert.notDeepEqual(is?.usage, was?.usage, "not the first try's count");
-    assert.deepEqual(is?.usage, { turns: 3, toolCalls: 2, inputTokens: 300, outputTokens: 15 }, 'only the responses since its own start');
+    assert.deepEqual(is?.usage, { turns: 3, toolCalls: 2, inputTokens: 300, uncachedTokens: 30, cacheWriteTokens: 0, cacheReadTokens: 270, outputTokens: 15, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 }, 'only the responses since its own start');
   });
 });
 
@@ -150,7 +150,7 @@ test('a statement read as nothing from a final sighting is read again once the t
 
     // Listed final between two turns, for one observation, and seen only by a view: nothing said yet.
     claude.set(row!.name, { state: 'done' });
-    assert.deepEqual((await engine.view(id)).usage, { turns: 1, toolCalls: 1, inputTokens: 100, outputTokens: 5 });
+    assert.deepEqual((await engine.view(id)).usage, { turns: 1, toolCalls: 1, inputTokens: 100, uncachedTokens: 10, cacheWriteTokens: 0, cacheReadTokens: 90, outputTokens: 5, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 });
     // Kept while the transcript says it has not been written since — shown by writing and putting the mtime back.
     append(row!.sessionId, response('msg_2', { type: 'text', text: 'the background task finished' }));
     age(row!.sessionId, 30_000);
@@ -164,6 +164,6 @@ test('a statement read as nothing from a final sighting is read again once the t
     assert.equal(v.state.settled, 'succeeded');
     const [a] = v.state.attempts;
     assert.deepEqual(a?.closeout, { outcome: 'done' }, 'found, not the nothing read before it was made');
-    assert.deepEqual(a?.usage, { turns: 3, toolCalls: 2, inputTokens: 300, outputTokens: 15 });
+    assert.deepEqual(a?.usage, { turns: 3, toolCalls: 2, inputTokens: 300, uncachedTokens: 30, cacheWriteTokens: 0, cacheReadTokens: 270, outputTokens: 15, peakContextTokens: 100, firstContextTokens: 100, firstCacheWriteTokens: 0 });
   });
 });

@@ -426,10 +426,14 @@ const CODEX_SAID_ITEMS: readonly string[] = ['agent_message'];
  * `cache_write_input_tokens` was 0 in every one, so whether `input_tokens` counts it is unknown, and a
  * stream where it is not 0 gives no input count. Tool calls are the call items, counted once by id.
  * No `turns` — it counts model responses, which the stream does not report — and no cost.
+ *
+ * The input's classes follow from the same counts: `cached_input_tokens` read from the cache, the rest of `input_tokens`
+ * uncached, and `cache_write_input_tokens` — 0, as the stream says — written. No peak: a `turn.completed` totals every
+ * response of a prompt, and the stream reports none alone (the rollout's `token_count` events do; not read here).
  */
 export const codexOutput = (output: string): HarnessOutput => {
   let started = 0;
-  const completed: Array<{ input?: number; output: number } | null> = [];
+  const completed: Array<{ input?: number; read?: number; output: number } | null> = [];
   const calls = new Set<string>();
   let uncounted = false;
   for (const line of output.split('\n')) {
@@ -441,7 +445,12 @@ export const codexOutput = (output: string): HarnessOutput => {
       const count = (key: string) => (typeof event.usage?.[key] === 'number' ? (event.usage[key] as number) : undefined);
       const input = count('input_tokens');
       const out = count('output_tokens');
-      completed.push(input === undefined || out === undefined ? null : { input: count('cache_write_input_tokens') ? undefined : input, output: out });
+      const read = count('cached_input_tokens');
+      completed.push(input === undefined || out === undefined ? null : {
+        input: count('cache_write_input_tokens') ? undefined : input,
+        ...(read !== undefined && read <= input && count('cache_write_input_tokens') === 0 ? { read } : {}),
+        output: out,
+      });
     } else if (event.type === 'item.started' || event.type === 'item.completed') {
       const { id, type } = event.item ?? {};
       if (typeof id !== 'string' || typeof type !== 'string') continue;
@@ -451,10 +460,13 @@ export const codexOutput = (output: string): HarnessOutput => {
   }
   if (started === 0 && completed.length === 0) return {};
   const turns = completed.length === started && completed.every((c) => c !== null)
-    ? (completed as Array<{ input?: number; output: number }>) : undefined;
+    ? (completed as Array<{ input?: number; read?: number; output: number }>) : undefined;
+  const sum = (key: 'input' | 'read') => turns!.reduce((n, t) => n + t[key]!, 0);
   const usage: Usage = {
     ...(uncounted ? {} : { toolCalls: calls.size }),
-    ...(turns?.every((t) => t.input !== undefined) ? { inputTokens: turns.reduce((n, t) => n + t.input!, 0) } : {}),
+    ...(turns?.every((t) => t.input !== undefined) ? { inputTokens: sum('input') } : {}),
+    ...(turns?.every((t) => t.input !== undefined && t.read !== undefined)
+      ? { uncachedTokens: sum('input') - sum('read'), cacheWriteTokens: 0, cacheReadTokens: sum('read') } : {}),
     ...(turns ? { outputTokens: turns.reduce((n, t) => n + t.output, 0) } : {}),
   };
   return Object.keys(usage).length ? { usage } : {};
@@ -674,14 +686,20 @@ export const codex: HarnessSpec = {
  * What the session cost is its `total_cost_usd`, and the time it waited on the API its `duration_api_ms` (2.1.272). The
  * cost is the process's own: a `claude -p --resume` printed $0.0042 of its own where the session it continued had
  * spent $0.018 — so it is the attempt's own, as the Claude runner's difference is. The result counts no tool time, and
- * its turns and tokens are not read here: its `usage` said 0 tokens beside a `modelUsage` that counted thousands.
+ * its turns are not read here: `num_turns` counts prompts' turns, not responses.
+ *
+ * Its tokens are its `usage`'s, in their classes — `input_tokens` uncached, `cache_creation_input_tokens` written,
+ * `cache_read_input_tokens` read — and the process's own: on 2.1.278 a `--resume` printed a `usage` of 21,402 input
+ * where its `modelUsage` carried its parent's 43,015 on (open issue 4). A `usage` whose input sums to 0 is not a count
+ * — every response reads its prompt — and gives none: 2.1.272 printed one beside a `modelUsage` that counted thousands.
+ * No peak: `usage.iterations` holds the last response alone, not the largest.
  *
  * A session that stopped at its `--max-budget-usd` says so as its `subtype`, `error_max_budget_usd` — measured on 2.1.272
  * at a $0.01 cap: exit 1, `is_error`, `terminal_reason: budget_exhausted`, "Reached maximum budget ($0.01)", and a
  * `total_cost_usd` of $0.018, since the cap is checked after the response that crosses it.
  */
 export const claudeResultOutput = (output: string): HarnessOutput => {
-  let result: { type?: unknown; subtype?: unknown; structured_output?: unknown; total_cost_usd?: unknown; duration_api_ms?: unknown } | undefined;
+  let result: { type?: unknown; subtype?: unknown; structured_output?: unknown; total_cost_usd?: unknown; duration_api_ms?: unknown; usage?: Record<string, unknown> } | undefined;
   for (const line of output.split('\n')) {
     if (!line.includes('"result"')) continue;
     try {
@@ -692,7 +710,13 @@ export const claudeResultOutput = (output: string): HarnessOutput => {
   if (!result) return {};
   const n = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? v : undefined);
   const [costUsd, apiMs] = [n(result.total_cost_usd), n(result.duration_api_ms)];
-  const usage: Usage = { ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
+  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = ['input_tokens', 'cache_creation_input_tokens', 'cache_read_input_tokens', 'output_tokens']
+    .map((key) => n(result.usage?.[key]));
+  const tokens = uncachedTokens !== undefined && cacheWriteTokens !== undefined && cacheReadTokens !== undefined && outputTokens !== undefined
+    && uncachedTokens + cacheWriteTokens + cacheReadTokens > 0
+    ? { inputTokens: uncachedTokens + cacheWriteTokens + cacheReadTokens, uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens }
+    : {};
+  const usage: Usage = { ...tokens, ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
   return {
     ...(result.structured_output != null ? { closeout: { payload: result.structured_output } } : {}),
     ...(Object.keys(usage).length ? { usage } : {}),

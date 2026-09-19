@@ -70,6 +70,10 @@ export const sdkRunner = () => {
                 ...(typeof u?.input_tokens === 'number' && typeof u.output_tokens === 'number'
                   ? { inputTokens: u.input_tokens + (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0), outputTokens: u.output_tokens }
                   : {}),
+                // Its classes only when the SDK gave all three: a class it left out is not measured, not 0.
+                ...(typeof u?.input_tokens === 'number' && typeof u.cache_creation_input_tokens === 'number' && typeof u.cache_read_input_tokens === 'number'
+                  ? { uncachedTokens: u.input_tokens, cacheWriteTokens: u.cache_creation_input_tokens, cacheReadTokens: u.cache_read_input_tokens }
+                  : {}),
                 ...(typeof m.total_cost_usd === 'number' ? { costUsd: m.total_cost_usd } : {}),
               },
             });

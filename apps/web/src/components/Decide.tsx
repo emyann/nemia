@@ -5,7 +5,7 @@ import { askRound, askTry, decisionQuery, type Decidable, type DecideCommand, ty
 import { answersOf, askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
-import { Facts } from './Facts';
+import { Facts, readRows } from './Facts';
 import { Markdown } from './Markdown';
 
 /**
@@ -80,7 +80,7 @@ export function DecideSection({ runId, decision, offers = null }: { runId: strin
 
       <section aria-label="Used" className="space-y-1">
         <h3 className="text-xs font-medium text-neutral-500">Used, over every step's current try — and what every try of the run cost</h3>
-        <Facts rows={[['used', total.used], ['cost', total.cost], ['every try', cost]]} />
+        <Facts rows={[['used', total.used], ['cost', total.cost], ...readRows(total), ['every try', cost]]} />
       </section>
 
       <Commands commands={commands} />

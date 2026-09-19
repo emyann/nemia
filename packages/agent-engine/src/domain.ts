@@ -112,8 +112,32 @@ export type Usage = {
   turns?: number;
   /** Tool calls the model made. Absent when its runner could not count them. */
   toolCalls?: number;
-  /** Every input token the model read, cached ones included. */
+  /**
+   * Every input token the model read, cached ones included: the sum of the three classes below when its runner measured
+   * them, and kept a field of its own so a journal written before they were still folds.
+   */
   inputTokens?: number;
+  /**
+   * The input tokens in their three classes, as the runner measured them — priced some twenty-fold apart, so a sum hides
+   * what an attempt cost: read from the cache, written to it, and neither. Each absent when its runner could not see it.
+   */
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  uncachedTokens?: number;
+  /**
+   * How large the attempt's context got: the largest input — the three classes together — any one of its responses read.
+   * A resumed attempt's first response carries its parent's conversation, so its peak starts where its parent ended.
+   */
+  peakContextTokens?: number;
+  /**
+   * The attempt's first response: the context it read, and how much of it was written to the cache. A continuation's first
+   * response reads its parent's conversation — from the cache, or, where the cache missed, written to it again at a write's
+   * price. Absent where the runner saw no single response.
+   */
+  firstContextTokens?: number;
+  firstCacheWriteTokens?: number;
+  /** How many times the attempt compacted its conversation: past about its window, a session summarises and carries on. Absent where none was seen. */
+  compactions?: number;
   outputTokens?: number;
   /**
    * What the session cost, in dollars, as its harness priced it — never computed here from tokens. Claude Code writes a

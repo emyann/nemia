@@ -41,14 +41,22 @@ running, then removed. One kind is left there, stopped: a task that asked for a 
 need that work somewhere else first. A session whose task a person or a deadline settled before the
 `settled` entry carried its id stays listed too, since `ae logs` could not read it once removed.
 
-### 4. `claude-detached` measures its cost, and no turns, tokens or tool calls
+### 4. `claude-detached` measures its cost and tokens, and no turns or tool calls — and a resumed one's cost is not its own
 
 `agent-engine/src/runner-detached.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
 `total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
-prints. Its turns, tokens and tool calls are not. The object carries `num_turns` and a `usage`, but on 2.1.272 that `usage`
-counted 0 input and 0 output tokens in a run whose `modelUsage` counted thousands, so neither is read until what each counts
-is measured; it has no count of tool calls, and no tool time. Low priority: this harness exists for comparison — and, since
-only `claude -p` keeps a spend cap (issue 17), for a task that must not spend past one.
+prints. Its tokens are read from the same object's `usage`, in their three classes, since 2026-09-19: on 2.1.278 that `usage`
+is the process's own — a `--resume` printed 10 uncached, 21,392 written and 0 read, where its `modelUsage` carried its parent's
+counts on. On 2.1.272 the same `usage` had counted 0 input and 0 output tokens in a run whose `modelUsage` counted thousands,
+so a `usage` whose input sums to 0 gives no tokens. It has no peak context (`usage.iterations` holds the last response
+alone), no count of turns or tool calls, and no tool time.
+
+**A resumed `claude -p`'s cost is carried on, on 2.1.278.** The same `--resume` printed a `total_cost_usd` of $0.0900: its
+parent's $0.0471 and its own $0.0430 together. The engine records it as the attempt's own, as 2.1.272 made it ($0.0042 of its
+own over a parent's $0.018). Not fixed: its own share cannot be read off the result alone — its `modelUsage` is carried on
+too, and the engine prices nothing — and the parent's total is on the parent's attempt, which the runner is not handed.
+Low priority: this harness exists for comparison — and, since only `claude -p` keeps a spend cap (issue 17), for a task
+that must not spend past one.
 
 ### 5. An unstartable first attempt of a continuation retries cold
 

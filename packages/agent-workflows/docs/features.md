@@ -3439,8 +3439,12 @@ The folder is picked from a card's words before any work exists; what the work t
 What it leaves:
 
 - **The paths are a list in a line.** A new app the e2e reads, or a new root file the build reads, is added to that line by hand.
-- **A merge that brings a change to the packages only** is not built, though the api the e2e serves imports them; the api's and the
-  packages' own suites are what judge it.
+- **A change to the packages only is not built or visited, though the e2e reads them.** The api takes the board's words from
+  agent-workflows (`toDecideWords`, `waitWord`, `timeline`, `listing`), and `apps/web/test/e2e/run.ts` runs `bin/wf.ts decide` itself and
+  checks what it prints: a `dev` run that rewords one of those in `packages/agent-workflows/src` passes its check and breaks the e2e on
+  main. Leaving `packages/` out was the ask's choice (§6, P0.6: the packages' sources reach no browser); adding
+  `packages/agent-workflows/src/` to the line's paths is the one-word change if a person decides otherwise, at the cost of a build and an
+  e2e on most package runs.
 
 ## 1. A run that grows steps from a plan
 

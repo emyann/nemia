@@ -88,7 +88,7 @@ const SKIPPED = 'no build, no e2e';
 test('dev and dev-planned judge implement by the same line: the suite and the types, then the build and the e2e on what git says was touched', () => {
   assert.equal(checkOf('dev-planned'), DEV, "dev-planned's implement is judged as dev's");
   assert.ok(DEV.startsWith('npm test && npm run typecheck && '), DEV);
-  assert.ok(DEV.includes('git diff --name-only "$range"'), DEV);
+  assert.ok(DEV.includes('git -c core.quotePath=false diff --no-renames --name-only "$range"'), DEV);
   assert.ok(DEV.includes('range="$WF_BASE_REF...HEAD"') && DEV.includes('range=HEAD...MERGE_HEAD'), DEV);
   // The folders a person picks for the build keep it whatever was touched: they asked for it.
   for (const folder of ['dev-build', 'dev-planned-build', 'ui']) assert.equal(checkOf(folder), 'npm test && npm run typecheck && npm run build && npm run e2e', folder);
@@ -114,6 +114,25 @@ test('as a check: a branch that touches only the packages, the docs or the workf
   assert.doesNotMatch(r.stdout, BUILT);
   assert.doesNotMatch(r.stdout, E2E);
   assert.ok(r.stdout.includes(SKIPPED), r.stdout);
+});
+
+test('as a check: a file moved out of the web app, or one whose name is not ASCII, counts as touching it', () => {
+  // A rename is listed by its new path alone under git's default rename detection, and a non-ASCII path is quoted: either would read
+  // as a change to the packages only.
+  const { repo, base } = branched(['apps/web/src/lib/shared.ts']);
+  git(repo, 'checkout', '-q', '-b', 'moved');
+  fs.mkdirSync(path.join(repo, 'packages', 'shared'), { recursive: true });
+  git(repo, 'mv', 'apps/web/src/lib/shared.ts', 'packages/shared/shared.ts');
+  git(repo, 'commit', '-q', '-m', 'move it out');
+  const moved = git(repo, 'rev-parse', 'work');
+  const r = asCheck(repo, DEV, moved);
+  assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+  assert.match(r.stdout, BUILT, `a move out of apps/web/ builds\n${r.stdout}`);
+
+  const named = branched(['apps/web/src/routes/café.tsx']);
+  const n = asCheck(named.repo, DEV, named.base);
+  assert.equal(n.status, 0, `${n.stdout}\n${n.stderr}`);
+  assert.match(n.stdout, BUILT, `a non-ASCII path under apps/web/ builds\n${n.stdout}`);
 });
 
 test('REFUSED as a check: a build that fails fails the check — the condition swallows nothing', () => {

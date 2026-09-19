@@ -94,8 +94,9 @@ export function RunNode({ data: { run, finished, open, reading, trouble, onToggl
           <span className="truncate font-mono" title={run.id}>
             {run.id}
           </span>
-          <span className="shrink-0" title={run.repo}>
-            {repoName(run.repo)}
+          {/* A folder run has no repository: its steps work in folders the run made (`workspace: folder`). */}
+          <span className="shrink-0" title={run.repo ?? 'Its steps work in folders the run made, with no git repository'}>
+            {run.repo ? repoName(run.repo) : 'folders'}
           </span>
         </p>
         {/* On whom a run started `--after` waits, in `wf ls`'s word — amber when one never ships without you — and what to do, on hover. */}

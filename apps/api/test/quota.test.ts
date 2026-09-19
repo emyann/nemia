@@ -185,15 +185,21 @@ test('REFUSED: an answer to another request — or a line that is not one — is
   assert.equal((asked as { response: { subtype: string } }).response.subtype, 'success');
 });
 
-test('REFUSED: the ask runs without what a Claude Code session hands its children, but with its CLAUDE_CONFIG_DIR, in the temporary directory', async () => {
+test('REFUSED: the ask runs without what a Claude Code session hands its children, but with how it signs in, in the temporary directory', async () => {
   fresh();
-  const env = { ...process.env, CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', CLAUDE_PID: '1' };
-  assert.deepEqual(Object.keys(usageEnv(env)).filter((k) => k.startsWith('CLAUDE')), ['CLAUDE_CONFIG_DIR']);
+  const session = { CLAUDECODE: '1', CLAUDE_CODE_ENTRYPOINT: 'cli', CLAUDE_PID: '1', CLAUDE_CODE_SESSION_ID: 's', AI_AGENT: 'claude-code' };
+  const signIn = { CLAUDE_CODE_OAUTH_TOKEN: 'sk-ant-oat-test', CLAUDE_CODE_USE_BEDROCK: '1' };
+  const env = { ...process.env, ...session, ...signIn };
+  const kept = usageEnv(env);
+  for (const key of Object.keys(session)) assert.equal(kept[key], undefined, key);
+  for (const [key, value] of Object.entries(signIn)) assert.equal(kept[key], value, key);
   await askUsage({ env });
   const ran = lastAskEnv();
   assert.equal(ran.CLAUDECODE, 'unset');
   assert.equal(ran.CLAUDE_CODE_ENTRYPOINT, 'unset');
   assert.equal(ran.CLAUDE_CONFIG_DIR, process.env.CLAUDE_CONFIG_DIR);
+  assert.equal(ran.CLAUDE_CODE_OAUTH_TOKEN, 'sk-ant-oat-test');
+  assert.equal(ran.CLAUDE_CODE_USE_BEDROCK, '1');
   assert.equal(ran.cwd, fs.realpathSync(os.tmpdir()));
   // Started without the user's settings — their plugins, hooks and skills' sync — without MCP servers, and writing no session.
   const started = fs.readFileSync(calls, 'utf8').split('\n').filter((l) => l.startsWith('-p ')).pop();

@@ -3525,8 +3525,9 @@ changed but this file.
 - **The ask** (`apps/api/src/quota.ts`, `askUsage`). The api starts the `claude` on its PATH as `claude -p --input-format stream-json
   --output-format stream-json --verbose --no-session-persistence --strict-mcp-config --setting-sources ''`, writes one
   `control_request` with subtype `get_usage`, reads stdout for the `control_response` whose `request_id` is its own, and closes stdin,
-  which ends the process. No model turn, nothing spent. It runs from `os.tmpdir()`, with every `CLAUDE*` variable of a session around
-  the api dropped but `CLAUDE_CONFIG_DIR`, and is killed at 15 s (SIGTERM, SIGKILL 2 s later).
+  which ends the process. No model turn, nothing spent. It runs from `os.tmpdir()`, with the variables a Claude Code session around
+  the api hands its children dropped by name (`SESSION_KEYS`) and its sign-in and provider kept, and is killed at 15 s (SIGTERM,
+  SIGKILL 2 s later).
 - **The keep** (`readQuota`). The api holds one answer in memory for `QUOTA_KEEP_MS`, 3 min (`HKB_QUOTA_KEEP_MS`; the e2e sets 0),
   with at most one ask in flight, which concurrent reads join. Nothing asks unless a board reads: the web polls every 60 s, every
   2 s while the state is `asking`. 3 min because the header counts the answer's age in minutes and the windows are hours and a week

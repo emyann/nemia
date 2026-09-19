@@ -17,7 +17,7 @@ import os from 'node:os';
  */
 export const QUOTA_KEEP_MS = 3 * 60 * 1000;
 
-/** How long a request waits for an ask before it answers `asking`: the Factory's loader never waits on a slow harness. */
+/** How long a request waits for an ask before it answers `asking`: the Factory's loader waits on a slow harness this long, no longer. */
 export const QUOTA_WAIT_MS = 2_000;
 
 /** How long an ask may take before it is given up on, and its process ended. */
@@ -205,9 +205,30 @@ export function quotaOf(held: Held | null, last: Held | null, now: number, keepM
   }
 }
 
-/** The environment an ask runs in: the api's, without what a Claude Code session hands its children, but for where it keeps its sign-in. */
+/**
+ * What a Claude Code session hands its children, as 2.1.278 does (read off a session's own environment): an api started from one would
+ * otherwise start the ask as that session's child. Named, not matched by prefix: the rest of `CLAUDE*` is how the api's claude signs in
+ * and whom it asks (`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, `CLAUDE_CODE_USE_BEDROCK`…), as it is for the engine's workers.
+ */
+const SESSION_KEYS = new Set([
+  'AI_AGENT',
+  'CLAUDECODE',
+  'CLAUDE_CODE_CHILD_SESSION',
+  'CLAUDE_CODE_ENTRYPOINT',
+  'CLAUDE_CODE_EXECPATH',
+  'CLAUDE_CODE_MESSAGING_SOCKET',
+  'CLAUDE_CODE_MESSAGING_TOKEN',
+  'CLAUDE_CODE_SESSION_ATTENDED',
+  'CLAUDE_CODE_SESSION_ID',
+  'CLAUDE_CODE_SSE_PORT',
+  'CLAUDE_EFFORT',
+  'CLAUDE_JOB_DIR',
+  'CLAUDE_PID',
+]);
+
+/** The environment an ask runs in: the api's, without what a Claude Code session hands its children (`SESSION_KEYS`). */
 export function usageEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  return Object.fromEntries(Object.entries(env).filter(([key]) => !key.startsWith('CLAUDE') || key === 'CLAUDE_CONFIG_DIR'));
+  return Object.fromEntries(Object.entries(env).filter(([key]) => !SESSION_KEYS.has(key)));
 }
 
 /** How long an asked process has, once its stdin is closed, to end of its own before it is killed. */

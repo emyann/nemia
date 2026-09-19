@@ -47,7 +47,8 @@ claude -p --input-format stream-json --output-format stream-json --verbose \
 
 with one `{"type":"control_request","request_id":…,"request":{"subtype":"get_usage"}}` on stdin. It writes no
 transcript, starts no MCP server and loads no settings, so no hook runs; it runs from the temp directory with
-the `CLAUDE*` variables of a session around the api taken out, all but `CLAUDE_CONFIG_DIR`. That claude must be
+the variables a Claude Code session hands its children taken out, should the api run inside one; how it signs in
+(`CLAUDE_CONFIG_DIR`, `CLAUDE_CODE_OAUTH_TOKEN`, a provider's switch) is kept, as the engine's workers keep it. That claude must be
 signed in to the subscription under the api's `CLAUDE_CONFIG_DIR` (`claude`, then `/login`): an API key, Bedrock
 or Vertex has no plan limits to show.
 

@@ -43,7 +43,7 @@ fs.writeFileSync(path.join(bin, 'claude'), [
   `echo "$*" >> '${calls}'`,
   `if [ "$1" = agents ]; then cat '${registry}'; fi`,
   'if [ "$1" = -p ]; then',
-  `  echo "usage-env CLAUDECODE=\${CLAUDECODE-unset} CLAUDE_CODE_ENTRYPOINT=\${CLAUDE_CODE_ENTRYPOINT-unset} CLAUDE_CONFIG_DIR=\${CLAUDE_CONFIG_DIR-unset} cwd=$(pwd -P) pid=$$" >> '${calls}'`,
+  `  echo "usage-env CLAUDECODE=\${CLAUDECODE-unset} CLAUDE_CODE_ENTRYPOINT=\${CLAUDE_CODE_ENTRYPOINT-unset} CLAUDE_CONFIG_DIR=\${CLAUDE_CONFIG_DIR-unset} CLAUDE_CODE_OAUTH_TOKEN=\${CLAUDE_CODE_OAUTH_TOKEN-unset} CLAUDE_CODE_USE_BEDROCK=\${CLAUDE_CODE_USE_BEDROCK-unset} cwd=$(pwd -P) pid=$$" >> '${calls}'`,
   `  case "$(cat '${mode}')" in`,
   '    silent) exec sleep 30 ;;',
   "    exit) echo 'claude: the harness was told to fail' >&2; exit 3 ;;",
@@ -75,7 +75,7 @@ export const asks = (): number => callsOf('-p');
 /** How many asks ended once their stdin was closed. */
 export const asksEnded = (): number => callsOf('usage-ended');
 
-/** What the last ask ran in: `{ CLAUDECODE, CLAUDE_CODE_ENTRYPOINT, CLAUDE_CONFIG_DIR, cwd, pid }`, `unset` for a variable it did not have. */
+/** What the last ask ran in: `{ CLAUDECODE, CLAUDE_CODE_ENTRYPOINT, CLAUDE_CONFIG_DIR, CLAUDE_CODE_OAUTH_TOKEN, CLAUDE_CODE_USE_BEDROCK, cwd, pid }`, `unset` for a variable it did not have. */
 export function lastAskEnv(): Record<string, string> {
   const line = fs.readFileSync(calls, 'utf8').split('\n').filter((l) => l.startsWith('usage-env ')).pop() ?? '';
   return Object.fromEntries(line.slice('usage-env '.length).split(' ').map((kv) => [kv.slice(0, kv.indexOf('=')), kv.slice(kv.indexOf('=') + 1)]));

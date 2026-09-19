@@ -2479,6 +2479,8 @@ What it leaves:
   offers none once approved: that window lasts until the next tick.
 - **A gated step not yet signed off** says `holds once it has signed off` in its facts, and nothing on the canvas.
 - **A phone.** The gate is a form on a page served on this machine, and Remote Control (§2) is what reaches it from elsewhere.
+- **A run held at a mid-run gate reads `failed` on the wire** (`status`, with `moving: false`): `assess` sees a step that stops its followers
+  and nothing running. It should read as waiting on a person, neither running nor finished; the Factory keeps it on its floor meanwhile off `waitsOnYou` (`floorRuns`).
 
 ## Shipped: the workflow builder — steps and their edges drawn on the board, written back as the folder
 

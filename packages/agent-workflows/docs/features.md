@@ -3517,6 +3517,56 @@ What it leaves:
 - **The web app's mirror of `EarlierTry.then`** (`apps/web/src/lib/api.ts`) does not name `signoff`. The api sends it, and the board's
   words come from `tryNote`; the type is a mirror only. Owned by apps/, not changed here.
 
+## Shipped: the subscription's quota on the board
+
+P0.7 of `docs/pivot-2026-09-18.md`. Apps only: nothing in `packages/` changed but this file.
+
+- **The script** (`apps/api/statusline/quota.ts`) is Claude Code's `statusLine` command and the one writer of `$WF_ROOT/quota.json`:
+  `{ written_at, claude_code_version, rate_limits }`, `rate_limits` as the payload had it, through a hidden file renamed over the real
+  one. It can wrap a person's own statusline (the command after it, run with the same stdin, printed first), prints its own
+  `5h 38% · 7d 86% · resets 16:40`, and on any error of its own prints nothing of its own and exits 0. It writes only numbers just
+  heard, so `written_at` is when they were (review, round 1). Claude Code runs a statusline with no answer behind it too: on a repaint,
+  and at a window's reset, where it drops that window and repeats the week as it last heard it. So the script writes nothing
+  - before a session's first answer (no `rate_limits`, `context_window.current_usage` null);
+  - when the session's `cost.total_api_duration_ms` has not moved since it last wrote. `heard` in the file keeps that counter for the
+    last 32 sessions to write, so an idle session's repaint does not put its old numbers over a busier session's newer ones. Two
+    sessions writing in the same instant can lose one's entry, which costs at most one repaint taken as news;
+  - no limits over a reading that has them. A subscriber's session has limits after every answer, so a session without them is an API
+    key, and says nothing of the subscription.
+
+  Nobody's `~/.claude/settings.json` was touched: the block is in `README.md`, *The quota on the board*.
+- **The api** (`GET /api/quota`, `apps/api/src/quota.ts`) reads the file on each request and keeps nothing: `fresh`, `stale` (older
+  than `QUOTA_STALE_MS`, 5 h — one five-hour window, past which the window it reports has certainly turned over), `none` (a session with no
+  limits), `missing`, `unreadable`, each but `fresh` with a sentence saying what to do. A window is `marked` at `QUOTA_MARK_PERCENT`, 80,
+  and `reset` when its `resets_at` has passed since the reading.
+- **The Factory's header** shows each window, its reset in the browser's time zone (a weekday when not today), and the reading's age; a
+  marked window is amber with a warning icon, a reset one says `reset 09:00, not read since` and is not marked. A stale reading shows only
+  its sentence, its numbers on hover. Loaded in the route's loader, and the floor fitted again when the line comes or goes.
+- **Tests.** `apps/api/test/statusline.test.ts` runs the script on a real-shaped payload, none, a wrapped command and an unwritable store,
+  each exiting 0; `quota.test.ts` the route and each state; `apps/web/test/quota.test.ts` the words across time zones. The e2e seeds the
+  file through the script and draws fresh, stale, missing and none in both themes, then puts the file back.
+
+What was verified about the payload, in the Claude Code 2.1.278 binary (`~/.local/share/claude/versions/2.1.278`, its strings), not in
+docs:
+
+- `rate_limits` holds `five_hour` and `seven_day`, each `{ used_percentage, resets_at }`: a percentage 0–100 rounded to 0.1, and
+  `resets_at` in Unix epoch **seconds**. `spend_limit`, of the same shape, only behind a Claude gateway. No `seven_day_sonnet` or
+  `seven_day_opus` in the statusline's payload (the api labels them if a later version adds them), and no `subscription_type`: that and
+  `rate_limits_available` are in the SDK's usage schema, not this one.
+- `rate_limits` is there only for a subscriber, only after the session's first API answer, and each window only while its `resets_at` is
+  still ahead (`resets_at > now`, window by window). The numbers are the process's own, from the last answer's headers. The payload
+  carries `version` and `session_id`; `context_window.current_usage` is null before the first answer; `cost.total_api_duration_ms` is the
+  session's API time, which moves with an answer and nothing else.
+- The setting is `{ type: "command", command, padding?, refreshInterval? (seconds, ≥ 1), hideVimModeIndicator? }`, and Claude Code runs
+  the command again at the nearest `resets_at` of its own accord. So the reading is as fresh as the owner's last interactive turn: a
+  factory of `claude -p` workers never writes it, which is why the bound and the age are on the header.
+
+What a run-level guard ("do not start a run above 90%") would need — out of scope here:
+
+1. A freshness rule for admission: a stale or missing reading must either hold every run or allow them, chosen and said, never read as 0%.
+2. The tick reading `quota.json` level-triggered at each admission, beside the cap — a pure judgement in `assess`, the file read by the runner.
+3. A refusal a person can act on, with the window, its reset and a way past it (a flag of `wf start`, say), shown on the queued card.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

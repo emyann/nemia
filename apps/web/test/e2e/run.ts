@@ -27,7 +27,7 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { CELL_HEIGHT } from '../../src/lib/factory.ts';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { AGENTS, arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, ENDING, FAKE, GATED, HELD, INBOX, LONG_NAMES, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedLongNames, seedQueue, seedWorkflows, SESSION, SHIPPED, UNMERGED, WORKFLOWS } from './seed.ts';
+import { AGENTS, arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, ENDING, FAKE, GATED, HELD, INBOX, LONG_NAMES, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, QUOTA, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedLongNames, seedQueue, seedQuota, seedWorkflows, SESSION, SHIPPED, UNMERGED, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -814,6 +814,67 @@ const PAGES: PageSpec[] = [
       await settled(page);
       await expectClearOfEachOther(page);
       await showFinished(page);
+      await settled(page);
+      await expectClearOfEachOther(page);
+    },
+  },
+  {
+    // The subscription's quota over the Factory's floor, as the statusline script wrote it into the store: each window's percentage and its
+    // reset in the browser's own time, the week marked past 80%, and the reading's age. Then the three cases with nothing to show as now —
+    // stale, missing, and no limits — each read again from the file and said in a sentence. The file is put back as the script wrote it.
+    name: 'quota',
+    route: '/',
+    expect: async (page) => {
+      const file = path.join(store!, 'quota.json');
+      const written = fs.readFileSync(file, 'utf8');
+      const line = page.locator('[data-quota]');
+      const shoot = async (what: string) => {
+        await settled(page);
+        await page.screenshot({ path: path.join(OUT, `factory-quota-${what}-${await themeOf(page)}.png`), fullPage: true });
+      };
+      try {
+        await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows the quota the statusline script wrote');
+        const { rate_limits: limits } = JSON.parse(written) as { rate_limits: Record<'five_hour' | 'seven_day', { resets_at: number }> };
+        // The resets as the browser says a time where it is, to the minute — and the weekday for the week, three days out.
+        const clock = (seconds: number, weekday: boolean) =>
+          page.evaluate(([at, day]) => {
+            const d = new Date(at * 1000);
+            const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+            return day ? `${new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(d)} ${time}` : time;
+          }, [seconds, weekday] as const);
+        const fiveResets = await clock(limits.five_hour.resets_at, false);
+        const weekResets = await clock(limits.seven_day.resets_at, true);
+        await expectTexts(line.locator('[data-quota-window="five_hour"]'), [`5-hour ${Math.round(QUOTA.fiveHour.used)}% · resets ${fiveResets}`], 'the five-hour window, used and when it resets, in the browser’s time');
+        await expectTexts(line.locator('[data-quota-window="seven_day"]'), [`week ${QUOTA.week.used}% · resets ${weekResets}`], 'the week, with the weekday it resets on');
+        await expectCount(line.locator('[data-quota-window="seven_day"][data-marked]'), 1, `the week, ${QUOTA.week.used}% used, is marked`);
+        await expectCount(line.locator('[data-quota-window="five_hour"][data-marked]'), 0, `the five-hour window, ${QUOTA.fiveHour.used}% used, is not`);
+        await expectVisible(line.locator('[data-quota-age]').filter({ hasText: /^read (just now|\d+ min ago)$/ }), 'and how old the reading is');
+        await shoot('fresh');
+
+        // Six hours old: past the bound, a sentence in place of the numbers.
+        const reading = JSON.parse(written) as { written_at: string };
+        fs.writeFileSync(file, JSON.stringify({ ...reading, written_at: new Date(Date.now() - 6 * 3_600_000).toISOString() }));
+        await page.reload({ waitUntil: 'networkidle' });
+        await expectVisible(page.locator('[data-quota="stale"]', { hasText: /^The quota was last read 6 h ago, older than 5 h, so it is not shown: send a message in an interactive claude session/ }), 'a stale reading is said, not shown');
+        await expectCount(page.locator('[data-quota-window]'), 0, 'and none of its numbers read as now');
+        await shoot('stale');
+
+        fs.rmSync(file);
+        await page.reload({ waitUntil: 'networkidle' });
+        await expectVisible(page.locator('[data-quota="missing"]', { hasText: /^No quota read yet: nothing has written .*quota\.json\. To show it, add the statusLine block in README\.md/ }), 'no file says how to install the script');
+        await shoot('missing');
+
+        fs.writeFileSync(file, JSON.stringify({ ...reading, rate_limits: null }));
+        await page.reload({ waitUntil: 'networkidle' });
+        await expectVisible(page.locator('[data-quota="none"]', { hasText: /^No plan limits to show: / }), 'a reading with no limits says so');
+      } finally {
+        fs.writeFileSync(file, written);
+      }
+      await page.reload({ waitUntil: 'networkidle' });
+      await expectCount(page.locator('[data-quota="fresh"]'), 1, 'with the file put back, the header shows the quota again');
+
+      // The header, taller with the quota, leaves every card clear of the one beneath it.
+      await page.getByRole('button', { name: 'Reset layout' }).click();
       await settled(page);
       await expectClearOfEachOther(page);
     },
@@ -3457,6 +3518,7 @@ async function main(): Promise<void> {
   seedWorkflows(checkout, store);
   seedInbox(store, checkout);
   seedQueue(store, checkout);
+  seedQuota(store);
   // After the checkout's files, which its base commits.
   seedDiamond(checkout, store);
   // Over every journal the seed wrote: where the api reads when each task was filed.

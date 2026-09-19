@@ -1017,6 +1017,35 @@ export const ceilingsQuery = queryOptions({
 });
 
 /**
+ * Mirrors `QuotaWindow` in apps/api/src/quota.ts: one limit of the subscription as Claude Code last reported it — `key` Claude Code's, `label`
+ * the board's word, `resetsAt` ISO, `reset` whether that time has passed since the reading, `marked` whether it is used past `Quota.markAt`.
+ */
+export type QuotaWindow = { key: string; label: string; usedPercentage: number; resetsAt: string | null; reset: boolean; marked: boolean };
+
+/**
+ * Mirrors `Quota` in apps/api/src/quota.ts: what the statusline script last wrote to `$WF_ROOT/quota.json`, judged by the api at the request —
+ * `fresh` to show, or `stale`, `none`, `missing` or `unreadable`, each with `said`, the sentence to show in its place.
+ */
+export type Quota = {
+  state: 'fresh' | 'stale' | 'none' | 'missing' | 'unreadable';
+  file: string;
+  writtenAt: string | null;
+  ageMs: number | null;
+  version: string | null;
+  windows: QuotaWindow[];
+  staleAfterMs: number;
+  markAt: number;
+  said: string | null;
+};
+
+/** The subscription's quota, read again every 30 s: it moves no faster than a person's interactive turns. */
+export const quotaQuery = queryOptions({
+  queryKey: ['quota'],
+  queryFn: () => get<Quota>('/api/quota'),
+  refetchInterval: 30_000,
+});
+
+/**
  * Ask for another try of a step, as `wf retry` does: the api calls the package's `retry()`, which writes the ask and nothing else, and the
  * next tick files the try. Resolves with the try asked for, its ask file, and the package's `stopFirst` — the tick stops the step's blocked
  * session before it files the try; rejects with the api's refusal in full — the package's words for a message or a budget that cannot ride

@@ -238,8 +238,9 @@ the loop replaced it, and its three honest answers moved into the contract the r
   target again — its last session continued, handed the looping step's declared output as data, without
   `again` or the summary — then the steps between, then the looping step, as new sessions. `again: false`
   continues to what comes after, or ends the run succeeded.
-- From round 2 the target owes `replies` (`fixed`, or `won't fix` and why), merged into its closeout
-  schema, and the next round's looping step is handed them as data. A target that gives none is `unsigned`.
+- From round 2 the target owes `replies` (`fixed`, or `won't fix` and why), and the next round's looping step
+  is handed them as data. A target that gives none, or an empty list, is `unsigned`. They are in its closeout
+  schema from round 1, where the answer is `[]` and goes nowhere (*one closeout schema for a loop's target*, below).
 - At the cap with `again: true`: `rounds exhausted`, waiting on a person. `wf decide` says so, prints the
   last findings and offers `wf round <run> [<step>]`, which writes `runs/<id>.asks/round-<step>-<n>`,
   honoured once. Refused while a round runs or the run would go round itself, on a loop that ended, on a
@@ -3262,6 +3263,45 @@ What it leaves:
   resolve it — as it does for any parent cancelled under a child. The window is one pass.
 - **An approval given before the hand merge still files ship.** `advance` reads no git for its gate, so an ending approved and then merged
   by hand before the next pass is filed, and its prose finds nothing to merge. The window is one pass; the refusal is at the approval.
+
+## Shipped: one closeout schema for a loop's target, so a continued session keeps its cache
+
+Measured 2026-09-18 over 73 resumed sessions (`docs/pivot-2026-09-18.md` §1, Finding 2; the scripts are
+`docs/pivot-2026-09-18/experiments/cost/resume.py` and `verify.py`): the 29 continuations filed with the same closeout schema as the
+session they continued reused the prompt cache, writing 5–20k tokens each. The 43 filed with a different one rewrote the whole
+conversation, 200k to 640k tokens each, at twenty times the price of reading them: 14.1M tokens, about $134 in six days. The cause was
+`closeoutSchemaOf(step, owesReplies(…))`: a loop's target was filed without `replies` in round 1 and with them from round 2. The schema is
+Claude Code's `StructuredOutput` tool (`--json-schema`), a tool definition sits at the front of the cached prompt, and a changed tool
+invalidates everything after it.
+
+- **`closeoutSchemaOf(step, steps)` reads the frozen workflow, never the round.** A step some step's `loop:` names (`isLoopTarget`) is
+  filed with `REPLIES_SCHEMA` merged on every try — its first filing, a try within a round, a round — so its one session is continued
+  under one tool. The function is not told the round, so it cannot vary with it. `REPLIES_SCHEMA`'s description, which the agent reads,
+  says that in the first round it was handed no findings and answers `[]`; the round-1 brief says so too, under *When you are finished*.
+- **What is owed does not change.** `owedFields` still adds `replies` from round 2 only. There, an empty list is refused as a missing one
+  is: `declaredOutput` counts an empty `replies` as not given, so the step reads `unsigned`, `wf decide` prints `!! declared and not given:
+  replies`, and the looping step's `## Replies from` says the target has not answered. A round whose findings were empty and asked
+  `again` all the same leaves the target nothing to answer: it reads `unsigned` until it signs off `blocked`, and a person decides — the refusal the change asked
+  for, and a case no shipped review should produce.
+- **Round 1's `[]` goes nowhere.** Not a declared output, so no `input:` is handed it; not owed, so `wf decide` does not print it; and the
+  looping step's `## Replies from` reads through `declaredOutput`, so an empty list is never handed on. `run.test.ts` pins each.
+- **The invariant, as a test.** `session-cache.test.ts` walks every shipped folder with a loop — `dev`, `dev-build`, `dev-planned`,
+  `dev-planned-build` and `ui` — through a first try, a nudge, an answer to the blocked try (`wf retry --message`), round 2 and round 3,
+  and a folder whose target declares an `output:` of its own; it fails on any task filed with `resumeFrom` whose `closeoutSchema` (as JSON,
+  byte for byte), `model`, `effort`, `tools`, `disallowedTools` or `permissionMode` is not the task's whose session it continues. On the
+  code before this change it fails on every folder, at round 2's continuation. The comparator is made to refuse a chain filed as before
+  and a change of each other field.
+- **Continuations that may still differ, on purpose.** `resume:` continues another step's session under the resuming step's own schema,
+  model and tools; no shipped folder has one, a loop refuses one, and one that changes any of those pays a cold resume once. A nudge with
+  `wf retry --budget` changes `budgetUsd`, which is not in the prompt.
+- **A run in flight when this lands** was filed in round 1 without `replies`. Its next round continues that session under the new schema
+  and pays one cold resume, once; nothing is migrated, and every continuation after it is warm.
+- The board is unchanged: the api reads a closeout's `replies` off the closeout itself, so a round-1 closeout shows `replies: []` where it
+  showed none. The one api test seed that signed a round-3 target off with `replies: []` now gives one reply.
+- From the root, `npx turbo run test --force`: agent-workflows 622 (620 passed, 2 skipped), from 613 — nine new tests (two in
+  `run.test.ts`, seven in `session-cache.test.ts`) and two changed: round 1's schema, and the load refusal of a target that declares
+  `replies`, whose words no longer say "from round 2". api 210, web 259 and agent-engine 340 (331 passed,
+  9 skipped) unchanged in count. `npm run typecheck` clean in all four.
 
 ## 1. A run that grows steps from a plan
 

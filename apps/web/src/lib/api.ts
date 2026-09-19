@@ -213,7 +213,7 @@ export type StepCheck = {
 export type StepTry = {
   try: number;
   round: number;
-  then: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'signoff' | null;
+  then: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'signoff' | 'back' | null;
   current: boolean;
   taskId: string | null;
   note: string | null;

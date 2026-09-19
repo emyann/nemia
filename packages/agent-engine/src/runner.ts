@@ -545,6 +545,11 @@ const costOf = (before: CostState | undefined, after: CostState | undefined, sin
  * together on any one of the attempt's responses, or on the summary call of any of its compactions, whose context Claude
  * Code writes on the boundary (`compactMetadata.preTokens`: on 25 boundaries read, at or a few thousand past the last
  * response before it). A resumed attempt's first response reads its parent's conversation, and its peak keeps that.
+ *
+ * `compactions` counts the attempt's own boundaries: a session compacts well short of its window (173,584 and 173,254
+ * under a 200k one, open issue 26), so its peak never says it reached it. And the attempt's first response is kept
+ * apart — its context and its cache write — since that is where a continuation either reads its parent's conversation
+ * from the cache or writes it there again.
  */
 export const transcriptUsage = (jsonl: string, since: number): Usage => {
   const responses = new Map<string, { uncached: number; write: number; read: number; output: number } | null>();
@@ -552,7 +557,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
   let before: CostState | undefined;
   let after: CostState | undefined;
   let begun = false;
-  let compacted = false;
+  let compactions = 0;
   // The context each of the attempt's compactions summarised, as Claude Code counted it (`compactMetadata.preTokens`).
   let summarised = 0;
   let name: string | undefined;
@@ -581,7 +586,7 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
       try {
         const entry = JSON.parse(line) as { subtype?: unknown; compactMetadata?: { preTokens?: unknown } } | null;
         if (entry?.subtype === 'compact_boundary') {
-          compacted = true;
+          compactions += 1;
           const pre = entry.compactMetadata?.preTokens;
           if (typeof pre === 'number' && Number.isFinite(pre)) summarised = Math.max(summarised, pre);
         }
@@ -608,6 +613,8 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
   const all = measured.length === counted.length;
   const total = (key: 'uncached' | 'write' | 'read' | 'output') => measured.reduce((t, c) => t + c[key], 0);
   const peak = measured.reduce((most, c) => Math.max(most, c.uncached + c.write + c.read), summarised);
+  const compacted = compactions > 0;
+  const first = counted[0];
   return {
     turns: responses.size,
     toolCalls: toolCalls.size,
@@ -619,6 +626,8 @@ export const transcriptUsage = (jsonl: string, since: number): Usage => {
         }
       : {}),
     ...(all && peak > 0 ? { peakContextTokens: peak } : {}),
+    ...(first ? { firstContextTokens: first.uncached + first.write + first.read, firstCacheWriteTokens: first.write } : {}),
+    ...(compacted ? { compactions } : {}),
     ...costOf(before, after, since, compacted),
   };
 };

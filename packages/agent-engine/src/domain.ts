@@ -129,6 +129,15 @@ export type Usage = {
    * A resumed attempt's first response carries its parent's conversation, so its peak starts where its parent ended.
    */
   peakContextTokens?: number;
+  /**
+   * The attempt's first response: the context it read, and how much of it was written to the cache. A continuation's first
+   * response reads its parent's conversation — from the cache, or, where the cache missed, written to it again at a write's
+   * price. Absent where the runner saw no single response.
+   */
+  firstContextTokens?: number;
+  firstCacheWriteTokens?: number;
+  /** How many times the attempt compacted its conversation: past about its window, a session summarises and carries on. Absent where none was seen. */
+  compactions?: number;
   outputTokens?: number;
   /**
    * What the session cost, in dollars, as its harness priced it — never computed here from tokens. Claude Code writes a

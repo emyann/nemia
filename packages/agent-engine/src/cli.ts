@@ -168,7 +168,8 @@ export const usageLine = (u: Usage | null): string => {
 
 /**
  * What an attempt read, by class, and how large its context got — after its cost, since the classes are what the cost is
- * made of: ` · read 21.4M · wrote 412.0k · uncached 1.2k · peak 167.0k`. Nothing for an attempt whose runner counted no
+ * made of: ` · read 21.4M · wrote 412.0k · uncached 1.2k · peak 167.0k`, and how often it compacted, which happens well
+ * short of its window, so its peak alone never says it got there. Nothing for an attempt whose runner counted no
  * tokens, which already says so; a class or a peak its runner could not see is named not measured.
  */
 const readLine = (u: Usage): string => {
@@ -176,7 +177,8 @@ const readLine = (u: Usage): string => {
   const classes = u.cacheReadTokens !== undefined && u.cacheWriteTokens !== undefined && u.uncachedTokens !== undefined
     ? `read ${count(u.cacheReadTokens)} · wrote ${count(u.cacheWriteTokens)} · uncached ${count(u.uncachedTokens)}` : 'cache not measured';
   const peak = u.peakContextTokens !== undefined ? `peak ${count(u.peakContextTokens)}` : 'peak not measured';
-  return ` · ${classes} · ${peak}`;
+  const compacted = u.compactions ? ` · compacted ${u.compactions === 1 ? 'once' : `${u.compactions} times`}` : '';
+  return ` · ${classes} · ${peak}${compacted}`;
 };
 
 /** Dollars for a person, to the cent: $3.01. Under a cent is `<$0.01` — `$0.00` would read as free. */

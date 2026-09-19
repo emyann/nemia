@@ -731,7 +731,7 @@ and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 ## What an attempt consumed
 
 Every attempt records `usage` — `{ turns?, toolCalls?, inputTokens?, uncachedTokens?, cacheWriteTokens?, cacheReadTokens?,
-peakContextTokens?, outputTokens?, costUsd?, apiMs?, toolMs?, unpricedModel? }` — and `exitCode`, copied from the sighting that ended it, or, for what a harness writes only as its
+peakContextTokens?, firstContextTokens?, firstCacheWriteTokens?, compactions?, outputTokens?, costUsd?, apiMs?, toolMs?, unpricedModel? }` — and `exitCode`, copied from the sighting that ended it, or, for what a harness writes only as its
 session exits, read once the session was let go (`measured`, below). **Each is `null` when nothing measured it,
 never `0`**: a zero that means "nobody counted" reads as "cost nothing". A count its runner could not
 see is absent from `usage` in the same way, and `ae show` names it not measured. `decide` reads neither.
@@ -776,6 +776,8 @@ runner measured them, and `inputTokens` stays their sum, so a journal written be
 | `cacheWriteTokens` | `cache_creation_input_tokens` | each response's, summed | its `usage`'s | `cache_write_input_tokens`: 0 in every run |
 | `uncachedTokens` | `input_tokens` | each response's, summed | its `usage`'s | `input_tokens` less the cached |
 | `peakContextTokens` | the three on one response | the largest response, or compaction | **absent** | **absent** |
+| `firstContextTokens`, `firstCacheWriteTokens` | the first response's | its first response's three, and its write | **absent** | **absent** |
+| `compactions` | `compact_boundary` lines | the attempt's own, absent when none | **absent** | **absent** |
 
 Measured by running each on this machine, 2026-09-19. `claude -p` (2.1.278) prints its session's totals in `usage` —
 the process's own, for a `--resume` too — and in `usage.iterations` the last response alone, which is not the largest: no
@@ -787,13 +789,19 @@ is absent, never 0, and a Codex turn whose cache writes are not 0 gives no input
 of the attempt's responses read. A compaction's summary call writes no response line, and Claude Code writes the context
 it summarised on the boundary (`compactMetadata.preTokens`, at or a few thousand past the last response before it on 25
 boundaries read), so that counts as one. It is what a task's `contextTokens` caps: the median worker of 2026-09-18
-peaked at 173k tokens and the largest at 831k.
+peaked at 173k tokens and the largest at 831k. It does not say a session reached its window: Claude Code compacts well
+short of it — at 173,584 and 173,254 tokens under `--autocompact 200000`, and 63k to 84k under 100k (open issue 26) —
+and a compaction's context is the peak. So an attempt counts its own compactions, `compactions`, and that is what says it
+got there.
 
 **A resumed attempt's numbers are its own**, as its cost is: its classes and its peak are counted over its own lines.
 Its first response reads its parent's whole conversation, so its peak starts where its parent ended, and nothing is
-taken off it — that is the context it carried. A resumed attempt whose cache writes pass half its peak rebuilt its cache
-rather than reading it: 43 did on 2026-09-18, 200k to 640k tokens each, and one number hid it for a week. The engine
-records the counts; the reading is a caller's (`wf`, the board).
+taken off it — that is the context it carried. That first response is kept apart, `firstContextTokens` and
+`firstCacheWriteTokens`: a continuation whose cache still holds its parent's conversation reads it there and writes only
+what is new, and one whose cache missed writes the whole of it again, at twenty times a read — 43 did on 2026-09-18, 200k
+to 640k tokens each, and one number hid it for a week. The attempt's writes in all cannot tell them apart: a warm
+continuation that grows from 60k to 150k writes some 90k over its responses. The engine records the counts; the reading
+is a caller's (`wf`, the board).
 
 **None of it is priced here.** `costUsd` is the harness's own figure; the engine turns no token into a dollar.
 

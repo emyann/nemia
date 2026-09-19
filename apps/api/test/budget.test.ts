@@ -177,7 +177,7 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
   const run = await detail();
   const tokens = stepOf(run, 'tokens');
   const [used, cost] = wordsOf(USAGE.tokens2);
-  assert.deepEqual(tokens.used, { usage: USAGE.tokens2, used, cost, costUsd: 2.5, apiMs: 420_000, toolMs: 31_000 });
+  assert.deepEqual(tokens.used, { usage: USAGE.tokens2, used, cost, costUsd: 2.5, apiMs: 420_000, toolMs: 31_000, read: null, peak: null, rebuilt: 0 });
   assert.equal(cost, '$2.50');
   assert.match(used!, / · api 7m00s · tools 31s$/);
   // Each try's session on the clock, with what it cost: the try before the current one too.
@@ -185,7 +185,7 @@ test("a measured try's cost is on the detail — the engine's costUsd, apiMs and
 
   // Codex priced nothing: null, and `not measured` — never 0, nor $0.00.
   const review = stepOf(run, 'review');
-  assert.deepEqual(review.used, { usage: USAGE.review, used: wordsOf(USAGE.review)[0], cost: 'not measured', costUsd: null, apiMs: null, toolMs: null });
+  assert.deepEqual(review.used, { usage: USAGE.review, used: wordsOf(USAGE.review)[0], cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 });
   assert.deepEqual(review.timeline.map((t) => [t.used?.costUsd, t.used?.apiMs, t.used?.toolMs, t.used?.cost]), [[null, null, null, 'not measured'], [null, null, null, 'not measured']]);
   assert.equal(review.spent, null, 'no try of it was measured: nothing spent is not $0');
 

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
-import { approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, parentOf, type ParentRun, phaseOfView, readAnswers, readAsks, readFilings, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
+import { approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitWord } from 'agent-workflows';
 import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, readArtifactFile, refusedName, type StepArtifact } from './artifacts.ts';
@@ -417,7 +417,18 @@ export type Usage = NonNullable<ReturnType<typeof consumption>[string]>;
  * `costUsd`, `apiMs` and `toolMs` are the engine's, off the same usage — what the harness priced the session at, and the
  * time it counted waiting on the model and running tools — each null where nobody measured it.
  */
-export type StepUsed = { usage: Usage | null; used: string; cost: string; costUsd: number | null; apiMs: number | null; toolMs: number | null };
+export type StepUsed = {
+  usage: Usage | null; used: string; cost: string; costUsd: number | null; apiMs: number | null; toolMs: number | null;
+  /**
+   * What the sessions read, by price, as `wf decide` says it beside the cost (`readWords`): `read 21.4M · wrote 412k · peak 167k`, the peak
+   * against the step's `context:` cap, and a resumed session that rebuilt its cache. Null where the runner measured none of it.
+   */
+  read: string | null;
+  /** Where the peak stands (`peakMark`): `cap` once it reached the step's `context:` cap, `large` past 200k on a step with none; null otherwise. */
+  peak: 'cap' | 'large' | null;
+  /** How many resumed sessions wrote their context to the cache again instead of reading it (`rebuiltCache`); 0 where none did, or nobody could tell. */
+  rebuilt: number;
+};
 
 /** What a branch touched, as `wf decide` reads it (`touchedBy`): its radius, or why git could not say. */
 export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
@@ -1120,6 +1131,8 @@ async function detail(run: Run): Promise<RunDetail> {
     steps: await Promise.all(names.map(async (name) => {
       const step = source?.find((s) => s.name === name);
       const taskId = run.steps[name]?.taskId ?? null;
+      // The `context:` its sessions ran under, as the run judges the step: where its peak reached it.
+      const cap = steps.find((s) => s.name === name)?.context;
       const needs = needsOf(run, name, views, judged);
       const current = {
         status: judged.words.get(name)!,
@@ -1145,11 +1158,11 @@ async function detail(run: Run): Promise<RunDetail> {
         said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
         asked: askedOf(judged.asked.get(name)),
         ...current,
-        used: taskId ? usedOf(used[name]) : null,
+        used: taskId ? usedOf(used[name], cap) : null,
         // Off the same views, which hold every try's task: no observation.
         ...costOf(run, name, steps, views, judged.spendOf),
         tries: triesOf(run, name, steps, views, current, judged.answers),
-        timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used) : null })),
+        timeline: (clock.steps[name] ?? []).map((t) => ({ ...t, used: t.session ? usedOf(t.used, cap) : null })),
       };
     })),
     timeline: {
@@ -1303,29 +1316,27 @@ function triesOf(
   ];
 }
 
-/** A usage in `wf decide`'s words: `usedLines`, each line without the label it starts with. */
-function usedOf(usage: Usage | undefined): StepUsed {
-  const [used = '', cost = ''] = usedLines(usage);
+/**
+ * A usage in `wf decide`'s words: `usedLines`, each line without the label it starts with — the cost alone, since what the sessions read
+ * is `read` — and the peak against `cap`, the `context:` of the step whose peak it is.
+ */
+function usedOf(usage: Usage | undefined, cap?: number): StepUsed {
+  const [used = ''] = usedLines(usage);
   return {
-    usage: usage ?? null, used: used.replace(/^used\s+/, ''), cost: cost.replace(/^cost\s+/, ''),
+    usage: usage ?? null, used: used.replace(/^used\s+/, ''), cost: usage?.costUsd !== undefined ? dollars(usage.costUsd) : 'not measured',
     costUsd: usage?.costUsd ?? null, apiMs: usage?.apiMs ?? null, toolMs: usage?.toolMs ?? null,
+    read: readWords(usage, cap) || null, peak: peakMark(usage, cap), rebuilt: usage?.rebuiltCaches ?? 0,
   };
 }
 
-/** The counts `sumUsage` adds up, as agent-workflows' radius.ts names them (`FIELDS`): the time the harness counted among them. */
-const USAGE_FIELDS = ['turns', 'toolCalls', 'inputTokens', 'outputTokens', 'costUsd', 'apiMs', 'toolMs'] as const;
-
 /**
- * Several usages as one, by `sumUsage`'s rule in agent-workflows' radius.ts, which the package does not export: a count is
- * the sum only when every usage measured it, since a sum over the ones that happened to be counted reads as the whole.
+ * Every filed step's usage as one (`sumUsage`), its peak read against the cap of the step it is the peak of: two steps' caps are not one
+ * cap, and the largest peak was reached under its own.
  */
-function sumUsages(usages: ReadonlyArray<Usage | undefined>): Usage | undefined {
-  if (!usages.length) return undefined;
-  const sum: Usage = {};
-  for (const field of USAGE_FIELDS) {
-    if (usages.every((u) => u?.[field] !== undefined)) sum[field] = usages.reduce((n, u) => n + u![field]!, 0);
-  }
-  return Object.keys(sum).length ? sum : undefined;
+function totalOf(steps: readonly Workflow[], usages: Record<string, Usage | undefined>, names: readonly string[]): StepUsed {
+  const total = sumUsage(names.map((name) => usages[name]));
+  const peakOf = names.find((name) => total?.peakContextTokens !== undefined && usages[name]?.peakContextTokens === total.peakContextTokens);
+  return usedOf(total, steps.find((s) => s.name === peakOf)?.context);
 }
 
 /** How many lines of one file's check-affecting diff the board is given. `wf decide` prints them all. */
@@ -1493,8 +1504,8 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     touched,
     lesson: lessonOf(touched),
     sensitive: touched.map((t) => sensitiveOf(run, t)),
-    used: Object.fromEntries(filed.map((name) => [name, usedOf(consumed[name])])),
-    total: usedOf(sumUsages(filed.map((name) => consumed[name]))),
+    used: Object.fromEntries(filed.map((name) => [name, usedOf(consumed[name], steps.find((s) => s.name === name)?.context)])),
+    total: totalOf(steps, consumed, filed),
     cost: runCostLines(run, spendOf)[0]?.replace(/^cost\s+/, '') ?? null,
     overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
     commands: commandsOf(run, d, offers, gates, merges(steps)),

@@ -25,28 +25,15 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { CELL_HEIGHT } from '../../src/lib/factory.ts';
+import { cancelledAt, expectKeys, expectRendered, expectSource, filesIn, nextVisit, PLACES, PLACES_SAID, sidebar, themeOf } from './board.ts';
+import { besideCard, cardOf, cardsDrawn, cardsOf, dragBy, drawEdge, edgeOf, expectClearOfEachOther, onTheFloor, placeOf, said, samePlace, showFinished } from './canvas.ts';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { AGENTS, arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, ENDING, FAKE, GATED, HELD, INBOX, LONG_NAMES, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, QUOTA, recordedUsage, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedLongNames, seedQueue, seedQuota, seedWorkflows, SESSION, SHIPPED, UNMERGED, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
-
-const WEB = path.resolve(import.meta.dirname, '..', '..');
-const REPO = path.resolve(WEB, '..', '..');
-const API = path.join(REPO, 'apps', 'api');
-const OUT = path.resolve(process.env.WF_ARTIFACTS || path.join(REPO, '.e2e'));
+import { API, apiEnv, heard, OUT, REPO, setApiEnv, setStore, store, WEB } from './world.ts';
 
 /** How long a server has to say where it listens. */
 const START_MS = 30_000;
-
-/** The menu's places, in its order: the Inbox first. */
-const PLACES = ['Inbox', 'Factory', 'Runs', 'Workflows', 'Agents', 'Capabilities'];
-
-/** On every page: the menu, with each of its places, in its order. */
-async function sidebar(page: Page): Promise<void> {
-  const menu = page.locator('[data-sidebar="sidebar"]');
-  for (const place of PLACES) await expectVisible(menu.getByRole('link', { name: place }), `the sidebar has ${place}`);
-  await expectTexts(menu.locator('[data-sidebar="content"] [data-sidebar="menu-button"]'), PLACES, 'the sidebar lists its places in order, the Inbox first');
-}
 
 /**
  * A place in the menu pressed with Enter, as from the keyboard: the page is not loaded again, and the history has one entry more, as after a
@@ -66,116 +53,6 @@ async function enterOnPlace(page: Page, place: (typeof PLACES)[number], route: s
   if (after !== before + 1) throw new Refused(`Enter on ${place} in the menu adds one entry to the history, as a click does — it went from ${before} to ${after}`);
 }
 
-/**
- * Finished runs on the Factory's floor too. Off by default, on every visit. Pressed where a person presses it, on its track: React Aria's
- * switch is a label drawn round an input hidden to the eye, so a click aimed at the input lands on the label, and Playwright waits for ever.
- */
-async function showFinished(page: Page): Promise<void> {
-  const toggle = page.getByRole('switch', { name: 'Show finished' });
-  await expectVisible(toggle, 'the Factory has a Show finished switch');
-  await expectCount(page.getByRole('switch', { name: 'Show finished', checked: false }), 1, 'Show finished is off as the Factory opens');
-  await page.locator('label', { has: toggle }).click();
-  await expectCount(page.getByRole('switch', { name: 'Show finished', checked: true }), 1, 'pressed, Show finished is on');
-}
-
-/** The fake run on the Factory: its card, its step nodes, and both together. */
-function onTheFloor(page: Page): { card: Locator; steps: Locator; run: Locator; step: (name: string) => Locator } {
-  const card = `.react-flow__node[data-id="${FAKE.id}"]`;
-  const steps = `.react-flow__node[data-id^="${FAKE.id}/"]`;
-  return {
-    card: page.locator(card),
-    steps: page.locator(steps),
-    run: page.locator(`${card}, ${steps}`),
-    step: (name) => page.locator(`.react-flow__node[data-id="${FAKE.id}/${name}"]`),
-  };
-}
-
-/**
- * Another visit to `page`'s address in the same browser, so what this browser kept, checked by `check` and
- * watched as the page itself is. A page of its own rather than a reload: a reload cuts off an in-flight
- * refetch, which the watch would rightly count as a failed request.
- */
-async function nextVisit(page: Page, check: (again: Page) => Promise<void>): Promise<void> {
-  const again = await page.context().newPage();
-  try {
-    const { problems } = watch(again);
-    await again.goto(page.url(), { waitUntil: 'networkidle' });
-    await check(again);
-    await again.waitForLoadState('networkidle');
-    const seen = problems();
-    if (seen.length) throw new Refused(`no console error and no failed request on the next visit — ${seen.length} seen:\n    ${seen.join('\n    ')}`);
-  } finally {
-    await again.close();
-  }
-}
-
-/** A run's card on the Factory, and the edge from one card into another (`after`). */
-const cardOf = (page: Page, id: string): Locator => page.locator(`.react-flow__node[data-id="${id}"]`);
-
-/** Where a node is on its canvas, in the canvas's own units, whatever the zoom or the pan: where React Flow put it (`translate(x, y)`). */
-const placeOf = (node: Locator): Promise<{ x: number; y: number }> =>
-  node.evaluate((el) => {
-    const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec((el as HTMLElement).style.transform) ?? [];
-    return { x: Number(m[1]), y: Number(m[2]) };
-  });
-
-/** Where a step is beside its card, in the canvas's units: the same on every visit that keeps the arrangement, wherever the card went. */
-async function besideCard(step: Locator, card: Locator): Promise<{ x: number; y: number }> {
-  const [s, c] = await Promise.all([placeOf(step), placeOf(card)]);
-  return { x: s.x - c.x, y: s.y - c.y };
-}
-
-/** How far the floor is zoomed, off React Flow's viewport (`scale(z)`): what a pixel of the pointer's move is worth in the canvas's units. */
-const zoomOf = (page: Page): Promise<number> =>
-  page.locator('.react-flow__viewport').first().evaluate((el) => Number(/scale\(([\d.]+)\)/.exec((el as HTMLElement).style.transform)?.[1] ?? 1));
-
-/**
- * A drag as a person makes one: the pointer down on `grip`, moved `by` in the canvas's units — through the floor's zoom — in a
- * dozen moves, and up. React Flow moves a node from the second move of a drag, so one move would move nothing.
- */
-async function dragBy(page: Page, grip: Locator, by: { x: number; y: number }, what: string): Promise<void> {
-  const [box, zoom] = [await grip.boundingBox(), await zoomOf(page)];
-  if (!box) throw new Refused(`${what} is on the page, to be dragged`);
-  const [x, y] = [box.x + box.width / 2, box.y + box.height / 2];
-  await page.mouse.move(x, y);
-  await page.mouse.down();
-  await page.mouse.move(x + by.x * zoom, y + by.y * zoom, { steps: 12 });
-  await page.mouse.up();
-}
-
-/**
- * Every card on the floor, in the canvas's own units whatever the zoom: where React Flow put it (`placeOf`), and how tall it is drawn.
- * A card's node alone — a step's node is named `<run>/<step>`.
- */
-const cardsDrawn = async (page: Page): Promise<Array<{ id: string; x: number; y: number; height: number }>> => {
-  const zoom = await zoomOf(page);
-  return page.locator('.react-flow__node[data-id]:not([data-id*="/"])').evaluateAll((nodes, z) => nodes.map((node) => {
-    const el = node as HTMLElement;
-    const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)/.exec(el.style.transform) ?? [];
-    return { id: el.getAttribute('data-id') ?? '', x: Number(m[1]), y: Number(m[2]), height: el.getBoundingClientRect().height / z };
-  }), zoom);
-};
-
-/**
- * That no card on the floor reaches over the card beneath it: for each card, the nearest card down its own column starts below its bottom
- * edge. The grid puts that card a cell's height below (`CELL_HEIGHT`), so a card drawn taller than its cell is over it wherever it is put.
- */
-async function expectClearOfEachOther(page: Page): Promise<void> {
-  const cards = await cardsDrawn(page);
-  const over = cards.flatMap((card) => {
-    const beneath = cards.filter((other) => Math.abs(other.x - card.x) < 1 && other.y > card.y).sort((a, b) => a.y - b.y)[0];
-    return beneath && beneath.y < card.y + card.height
-      ? [`${card.id} is ${Math.round(card.height)} tall in a cell of ${CELL_HEIGHT}, and ${beneath.id} starts ${Math.round(beneath.y - card.y)} below it`]
-      : [];
-  });
-  if (over.length) throw new Refused(`no card on the floor reaches over the card beneath it — ${over.join('; ')}`);
-}
-
-const samePlace = (a: { x: number; y: number }, b: { x: number; y: number }): boolean => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
-const said = ({ x, y }: { x: number; y: number }): string => `(${Math.round(x)}, ${Math.round(y)})`;
-const cardsOf = (page: Page, ...ids: string[]): Locator => page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
-const edgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`);
-
 /** The diamond's cards laid out as a diamond: every run left of each run that waits on it, and its top and bottom level with the middle of its sides. */
 async function expectDiamond(page: Page, when: string): Promise<void> {
   const { top, shipped, running, bottom } = DIAMOND;
@@ -185,15 +62,6 @@ async function expectDiamond(page: Page, when: string): Promise<void> {
   await expectApart(cardOf(page, shipped.id), cardOf(page, running.id), `${when}: the two sides are laid out apart`);
   await expectBetween(cardsOf(page, top.id, bottom.id), cardOf(page, shipped.id), cardOf(page, running.id), `${when}: the top and the bottom are level with the middle of the two sides`);
 }
-
-/** When the run DIAMOND calls off was cancelled, as `wf cancel` wrote it beside its record. */
-const cancelledAt = (): string => fs.readFileSync(path.join(store!, 'runs', `${DIAMOND.cancelled.id}.cancelled`), 'utf8').trim();
-
-/** The theme a page is in, as its browser prefers it: what names a photograph taken beside the visit's own. */
-const themeOf = (page: Page): Promise<string> => page.evaluate(() => (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-
-/** The places of the three queued cards, as the board says them. */
-const PLACES_SAID = ['1st', '2nd', '3rd', '4th'] as const;
 
 /**
  * The runs in flight against the cap, as the package counts them in the seeded store: NEIGHBOUR's session at work, HELD's the harness blocked,
@@ -232,28 +100,6 @@ async function addStep(builder: Locator, name: string, body: string): Promise<vo
   await expectVisible(builder.locator(`.react-flow__node[data-id="${name}"]`), `the step added, ${name}, is a block on the canvas`);
 }
 
-/**
- * An edge drawn on a builder, as a person drags it: from `from`'s right-hand dot to `to`'s left-hand dot, which makes `to` wait on `from` — or,
- * with `loop`, from the violet dot under `from` to the one under `to`, which makes `from` loop back to `to`. With the mouse, not `dragTo`: a
- * handle a drag cannot start from takes no pointer events until a drag is under way, so `dragTo`'s check that the target is what the pointer
- * would hit finds the node over it, and waits for ever.
- */
-async function drawEdge(page: Page, builder: Locator, from: string, to: string, loop = false): Promise<void> {
-  await settled(page);
-  const source = builder.locator(`.react-flow__node[data-id="${from}"] .react-flow__handle.source[data-handlepos="${loop ? 'bottom' : 'right'}"]`);
-  const target = builder.locator(`.react-flow__node[data-id="${to}"] .react-flow__handle.target[data-handlepos="${loop ? 'bottom' : 'left'}"]`);
-  await expectVisible(source, `${from}'s dot to draw from`);
-  await expectVisible(target, `${to}'s dot to draw to`);
-  await source.scrollIntoViewIfNeeded();
-  const [a, b] = [await source.boundingBox(), await target.boundingBox()];
-  if (!a || !b) throw new Refused(`${from}'s and ${to}'s dots are on the page to draw between`);
-  await page.mouse.move(a.x + a.width / 2, a.y + a.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 12 });
-  await page.mouse.up();
-  await expectCount(builder.locator(`.react-flow__edge[data-id="${loop ? 'loop:' : ''}${from}->${to}"]`), 1, `the ${loop ? 'loop' : 'edge'} drawn from ${from} to ${to}`);
-}
-
 /** A card on the Inbox page, by its name. */
 const cardIn = (page: Page, name: string): Locator => page.locator(`section[aria-label="Cards"] li[data-card="${name}"]`);
 
@@ -266,55 +112,6 @@ const STARTED_AS = 'show-what-a-step-cost-on-the-e2e0';
 
 /** What the `answer` page answers FAKE's blocked step with. */
 const ANSWER = 'Keep it off the floor: a finished run is under Show finished.';
-
-/** A folder's files, each name with its text: what a page that writes nothing leaves as it found. */
-const filesIn = (dir: string): Array<[string, string]> =>
-  fs.readdirSync(dir).sort().map((name) => [name, fs.statSync(path.join(dir, name)).isFile() ? fs.readFileSync(path.join(dir, name), 'utf8') : '(a folder)']);
-
-/** A text's markdown, rendered: its `##` a heading two levels down, an h4 — the page's own are h1 and h2 — and its list, a list. */
-async function expectRendered(body: Locator, text: { heading: string; items: readonly string[]; cells?: readonly string[]; code?: string }): Promise<void> {
-  await expectVisible(body.getByRole('heading', { level: 4, name: text.heading }), `its ## is a heading, an h4 (${text.heading})`);
-  await expectTexts(body.locator('ul > li'), text.items, `its list is a list (${text.items.join(' · ')})`);
-  for (const cell of text.cells ?? []) await expectVisible(body.getByRole('cell', { name: cell, exact: true }), `its table is a table, with a cell ${cell}`);
-  if (text.code) await expectVisible(body.locator('[data-language="bash"]', { hasText: text.code }), `its fenced block is the board's code block, in bash (${text.code})`);
-}
-
-/**
- * A page's key table: a row per key the api answers, in its order, each with its value — or `not set` — and what it means, as the api says it.
- * `set` is what the file sets, by key, as the seed wrote it: every other key reads `not set`.
- */
-async function expectKeys(page: Page, file: Locator, api: string, set: Readonly<Record<string, string>>): Promise<void> {
-  const answered = await page.request.get(new URL(api, page.url()).href);
-  if (!answered.ok()) throw new Refused(`GET ${api} answers the page's keys — it answered ${answered.status()}`);
-  const { keys } = (await answered.json()) as { keys: Array<{ key: string; value: string | null; meaning: string }> };
-  const rows = file.locator('section[aria-label="Keys"] tr[data-key]');
-  await expectCount(rows, keys.length, `a row per key (${keys.map((k) => k.key).join(', ')})`);
-  const order = await rows.evaluateAll((trs) => trs.map((tr) => tr.getAttribute('data-key')));
-  if (JSON.stringify(order) !== JSON.stringify(keys.map((k) => k.key))) throw new Refused(`the rows are in the package's order — ${order.join(', ')}`);
-  for (const { key, value, meaning } of keys) {
-    if (value !== (set[key] ?? null)) throw new Refused(`GET ${api} reads ${key} as the file sets it (${set[key] ?? 'not set'}) — it answered ${JSON.stringify(value)}`);
-    const row = rows.filter({ has: page.locator(`th[scope="row"]`, { hasText: new RegExp(`^${key}$`) }) });
-    await expectTexts(row.locator('[data-value]'), [value ?? 'not set'], `${key}'s value reads ${value ?? 'not set'}`);
-    // The meaning is markdown: its code spans are drawn as code, so the text read has no backticks.
-    await expectTexts(row.locator('[data-meaning]'), [meaning.replaceAll('`', '')], `${key}'s row says what it means, as the package does`);
-  }
-}
-
-/** Source: the file as written, frontmatter included, in place of what the page renders of it — and back. */
-async function expectSource(file: Locator, body: Locator, onDisk: string): Promise<void> {
-  const toggle = file.getByRole('button', { name: 'Source' });
-  await toggle.click();
-  const source = file.locator('pre[data-source]');
-  await expectVisible(source, 'Source shows the file as written');
-  const shown = await source.textContent();
-  const written = fs.readFileSync(onDisk, 'utf8');
-  if (shown !== written) throw new Refused(`Source is the file byte for byte, frontmatter included — it shows ${JSON.stringify(shown)}, and ${onDisk} holds ${JSON.stringify(written)}`);
-  if ((await toggle.getAttribute('aria-pressed')) !== 'true') throw new Refused('Source says it is pressed while the file is shown');
-  await expectCount(file.locator('section[aria-label="Keys"]'), 0, 'in place of the rendered body and the keys');
-  await toggle.click();
-  await expectCount(source, 0, 'pressed again, Source gives the rendered page back');
-  await expectVisible(body, 'the body rendered again');
-}
 
 /** The pages, and what each must have. A new page gets a line here, or the check never looks at it. */
 const PAGES: PageSpec[] = [
@@ -3402,11 +3199,6 @@ const PAGES: PageSpec[] = [
 // ─── the servers, and stopping them ─────────────────────────────────────────
 
 const servers: Array<{ name: string; child: ChildProcess; output: () => string }> = [];
-let store: string | undefined;
-/** The environment the api runs in — its store, its `claude`, where sessions register — for a `wf` a page runs on the same store. */
-let apiEnv: NodeJS.ProcessEnv = {};
-/** Every line draft's stand-in inbox (SAYING, INBOX) has been sent, in order: what the `say` page holds its words to. */
-const heard: unknown[] = [];
 
 /**
  * A Unix socket standing in for a session's inbox, as Claude Code's reads one: each connection's lines kept, as JSON where they parse, nothing
@@ -3447,7 +3239,7 @@ function cleanUp(): void {
     if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
   }
   if (store) fs.rmSync(store, { recursive: true, force: true });
-  store = undefined;
+  setStore(undefined);
 }
 process.on('exit', cleanUp);
 for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP'] as const) {
@@ -3510,7 +3302,9 @@ async function main(): Promise<void> {
     throw new Error(`the web app did not build:\n${String(stdout ?? '')}${String(stderr ?? '')}`.replace(ANSI, ''));
   }
 
-  store = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-'));
+  // A string from here on, and the same store the pages read off world.ts.
+  const store = fs.mkdtempSync(path.join(os.tmpdir(), 'hkb-e2e-'));
+  setStore(store);
   seed(store);
   const checkout = path.join(store, 'checkout');
   seedCheckout(checkout, path.join(API, 'test', 'fixtures', 'mcp-server.ts'));
@@ -3549,12 +3343,12 @@ async function main(): Promise<void> {
     const { session_id: sessionId, message } = (line ?? {}) as { session_id?: unknown; message?: { content?: unknown } };
     if (sessionId === SAYING.sessionId && typeof message?.content === 'string') fs.appendFileSync(draftTranscript, arrivalLine(message.content, new Date().toISOString()));
   });
-  apiEnv = {
+  setApiEnv({
     ...process.env, PORT: '0', WF_ROOT: store, HKB_REPO: checkout, CLAUDE_CONFIG_DIR: path.join(store, 'claude'),
     // The quota asked of the e2e's claude on every read, so the quota page reads the answer it has just written.
     HKB_QUOTA_KEEP_MS: '0',
     PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}`,
-  };
+  });
   const apiPort = await startServer('the api', [path.join(API, 'src', 'main.ts')], API, apiEnv, /api listening on http:\/\/127\.0\.0\.1:(\d+)/);
   const base = await startServer('vite preview', [vite, 'preview', '--port', '0', '--host', '127.0.0.1'], WEB,
     { ...process.env, HKB_API_URL: `http://127.0.0.1:${apiPort}` },

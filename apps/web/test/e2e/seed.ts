@@ -758,31 +758,39 @@ export function seedQueue(root: string, repo: string, now = Date.now()): void {
 }
 
 /**
- * The subscription's quota as Claude Code hands it to a statusline (2.1.278's shape): the five-hour window 38% used, resetting in two hours
- * and a bit, and the week 86% used — past the api's mark of 80 — resetting in three days. Written into the store by the statusline script
- * itself (`apps/api/statusline/quota.ts`), as a person's session would, so the e2e reads what the script writes.
+ * The subscription's quota as Claude Code answers its get_usage request (2.1.278's shape): the five-hour window 38% used, resetting in two
+ * hours and a bit, and the week 86% used — past the api's mark of 80 — resetting in three days. The e2e's `claude` prints `QUOTA.file`, its
+ * `@ID@` made the request's id; the api asks it on every read (HKB_QUOTA_KEEP_MS=0), so a page that changes the file reads the change.
  */
 export const QUOTA = {
-  version: '2.1.278',
+  file: 'usage-answer.json',
   fiveHour: { used: 38.4, resetsInMinutes: 130 },
   week: { used: 86, resetsInMinutes: 3 * 24 * 60 },
-  script: path.resolve(import.meta.dirname, '..', '..', '..', 'api', 'statusline', 'quota.ts'),
 };
 
-/** Run the statusline script over QUOTA's payload with `root` as its store, and answer with the file it wrote. */
+/** Claude Code 2.1.278's recorded answers to get_usage (the api's `test/fixtures`), with `@ID@` for the request's id. */
+export function recordedUsage(name: 'no-plan' | 'unsupported'): string {
+  const file = path.resolve(import.meta.dirname, '..', '..', '..', 'api', 'test', 'fixtures', `get-usage-${name}-2.1.278.json`);
+  return fs.readFileSync(file, 'utf8').replace('"request_id":"usage-1"', '"request_id":"@ID@"');
+}
+
+/** Write QUOTA's answer into `root`, as a subscriber's Claude Code would give it, and answer with the file. */
 export function seedQuota(root: string, now = Date.now()): string {
-  const at = (minutes: number) => Math.floor((now + minutes * 60_000) / 1000);
-  const payload = {
-    session_id: 'e2e', version: QUOTA.version, model: { id: 'claude-opus-5', display_name: 'Opus 5' },
-    context_window: { current_usage: { input_tokens: 1, output_tokens: 1 } },
-    rate_limits: {
-      five_hour: { used_percentage: QUOTA.fiveHour.used, resets_at: at(QUOTA.fiveHour.resetsInMinutes) },
-      seven_day: { used_percentage: QUOTA.week.used, resets_at: at(QUOTA.week.resetsInMinutes) },
+  const at = (minutes: number) => new Date(now + minutes * 60_000).toISOString().replace('Z', '+00:00');
+  const response = {
+    subtype: 'success', request_id: '@ID@',
+    response: {
+      subscription_type: 'max', rate_limits_available: true,
+      rate_limits: {
+        five_hour: { utilization: QUOTA.fiveHour.used, resets_at: at(QUOTA.fiveHour.resetsInMinutes) },
+        seven_day: { utilization: QUOTA.week.used, resets_at: at(QUOTA.week.resetsInMinutes) },
+        seven_day_opus: null,
+      },
+      behaviors: null,
     },
   };
-  execFileSync(process.execPath, [QUOTA.script], { input: JSON.stringify(payload), env: { ...process.env, WF_ROOT: root }, stdio: ['pipe', 'ignore', 'pipe'] });
-  const file = path.join(root, 'quota.json');
-  if (!fs.existsSync(file)) throw new Error(`the statusline script wrote no ${file}`);
+  const file = path.join(root, QUOTA.file);
+  write(file, `${JSON.stringify({ type: 'control_response', response })}\n`);
   return file;
 }
 

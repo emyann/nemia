@@ -1,7 +1,7 @@
 import path from 'node:path';
 import type { Page } from 'playwright';
 import { nextVisit, PLACES_SAID, sidebar, themeOf } from '../board.ts';
-import { besideCard, cardOf, cardsOf, dragBy, edgeOf, expectClearOfEachOther, onTheFloor, placeOf, said, samePlace, showFinished } from '../canvas.ts';
+import { besideCard, cardOf, cardsOf, dragBy, edgeOf, expectClearOfEachOther, expectClearOfPanels, onTheFloor, placeOf, said, samePlace, showFinished } from '../canvas.ts';
 import { expectApart, expectBetween, expectCount, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
 import { COSTLY, DIAMOND, DIAMOND_RUNS, ENDING, FAKE, GATED, HELD, LOOPING, NEIGHBOUR, QUEUE, QUEUED, refusedWhy, SESSION, SHIPPED, UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -77,6 +77,8 @@ export default {
       `the card of a run whose session the harness blocked says so — not needs-human alone (${HELD.id})`,
     );
     await settled(page);
+    // As a person first finds it: every card on the fitted floor can be read and pressed, none under the legend or the buttons.
+    await expectClearOfPanels(page, 'on first load');
 
     // The diamond, drawn as a graph of cards: an edge from each run a card waits on into it, parents left of children, and the two
     // sides level about the middle. Its top and its shipped side are finished, and on the floor all the same: a run in flight waits on each.
@@ -85,9 +87,10 @@ export default {
     for (const run of [top, shipped]) {
       await expectVisible(cardOf(page, run.id).getByText(/^started .+ ago$/), `${run.id}, shipped, is drawn finished — on the floor because a run in flight waits on it`);
     }
-    for (const run of [cancelled, orphan]) {
-      await expectCount(cardOf(page, run.id), 0, `${run.id} is not on the floor by default: ${orphan.id} waits on a run called off, and nothing of either moves`);
-    }
+    // The run called off moves no more and waits on nobody: off the floor. The run waiting on it will wait for ever without a person, so
+    // it waits on you, and its card stays on the floor though nothing of it moves.
+    await expectCount(cardOf(page, cancelled.id), 0, `${cancelled.id} is not on the floor by default: called off, it waits on nobody`);
+    await expectVisible(cardOf(page, orphan.id), `${orphan.id} is on the floor by default: it waits on a run called off, so on a person`);
     // Counted, not seen: an edge whose ends are level is a path with no height, which Playwright takes for hidden.
     for (const [from, to, state] of [[top, shipped, 'done'], [top, running, 'done'], [shipped, bottom, 'to-come'], [running, bottom, 'to-come']] as const) {
       await expectCount(
@@ -140,18 +143,20 @@ export default {
       if (!samePlace(kept, putDown)) throw new Refused(`the next visit finds ${bottom.id} where its side's drag put it down, ${said(putDown)} — it is at ${said(kept)}`);
     });
 
-    // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight.
-    // Its followers read `waiting`, and will for ever; they do not keep it on the floor.
-    await expectCount(card, 0, `a run whose check refused is finished, not in flight: no card on the floor by default (${FAKE.id})`);
-    // So is the loop out of rounds: it waits on a person, and nothing of it moves.
+    // The fake run stopped at a refused check, and at a step signed off blocked: finished, not in flight. Its followers read `waiting`, and
+    // will for ever — but the blocked step asks a person something, so the run waits on you, and its card stays on the floor until answered.
+    await expectVisible(card, `a run with a step signed off blocked waits on a person: its card is on the floor by default (${FAKE.id})`);
+    // So does the loop out of rounds: it waits on a person, and nothing of it moves.
+    await expectVisible(cardOf(page, LOOPING.id), `a loop out of rounds waits on a person: its card is on the floor by default (${LOOPING.id})`);
     // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. To decide: ENDING and UNMERGED. Waiting on you: FAKE,
     // LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off.
     await expectVisible(
       page.getByText('4 in flight · 11 finished · 2 to decide · 6 waiting on you'),
       'the Factory counts the runs in flight, the finished, those nobody has decided, and those waiting on you',
     );
-    // A run at its gate is finished too: nothing of it moves until a person approves its step.
-    await expectCount(cardOf(page, GATED.id), 0, `a run waiting at its gate is not in flight: no card on the floor by default (${GATED.id})`);
+    // A run at a gate in its middle: nothing of it moves until a person approves its step, and the api reads it failed, with nothing to
+    // decide about its result — its card stays on the floor all the same, since it waits on a person.
+    await expectVisible(cardOf(page, GATED.id), `a run held at its plan's gate waits on a person: its card is on the floor by default (${GATED.id})`);
 
     // A run nobody has decided is finished too — and its card is on the floor all the same, until it is decided: at its ending's gate,
     // in the folder's own words with the command that approves it; or with a branch nobody merged, which git ends.

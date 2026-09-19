@@ -138,3 +138,40 @@ test('REFUSED as a check: an empty WF_BASE_REF, outside a merge, is not read as 
   assert.match(r.stderr, /cannot tell what the work touched/);
   assert.ok(!r.stdout.includes(SKIPPED), r.stdout);
 });
+
+/** `branched`, then main moves on with `onMain`, and main is mid-merge of `work` — the shipper's step 2, `--no-ff --no-commit`. */
+function midMerge(files: string[], onMain: string[]): string {
+  const { repo } = branched(files);
+  git(repo, 'checkout', '-q', 'main');
+  for (const f of onMain) write(repo, f);
+  git(repo, 'add', '-A');
+  git(repo, 'commit', '-q', '-m', 'main moved');
+  git(repo, 'merge', '--no-ff', '--no-commit', 'work');
+  assert.ok(fs.existsSync(path.join(repo, '.git', 'MERGE_HEAD')), 'mid-merge');
+  return repo;
+}
+
+test("by the shipper's hand, mid-merge with no WF_BASE_REF: a merge that brings the web app runs the build and the e2e on the merged tree", () => {
+  const repo = midMerge(['apps/web/src/routes/runs.tsx'], ['packages/agent-engine/src/engine.ts']);
+  const r = byHand(repo, DEV);
+  assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+  assert.match(r.stdout, BUILT, r.stdout);
+  assert.match(r.stdout, E2E, r.stdout);
+});
+
+test("by the shipper's hand, mid-merge: what counts is what the merge brings, not what the base branch did meanwhile", () => {
+  // Main touched the web app after the branch left it; the branch did not. The merge brings no web change, and nothing is built.
+  const repo = midMerge(['packages/agent-workflows/src/run.ts'], ['apps/web/src/main.tsx']);
+  const r = byHand(repo, DEV);
+  assert.equal(r.status, 0, `${r.stdout}\n${r.stderr}`);
+  assert.doesNotMatch(r.stdout, BUILT);
+  assert.ok(r.stdout.includes(SKIPPED), r.stdout);
+});
+
+test('REFUSED by hand: no WF_BASE_REF and no merge in progress fails loudly, and never passes as nothing touched', () => {
+  const { repo } = branched(['packages/agent-workflows/src/run.ts']);
+  const r = byHand(repo, DEV);
+  assert.notEqual(r.status, 0, `${r.stdout}\n${r.stderr}`);
+  assert.match(r.stderr, /cannot tell what the work touched, since git diff --name-only HEAD\.\.\.MERGE_HEAD failed/);
+  assert.ok(!r.stdout.includes(SKIPPED), r.stdout);
+});

@@ -85,6 +85,30 @@ test('an agent that does not read is listed with its refusal, and its lines as w
   }
 });
 
+test('an agent that is a link is listed with its refusal alone: nothing of what it points at, outside the folder, is read', async () => {
+  const outside = path.join(root, 'outside-agent.md');
+  fs.writeFileSync(outside, '---\nmodel: opus\n---\nA secret from outside.\n');
+  const outsideSchema = path.join(root, 'outside.schema.json');
+  fs.writeFileSync(outsideSchema, '{"secret":true}');
+  fs.symlinkSync(outside, path.join(AGENTS, 'linked.md'));
+  fs.writeFileSync(path.join(AGENTS, 'schemed.md'), '---\noutput: schemed.schema.json\n---\nDo it.\n');
+  fs.symlinkSync(outsideSchema, path.join(AGENTS, 'schemed.schema.json'));
+  try {
+    const agents = await listed();
+    const linked = agents.find((a) => a.name === 'linked')!;
+    assert.match(linked.error ?? '', /linked\.md is a link, and an agent's file is its own/);
+    assert.equal(linked.source, '');
+    assert.equal(linked.body, '');
+    assert.deepEqual(linked.keys, {});
+    const was = linked.version;
+    fs.writeFileSync(outside, 'changed\n');
+    assert.equal((await listed()).find((a) => a.name === 'linked')!.version, was, 'the version is not what the link points at');
+    assert.equal(agents.find((a) => a.name === 'schemed')!.schema, null);
+  } finally {
+    for (const f of ['linked.md', 'schemed.md', 'schemed.schema.json']) fs.rmSync(path.join(AGENTS, f));
+  }
+});
+
 test('one agent is read by name; a name that is not an agent\'s, or a place that is not one, is refused before a file is read', async () => {
   const res = await app.request('/api/agents/repo/implementer');
   assert.equal(res.status, 200);

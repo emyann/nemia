@@ -1273,7 +1273,9 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
 export function agentVersion(dir: string, name: string): string | null {
   const at = path.join(dir, `${name}.md`);
   if (!fs.lstatSync(at, { throwIfNoEntry: false })) return null;
-  const read = (file: string): string | { unreadable: string } => {
+  // A link counts as where it points, never as what it points at: that is outside the folder, and no write of the agent goes through it.
+  const read = (file: string): string | { unreadable: string } | { link: string } => {
+    if (fs.lstatSync(file, { throwIfNoEntry: false })?.isSymbolicLink()) return { link: fs.readlinkSync(file) };
     try { return fs.readFileSync(file, 'utf8'); } catch (err) { return { unreadable: (err as Error).message }; }
   };
   const text = read(at);

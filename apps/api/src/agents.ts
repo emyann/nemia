@@ -65,10 +65,13 @@ export function listedAgent(from: WorkflowSource, dir: string, name: string): Ag
     return { from, workflow, step };
   });
   const agent = loadAgents(dir).get(name);
+  // A link is refused by the package's reader, and read here it would be whatever it points at, outside the folder: only the refusal.
+  const linked = (at: string) => Boolean(fs.lstatSync(at, { throwIfNoEntry: false })?.isSymbolicLink());
+  if (linked(file)) return { ...empty(from, dir, file, name, version, usedBy), error: agent instanceof Error ? agent.message : `${AGENTS_FOLDER}/${name}.md is a link.` };
   let source: string;
   try { source = fs.readFileSync(file, 'utf8'); } catch (err) { return { ...empty(from, dir, file, name, version, usedBy), error: messageOf(err) }; }
   const schemaOf = (output: string | undefined): AgentSchema | null => {
-    if (output === undefined || path.isAbsolute(output) || /[\\/]/.test(output)) return null;
+    if (output === undefined || path.isAbsolute(output) || /[\\/]/.test(output) || linked(path.join(dir, output))) return null;
     try { return { file: output, text: fs.readFileSync(path.join(dir, output), 'utf8') }; } catch { return null; }
   };
   if (agent === undefined || agent instanceof Error) {

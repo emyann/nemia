@@ -148,6 +148,28 @@ test('a write through a link is refused by name', () => {
   assert.equal(fs.readFileSync(outside, 'utf8'), 'mine\n');
 });
 
+test('a result schema written through a link is refused by name, and what the link points at is left as it was', () => {
+  fresh();
+  const outside = path.join(ROOT, 'outside.schema.json');
+  fs.writeFileSync(outside, '{"mine":true}\n');
+  fs.symlinkSync(outside, path.join(AGENTS, 'scribe.schema.json'));
+  const withSchema = { ...scribe, keys: { ...scribe.keys, output: 'scribe.schema.json' } };
+  const schema = { file: 'scribe.schema.json', text: '{"type":"object"}\n' };
+  refused(() => writeAgent(AGENTS, withSchema, { version: null, schema }), /^\S*scribe\.schema\.json is a link, and a result schema is its agent's own/);
+  assert.equal(fs.readFileSync(outside, 'utf8'), '{"mine":true}\n');
+  assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false);
+});
+
+test("an agent's version counts a link as where it points, not as what it points at", () => {
+  fresh();
+  const outside = path.join(ROOT, 'outside-version.md');
+  fs.writeFileSync(outside, 'one\n');
+  fs.symlinkSync(outside, path.join(AGENTS, 'linked.md'));
+  const was = agentVersion(AGENTS, 'linked');
+  fs.writeFileSync(outside, 'two\n');
+  assert.equal(agentVersion(AGENTS, 'linked'), was);
+});
+
 test('a remove or a rename of an agent a step still names is refused, naming the steps', () => {
   fresh();
   const reviewer = agentVersion(AGENTS, 'reviewer')!;

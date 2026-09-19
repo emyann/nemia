@@ -10,6 +10,7 @@ import { graphOf, type RunGraph } from './graph.ts';
 import { capabilitiesWithSteps } from './reach.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { inbox } from './inbox.ts';
+import { mergesOnto, mergeWord, type MergeWord } from './merge.ts';
 import { agents } from './agents.ts';
 import { builder } from './builder.ts';
 import { workflows } from './workflows.ts';
@@ -73,15 +74,27 @@ export type RunSummary = {
  *
  * `said` is the whole of what `wf ls` prints after `→ to decide:`, and `command` the command at the end of it — `wf approve <run> <step>`,
  * or `wf decide <run>` for the branches, which the board runs no more than `wf ls` does.
+ *
+ * An approval carries what the Factory's card answers it with, off the record alone: `back`, the steps a send-back goes to (`sendBackTo`) —
+ * the step itself once it has a task, and at an ending's gate, held before it is filed, the work it waits on — and `onto`, the base branch
+ * the run's result is on its way to. Neither asks git anything, so the list the Factory polls can carry them.
  */
-export type RunToDecide = ToDecide & { said: string; command: string };
+export type RunToDecide = (
+  | (Extract<ToDecide, { kind: 'approve' }> & { back: string[]; onto: string })
+  | Extract<ToDecide, { kind: 'git' }>
+) & { said: string; command: string };
 
 /**
  * What a person has to decide, as the board is given it: the package's own reading, with its words and the command that ends them. Null
  * where the package leaves it — a run still going, one called off, one whose ending has run, and a branch already on the base.
  */
-const toDecideOf = (run: Run, t: ToDecide | undefined): RunToDecide | null =>
-  t ? { ...t, said: toDecideWords(run, t), command: t.kind === 'approve' ? `wf approve ${run.id} ${t.step}` : `wf decide ${run.id}` } : null;
+function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[]): RunToDecide | null {
+  if (!t) return null;
+  const said = toDecideWords(run, t);
+  if (t.kind === 'git') return { ...t, said, command: `wf decide ${run.id}` };
+  const step = steps.find((s) => s.name === t.step);
+  return { ...t, back: step ? sendBackTo(step, run) : [t.step], onto: run.branch, said, command: `wf approve ${run.id} ${t.step}` };
+}
 
 /**
  * What sessions cost, as the package adds it up off the engine's `usage.costUsd` (`Spend`: `stepSpend`, `runSpend`): the dollars of the
@@ -451,7 +464,13 @@ export type Touched = { branch: string; radius: ReturnType<typeof touchedBy> };
  * `--shortstat`): `3 files changed, 12 insertions(+), 1 deletion(-)`, trimmed. `stat` is null where git said nothing of it: a branch it no
  * longer has, or one with nothing on it past the run's base.
  */
-export type Standing = BranchStanding & { said: string; stat: string | null };
+export type Standing = BranchStanding & { said: string; stat: string | null; merge: StandingMerge | null };
+
+/**
+ * Whether a branch ahead of the base still merges onto it as the base is now (`mergesOnto`, git's `merge-tree`), and that in words
+ * (`mergeWord`): what an ending that merges would find. Null for a branch on the base or gone, which nothing would merge.
+ */
+export type StandingMerge = MergeWord & { said: string };
 
 /** One file of a branch's check-affecting diff: its unified diff, at most `DIFF_LINES` lines, and how many more it had. */
 export type DiffFile = { path: string; lines: string[]; cut: number };
@@ -887,7 +906,7 @@ function judge(
     waitingOnYou,
     // In the page's order, as `waitingOnYou` is: the words `wf ls` prints after `→ waiting on you:`.
     onYou: onYouWords({ steps: said.steps, waitingOnYou }),
-    toDecide: toDecideOf(run, said.toDecide),
+    toDecide: toDecideOf(run, said.toDecide, steps),
     status,
     // The line `cancelPlan` draws for a finished run, which `status` does not: nothing in flight, and nothing a
     // tick would still file. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands.
@@ -1508,7 +1527,7 @@ async function decisionOf(run: Run): Promise<RunDecision> {
   // Where the result stands against the base branch, and how much it changed, as `wf decide` prints them under the run — none for a run
   // that worked on its base branch itself, whose standing would read `main is on main` and whose own line says so instead.
   const standings: Standing[] = run.isolate
-    ? branchStandings(run, results).map((s) => ({ ...s, said: branchWord(run, s), stat: diffStat(run, s.branch).trim() || null }))
+    ? branchStandings(run, results).map((s) => ({ ...s, said: branchWord(run, s), stat: diffStat(run, s.branch).trim() || null, merge: mergeOf(run, s) }))
     : [];
   const consumed = consumption(views, run);
   const filed = Object.keys(run.steps).filter((name) => run.steps[name]?.taskId);
@@ -1529,6 +1548,13 @@ async function decisionOf(run: Run): Promise<RunDecision> {
     overBudget: overBudgetLine(steps, run, d, spendOf) ?? null,
     commands: commandsOf(run, d, offers, gates, merges(steps)),
   };
+}
+
+/** Whether a branch ahead of the base still merges onto it (`StandingMerge`); null for one that is not ahead, which nothing would merge. */
+function mergeOf(run: Run, standing: BranchStanding): StandingMerge | null {
+  if (standing.where !== 'ahead') return null;
+  const merge = mergesOnto(run.repo, run.branch, standing.branch);
+  return { ...merge, said: mergeWord(merge, run.branch) };
 }
 
 /** Off the engine's view of a try's task. A try with no task, or one the engine has lost, has had none. */

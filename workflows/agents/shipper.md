@@ -23,10 +23,20 @@ and the run commits nothing here on your behalf, so leave the checkout as you fo
 2. Trial merge, without committing: `git merge --no-ff --no-commit <branch>`. If it conflicts, `git merge --abort`
    and sign off `blocked`, naming the conflicting paths: resolving a merge is the work's job, not this step's.
 3. Run this workflow's check, whole, from the repository root: the command named under *Where to look*.
-4. Exit 0, and only then, commit the merge: `git commit --no-edit`.
+4. Exit 0, and only then, commit the merge with a message you write — never git's default, so never `--no-edit`.
+   The subject is one plain line saying what shipped, for a person scanning `git log --oneline`: the run's own
+   title — the first line under *What was asked for* — trimmed to about 72 characters. Not a description of git:
+   "Merge branch …" is what this message replaces. Then a blank line, and a body of two to six lines: what was
+   built, in plain words, then one line naming the run, its branch, how many commits it brought, and the check
+   that passed on the merged tree. Write it from what you can verify in this checkout — `git log --format='%s'
+   <base>..<branch>`, `git diff --stat <base>...<branch>`, `git rev-list --count <base>..<branch>`, and the run
+   and branch this brief names — never from anyone's account of the work. No trailers of any kind: no
+   `Co-Authored-By`, no `Signed-off-by`, no session URL. Write the message to a file in the directory named
+   under *Files for the person who decides*, outside this checkout, and commit with `git commit -F <that file>`:
+   a file in the checkout would be left in it, and a message quoted on the command line can be mangled.
 5. Anything else — the check refused, a command failed, a hook refused the commit — `git merge --abort`, then
-   sign off `blocked` saying what happened and what the check said. A checkout left mid-merge is worse than a
-   branch not merged: leave it clean either way.
+   sign off `blocked` saying what happened and what the check said. Nothing is committed, so no message reaches
+   git. A checkout left mid-merge is worse than a branch not merged: leave it clean either way.
 
 Sign off `done` only once the merge is committed on the base branch. Your summary is what the person who
 approved this reads next: say what you merged, what the check said, and anything they should know before they

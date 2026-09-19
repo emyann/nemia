@@ -160,9 +160,17 @@ test("every dev* folder ends in `ship`: gated, in the repository's checkout, wit
     assert.equal(brief.split("This workflow's check, which its work was judged by:").length, 2, `${folder}: its check, and no other`);
   }
 
-  // One ending, written once: every dev* folder's ship.md is the same file, wiring and the shipper.
+  // One ending, written once: every dev* folder's ship.md is the same wiring and the shipper. A build folder's adds a note after it, the
+  // team's reason to run its build and e2e on the merged tree, which the shipper — one recipe for every folder — does not give.
   const shipIn = (folder: string) => fs.readFileSync(path.join(REPO, 'workflows', folder, 'ship.md'), 'utf8');
-  for (const folder of ['dev-planned', 'dev-build', 'dev-planned-build']) assert.equal(shipIn(folder), shipIn('dev'), folder);
+  assert.equal(shipIn('dev-planned'), shipIn('dev'), 'dev-planned');
+  assert.equal(shipIn('dev-planned-build'), shipIn('dev-build'), 'dev-planned-build');
+  assert.ok(shipIn('dev-build').startsWith(shipIn('dev')), 'dev-build is the same wiring, then its note');
+  const WHY = ["`npm run build` regenerates the web app's route tree", '`npm run e2e` visits every page in both themes', 'the merged tree is the first tree either has seen'];
+  for (const folder of Object.keys(CHECKS)) {
+    const body = said(loadWorkflows(path.join(REPO, 'workflows', folder)).find((s) => s.name === 'ship')!.body);
+    for (const why of WHY) assert.equal(body.includes(why), CHECKS[folder] === E2E, `${folder}: ${why}\n\n${body}`);
+  }
 });
 
 test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`, which the settings allow for implement's sake, and every implement what no step needs", () => {

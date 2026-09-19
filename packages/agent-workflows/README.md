@@ -177,7 +177,8 @@ At `wf start` each node is resolved and frozen on the run, so a run never reads 
 anywhere: the agent's keys are the defaults, a key the step writes wins, and the refusals that depend on the harness
 read the merged keys and name the step. The brief is the agent's instructions, a blank line, then the step's own
 words. Those words are a team's note to its agent — *in this team, also check …* — an escape hatch, not the normal
-case: no shipped step has one. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
+case: two shipped steps have one, the `ship` of `dev-build` and `dev-planned-build`, which tell the shipper why a build
+and an e2e matter on a merged tree. `renderStep` writes a resolved step back as its file was: `agent:`, the keys the step
 set itself, and its own note, never the agent's. `wf start` names each node's agent beside it —
 `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its name alone.
 

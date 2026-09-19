@@ -22,8 +22,21 @@ const BEFORE: Record<string, Array<Record<string, unknown>>> = JSON.parse(fs.rea
  * serves every dev folder. The implementer's plan paragraph is said when a plan is there, which dev-planned said always and dev never;
  * the shipper's third item points to the check under *Where to look*, which `composeBrief` names for each folder, where each ship.md
  * wrote its folder's check out.
+ *
+ * The two build folders' ship bodies moved once more afterwards, and stay in this list: their ship.md got back, as a team's note after
+ * the shipper's instructions (`NOTES`), the reason their old recipe gave for running the build and the e2e on the merged tree.
  */
 const BODIES_REWORDED: string[] = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]);
+
+/**
+ * The shipped steps that keep words of their own after the agent's, as `<folder>/<step>` and a phrase of the note: the ship of each build
+ * folder, told why its check's build and e2e matter on a merged tree — what the reworded shipper, which names no check, no longer said.
+ * Every other shipped step keeps none.
+ */
+const NOTES: Record<string, string> = {
+  'workflows/dev-build/ship': 'the merged tree is the first tree either has seen',
+  'workflows/dev-planned-build/ship': 'the merged tree is the first tree either has seen',
+};
 
 /** The agent each shipped step names, by `<folder>/<step>`: the steps of the dev folders and ui. The supervisor and the codex folder name none. */
 const AGENTS: Record<string, string> = {
@@ -75,7 +88,12 @@ test('every shipped folder resolves to the keys it had before agents, and only t
       const agent = step.agent as { name: string; body: string } | undefined;
       if (agent) {
         named[`${folder}/${String(step.name)}`] = agent.name;
-        assert.equal(agent.body, '', `${folder}/${String(step.name)}: no shipped step keeps words of its own`);
+        const note = NOTES[`${folder}/${String(step.name)}`];
+        if (note === undefined) assert.equal(agent.body, '', `${folder}/${String(step.name)}: keeps no words of its own`);
+        else {
+          assert.ok(agent.body.replace(/\s+/g, ' ').includes(note), `${folder}/${String(step.name)}: its note says ${note}\n\n${agent.body}`);
+          assert.ok(String(step.body).endsWith(`\n\n${agent.body}`), `${folder}/${String(step.name)}: its note comes after the agent's instructions`);
+        }
       }
       if (step.body !== was.body) {
         moved.push(`${folder}/${String(step.name)}`);

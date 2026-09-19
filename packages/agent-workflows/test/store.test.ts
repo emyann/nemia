@@ -1581,8 +1581,13 @@ test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose 
   // Killed at its deadline: the engine settles it `failed`, with no exit code on its attempt and no trailer on its log.
   const killed = await throughCheck('check: npm test\nretries: 1', 'failed');
   killed.logs.set(`${killed.run.id}-implement-check`, 'ok 1 - builds\n');
+  // Cut at its deadline with an exit code on its end — a script that traps the signal and exits — is cut all the same:
+  // the engine ends it `deadline` since P0.5, and the code on that end is how it died, not a verdict on the work.
+  const cut = await throughCheck('check: npm test\nretries: 1', 'failed', 143);
+  cut.settle(`${cut.run.id}-implement-check`, 'failed', undefined, 143, 'deadline');
+  cut.logs.set(`${cut.run.id}-implement-check`, 'ok 1 - builds\n');
 
-  for (const [b, verdict] of [[refused, 1], [killed, 'unfinished']] as const) {
+  for (const [b, verdict] of [[refused, 1], [killed, 'unfinished'], [cut, 'unfinished']] as const) {
     const run = readRun(b.run.id);
     const verdictOf = exitVerdicts(await viewsOf(b.e, run), run);
     assert.equal(verdictOf('implement'), verdict);
@@ -1590,6 +1595,7 @@ test('REFUSED as a verdict: `exitVerdicts` reads `unfinished` for a check whose 
     assert.equal((await list(b.e, run)).steps[0]!.status, `failed ✗ check (${verdictWord(verdict)})`, "`wf ls`'s word, which it read off the log");
   }
   assert.deepEqual((await advance(killed.e, readRun(killed.run.id))).tried, [], 'a check that did not finish spends no retry');
+  assert.deepEqual((await advance(cut.e, readRun(cut.run.id))).tried, [], 'nor does one cut at its deadline, whatever code it exited with');
   assert.deepEqual((await advance(refused.e, readRun(refused.run.id))).tried, ['implement'], 'a refusal does');
 });
 

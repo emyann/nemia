@@ -3431,8 +3431,21 @@ docs/pivot-2026-09-18.md, P0.5. A session asked for a closing statement could st
   cap; and `maxAttempts: 2` restarts after a harness failure too. The run's nudge is also what worked by hand ($0.66–0.93, 25–43 s),
   and it is recorded as a try with its cost.
 
+- **An outcome of one shape.** Every ended attempt carries the agent's statement, untouched, or the machine's reason it has none
+  (the engine README's *Every ended attempt carries its statement or the reason it has none*). Two ends left neither: a stop and a
+  deadline settled their task over an open attempt (4 of 511 settled tasks here), and now end it `operator` or `deadline` first. A
+  third was wrong the other way: a session cut at its budget and listed `done` was recorded `done` and settled `succeeded`; it is
+  `failed` now. No new envelope: `ended` already says both. `exitVerdicts` reads a check cut at its deadline `unfinished` whatever
+  code its process died with (`test/store.test.ts`), as it read one with no end before.
+
 What it leaves:
 
+- **One outcome record for every kind of node.** An agent's end is `ended` {`closeout` | `reason`}; a check's is an exit code read
+  by the run (`exitVerdicts`, `readVerdict` off its log); a script would print JSON. A record common to all three needs: who wrote
+  it — the agent, the machine, a check's process — as a field, not inferred from the node's kind; the payload validated against the
+  node's `output:` wherever it came from, as only an agent's is now (by its harness); a check's exit code mapped to a reason (0
+  passed, a number refused, none unfinished) once, in one place, instead of in `refusedCheck`; and the schema it answered carried
+  with it, so the board can render a payload without reading the folder frozen on the run.
 - **The web app's mirror of `EarlierTry.then`** (`apps/web/src/lib/api.ts`) does not name `signoff`. The api sends it, and the board's
   words come from `tryNote`; the type is a mirror only. Owned by apps/, not changed here.
 

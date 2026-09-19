@@ -101,9 +101,10 @@ settled and was released in the same pass; it was gone from `claude agents`, `ae
 transcript, and a second task filed with `resumeFrom` its id said the word back. `ae logs` finds a released session by the id recorded when its attempt ended, or when its task
 settled with the attempt still open, and asks the task's own harness for it.
 
-A task settled with no end on the record — stopped by a person, or past its deadline — has its
-session's id written on its `settled` entry instead, so that session is released like any other and
-`ae logs` still reads it. One kind is left listed: a task that asked for a `worktree` has its session
+A task stopped by a person, or past its deadline, ends its open attempt — reason `operator` or `deadline` — before it
+settles, and that end carries its session's id (since 2026-09-19; below). A journal from before settled over the open
+attempt, and has the id on its `settled` entry instead, so that session is released like any other and `ae logs` still
+reads it. One kind is left listed: a task that asked for a `worktree` has its session
 stopped and not removed, because `claude rm` deletes the worktree with the session and the task's work
 is in it. (So is a session whose task settled before its id was recorded: removed, it could not be
 read.) `release` is optional on `Runner`: the detached runner has none, because its run files are the
@@ -675,6 +676,37 @@ so the case has not been seen live either way. Claude Code 2.1.271's bundle has 
 when its turn ends without the call, and whether it then ends itself `done` with nothing said — a way to a success
 without a statement that quiet does not cover — is what `test/live.test.ts` measures (`AE_LIVE=1`), and it has not been
 run.
+
+### Every ended attempt carries its statement or the reason it has none
+
+The contract, over every runner and every way an attempt ends: an `ended` entry carries **the agent's statement** —
+`closeout`, the payload its session gave, untouched — or **the machine's reason** it has none, in `reason`. Never
+neither, and never words the machine wrote in the agent's name: the engine writes no `closeout` of its own, and a
+statement it read is recorded as read.
+
+| `reason` | recorded | the attempt |
+|---|---|---|
+| `harness` | the harness's own state | its harness ended it: `done` with the statement, where one was asked for; `failed` or `stopped` as the harness said; `done` with nothing, on a task that asked for nothing |
+| `unsigned` | `failed` | ended — quiet, or `done` — without the statement it was asked for (above) |
+| `lost` | `failed` | vanished, or its worker stopped beating: nobody said anything |
+| `unstartable` | `failed` | its spawn was refused, and nothing ran |
+| `budget` | `failed` | its harness cut it at the task's spend cap — `failed` whatever state it was left in |
+| `operator` | `stopped` | a person stopped its task, and the session was stopped before its harness ended it |
+| `deadline` | `failed` | its task ran past `deadlineSeconds`, and the session was stopped before its harness ended it |
+
+A statement given before the cut is carried on `operator` and `deadline` ends too; a session its harness had already
+ended when the cut came is recorded as its harness ended it.
+
+**Two ends left neither, until 2026-09-19.** A stop and a deadline settled the task over its open attempt, with no
+`ended` at all: 4 of the 511 settled tasks in this machine's store, all stopped by a person, every one on a task that
+had asked for a statement. `decide` now ends the attempt first (`cut`, beside `endOf`), and the task settles on the next
+step as before. And an attempt its harness cut at its budget while listing it `done`, or quiet, was recorded `done`,
+reason `budget` — and its task settled `succeeded`, past the rule that a spent budget settles `failed`. None is on the
+record here; the contract test found it. `test/decide.test.ts`'s CONTRACT walks every sighting, with and without a
+schema, a statement, a spent budget and a cut, to its settle, and fails on either.
+
+A check (agent-workflows' `check:`) keeps its verdict in its exit code, not a statement: one cut at its deadline is
+`deadline`, and its exit code, if its process left one, says how it died, not what it found.
 
 ### The workload's own word
 

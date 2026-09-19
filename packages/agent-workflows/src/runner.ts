@@ -625,8 +625,9 @@ export const spendReader = (views: ReadonlyMap<string, TaskView>): SpendOf => (t
 export const exitVerdicts = (views: ReadonlyMap<string, TaskView>, run: Run) => (step: string): Verdict | undefined => {
   const taskId = run.steps[step]?.check?.taskId;
   if (!taskId) return undefined;
-  const exitCode = views.get(taskId)?.state.attempts.at(-1)?.exitCode;
-  return typeof exitCode === 'number' ? exitCode : 'unfinished';
+  // A check the operator or its deadline cut short did not finish, whatever code its process died with.
+  const last = views.get(taskId)?.state.attempts.at(-1);
+  return typeof last?.exitCode === 'number' && last.reason !== 'deadline' && last.reason !== 'operator' ? last.exitCode : 'unfinished';
 };
 
 /** The harness's own id for a task's last session — what `--resume` takes. */

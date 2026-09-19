@@ -2041,6 +2041,18 @@ test('REFUSED by name at `wf start --after`: a run given twice, one the store do
   assert.equal(afterRefusal(['a-1'], { repo: '/repo/', branch: 'main' }, parentOf), null);
 });
 
+test('REFUSED at `wf start --after`, on either side, when a folder run is involved: one waits on none, and none waits on one', () => {
+  const folder = { ...record('n-1'), place: { kind: 'folder' as const }, repo: undefined, baseRef: undefined, branch: undefined, isolate: undefined };
+  const parents: Record<string, Pick<ParentRun, 'record' | 'gone'>> = { 'a-1': { record: record('a-1') }, 'n-1': { record: folder as unknown as Run } };
+  const parentOf = (id: string): Pick<ParentRun, 'record' | 'gone'> => parents[id] ?? {};
+  assert.equal(afterRefusal(['n-1'], { repo: '/repo', branch: 'main' }, parentOf), "--after n-1: n-1 is a folder run (workspace: folder), which never ships onto a branch, so this run would wait for ever. When n-1's work is done, start it without --after n-1.");
+  // A folder run's own --after is refused whatever it names — a git run, a folder run, or no run at all.
+  for (const id of ['a-1', 'n-1', 'x-9']) {
+    assert.equal(afterRefusal([id], { place: { kind: 'folder' } }, parentOf), `--after ${id}: this run's team works in folders (workspace: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`);
+  }
+  assert.equal(afterRefusal([], { place: { kind: 'folder' } }, parentOf), null);
+});
+
 // ─── a run that waited on runs, handed what they concluded ──────────────────
 
 test("a root of a run that waited on runs is handed each parent under `## From run <id>`, after what it was asked: the first line of the parent's brief, each terminal step's summary and declared fields, fenced as data — or why they cannot be given — and a run with none composes exactly as before", () => {

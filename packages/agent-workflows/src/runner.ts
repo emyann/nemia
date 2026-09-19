@@ -21,14 +21,14 @@ export { isGitRun, placeOf } from './run.ts';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, signoffsSpent, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { FolderRun, GitRun, PlaceKind } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
-import { agentNameRefusal, agentsDir, agentsFolderRefusal, agentUsers, agentVersion, AGENTS_FOLDER, fansOut, frontmatterKey, parseAgent, renderAgent, type Agent, type AgentDraft, isReadme, linkRefusal, loadAgents, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
+import { agentNameRefusal, agentsDir, agentsFolderRefusal, agentUsers, agentVersion, AGENTS_FOLDER, fansOut, frontmatterKey, isFolderTeam, parseAgent, renderAgent, type Agent, type AgentDraft, isReadme, linkRefusal, loadAgents, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
-import { folderPlace } from './places.ts';
+import { folderPlace, workRoot } from './places.ts';
 import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
 import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
@@ -932,6 +932,14 @@ export const runId = (brief: string): string => {
  */
 function stepsToStart(workflowDir: string, isolate: boolean): Workflow[] {
   const steps = loadWorkflows(workflowDir);   // validated before anything is spent
+  // A team that says `workspace: folder` (every step or none: `validate`) works in folders the run makes, where there is no base branch to
+  // work on in place: --no-worktree would name one, so it is refused rather than read as nothing.
+  if (!isolate && isFolderTeam(steps)) {
+    throw Object.assign(new Error(
+      `--no-worktree: this workflow's steps say \`workspace: folder\`, so each works in a folder the run makes, with no git repository — there is no base branch for them to work on in place.\n`
+      + `Start it without --no-worktree.`,
+    ), { exitCode: 2 });
+  }
   if (!isolate && fansOut(steps)) {
     throw new Error(
       'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
@@ -994,13 +1002,20 @@ function refuseInclude(repo: string, isolate: boolean): void {
  * (`wf start --gate`, a card's `gate:`): refused before anything is written when one is given twice or names no step of the workflow
  * (`gateRefusal`), and frozen on the record. Left out, the record has none.
  */
-export function start(opts: { brief: string; repo: string; workflowDir: string; isolate?: boolean; after?: readonly string[]; inputs?: readonly string[]; from?: { inbox: string }; gates?: readonly string[] }): Run {
+export function start(opts: { brief: string; repo: string; repoNamed?: boolean; workflowDir: string; isolate?: boolean; after?: readonly string[]; inputs?: readonly string[]; from?: { inbox: string }; gates?: readonly string[] }): Run {
   const isolate = opts.isolate ?? true;
   const steps = stepsToStart(opts.workflowDir, isolate);
+  const folder = isFolderTeam(steps);
+  if (folder && opts.repoNamed) {
+    throw Object.assign(new Error(
+      `--repo ${opts.repo}: this workflow's steps say \`workspace: folder\`, so the run works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n`
+      + `Start it without --repo, or start a workflow whose steps work on a repository.`,
+    ), { exitCode: 2 });
+  }
   const gates = opts.gates ?? [];
   const refusedGates = gateRefusal(gates, steps);
   if (refusedGates) throw Object.assign(new Error(refusedGates), { exitCode: 2 });
-  refuseInclude(opts.repo, isolate);
+  if (!folder) refuseInclude(opts.repo, isolate);
   const inputs = (opts.inputs ?? []).map((given): InputFile => {
     const resolved = path.resolve(given);
     const at = fs.statSync(resolved, { throwIfNoEntry: false });
@@ -1009,17 +1024,10 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
   const refusedInputs = inputRefusal(inputs);
   if (refusedInputs) throw Object.assign(new Error(refusedInputs), { exitCode: 2 });
   const id = runId(opts.brief);
-  const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
   const after = opts.after ?? [];
-  const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentRecord);
-  if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
-
-  const run: Run = {
-    id,
-    repo: opts.repo,
-    workspace,
-    baseRef,
-    isolate,
+  // Keyed in the order the steps run, as `loadWorkflows` gives them: what `wf ls`, `wf decide` and the board list a run's steps in.
+  const stepRecords = Object.fromEntries(steps.map((s) => [s.name, { taskId: null }]));
+  const told = {
     brief: opts.brief,
     workflowDir: path.resolve(opts.workflowDir),
     workflow: steps,
@@ -1027,11 +1035,30 @@ export function start(opts: { brief: string; repo: string; workflowDir: string; 
     ...(inputs.length ? { inputs: inputs.map((f) => path.basename(f.resolved)) } : {}),
     ...(opts.from ? { from: { inbox: opts.from.inbox } } : {}),
     ...(gates.length ? { gates: [...gates] } : {}),
-    branch,
-    // Keyed in the order the steps run, as `loadWorkflows` gives them: what `wf ls`, `wf decide` and the board list a run's steps in.
-    steps: Object.fromEntries(steps.map((s) => [s.name, { taskId: null }])),
-    createdAt: new Date().toISOString(),
   };
+  let run: Run;
+  if (folder) {
+    // No git at all: the repository `wf start` was typed in is not looked at, and the run's own directory in the store is its workspace,
+    // each step's folder made beneath it when the step is filed (`folderPlace`). `--after` is refused here, a folder run having no branch to wait for.
+    const refusedAfter = afterRefusal(after, { place: { kind: 'folder' } }, parentRecord);
+    if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
+    run = { id, place: { kind: 'folder' }, workspace: workRoot(runsDir(), id), ...told, steps: stepRecords, createdAt: new Date().toISOString() };
+  } else {
+    const { workspace, baseRef, branch } = makeWorkspace(opts.repo, isolate);
+    const refusedAfter = afterRefusal(after, { repo: opts.repo, branch }, parentRecord);
+    if (refusedAfter) throw Object.assign(new Error(refusedAfter), { exitCode: 2 });
+    run = {
+      id,
+      repo: opts.repo,
+      workspace,
+      baseRef,
+      isolate,
+      ...told,
+      branch,
+      steps: stepRecords,
+      createdAt: new Date().toISOString(),
+    };
+  }
   // Copied before the record is written, so a record never names a file that is not there. A copy that fails takes the directory back with it.
   if (inputs.length) {
     const dir = inputsDir(run);

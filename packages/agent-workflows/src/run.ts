@@ -914,12 +914,13 @@ export function afterRefusal(
     const without = `start it without --after ${id}`;
     if (seen.has(id)) return `--after ${id} is given twice, and a run waits on another once. Give each run one --after.`;
     seen.add(id);
-    const { record, gone } = parentOf(id);
-    if (!record) return `--after ${id}: the store has no run ${id}. --after takes a run this one waits on, by its id — wf ls lists them.`;
-    // A run waits for another to SHIP, onto its base branch: a folder run has neither, so it is refused on either side of --after.
+    // A run waits for another to SHIP, onto its base branch: a folder run has neither, so it is refused on either side of --after — this
+    // side whatever the id names, since no run could be waited on.
     if (child.repo === undefined) {
       return `--after ${id}: this run's team works in folders (workspace: folder), and --after waits for a run to ship onto a git branch, which a folder run has none of. Start it without --after, once ${id} is done.`;
     }
+    const { record, gone } = parentOf(id);
+    if (!record) return `--after ${id}: the store has no run ${id}. --after takes a run this one waits on, by its id — wf ls lists them.`;
     if (record.repo === undefined) {
       return `--after ${id}: ${id} is a folder run (workspace: folder), which never ships onto a branch, so this run would wait for ever. When ${id}'s work is done, ${without}.`;
     }

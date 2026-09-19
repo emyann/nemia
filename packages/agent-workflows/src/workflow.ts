@@ -1319,6 +1319,9 @@ export function workflowDescription(dir: string): string | null {
   return null;
 }
 
+/** Whether a team works in folders the run makes, with no git repository (`workspace: folder`): every step says it, or none does (`validate`). */
+export const isFolderTeam = (steps: readonly Pick<Workflow, 'workspace'>[]): boolean => steps.length > 0 && steps.every((s) => s.workspace === 'folder');
+
 /**
  * The ways a folder of markdown is not a workflow: a step waits on one that does not exist, the steps
  * wait on each other, or a step reads the output of one that has not finished or declares none. All

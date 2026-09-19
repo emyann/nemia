@@ -513,6 +513,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       const run = start({
         brief: card ? card.body : text?.trim() ?? arg,
         repo,
+        // Named or not matters to a team that says `workspace: folder`, which works on no repository and refuses one named.
+        repoNamed: how.repo !== undefined,
         // A folder from here, or one of the repository's by name: `--workflows dev` is <repo>/workflows/dev. Without the flag, a card's
         // `workflow:`, found from its plan folder as `wf plan` finds it.
         workflowDir: how.workflows === undefined && card?.workflow !== undefined

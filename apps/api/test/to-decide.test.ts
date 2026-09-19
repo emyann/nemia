@@ -220,6 +220,47 @@ test("an ending that waits on several steps offers a send-back to each, and one 
   }
 });
 
+test("an ending that ran on its approval and stopped on the base branch offers both ways on: ship again, and a send-back through the loop with its words", async () => {
+  const id = 'r-stopped';
+  const loop = [
+    { name: 'implement', after: [], body: 'Implement it.', harness: 'codex' },
+    { name: 'review', after: ['implement'], body: 'Review it.', harness: 'codex', loop: 'implement', rounds: 3, output: { file: 'review.json', schema: {
+      type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false,
+    } } },
+    { name: 'ship', after: ['review'], body: SHIP_BODY, harness: 'claude', workspace: 'main', gate: true },
+  ];
+  branchOff(repo, `wf/${id}/implement`, 'src/stopped.ts', 'export const stopped = 1;\n');
+  signedOff(`${id}-implement`, repo);
+  // Review handed on: `again: false`, flat beside the outcome as a harness writes it.
+  write(path.join(root, 'engine', 'tasks', `${id}-review.jsonl`), jsonl([
+    { kind: 'filed', at, brief: 'Review it.', cwd: repo, maxAttempts: 1, harness: 'codex' },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: `ae/${id}-review/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'done', summary: 'Holds.', needs: null, artifacts: [], again: false } },
+    { kind: 'settled', at, outcome: 'succeeded' },
+  ]));
+  write(path.join(root, 'engine', 'tasks', `${id}-ship.jsonl`), jsonl([
+    { kind: 'filed', at, brief: 'Ship it.', cwd: repo, maxAttempts: 1, harness: 'claude' },
+    { kind: 'starting', at, attempt: 1 },
+    { kind: 'spawned', at, attempt: 1 },
+    { kind: 'ended', at, attempt: 1, sessionId: `ae/${id}-ship/1`, observed: 'done', reason: 'harness', closeout: { outcome: 'blocked', summary: 'The trial merge conflicts.', needs: 'the branch has to take main', artifacts: [] } },
+    { kind: 'settled', at, outcome: 'succeeded' },
+  ]));
+  writeRun({
+    id, repo, baseRef: base, workflow: loop,
+    steps: {
+      implement: { taskId: `${id}-implement`, branch: `wf/${id}/implement` },
+      review: { taskId: `${id}-review`, branch: `wf/${id}/implement` },
+      ship: { taskId: `${id}-ship`, workspace: repo, branch: 'main' },
+    },
+  });
+  const { commands } = await decisionOf(id);
+  assert.deepEqual(commands?.map((c) => [c.label, c.command]), [
+    ['send back', `wf retry ${id} review --message "<objection>"`],
+    ['once more', `wf retry ${id} ship`],
+  ]);
+});
+
 test('a finished run whose folder says nothing about shipping: `to decide` is its branch ahead of the base, and the command is `wf decide`', async () => {
   const id = 'r-plain';
   const branch = `wf/${id}/implement`;

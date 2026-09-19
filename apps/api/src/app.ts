@@ -1467,9 +1467,10 @@ function lessonOf(touched: readonly Touched[]): Lesson {
 
 /**
  * A once-more line's command: `wf retry <run> <step>`, `--recheck` when it says so, or `wf round <run> <step>` — with `--budget <amount>`
- * past a cap — after the colon and two spaces.
+ * past a cap — after the colon and two spaces. Or a send-back from an ending that stopped on the base branch, which needs its words:
+ * `wf retry <run> <step> --message "<objection>"`.
  */
-const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck| --budget <amount>)?)/;
+const ONCE_MORE = /:\s{2}(wf (?:retry|round) \S+ \S+(?: --recheck| --budget <amount>| --message "<objection>")?)/;
 
 /**
  * A step waiting at its gate on a person, and the steps a send-back of it names (`sendBackTo`): what `wf decide` prints under the step, as
@@ -1495,7 +1496,10 @@ type AtGate = { step: string; back: string[] };
 function commandsOf(run: Run, d: Decision, offers: readonly string[], gates: readonly AtGate[] = [], endingMerges = false): DecideCommand[] {
   if (d.kind !== 'awaiting') return [];
   const once = [
-    ...offers.map((said): DecideCommand => ({ label: 'once more', command: ONCE_MORE.exec(said)?.[1] ?? said, said })),
+    ...offers.map((said): DecideCommand => {
+      const command = ONCE_MORE.exec(said)?.[1] ?? said;
+      return { label: command.endsWith('--message "<objection>"') ? 'send back' : 'once more', command, said };
+    }),
     ...gates.flatMap(({ step, back }): DecideCommand[] => {
       const approve = `wf approve ${run.id} ${step}`;
       return [

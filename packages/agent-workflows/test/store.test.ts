@@ -309,6 +309,8 @@ test('the run files a signed step\'s check itself: the frozen command, in its wo
   assert.deepEqual(readRun(run.id).steps.implement, {
     // Still the step's own task: apps/api reads `taskId`, and the check is not it.
     taskId: `${run.id}-implement`, workspace: run.repo, branch: run.branch, check: { taskId: id },
+    // Handed off in the pass that filed its check: what it left is committed once for this try, and never again (`handOffDue`).
+    handedOff: `${run.id}-implement`,
   });
 
   const spec = tasks.get(id)!.spec;

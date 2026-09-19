@@ -906,6 +906,16 @@ test("a step is no longer handed off once a later step works in its workspace �
     'a follower in a worktree of its own takes nothing from this one');
 });
 
+test("REFUSED at shipped defaults: a step is handed off once for each try — what a person leaves in its workspace afterwards is not committed under its name", () => {
+  const chain: Workflow[] = [step('review'), { ...step('ship', ['review']), workspace: 'main', gate: true }];
+  const p = phases({ t1: 'succeeded', t2: 'succeeded', t9: 'failed' });
+  const at = (review: Run['steps'][string]) => run({}, { steps: { review, ship: { taskId: 't9', workspace: '/repo' } } });
+  // The incident: review handed off, its ending filed in another checkout — and every pass after committed a person's edits as review's.
+  assert.deepEqual(handOffDue(chain, at({ taskId: 't1', workspace: '/w' }), p), ['review'], 'not yet handed off: due');
+  assert.deepEqual(handOffDue(chain, at({ taskId: 't1', workspace: '/w', handedOff: 't1' }), p), [], 'handed off for this try: never again');
+  assert.deepEqual(handOffDue(chain, at({ taskId: 't2', workspace: '/w', handedOff: 't1' }), p), ['review'], 'a new try is handed off anew');
+});
+
 test('`wf decide` names every step that did not earn a follower, each in its own word', () => {
   const four: Workflow[] = [{ ...step('a'), check: 'npm test' }, step('b'), step('c'), step('d')];
   const r = run({}, {

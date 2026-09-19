@@ -3592,6 +3592,31 @@ What a run-level guard ("do not start a run above 90%") would need — out of sc
    read from the api, bounded by the same keep.
 3. A refusal a person can act on, with the window, its reset and a way past it (a flag of `wf start`, say), shown on the queued card.
 
+## Shipped: the judge package (P5, first slice)
+
+P5 of `docs/pivot-2026-09-18.md`, its first slice: `packages/agent-judge`, a new package. Nothing in `packages/agent-workflows` or `apps/`
+changed but this file. It asks TypeSafe's Jev (`jev-1.13.0`) a typed question once, and records what came of it. Its README
+is the account.
+
+- **Optional.** It imports nothing from the workspace, and nothing imports it or `@typesafe-ai/sdk`: `test/boundary.test.ts`
+  refuses either. Without `TYPESAFE_API_KEY`, every question reads `unsure` and nothing is claimed,
+  written or sent, so a key set later asks with no `--reask`. `judge status` prints
+  `ready` or `off: …`, and exits 0 either way.
+- **Never in a tick.** Nothing in a tick, in `assess`, in `wf decide` or in a gate calls it. Before anything does, three things
+  must hold: the owner has adopted §5's proposed wording, the ask is filed from the pass as a task (as a check is), and the
+  key is kept out of `wf up`'s environment.
+- **Asked once.** A key is sha256 over the pinned model, the question's words and options, and the state's hash. Each key and
+  asking is a write-once file: a claim with `wx`, then an answer or failure written through `link`. The first whole answer to
+  land is linked as the key's `answer.json` and read alone, so a late answer never changes what was read. A failure is a
+  fact, and only `--reask` asks it again.
+- **The judgment.** `decide` gives `yes`, `no` or `unsure`, and every failure kind reads `unsure`.
+- **Effect** is inside the package only. The facade is plain Promises.
+- **`judge card <file>`** asks four properties of a card: web, plan, clear and size. It prints the shipped `dev*` folder they
+  map to, or why the card stays in the inbox.
+- **Tried live** on 2026-09-19 against two real cards, each asked twice, with the record in a job's temp directory; the
+  second asking made 0 requests. `card-p06.md` stayed in the inbox, unsure about planning first (P 0.74).
+  `card-agents-board.md` mapped to `dev-planned-build`. The thresholds have not been measured on held-out cards.
+
 ## 1. A run that grows steps from a plan
 
 **Registered.** The README, under the splitter:

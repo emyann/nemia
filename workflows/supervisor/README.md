@@ -52,6 +52,16 @@ wf retry <run> supervise --message "Merge it."                          # the an
 There is no cap on the number of answers: each is a try, and each try continues the session before it. What
 ends the run is a person — `wf cancel <run>`.
 
+**Its session is capped at 200k tokens of context** (`context: 200k`), because it is the one session here that never
+ends: every answer continues it, and it grows for as long as it lives. Past about 173k it compacts — summarises what it
+has read and carries on — and every answer continues it on the same window. A turn whose reads refill the window within
+three turns of a compaction, three times in a row, trips Claude Code's guard instead: the step reads `blocked`, and
+`wf logs <run> supervise` ends on *"Autocompact is thrashing: the context refilled to the limit within 3 turns of the
+previous compact…"* (agent-engine's open issue 26 measured it at 100k with 22k-token reads; at 200k the same reads
+compacted and signed off). Answer it with `wf retry <run> supervise --message "Read in smaller chunks."` and it carries
+on, or change the window: a run keeps the window it froze at `wf start`, so raise `context:` in `supervise.md` (up to
+`1000k`), `wf cancel <run>`, and start a fresh supervisor — which starts with an empty context too.
+
 When nothing needs a person it waits and reads again — a foreground wait that ends by itself, never a
 background loop, which is how a session was once held for seventy-seven minutes with nothing running in it.
 Signing off is how it asks, so it signs off only when it has something to ask.

@@ -3331,7 +3331,7 @@ The README's *An agent is a node's attachment* says the rules; this is what the 
   (`agents-before-after.test.ts` prints each diff). The implementer's plan paragraph became conditional on a plan being below; the ship
   recipe's item 3 runs "the command named under *Where to look*", and `composeBrief` names there each check the run's work was judged by
   (`039055a`), so the four `ship.md` files are one file and each ship brief names its own folder's check — proven by a test, not by prose.
-  No shipped step keeps words of its own. The supervisor, the package's codex `workflows/` and `wf-examples` stay without `agent:`.
+  No shipped step kept words of its own. The supervisor, the package's codex `workflows/` and `wf-examples` stay without `agent:`.
 - **`wf start` names each node's agent**: `implement (implementer) → review (reviewer) → ship (shipper)`; a node with none by its name.
 - **The board edits the node.** The listing's `spec` is resolved, so `ListedStep.own` carries the keys and note the step writes itself,
   and a PUT carries it back: without it a step saved as listed would write its agent's keys into its file. The builder picks the agent
@@ -3346,6 +3346,18 @@ What it leaves:
 - **Other attachments.** A script, an HTTP call, a typed judgement, a remote agent: `agent:` is the one kind built.
 - **Teams and dispatch.** Which agent takes a card, or a team of agents chosen per brief (`docs/pivot-2026-09-18.md`), is not here: a
   folder still names its agents by hand.
+
+Two of its leftovers were taken up after it (`docs/pivot-2026-09-18.md` §6, P1, *Still open from it*):
+
+- **The build folders' ship says why again, as a team's note.** The reworded recipe no longer said that the build regenerates the web
+  app's route tree, the e2e visits every page in both themes, and the merged tree is the first tree either has seen. `ship.md` in
+  `dev-build` and `dev-planned-build` says it after the shipper's instructions; `dev` and `dev-planned` say nothing of their own.
+  `agents-before-after.test.ts` still holds every resolved key and the same eight moved bodies, and names the two steps that keep a note
+  (`NOTES`); every other shipped step must keep none.
+- **The supervisor's session is capped, `context: 200k`.** It never ends and grows on every answer, so it is the session a cap is for.
+  `supervisor.test.ts` files the shipped folder and checks each of five answers continues the session on that window; the fixture test
+  names it as the one key a shipped step gained (`KEYS_ADDED`). The supervisor's README says what a thrash looks like — the step
+  `blocked`, its log ending on Claude Code's *"Autocompact is thrashing"* — and what to do: answer it, or raise the cap and start a fresh one.
 
 ## 1. A run that grows steps from a plan
 

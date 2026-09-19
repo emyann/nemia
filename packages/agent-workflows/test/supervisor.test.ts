@@ -112,9 +112,10 @@ test('the supervisor is one step that never ends: in the repository\'s checkout,
   const steps = loadWorkflows(FOLDER);
   assert.deepEqual(steps.map((s) => s.name), ['supervise']);
   const supervise = steps[0]!;
-  const { after, workspace, slot, harness, model, remote, disallow, check, tools, output, gate, loop, resume, input } = supervise;
-  assert.deepEqual({ after, workspace, slot, harness, model, remote, disallow, check, tools, output, gate, loop, resume, input }, {
-    after: [], workspace: 'main', slot: 'none', harness: 'claude', model: 'opus', remote: true,
+  const { after, workspace, slot, harness, model, effort, context, remote, disallow, check, tools, output, gate, loop, resume, input } = supervise;
+  assert.deepEqual({ after, workspace, slot, harness, model, effort, context, remote, disallow, check, tools, output, gate, loop, resume, input }, {
+    // A window of its own: the one session here that never ends grows on every answer, so it compacts rather than reads up to a million.
+    after: [], workspace: 'main', slot: 'none', harness: 'claude', model: 'opus', effort: 'high', context: 200_000, remote: true,
     disallow: DENIED, check: undefined, tools: undefined, output: undefined, gate: undefined, loop: undefined, resume: undefined, input: undefined,
   });
   assert.deepEqual(terminalSteps(steps).map((s) => s.name), ['supervise'], 'it is the whole workflow');
@@ -196,7 +197,7 @@ test("REFUSED by the shipped folder: the git a session in a person's checkout mu
 
 // ─── a step that never ends ─────────────────────────────────────────────────
 
-test('a step answered five times over keeps working: each answer a try of the same session, told what was said, with nothing capping the count', async () => {
+test('a step answered five times over keeps working: each answer a try of the same session, told what was said, on the window it was started with, and nothing capping the count', async () => {
   const repo = aRepo();
   const { e, tasks, filings, settle } = board();
   const run = start({ brief: 'supervise this repository', repo, workflowDir: FOLDER });
@@ -205,6 +206,7 @@ test('a step answered five times over keeps working: each answer a try of the sa
   assert.deepEqual(filings, [`${run.id}-supervise`], 'filed once, in the repository\'s own checkout');
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.cwd, repo);
   assert.equal(tasks.get(`${run.id}-supervise`)!.spec.remoteControl, true, 'bridged, as `remote: true` says');
+  assert.equal(tasks.get(`${run.id}-supervise`)!.spec.contextTokens, 200_000, 'capped, as `context: 200k` says');
 
   for (let n = 1; n <= 5; n++) {
     const taskId = n === 1 ? `${run.id}-supervise` : `${run.id}-supervise-try${n}`;
@@ -221,6 +223,9 @@ test('a step answered five times over keeps working: each answer a try of the sa
     assert.ok(tasks.has(next), `try ${n + 1} is on the board: ${filings.join(', ')}`);
     assert.match(tasks.get(next)!.spec.brief, new RegExp(`## Your answer[\\s\\S]*yes, merge r-${n}`), `try ${n + 1} is told answer ${n}`);
     assert.equal(tasks.get(next)!.spec.resumeFrom, `native-${taskId}`, `try ${n + 1} continues try ${n}'s session`);
+    // Claude Code's copy of a resumed session keeps only the flags it is given: an answer filed without the window would run the
+    // session that grows the most on the model's whole one again.
+    assert.equal(tasks.get(next)!.spec.contextTokens, 200_000, `try ${n + 1} continues on the same window`);
   }
   assert.equal(readRun(run.id).steps.supervise?.tries?.length, 5, 'five tries behind the one it is on, and the sixth running');
   assert.equal(filings.length, 6);

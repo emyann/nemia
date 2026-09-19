@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, writeWorkflow } from 'agent-workflows';
-import { AGENTS_FOLDER, EFFORTS, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, agentsDir, EFFORTS, loadAgents, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './workflows.ts';
@@ -41,7 +41,7 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
  * does not export: `test/builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
-  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
+  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'text', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
   tools: 'list', disallow: 'list', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
@@ -245,7 +245,7 @@ function judgedWith(dir: string, steps: readonly StepDraft[], schemas: readonly 
     try { return fs.readFileSync(path.resolve(dir, file), 'utf8'); } catch { return undefined; }
   };
   try {
-    parseFolder(steps.map((step) => [step.name, renderStep(step)] as const), read);
+    parseFolder(steps.map((step) => [step.name, renderStep(step)] as const), read, loadAgents(agentsDir(dir)));
     return null;
   } catch (err) {
     if (!(err instanceof WorkflowError)) throw err;

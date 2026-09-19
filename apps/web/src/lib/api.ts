@@ -599,6 +599,8 @@ export type WorkflowStepSpec = {
   after: string[];
   resume: string | null;
   input: string[];
+  /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
+  agent: string | null;
   permissionMode: string | null;
   tools: string[] | null;
   /** What the session may not have (`disallow:`): empty where the step denies nothing. */

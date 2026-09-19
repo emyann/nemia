@@ -19,7 +19,7 @@ export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, doll
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
-import { agentsFolderRefusal, fansOut, isReadme, linkRefusal, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
+import { agentsDir, agentsFolderRefusal, fansOut, isReadme, linkRefusal, loadAgents, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
@@ -1089,7 +1089,8 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   const read = (file: string): string | undefined => {
     try { return fs.readFileSync(path.resolve(at, file), 'utf8'); } catch { return undefined; }
   };
-  const parsed = parseFolder(texts, read);
+  const agents = loadAgents(agentsDir(at));
+  const parsed = parseFolder(texts, read, agents);
 
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
@@ -1109,7 +1110,7 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   for (const [name, text] of texts) {
     const step = parsed.find((s) => s.name === name);
     put(`${name}.md`, text, (there) => {
-      try { return isDeepStrictEqual(parseWorkflow(name, there, read), step); } catch { return false; }
+      try { return isDeepStrictEqual(parseWorkflow(name, there, read, agents), step); } catch { return false; }
     });
   }
   if (readme !== undefined) put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);

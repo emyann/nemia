@@ -7,11 +7,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { AGENT_KEYS, agentsDir, loadAgents, loadWorkflows, parseAgent, STEP_KEYS, workflowFolder, workflowsIn, WorkflowError, type Agent } from '../src/workflow.ts';
+import { execFileSync } from 'node:child_process';
+import { AGENT_KEYS, agentsDir, loadAgents, loadWorkflows, parseAgent, parseWorkflow, renderStep, STEP_KEYS, workflowFolder, workflowsIn, WorkflowError, type Agent, type Agents } from '../src/workflow.ts';
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'wf-agents-'));
 process.env.WF_ROOT = ROOT;
-const { writeWorkflow } = await import('../src/runner.ts');
+const { start, writeWorkflow } = await import('../src/runner.ts');
 
 /** A folder of workflows under a fresh directory, each file written from `files`, by its path from the folder. */
 function workflows(files: Record<string, string>): string {
@@ -132,4 +133,120 @@ test('REFUSED at shipped defaults: a workflow named agents — loaded, named bar
   assert.ok(written.startsWith(`${folder} is agents/, the folder of the agents`), written);
   assert.deepEqual(fs.readdirSync(folder), ['implementer.md'], 'nothing written');
   assert.equal(fs.readFileSync(path.join(folder, 'implementer.md'), 'utf8'), before);
+});
+
+/** The agents a step may name, by name, each parsed from its file's text. */
+const agentsOf = (files: Record<string, string>): Agents => new Map(Object.entries(files).map(([name, text]) => [name, agent(name, text)]));
+
+const IMPLEMENTER = '---\ndescription: Does the work\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallow: SendMessage\n---\nImplement what you are asked.\n';
+
+test("a step that names an agent runs with the agent's role keys, its own keys winning, and is told the agent's words, then its own", () => {
+  const agents = agentsOf({ implementer: IMPLEMENTER });
+  // The step is `build`, not `implementer`: nothing ties a step's name to its agent's.
+  const build = parseWorkflow('build', '---\nagent: implementer\nafter: plan\nmodel: sonnet\ncheck: npm test\n---\nBuild the parser first.\n', undefined, agents);
+  assert.equal(build.name, 'build');
+  assert.equal(build.harness, 'claude');
+  assert.equal(build.model, 'sonnet', "the step's own key wins");
+  assert.equal(build.effort, 'high', "the agent's key is the default");
+  assert.equal(build.context, 200000);
+  assert.deepEqual(build.disallow, ['SendMessage']);
+  assert.deepEqual(build.after, ['plan']);
+  assert.equal(build.check, 'npm test');
+  assert.equal(build.body, 'Implement what you are asked.\n\nBuild the parser first.');
+  assert.deepEqual(build.agent, { name: 'implementer', keys: ['after', 'model', 'check'], body: 'Build the parser first.' });
+
+  const bare = parseWorkflow('build', '---\nagent: implementer\n---\n', undefined, agents);
+  assert.equal(bare.body, 'Implement what you are asked.', "no note of its own: the agent's words alone");
+  assert.equal(bare.model, 'opus');
+
+  const same = parseWorkflow('build', '---\nharness: claude\nmodel: opus\neffort: high\ncontext: 200k\ndisallow: SendMessage\n---\nImplement what you are asked.\n');
+  const { agent: _agent, ...resolved } = bare;
+  assert.deepEqual(resolved, same, 'resolved, it is the step written out whole');
+  assert.equal(same.agent, undefined, 'a step with no agent carries no `agent`');
+});
+
+test('REFUSED at shipped defaults: a step naming an agent there is not, listing the agents there are — or saying there are none', () => {
+  const agents = agentsOf({ implementer: IMPLEMENTER, reviewer: '---\nmodel: opus\n---\nReview it.\n' });
+  const unknown = refusal(() => parseWorkflow('build', '---\nagent: builder\n---\nBuild it.\n', undefined, agents));
+  assert.equal(unknown, 'build: `agent: builder` is not an agent here. The agents are: implementer, reviewer — name one, or write agents/builder.md beside them.');
+  const none = refusal(() => parseWorkflow('build', '---\nagent: builder\n---\nBuild it.\n'));
+  assert.ok(none.startsWith('build: `agent: builder` is not an agent here. There are none: an agent is a file in agents/'), none);
+  const empty = refusal(() => parseWorkflow('build', '---\nagent: quiet\n---\n', undefined, agentsOf({ quiet: '---\nmodel: opus\n---\n' })));
+  assert.ok(empty.startsWith("build: the body is empty, and so is agents/quiet.md's"), empty);
+});
+
+test("a schema the agent's output: names is read beside the agent, and one the step names beside the step", () => {
+  const dir = workflows({
+    'agents/reviewer.md': '---\noutput: review.schema.json\n---\nReview it.\n',
+    'agents/review.schema.json': '{"type":"object","properties":{"verdict":{"type":"string"}},"required":["verdict"],"additionalProperties":false}',
+    'dev/implement.md': 'Implement it.\n',
+    'dev/check.md': '---\nagent: reviewer\nafter: implement\n---\n',
+    'dev/judge.md': '---\nagent: reviewer\nafter: implement\noutput: judge.schema.json\n---\n',
+    'dev/judge.schema.json': '{"type":"object","properties":{"ok":{"type":"boolean"}},"required":["ok"],"additionalProperties":false}',
+  });
+  const steps = loadWorkflows(path.join(dir, 'dev'));
+  const check = steps.find((s) => s.name === 'check')!;
+  assert.equal(check.output?.file, 'review.schema.json');
+  assert.deepEqual(Object.keys((check.output?.schema as { properties: object }).properties), ['verdict']);
+  const judge = steps.find((s) => s.name === 'judge')!;
+  assert.deepEqual(Object.keys((judge.output?.schema as { properties: object }).properties), ['ok']);
+});
+
+test('REFUSED at shipped defaults: a broken agent, only when a step names it, naming agents/<file> — a linked one too', () => {
+  const dir = workflows({
+    'agents/implementer.md': IMPLEMENTER,
+    'agents/broken.md': '---\nretries: 2\n---\nBreak it.\n',
+    'elsewhere/linked.md': '---\nmodel: opus\n---\nLinked.\n',
+    'dev/build.md': '---\nagent: implementer\n---\n',
+    'bad/build.md': '---\nagent: broken\n---\n',
+    'linked/build.md': '---\nagent: linked\n---\n',
+  });
+  fs.symlinkSync(path.join(dir, 'elsewhere', 'linked.md'), path.join(dir, 'agents', 'linked.md'));
+  assert.equal(loadWorkflows(path.join(dir, 'dev'))[0]!.model, 'opus', 'a broken agent beside it stops no step that does not name it');
+  const broken = refusal(() => loadWorkflows(path.join(dir, 'bad')));
+  assert.ok(broken.startsWith('build: `agent: broken` names an agent whose file is refused — agents/broken.md: `retries` is wiring, and belongs on the step:'), broken);
+  const linked = refusal(() => loadWorkflows(path.join(dir, 'linked')));
+  assert.ok(linked.startsWith(`build: \`agent: linked\` names an agent whose file is refused — ${path.join(dir, 'agents', 'linked.md')} is a link`), linked);
+});
+
+test("renderStep writes a resolved step as its file was: `agent:`, the step's own keys and its own note — never the agent's", () => {
+  const agents = agentsOf({ implementer: IMPLEMENTER });
+  const text = '---\nafter: plan\nresume: plan\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n';
+  const build = parseWorkflow('build', text, undefined, agents);
+  const rendered = renderStep(build);
+  assert.equal(rendered, '---\nafter: plan\nresume: plan\nagent: implementer\nmodel: sonnet\n---\nBuild the parser first.\n');
+  assert.deepEqual(parseWorkflow('build', rendered, undefined, agents), build, 'it reads back as the same step');
+  assert.equal(renderStep(parseWorkflow('build', '---\nagent: implementer\n---\n', undefined, agents)), '---\nagent: implementer\n---\n\n');
+
+  const draft = renderStep({ name: 'build', after: [], agent: 'implementer', model: 'sonnet', body: 'Build it.' });
+  assert.equal(draft, '---\nagent: implementer\nmodel: sonnet\n---\nBuild it.\n', "a draft naming its agent is its own keys and note");
+});
+
+test('writeWorkflow resolves against the agents beside the folder, keeps a file that reads as its step, and refuses an agent there is not', () => {
+  const dir = workflows({ 'agents/implementer.md': IMPLEMENTER, 'dev/build.md': '---\n# the implementer, cheaper\nagent: implementer\nmodel: sonnet\n---\n' });
+  const folder = path.join(dir, 'dev');
+  const steps = loadWorkflows(folder);
+  const written = writeWorkflow(folder, steps, undefined, { anywhere: true });
+  assert.deepEqual(written.kept, ['build.md'], 'the file with its comment is kept');
+  assert.deepEqual(written.steps, steps);
+
+  const unknown = refusal(() => writeWorkflow(folder, [{ name: 'build', after: [], agent: 'builder', body: 'Build it.' }], undefined, { anywhere: true }));
+  assert.ok(unknown.startsWith('build: `agent: builder` is not an agent here. The agents are: implementer'), unknown);
+  assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\n# the implementer, cheaper\nagent: implementer\nmodel: sonnet\n---\n', 'nothing written');
+});
+
+test('wf start freezes the resolved steps on the run: an agent edited after the start changes no step of the run', () => {
+  const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
+  const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, stdio: ['ignore', 'pipe', 'pipe'] });
+  git('init', '-q', '-b', 'main');
+  fs.writeFileSync(path.join(repo, 'README.md'), 'x\n');
+  git('add', '-A');
+  git('commit', '-q', '-m', 'base');
+  const dir = workflows({ 'agents/implementer.md': IMPLEMENTER, 'dev/build.md': '---\nagent: implementer\n---\nBuild it.\n' });
+  const run = start({ brief: 'build it', repo, workflowDir: path.join(dir, 'dev'), isolate: false });
+  fs.writeFileSync(path.join(dir, 'agents', 'implementer.md'), '---\nmodel: haiku\n---\nSomething else.\n');
+  const [build] = run.workflow;
+  assert.equal(build!.model, 'opus');
+  assert.equal(build!.body, 'Implement what you are asked.\n\nBuild it.');
+  assert.deepEqual(build!.agent, { name: 'implementer', keys: [], body: 'Build it.' });
 });

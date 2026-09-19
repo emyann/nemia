@@ -44,6 +44,8 @@ export type WorkflowStepSpec = {
   workspace: 'main' | null;
   /** `slot: none`: the run takes no run slot (`WF_MAX_RUNS`). Null for a step without the line, which is the only other thing a step can say. */
   slot: 'none' | null;
+  /** The agent attached to the step (`agent:`), in agents/ beside the folder: the rest of the keys are resolved with it. Null for none. */
+  agent: string | null;
   permissionMode: string | null;
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallow:`): empty where the step denies nothing. */
@@ -107,7 +109,7 @@ export type WorkflowStepPage = { workflow: string; from: WorkflowSource; dir: st
  * `renderStep` writes it), `output:` as the file it names, and null for none.
  */
 function keyValue(step: Workflow, key: StepKey): string | null {
-  const value = key === 'output' ? step.output?.file : step[key];
+  const value = key === 'output' ? step.output?.file : key === 'agent' ? step.agent?.name : step[key];
   if (value === undefined) return null;
   if (key === 'context' && typeof value === 'number') return contextText(value);
   if (Array.isArray(value)) return value.length ? value.join(', ') : null;
@@ -185,6 +187,7 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
   input: step.input ?? [],
   workspace: step.workspace ?? null,
   slot: step.slot ?? null,
+  agent: step.agent?.name ?? null,
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,
   disallow: step.disallow ?? [],

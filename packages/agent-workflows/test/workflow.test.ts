@@ -329,7 +329,8 @@ const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${lines}\n
 
 test('every key a step has is read — none is accepted and then dropped', () => {
   // Every key but `workspace:`, which no step may set beside a `check:`, and `slot:`, which is a workflow of one step's: both are read below.
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot'>, string> = {
+  // And `agent:`, which names an agent the step is resolved with: read below, and in test/agents.test.ts.
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '150000', permissionMode: 'dontAsk',
     tools: 'Read, Grep, Glob, Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50', check: 'npm test && npm run typecheck', retries: '1', gate: 'true', output: 'review.schema.json',
     loop: 'implement', rounds: '2',
@@ -340,7 +341,9 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   assert.equal(ending.workspace, 'main');
   const watching = fm('supervise', 'slot: none');
   assert.equal(watching.slot, 'none');
-  const all = { ...w, workspace: ending.workspace, slot: watching.slot };
+  const attached = parseWorkflow('build', '---\nagent: implementer\n---\nBuild it.\n', undefined, new Map([['implementer', { name: 'implementer', keys: {}, body: '', read: () => undefined }]]));
+  assert.equal(attached.agent?.name, 'implementer');
+  const all = { ...w, workspace: ending.workspace, slot: watching.slot, agent: attached.agent };
   for (const key of STEP_KEYS) assert.notEqual(all[key], undefined, `${key} is on the list and never read`);
   assert.equal(w.deadlineSeconds, 900);
   assert.equal(w.retries, 1);
@@ -380,7 +383,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 });
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
-  const list = "A step's keys are: after, resume, input, workspace, slot, harness, model, effort, context, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
+  const list = "A step's keys are: after, resume, input, workspace, slot, agent, harness, model, effort, context, permissionMode, tools, disallow, remote, deadlineSeconds, maxAttempts, budget, check, retries, gate, output, loop, rounds.";
   assert.throws(() => fm('review', 'colour: red'), (e: unknown) => {
     assert.ok(e instanceof WorkflowError);
     assert.equal(e.exitCode, 2, 'the author has something to fix');
@@ -1048,13 +1051,14 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
 test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
   // Every key but `workspace:`, which the parser refuses beside a `check:`, and `slot:`, which is a workflow of one step's: both render below.
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot'>, string> = {
+  // `agent:` renders in test/agents.test.ts, which has agents to resolve it with.
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent'>, string> = {
     after: 'implement', resume: 'implement', input: 'implement', harness: 'claude-detached', model: 'opus', effort: 'xhigh', context: '200000', permissionMode: 'dontAsk',
     tools: 'Read, Grep,Glob , Bash', disallow: 'Bash(npm run build), SendMessage', remote: 'true', deadlineSeconds: '900', maxAttempts: '2', budget: '2.50',
     check: 'npm test && node -e "console.log(1 ? 2 : 3)"', retries: '0', gate: 'true', output: 'review.schema.json', loop: 'implement', rounds: '2',
   };
   const step = parseWorkflow('review', `---\n${Object.entries(values).reverse().map(([k, v]) => `${k}: ${v}`).join('\n')}\n---\n\nDo the work.\n\nAll of it.\n\n`, read);
-  for (const key of STEP_KEYS) if (key !== 'workspace' && key !== 'slot') assert.notEqual(step[key], undefined, key);
+  for (const key of STEP_KEYS) if (key !== 'workspace' && key !== 'slot' && key !== 'agent') assert.notEqual(step[key], undefined, key);
   const text = renderStep(step);
   assert.equal(text, [
     '---',

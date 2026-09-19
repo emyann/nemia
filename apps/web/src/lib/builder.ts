@@ -14,7 +14,7 @@ export const DEFAULT_ROUNDS = 3;
 
 /** A step that sets nothing, as the listing has one. */
 export const UNSET: Readonly<WorkflowStepSpec> = {
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], agent: null, permissionMode: null, tools: null, disallow: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null,
 };
 

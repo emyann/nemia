@@ -27,7 +27,7 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { CELL_HEIGHT } from '../../src/lib/factory.ts';
 import { expectApart, expectBeneath, expectBetween, expectCount, expectDrawn, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled, WAIT_MS, watch } from './checks.ts';
-import { arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, ENDING, FAKE, GATED, HELD, INBOX, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedQueue, seedWorkflows, SESSION, SHIPPED, UNMERGED, WORKFLOWS } from './seed.ts';
+import { AGENTS, arrivalLine, CARDS, CHECKOUT, COSTLY, DIAMOND, DIAMOND_RUNS, DRAFT_TRANSCRIPT, ENDING, FAKE, GATED, HELD, INBOX, LOOPING, NEIGHBOUR, QUEUE, QUEUED, queuedCardText, refusedWhy, REGISTRY, SAYING, seed, seedCheckout, seedDiamond, seedFeed, seedInbox, seedQueue, seedWorkflows, SESSION, SHIPPED, UNMERGED, WORKFLOWS } from './seed.ts';
 import { exitOn, launch, visitAll, type PageSpec } from './visit.ts';
 
 const WEB = path.resolve(import.meta.dirname, '..', '..');
@@ -39,7 +39,7 @@ const OUT = path.resolve(process.env.WF_ARTIFACTS || path.join(REPO, '.e2e'));
 const START_MS = 30_000;
 
 /** The menu's places, in its order: the Inbox first. */
-const PLACES = ['Inbox', 'Factory', 'Runs', 'Workflows', 'Capabilities'];
+const PLACES = ['Inbox', 'Factory', 'Runs', 'Workflows', 'Agents', 'Capabilities'];
 
 /** On every page: the menu, with each of its places, in its order. */
 async function sidebar(page: Page): Promise<void> {
@@ -222,12 +222,12 @@ async function pasteSchema(builder: Locator, step: string, text: string): Promis
   if (file !== `${step}.schema.json`) throw new Refused(`a schema pasted for ${step} is written beside it as ${step}.schema.json — the form says ${file}`);
 }
 
-/** A step added on a builder: its name and what its agent is told. */
+/** A step added on a builder: its name and what it is told. */
 async function addStep(builder: Locator, name: string, body: string): Promise<void> {
   await builder.getByRole('button', { name: 'Add a step' }).click();
   const form = builder.getByRole('form', { name: 'Add a step' });
   await form.getByRole('textbox', { name: 'Step name' }).fill(name);
-  await form.getByRole('textbox', { name: 'What its agent is told' }).fill(body);
+  await form.getByRole('textbox', { name: 'What it is told' }).fill(body);
   await form.getByRole('button', { name: 'Add', exact: true }).click();
   await expectVisible(builder.locator(`.react-flow__node[data-id="${name}"]`), `the step added, ${name}, is a block on the canvas`);
 }
@@ -2082,7 +2082,7 @@ const PAGES: PageSpec[] = [
         const builder = mine.locator(`section[data-builder="${yours.name}"]`);
         const keys = builder.locator('[data-step-form="plan"]');
         await expectVisible(keys, "plan's form, open as the builder opens");
-        await keys.getByRole('textbox', { name: 'What its agent is told' }).fill('Write PLAN.md, briefly.');
+        await keys.getByRole('textbox', { name: 'What it is told' }).fill('Write PLAN.md, briefly.');
         fs.writeFileSync(planFile, byHand);
         const [answered] = await Promise.all([
           stale.waitForResponse(puts(yours.name), { timeout: WAIT_MS }),
@@ -2103,7 +2103,7 @@ const PAGES: PageSpec[] = [
         await expectCount(builder.locator('[data-refused]'), 0, 'read again, the refusal goes');
         await expectVisible(builder.locator('span', { hasText: /^Saved$/ }), 'and the draft is the folder as it is now: nothing unsaved');
         await expectVisible(builder.locator('.react-flow__node[data-id="plan"] dd', { hasText: /^test -f PLAN\.md$/ }), "plan's block shows the check written by hand");
-        const body = await builder.locator('[data-step-form="plan"]').getByRole('textbox', { name: 'What its agent is told' }).inputValue();
+        const body = await builder.locator('[data-step-form="plan"]').getByRole('textbox', { name: 'What it is told' }).inputValue();
         if (body !== 'Write PLAN.md.') throw new Refused(`plan's form reads the body on disk, and the change drawn is let go — it shows ${JSON.stringify(body)}`);
         await stale.waitForLoadState('networkidle');
         const expected = `request answered 409: PUT ${answered.url()}`;
@@ -2142,7 +2142,7 @@ const PAGES: PageSpec[] = [
         await expectTexts(keys.locator('[data-agent-note]'), [`Told after ${agent}'s instructions, agents/${agent}.md.`], 'and says whose instructions it is told after');
         const picker = keys.locator('[data-field="agent"] select');
         const offered = await picker.locator('option').allTextContents();
-        if ((await picker.inputValue()) !== agent || JSON.stringify(offered) !== JSON.stringify(['no agent', agent, other])) {
+        if ((await picker.inputValue()) !== agent || JSON.stringify(offered) !== JSON.stringify(['no agent', agent, other, AGENTS.seeded.name])) {
           throw new Refused(`the picker names ${agent}, and offers no agent and each agent of yours — it offers ${JSON.stringify(offered)} on ${JSON.stringify(await picker.inputValue())}`);
         }
         const model = keys.locator('[data-field="model"] input');
@@ -2162,7 +2162,7 @@ const PAGES: PageSpec[] = [
 
         await picker.selectOption('');
         await expectCount(keys.locator('[data-agent-note]'), 0, 'with no agent, nothing is told before its body');
-        await expectVisible(keys.getByRole('textbox', { name: 'What its agent is told' }), 'and its body is all it is told');
+        await expectVisible(keys.getByRole('textbox', { name: 'What it is told' }), 'and its body is all it is told');
         await crewed.waitForLoadState('networkidle');
         if (problems().length) throw new Refused(`the agent's page saw nothing refused — it saw:\n    ${problems().join('\n    ')}`);
       } finally {
@@ -2180,7 +2180,7 @@ const PAGES: PageSpec[] = [
         const form = page.getByRole('form', { name: 'New workflow' });
         await form.getByRole('textbox', { name: 'Workflow name' }).fill(name);
         await form.getByRole('textbox', { name: 'First step' }).fill('plan');
-        await form.getByRole('textbox', { name: 'What its agent is told' }).fill(plan);
+        await form.getByRole('textbox', { name: 'What it is told' }).fill(plan);
         const [created] = await Promise.all([
           page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/workflows/yours', { timeout: WAIT_MS }),
           form.getByRole('button', { name: 'Make it' }).click(),
@@ -2867,7 +2867,7 @@ const PAGES: PageSpec[] = [
     },
   },
   {
-    // A step's page, from its block on the Workflows page: what its agent is told, rendered, then every key a step may set — set or not — with
+    // A step's page, from its block on the Workflows page: what it is told, rendered, then every key a step may set — set or not — with
     // its value as the loader reads it and what it means, and Source: the file as written. It writes nothing: the checkout's folder is as it was.
     name: 'workflow-step',
     route: `/workflows/repo/${WORKFLOWS.good.name}/review`,
@@ -2887,6 +2887,165 @@ const PAGES: PageSpec[] = [
       await expectKeys(page, file, `/api/workflows/repo/${good.name}/review`, good.review.keys);
       await expectSource(file, body, path.join(folder, 'review.md'));
       if (JSON.stringify(filesIn(folder)) !== JSON.stringify(before)) throw new Refused(`a step's page writes nothing — ${folder} changed while it was open`);
+    },
+  },
+  {
+    // The agents beside the workflows: yours, which the board writes, and the repository's, read-only, each with the nodes that name it, linked.
+    // The repository's `implementer` read, and the node that names it followed to its step's page, which links back; `scribe`'s form read with
+    // its result schema; an agent made, edited and removed, each on disk as the package writes it. And, in a page of its own, a removal refused
+    // because a node still names the agent. Every write is taken back, so the next visit, in either theme, reads the store as seeded.
+    name: 'agents',
+    route: '/agents',
+    expect: async (page) => {
+      await sidebar(page);
+      await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Agents' }), 'the sidebar lights Agents on its page');
+      const { good } = WORKFLOWS;
+      const { seeded, made, naming } = AGENTS;
+      const agentsDir = path.join(store!, 'workflows', 'agents');
+      const before = filesIn(agentsDir);
+      const card = (p: Page, from: string, name: string) => p.locator(`section[data-agent="${name}"][data-from="${from}"]`);
+      const agentPath = (from: string, name: string) => `/agents/${from}/${name}`;
+
+      const yours = page.locator('section[aria-label="Yours"]');
+      const theirs = page.locator('section[aria-label="This repository"]');
+      await expectCount(yours.locator('section[data-agent]'), 1, `yours lists one agent, ${seeded.name}`);
+      await expectCount(theirs.locator('section[data-agent]'), 1, `the repository's lists one, ${good.agent.name}`);
+      const scribe = card(page, 'yours', seeded.name);
+      await expectVisible(scribe.getByText(seeded.description, { exact: true }), `${seeded.name} with its description`);
+      await expectVisible(scribe.locator('dd', { hasText: /^sonnet$/ }), 'and the keys it sets');
+      await expectTexts(scribe.locator('[data-used-by]'), ['No node names it yet.'], `and that no node names ${seeded.name}`);
+      const implementer = card(page, 'repo', good.agent.name);
+      const node = implementer.locator(`[data-used-by] a[data-node="${good.name}/implement"]`);
+      await expectVisible(node, `${good.agent.name} links the node that names it, ${good.name} › implement`);
+      if ((await node.getAttribute('href')) !== `/workflows/repo/${good.name}/implement`) throw new Refused(`the node's link is its step's page — it is ${await node.getAttribute('href')}`);
+
+      // The repository's agent, read-only: every field read and none written, no Save, and how to start one of yours from it.
+      await implementer.getByRole('link', { name: good.agent.name, exact: true }).click();
+      await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
+      const repoForm = page.locator(`form[data-agent-form="${good.agent.name}"]`);
+      await expectVisible(repoForm, `${good.agent.name}'s form`);
+      if ((await repoForm.getByRole('textbox', { name: 'Model' }).inputValue()) !== 'opus') throw new Refused(`${good.agent.name}'s model reads opus, as its file sets it`);
+      for (const field of ['Name', 'Model', 'Instructions']) {
+        if ((await repoForm.getByRole('textbox', { name: field }).getAttribute('readonly')) === null) throw new Refused(`the repository's agent is read-only: its ${field} is not`);
+      }
+      await expectCount(repoForm.getByRole('button', { name: 'Save' }), 0, 'and it offers no Save');
+      await expectCount(page.getByRole('button', { name: 'Remove…' }), 0, 'nor Remove');
+      await expectVisible(page.locator('[data-read-only]', { hasText: `cp ${path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`)} ~/.agent-workflows/workflows/agents/` }), 'and says how to start one of yours from it');
+      const file = page.locator('section[aria-label="The file"]');
+      await file.getByRole('button', { name: 'Source' }).click();
+      const shown = await file.locator('pre[data-source]').textContent();
+      const onDisk = fs.readFileSync(path.join(store!, 'checkout', 'workflows', 'agents', `${good.agent.name}.md`), 'utf8');
+      if (shown !== onDisk) throw new Refused(`Source is the agent's file byte for byte — it shows ${JSON.stringify(shown)}`);
+      await file.getByRole('button', { name: 'Source' }).click();
+      await settled(page);
+      await page.screenshot({ path: path.join(OUT, `agents-repo-${await themeOf(page)}.png`), fullPage: true });
+
+      // Its node, followed: the step's page names the agent attached to it, linked back.
+      await page.locator(`[data-used-by] a[data-node="${good.name}/implement"]`).click();
+      await page.waitForURL((url) => url.pathname === `/workflows/repo/${good.name}/implement`, { timeout: WAIT_MS });
+      const back = page.locator(`[data-step-agent] a[data-agent-link="${good.agent.name}"]`);
+      await expectVisible(back, `implement's page names its agent, ${good.agent.name}, as a link`);
+      await back.click();
+      await page.waitForURL((url) => url.pathname === agentPath('repo', good.agent.name), { timeout: WAIT_MS });
+
+      // Yours: scribe's form, its result schema read from the file its output: names.
+      await page.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'networkidle' });
+      const scribeForm = page.locator(`form[data-agent-form="${seeded.name}"]`);
+      await expectVisible(scribeForm, `${seeded.name}'s form`);
+      if ((await scribeForm.getByRole('textbox', { name: 'File' }).inputValue()) !== seeded.keys.output) throw new Refused(`${seeded.name}'s result schema is ${seeded.keys.output}`);
+      if ((await scribeForm.getByRole('textbox', { name: 'Its fields' }).inputValue()) !== `${seeded.schema}\n`) throw new Refused(`and its fields are the schema's text — it shows ${JSON.stringify(await scribeForm.getByRole('textbox', { name: 'Its fields' }).inputValue())}`);
+      const instructions = await scribeForm.getByRole('textbox', { name: 'Instructions' }).inputValue();
+      if (instructions.trim() !== seeded.body) throw new Refused(`and its instructions are its body — they read ${JSON.stringify(instructions)}`);
+      await expectVisible(scribeForm.getByRole('button', { name: 'Save' }), 'yours offers Save');
+      if (!(await scribeForm.getByRole('button', { name: 'Save' }).isDisabled())) throw new Refused('Save waits for a change');
+
+      // Made: the form, filled, creates agents/<name>.md as the package writes it, and opens its page.
+      const madeFile = path.join(agentsDir, `${made.name}.md`);
+      try {
+        await page.goto(new URL('/agents', page.url()).href, { waitUntil: 'networkidle' });
+        await page.getByRole('link', { name: 'New agent' }).click();
+        await page.waitForURL((url) => url.pathname === '/agents/new', { timeout: WAIT_MS });
+        const form = page.getByRole('form', { name: 'New agent' });
+        await form.getByRole('textbox', { name: 'Name' }).fill(made.name);
+        await form.getByRole('textbox', { name: 'Description' }).fill(made.description);
+        await form.getByRole('textbox', { name: 'Model' }).fill(made.model);
+        await form.getByRole('textbox', { name: 'Instructions' }).fill(made.body);
+        await settled(page);
+        await page.screenshot({ path: path.join(OUT, `agents-new-${await themeOf(page)}.png`), fullPage: true });
+        const [created] = await Promise.all([
+          page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/agents/yours', { timeout: WAIT_MS }),
+          form.getByRole('button', { name: 'Create agent' }).click(),
+        ]);
+        if (created.status() !== 201) throw new Refused(`the api makes the agent — it answered ${created.status()}: ${await created.text()}`);
+        await page.waitForURL((url) => url.pathname === agentPath('yours', made.name), { timeout: WAIT_MS });
+        const written = `---\ndescription: ${made.description}\nmodel: ${made.model}\n---\n${made.body}\n`;
+        if (!fs.existsSync(madeFile) || fs.readFileSync(madeFile, 'utf8') !== written) throw new Refused(`agents/${made.name}.md is written as the package writes an agent — it holds ${fs.existsSync(madeFile) ? JSON.stringify(fs.readFileSync(madeFile, 'utf8')) : 'nothing'}`);
+
+        // Edited: its model changed and saved, against the version it was read at.
+        const madeForm = page.locator(`form[data-agent-form="${made.name}"]`);
+        await expectVisible(madeForm, `the page of ${made.name}, made`);
+        await madeForm.getByRole('textbox', { name: 'Model' }).fill(made.edited);
+        const [saved] = await Promise.all([
+          page.waitForResponse((r) => r.request().method() === 'PUT' && new URL(r.url()).pathname === `/api/agents/yours/${made.name}`, { timeout: WAIT_MS }),
+          madeForm.getByRole('button', { name: 'Save' }).click(),
+        ]);
+        if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);
+        const edited = written.replace(`model: ${made.model}`, `model: ${made.edited}`);
+        if (fs.readFileSync(madeFile, 'utf8') !== edited) throw new Refused(`the edit is on disk — agents/${made.name}.md holds ${JSON.stringify(fs.readFileSync(madeFile, 'utf8'))}`);
+        await expectVisible(madeForm.getByRole('button', { name: 'Save', disabled: true }), 'once saved, the form is the agent as it now reads, and Save waits again');
+        await settled(page);
+        await page.screenshot({ path: path.join(OUT, `agents-edit-${await themeOf(page)}.png`), fullPage: true });
+
+        // Removed: asked twice, then gone from disk and from the list.
+        await page.getByRole('button', { name: 'Remove…' }).click();
+        const [removed] = await Promise.all([
+          page.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/agents/yours/${made.name}`, { timeout: WAIT_MS }),
+          page.locator('[data-remove-asks]').getByRole('button', { name: 'Remove', exact: true }).click(),
+        ]);
+        if (removed.status() !== 200) throw new Refused(`the api removes the agent — it answered ${removed.status()}: ${await removed.text()}`);
+        await page.waitForURL((url) => url.pathname === '/agents', { timeout: WAIT_MS });
+        await expectCount(card(page, 'yours', made.name), 0, `${made.name} is gone from the list`);
+      } finally {
+        fs.rmSync(madeFile, { force: true });
+      }
+
+      // Refused, in a page of its own whose one refusal is the point: scribe removed while a node of yours names it. The package's sentence,
+      // word for word, with the node linked, and nothing removed.
+      const namingDir = path.join(store!, 'workflows', naming);
+      fs.mkdirSync(namingDir, { recursive: true });
+      fs.writeFileSync(path.join(namingDir, 'write.md'), `---\nagent: ${seeded.name}\n---\nWrite the notes.\n`);
+      const refused = await page.context().newPage();
+      try {
+        const { problems } = watch(refused);
+        await refused.goto(new URL(agentPath('yours', seeded.name), page.url()).href, { waitUntil: 'networkidle' });
+        await expectVisible(refused.locator(`[data-used-by] a[data-node="${naming}/write"]`), `${seeded.name} is attached to ${naming} › write`);
+        await refused.getByRole('button', { name: 'Remove…' }).click();
+        const [answered] = await Promise.all([
+          refused.waitForResponse((r) => r.request().method() === 'DELETE' && new URL(r.url()).pathname === `/api/agents/yours/${seeded.name}`, { timeout: WAIT_MS }),
+          refused.locator('[data-remove-asks]').getByRole('button', { name: 'Remove', exact: true }).click(),
+        ]);
+        const { error, users } = (await answered.json()) as { error?: string; users?: string[] };
+        if (answered.status() !== 409 || !error?.startsWith(`agents/${seeded.name}.md is named by a step beside it — ${naming}/write — `) || JSON.stringify(users) !== JSON.stringify([`${naming}/write`])) {
+          throw new Refused(`the package refuses to remove an agent a node names — the api answered ${answered.status()}: ${JSON.stringify({ error, users })}`);
+        }
+        const alert = refused.locator('[data-agent-refused]');
+        await expectVisible(alert, 'the refusal is shown, not swallowed');
+        const said = await alert.locator('p.font-mono').textContent();
+        if (said !== error) throw new Refused(`the refusal is the package's sentence, verbatim — it shows ${JSON.stringify(said)}`);
+        await expectVisible(alert.locator(`a[data-node="${naming}/write"]`), 'with the node that names it, linked');
+        if (JSON.stringify(filesIn(agentsDir)) !== JSON.stringify(before)) throw new Refused(`nothing is removed on a refusal — ${agentsDir} changed`);
+        await settled(refused);
+        await refused.screenshot({ path: path.join(OUT, `agents-refused-${await themeOf(refused)}.png`), fullPage: true });
+        await refused.waitForLoadState('networkidle');
+        const expected = `request answered 409: DELETE ${answered.url()}`;
+        const seen = problems();
+        const others = seen.filter((p) => p !== expected && !/^console error: Failed to load resource: the server responded with a status of 409\b/.test(p));
+        if (!seen.includes(expected) || others.length) throw new Refused(`the refused page saw its one refusal and nothing else — it saw:\n    ${seen.join('\n    ')}`);
+      } finally {
+        await refused.close();
+        fs.rmSync(namingDir, { recursive: true, force: true });
+      }
+      if (JSON.stringify(filesIn(agentsDir)) !== JSON.stringify(before)) throw new Refused(`the page puts the store back — ${agentsDir} holds ${filesIn(agentsDir).map(([n]) => n).join(', ')}`);
     },
   },
   {

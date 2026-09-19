@@ -3,7 +3,7 @@ import path from 'node:path';
 import { themeOf } from '../board.ts';
 import { cardOf, cardsDrawn, expectClearOfEachOther } from '../canvas.ts';
 import { expectCount, expectVisible, Refused, settled } from '../checks.ts';
-import { ENDING, lines, UNMERGED, write } from '../seed.ts';
+import { lines, write } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -79,9 +79,12 @@ export default {
   route: '/',
   expect: async (page) => {
     const { id, ending, back, onto } = LONG_NAMES;
-    // Dated between ENDING and UNMERGED, which the grid puts in the last column, so it lands above one of them: a card one cell beneath it.
-    const dated = (run: string) => Date.parse(JSON.parse(fs.readFileSync(path.join(store!, 'runs', `${run}.json`), 'utf8')).createdAt);
-    const written = seedLongNames(store!, new Date((dated(ENDING.id) + dated(UNMERGED.id)) / 2).toISOString());
+    // Dated before every run in the store, so the grid, oldest first, puts it in the first cell — the top of its column, with the default
+    // floor's cards beneath it. Dated among the others, it moves whenever a run joins or leaves the default floor, and lands in its last row.
+    const runs = path.join(store!, 'runs');
+    const oldest = Math.min(...fs.readdirSync(runs).filter((file) => file.endsWith('.json'))
+      .map((file) => Date.parse(JSON.parse(fs.readFileSync(path.join(runs, file), 'utf8')).createdAt)).filter((at) => !Number.isNaN(at)));
+    const written = seedLongNames(store!, new Date(oldest - 60_000).toISOString());
     const card = cardOf(page, id);
     try {
       await page.reload({ waitUntil: 'networkidle' });
@@ -99,7 +102,9 @@ export default {
       await expectVisible(line, `the card has ${ending}'s gate line`);
       const title = await line.getAttribute('title');
       if (!title?.includes(whole)) throw new Refused(`the gate line is whole on hover — its title is ${JSON.stringify(title)}`);
-      const rows = await line.evaluate((el) => Math.round(el.getBoundingClientRect().height / parseFloat(getComputedStyle(el).lineHeight)));
+      // In the card's own pixels (`offsetHeight`), not the screen's: the floor is drawn zoomed out, and under half its size a row read off
+      // the screen rounds to none.
+      const rows = await line.evaluate((el) => Math.round((el as HTMLElement).offsetHeight / parseFloat(getComputedStyle(el).lineHeight)));
       if (rows !== 1) throw new Refused(`the gate line holds one row whatever the names — it is ${rows} rows`);
       await page.screenshot({ path: path.join(OUT, `factory-gate-long-names-card-${await themeOf(page)}.png`), fullPage: true });
     } finally {

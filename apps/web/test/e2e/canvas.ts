@@ -93,6 +93,23 @@ export async function expectClearOfEachOther(page: Page): Promise<void> {
   if (over.length) throw new Refused(`no card on the floor reaches over the card beneath it — ${over.join('; ')}`);
 }
 
+/**
+ * Every card on a floor just fitted is clear of the panels drawn over the floor — the buttons at its top, the zoom controls, the legend
+ * and the minimap at its bottom — so each can be read and pressed where it is. Measured, not seen: a card's footer under the legend is
+ * drawn, and a press on its Approve lands on the legend (learned by the run that kept the runs waiting on you on the floor).
+ */
+export async function expectClearOfPanels(page: Page, when: string): Promise<void> {
+  const under = await page.locator('.react-flow').first().evaluate((floor) => {
+    const boxes = (selector: string) => Array.from(floor.querySelectorAll(selector)).map((el) => ({ el, box: el.getBoundingClientRect() })).filter(({ box }) => box.height > 0);
+    const panels = boxes('.react-flow__panel');
+    return boxes('.react-flow__node').filter(({ el }) => !(el as HTMLElement).dataset.id?.includes('/')).flatMap(({ el, box }) =>
+      panels
+        .filter(({ box: at }) => box.left < at.right && at.left < box.right && box.top < at.bottom && at.top < box.bottom)
+        .map(({ el: panel }) => `${(el as HTMLElement).dataset.id} is under the ${panel.getAttribute('aria-label') ?? Array.from(panel.classList).join('.')} panel`));
+  });
+  if (under.length) throw new Refused(`${when}, the fitted floor puts no card under a panel over it — ${under.join('; ')}`);
+}
+
 export const samePlace = (a: { x: number; y: number }, b: { x: number; y: number }): boolean => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1;
 export const said = ({ x, y }: { x: number; y: number }): string => `(${Math.round(x)}, ${Math.round(y)})`;
 export const cardsOf = (page: Page, ...ids: string[]): Locator => page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));

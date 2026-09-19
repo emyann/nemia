@@ -64,7 +64,30 @@ const edgeTypes = { state: StateEdge };
 
 type FloorNode = RunFlowNode | StepFlowNode;
 
-const FIT = { padding: 0.15, maxZoom: 1 };
+/** The room left round the cards when the floor is fitted, beyond what the floor's own panels take (`fitClear`). */
+const FIT_GAP = 16;
+
+/**
+ * How the floor is fitted: every card in view, and none under a panel drawn over the floor — the buttons at its top, the zoom controls,
+ * the legend and the minimap at its bottom. A padding in proportion to the floor was not enough: with a floor of three rows, the fit put
+ * the bottom row's footer under the legend, which wraps to two lines, and its Approve could not be pressed. So the panels are measured
+ * where they are drawn, at each fit, and the fit keeps that much clear above and below: the legend's height moves with the floor's width.
+ */
+function fitClear(frame: HTMLElement | null) {
+  let top = 0;
+  let bottom = 0;
+  if (frame) {
+    const box = frame.getBoundingClientRect();
+    for (const panel of frame.querySelectorAll('.react-flow__panel')) {
+      const at = panel.getBoundingClientRect();
+      // A panel hidden on a narrow floor is drawn nowhere, and takes no room.
+      if (!at.height) continue;
+      if (panel.classList.contains('top')) top = Math.max(top, at.bottom - box.top);
+      if (panel.classList.contains('bottom')) bottom = Math.max(bottom, box.bottom - at.top);
+    }
+  }
+  return { maxZoom: 1, padding: { top: `${top + FIT_GAP}px`, bottom: `${bottom + FIT_GAP}px`, x: `${2 * FIT_GAP}px` } } as const;
+}
 
 /** A handful of cells fits on a screen; past that, the minimap says where the rest are. */
 const HANDFUL = 5;
@@ -426,14 +449,16 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
   }, [revealing, placedFor, layoutKey, openSet, graphs, reveal]);
 
   // Fitted once per ask, and not before the cards asked for are on the floor, or it fits the floor
-  // they are about to join.
-  const [fits, setFits] = useState(0);
+  // they are about to join. Asked once from the start: the first fit is this one, not React Flow's own, so it keeps clear of the
+  // panels too (`fitClear`) — React Flow waits for the cards to be measured — and it is not animated from nowhere.
+  const [fits, setFits] = useState(1);
   const fitted = useRef(0);
   useEffect(() => {
     if (fits === fitted.current) return;
     if (placed.length !== ids.length || placed.some((node, i) => node.id !== ids[i])) return;
+    const first = fitted.current === 0;
     fitted.current = fits;
-    void fitView({ ...FIT, duration: 300 });
+    void fitView({ ...fitClear(frame.current), duration: first ? 0 : 300 });
   }, [fits, placed, idsKey, fitView]);
 
   // Runs left open on the last visit unfold once their steps are read, and the floor is fitted again then, once.
@@ -489,8 +514,8 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     setFits((n) => n + 1);
   };
   const finished = runs.length - flying.size;
-  // Said beside the counts: a run stopped at a step that needs a person is finished, so off the floor by default — and so is one
-  // waiting on a run that never ships without a person.
+  // Said beside the counts: a run stopped at a step that needs a person, or waiting on a run that never ships without one. Nothing of it
+  // moves, so it is counted finished too, but it stays on the floor whatever "Show finished" says (`floorRuns`): each has its card.
   const waiting = runs.filter(waitsOnYou).length;
   // And the runs nobody has decided, which are finished too and stay on the floor: counted as `wf ls` says them, before who else
   // the run waits on. A run at its ending's gate is in both counts — the decision is what it waits on you for.
@@ -585,8 +610,6 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
                 // Null, so arrowheads take `--xy-edge-stroke` like their edges instead of one grey for both themes.
                 defaultMarkerColor={null}
                 minZoom={0.2}
-                fitView
-                fitViewOptions={FIT}
               >
                 {/* Only where the floor is wide enough for it beside the buttons: a step's inspector narrows it. */}
                 <Panel position="top-left" className="hidden text-[11px] text-muted-foreground @2xl:block">

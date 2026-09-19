@@ -99,9 +99,9 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
 
 /**
  * A run of `dir` through a loop's first try, a nudge, an answer to its blocked try, round 2 and round 3, every other step signing off with
- * what its schema asks for — and the tasks it filed, in order.
+ * what its schema asks for — and the tasks it filed, in order. `first` is how try 2 is asked for: a nudge, or a new session on a model.
  */
-async function walk(dir: string): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
+async function walk(dir: string, first: { mode: 'nudge' | 'fresh'; model?: string } = { mode: 'nudge' }): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
   const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: dir });
   const steps = stepsOf(run);
   const looping = steps.find((s) => s.loop)!;
@@ -127,7 +127,7 @@ async function walk(dir: string): Promise<{ id: string; filed: Filed[]; target: 
       if (r) said.again = r < 3;                                                                   // rounds 1 and 2 ask again; 3 is done
       b.settle(id, 'succeeded', said);
     }
-    if (pending.some(([id]) => tryOfId(id, target) === 1)) await retry(b.e, run.id, target, { mode: 'nudge' });
+    if (pending.some(([id]) => tryOfId(id, target) === 1)) await retry(b.e, run.id, target, first);
     if (pending.some(([id]) => tryOfId(id, target) === 2)) await retry(b.e, run.id, target, { mode: 'nudge', message: 'the --dry-run flag' });
   }
   return { id: run.id, filed: order.map((id) => b.tasks.get(id)!.spec), target, looping: looping.name, steps };
@@ -148,6 +148,15 @@ for (const name of LOOPED) {
     }
   });
 }
+
+test("REFUSED before the fix, now kept: a `wf retry --model` session is continued on its model — by the answer to it, and by the round after — not on the step's", async () => {
+  // Try 2 a new session on sonnet (`--model sonnet`), blocked; try 3 answers it, continuing sonnet's session; round 2 continues try 3's.
+  const { id, filed, target } = await walk(path.join(SHIPPED, 'dev'), { mode: 'fresh', model: 'sonnet' });
+  const of = (n: number) => filed.find((f) => f.id === `${id}-${target}-try${n}`)!;
+  assert.deepEqual([2, 3, 4, 5].map((n) => [of(n).model, Boolean(of(n).resumeFrom)]), [['sonnet', false], ['sonnet', true], ['sonnet', true], ['sonnet', true]]);
+  assert.equal(filed.find((f) => f.id === `${id}-${target}`)!.model, 'opus', "the first try on the step's model");
+  assert.deepEqual(chainDifferences(filed), []);
+});
 
 test("a loop's target that declares an `output:` of its own keeps one schema too: its fields, then `replies`, on every try", async () => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));

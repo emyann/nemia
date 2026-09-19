@@ -3291,6 +3291,11 @@ invalidates everything after it.
   byte for byte), `model`, `effort`, `tools`, `disallowedTools` or `permissionMode` is not the task's whose session it continues. On the
   code before this change it fails on every folder, at round 2's continuation. The comparator is made to refuse a chain filed as before
   and a change of each other field.
+- **A continuation keeps its session's model too.** A nudge filed `r.model ?? step.model` and a round `target.model`, so after a
+  `wf retry --model sonnet` on an `opus` step, the answer to that try, a `retries:` nudge or the next round continued the sonnet session on
+  opus (review's round 2 found it). `sessionModel` reads the model off the record — the last fresh try's `--model`, else the step's — and
+  every continuation is filed on it; only `--fresh` or `--model` starts a session on another. The walk has a leg that asks for try 2 with
+  `--model sonnet` and checks the answer and rounds 2 and 3 stay on sonnet; it fails without the change.
 - **Continuations that may still differ, on purpose.** `resume:` continues another step's session under the resuming step's own schema,
   model and tools; no shipped folder has one, a loop refuses one, and one that changes any of those pays a cold resume once. A nudge with
   `wf retry --budget` changes `budgetUsd`, which is not in the prompt.
@@ -3298,8 +3303,8 @@ invalidates everything after it.
   and pays one cold resume, once; nothing is migrated, and every continuation after it is warm.
 - The board is unchanged: the api reads a closeout's `replies` off the closeout itself, so a round-1 closeout shows `replies: []` where it
   showed none. The one api test seed that signed a round-3 target off with `replies: []` now gives one reply.
-- From the root, `npx turbo run test --force`: agent-workflows 622 (620 passed, 2 skipped), from 613 — nine new tests (two in
-  `run.test.ts`, seven in `session-cache.test.ts`) and two changed: round 1's schema, and the load refusal of a target that declares
+- From the root, `npx turbo run test --force`: agent-workflows 624 (622 passed, 2 skipped), from 613 — eleven new tests (three in
+  `run.test.ts`, eight in `session-cache.test.ts`) and two changed: round 1's schema, and the load refusal of a target that declares
   `replies`, whose words no longer say "from round 2". api 210, web 259 and agent-engine 340 (331 passed,
   9 skipped) unchanged in count. `npm run typecheck` clean in all four.
 

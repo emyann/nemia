@@ -1568,6 +1568,20 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
   return { ...rest, taskId: retry.mode === 'recheck' ? record.taskId : taskId!, tries: [...tries, over] };
 }
 
+/**
+ * The model a step's current try runs on: the one a `wf retry --model` named for the new session it started, carried by every try that
+ * continued that session since — a nudge, a `retries:` nudge, a round — and the step's own where none did. A recheck is the same try.
+ * What a continuation is filed with, since a model is part of the prompt the session cached: a nudge after `--model sonnet` on the step's
+ * `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
+ */
+export function sessionModel(step: Workflow, record: StepRecord | undefined): string | undefined {
+  for (const t of [...(record?.tries ?? [])].reverse()) {
+    if (t.then === 'recheck') continue;
+    if (t.then === 'fresh') return t.model ?? step.model;
+  }
+  return step.model;
+}
+
 /** The asks a record already answers — each names a try its step has reached. The tick consumes these. */
 export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => asks.filter((a) => a.try <= tryOf(run, a.step));
 

@@ -189,6 +189,8 @@ test("a boundary its session wrote before the attempt began is not the attempt's
     costStateWith(1.6757343, first, { 'claude-sonnet-5': [100000, 500000, 375784, 19745] })].join('\n');
   const u = transcriptUsage(compactedToo, since);
   assert.deepEqual([u.inputTokens, u.outputTokens, u.costUsd], [975784 - 601367, 19745 - 13138, 0.427121], 'compacted itself: its share of the carried count, tokens as cost');
+  assert.deepEqual([u.uncachedTokens, u.cacheReadTokens, u.cacheWriteTokens], [100000 - 77091, 500000 - 298435, 375784 - 225841], 'its classes too');
+  assert.equal(u.peakContextTokens, 83770, "its own boundary's context, not taken off for the parent's before it");
 });
 
 test("an attempt's input is counted in its three classes, which sum to inputTokens, and its peak is the largest any one response read", () => {
@@ -209,6 +211,30 @@ test("an attempt's input is counted in its three classes, which sum to inputToke
   const unmeasured = transcriptUsage([prompt('2026-09-18T09:00:01Z'), response('2026-09-18T09:00:02Z', 'msg_1', [], usage(5, 20_000, 0)), response('2026-09-18T09:00:03Z', 'msg_2', [], null)].join('\n'), since);
   assert.equal('peakContextTokens' in unmeasured, false, 'a response without its counts may have been the largest: no peak rather than a low one');
   assert.equal('cacheReadTokens' in unmeasured, false);
+});
+
+test("a resumed attempt's classes and peak are its own lines', and its peak starts where its parent's conversation ended", () => {
+  // One transcript, as `--resume` leaves it: the parent's conversation under the parent's times, then the child's.
+  const parentStart = Date.parse('2026-09-18T08:00:00Z');
+  const since = Date.parse('2026-09-18T09:00:00Z');
+  const usage = (uncached: number, write: number, read: number) => ({ input_tokens: uncached, cache_creation_input_tokens: write, cache_read_input_tokens: read, output_tokens: 9 });
+  const jsonl = [
+    prompt('2026-09-18T08:00:01Z'),
+    response('2026-09-18T08:00:02Z', 'msg_p1', [], usage(4, 30_000, 0)),
+    response('2026-09-18T08:10:00Z', 'msg_p2', [], usage(2, 2_000, 180_000)),
+    prompt('2026-09-18T09:00:01Z'),
+    // The child's first response reads the whole of the parent's conversation, and here rewrites it to the cache.
+    response('2026-09-18T09:00:05Z', 'msg_c1', [], usage(6, 183_000, 0)),
+    response('2026-09-18T09:00:09Z', 'msg_c2', [], usage(1, 1_500, 183_000)),
+  ].join('\n');
+  const child = transcriptUsage(jsonl, since);
+  assert.deepEqual(
+    [child.turns, child.uncachedTokens, child.cacheWriteTokens, child.cacheReadTokens, child.inputTokens, child.peakContextTokens],
+    [2, 7, 184_500, 183_000, 367_507, 184_501],
+    "its own two responses: the parent's are not counted, and nothing of the parent's is taken off the peak",
+  );
+  const parent = transcriptUsage(jsonl.split('\n').slice(0, 3).join('\n'), parentStart);
+  assert.deepEqual([parent.cacheWriteTokens, parent.cacheReadTokens, parent.peakContextTokens], [32_000, 180_000, 182_002], "the parent's, read on its own");
 });
 
 test('a journal written before the classes were measured folds as it did: inputTokens alone, and no class standing in as 0', () => {

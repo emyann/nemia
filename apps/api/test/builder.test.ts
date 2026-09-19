@@ -349,7 +349,7 @@ test("REFUSED at shipped defaults: a new folder whose name is not a folder's (40
   for (const [name, said] of [
     [undefined, /^A workflow has no name/], ['', /^A workflow has no name/], [42, /^A workflow has no name/], ['a/b', /a slash names a folder inside another/],
     ['..', /a folder whose name starts with a dot is hidden/], ['.hidden', /is hidden/], [' spaced ', /spaces around it/], ['tab\tbed', /control character/],
-    ['x'.repeat(256), /255 bytes/],
+    ['x'.repeat(256), /255 bytes/], ['agents', /agents\/ is the folder of the agents the workflows beside it name/],
   ] as const) {
     const res = await post({ name, step });
     assert.equal(res.status, 400, String(name));

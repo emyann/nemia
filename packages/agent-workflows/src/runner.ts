@@ -19,7 +19,7 @@ export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, doll
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
-import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
+import { agentsFolderRefusal, fansOut, isReadme, linkRefusal, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
@@ -1071,6 +1071,7 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
 export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?: string, { anywhere = false }: { anywhere?: boolean } = {}): WorkflowWritten {
   const at = path.resolve(dir);
   const refuse = (why: string | undefined) => { if (why) throw new WorkflowError(why); };
+  refuse(agentsFolderRefusal(at));
   if (!anywhere) refuse(workflowPlaceRefusal(at));
   if (fs.existsSync(at) && !isDirectory(at)) refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
   // The folder as it is, read before a byte is written — and a workflow's files are its own, so a `.md` among them that is a link is refused.
@@ -1078,7 +1079,7 @@ export function writeWorkflow(dir: string, steps: readonly StepDraft[], readme?:
   try { entries = fs.readdirSync(at, { withFileTypes: true }); } catch { /* not there: a new workflow's folder is made below */ }
   const linked = entries.find((e) => e.isSymbolicLink() && e.name.endsWith('.md') && (readme !== undefined || !isReadme(e.name)));
   if (linked) {
-    refuse(`${path.join(at, linked.name)} is a link, and a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes. Replace the link with a file of its own — remove the link and copy what it pointed at into its place, rm <file> && cp <target> <file> — or take it out of the folder.`);
+    refuse(linkRefusal(path.join(at, linked.name), "a workflow's files are its own. Writing this workflow would follow it and write into whatever it points at, outside the folder, and would not remove it when its step goes."));
   }
   if (!steps.length) refuse(`no steps to write to ${at}, and a workflow has at least one. To remove the workflow, remove its folder.`);
   for (const step of steps) refuse(stepNameRefusal(step?.name));

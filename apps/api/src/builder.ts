@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, writeWorkflow } from 'agent-workflows';
-import { EFFORTS, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, EFFORTS, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './workflows.ts';
@@ -180,6 +180,7 @@ export function workflowNameRefusal(name: unknown): string | undefined {
   if (name.startsWith('.')) return `${as} a folder whose name starts with a dot is hidden, and the board lists no hidden folder as a workflow. ${fix}`;
   if (name !== name.trim()) return `${as} a name with spaces around it is a folder nobody can type. Write it without them.`;
   if (new TextEncoder().encode(name).length > 255) return `${as} it is longer than a folder's name may be, 255 bytes. ${fix}`;
+  if (name === AGENTS_FOLDER) return `${as} ${AGENTS_FOLDER}/ is the folder of the agents the workflows beside it name, and its files are agents, not steps. ${fix}`;
   return undefined;
 }
 

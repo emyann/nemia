@@ -53,6 +53,8 @@ write(path.join(repo, 'workflows', 'NOTES.txt'), 'Ideas for workflows.\n');
 // Hidden, so not a workflow either: an editor's folder, and one that even has a step in it.
 write(path.join(repo, 'workflows', '.vscode', 'settings.json'), '{}\n');
 write(path.join(repo, 'workflows', '.draft', 'implement.md'), 'Implement it.\n');
+// The agents the workflows beside it name: files that look like steps, and not a workflow.
+write(path.join(repo, 'workflows', 'agents', 'implementer.md'), '---\nharness: claude\n---\nImplement what you are asked.\n');
 
 /** Yours, in the store: one step, and no README — kept in git, as a person's own workflows may be. */
 const mine = path.join(root, 'workflows', 'mine');
@@ -223,8 +225,9 @@ test('REFUSED at shipped defaults: an unknown workflow (404, naming the ones the
   const { error } = await unknown.json();
   assert.ok(error.startsWith("No workflow 'nope' in "), error);
   assert.ok(error.includes('The workflows there are: broken (repo), good (repo), mine (yours).'), error);
-  // Found among the folders, never joined onto a path: `..` names none of them. Nor does a hidden folder, one with a step in it included.
-  for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode']) assert.equal((await post({ workflow, brief: 'Do it.' })).status, 404, workflow);
+  // Found among the folders, never joined onto a path: `..` names none of them. Nor does a hidden folder, one with a step in it included,
+  // nor `agents/`, whose files read as steps.
+  for (const workflow of ['..', 'good/../mine', 'NOTES.txt', '.draft', '.git', '.vscode', 'agents']) assert.equal((await post({ workflow, brief: 'Do it.' })).status, 404, workflow);
 
   for (const brief of [undefined, '', '  \n', 42]) {
     const res = await post({ workflow: 'good', brief });

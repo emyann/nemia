@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { contextText, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, contextText, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -203,7 +203,7 @@ const specOf = (step: Workflow): WorkflowStepSpec => ({
 /**
  * The folders directly in `dir`, sorted, a link to one included. None when `dir` is not there. A hidden folder is not a
  * workflow — `.git`, where a person keeps their workflows in git, or an editor's `.vscode` — so it is not listed, and no start
- * can name it.
+ * can name it; nor is `agents/`, whose files are the agents the workflows beside it name.
  */
 export function foldersIn(dir: string): string[] {
   let names: string[];
@@ -214,7 +214,7 @@ export function foldersIn(dir: string): string[] {
     throw new Error(`${dir} could not be listed (${messageOf(err)}), so no workflow in it is shown. Check its permissions.`);
   }
   return names.filter((name) => {
-    if (name.startsWith('.')) return false;
+    if (name.startsWith('.') || name === AGENTS_FOLDER) return false;
     try {
       return fs.statSync(path.join(dir, name)).isDirectory();
     } catch {

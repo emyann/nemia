@@ -142,9 +142,9 @@ export function StepNode({
 /** A step's place in its workflow's order, as its node heads it: `step 01`. */
 const stepLabel = (index: number): string => `step ${String(index + 1).padStart(2, '0')}`;
 
-/** What a step runs on, as its node says it: the harness and the model, or that it takes the default. */
-const runsOn = (spec: { harness: string | null; model: string | null }): string =>
-  `${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}`;
+/** Who does a step and what on, as its node says it: its agent first where it has one, then the harness and the model, or that it takes the default. */
+const runsOn = (spec: { agent?: string | null; harness: string | null; model: string | null }): string =>
+  `${spec.agent ? `${spec.agent} · ` : ''}${spec.harness ?? 'default harness'} · ${spec.model ?? 'default model'}`;
 
 /**
  * A step of a workflow no run has started: `index` is its place in the workflow's order, `spec` what its frontmatter sets. `build` while the

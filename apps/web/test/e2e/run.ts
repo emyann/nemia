@@ -1874,7 +1874,8 @@ const PAGES: PageSpec[] = [
       const graph = dev.locator('.react-flow');
       const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);
       await expectCount(graph.locator('.react-flow__node'), good.steps.length, `${good.name}'s graph has a node per step (${good.steps.join(', ')})`);
-      for (const step of good.steps) await expectVisible(node(step).getByText(good.runsOn, { exact: true }), `${step}'s node says what it runs on (${good.runsOn})`);
+      await expectVisible(node('implement').getByText(good.agent.runsOn, { exact: true }), `implement's node names its agent first, then what it runs on (${good.agent.runsOn})`);
+      await expectVisible(node('review').getByText(good.runsOn, { exact: true }), `review's node, with no agent, says what it runs on (${good.runsOn})`);
       await expectVisible(node('implement').getByText(good.check, { exact: true }), `implement's node shows its check (${good.check})`);
       const tools = good.tools.split(', ').length;
       await expectVisible(node('review').locator(`dd[title="${good.tools}"]`, { hasText: new RegExp(`^${tools}$`) }), `review's node counts its ${tools} tools and names them on hover (${good.tools})`);

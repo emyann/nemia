@@ -20,18 +20,41 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
 
 /** A folder's steps as a draft: as they are listed, nothing pasted — and none of its lists the listing's, which the page's cache holds. */
 export const draftOf = (workflow: Pick<WorkflowListing, 'steps'>): DraftStep[] =>
-  workflow.steps.map(({ name, spec, body }) => ({
+  workflow.steps.map(({ name, spec, body, own }) => ({
     name,
     spec: { ...spec, after: [...spec.after], input: [...spec.input], disallow: [...spec.disallow], tools: spec.tools && [...spec.tools] },
     body,
+    own: own && { keys: [...own.keys], body: own.body },
     schema: null,
   }));
 
 const without = (list: readonly string[], name: string): string[] => list.filter((x) => x !== name);
 
-/** `name`'s spec with `change` made to it. */
+/**
+ * `name`'s spec with `change` made to it. On a step with an agent, a key the change sets is the step's own from then on, and one it unsets is
+ * its agent's again: the save writes the step's own keys, and the agent's value comes back on the next read.
+ */
 const changed = (steps: readonly DraftStep[], name: string, change: (spec: WorkflowStepSpec) => WorkflowStepSpec): DraftStep[] =>
-  steps.map((step) => (step.name === name ? { ...step, spec: change(step.spec) } : step));
+  steps.map((step) => {
+    if (step.name !== name) return step;
+    const spec = change(step.spec);
+    return { ...step, spec, own: ownAfter(step, spec) };
+  });
+
+/** A step's own keys once its spec is `next`: each key `next` changed joins them when set, and leaves them when unset. None for a step with no agent. */
+function ownAfter(step: DraftStep, next: WorkflowStepSpec): DraftStep['own'] {
+  if (!step.own) return null;
+  const keys = new Set(step.own.keys);
+  for (const key of Object.keys(next) as Array<keyof WorkflowStepSpec>) {
+    if (key === 'agent' || JSON.stringify(next[key]) === JSON.stringify(step.spec[key])) continue;
+    if (isSet(next[key])) keys.add(key);
+    else keys.delete(key);
+  }
+  return { ...step.own, keys: [...keys] };
+}
+
+/** Whether a key's value says something: not null, and not a list with nothing in it. */
+const isSet = (value: unknown): boolean => value !== null && !(Array.isArray(value) && !value.length);
 
 /**
  * An edge drawn from `source` to `target`: `after: source` on `target` — or, drawn from the loop handle, `loop: target` on `source`, with the
@@ -68,7 +91,7 @@ export function nameRefusal(steps: readonly DraftStep[], name: string): string |
 /** A step added: its name and what its agent is told, every key unset. The draft as it was, for a name refused (`nameRefusal`). */
 export function addStep(steps: readonly DraftStep[], name: string, body: string): DraftStep[] {
   if (nameRefusal(steps, name)) return [...steps];
-  return [...steps, { name, spec: { ...UNSET, after: [], input: [], disallow: [] }, body, schema: null }];
+  return [...steps, { name, spec: { ...UNSET, after: [], input: [], disallow: [] }, body, own: null, schema: null }];
 }
 
 /** A step removed, and every key of another step that names it: `after`, `input`, `resume`, and `loop` with its rounds. */
@@ -93,8 +116,20 @@ export function removeStep(steps: readonly DraftStep[], name: string): DraftStep
 /**
  * One key set on a step. `loop` brings its rounds with it — the default when set with none, none when unset — as drawing and taking away the
  * edge do; `resume` waits on the step it names, as the parser reads it. Every other key is set as given.
+ *
+ * `agent` set on a step with none makes what the step has its own — every key it sets, and what it is told as its note after the agent's
+ * words — and the agent's keys come in on the next read. Unset, the step keeps what its agent gave it as its own, words and all.
  */
 export function setKey<K extends keyof WorkflowStepSpec>(steps: readonly DraftStep[], name: string, key: K, value: WorkflowStepSpec[K]): DraftStep[] {
+  if (key === 'agent') {
+    return steps.map((step) => {
+      if (step.name !== name) return step;
+      const agent = value as string | null;
+      if (agent === null) return { ...step, spec: { ...step.spec, agent }, own: null };
+      const keys = (Object.keys(step.spec) as Array<keyof WorkflowStepSpec>).filter((k) => k !== 'agent' && isSet(step.spec[k]));
+      return { ...step, spec: { ...step.spec, agent }, own: step.own ?? { keys, body: step.body } };
+    });
+  }
   return changed(steps, name, (spec) => {
     const next = { ...spec, [key]: value };
     if (key === 'loop') next.rounds = value === null ? null : spec.rounds ?? DEFAULT_ROUNDS;
@@ -103,16 +138,20 @@ export function setKey<K extends keyof WorkflowStepSpec>(steps: readonly DraftSt
   });
 }
 
-/** What a step's agent is told, set. */
+/** What a step's agent is told, set — for a step with an agent, its own note, which follows the agent's words. */
 export const setBody = (steps: readonly DraftStep[], name: string, body: string): DraftStep[] =>
-  steps.map((step) => (step.name === name ? { ...step, body } : step));
+  steps.map((step) => (step.name !== name ? step : step.own ? { ...step, own: { ...step.own, body } } : { ...step, body }));
 
 /**
  * A schema pasted for a step's `output:`, which names its file: written beside the steps when the draft is saved. Null takes the paste back,
  * and leaves `output:` as it is.
  */
 export const setSchema = (steps: readonly DraftStep[], name: string, schema: DraftStep['schema']): DraftStep[] =>
-  steps.map((step) => (step.name === name ? { ...step, schema, spec: schema ? { ...step.spec, output: schema.file } : step.spec } : step));
+  steps.map((step) => {
+    if (step.name !== name) return step;
+    const own = schema && step.own && !step.own.keys.includes('output') ? { ...step.own, keys: [...step.own.keys, 'output' as const] } : step.own;
+    return { ...step, schema, spec: schema ? { ...step.spec, output: schema.file } : step.spec, own };
+  });
 
 /**
  * The draft's graph, as the api's `graphOf` draws a folder's: its roots, an `after` edge per step a step waits on, and a `loop` edge from each
@@ -158,9 +197,9 @@ export function orderOf(steps: readonly DraftStep[]): string[] {
   return [...placed, ...pending.map((s) => s.name)];
 }
 
-/** A step as it is compared: its keys in one order, its body, and a pasted schema. */
+/** A step as it is compared: its keys in one order, its body, what it sets itself, and a pasted schema. */
 const said = (step: ListedStep, schema: DraftStep['schema']): string =>
-  JSON.stringify([Object.keys(step.spec).sort().map((k) => [k, step.spec[k as keyof WorkflowStepSpec]]), step.body, schema]);
+  JSON.stringify([Object.keys(step.spec).sort().map((k) => [k, step.spec[k as keyof WorkflowStepSpec]]), step.body, step.own && [[...step.own.keys].sort(), step.own.body], schema]);
 
 /** The steps of the draft that are not as the folder was listed — changed, added, or given a schema to write — by name. */
 export function unsavedSteps(steps: readonly DraftStep[], workflow: Pick<WorkflowListing, 'steps'>): string[] {
@@ -174,7 +213,7 @@ export const unsaved = (steps: readonly DraftStep[], workflow: Pick<WorkflowList
 
 /** The draft as a save puts it: each step in the listing's shape, a pasted schema's file named by its `output:`. */
 export const toPut = (steps: readonly DraftStep[]): ListedStep[] =>
-  steps.map(({ name, spec, body, schema }) => ({ name, spec: schema ? { ...spec, output: schema.file } : spec, body }));
+  steps.map(({ name, spec, body, own, schema }) => ({ name, spec: schema ? { ...spec, output: schema.file } : spec, body, own }));
 
 /** The schemas pasted in the draft, as a save carries them: written beside the steps with them, judged with them first. */
 export const schemasOf = (steps: readonly DraftStep[]): SchemaFile[] => steps.flatMap(({ schema }) => (schema ? [{ file: schema.file, text: schema.text }] : []));

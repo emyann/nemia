@@ -532,7 +532,8 @@ export function seedCheckout(repo: string, mcpServer: string): void {
 
 /**
  * The workflows the Workflows page lists. In the checkout's `workflows/`, `dev`: implement ⇄ review, described by its README,
- * each step with what the page draws on its node; and `broken`, whose reviewer misspells `after`, which the loader refuses.
+ * each step with what the page draws on its node — implement's harness and model given by its agent, `implementer`, in `workflows/agents/`,
+ * whose name its node shows first; and `broken`, whose reviewer misspells `after`, which the loader refuses.
  * In the store's `workflows/`, yours: `mine`, one step and no README.
  */
 export const WORKFLOWS = {
@@ -541,6 +542,8 @@ export const WORKFLOWS = {
     description: 'Implement what was asked, then a second engineer reviews it, three rounds at most.',
     steps: ['implement', 'review'],
     runsOn: 'claude · opus',
+    /** Implement's agent, which gives it its harness and model: its node names it before them. */
+    agent: { name: 'implementer', runsOn: 'implementer · claude · opus' },
     check: 'npm test && npm run typecheck',
     tools: 'Read, Grep, Glob, Bash',
     /** The effort review sets; implement sets none, and runs at its harness's own. */
@@ -568,7 +571,8 @@ export function seedWorkflows(repo: string, root: string): void {
   const { good, broken, yours } = WORKFLOWS;
   const dev = path.join(repo, 'workflows', good.name);
   write(path.join(dev, 'README.md'), `# ${good.name}\n\n${good.description}\n\nA second paragraph, which the page does not show.\n`);
-  write(path.join(dev, 'implement.md'), `---\nharness: claude\nmodel: opus\ncheck: ${good.check}\ndisallow: ${good.disallow}\n---\nImplement what was asked.\n`);
+  write(path.join(repo, 'workflows', 'agents', `${good.agent.name}.md`), '---\nharness: claude\nmodel: opus\n---\nYou implement what is asked, and test it.\n');
+  write(path.join(dev, 'implement.md'), `---\nagent: ${good.agent.name}\ncheck: ${good.check}\ndisallow: ${good.disallow}\n---\nImplement what was asked.\n`);
   write(path.join(dev, 'review.md'), `---\nharness: claude\nmodel: opus\nafter: implement\neffort: ${good.effort}\ncontext: ${good.context}\ntools: ${good.tools}\npermissionMode: dontAsk\noutput: review.schema.json\nloop: implement\nrounds: 3\n---\n${good.review.body}\n`);
   write(path.join(dev, 'review.schema.json'), JSON.stringify({ type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false }, null, 2));
   const bad = path.join(repo, 'workflows', broken.name);

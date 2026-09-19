@@ -1767,8 +1767,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // A try is never a run's first filing: it goes before a newer run's first step (`MOMENTUM`).
         priority: MOMENTUM,
         resumeFrom,
-        // A loop's target tried again within a round still owes its answers to the findings it was handed.
-        closeoutSchema: closeoutSchemaOf(step, owesReplies(steps, run, r.step)),
+        // The step's one schema, whatever round the run is on: a nudge continues a session, and a changed schema would rebuild its cache.
+        // What a loop's target owes on this try — its answers to the round's findings — is `owedFields`', read when it signs off.
+        closeoutSchema: closeoutSchemaOf(step, steps),
       });
     }
     run.steps[r.step] = nextTry(record, r, taskId);
@@ -1812,7 +1813,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         budgetUsd: budgetUsdFor(target, r.budget !== undefined && r.raise?.includes(r.target) ? r.budget : budgetOf(target, record), stepSpend(run, r.target, spendOf)),
         priority: MOMENTUM,
         resumeFrom,
-        closeoutSchema: closeoutSchemaOf(target, true),
+        // The schema round 1 was filed with, `replies` and all (`closeoutSchemaOf`): the session is continued, and keeps its cache.
+        closeoutSchema: closeoutSchemaOf(target, steps),
       });
     }
     Object.assign(run.steps, roundFiled(steps, run, r, taskId));
@@ -1918,7 +1920,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       // The shape of the step's closing statement, with the fields its `output:` declares — from the
       // workflow this run froze, never the folder. The engine hands it to the harness and records the
       // answer without reading it; what the fields mean is ours — see `Closeout`.
-      closeoutSchema: closeoutSchemaOf(step),
+      // A loop's target is asked for `replies` from its first round, so every round continues its session under this same schema.
+      closeoutSchema: closeoutSchemaOf(step, steps),
     });
     // The tries a round moved behind stay with it.
     run.steps[name] = { ...run.steps[name], taskId, workspace: place.workspace, branch: place.branch };

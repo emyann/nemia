@@ -84,7 +84,7 @@ export type Workflow = {
    * The context window the step's sessions are given, in tokens — written `context: 200k` or `context: 150000`, read once into the
    * number. Past about it Claude Code compacts the conversation and carries on (`--autocompact`, the engine's `contextTokens`); absent,
    * a session runs on the model's whole window. Refused outside the range the harness takes (`CONTEXT_WINDOWS`), and on a harness with
-   * no such knob: codex.
+   * no such knob: codex. A step that continues another's session (`resume:`) keeps that session's window (`sessionContext`).
    */
   context?: number;
   permissionMode?: string;
@@ -675,6 +675,23 @@ function contextOf(step: string, context: string | undefined, harness: string | 
   return tokens;
 }
 
+/**
+ * The context window a step's sessions run on: its own, or — for a step that continues another's session (`resume:`) — the window that
+ * session was started with, since Claude Code's resumed copy keeps only the flags it is given, and one given another window would compact
+ * where the session it continues did not. `validate` refuses a `resume:` step whose own `context:` differs; one without the line inherits.
+ */
+export function sessionContext(step: Pick<Workflow, 'name' | 'resume' | 'context'>, steps: readonly Pick<Workflow, 'name' | 'resume' | 'context'>[]): number | undefined {
+  const seen = new Set<string>();
+  let at: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = step;
+  while (at?.resume && !seen.has(at.name)) {
+    seen.add(at.name);
+    const next: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = steps.find((s) => s.name === at!.resume);
+    if (!next) break;
+    at = next;
+  }
+  return at?.context;
+}
+
 const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
 
 /**
@@ -1035,6 +1052,11 @@ export function validate(steps: readonly Workflow[]): void {
       // it is a different agent claiming someone else's memory.
       if ((target.harness ?? 'claude') !== (s.harness ?? 'claude')) {
         throw new WorkflowError(`${s.name}: resumes ${target.name}, which runs on a different harness (${target.harness ?? 'claude'})`);
+      }
+      // One window for a session's whole chain: the continuation is filed with the one its session was started with (`sessionContext`).
+      const window = sessionContext(target, steps);
+      if (s.context !== undefined && s.context !== window) {
+        throw new WorkflowError(`${s.name}: \`context: ${contextText(s.context)}\`, and it continues ${target.name}'s session, which runs on ${window === undefined ? "the model's whole window" : `\`context: ${contextText(window)}\``}. A session keeps one window: delete the line, and ${s.name} continues on ${target.name}'s${window === undefined ? '' : `, or give ${target.name} the window you meant for both`}.`);
       }
     }
   }

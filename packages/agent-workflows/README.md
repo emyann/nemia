@@ -183,7 +183,12 @@ Code's own flag would read as thousands, is refused saying to write `200k`; and 
 exec` has no such knob. The range is a copy of the engine's `CLAUDE_CONTEXT_TOKENS`, held to it by
 `test/vocabulary.test.ts`.
 
-It goes to the engine on every filing of the step, as `effort:` does. A window small enough that one turn's reads refill
+It goes to the engine on every filing of the step, as `effort:` does, and **a session keeps one window**: a nudge, an
+answer, a `retries:` try and a round each continue the session on the window it was started with, and a step that
+continues another's session (`resume:`) is filed with that session's window — without a line of its own it inherits it,
+and one with another is refused at load (`sessionContext`). Claude Code's resumed copy of a session keeps only the flags it
+is given, so a continuation filed with none would run on the model's whole window again; the window is not part of the
+cached prompt, so keeping it costs nothing there (`test/session-cache.test.ts` walks the chain). A window small enough that one turn's reads refill
 it stops the session: Claude Code says the autocompact is thrashing, and the session waits, `blocked` (agent-engine's open
 issue 26, measured on a 100k window with 22k-token reads).
 

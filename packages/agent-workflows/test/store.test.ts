@@ -1310,6 +1310,27 @@ test('a step with `context:` reaches `e.file` as its tokens, `contextTokens` —
   assert.equal(b.tasks.get(`${plain.id}-implement`)!.spec.contextTokens, undefined, "no line, no window: the model's own");
 });
 
+test("a step that continues another's session (`resume:`) is filed with that session's window, and with no line of its own inherits it — a retry of it too", async () => {
+  // REFUSED before `sessionContext`: respond was filed with its own `context:`, none, and its copy of implement's session ran on the whole window.
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncontext: 200k\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'respond.md'), '---\nresume: implement\ncheck: npm test\n---\nanswer it\n');
+  const run = started(dir);
+  const { e, tasks, settle } = board();
+  await advance(e, readRun(run.id));
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['respond']);
+  const respond = tasks.get(`${run.id}-respond`)!.spec;
+  assert.deepEqual([respond.resumeFrom, respond.contextTokens], [`native-${run.id}-implement`, 200_000]);
+
+  settle(`${run.id}-respond`, 'succeeded', SIGNED);
+  assert.deepEqual((await advance(e, readRun(run.id))).checked, ['respond']);
+  settle(`${run.id}-respond-check`, 'failed', undefined, 1);
+  await retry(e, run.id, 'respond', { mode: 'nudge', message: 'the test fails' });
+  assert.deepEqual((await advance(e, readRun(run.id))).tried, ['respond']);
+  assert.equal(tasks.get(`${run.id}-respond-try2`)!.spec.contextTokens, 200_000, 'its nudge, continuing the same chain');
+});
+
 test('a step with `disallow:` reaches `e.file` with exactly those rules as `disallowedTools` — on its first filing, a try `retries:` files, and a try `wf retry` asks for', async () => {
   const RULES = ['Bash(npm run build)', 'Bash(npm run e2e)', 'SendMessage'];
   const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\ndisallow: Bash(npm run build), Bash(npm run e2e), SendMessage', 'failed', 1);

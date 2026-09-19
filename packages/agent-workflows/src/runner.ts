@@ -19,7 +19,7 @@ export { AGENT_FACING, CHECK_AFFECTING, LESSON, branchesToRead, budgetWord, doll
 import { radius, sensitivePaths, sumUsage, type Radius, type Touched } from './radius.ts';
 export { approvalOf, approvalRefusal, approvalWordsRefusal, approvedFirst, artifactLines, branchWord, checkoutLine, checkoutWord, endingSteps, firstLine, merges, resultSteps, sendBackTo, toDecideWords, budgetRefusal, ceilingLines, forgetLine, idRefusal, costLine, slotWord, dueNote, durationWord, fromNote, gateRefusal, gatesOf, hasGate, inputsNote, onYouWords, messageRefusal, namesInOrder, outputLines, owedFields, roundDueNote, runCostLines, runSpend, saidLines, spentWord, stepSpend, taskSpend, timeline, timelineLines, timelineTotalLines, tryNote, waitAdvice, waitWord } from './run.ts';
 export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutAsked, ForgetHow, Forgot, ParentCloseout, ParentRun, ParentStep, Raise, Retry, RetryAsk, RetryHow, RetryMode, Round, RoundAsk, RunSlot, Said, SaidTo, Shipped, SlotWait, Spend, SpendOf, TaskSpan, TaskSpend, Timeline, TimelineTotal, TimelineTry, Wait } from './run.ts';
-import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
+import { fansOut, isReadme, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
 export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
@@ -1755,7 +1755,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // after a `--model` try continues that session as it cached it.
         model: r.mode === 'fresh' ? r.model ?? step.model : sessionModel(step, record),
         effort: step.effort,
-        contextTokens: step.context,
+        // One window for the session's whole chain (`sessionContext`): a resumed copy keeps only the flags it is given.
+        contextTokens: sessionContext(step, steps),
         permissionMode: step.permissionMode,
         // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
         tools: step.tools,
@@ -1808,7 +1809,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // The model the session it continues runs on: a `wf retry --model` within the round before is kept (`sessionModel`).
         model: sessionModel(target, record),
         effort: target.effort,
-        contextTokens: target.context,
+        contextTokens: sessionContext(target, steps),
         permissionMode: target.permissionMode,
         tools: target.tools,
         disallowedTools: target.disallow,
@@ -1905,8 +1906,9 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       harness: step.harness,
       model: step.model,
       effort: step.effort,
-      // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on.
-      contextTokens: step.context,
+      // The session's context window, as `--autocompact`: past about it Claude Code compacts the conversation and carries on. A step that
+      // continues another's session (`resume:`) is filed with the window that session was started with (`sessionContext`).
+      contextTokens: sessionContext(step, steps),
       // Left to the engine's default (`auto`) unless the step says otherwise: a workflow runs
       // unattended by definition, and a mode that prompts is a mode that stalls.
       permissionMode: step.permissionMode,

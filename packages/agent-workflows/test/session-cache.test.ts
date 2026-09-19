@@ -5,6 +5,11 @@
  * whole conversation at twenty times the price of reading it. Measured 2026-09-18: 43 continuations filed with another schema than the one
  * they continued rewrote 200k to 640k tokens each (docs/pivot-2026-09-18.md §1, Finding 2).
  *
+ * And its context window (`contextTokens`), which is not part of the cached prompt — a resume given another window, or none, read the whole
+ * prompt from the cache (agent-engine open issue 26) — but which a resumed session keeps only when it is given it again: Claude Code's copy
+ * of a `--bg` session keeps the flags it was started with and no others, so a continuation filed without the window runs on the model's
+ * whole window, and one filed with another compacts where the session it continues did not.
+ *
  * Walked at shipped defaults, over every shipped folder with a loop: a first try, a nudge, an answer to a blocked step (`wf retry
  * --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:` of its own.
  */
@@ -27,8 +32,8 @@ const { advance, readRun, retry, start, stepsOf } = await import('../src/runner.
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows');
 const LOOPED = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build', 'ui'];
 
-/** What a task is filed with that the harness puts in the cached prompt, beside the conversation itself. */
-const CACHED = ['closeoutSchema', 'model', 'effort', 'tools', 'disallowedTools', 'permissionMode'] as const;
+/** What a task is filed with that the harness puts in the cached prompt, beside the conversation itself — and the window the session keeps. */
+const CACHED = ['closeoutSchema', 'model', 'effort', 'tools', 'disallowedTools', 'permissionMode', 'contextTokens'] as const;
 
 type Filed = { id: string; resumeFrom?: string; closeoutSchema?: object } & Record<string, unknown>;
 
@@ -175,6 +180,26 @@ test("a loop's target that declares an `output:` of its own keeps one schema too
   assert.deepEqual((filed[0]!.closeoutSchema as { required: string[] }).required, ['outcome', 'summary', 'artifacts', 'needs', 'notes', 'replies'], 'the first try');
 });
 
+test("a loop's target with a context window keeps it on every try — a nudge, an answer, a `--model` session and the rounds after it", async () => {
+  const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+  const looping = {
+    type: 'object',
+    properties: { findings: { type: 'array', items: { type: 'string' } }, again: { type: 'boolean' } },
+    required: ['findings', 'again'], additionalProperties: false,
+  };
+  fs.writeFileSync(path.join(dir, 'implement.md'), '---\ncheck: npm test\nmodel: opus\ncontext: 200k\n---\nimplement it\n');
+  fs.writeFileSync(path.join(dir, 'review.md'), '---\nafter: implement\ncontext: 150000\noutput: review.schema.json\nloop: implement\n---\nreview it\n');
+  fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(looping));
+  for (const first of [{ mode: 'nudge' as const }, { mode: 'fresh' as const, model: 'sonnet' }]) {
+    const { id, filed, target } = await walk(dir, first);
+    assert.deepEqual(chainDifferences(filed), [], first.mode);
+    const tries = filed.filter((f) => f.id.startsWith(`${id}-${target}`) && !f.id.endsWith('-check'));
+    assert.deepEqual(tries.map((f) => f.contextTokens), tries.map(() => 200_000), `${first.mode}: ${tries.map((f) => f.id).join(', ')}`);
+    assert.ok(tries.length >= 5, 'a first try, a nudge or a new session, an answer, and two rounds');
+    assert.ok(filed.filter((f) => f.id.includes('-review')).every((f) => f.contextTokens === 150_000), "the reviewer's sessions on its own window");
+  }
+});
+
 test('REFUSED by the check: a chain that changes its schema — round 1 without `replies`, round 2 with them, as it was filed before — or its model, effort, tools, fence or mode', () => {
   // The opposite first: the target's round-1 session filed as it was until 2026-09-18, and round 2 continuing it with `replies`.
   const target: Workflow = { name: 'implement', after: [], body: 'implement it' };
@@ -189,8 +214,8 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
   const reordered = { ...closeoutSchemaOf(target, steps), required: [...closeoutSchemaOf(target, steps).required].reverse() };
   assert.deepEqual(chainDifferences([{ ...chain[1]!, id: 'r-implement' }, { ...chain[1]!, closeoutSchema: reordered, resumeFrom: 'native-r-implement' }]), ["r-implement-try2: closeoutSchema is not r-implement's"]);
 
-  const same = { closeoutSchema: CLOSEOUT_SCHEMA, model: 'opus', effort: 'high', tools: ['Read'], disallowedTools: ['SendMessage'], permissionMode: 'dontAsk' };
-  for (const [key, value] of [['model', 'sonnet'], ['effort', 'medium'], ['tools', ['Read', 'Bash']], ['disallowedTools', []], ['permissionMode', 'auto']] as const) {
+  const same = { closeoutSchema: CLOSEOUT_SCHEMA, model: 'opus', effort: 'high', tools: ['Read'], disallowedTools: ['SendMessage'], permissionMode: 'dontAsk', contextTokens: 200_000 };
+  for (const [key, value] of [['model', 'sonnet'], ['effort', 'medium'], ['tools', ['Read', 'Bash']], ['disallowedTools', []], ['permissionMode', 'auto'], ['contextTokens', 150_000], ['contextTokens', undefined]] as const) {
     assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same, [key]: value }]), [`a-try2: ${key} is not a's`], key);
   }
   assert.deepEqual(chainDifferences([{ id: 'a-try2', resumeFrom: 'native-a', ...same }]), ['a-try2: continues native-a, which no task here was']);

@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
-import { parseFolder, renderStep, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
+import { parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -450,6 +450,22 @@ test('REFUSED: a context: that is not a number of tokens, one outside what the h
   assert.throws(() => fm('review', 'harness: codex\ncontext: 200k'),
     refusedWith(/^review: `context: 200k` sets the session's context window, and codex has no such knob: `codex exec` runs on its model's own window, whatever the step says\. Delete the line, or run the step on claude or claude-detached\.$/));
   assert.throws(() => parseWorkflow('implement', '---\ncontext:\n---\nDo it.\n'), refusedWith(/`context` has no value/));
+});
+
+test("REFUSED: a step that continues another's session with a context window of its own other than that session's — by name, saying what to do", () => {
+  const folder = (implement: string, respond: string, extra: Array<[string, string]> = []) =>
+    parseFolder([['implement', `---\n${implement}\n---\nimplement it\n`], ['respond', `---\nresume: implement\n${respond}\n---\nanswer it\n`], ...extra]);
+  assert.throws(() => folder('context: 200k', 'context: 150k'),
+    refusedWith(/^respond: `context: 150k`, and it continues implement's session, which runs on `context: 200k`\. A session keeps one window: delete the line, and respond continues on implement's, or give implement the window you meant for both\.$/));
+  assert.throws(() => folder('harness: claude', 'context: 150000'),
+    refusedWith(/^respond: `context: 150k`, and it continues implement's session, which runs on the model's whole window\. A session keeps one window: delete the line, and respond continues on implement's\.$/));
+  // Through a chain: a step that continues respond continues implement's session.
+  assert.throws(() => folder('context: 200k', 'harness: claude', [['more', '---\nresume: respond\ncontext: 300k\n---\nmore\n']]), refusedWith(/^more: `context: 300k`, and it continues respond's session, which runs on `context: 200k`/));
+  // The same window, written another way, is the same window; none inherits it.
+  const same = folder('context: 200k', 'context: 200000');
+  assert.deepEqual(same.map((s) => sessionContext(s, same)), [200_000, 200_000]);
+  const inherits = folder('context: 200k', 'harness: claude');
+  assert.deepEqual(inherits.map((s) => [s.context, sessionContext(s, inherits)]), [[200_000, 200_000], [undefined, 200_000]]);
 });
 
 test('REFUSED: an empty tools: — blank, or only commas — is not "every tool", nor "none"', () => {

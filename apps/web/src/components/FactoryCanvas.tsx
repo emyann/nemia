@@ -19,7 +19,8 @@ import { routeLink } from '@/components/routeLink';
 import { Button, LinkButton } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
-import { ceilingsQuery, inboxQuery, type RunDetail, runQuery, type RunSummary } from '@/lib/api';
+import { QuotaLine } from '@/components/QuotaLine';
+import { ceilingsQuery, inboxQuery, quotaQuery, type RunDetail, runQuery, type RunSummary } from '@/lib/api';
 import { forgetFactoryLayout, forgetFactoryOpen, forgetFactorySteps, readFactoryLayout, readFactoryOpen, readFactorySteps, saveFactoryLayout, saveFactoryOpen, saveFactorySteps } from '@/lib/canvas';
 import {
   arranged,
@@ -121,7 +122,8 @@ type Graph = null | { error: string } | ({ run: RunDetail } & Exclude<Unfolded, 
  * step was dragged, are kept in this browser with the layout.
  *
  * The inbox's queued cards wait at the floor's left edge, as ghosts, in the order the tick starts them (`QueueLane`), and the header says the
- * run slots taken of the cap the daemon runs with (`CapLine`). Both are read again every 5 s, as the runs are: the daemon starts a card
+ * run slots taken of the cap the daemon runs with (`CapLine`), and the subscription's quota as Claude Code last reported it (`QuotaLine`). The
+ * first two are read again every 5 s, as the runs are: the daemon starts a card
  * when a run slot frees, and nothing on the board asks it to.
  */
 export function FactoryCanvas({ runs }: { runs: readonly RunSummary[] }) {
@@ -503,6 +505,16 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
     wasLaned.current = laned;
     setFits((n) => n + 1);
   }, [laned]);
+  // The quota over the floor, read in the route's loader so the floor is fitted beside it once. Should it come, go, or change what it says —
+  // a sentence in place of the numbers, which may wrap the header to another line — the floor is fitted again to its new height.
+  const quota = useQuery(quotaQuery);
+  const quotaShown = quota.error ? 'error' : (quota.data?.state ?? 'none');
+  const wasQuota = useRef(quotaShown);
+  useEffect(() => {
+    if (wasQuota.current === quotaShown) return;
+    wasQuota.current = quotaShown;
+    setFits((n) => n + 1);
+  }, [quotaShown]);
   const cells = placed.reduce((sum, node) => {
     const { columns, rows } = spans.get(node.id) ?? ONE_CELL;
     return sum + columns * rows;
@@ -525,6 +537,7 @@ function Floor({ runs }: { runs: readonly RunSummary[] }) {
             {waiting > 0 && ` · ${waiting} waiting on you`}
           </p>
           <CapLine queued={queued.length} queueError={queue.error} />
+          <QuotaLine quota={quota.data} error={quota.error} />
         </div>
         {/* The aria switch is a label of its own, round its input, so its words are a label beside it that names that input. */}
         <div className="flex items-center gap-2 text-sm">

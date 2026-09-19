@@ -1,12 +1,13 @@
 import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { FactoryCanvas } from '@/components/FactoryCanvas';
-import { inboxQuery, runsQuery } from '@/lib/api';
+import { inboxQuery, quotaQuery, runsQuery } from '@/lib/api';
 
 export const Route = createFileRoute('/')({
-  // The inbox too, for the queue's ghosts beside the floor: drawn with the first cards, the floor is fitted beside them. A prefetch, which never
-  // throws: an inbox that cannot be read says so over the floor, and the runs are drawn all the same.
-  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(runsQuery), context.queryClient.prefetchQuery(inboxQuery)]),
+  // The inbox too, for the queue's ghosts beside the floor, and the quota over it: drawn with the first cards, the floor is fitted beside them.
+  // Prefetches, which never throw: an inbox or a quota that cannot be read says so over the floor, and the runs are drawn all the same.
+  loader: ({ context }) =>
+    Promise.all([context.queryClient.ensureQueryData(runsQuery), context.queryClient.prefetchQuery(inboxQuery), context.queryClient.prefetchQuery(quotaQuery)]),
   staticData: { fullBleed: true },
   component: Factory,
   errorComponent: ({ error }) => (

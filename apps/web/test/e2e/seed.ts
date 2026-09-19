@@ -757,6 +757,35 @@ export function seedQueue(root: string, repo: string, now = Date.now()): void {
   write(path.join(root, 'tick.json'), JSON.stringify({ sessions: QUEUE.sessions, runs: QUEUE.cap }, null, 2));
 }
 
+/**
+ * The subscription's quota as Claude Code hands it to a statusline (2.1.278's shape): the five-hour window 38% used, resetting in two hours
+ * and a bit, and the week 86% used — past the api's mark of 80 — resetting in three days. Written into the store by the statusline script
+ * itself (`apps/api/statusline/quota.ts`), as a person's session would, so the e2e reads what the script writes.
+ */
+export const QUOTA = {
+  version: '2.1.278',
+  fiveHour: { used: 38.4, resetsInMinutes: 130 },
+  week: { used: 86, resetsInMinutes: 3 * 24 * 60 },
+  script: path.resolve(import.meta.dirname, '..', '..', '..', 'api', 'statusline', 'quota.ts'),
+};
+
+/** Run the statusline script over QUOTA's payload with `root` as its store, and answer with the file it wrote. */
+export function seedQuota(root: string, now = Date.now()): string {
+  const at = (minutes: number) => Math.floor((now + minutes * 60_000) / 1000);
+  const payload = {
+    session_id: 'e2e', version: QUOTA.version, model: { id: 'claude-opus-5', display_name: 'Opus 5' },
+    context_window: { current_usage: { input_tokens: 1, output_tokens: 1 } },
+    rate_limits: {
+      five_hour: { used_percentage: QUOTA.fiveHour.used, resets_at: at(QUOTA.fiveHour.resetsInMinutes) },
+      seven_day: { used_percentage: QUOTA.week.used, resets_at: at(QUOTA.week.resetsInMinutes) },
+    },
+  };
+  execFileSync(process.execPath, [QUOTA.script], { input: JSON.stringify(payload), env: { ...process.env, WF_ROOT: root }, stdio: ['pipe', 'ignore', 'pipe'] });
+  const file = path.join(root, 'quota.json');
+  if (!fs.existsSync(file)) throw new Error(`the statusline script wrote no ${file}`);
+  return file;
+}
+
 const write = (file: string, text: string | Buffer): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);

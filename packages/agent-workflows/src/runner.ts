@@ -1225,7 +1225,7 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
     if (bad) refuse(`\`${schema?.file}\` is not a result schema's name: it is a .json file beside the agent, named with no folder — ${name}.schema.json, say.`);
     if (schema.file !== output) refuse(`the result schema is ${schema.file}, and ${AGENTS_FOLDER}/${name}.md ${output === undefined ? 'names none' : `names ${output}`}: a schema travels with the agent whose \`output:\` names it. Set \`output: ${schema.file}\`, or send no schema.`);
     if (linked(path.join(at, schema.file))) refuse(linkRefusal(path.join(at, schema.file), "a result schema is its agent's own: a write follows a link, and would write into whatever it points at, outside the folder."));
-    const others = [...fs.readdirSync(at, { withFileTypes: true })].filter((e) => e.name.endsWith('.md') && e.name !== `${old}.md` && e.name !== `${name}.md`)
+    const others = (fs.existsSync(at) ? fs.readdirSync(at, { withFileTypes: true }) : []).filter((e) => e.name.endsWith('.md') && e.name !== `${old}.md` && e.name !== `${name}.md`)
       .filter((e) => { try { return frontmatterKey(fs.readFileSync(path.join(at, e.name), 'utf8'), 'output') === schema.file; } catch { return false; } })
       .map((e) => path.basename(e.name, '.md'));
     if (others.length) refuse(`${schema.file} is the result schema of ${others.join(', ')} too, and changing it here would change what ${others.length === 1 ? 'that agent' : 'those agents'} declare. Name a schema of this agent's own: ${name}.schema.json, say.`);
@@ -1236,6 +1236,7 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   };
   const agent = parseAgent(name, text, read);
 
+  fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
   const removed: string[] = [];
   const before = schema ? (() => { try { return fs.readFileSync(path.join(at, schema.file), 'utf8'); } catch { return undefined; } })() : undefined;

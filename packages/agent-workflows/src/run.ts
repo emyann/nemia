@@ -3625,15 +3625,18 @@ export function composeBrief(
 
   if (earlier.length || tree.length || step.workspace === 'main' || inFolder) parts.push('', '## Where to look', '');
   if (inFolder) {
-    // A folder step continues its one parent's folder (`inherit`), and any other starts in an empty folder of its own: what came before is
-    // in the folders the record names, which it reads and leaves as they are.
+    // A folder step continues its one parent's folder (`inherit`), and any other starts in an empty folder of its own. Which earlier steps
+    // worked *here* is read off the folders the record names, not off the plan: a root tried again, or a loop's target in its next round,
+    // works in the folder it made, and a step that continued that folder has worked in it too. The rest it reads and leaves as they are.
     parts.push('This step works in a folder the run made for it: what you leave there, and name in `artifacts`, is what the steps after you and the person who decides receive.');
-    const inherited = workspacePlan(steps, step).kind === 'inherit';
-    if (earlier.length && inherited) {
-      parts.push('', `This folder has already been worked in by: ${earlier.join(', ')}. Their work is on disk here.`);
-    } else if (earlier.length) {
-      const where = earlier.map((name) => `- ${name}: \`${run.steps[name]?.workspace ?? 'no folder yet'}\``);
-      parts.push('', 'The steps before you worked in folders of their own, which this one is not:', '', ...where, '',
+    const plan = workspacePlan(steps, step);
+    const here = run.steps[step.name]?.workspace ?? (plan.kind === 'inherit' ? run.steps[plan.from]?.workspace : undefined);
+    const inHere = earlier.filter((name) => here !== undefined && run.steps[name]?.workspace === here);
+    const elsewhere = earlier.filter((name) => !inHere.includes(name));
+    if (inHere.length) parts.push('', `This folder has already been worked in by: ${inHere.join(', ')}. Their work is on disk here.`);
+    if (elsewhere.length) {
+      const where = elsewhere.map((name) => `- ${name}: \`${run.steps[name]?.workspace ?? 'no folder yet'}\``);
+      parts.push('', `${inHere.length ? 'Other steps' : 'The steps before you'} worked in folders of their own, which this one is not:`, '', ...where, '',
         'Read what you need there, and change nothing in them: what you make goes in this folder.');
     }
     if (earlier.length) {

@@ -3887,6 +3887,26 @@ test('a folder run is briefed on folders, never on git: a chain continues its pa
   assert.match(briefs[4]!, /An earlier one worked on this step in this folder, and what it left is still here\./);
   assert.match(briefs[5]!, /your last one could not be continued\. What it left is in this folder\./);
   for (const brief of briefs) assert.match(brief, /the run copies each such file into that directory/);
+
+  // As a run records them, a chain's step works in its parent's folder: review's is write's, and critic's is draft's. A root tried again
+  // after review ran, and a loop's target in its next round, work in that folder too, and are told the later step worked here — never
+  // that its folder is not theirs, which would tell the writer to leave its own note alone.
+  const continued = (r: Run, from: string, to: string): Run => ({ ...r, steps: { ...r.steps, [to]: { ...r.steps[to]!, workspace: r.steps[from]!.workspace } } });
+  const again = [
+    composeBrief(write, continued(folder({ write: 't1', review: 't2' }), 'write', 'review'), [write, review], undefined, '/store/runs/n-1/artifacts/write', undefined,
+      { try: 2, by: 'person', mode: 'fresh', resumed: false, status: 'blocked' }),
+    composeBrief(loopTarget, continued(folder({ draft: 't1', critic: 't2' }), 'draft', 'critic'), [loopTarget, looper], undefined, '/store/runs/n-1/artifacts/draft', undefined, undefined,
+      { loop: 'critic', round: 2, rounds: 3, by: 'again', resumed: false }),
+  ];
+  assert.match(again[0]!, /This folder has already been worked in by: review\. Their work is on disk here\./);
+  assert.match(again[1]!, /This folder has already been worked in by: critic\. Their work is on disk here\./);
+  for (const brief of again) assert.doesNotMatch(brief, /which this one is not|change nothing in them/, brief);
+  // A fork's side tried again, beside a sibling in a folder of its own and the parent it did not continue: here is its own, the rest are not.
+  const side = composeBrief(a, folder({ write: 't1', a: 't2', b: 't3', join: null }), [write, a, b, join], undefined, '/store/runs/n-1/artifacts/a', undefined,
+    { try: 2, by: 'person', mode: 'fresh', resumed: false, status: 'blocked' });
+  assert.match(side, /The steps before you worked in folders of their own, which this one is not:\n\n- write: `\/store\/runs\/n-1\/work\/write`\n\n/);
+  assert.doesNotMatch(side, /already been worked in/);
+
   // The same shapes on a git run still say git's words: the folder's are said only on a folder run.
   assert.match(composeBrief(join, run({ write: 't1', a: 't2', b: 't3', join: null }), [write, a, b, join].map((s) => ({ ...s, workspace: undefined }))), /has been merged into this branch/);
 });

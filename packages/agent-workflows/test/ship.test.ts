@@ -594,3 +594,133 @@ test("a check that refuses leaves the checkout clean: the abort the ending's pro
   if (decision.kind !== 'awaiting') return;
   assert.deepEqual([decision.outcome, decision.stuck, decision.branches], ['blocked', ['ship'], [branch]]);
 });
+
+/**
+ * The incident, as the record had it: `implement ⇄ review → ship`, implement verified, review done with `again: false`, ship approved at
+ * try 1, filed in the repository's own checkout, and signed off blocked — the work does not hold on the base branch as it is now.
+ */
+async function stoppedOnBase(dir = loopingFolder()) {
+  const repo = aRepo();
+  const run = start({ brief: 'add sub', repo, workflowDir: dir });
+  const b = board();
+  const { e, settle } = b;
+  await advance(e, readRun(run.id));
+  const work = readRun(run.id).steps.implement!;
+  fs.appendFileSync(path.join(work.workspace!, 'add.ts'), 'export const sub = (a, b) => a - b;\n');
+  git(work.workspace!, 'add', '-A');
+  git(work.workspace!, 'commit', '-q', '-m', 'add sub');
+  settle(`${run.id}-implement`, 'succeeded', SIGNED);
+  await advance(e, readRun(run.id));
+  if (readRun(run.id).steps.review) {
+    settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: false });
+    await advance(e, readRun(run.id));
+  }
+  await approve(e, run.id, 'ship', 'Merge it.');
+  assert.deepEqual((await advance(e, readRun(run.id))).filed, ['ship']);
+  settle(`${run.id}-ship`, 'succeeded', STOPPED);
+  await advance(e, readRun(run.id));
+  return { repo, id: run.id, branch: work.branch!, ...b, base: git(repo, 'rev-parse', 'HEAD') };
+}
+
+const STOPPED = { outcome: 'blocked', summary: 'main moved since the branch was cut: the trial merge conflicts in add.ts, so I aborted it', artifacts: [], needs: 'the branch has to take main: add.ts conflicts with main\'s sub' };
+
+/** What `wf decide` prints for a run, line by line. */
+async function decideLines(t: { mock: { method: typeof import('node:test').mock.method } }, e: Engine, id: string): Promise<string[]> {
+  const printed: string[] = [];
+  const log = t.mock.method(console, 'log', (...args: unknown[]) => { printed.push(args.map(String).join(' ')); });
+  try { await main(['decide', id], e); } finally { log.mock.restore(); }
+  return printed;
+}
+
+test("an ending that stopped on the base branch sends the work back through the loop: review hears the objection and the ending's needs, implement gets a round, and ship waits at its gate for a new approval", async (t) => {
+  const { repo, id, e, tasks, filings, settle, base } = await stoppedOnBase();
+  assert.equal(readRun(id).steps.ship!.taskId, `${id}-ship`, 'the fixture is the incident: ship ran on its approval');
+
+  // `wf decide` offers both ways on, each with when to take it.
+  const printed = await decideLines(t, e, id);
+  assert.ok(printed.some((l) => l.includes(`ship: blocked. Ship again, when what stopped it was not the work — a dirty checkout, a flaky test. Continue its session, told what happened:  wf retry ${id} ship  (`)), printed.join('\n'));
+  assert.ok(printed.some((l) => l.includes(`review: ship stopped on the base branch. Send the work back, when it does not hold on the base branch — review is filed again with your objection and what ship said, may ask for a round, and ship waits at its gate for a new approval:  wf retry ${id} review --message "<objection>"`)), printed.join('\n'));
+
+  const { ask } = await retry(e, id, 'review', { mode: 'nudge', message: 'take main, and keep both subs working' });
+  assert.deepEqual([ask.step, ask.try], ['review', 2]);
+  // Between the ask and the pass, the ending reads as waiting for the work, not as blocked: what the next pass will say.
+  assert.equal((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.status, 'waiting');
+
+  const sent = await advance(e, readRun(id));
+  assert.deepEqual([sent.tried, sent.filed], [['review'], []], 'the reviewer is filed again, and the ending is not');
+  assert.deepEqual(readRun(id).steps.ship, { taskId: null, workspace: repo, branch: 'main', tries: [{ taskId: `${id}-ship`, then: 'back' }] });
+  assert.equal(git(repo, 'rev-parse', 'HEAD'), base, 'nothing merged');
+  const brief = tasks.get(`${id}-review-try2`)!.spec.brief;
+  assert.match(brief, /the work went on to ship, which a person approved: it acts on main in the repository's own checkout, and it stopped there — `blocked` —/);
+  assert.match(brief, /## Your answer\n\n```text\ntake main, and keep both subs working\n```/);
+  assert.match(brief, /## What ship said\n\nIts summary:\n\n```text\nmain moved since the branch was cut/);
+  assert.match(brief, /What it needs:\n\n```text\nthe branch has to take main: add.ts conflicts with main's sub\n```/);
+  assert.match(brief, /sign off with `again: true` and say what — what ship needs among it: the work's next round is on the run's branch, where merging main into it is the work's to do\./);
+  await assert.rejects(approve(e, id, 'ship'), (err: Error & { exitCode?: number }) => err.exitCode === 2 && /^ship is not at its gate yet/.test(err.message),
+    'the approval of try 1 does not carry over, and none is taken while the work is out');
+
+  // The reviewer asks for a round: implement goes on, on its branch, and review reviews again.
+  settle(`${id}-review-try2`, 'succeeded', { ...SIGNED, again: true });
+  const looped = await advance(e, readRun(id));
+  assert.deepEqual(looped.looped, ['review']);
+  assert.ok(filings.includes(`${id}-implement-try2`), filings.join(', '));
+  settle(`${id}-implement-try2`, 'succeeded', { ...SIGNED, replies: [{ finding: 'take main', answer: 'fixed', why: 'merged main into the branch, and both subs are one' }] });
+  await advance(e, readRun(id));
+  settle(`${id}-review-try3`, 'succeeded', { ...SIGNED, again: false });
+  const settled = await advance(e, readRun(id));
+  assert.deepEqual(settled.filed, [], 'the loop has settled, and the ending holds at its gate: nothing of it runs');
+  const listed = await list(e, readRun(id));
+  assert.deepEqual([listed.steps.find((s) => s.name === 'ship')!.status, listed.toDecide?.kind], ['awaiting approval', 'approve']);
+
+  // A new approval, of the try the ending is now on, files it.
+  const { approval } = await approve(e, id, 'ship', 'Merge it, now it takes main.');
+  assert.deepEqual([approval.step, approval.try], ['ship', 2]);
+  assert.deepEqual((await advance(e, readRun(id))).filed, ['ship']);
+  assert.equal(tasks.get(`${id}-ship-try2`)!.spec.cwd, repo);
+});
+
+test("REFUSED at shipped defaults: a send-back from a stopped ending with no words, to a step that is not the loop's, a round of the loop, or while the ending's own try is asked for — and the ending's try while a send-back is", async () => {
+  const { id, e } = await stoppedOnBase();
+  const refused = (words: string) => (err: Error & { exitCode?: number }) => { assert.equal(err.exitCode, 2); assert.equal(err.message, words); return true; };
+  await assert.rejects(retry(e, id, 'review', { mode: 'nudge' }), refused(
+    "review's work went on to ship, and ship stopped on the base branch (blocked) without doing what it was approved for: a try of review sends the work back from there, and one with no words tells its session nothing to change. "
+    + `Say what to change: wf retry ${id} review --message "<objection>" — or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${id} ship.`));
+  await assert.rejects(retry(e, id, 'implement', { mode: 'nudge', message: 'take main' }), refused(
+    "ship stopped on the base branch (blocked) without doing what it was approved for, and the work goes back through the folder's loop, not to implement: send it back to review, which is filed again with your objection and what ship said, and may ask for a round of the work — "
+    + `wf retry ${id} review --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${id} ship.`));
+  // A round carries no words, and the loop is over: what goes round again is the send-back's `again: true`.
+  await assert.rejects(round(e, id, 'review'), refused(
+    "review signed off without asking for another round (`again: false`), and ship stopped on the base branch (blocked) without doing what it was approved for: a round would file the work again with nothing said of why. "
+    + "Send it back, with what to change — review is filed again with your objection and what ship said, and its `again: true` is the round: "
+    + `wf retry ${id} review --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${id} ship.`));
+  assert.ok(!fs.existsSync(path.join(ROOT, 'runs', `${id}.asks`, 'round-review-2')), 'and no ask was written');
+
+  // The two ways on take the same try of the ending: one asked refuses the other, each way round.
+  const { ask } = await retry(e, id, 'ship', { mode: 'nudge', message: 'the checkout is clean now' });
+  await assert.rejects(retry(e, id, 'review', { mode: 'nudge', message: 'take main' }), (err: Error & { exitCode?: number }) =>
+    err.exitCode === 2 && err.message.startsWith(`try 2 of ship is asked for (--nudge, at ${ask.at}): it does the act again on the work as it stands, and a send-back would take that try back.`));
+  fs.rmSync(path.join(ROOT, 'runs', `${id}.asks`, 'retry-ship-2'));
+  const back = await retry(e, id, 'review', { mode: 'nudge', message: 'take main' });
+  await assert.rejects(retry(e, id, 'ship', { mode: 'nudge' }), refused(
+    `the work is being sent back from ship (wf retry ${id} review, at ${back.ask.at}): ship returns to its gate once it settles, and a try of ship now would act on work that is being changed. Wait for it: wf ls ${id}.`));
+});
+
+test("REFUSED at shipped defaults: a folder with no loop before its ending has no way to send the work back from it, and says so — shipping again is still there", async () => {
+  const { id, e, settle, tasks } = await stoppedOnBase(folder());
+  await assert.rejects(retry(e, id, 'implement', { mode: 'nudge', message: 'take main' }), (err: Error & { exitCode?: number }) => {
+    assert.equal(err.exitCode, 2);
+    assert.equal(err.message, "ship stopped on the base branch (blocked) without doing what it was approved for, and this workflow has no loop before it to send the work back through: a send-back files the looping step an ending waits on, whose `again: true` gives the work a round, and implement does not loop. "
+      + `Ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${id} ship. For work that does not hold on the base branch, call this run off (wf cancel ${id}) and start one for the work on the base branch as it is now (wf start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`);
+    return true;
+  });
+  assert.equal(readRun(id).steps.implement!.tries, undefined, 'and nothing was asked');
+
+  // Shipping again is a try of the ending, filed without a new approval, and once it signs off the run is over — not at its gate again.
+  await retry(e, id, 'ship', { mode: 'nudge', message: 'the checkout is clean now' });
+  assert.deepEqual((await advance(e, readRun(id))).tried, ['ship']);
+  assert.ok(tasks.get(`${id}-ship-try2`));
+  settle(`${id}-ship-try2`, 'succeeded', SIGNED);
+  const done = await advance(e, readRun(id));
+  assert.equal(done.status, 'succeeded');
+  assert.notEqual((await list(e, readRun(id))).steps.find((s) => s.name === 'ship')!.status, 'awaiting approval');
+});

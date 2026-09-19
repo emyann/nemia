@@ -30,7 +30,7 @@ import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCa
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
 import { folderPlace, workRoot } from './places.ts';
 import { admissionOrder, resultSteps, slotFree, takesNoSlot, afterRefusal, endingAsked, type BranchStanding, type CheckoutHold, type MainClaim, heldCheckouts, type ToDecide, approvalRefusal, approvedFirst, gateRefusal, spentApprovals, triedFrom, type Approval, artifactPlace, branchFates, checkLogsOf, forgetRefusal, gated, heldRuns, heldWorktree, idRefusal, namesInOrder, parseWorktrees, runAdmitted, runCapOf, runWorktrees, slotNeed, slotWord, type AskName, type BranchFate, type ForgetHow, type Forgot, hasStarted, runReady, tipBranches, tipsSeen, waitsOf, type ArtifactFile, type ParentRun, type RunSlot, type Shipped, type Wait } from './run.ts';
-import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
+import { answerLines, answerOf, askingTry, assess, gateLines, budgetOf, budgetUsdFor, MOMENTUM, priorityOf, costLine, overBudgetLine, ownStatus, runCostLines, stepSpend, taskSpend, type SpendOf, taskUsage, timeline, type Timeline, cancelPlan, inputRefusal, capOf, checkTaskId, closeoutSchemaOf, composeBrief, decision, handOffDue, inFlight, listing, modeWord, nextTry, owesReplies, parseCloseout, retriesDue, retryable, retryLines, retryRefusal, roundAsk, sentBack, type EndingStopped, roundFiled, roundLines, roundsDue, sayRefusal, sessionModel, spentAsks, spentRoundAsks, stepStatus, stepTaskId, tryOf, workspacePlan, type Assessment, type CancelPlan, type InputFile, type MissingArtifact, type Closeout, type Decision, type Listing, type ParentCloseout, type ParentStep, type Retry, type RetryAsk, type RetryHow, type Round, type RoundAsk, type Run, type GitRun, isGitRun, placeOf, type Said, type SaidTo, type CloseoutAsked, type TaskPhase } from './run.ts';
 
 export const HOME = process.env.WF_ROOT ?? path.join(os.homedir(), '.agent-workflows');
 
@@ -523,6 +523,7 @@ async function adoptTries(
     views.set(taskId, view);
     const record = run.steps[r.step]!;
     run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : nextTry(record, r, taskId);
+    for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]!);
     adopted.push(r.step);
   }
   return adopted;
@@ -1897,6 +1898,14 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
   // filed on this pass.
   let calledOff = false;
   const mayFile = (): boolean => !(calledOff ||= !fs.existsSync(runFile(run.id)) || fs.existsSync(cancelFile(run.id)));
+  const endingSaid = (ending: Workflow): EndingStopped => {
+    const said = signedOff(ending.name);
+    return {
+      step: ending.name, status: ownStatus(ending, run, phaseOf, signedOff, asked, steps, spendOf),
+      ...(said?.summary ? { summary: said.summary } : {}), ...(said?.needs ? { needs: said.needs } : {}),
+      onto: isGitRun(run) ? run.branch : 'the base branch',
+    };
+  };
   for (const r of retry) {
     const step = steps.find((s) => s.name === r.step)!;
     const record = run.steps[r.step]!;
@@ -1950,6 +1959,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
           // How the last try ended on its own work — unsigned, failed, its check — and not `over budget`, which is why nothing was filed: `budget` says that.
           // A gated step that signed off was sent back from its gate.
           status: triedFrom(step, run, phaseOf, signedOff, asked, steps, spendOf), ...(refusal ? { refusal } : {}),
+          // Sent back from an ending that stopped on the base branch: how it stopped and what it said, for the step to weigh.
+          ...(r.back?.length ? { ending: endingSaid(steps.find((s) => s.name === r.back![0])!) } : {}),
         }, undefined, undefined, inputsDir(run)),
         cwd: record.workspace ?? run.workspace,
         harness: step.harness,
@@ -1979,6 +1990,8 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       });
     }
     run.steps[r.step] = nextTry(record, r, taskId);
+    // Sent back from an ending that stopped on the base branch: its try moves behind in the same write, so it waits for the work again.
+    for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]!);
   }
 
   // Another round: a looping step said `again: true` with rounds left, or a person's `wf round` took a loop out of rounds once more. The

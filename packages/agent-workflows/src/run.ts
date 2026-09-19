@@ -1335,12 +1335,13 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
  * A try that is over, kept on the step's record behind the one that replaced it.
  *
  * `then` is what replaced it: `retries`, the run re-filing the step itself after its check refused — a
- * nudge on the workflow's word — or the mode a person asked for, with the model a `--model` named. A
+ * nudge on the workflow's word — or `signoff`, the run continuing a session that ended without its closeout, once a
+ * round, before it waits on a person (`retriesDue`) — or the mode a person asked for, with the model a `--model` named. A
  * recheck replaces only the check, so the try after one has the same `taskId`. Or `round`: the step's loop
  * went round again (`roundFiled`), and the try after it is the next round's.
  */
 export type EarlierTry = {
-  taskId: string; check?: { taskId: string }; then: 'retries' | RetryMode | 'round'; model?: string;
+  taskId: string; check?: { taskId: string }; then: 'retries' | 'signoff' | RetryMode | 'round'; model?: string;
   /** The cap a person raised the step's `budget:` to for the try after this one (`--budget`): in force from it on (`budgetOf`). */
   budget?: number;
 };
@@ -1363,14 +1364,15 @@ export type RetryAsk = { step: string; try: number; mode: RetryMode; model?: str
 export type RetryHow = { mode: RetryMode; model?: string; message?: string; budget?: number };
 
 /**
- * A try to file on this pass: of which step, its number, how, on whose word — and, for a person's, what they said with it.
+ * A try to file on this pass: of which step, its number, how, on whose word — `retries:`, a person's `ask`, or `signoff`, the run's one
+ * nudge a round to a session that ended without its closeout — and, for a person's, what they said with it.
  *
  * `stopFirst` on a person's try of a step whose task has not settled (`retriesDue`): the pass asks the engine to stop that session — once,
  * as the engine's `stopRequested` says — and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped
  * step, and files it. `runsOn` beside it when the harness no longer says the session is blocked: asked for while it was, the session has
  * worked again since.
  */
-export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; budget?: number; by: 'retries' | 'ask'; stopFirst?: true; runsOn?: true };
+export type Retry = { step: string; try: number; mode: RetryMode; model?: string; message?: string; budget?: number; by: 'retries' | 'signoff' | 'ask'; stopFirst?: true; runsOn?: true };
 
 /**
  * Why a message cannot ride on this ask, in words that say what to do instead — or null. Pure, and asked before anything about the
@@ -1396,6 +1398,16 @@ export const tryOf = (run: Run, step: string): number => (run.steps[step]?.tries
 export const retriesSpent = (record: StepRecord | undefined): number => {
   let spent = 0;
   for (const t of record?.tries ?? []) spent = t.then === 'round' ? 0 : spent + (t.then === 'retries' ? 1 : 0);
+  return spent;
+};
+
+/**
+ * The sign-off nudges the run has filed for a step in the round it is on: at most one (`retriesDue`). Counted as `retriesSpent` counts,
+ * from the step's record — so a restart, a person's try in between, or a second tick never files another — and new at each round.
+ */
+export const signoffsSpent = (record: StepRecord | undefined): number => {
+  let spent = 0;
+  for (const t of record?.tries ?? []) spent = t.then === 'round' ? 0 : spent + (t.then === 'signoff' ? 1 : 0);
   return spent;
 };
 
@@ -1511,6 +1523,14 @@ const heard = (a: Pick<RetryAsk, 'message'>, sendsBack: true | undefined): boole
  * tries left: the step re-filed as a nudge. Past them, or for a check that did not finish, nothing is due — the step waits on the
  * person, as it always has.
  *
+ * And a session the engine ended `unsigned` — quiet, or `done` by its harness, without the closing statement it was asked for — that said
+ * nothing at all — a session that said anything reads `failed`, not `unsigned` (`ownStatus`) — its session continued once (`signoff`), told it ended without calling `StructuredOutput`, that its work stands and it
+ * should change nothing and sign off, finishing first if it had not, and signing off anyway saying what stops it if it cannot
+ * (`retrySection`). Once a round (`signoffsSpent`), never in a loop: a nudge that ends unsigned again leaves the step `unsigned`, on a
+ * person. Keyed on the engine's reason, not on the step's word `unsigned`, which also covers a closeout short of a declared field — a
+ * statement given, which a reminder to give one would not mend — and a journal written before the engine said `unsigned` for `done`. Nor
+ * is a step over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
+ *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
  * spent (`spentAsks`) and files nothing, whichever pass reads it.
  *
@@ -1553,6 +1573,9 @@ export function retriesDue(
     } else if (status === 'failed (check)' && record.check && refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name))
       && retriesSpent(record) < (step.retries ?? 0)) {
       due.push({ step: step.name, try: next, mode: 'nudge', by: 'retries' });
+    } else if (status === 'unsigned' && askedCloseout(record.taskId) === 'unsigned'
+      && signoffsSpent(record) < 1) {
+      due.push({ step: step.name, try: next, mode: 'nudge', by: 'signoff' });
     }
   }
   return due;
@@ -1570,7 +1593,7 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
   const over: EarlierTry = {
     taskId: record.taskId!,
     ...(check ? { check } : {}),
-    then: retry.by === 'retries' ? 'retries' : retry.mode,
+    then: retry.by === 'ask' ? retry.mode : retry.by,
     ...(retry.model ? { model: retry.model } : {}),
     ...(retry.budget !== undefined ? { budget: retry.budget } : {}),
   };
@@ -1579,7 +1602,7 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
 
 /**
  * The model a step's current try runs on: the one a `wf retry --model` named for the new session it started, carried by every try that
- * continued that session since — a nudge, a `retries:` nudge, a round — and the step's own where none did. A recheck is the same try.
+ * continued that session since — a nudge, a `retries:` nudge, a sign-off nudge, a round — and the step's own where none did. A recheck is the same try.
  * What a continuation is filed with, since a model is part of the prompt the session cached: a nudge after `--model sonnet` on the step's
  * `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
  */
@@ -1701,7 +1724,11 @@ export function retryRefusal(
     const spent = cap === undefined ? `, and has no \`budget:\` to raise` : `: its tries have cost ${spentWord(stepSpend(run, name, spendOf))} of its ${budgetWord(cap)} budget, which is not what stops it`;
     return `--budget raises the cap of a step over its budget, or ended at it, and ${name} is ${status}${spent}. Try it without --budget: ${command}.`;
   }
-  if (retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf).some((r) => r.step === name)) {
+  const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf).find((r) => r.step === name);
+  if (itself?.by === 'signoff') {
+    return `the run nudges ${name} itself: its session ended without the closeout it was asked for, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: wf ls ${run.id}.`;
+  }
+  if (itself) {
     const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);
     return `the run tries ${name} again itself: its check refused, and \`retries: ${step.retries}\` has ${left} left, so the next tick files try ${next}. Wait for it: wf ls ${run.id}.`;
   }
@@ -1724,6 +1751,7 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   const raised = last.budget !== undefined ? `budget ${budgetWord(last.budget)}` : '';
   if (last.then === 'round') return [inRound, raised].filter(Boolean).join(', ');
   const how = last.then === 'retries' ? `by retries: ${step.retries ?? 0}`
+    : last.then === 'signoff' ? 'nudged to sign off by the run'
     : last.then === 'recheck' ? 'rechecked on your word'
     : last.then === 'fresh' ? `fresh${last.model ? ` on ${last.model}` : ''}, on your word`
     : 'nudged on your word';
@@ -1736,6 +1764,7 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
  */
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => (r.by === 'ask'
   ? `try ${r.try} asked (${modeWord(r)}${r.budget !== undefined ? `, --budget ${r.budget}` : ''}${r.message !== undefined ? ', with your answer' : ''}) — ${r.stopFirst ? `stopping its ${r.runsOn ? '' : 'blocked '}session, then the tick files it` : 'the next tick files it'}`
+  : r.by === 'signoff' ? `try ${r.try} due — a nudge to sign off, once a round: its session ended without its closeout`
   : `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`);
 
 /**
@@ -2371,7 +2400,7 @@ export function forgetRefusal(
       for (const name of a.check) due.push(`${name}'s check is due`);
       for (const r of a.retry) {
         const step = steps.find((s) => s.name === r.step);
-        due.push(`try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : `wf retry ${modeWord(r)}`})`);
+        due.push(`try ${r.try} of ${r.step} is due (${r.by === 'retries' ? `retries: ${step?.retries}` : r.by === 'signoff' ? 'a nudge to sign off' : `wf retry ${modeWord(r)}`})`);
       }
       for (const r of a.round) due.push(`round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'wf round'})`);
       // Save an ending that has not run whose result git already has: nothing files it — its approval is refused (`approvalRefusal`) — and the
@@ -3616,6 +3645,22 @@ export type RetryBriefing = {
 };
 
 /**
+ * What the run's sign-off nudge tells a session that ended without its closeout (`retriesDue`, `by: 'signoff'`), in its owner's words,
+ * pinned by a test. It names the tool: the engine's own nudge named nothing until 2026-09-17, and did not get a finished step to sign
+ * off; a person's message that named `StructuredOutput` and said to change nothing did, twice (agent-engine's open issue 25).
+ */
+export const SIGNOFF = [
+  'Your last turn ended without calling `StructuredOutput`, and this step asks for a closing statement: nothing that waits',
+  'on it can start without one.',
+  '',
+  'The work you did stands. Change nothing, and sign off now: call `StructuredOutput` with your closeout. If the work is not',
+  'finished, finish it first and then sign off. If it cannot be finished, sign off anyway, saying what stops it.',
+].join('\n');
+
+const NEW_SESSION = 'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n'
+  + 'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
+
+/**
  * `## Try <n>`: why the step is being tried again, and on whose word — then `## Your answer`, what the person who
  * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
  * then, for a check that did not pass, what the check said, as data (`refusalSection`). The fence is what keeps the
@@ -3641,14 +3686,15 @@ export function retrySection(step: Workflow, r: RetryBriefing): string {
   const pastBudget = r.budget !== undefined && r.status !== 'budget exhausted'
     ? ["And this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap."]
     : [];
+  // The run's own sign-off nudge, to the session that did not sign off, says it in the owner's words (`SIGNOFF`), in place of why and who:
+  // it is the whole of what is asked. With no session to continue, a new one has no last turn to be told of, and is told as any try is.
+  if (r.by === 'signoff' && r.resumed) return ['', `## Try ${r.try}`, '', SIGNOFF, ...saidSection(r.said)].join('\n');
   const who = r.by === 'retries'
     ? `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`
+    : r.by === 'signoff' ? 'The run filed this try itself, once in a round, before it waits on a person.'
     : `A person asked for this try: \`wf retry ${modeWord(r)}${r.budget !== undefined ? ` --budget ${r.budget}` : ''}${r.message !== undefined ? ' --message' : ''}\``
       + `${r.budget !== undefined ? `, raising this step's budget to ${budgetWord(r.budget)}` : ''}${r.message !== undefined ? ', with what they said below' : ''}.`;
-  const where = r.resumed
-    ? "This is the last try's session, continued. Finish the work, then sign off again."
-    : 'This is a new session. An earlier one worked on this step in this workspace, and what it left is committed on\n'
-      + 'this branch. You have not been given its reasoning, on purpose: read the change, not an account of it.';
+  const where = r.resumed ? "This is the last try's session, continued. Finish the work, then sign off again." : NEW_SESSION;
   const answer = r.message !== undefined ? ['', '## Your answer', '', ...fenced(r.message, 'text')] : [];
   // What was said to the session while it ran comes before the answer given now, in the order a person said them.
   const told = r.resumed ? saidSection(r.said) : [];

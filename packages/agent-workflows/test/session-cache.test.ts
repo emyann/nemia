@@ -11,7 +11,8 @@
  * whole window, and one filed with another compacts where the session it continues did not.
  *
  * Walked at shipped defaults, over every shipped folder with a loop: a first try, a nudge, an answer to a blocked step (`wf retry
- * --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:` of its own.
+ * --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:` of its own. And the run's own nudge
+ * to sign off, filed with no person's word when a session ends `unsigned`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,7 +67,7 @@ const aRepo = (): string => {
 
 /** An engine board the walk settles by hand, keeping each task as it was filed. Each task's session is its own, `native-<id>`. */
 const board = () => {
-  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number }>();
+  const tasks = new Map<string, { spec: Filed; phase: TaskPhase; closeout?: unknown; exitCode?: number; reason?: string }>();
   const e = {
     view: async (id: string) => {
       const t = tasks.get(id);
@@ -75,7 +76,7 @@ const board = () => {
         id, phase: t?.phase ?? 'pending', sessionId: t ? 's' : null,
         state: {
           brief: (t?.spec.brief as string | undefined) ?? '', closeoutSchema: t?.spec.closeoutSchema, settled, stopRequested: false, said: [],
-          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: null }],
+          attempts: !t || t.phase === 'pending' ? [] : [{ n: 1, ended: null, nativeId: `native-${id}`, closeout: t.closeout, exitCode: t.exitCode ?? null, usage: null, reason: t.reason }],
         },
       };
     },
@@ -83,7 +84,7 @@ const board = () => {
     stop: async () => {},
     logs: async () => '',
   } as unknown as Engine;
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string) => Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason });
   return { e, tasks, settle };
 };
 
@@ -221,3 +222,30 @@ test('REFUSED by the check: a chain that changes its schema — round 1 without 
   assert.deepEqual(chainDifferences([{ id: 'a-try2', resumeFrom: 'native-a', ...same }]), ['a-try2: continues native-a, which no task here was']);
   assert.deepEqual(chainDifferences([{ id: 'a', ...same }, { id: 'a-try2', resumeFrom: 'native-a', ...same }]), []);
 });
+
+for (const name of LOOPED) {
+  test(`${name}, at shipped defaults: the run's own nudge to sign off continues an unsigned session filed as that session was — schema, model, effort, tools, window`, async () => {
+    const run = start({ brief: 'add a flag', repo: aRepo(), workflowDir: path.join(SHIPPED, name) });
+    const target = stepsOf(run).find((s) => s.loop)!.loop!;
+    const b = board();
+    const order: string[] = [];
+    const first = `${run.id}-${target}`;
+    const nudge = `${first}-try2`;
+    for (let pass = 0; pass < 20 && !b.tasks.has(nudge); pass++) {
+      await advance(b.e, readRun(run.id));
+      for (const [id, t] of b.tasks) {
+        if (t.phase !== 'pending' || id === nudge) continue;
+        order.push(id);
+        if (id.endsWith('-check')) b.settle(id, 'succeeded', undefined, 0);
+        // The target ends as the engine records a session that never called StructuredOutput: failed, its last attempt `unsigned`.
+        else if (id === first) b.settle(id, 'failed', undefined, undefined, 'unsigned');
+        else b.settle(id, 'succeeded', { ...SIGNED, ...(valueOf(t.spec.closeoutSchema as Record<string, unknown>) as object), outcome: 'done', needs: null });
+      }
+    }
+    assert.ok(b.tasks.has(nudge), `the run filed ${nudge} itself: ${[...b.tasks.keys()].join(', ')}`);
+    const filed = [...order, nudge].map((id) => b.tasks.get(id)!.spec);
+    assert.equal(b.tasks.get(nudge)!.spec.resumeFrom, `native-${first}`, 'the same session, continued');
+    assert.deepEqual(chainDifferences(filed), []);
+    assert.equal(readRun(run.id).steps[target]?.tries?.at(-1)?.then, 'signoff');
+  });
+}

@@ -808,4 +808,6 @@ machine's store on 2026-09-19, 5 had a last end journalled `observed: done`, `re
 `the-workflow-builder-on-the-4ifo`). `decide` now reads a `done` sighting with no statement, on a task that asked for one,
 as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`test/decide.test.ts`, and a fake `claude`
 listing the session `done` in `test/unsigned.test.ts`; both fail with it reverted). A journal written before keeps what
-it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two.
+it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-workflows', not the
+engine's: the run continues an unsigned session once a round (`signoff`, agent-workflows' features.md, P0.5), and the engine's
+own allowance stays `maxAttempts`, which agent-workflows leaves at 1.

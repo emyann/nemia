@@ -1340,6 +1340,7 @@ What it leaves:
   (`1 attempt(s), none succeeded: the last ended without the closing statement it was asked for`; the note read *went quiet* until 2026-09-19), and nothing here prints it.
 - **At defaults the engine's nudge is not spent on a step.** agent-workflows files one attempt unless a step declares
   `maxAttempts`, so a quiet session's task settles `failed` at once, and a person's `wf retry --nudge` is the nudge.
+  (Taken up by P0.5 below: the run nudges it once a round itself.)
 
 ## Shipped: cost measured and a budget set — `budget:`, and dollars where a person decides
 
@@ -3411,6 +3412,29 @@ What it leaves:
 
 - **Teams, dispatch, capabilities, other attachments.** Out of this change, as the pivot orders them.
 - **Renaming across the nodes.** A rename is refused while a node names the agent; moving each node to the new name is by hand.
+
+## Shipped: every run of an agent ends in its statement or the reason it has none (P0.5)
+
+docs/pivot-2026-09-18.md, P0.5. A session asked for a closing statement could still end, by the harness's `done`, with none, and settle
+`succeeded`: a false completion. On 2026-09-19, 5 of the 344 tasks filed with a schema in this machine's store had done so.
+
+- **The engine's rule.** `decide` reads a `done` sighting with no statement of the attempt's own, on a task that asked for one, as it
+  reads quiet: `unsigned`, recorded `failed`. One condition in `decide`; a schemaless task still succeeds on `done`, and a journal
+  written before folds as it recorded. The out-of-attempts note says *ended without*, not *went quiet without*.
+- **One nudge before a person, in the run.** `retriesDue` files a `signoff` try — a nudge on no one's word — for a step whose engine
+  reason is `unsigned` and which said nothing, once a round (`signoffsSpent`). The continuation is filed as every one is, with the
+  schema, model, effort, window, tools and permission mode of the session it continues (`test/session-cache.test.ts`), and its
+  `## Try <n>` is the owner's words, pinned (`SIGNOFF`). A nudge that ends unsigned too leaves the step `unsigned`: `wf ls` says
+  `try 2, nudged to sign off by the run`, as the board does through `tryNote`, and `wf decide` says `UNSIGNED: implement (nudged to sign
+  off once by the run, and unsigned again)`. In the run, not the engine: an engine allowance is per task, so a person's try — a new
+  task — would earn another automatic nudge in the same round; each engine attempt gets the task's whole `budgetUsd`, past the run's
+  cap; and `maxAttempts: 2` restarts after a harness failure too. The run's nudge is also what worked by hand ($0.66–0.93, 25–43 s),
+  and it is recorded as a try with its cost.
+
+What it leaves:
+
+- **The web app's mirror of `EarlierTry.then`** (`apps/web/src/lib/api.ts`) does not name `signoff`. The api sends it, and the board's
+  words come from `tryNote`; the type is a mirror only. Owned by apps/, not changed here.
 
 ## 1. A run that grows steps from a plan
 

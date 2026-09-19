@@ -474,7 +474,7 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
         // Each node with what is attached to it: `review (reviewer)`. A node with no agent is its name alone.
         console.log(`${run.id}  ${steps.length} step(s): ${steps.map((s) => s.agent ? `${s.name} (${s.agent.name})` : s.name).join(' → ')}`);
         if (from) console.log(from);
-        console.log(`workspace: ${run.workspace}`);
+        console.log(`workspace: ${run.workspace}${isGitRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`);
         if (run.inputs?.length) console.log(`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`);
         if (run.after?.length) console.log(`waits on: ${run.after.join(', ')} — nothing is filed until wf decide says each has shipped onto ${run.branch}`);
         const gates = gatesOf(steps, run);
@@ -894,7 +894,10 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
 
       // Worked on the base branch itself (`--no-worktree`): `merge --no-ff main` into main is nothing, `branch -D main` is not a command
       // to print beside it, and a standing would read `main is on main`. What there is to decide is still said, below.
-      if (decision.direct) {
+      // A folder run has no branch to stand anywhere: its work is in its steps' folders, and what they named is listed above.
+      if (!git) {
+        console.log(`\n  worked in folders, with no git repository: ${run.workspace}, a folder per step; nothing to merge`);
+      } else if (decision.direct) {
         console.log(`\n  worked directly on ${run.branch}; nothing to merge; the base was ${run.baseRef}`);
         console.log(`  read it    git -C ${run.repo} diff ${run.baseRef}...${run.branch}`);
       } else if (standings.length) {
@@ -917,6 +920,8 @@ export async function main(argv: string[], e: ReturnType<typeof engine> = engine
       // And where no step of the workflow merges (`merges`), the commands a person runs by hand: this folder says nothing about what
       // happens when the work is done, whether its last step was gated or not, and its branch is still a person's to land or drop.
       // None for a run that worked on the base branch itself: there is nothing to merge, and its own lines are above.
+      // A folder run's work is kept where it is until a person is done with it: there is nothing to land, and forgetting it is the one command.
+      if (!git) return console.log(`\n  done with it   wf rm ${run.id}  — forgets the run with its folders and files`);
       const first = decision.branches[0];
       if (first && !merges(steps) && !decision.direct) {
         console.log(`\n  ship it   git -C ${run.repo} merge --no-ff ${first}`);

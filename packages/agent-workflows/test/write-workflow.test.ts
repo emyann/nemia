@@ -19,7 +19,10 @@ const { writeWorkflow } = await import('../src/runner.ts');
 const STORE = path.join(ROOT, 'workflows');
 const SHIPPED = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'dev');
 
-/** A copy of the repository's `dev` — README, schema, comments and all — as a workflow of the store's, named `name`. */
+/** The repository's agents, beside the store's workflows as beside its own: dev's steps name them. */
+fs.cpSync(path.join(SHIPPED, '..', 'agents'), path.join(STORE, 'agents'), { recursive: true });
+
+/** A copy of the repository's `dev` — README, comments and all — as a workflow of the store's, named `name`. */
 function devIn(name: string): string {
   const dir = path.join(STORE, name);
   fs.mkdirSync(dir, { recursive: true });
@@ -69,6 +72,8 @@ test("a workflow's steps written back as they were leave every file as it was �
 
 test('a step changed is rendered and written, a step unchanged keeps its file, a step gone loses its file — and the schema and the README stay as they are', () => {
   const dir = devIn('changed');
+  // dev's review reads its schema beside its agent now; a schema in the folder is still the folder's, and no write of the steps touches it.
+  fs.copyFileSync(path.join(STORE, 'agents', 'review.schema.json'), path.join(dir, 'review.schema.json'));
   const before = snapshot(dir);
   const [implement, review, ship] = loadWorkflows(dir) as [Workflow, Workflow, Workflow];
 

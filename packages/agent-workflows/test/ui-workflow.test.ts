@@ -119,7 +119,7 @@ const REVIEW_DENIED = ['Bash(npm run build)', 'Bash(npm run e2e)'];
 /** What an unattended session has and no step needs (plan §4b, "what a worker gets, measured"). */
 const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrigger'];
 
-test("every dev* folder ends in `ship`: gated, in the repository's checkout, with implement's denies and no check of its own — and its prose is the trial merge, that folder's check, the commit, and the abort", () => {
+test("every dev* folder ends in `ship`: gated, in the repository's checkout, with implement's denies and no check of its own — and its prose is the trial merge, the check, the commit, and the abort, with that folder's check in its brief", () => {
   const CHECKS: Record<string, string> = {
     dev: 'npm test && npm run typecheck',
     'dev-planned': 'npm test && npm run typecheck',
@@ -138,24 +138,31 @@ test("every dev* folder ends in `ship`: gated, in the repository's checkout, wit
     }, folder);
     assert.deepEqual(terminalSteps(loadWorkflows(dir)).map((s) => s.name), ['ship'], `${folder} ends there`);
 
-    // The prose is the recipe, and the folder's own check is in it: a step whose `check:` the run would execute in a person's checkout
-    // is refused, so what this step is judged by is what it runs itself.
+    // The prose is the recipe, one for every folder (the shipper's), and the folder's own check reaches it in the brief: a step whose
+    // `check:` the run would execute in a person's checkout is refused, so what this step is judged by is what it runs itself.
     const body = said(ship.body);
     for (const sentence of [
       "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit — or abort and say why.",
       'git merge --no-ff --no-commit <branch>',
-      `Run this workflow's check, whole, from the repository root: \`${check}\``,
+      "Run this workflow's check, whole, from the repository root: the command named under *Where to look*.",
       'commit the merge: `git commit --no-edit`',
       '`git merge --abort`, then sign off `blocked` saying what happened',
       'Do not push, and do not delete the branch',
     ]) assert.ok(body.includes(sentence), `${folder}: ${sentence}\n\n${body}`);
+    const run: Run = {
+      id: 'r-1', repo: '/repo', workspace: '/repo', baseRef: 'abc123', branch: 'main', isolate: true, brief: 'Ship it',
+      workflowDir: dir, createdAt: '2026-09-19T00:00:00Z',
+      steps: Object.fromEntries(Object.keys(byName).map((name) => [name, name === 'ship' ? { taskId: null } : { taskId: `t-${name}`, workspace: '/wt', branch: 'wf/r-1/implement' }])),
+    };
+    const brief = composeBrief(ship, run, loadWorkflows(dir));
+    const where = brief.slice(brief.indexOf('\n## Where to look\n'));
+    assert.ok(where.includes(`This workflow's check, which its work was judged by: \`${check}\``), `${folder}\n\n${brief}`);
+    assert.equal(brief.split("This workflow's check, which its work was judged by:").length, 2, `${folder}: its check, and no other`);
   }
 
-  // dev-planned's ending is dev's, file for file, and dev-planned-build's is dev-build's: one ending, written twice over.
+  // One ending, written once: every dev* folder's ship.md is the same file, wiring and the shipper.
   const shipIn = (folder: string) => fs.readFileSync(path.join(REPO, 'workflows', folder, 'ship.md'), 'utf8');
-  assert.equal(shipIn('dev-planned'), shipIn('dev'));
-  assert.equal(shipIn('dev-planned-build'), shipIn('dev-build'));
-  assert.notEqual(shipIn('dev'), shipIn('dev-build'), 'and each says its own folder\'s check');
+  for (const folder of ['dev-planned', 'dev-build', 'dev-planned-build']) assert.equal(shipIn(folder), shipIn('dev'), folder);
 });
 
 test("every shipped Claude reviewer is denied `npm run build` and `npm run e2e`, which the settings allow for implement's sake, and every implement what no step needs", () => {
@@ -257,14 +264,20 @@ test("the repository's workflows/ui/ is the package's, file for file — and a c
   fs.cpSync(shipped, drifted, { recursive: true });
   fs.appendFileSync(path.join(drifted, 'review.md'), '\nAlso check the spelling.\n');
   fs.writeFileSync(path.join(drifted, 'look.md'), '---\nafter: implement\n---\nLook.\n');
-  fs.rmSync(path.join(drifted, 'implement.schema.json'));
+  fs.rmSync(path.join(drifted, 'review.schema.json'));
   fs.writeFileSync(path.join(drifted, 'README.md'), '# Not the package\n');
-  assert.deepEqual(differences(drifted, shipped), ['implement.schema.json', 'look.md', 'review.md'], 'the README may differ, and nothing else');
+  assert.deepEqual(differences(drifted, shipped), ['look.md', 'review.md', 'review.schema.json'], 'the README may differ, and nothing else');
   fs.rmSync(drifted, { recursive: true, force: true });
 
   const repository = path.join(REPO, 'workflows', 'ui');
   assert.deepEqual(differences(repository, shipped), []);
   assert.ok(fs.existsSync(path.join(repository, 'README.md')), 'the repository copy says what it is');
+
+  // And the agents its steps name, beside it: the package's agents/ holds ui's two and their schema, each the repository's byte for byte.
+  const agents = path.join(WORKFLOWS, 'agents');
+  const theirs = path.join(REPO, 'workflows', 'agents');
+  assert.deepEqual(fs.readdirSync(agents).sort(), ['implement.schema.json', 'ui-implementer.md', 'ui-reviewer.md']);
+  for (const file of fs.readdirSync(agents)) assert.ok(fs.readFileSync(path.join(agents, file)).equals(fs.readFileSync(path.join(theirs, file))), `agents/${file}`);
 });
 
 test("review is handed implement's screenshots and pages, and not its summary, beside the loop's contract", () => {

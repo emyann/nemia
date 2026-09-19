@@ -17,8 +17,26 @@ import { loadWorkflows } from '../src/workflow.ts';
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const BEFORE: Record<string, Array<Record<string, unknown>>> = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures', 'resolved-before.json'), 'utf8'));
 
-/** The steps whose resolved body is not the one it had, as `<folder>/<step>`: none, until an agent's words differ from a step's. */
-const BODIES_REWORDED: string[] = [];
+/**
+ * The steps whose resolved body is not the one it had, as `<folder>/<step>`: the implementer's and the shipper's, reworded so one file
+ * serves every dev folder. The implementer's plan paragraph is said when a plan is there, which dev-planned said always and dev never;
+ * the shipper's third item points to the check under *Where to look*, which `composeBrief` names for each folder, where each ship.md
+ * wrote its folder's check out.
+ */
+const BODIES_REWORDED: string[] = ['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [`workflows/${folder}/implement`, `workflows/${folder}/ship`]);
+
+/** The agent each shipped step names, by `<folder>/<step>`: the steps of the dev folders and ui. The supervisor and the codex folder name none. */
+const AGENTS: Record<string, string> = {
+  ...Object.fromEntries(['dev', 'dev-build', 'dev-planned', 'dev-planned-build'].flatMap((folder) => [
+    [`workflows/${folder}/implement`, 'implementer'], [`workflows/${folder}/review`, 'reviewer'], [`workflows/${folder}/ship`, 'shipper'],
+  ])),
+  'workflows/dev-planned/plan': 'planner',
+  'workflows/dev-planned-build/plan': 'planner',
+  'workflows/ui/implement': 'ui-implementer',
+  'workflows/ui/review': 'ui-reviewer',
+  'packages/agent-workflows/workflows/ui/implement': 'ui-implementer',
+  'packages/agent-workflows/workflows/ui/review': 'ui-reviewer',
+};
 
 /** A step as JSON has it — no `undefined` — without the fields the proof sets aside. */
 const keysOf = (step: Record<string, unknown>): Record<string, unknown> => {
@@ -45,6 +63,7 @@ function lineDiff(before: string, after: string): string {
 
 test('every shipped folder resolves to the keys it had before agents, and only the reworded bodies moved', (t) => {
   const moved: string[] = [];
+  const named: Record<string, string> = {};
   for (const [folder, before] of Object.entries(BEFORE)) {
     const dir = path.join(REPO, folder);
     assert.ok(fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory(), `${folder} is still shipped`);
@@ -53,6 +72,11 @@ test('every shipped folder resolves to the keys it had before agents, and only t
     for (const [i, step] of after.entries()) {
       const was = before[i]!;
       assert.deepEqual(keysOf(step), keysOf(was), `${folder}/${String(step.name)}: every key as it resolved before`);
+      const agent = step.agent as { name: string; body: string } | undefined;
+      if (agent) {
+        named[`${folder}/${String(step.name)}`] = agent.name;
+        assert.equal(agent.body, '', `${folder}/${String(step.name)}: no shipped step keeps words of its own`);
+      }
       if (step.body !== was.body) {
         moved.push(`${folder}/${String(step.name)}`);
         t.diagnostic(`${folder}/${String(step.name)}.md, its brief before and after:\n${lineDiff(String(was.body), String(step.body))}`);
@@ -60,4 +84,5 @@ test('every shipped folder resolves to the keys it had before agents, and only t
     }
   }
   assert.deepEqual(moved.sort(), [...BODIES_REWORDED].sort(), 'the bodies that moved are exactly the reworded ones');
+  assert.deepEqual(named, AGENTS, 'each shipped step names the agent it was written from');
 });

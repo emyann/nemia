@@ -153,7 +153,10 @@ test("a step that names an agent runs with the agent's role keys, its own keys w
   assert.deepEqual(build.after, ['plan']);
   assert.equal(build.check, 'npm test');
   assert.equal(build.body, 'Implement what you are asked.\n\nBuild the parser first.');
-  assert.deepEqual(build.agent, { name: 'implementer', keys: ['after', 'model', 'check'], body: 'Build the parser first.' });
+  assert.deepEqual(build.agent, {
+    name: 'implementer', keys: ['after', 'model', 'check'], body: 'Build the parser first.',
+    given: { harness: 'claude', effort: 'high', context: '200k', disallow: 'SendMessage' },
+  }, 'the keys the step set, its note, and what each key it did not set read as');
 
   const bare = parseWorkflow('build', '---\nagent: implementer\n---\n', undefined, agents);
   assert.equal(bare.body, 'Implement what you are asked.', "no note of its own: the agent's words alone");
@@ -218,6 +221,12 @@ test("renderStep writes a resolved step as its file was: `agent:`, the step's ow
   assert.deepEqual(parseWorkflow('build', rendered, undefined, agents), build, 'it reads back as the same step');
   assert.equal(renderStep(parseWorkflow('build', '---\nagent: implementer\n---\n', undefined, agents)), '---\nagent: implementer\n---\n\n');
 
+  // A key the step did not set, changed since it was read, is the step's own now — never dropped for being the agent's.
+  assert.equal(renderStep({ ...build, effort: 'low', after: ['plan', 'lint'] }), '---\nafter: plan, lint\nresume: plan\nagent: implementer\nmodel: sonnet\neffort: low\n---\nBuild the parser first.\n');
+  const derived = parseWorkflow('build', '---\nresume: plan\nagent: implementer\n---\n', undefined, agents);
+  assert.deepEqual(derived.after, ['plan']);
+  assert.equal(renderStep(derived), '---\nresume: plan\nagent: implementer\n---\n\n', "an after: the parser made of resume: is not written as the step's");
+
   const draft = renderStep({ name: 'build', after: [], agent: 'implementer', model: 'sonnet', body: 'Build it.' });
   assert.equal(draft, '---\nagent: implementer\nmodel: sonnet\n---\nBuild it.\n', "a draft naming its agent is its own keys and note");
 });
@@ -248,5 +257,5 @@ test('wf start freezes the resolved steps on the run: an agent edited after the 
   const [build] = run.workflow;
   assert.equal(build!.model, 'opus');
   assert.equal(build!.body, 'Implement what you are asked.\n\nBuild it.');
-  assert.deepEqual(build!.agent, { name: 'implementer', keys: [], body: 'Build it.' });
+  assert.deepEqual(build!.agent, { name: 'implementer', keys: [], body: 'Build it.', given: { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallow: 'SendMessage' } });
 });

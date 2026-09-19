@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, writeWorkflow } from 'agent-workflows';
-import { AGENTS_FOLDER, agentsDir, EFFORTS, loadAgents, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
+import { AGENT_KEYS, AGENTS_FOLDER, agentsDir, EFFORTS, loadAgents, HARNESSES, parseFolder, PERMISSION_MODES, renderStep, SLOTS, STEP_KEY_MEANINGS, STEP_KEYS, stepNameRefusal, WORKSPACES, WorkflowError, type StepDraft, type StepKey } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './workflows.ts';
@@ -32,7 +32,8 @@ import { folderOf, foldersIn, listed, versionOf, type WorkflowListing } from './
  * (`byHarness`: `effort`, `permissionMode`); `text`, one line (`model`, `check`); `list`, names (`tools`, `disallow`); `count`, a whole number;
  * `dollars`, an amount; `tokens`, a number of tokens, which the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as
  * `choices` has them (`remote`, `gate`); `schema`, a file beside the step (`output`).
- * `workspace` is a `choice` of one word, `main`, and `slot` of one word, `none`, since a step either says it or says nothing.
+ * `workspace` is a `choice` of one word, `main`, and `slot` of one word, `none`, since a step either says it or says nothing. `agent` is a
+ * `choice` of the agents in yours' `agents/`, the only folder the builder writes the steps of.
  */
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
 
@@ -41,7 +42,7 @@ export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'l
  * does not export: `test/builder.test.ts` holds this copy to the parser, which refuses exactly those keys as "not a count".
  */
 const KINDS: Readonly<Record<StepKey, KeyKind>> = {
-  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'text', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
+  after: 'steps', resume: 'step', input: 'steps', workspace: 'choice', slot: 'choice', agent: 'choice', harness: 'choice', model: 'text', effort: 'harness-word', context: 'tokens', permissionMode: 'harness-word',
   tools: 'list', disallow: 'list', remote: 'flag', deadlineSeconds: 'count', maxAttempts: 'count', budget: 'dollars', check: 'text',
   retries: 'count', gate: 'flag', output: 'schema', loop: 'step', rounds: 'count',
 };
@@ -55,18 +56,29 @@ export const DEFAULT_HARNESS = 'claude';
 /** One key of a step's form: the key, the package's line of what it means, how it is set, and the words it may be set to where there are some. */
 export type KeyField = { key: StepKey; meaning: string; kind: KeyKind; choices: readonly string[] | null; byHarness: Readonly<Record<string, readonly string[]>> | null };
 
-/** What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, and the default harness. */
-export type KeyForm = { keys: KeyField[]; defaultHarness: string };
+/**
+ * What the builder's form is drawn from (`GET /api/workflows/keys`): every key a step may set, in the package's order, and the default harness.
+ * `roleKeys` are the keys an agent may set (the package's `AGENT_KEYS` but its description), which a step with an agent takes from it unless
+ * its file sets them itself: the form shows those as the agent's until one is changed.
+ */
+export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: StepKey[] };
 
-export const keyForm = (): KeyForm => ({
+/** The keys a step may take from its agent: the agent's keys but its description, which describes the agent and no step. */
+const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter((key): key is Exclude<typeof key, 'description'> => key !== 'description');
+
+/** The agents a step of yours may name: each file of yours' `agents/`, by name, readable or not — naming a broken one is refused on save, in its words. */
+const agentsOfYours = (home: string): string[] => [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER)).keys()].sort();
+
+export const keyForm = (home: string = HOME): KeyForm => ({
   keys: STEP_KEYS.map((key) => ({
     key,
     meaning: STEP_KEY_MEANINGS[key],
     kind: KINDS[key],
-    choices: key === 'harness' ? HARNESSES : key === 'workspace' ? WORKSPACES : key === 'slot' ? SLOTS : FLAGS[key] ?? null,
+    choices: key === 'harness' ? HARNESSES : key === 'workspace' ? WORKSPACES : key === 'slot' ? SLOTS : key === 'agent' ? agentsOfYours(home) : FLAGS[key] ?? null,
     byHarness: key === 'effort' ? EFFORTS : key === 'permissionMode' ? PERMISSION_MODES : null,
   })),
   defaultHarness: DEFAULT_HARNESS,
+  roleKeys: [...ROLE_KEYS],
 });
 
 /** What a write answers: the folder read back from disk, as the listing has it, and its files by name — written, left as they were, removed. */
@@ -95,7 +107,7 @@ const messageOf = (err: unknown): string => (err instanceof Error ? err.message 
 
 const isObject = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 
-const STEP_SHAPE = '`{ "name": "<step>", "spec": { "after": ["<step>"], "harness": "claude", … }, "body": "<what its agent is told>" }`, as GET /api/workflows lists a step, a key unset as null or left out';
+const STEP_SHAPE = '`{ "name": "<step>", "spec": { "after": ["<step>"], "harness": "claude", … }, "body": "<what its agent is told>", "own"?: { "keys": ["<key>", …], "body": "<its own note>" } }`, as GET /api/workflows lists a step, a key unset as null or left out';
 const PUT_SHAPE = `\`{ "version": "<as GET /api/workflows lists it>", "steps": [<step>, …], "schemas"?: [{ "file": "<name>.json", "text": "<a JSON Schema>" }, …], "readme"?: "<README.md>" }\`, each step ${STEP_SHAPE}`;
 const POST_SHAPE = `\`{ "name": "<workflow>", "step": <step>, "readme"?: "<README.md>" }\`, the step ${STEP_SHAPE}`;
 
@@ -143,26 +155,38 @@ const TYPES: Readonly<Record<KeyKind, { is: (value: unknown) => boolean; said: s
  * A step of a request as `writeWorkflow` takes it, or why it is not one (400). Each key the listing has is typed as it lists it, null or left
  * out for unset; whether a value is one the step may have is the package's to say. A key no step has is passed on as it came, so the package
  * refuses it in its words, naming the step. `output` names its file: the schema is the folder's.
+ *
+ * A step with an agent (`spec.agent`) is written as `agent:`, its own keys and its own note. Sent as the listing has it — `own` with the
+ * keys its file sets and its note — a role key `own.keys` does not name is its agent's, and is not written; its wiring is always its own.
+ * Sent without `own`, every key it sets is its own and `body` is its note (the package's `StepDraft`, whose `agent` is a name).
  */
 function draftOf(step: unknown, at: string, route: string, shape: string): StepDraft | Refusal {
   const bad = (why: string): Refusal => ({ status: 400, error: `${route}: ${at} ${why} Send ${shape}.` });
   if (!isObject(step)) return bad(`is ${JSON.stringify(step)}, and a step is an object.`);
-  const { name, spec = {}, body } = step;
+  const { name, spec = {}, body, own } = step;
   if (typeof name !== 'string') return bad(`has no \`name\`: a step is named by its file, without .md.`);
   const called = `${at} (${name})`;
   if (typeof body !== 'string') return { status: 400, error: `${route}: ${called} has no \`body\`, what its agent is told, as a string. Send ${shape}.` };
   if (!isObject(spec)) return { status: 400, error: `${route}: ${called}'s \`spec\` is ${JSON.stringify(spec)}, and it is an object of the step's keys. Send ${shape}.` };
+  if (own != null && !(isObject(own) && Array.isArray(own.keys) && own.keys.every((k) => typeof k === 'string') && typeof own.body === 'string')) {
+    return { status: 400, error: `${route}: ${called}'s \`own\` is ${JSON.stringify(own)}, and it is what a step with an agent sets itself: \`{ "keys": ["<key>", …], "body": "<its own note>" }\`, as GET /api/workflows lists it, or null. Send ${shape}.` };
+  }
   const draft: Record<string, unknown> = { after: [] };
+  const agents = spec.agent != null && own != null;
   for (const [key, value] of Object.entries(spec)) {
     if (value === null || value === undefined) continue;
     const kind = (KINDS as Record<string, KeyKind | undefined>)[key];
     if (kind && !TYPES[kind].is(value)) {
       return { status: 400, error: `${route}: ${called}'s \`${key}\` is ${TYPES[kind].said}, or null for unset, and this request's was ${JSON.stringify(value)}. Send ${shape}.` };
     }
+    // A role key the step's file does not set is its agent's: written, it would pin the agent's value in the step.
+    if (agents && isRoleKey(key) && !(own.keys as string[]).includes(key)) continue;
     draft[key] = key === 'output' ? { file: value } : value;
   }
-  return { ...draft, name, body } as StepDraft;
+  return { ...draft, name, body: agents ? own.body : body } as StepDraft;
 }
+
+const isRoleKey = (key: string): boolean => (ROLE_KEYS as readonly string[]).includes(key);
 
 /** A readme a request gives, or why not (400): a string, or left out for the README as it is. */
 function readmeOf(readme: unknown, route: string, shape: string): { readme: string | undefined } | Refusal {

@@ -8,7 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fansOut, loadWorkflows, orderSteps, terminalSteps, parseWorkflow, validate, workflowDescription, workflowFolder, WorkflowError, type Workflow } from '../src/workflow.ts';
 import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANINGS, STEP_KEYS, type StepKey } from '../src/workflow.ts';
-import { parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
+import { agentsDir, loadAgents, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 
 const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: 'do a thing' });
 
@@ -1007,7 +1007,7 @@ const shippedFolders = (): string[] => {
   const pkg = path.join(import.meta.dirname, '..');
   const examples = path.join(pkg, 'wf-examples');
   return [
-    ...fs.readdirSync(root).map((name) => path.join(root, name)),
+    ...fs.readdirSync(root).filter((name) => name !== 'agents').map((name) => path.join(root, name)),
     path.join(pkg, 'workflows'),
     path.join(pkg, 'workflows', 'ui'),
     ...fs.readdirSync(examples).map((name) => path.join(examples, name)),
@@ -1032,18 +1032,19 @@ test('`renderStep` is the parser run backwards: every step of every shipped fold
   for (const dir of folders) {
     const steps = loadWorkflows(dir);
     const read = readIn(dir);
+    const agents = loadAgents(agentsDir(dir));
     for (const step of steps) {
       const text = renderStep(step);
-      assert.deepEqual(parseWorkflow(step.name, text, read), step, `${path.relative(root, dir)}/${step.name}.md, rendered:\n${text}`);
-      assert.equal(renderStep(parseWorkflow(step.name, text, read)), text, 'and renders to the same text again');
+      assert.deepEqual(parseWorkflow(step.name, text, read, agents), step, `${path.relative(root, dir)}/${step.name}.md, rendered:\n${text}`);
+      assert.equal(renderStep(parseWorkflow(step.name, text, read, agents)), text, 'and renders to the same text again');
     }
-    assert.deepEqual(parseFolder(steps.map((step) => [step.name, renderStep(step)]), read), steps, dir);
+    assert.deepEqual(parseFolder(steps.map((step) => [step.name, renderStep(step)]), read, agents), steps, dir);
   }
-  // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then the body.
+  // What a render of a shipped step looks like: the keys it sets in the keys' order, no comments, then its own note — none. The keys
+  // its agent gives it are the agent's file's, and are not written into the step's.
   const review = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'review')!;
-  assert.ok(renderStep(review).startsWith([
-    '---', 'after: implement', 'harness: claude', 'model: opus', 'effort: high', 'context: 200k', 'permissionMode: dontAsk', 'tools: Read, Grep, Glob, Bash, Skill, WebFetch, WebSearch',
-  ].join('\n')), renderStep(review));
+  assert.equal(renderStep(review), ['---', 'after: implement', 'agent: reviewer', 'budget: 20', 'loop: implement', 'rounds: 3', '---', '', ''].join('\n'));
+  assert.equal(review.model, 'opus', "and the step runs with the agent's keys all the same");
   assert.doesNotMatch(renderStep(review).split('\n---\n')[0]!, /^#/m, 'the file has comments in its frontmatter, and the step does not carry them');
   assert.match(fs.readFileSync(path.join(root, 'dev', 'review.md'), 'utf8'), /^# /m);
 });

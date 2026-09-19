@@ -23,6 +23,8 @@ const { advance, approve, cancel, decide, forget, isShipped, list, readRun, retr
 const { main } = await import('../src/cli.ts');
 
 const REPO_ROOT = path.join(import.meta.dirname, '..', '..', '..');
+// The shipped agents, beside every folder this file makes under ROOT: the shipped ship.md names `agent: shipper`, and its recipe is there.
+fs.cpSync(path.join(REPO_ROOT, 'workflows', 'agents'), path.join(ROOT, 'agents'), { recursive: true });
 const git = (cwd: string, ...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 
 /** A repository with one file committed on main. */

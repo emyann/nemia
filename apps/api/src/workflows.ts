@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { AGENTS_FOLDER, contextText, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, agentsDir, contextText, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -88,8 +88,15 @@ export type WorkflowListing = {
   error: string | null;
 };
 
-/** A step as a workflow's listing has it, and as the builder takes it back. */
-export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string };
+/**
+ * A step as a workflow's listing has it, and as the builder takes it back. `spec` and `body` are the step resolved, what a run of it would
+ * be; for a step with an agent, `own` is what its file sets itself — the keys (the rest are its agent's) and its own note, which follows
+ * the agent's instructions in `body`. Null for a step with no agent, whose file is all of it.
+ */
+export type ListedStep = { name: string; spec: WorkflowStepSpec; body: string; own: StepOwn | null };
+
+/** What a step with an agent sets itself: the keys its file writes, and its own note (empty where the agent's instructions are all of it). */
+export type StepOwn = { keys: StepKey[]; body: string };
 
 /**
  * One key of a file, as a card's or a step's page lays them out: the key, its value as the package read it — null where the file does not
@@ -141,15 +148,24 @@ export function listed(name: string, from: WorkflowSource, dir: string): Workflo
   } catch (err) {
     return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, version, error: messageOf(err) };
   }
-  return { name, from, dir, description, steps: steps.map((step) => ({ name: step.name, spec: specOf(step), body: step.body })), graph: graphOf(steps), schemas, version, error: null };
+  return { name, from, dir, description, steps: steps.map(listedStep), graph: graphOf(steps), schemas, version, error: null };
 }
+
+/** A step as the listing has it: resolved, and what its file sets itself where an agent gives it the rest. */
+const listedStep = (step: Workflow): ListedStep => ({
+  name: step.name,
+  spec: specOf(step),
+  body: step.body,
+  own: step.agent ? { keys: step.agent.keys.filter((key) => key !== 'agent'), body: step.agent.body } : null,
+});
 
 /**
  * What a folder's files hold, as one word: a digest of each `.md` and `.json` directly in it — its steps, its README and its schemas, what a
  * save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and `writeWorkflow`
  * removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or removed changes it,
  * and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as what it says, so it
- * changes the word too.
+ * changes the word too. So does each agent a step names (`agent:`), its file in `agents/` beside the folder: what the board shows a step
+ * with an agent is the agent's keys and words as much as the step's, and an agent edited since is a step the board no longer shows as it is.
  */
 export function versionOf(dir: string): string {
   let names: string[];
@@ -158,14 +174,24 @@ export function versionOf(dir: string): string {
   } catch {
     names = [];
   }
-  const files = names.map((name) => {
+  const read = (file: string): string | { unreadable: string } => {
     try {
-      return [name, fs.readFileSync(path.join(dir, name), 'utf8')];
+      return fs.readFileSync(file, 'utf8');
     } catch (err) {
-      return [name, { unreadable: messageOf(err) }];
+      return { unreadable: messageOf(err) };
     }
-  });
-  return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
+  };
+  const files = names.map((name) => [name, read(path.join(dir, name))] as const);
+  const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? agentNamed(text) : [])))].sort();
+  const agents = named.map((agent) => [`${AGENTS_FOLDER}/${agent}.md`, read(path.join(agentsDir(dir), `${agent}.md`))]);
+  return createHash('sha256').update(JSON.stringify([...files, ...agents])).digest('hex').slice(0, 16);
+}
+
+/** The agent a step file's frontmatter names, as its `agent:` line writes it — none for a file with no such line. A name with a slash names no file of agents/. */
+function agentNamed(text: string): string[] {
+  const block = /^---[ \t]*\n([\s\S]*?)\n---[ \t]*(?:\n|$)/.exec(text.replace(/\r\n/g, '\n'))?.[1] ?? '';
+  const name = /^agent:[ \t]*(.*?)[ \t]*$/m.exec(block)?.[1];
+  return name && !/[\\/]/.test(name) ? [name] : [];
 }
 
 /** The `.json` files directly in a workflow's folder, sorted: the schemas an `output:` may name. None for a folder that cannot be listed. */

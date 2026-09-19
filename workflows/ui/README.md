@@ -29,8 +29,10 @@ person decides.
 Looking is a skill rather than a step, so any step may do it: a step of its own could only look at
 pictures another step took, and could not send the change round again.
 
-Every file but this README is a copy of the package's `packages/agent-workflows/workflows/ui/`, which
-stays the package's shipped example, and a test holds the copy to it; the package README,
+The two steps name `ui-implementer` and `ui-reviewer`, in `workflows/agents/` with `implement.schema.json`: the role
+keys above and the instructions are theirs, and the step files keep the wiring. Every file but this README is a
+copy of the package's `packages/agent-workflows/workflows/ui/`, and its two agents of `packages/agent-workflows/workflows/agents/`,
+which stay the package's shipped example, and a test holds the copy to them; the package README,
 *`workflows/ui/`: a change a person will see*, says more.
 
 ```bash

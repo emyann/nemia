@@ -171,8 +171,13 @@ export type Workflow = {
   agent?: StepAgent;
 };
 
-/** Where an agent-attached step's keys and words came from: the agent's name, the keys the step set itself, and its own note. */
-export type StepAgent = { name: string; keys: StepKey[]; body: string };
+/**
+ * Where an agent-attached step's keys and words came from: the agent's name, the keys the step set itself, and its own note — and, for each
+ * key the step did not set, the value it read as, as its line would write it (`given`): the agent's, or what the parser makes of the step's
+ * other keys (`after:` from `resume:`, `rounds:` from `loop:`). A key whose value is no longer its given one was changed on the step since
+ * it was read, and is the step's own from then on (`renderStep`).
+ */
+export type StepAgent = { name: string; keys: StepKey[]; body: string; given: Partial<Record<StepKey, string>> };
 
 /** The rounds a `loop:` runs when its step does not say. */
 export const DEFAULT_ROUNDS = 3;
@@ -366,7 +371,12 @@ export function parseWorkflow(name: string, text: string, read?: (file: string) 
   // The agent's schema is read beside the agent, and one the step names itself beside the step.
   const fromAgent = meta.output === undefined && agent.keys.output !== undefined;
   const step = stepFrom(name, { ...agent.keys, ...meta }, body, fromAgent ? agent.read : read);
-  return { ...step, agent: { name: agent.name, keys: STEP_KEYS.filter((key) => Object.hasOwn(meta, key)), body: own } };
+  const keys = STEP_KEYS.filter((key) => Object.hasOwn(meta, key));
+  const given = Object.fromEntries(STEP_KEYS.flatMap((key) => {
+    const value = key === 'agent' || keys.includes(key) ? undefined : writtenValue(name, key, step[key]);
+    return value === undefined ? [] : [[key, value]];
+  }));
+  return { ...step, agent: { name: agent.name, keys, body: own, given } };
 }
 
 /** The agent `agent:` names, or why not: one there is not, listing those there are, or one whose file is refused, in its words. */
@@ -438,8 +448,10 @@ const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow'];
  * the step, so a render has none.
  *
  * A step whose `agent` says where its keys came from (`StepAgent`, as the parser resolves one) is written as its file was: `agent:`, the
- * keys the step set itself and its own note — never what the agent gave it, which would pin the agent's words in every step's file. A step
- * whose `agent` is a name is a draft of the step's own: every key it sets is written, after `agent:`, and its body is its own note.
+ * keys the step set itself and its own note — never what the agent gave it, which would pin the agent's words in every step's file. A key
+ * it did not set but whose value was changed since it was read is written too, as the step's own: a change is never dropped. Its body is
+ * its own note, whatever `body` says. A step whose `agent` is a name is a draft of the step's own: every key it sets is written, after
+ * `agent:`, and its body is its own note.
  *
  * It judges nothing the parser judges: a value the parser would refuse is written as given, and the parser refuses it in its own words
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
@@ -450,10 +462,10 @@ export function renderStep(step: StepDraft): string {
   const unknown = Object.keys(step).find((key) => key !== 'name' && key !== 'body' && !isStepKey(key) && (step as Record<string, unknown>)[key] != null);
   if (unknown !== undefined) refuse(unknownKey(step.name, unknown));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
-  const own = provenance && new Set<StepKey>(['agent', ...provenance.keys]);
   const lines = STEP_KEYS.flatMap((key) => {
-    if (own && !own.has(key)) return [];
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : step[key]);
+    // A key the step did not set is left to its agent — unless it was changed since, and is the step's now.
+    if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key]) return [];
     return value === undefined ? [] : [`${key}: ${value}`];
   });
   const body = String((provenance ? provenance.body : step.body) ?? '').trim();

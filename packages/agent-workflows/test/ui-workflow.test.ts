@@ -19,6 +19,8 @@ import { loadWorkflows, loopSpan, terminalSteps } from '../src/workflow.ts';
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const WORKFLOWS = path.join(import.meta.dirname, '..', 'workflows');
 const E2E = 'npm test && npm run typecheck && npm run build && npm run e2e';
+/** `dev`'s implement check, as its folder writes it: the suite and the types, then the build and the e2e on what git says was touched. */
+const DEV_CHECK = loadWorkflows(path.join(REPO, 'workflows', 'dev')).find((s) => s.name === 'implement')!.check!;
 const ui = loadWorkflows(path.join(WORKFLOWS, 'ui'));
 const steps = Object.fromEntries(ui.map((s) => [s.name, s]));
 
@@ -121,8 +123,9 @@ const IMPLEMENT_DENIED = ['SendMessage', 'CronCreate', 'CronDelete', 'RemoteTrig
 
 test("every dev* folder ends in `ship`: gated, in the repository's checkout, with implement's denies and no check of its own — and its prose is the trial merge, the check, the commit, and the abort, with that folder's check in its brief", () => {
   const CHECKS: Record<string, string> = {
-    dev: 'npm test && npm run typecheck',
-    'dev-planned': 'npm test && npm run typecheck',
+    // The suite and the types, then the build and the e2e when git says the work touched the web app (web-check.test.ts runs it).
+    dev: DEV_CHECK,
+    'dev-planned': DEV_CHECK,
     'dev-build': E2E,
     'dev-planned-build': E2E,
   };

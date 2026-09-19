@@ -3447,6 +3447,39 @@ What it leaves — the inspector is still a mess, and was left so on purpose (th
 - **Tabs.** Details, Output and Activity split one step's story three ways; the closeout a person approves is under Output, not beside
   the gate as on the run page.
 - **Cost per round.** The round's fact says the run's cost so far, not the round's.
+## Shipped: `dev` builds what touched the web app
+
+P0.6 of `docs/pivot-2026-09-18.md` (§2.3, §6). Measured 2026-09-18 over 71 runs: three changed `apps/web/src` on `dev`, whose implement
+check was `npm test && npm run typecheck`, and no build and no e2e ever ran on them; their closeouts said the e2e had run, which is prose.
+The folder is picked from a card's words before any work exists; what the work touched is git's fact by the time the check runs.
+
+- **`dev` and `dev-planned` build on a fact.** Implement's `check:` runs the suite and the types, then `npm run build && npm run e2e`
+  when, and only when, `git diff --name-only "$WF_BASE_REF"...HEAD` names a path under `apps/web/` or `apps/api/` (the api serves the
+  e2e), or the root's `package.json`, `package-lock.json` or `turbo.json`. The packages' sources reach no browser; their own tests judge
+  them. The condition is shell in the `check:` line itself — no script in the checkout, which a step could edit — and a check whose
+  `git diff` fails (a shallow clone, a missing base, an empty `WF_BASE_REF`) fails with words, never reads as nothing touched.
+- **The shipper runs the same line, mid-merge, with no `WF_BASE_REF`.** There the line reads what the merge brings, `HEAD...MERGE_HEAD`,
+  so the build runs on the merged tree that needs it; with neither a base nor a merge in progress, `git diff` fails and so does the
+  check. The line is right in both places, so the ending's brief and `run.ts` did not change; `shipper.md` step 3 says to run it as
+  written and set nothing for it.
+- **`dev-build`, `dev-planned-build` and `ui` keep their unconditional check**: a person who picks one asks for the build whatever the
+  diff says. Nobody needs to pick `dev-build` for fear that `dev` will not build a web change.
+- **Tests.** `test/web-check.test.ts` runs the shipped line through `CHECK` and by hand in bash against throwaway repositories: a branch
+  touching `apps/web/`, `apps/api/` or the root's package files builds; one touching only the packages, the docs or the workflows does
+  not, and says so; a failing build fails the check; a missing or empty base fails loudly; mid-merge, a merge bringing `apps/web/`
+  builds and one bringing only the packages does not, though main touched `apps/web/` meanwhile; no base and no merge fails. The pins
+  moved on purpose: the api's picture of `dev`, and `agents-before-after.test.ts`, whose fixture is not regenerated, gained a named
+  exception, `KEYS_CHANGED`, for `check` on the two implement steps.
+
+What it leaves:
+
+- **The paths are a list in a line.** A new app the e2e reads, or a new root file the build reads, is added to that line by hand.
+- **A change to the packages only is not built or visited, though the e2e reads them.** The api takes the board's words from
+  agent-workflows (`toDecideWords`, `waitWord`, `timeline`, `listing`), and `apps/web/test/e2e/run.ts` runs `bin/wf.ts decide` itself and
+  checks what it prints: a `dev` run that rewords one of those in `packages/agent-workflows/src` passes its check and breaks the e2e on
+  main. Leaving `packages/` out was the ask's choice (§6, P0.6: the packages' sources reach no browser); adding
+  `packages/agent-workflows/src/` to the line's paths is the one-word change if a person decides otherwise, at the cost of a build and an
+  e2e on most package runs.
 
 ## 1. A run that grows steps from a plan
 

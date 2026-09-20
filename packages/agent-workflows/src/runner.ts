@@ -1187,8 +1187,20 @@ export class AgentWriteError extends WorkflowError {
 /** What `writeAgent` did: the agent as it now reads, its version, and its files by name — written, and removed. */
 export type AgentWritten = { dir: string; agent: Agent; version: string; written: string[]; removed: string[] };
 
+/**
+ * A file written beside an agent, named by one of the agent's own keys: the result schema its `output:` names, or the skills its `skills:`
+ * names. Its file is a plain `.json` name in the folder — no folder of its own, and not another agent's file.
+ */
+export type AgentSidecar = { file: string; text: string };
+
 /** A result schema written with an agent: its file, beside the agent, and what it holds. */
-export type AgentSchema = { file: string; text: string };
+export type AgentSchema = AgentSidecar;
+
+/** The agent keys that name a file beside the agent, and what a refusal calls each. */
+const SIDECARS = [
+  { key: 'skills' as const, what: 'skills file', a: 'the skills file', suggest: (name: string) => `${name}.skills.json` },
+  { key: 'output' as const, what: 'result schema', a: 'the result schema', suggest: (name: string) => `${name}.schema.json` },
+];
 
 /**
  * Why no agent may be written to or removed from `dir`, or `undefined`: an agent is a file in `agents/` beside the workflows the board lists
@@ -1222,11 +1234,12 @@ const inUse = (name: string, users: readonly string[], does: string): string =>
  * since `version` was read, a rename onto another agent or of one steps still name — saying which — and then the file as it would be,
  * rendered and parsed as `loadAgents` parses one, so every key and value the parser refuses is refused here, in its words.
  *
- * `schema` is the result schema the agent's `output:` names, written beside it with it: a `.json` file's name with no folder, the one
- * `output:` names, and not a schema another agent names — that one is its agent's to change. Without it the schema `output:` names is read
- * from the folder as it is.
+ * `schema` is the result schema the agent's `output:` names and `skills` the skills its `skills:` names, each written beside it with it: a
+ * `.json` file's name with no folder, the one that key names, and not a file another agent names — that one is its agent's to change.
+ * Without one, the file that key names is read from the folder as it is. A key whose line is taken off, or pointed at another file, takes
+ * the file it named with it, unless another agent names that one — as `removeAgent` does, so nothing in `agents/` is named by nothing.
  */
-export function writeAgent(dir: string, draft: AgentDraft, { version, from, schema, anywhere = false }: { version: string | null; from?: string; schema?: AgentSchema | null; anywhere?: boolean }): AgentWritten {
+export function writeAgent(dir: string, draft: AgentDraft, { version, from, schema, skills, anywhere = false }: { version: string | null; from?: string; schema?: AgentSidecar | null; skills?: AgentSidecar | null; anywhere?: boolean }): AgentWritten {
   const at = path.resolve(dir);
   const refuse = (why: string | undefined, kind?: AgentWriteError['why'], users?: string[]) => { if (why) throw new AgentWriteError(why, kind, users); };
   refuse(agentPlaceRefusal(at, anywhere));
@@ -1253,19 +1266,24 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
     if (users.length) refuse(inUse(old, users, `renaming it to ${name}`), 'in-use', users);
   }
   const text = renderAgent(draft);
-  const output = frontmatterKey(text, 'output');
-  if (schema) {
-    const bad = typeof schema.file !== 'string' || !/^[^\\/]+\.json$/.test(schema.file) || schema.file.startsWith('.');
-    if (bad) refuse(`\`${schema?.file}\` is not a result schema's name: it is a .json file beside the agent, named with no folder — ${name}.schema.json, say.`);
-    if (schema.file !== output) refuse(`the result schema is ${schema.file}, and ${AGENTS_FOLDER}/${name}.md ${output === undefined ? 'names none' : `names ${output}`}: a schema travels with the agent whose \`output:\` names it. Set \`output: ${schema.file}\`, or send no schema.`);
-    if (linked(path.join(at, schema.file))) refuse(linkRefusal(path.join(at, schema.file), "a result schema is its agent's own: a write follows a link, and would write into whatever it points at, outside the folder."));
+  // Each file the agent names beside it, judged whole before a byte is written: its name, that the agent's own key names it, that it is not
+  // a link, and that it is not another agent's to change.
+  const given = SIDECARS.map((kind) => ({ ...kind, sidecar: (kind.key === 'skills' ? skills : schema) ?? null, named: frontmatterKey(text, kind.key) }));
+  for (const { key, what, a, suggest, sidecar, named: mine } of given) {
+    if (!sidecar) continue;
+    const bad = typeof sidecar.file !== 'string' || !/^[^\\/]+\.json$/.test(sidecar.file) || sidecar.file.startsWith('.');
+    if (bad) refuse(`\`${sidecar?.file}\` is not a ${what}'s name: it is a .json file beside the agent, named with no folder — ${suggest(name)}, say.`);
+    if (sidecar.file !== mine) refuse(`${a} is ${sidecar.file}, and ${AGENTS_FOLDER}/${name}.md ${mine === undefined ? 'names none' : `names ${mine}`}: a ${what} travels with the agent whose \`${key}:\` names it. Set \`${key}: ${sidecar.file}\`, or send none.`);
+    if (linked(path.join(at, sidecar.file))) refuse(linkRefusal(path.join(at, sidecar.file), `a ${what} is its agent's own: a write follows a link, and would write into whatever it points at, outside the folder.`));
     const others = (fs.existsSync(at) ? fs.readdirSync(at, { withFileTypes: true }) : []).filter((e) => e.name.endsWith('.md') && e.name !== `${old}.md` && e.name !== `${name}.md`)
-      .filter((e) => { try { return frontmatterKey(fs.readFileSync(path.join(at, e.name), 'utf8'), 'output') === schema.file; } catch { return false; } })
+      .filter((e) => { try { return frontmatterKey(fs.readFileSync(path.join(at, e.name), 'utf8'), key) === sidecar.file; } catch { return false; } })
       .map((e) => path.basename(e.name, '.md'));
-    if (others.length) refuse(`${schema.file} is the result schema of ${others.join(', ')} too, and changing it here would change what ${others.length === 1 ? 'that agent' : 'those agents'} declare. Name a schema of this agent's own: ${name}.schema.json, say.`);
+    if (others.length) refuse(`${sidecar.file} is the ${what} of ${others.join(', ')} too, and changing it here would change what ${others.length === 1 ? 'that agent' : 'those agents'} ${key === 'skills' ? 'say they can do' : 'declare'}. Name one of this agent's own: ${suggest(name)}, say.`);
   }
+  const sending = given.flatMap(({ sidecar }) => sidecar ?? []);
   const read = (f: string): string | undefined => {
-    if (schema && f === schema.file) return schema.text;
+    const sent = sending.find((s) => s.file === f);
+    if (sent) return sent.text;
     try { return fs.readFileSync(path.resolve(at, f), 'utf8'); } catch { return undefined; }
   };
   const agent = parseAgent(name, text, read);
@@ -1273,27 +1291,37 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
   const removed: string[] = [];
-  const before = schema ? (() => { try { return fs.readFileSync(path.join(at, schema.file), 'utf8'); } catch { return undefined; } })() : undefined;
-  if (schema && before !== schema.text) {
-    fs.writeFileSync(path.join(at, schema.file), schema.text);
-    written.push(schema.file);
-  }
+  const held = (f: string): string | undefined => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
+  const before = sending.map((sidecar) => ({ sidecar, was: held(sidecar.file) }));
   try {
+    for (const { sidecar, was } of before) {
+      if (was === sidecar.text) continue;
+      fs.writeFileSync(path.join(at, sidecar.file), sidecar.text);
+      written.push(sidecar.file);
+    }
     // Renamed by case where the filesystem does not tell case apart, the old name is the new file: it goes first, as in `writeWorkflow`.
     if (renamed && sameFile(file(name), file(old))) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
     fs.writeFileSync(file(name), text);
     written.push(`${name}.md`);
   } catch (err) {
-    // The schema goes back to what it was, so an agent that was not written leaves nothing of itself behind.
-    if (schema && written.includes(schema.file)) before === undefined ? fs.rmSync(path.join(at, schema.file), { force: true }) : fs.writeFileSync(path.join(at, schema.file), before);
+    // Each file beside it goes back to what it was, so an agent that was not written leaves nothing of itself behind — including a write
+    // that failed part-way through those files, which is why they are written in here too.
+    for (const { sidecar, was } of before) {
+      if (!written.includes(sidecar.file)) continue;
+      was === undefined ? fs.rmSync(path.join(at, sidecar.file), { force: true }) : fs.writeFileSync(path.join(at, sidecar.file), was);
+    }
     throw err;
   }
   if (renamed && !removed.length) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
+  // A key's line taken off, or pointed at another file, leaves the file it named where it is. A save is an edit, and a field cleared on
+  // the board by mistake must not cost a person the schema or the skills they wrote: a file nothing names is harmless, and a person
+  // removes it. Removing the AGENT is what takes its files with it (`removeAgent`), and says so.
   return { dir: at, agent, version: agentVersion(at, name)!, written, removed };
 }
 
 /**
- * An agent removed: its file, and the result schema its `output:` names unless another agent names it too. Refused, by name, as a write
+ * An agent removed: its file, and each file it names beside it — the skills its `skills:` names, the result schema its `output:` names —
+ * unless another agent names that one too. Refused, by name, as a write
  * is — the place, the name, a link, an agent not there or changed since `version` was read — and while any step of any workflow beside
  * it still names it, saying which: removed, each of those workflows would stop loading.
  */
@@ -1310,15 +1338,51 @@ export function removeAgent(dir: string, name: string, { version, anywhere = fal
   const users = agentUsers(path.dirname(at), name);
   if (users.length) refuse(inUse(name, users, 'removing it'), 'in-use', users);
   const read = (f: string) => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
-  const output = frontmatterKey(read(`${name}.md`) ?? '', 'output');
+  const mine = SIDECARS.map(({ key }) => ({ key, named: frontmatterKey(read(`${name}.md`) ?? '', key) }));
   fs.rmSync(file);
   const removed = [`${name}.md`];
-  if (output !== undefined && /^[^\\/]+\.json$/.test(output)) {
-    const shared = fs.readdirSync(at).some((f) => f.endsWith('.md') && frontmatterKey(read(f) ?? '', 'output') === output);
-    const schemaAt = path.join(at, output);
-    if (!shared && fs.lstatSync(schemaAt, { throwIfNoEntry: false })?.isFile()) { fs.rmSync(schemaAt); removed.push(output); }
+  for (const { key, named } of mine) {
+    if (named === undefined || !/^[^\\/]+\.json$/.test(named)) continue;
+    const shared = fs.readdirSync(at).some((f) => f.endsWith('.md') && frontmatterKey(read(f) ?? '', key) === named);
+    const sidecarAt = path.join(at, named);
+    if (!shared && fs.lstatSync(sidecarAt, { throwIfNoEntry: false })?.isFile()) { fs.rmSync(sidecarAt); removed.push(named); }
   }
   return { dir: at, removed };
+}
+
+/** Where an agent may be, in order: the repository's `workflows/agents`, then your store's. The board's two places (`sourcesOf`, apps/api). */
+export const agentPlaces = (repo: string): Array<{ from: AgentPlace; dir: string }> => [
+  { from: 'repo', dir: path.join(path.resolve(repo), 'workflows', AGENTS_FOLDER) },
+  { from: 'yours', dir: path.join(HOME, 'workflows', AGENTS_FOLDER) },
+];
+
+export type AgentPlace = 'repo' | 'yours';
+
+/** Every agent of both places, in the order the places come, each read now. An agent that does not read carries its refusal. */
+export function listAgents(repo: string): Array<{ from: AgentPlace; dir: string; name: string; agent: Agent | WorkflowError }> {
+  return agentPlaces(repo).flatMap(({ from, dir }) =>
+    [...loadAgents(dir).entries()].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([name, agent]) => ({ from, dir, name, agent })));
+}
+
+/**
+ * One agent by name, from `from` when it is given and otherwise the first place that has it. Refused, naming the fix, when no place has it,
+ * when both do and nothing says which, or when the file is there and does not read — that last in the parser's own words.
+ */
+export function findAgent(name: string, repo: string, from?: AgentPlace): { from: AgentPlace; dir: string; agent: Agent } {
+  const places = agentPlaces(repo).filter((place) => from === undefined || place.from === from);
+  const found = places.flatMap((place) => {
+    const agent = loadAgents(place.dir).get(name);
+    return agent === undefined ? [] : [{ ...place, agent }];
+  });
+  const where = (list: ReadonlyArray<{ from: AgentPlace }>) => list.map((p) => `--from ${p.from}`).join(' or ');
+  if (!found.length) {
+    const has = agentPlaces(repo).filter((place) => fs.existsSync(place.dir)).map((place) => `${place.dir} (${[...loadAgents(place.dir).keys()].sort().join(', ') || 'no agents'})`);
+    throw new WorkflowError(`no agent named ${name}${from ? ` in ${from}` : ''}. Looked in ${has.length ? has.join(' and ') : agentPlaces(repo).map((p) => p.dir).join(' and ')}. wf agents lists them.`);
+  }
+  if (found.length > 1) throw new WorkflowError(`${name} is an agent in both places — ${found.map((p) => p.dir).join(' and ')}. Say which: ${where(found)}.`);
+  const one = found[0]!;
+  if (one.agent instanceof Error) throw one.agent;
+  return { from: one.from, dir: one.dir, agent: one.agent };
 }
 
 /**

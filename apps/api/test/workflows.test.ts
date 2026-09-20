@@ -24,7 +24,7 @@ const { listWorkflows, versionOf } = await import('../src/workflows.ts');
 const { HOME_REPO } = await import('../src/capabilities.ts');
 const { parentRecord, readRun } = await import('agent-workflows');
 const { afterRefusal } = await import('agent-workflows/run');
-const { isReadme, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-workflows/workflow');
+const { AGENTS_FOLDER, isReadme, loadWorkflows, STEP_KEY_MEANINGS, STEP_KEYS } = await import('agent-workflows/workflow');
 type WorkflowStepSpec = import('../src/workflows.ts').WorkflowStepSpec;
 type WorkflowStepPage = import('../src/workflows.ts').WorkflowStepPage;
 
@@ -142,6 +142,8 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   assert.deepEqual({ ...review, keys: undefined }, {
     workflow: 'good', from: 'repo', dir: good, step: 'review', body: 'Review it.',
     source: fs.readFileSync(path.join(good, 'review.md'), 'utf8'), keys: undefined,
+    // This step names no agent, so there is nothing it says it can do; a step whose agent has skills is further down, in this test.
+    agentSkills: null,
   });
   assert.deepEqual(review.keys, rows({ after: 'implement', harness: 'claude', permissionMode: 'dontAsk', tools: 'Read, Grep', output: 'review.json', loop: 'implement', rounds: '2' }));
   assert.deepEqual(review.keys.map((k) => k.key), [...STEP_KEYS], "in the package's order, set or not");
@@ -162,6 +164,20 @@ test("GET /api/workflows/:from/:name/:step is a step's page: which workflow and 
   const windowed: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
   assert.deepEqual(windowed.keys, rows({ context: '150k' }));
   fs.rmSync(path.join(mine, 'notes.md'));
+
+  // A step that names an agent: what that agent says it can do, read from the file its `skills:` names, is on the step's page beside its keys.
+  const said = [{ id: 'take-notes', name: 'Take notes', description: 'Writes down what was decided.', tags: ['notes', 'writing'] }];
+  write(path.join(root, 'workflows', AGENTS_FOLDER, 'scribe.md'), '---\ndescription: Writes things down.\nskills: scribe.skills.json\nharness: claude\n---\nWrite it down.\n');
+  write(path.join(root, 'workflows', AGENTS_FOLDER, 'scribe.skills.json'), `${JSON.stringify(said, null, 2)}\n`);
+  write(path.join(mine, 'notes.md'), '---\nagent: scribe\n---\nTake notes.\n');
+  const attached: WorkflowStepPage = await (await stepPage('yours', 'mine', 'notes')).json();
+  assert.deepEqual(attached.agentSkills, said);
+  assert.deepEqual(attached.keys.find((k) => k.key === 'harness'), { key: 'harness', value: 'claude', meaning: STEP_KEY_MEANINGS.harness }, "the agent's keys are the step's too");
+  // The same step with the line taken off: the agent is not named, so the page says nothing it can do.
+  write(path.join(mine, 'notes.md'), 'Take notes.\n');
+  assert.equal(((await (await stepPage('yours', 'mine', 'notes')).json()) as WorkflowStepPage).agentSkills, null);
+  fs.rmSync(path.join(mine, 'notes.md'));
+  fs.rmSync(path.join(root, 'workflows', AGENTS_FOLDER), { recursive: true });
 
   assert.deepEqual([filesOf(good), filesOf(mine)], before, 'read, and nothing written');
 });

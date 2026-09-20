@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, loadWorkflows, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, loadAgents, loadWorkflows, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type AgentSkill, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -115,9 +115,10 @@ export type KeyRow = { key: string; value: string | null; meaning: string };
 /**
  * What a step's page shows: which workflow and step, its body, the file as written — frontmatter and all — and every key a step may set, in
  * the package's order, with its value as the loader read it. Read so, `after` names the step `resume:` implies too, and a loop's `rounds` is
- * the default where the file sets none: the file as written says which.
+ * the default where the file sets none: the file as written says which. `agentSkills` is what the agent attached to the step says it can do,
+ * read from beside the agent and shown here read-only — the agent's page is where it is edited; null on a step with no agent, or none.
  */
-export type WorkflowStepPage = { workflow: string; from: WorkflowSource; dir: string; step: string; body: string; source: string; keys: KeyRow[] };
+export type WorkflowStepPage = { workflow: string; from: WorkflowSource; dir: string; step: string; body: string; source: string; keys: KeyRow[]; agentSkills: AgentSkill[] | null };
 
 /**
  * A step's value for `key`, as a row says it: a list joined, a count in digits, a context window in the package's one form (`200k`, as
@@ -172,9 +173,9 @@ const listedStep = (step: Workflow): ListedStep => ({
  * save writes, removes or reads — by name, with what it holds. Hidden ones too: the package reads a `.draft.md` as a step and `writeWorkflow`
  * removes it when the steps saved do not have it, and an `output:` may name a hidden schema. Any of them edited, added or removed changes it,
  * and nothing else does: a note beside the steps, or a folder inside, is no step. A file that cannot be read counts as what it says, so it
- * changes the word too. So does each agent a step names (`agent:`), its file in `agents/` beside the folder, and the schema that agent's
- * `output:` names beside it: what the board shows a step with an agent is the agent's keys, words and declared fields as much as the step's,
- * and an agent edited since is a step the board no longer shows as it is.
+ * changes the word too. So does each agent a step names (`agent:`), its file in `agents/` beside the folder, and each file that agent names
+ * beside it — the schema of its `output:`, the skills of its `skills:`: what the board shows a step with an agent is the agent's keys, words,
+ * declared fields and skills as much as the step's, and an agent edited since is a step the board no longer shows as it is.
  */
 export function versionOf(dir: string): string {
   let names: string[];
@@ -194,8 +195,8 @@ export function versionOf(dir: string): string {
   const named = [...new Set(files.flatMap(([, text]) => (typeof text === 'string' ? frontmatterValue(text, 'agent') : [])))].sort();
   const agents = named.flatMap((agent) => {
     const text = read(path.join(agentsDir(dir), `${agent}.md`));
-    const schemas = typeof text === 'string' ? frontmatterValue(text, 'output') : [];
-    return [[`${AGENTS_FOLDER}/${agent}.md`, text], ...schemas.map((schema) => [`${AGENTS_FOLDER}/${schema}`, read(path.resolve(agentsDir(dir), schema))])];
+    const beside = typeof text === 'string' ? (['output', 'skills'] as const).flatMap((key) => frontmatterValue(text, key)) : [];
+    return [[`${AGENTS_FOLDER}/${agent}.md`, text], ...beside.map((file) => [`${AGENTS_FOLDER}/${file}`, read(path.resolve(agentsDir(dir), file))])];
   });
   return createHash('sha256').update(JSON.stringify([...files, ...agents])).digest('hex').slice(0, 16);
 }
@@ -205,7 +206,7 @@ export function versionOf(dir: string): string {
  * `  agent: coder` and `agent : coder` name the agent they load with. None for a file with no such line, or whose frontmatter never
  * closes (the load refuses it). A name with a slash names no file of agents/.
  */
-function frontmatterValue(text: string, key: 'agent' | 'output'): string[] {
+function frontmatterValue(text: string, key: 'agent' | 'output' | 'skills'): string[] {
   let block: string | null;
   try {
     block = splitFrontmatter('', text).block;
@@ -217,7 +218,7 @@ function frontmatterValue(text: string, key: 'agent' | 'output'): string[] {
     const i = line.indexOf(':');
     if (line.startsWith('#') || i <= 0 || line.slice(0, i).trim() !== key) continue;
     const value = line.slice(i + 1).trim();
-    return value && (key === 'output' || !/[\\/]/.test(value)) ? [value] : [];
+    return value && (key !== 'agent' || !/[\\/]/.test(value)) ? [value] : [];
   }
   return [];
 }
@@ -411,7 +412,10 @@ export const workflows = new Hono()
         return c.json({ error: `No step '${step}' in workflow ${name} (${folder.dir}). Its steps are: ${steps.map((s) => s.name).join(', ')}.` }, 404);
       }
       const source = fs.readFileSync(path.join(folder.dir, `${found.name}.md`), 'utf8');
-      return c.json({ workflow: name, from, dir: folder.dir, step: found.name, body: found.body, source, keys: keyRows(found) } satisfies WorkflowStepPage);
+      // The step's resolved agent carries its keys and words, not its skills: those are read from the agent's own file, beside the folder.
+      const attached = found.agent ? loadAgents(agentsDir(folder.dir)).get(found.agent.name) : undefined;
+      const agentSkills = attached instanceof Error || attached === undefined ? null : attached.skills?.list ?? null;
+      return c.json({ workflow: name, from, dir: folder.dir, step: found.name, body: found.body, source, keys: keyRows(found), agentSkills } satisfies WorkflowStepPage);
     } catch (err) {
       return c.json({ error: messageOf(err) }, 500);
     }

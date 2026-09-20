@@ -1,5 +1,6 @@
 ---
 description: Implements what was asked in the repository, in small commits with tests, and weighs a plan when a step before it made one.
+skills: implementer.skills.json
 harness: claude
 model: opus
 # Said here, or the session takes the effort of whoever runs the daemon (`effortLevel` in their Claude Code settings,

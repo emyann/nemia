@@ -43,9 +43,10 @@ export default {
         }, iso);
       const fiveResets = await clock(limits.five_hour.resets_at);
       const weekResets = await clock(limits.seven_day.resets_at);
-      if (!/^\D+ \d{2}:\d{2}$/.test(weekResets)) throw new Refused(`the week resets three days out, on another day, so it reads with its weekday — it read ${weekResets}`);
       await expectTexts(line.locator('[data-quota-window="five_hour"]'), [`5-hour ${Math.round(QUOTA.fiveHour.used)}% · resets ${fiveResets}`], 'the five-hour window, used and when it resets, in the browser’s time');
       await expectTexts(line.locator('[data-quota-window="seven_day"]'), [`week ${QUOTA.week.used}% · resets ${weekResets}`], 'the week, with the weekday it resets on');
+      // Whatever the browser's locale writes a short weekday as — `Mon`, `dim.`, `Mo.`, `月` — it is not a number, and a bare time begins with one.
+      if (/^\p{N}/u.test(weekResets)) throw new Refused(`three days out, the week's reset says the weekday it is on — this read ${JSON.stringify(weekResets)}, a time alone`);
       await expectCount(line.locator('[data-quota-window="seven_day"][data-marked]'), 1, `the week, ${QUOTA.week.used}% used, is marked`);
       await expectCount(line.locator('[data-quota-window="five_hour"][data-marked]'), 0, `the five-hour window, ${QUOTA.fiveHour.used}% used, is not`);
       await expectVisible(line.locator('[data-quota-age]').filter({ hasText: /^read just now$/ }), 'and how old the answer is');

@@ -984,6 +984,118 @@ function outputOf(step: string, file: string | undefined, read: ((file: string) 
 
 const isObject = (v: unknown): v is Record<string, unknown> => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
 
+/**
+ * One thing an agent says it can do, in the A2A protocol's words: its `AgentSkill`, as `specification/a2a.proto` defines it (protocol 1.0,
+ * read 2026-09-19) and as the specification's sample card spells it in JSON — camelCase.
+ *
+ * `id`, `name`, `description` and `tags` are REQUIRED there and are required here. `examples` are the sentences a person would actually
+ * type — "use this when…" is one. `inputModes` and `outputModes` are media types, and say nothing an agent's card does not already say by
+ * default, so they are written only where they differ. A skill is a description, not a permission: the proto's own comment says skills
+ * "represent the abilities of an agent … a more focused set of behaviors that the agent is likely to succeed at". Nothing reads them to
+ * decide what a session may touch.
+ */
+export type AgentSkill = {
+  id: string;
+  name: string;
+  description: string;
+  tags: string[];
+  examples?: string[];
+  inputModes?: string[];
+  outputModes?: string[];
+};
+
+/** The skills an agent's `skills:` names: the file, beside the agent, and what it holds in the order it holds them. */
+export type AgentSkills = { file: string; list: AgentSkill[] };
+
+/** The keys an A2A `AgentSkill` has that this package writes and reads. `securityRequirements` is the one it refuses — see `skillsOf`. */
+const SKILL_KEYS = ['id', 'name', 'description', 'tags', 'examples', 'inputModes', 'outputModes'] as const;
+/** Of those, the ones whose value is a list of words. */
+const SKILL_LISTS = ['tags', 'examples', 'inputModes', 'outputModes'] as const;
+
+/**
+ * The skills an agent's `skills:` names, read and refused unless every one of them is an A2A `AgentSkill`.
+ *
+ * Strict for the same reason `outputOf` is strict: what is written here is printed as a card (`agentCard`) and shown on the board as what
+ * the agent can do, so a skill missing a field the protocol marks REQUIRED would be a card nobody could read and a line on the board saying
+ * nothing. Refused where it is written, by name, with the fix in the message.
+ */
+function skillsOf(agent: string, file: string | undefined, read: ((file: string) => string | undefined) | undefined): AgentSkills | undefined {
+  if (file === undefined) return undefined;
+  const named = `${agent}: \`skills: ${file}\``;
+  const beside = agent.endsWith('.md') ? agent : `${agent}.md`;
+  const suggest = `${path.basename(beside, '.md')}.skills.json`;
+  if (path.isAbsolute(file) || /[\\/]/.test(file) || file.startsWith('.') || !file.endsWith('.json')) {
+    refuse(`${named} is not a skills file's name. It is a .json file beside the agent, named with no folder — \`skills: ${suggest}\` — or delete the line, and the agent says nothing of what it can do.`);
+  }
+  if (!read) refuse(`${named} names a file beside the agent, and this agent was read without its folder. Load it with \`loadAgents(<folder>)\`, which reads the file.`);
+  const text = read(file);
+  if (text === undefined) {
+    refuse(`${named} is not there. It is a list of A2A skills — write it beside ${beside}, correct the name, or delete the line and the agent says nothing of what it can do.`);
+  }
+  let value: unknown;
+  try { value = JSON.parse(text); } catch (e) {
+    refuse(`${named} is not JSON (${(e as Error).message}). It is a JSON array of skills, each \`{ "id", "name", "description", "tags" }\`.`);
+  }
+  if (!Array.isArray(value)) {
+    refuse(`${named} is not a list. An agent's skills are a JSON array, each one \`{ "id", "name", "description", "tags": [<a word or two>], "examples"?: ["<use this when…>"] }\` — the A2A protocol's \`AgentSkill\`.`);
+  }
+  if (!value.length) {
+    refuse(`${named} is an empty list, and an agent with no skills says nothing it can do. Write at least one skill, or delete the line.`);
+  }
+  const list: AgentSkill[] = [];
+  const seen = new Map<string, number>();
+  value.forEach((entry, i) => {
+    const at = `${named}, skill ${i + 1}`;
+    if (!isObject(entry)) refuse(`${at} is ${JSON.stringify(entry)}, not a skill. Each entry is an object: \`{ "id", "name", "description", "tags" }\`.`);
+    const extra = Object.keys(entry).filter((k) => !(SKILL_KEYS as readonly string[]).includes(k));
+    if (extra.includes('securityRequirements')) {
+      refuse(`${at} sets \`securityRequirements\`, which names a security scheme its agent's card declares — and nothing here serves this agent over A2A, so its card declares none and a client reading one would find nothing to satisfy. Delete the key; the slice that serves a card adds it with the schemes.`);
+    }
+    if (extra.length) {
+      refuse(`${at} sets ${extra.map((k) => `\`${k}\``).join(', ')}, which an A2A skill does not have. A skill's keys are: ${SKILL_KEYS.join(', ')}. Correct the spelling or delete the key — what the card does not carry, nobody reads.`);
+    }
+    for (const key of ['id', 'name', 'description'] as const) {
+      if (typeof entry[key] !== 'string' || !entry[key].trim()) {
+        refuse(`${at} has no \`${key}\`, and the A2A protocol marks it REQUIRED. Give it one: \`"${key}": "…"\`.`);
+      }
+    }
+    const id = (entry.id as string).trim();
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
+      refuse(`${named}, skill \`${id}\` is not an id: an id is what a caller names the skill by, and the protocol's own examples are lowercase words joined by dashes — \`review-a-change\`, say. Rename it.`);
+    }
+    const first = seen.get(id);
+    if (first !== undefined) {
+      refuse(`${named} gives \`${id}\` twice, as skill ${first + 1} and skill ${i + 1}, and a caller naming it would not know which. Give one of them another id.`);
+    }
+    seen.set(id, i);
+    const lists: Partial<Record<(typeof SKILL_LISTS)[number], string[]>> = {};
+    for (const key of SKILL_LISTS) {
+      const value = entry[key];
+      if (value === undefined) {
+        if (key === 'tags') refuse(`${named}, skill \`${id}\` has no \`tags\`, and the A2A protocol marks them REQUIRED: they are the words a person or a dispatcher searches by. Give it one or two — \`"tags": ["code", "review"]\`.`);
+        continue;
+      }
+      if (!Array.isArray(value) || value.some((word) => typeof word !== 'string' || !word.trim())) {
+        refuse(`${named}, skill \`${id}\`: \`${key}\` is a JSON array of words, each one a line of text — ${JSON.stringify(value)} is not one.`);
+      }
+      if (key === 'tags' && !value.length) {
+        refuse(`${named}, skill \`${id}\` has an empty \`tags\`, which says as little as none: the protocol marks them REQUIRED because they are what the skill is found by. Give it one or two — \`"tags": ["code", "review"]\`.`);
+      }
+      lists[key] = (value as string[]).map((word) => word.trim());
+    }
+    list.push({
+      id,
+      name: (entry.name as string).trim(),
+      description: (entry.description as string).trim(),
+      tags: lists.tags!,
+      ...(lists.examples ? { examples: lists.examples } : {}),
+      ...(lists.inputModes ? { inputModes: lists.inputModes } : {}),
+      ...(lists.outputModes ? { outputModes: lists.outputModes } : {}),
+    });
+  });
+  return { file, list };
+}
+
 /** Keywords whose value is a schema. `items` may also be an array of them, as older drafts wrote it. */
 const ONE_SCHEMA = ['items', 'additionalItems', 'additionalProperties', 'unevaluatedItems', 'unevaluatedProperties', 'contains', 'propertyNames', 'not', 'if', 'then', 'else'];
 /** Keywords whose value is an array of schemas. */
@@ -1173,14 +1285,19 @@ export function workflowFolder(given: string, from: string, repo: string): strin
 }
 
 /**
- * The keys an agent file sets: what it is for, in a line, and who does the work and how. A step that names the agent (`agent:`) takes these
- * as its own defaults, and a key it sets itself wins. Everything else a step sets is wiring — where the step sits in its workflow, what it
- * reads, how it is judged and for how long — and belongs on the step: an agent file that sets one is refused by name.
+ * The keys an agent file sets: what it is for, in a line; what it can do, in the file its `skills:` names; and who does the work and how. A
+ * step that names the agent (`agent:`) takes the last of those as its own defaults, and a key it sets itself wins. Everything else a step
+ * sets is wiring — where the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent
+ * file that sets one is refused by name.
  */
-export const AGENT_KEYS = ['description', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'remote', 'output'] as const;
+export const AGENT_KEYS = ['description', 'skills', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'remote', 'output'] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
-/** The keys a step takes from its agent: every agent key but its description, which is the agent's own. */
-export type RoleKey = Exclude<AgentKey, 'description'>;
+/**
+ * The keys a step takes from its agent: every agent key but the two that describe the agent itself — its `description:` and the `skills:` it
+ * says it has. A step has neither, so neither is a `STEP_KEY`, and code outside the package that reads the role keys leaves both out
+ * (`apps/api/src/builder.ts`'s `ROLE_KEYS`, `apps/api/src/agents.ts`'s).
+ */
+export type RoleKey = Exclude<AgentKey, 'description' | 'skills'>;
 const isAgentKey = (key: string): key is AgentKey => (AGENT_KEYS as readonly string[]).includes(key);
 
 /**
@@ -1191,6 +1308,7 @@ const isAgentKey = (key: string): key is AgentKey => (AGENT_KEYS as readonly str
 export type Agent = {
   name: string;
   description?: string;
+  skills?: AgentSkills;
   keys: Partial<Record<RoleKey, string>>;
   body: string;
   read: (file: string) => string | undefined;
@@ -1222,9 +1340,10 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
   const file = `${AGENTS_FOLDER}/${name}.md`;
   const { block, body } = splitFrontmatter(file, text);
   const meta: Partial<Record<AgentKey, string>> = block === null ? {} : readKeys<AgentKey>(file, block, (key) => agentKeyRefusal(file, key));
-  const { description, ...keys } = meta;
+  const { description, skills: named, ...keys } = meta;
   stepFrom(file, keys, body, read);
-  return { name, ...(description !== undefined && { description }), keys, body, read: read ?? (() => undefined) };
+  const skills = skillsOf(file, named, read);
+  return { name, ...(description !== undefined && { description }), ...(skills !== undefined && { skills }), keys, body, read: read ?? (() => undefined) };
 }
 
 /**
@@ -1259,7 +1378,7 @@ export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
  * An agent as it is written back: what `renderAgent` takes, and what `parseAgent` reads — its name, the file's, its description, its keys as
  * written (`200k`, `Read, Grep`), and its instructions. A key unset is left out, or `null`.
  */
-export type AgentDraft = { name: string; description?: string | null; keys: Partial<Record<RoleKey, string | null>>; body: string };
+export type AgentDraft = { name: string; description?: string | null; skills?: string | null; keys: Partial<Record<RoleKey, string | null>>; body: string };
 
 /**
  * An agent as its file: the frontmatter, `description:` first and then each role key it sets in `AGENT_KEYS`' order, as written; then its
@@ -1277,10 +1396,12 @@ export function renderAgent(draft: AgentDraft): string {
   for (const key of Object.keys(keys)) {
     if (keys[key] == null) continue;
     if (key === 'description') refuse(`${file}: \`description\` is the agent's own line, not one of its role keys — give it as the description, once.`);
+    if (key === 'skills') refuse(`${file}: \`skills\` is the agent's own line — the file beside it that says what it can do — not one of its role keys. Give it as the skills, once.`);
     const refused = agentKeyRefusal(file, key);
     if (refused !== undefined) refuse(refused);
   }
-  const values: Array<[string, string | null | undefined]> = [['description', draft.description], ...AGENT_KEYS.filter((key) => key !== 'description').map((key) => [key, keys[key]] as [string, string | null | undefined])];
+  const own: ReadonlyArray<'description' | 'skills'> = ['description', 'skills'];
+  const values: Array<[string, string | null | undefined]> = [['description', draft.description], ['skills', draft.skills], ...AGENT_KEYS.filter((key) => !(own as readonly string[]).includes(key)).map((key) => [key, keys[key]] as [string, string | null | undefined])];
   const lines = values.flatMap(([key, value]) => {
     if (value == null) return [];
     const text = String(value);
@@ -1290,6 +1411,59 @@ export function renderAgent(draft: AgentDraft): string {
   const body = String(draft.body ?? '').trim();
   if (lines.length) return `---\n${lines.map((line) => `${line}\n`).join('')}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : body ? `${body}\n` : '';
+}
+
+/**
+ * A local agent described in the A2A protocol's terms — its name, what it is for, what it can do — and **not** an A2A Agent Card. Protocol
+ * 1.0, read at the source on 2026-09-19: `specification/a2a.proto` in a2aproject/A2A, and the specification's Agent Card section.
+ *
+ * The protocol marks `supported_interfaces` REQUIRED: it is the list of URLs and bindings a client would call the agent at. Nothing here
+ * serves this agent over A2A, so there is no URL to give, and this leaves the field out rather than give an address that does not answer. A
+ * document missing a REQUIRED field is not a valid `AgentCard`, so everything that prints this says so in the same breath (`wf agents card`
+ * on stderr, the api's `servedOverA2A: false`), and `test/agent-card.test.ts` pins the omission: the slice that serves a card deletes it
+ * deliberately.
+ *
+ * `provider`, `documentationUrl`, `iconUrl`, `securitySchemes`, `security` and `signatures` are left out for the same reason — nothing here
+ * fills them honestly. `capabilities` in A2A are protocol features, not reach: streaming, push notifications, an extended card. None of the
+ * three exists here, so all three are false. What an agent can do is its `skills`.
+ */
+export type AgentCardShape = {
+  name: string;
+  description: string;
+  version: string;
+  capabilities: { streaming: boolean; pushNotifications: boolean; extendedAgentCard: boolean };
+  defaultInputModes: string[];
+  defaultOutputModes: string[];
+  skills: AgentSkill[];
+};
+
+/**
+ * The card-shaped description of `agent`, at `version` — what `wf agents card` prints and the api answers with, one builder so the two can
+ * never disagree. Pure. The JSON is spelled as the specification's sample card spells it, camelCase.
+ *
+ * `defaultInputModes` is `text/plain`: a step is handed a composed brief and nothing else. `defaultOutputModes` is `application/json`: every
+ * closeout is a JSON object. An agent's `output:` names a JSON Schema, and A2A describes an output's *media type*, never its schema — there
+ * is no field for it, so it contributes the media type and nothing more.
+ *
+ * Refused, rather than printed hollow: an agent with no `description:` and one with no `skills:`, both of which the protocol marks REQUIRED.
+ */
+export function agentCard(agent: Agent, version: string): AgentCardShape {
+  const named = `${AGENTS_FOLDER}/${agent.name}.md`;
+  if (!agent.description?.trim()) {
+    refuse(`${named} has no \`description:\`, and the A2A protocol marks a card's description REQUIRED. Write one line saying when to attach this agent to a step.`);
+  }
+  if (!agent.skills?.list.length) {
+    refuse(`${named} has no \`skills:\`, and the A2A protocol marks a card's skills REQUIRED: a card with none says nothing the agent can do. Write ${agent.name}.skills.json beside it, a JSON array of \`{ "id", "name", "description", "tags" }\`, and name it with \`skills: ${agent.name}.skills.json\`.`);
+  }
+  return {
+    name: agent.name,
+    description: agent.description.trim(),
+    version,
+    capabilities: { streaming: false, pushNotifications: false, extendedAgentCard: false },
+    defaultInputModes: ['text/plain'],
+    defaultOutputModes: ['application/json'],
+    skills: agent.skills.list,
+  };
 }
 
 /**
@@ -1349,9 +1523,10 @@ export function agentUsers(workflowsDir: string, name: string): string[] {
 }
 
 /**
- * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md` and of the schema its `output:`
- * names beside it, each by name with what it holds — a file that cannot be read counts as what it says. A write of the agent carries it, and
- * is refused when the agent no longer holds it (`writeAgent`), rather than written over what changed since it was read.
+ * What an agent's files hold, as one word, or `null` for an agent that is not there: a digest of `<name>.md` and of each file it names beside
+ * it — the skills its `skills:` names and the schema its `output:` names — each by name with what it holds, so a file that cannot be read
+ * counts as what it says. A write of the agent carries it, and is refused when the agent no longer holds it (`writeAgent`), rather than
+ * written over what changed since it was read. A second sidecar has a second version function to keep right, the api's `versionOf`.
  */
 export function agentVersion(dir: string, name: string): string | null {
   const at = path.join(dir, `${name}.md`);
@@ -1362,8 +1537,9 @@ export function agentVersion(dir: string, name: string): string | null {
     try { return fs.readFileSync(file, 'utf8'); } catch (err) { return { unreadable: (err as Error).message }; }
   };
   const text = read(at);
-  const schema = typeof text === 'string' ? frontmatterKey(text, 'output') : undefined;
-  const files = [[`${name}.md`, text], ...(schema === undefined ? [] : [[schema, read(path.resolve(dir, schema))]])];
+  // Every file the agent names beside it, in the order `renderAgent` writes the keys: what it can do, and what its steps declare.
+  const beside = typeof text === 'string' ? (['skills', 'output'] as const).flatMap((key) => frontmatterKey(text, key) ?? []) : [];
+  const files = [[`${name}.md`, text], ...beside.map((file) => [file, read(path.resolve(dir, file))])];
   return createHash('sha256').update(JSON.stringify(files)).digest('hex').slice(0, 16);
 }
 

@@ -66,8 +66,11 @@ export type KeyField = { key: StepKey; meaning: string; kind: KeyKind; choices: 
  */
 export type KeyForm = { keys: KeyField[]; defaultHarness: string; roleKeys: StepKey[]; agents: Record<string, Partial<WorkflowStepSpec>> };
 
-/** The keys a step may take from its agent: the agent's keys but its description, which describes the agent and no step. */
-const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter((key): key is Exclude<typeof key, 'description'> => key !== 'description');
+/**
+ * The keys a step may take from its agent: the agent's keys but the two that describe the agent itself — its description and the skills it
+ * says it can do, neither of which a step has. A key added to `AGENT_KEYS` that is not a role key is left out here too, or the cast fails.
+ */
+const ROLE_KEYS: readonly StepKey[] = AGENT_KEYS.filter((key): key is Exclude<typeof key, 'description' | 'skills'> => key !== 'description' && key !== 'skills');
 
 /** The agents a step of yours may name: each file of yours' `agents/`, by name, readable or not — naming a broken one is refused on save, in its words. */
 const agentsOfYours = (home: string): string[] => [...loadAgents(path.join(home, 'workflows', AGENTS_FOLDER)).keys()].sort();

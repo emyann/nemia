@@ -2,7 +2,7 @@ import { useSuspenseQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 import { LinkButton } from '@/components/ui/button';
-import { FromBadge, RouteLink, UsedBy } from '../components/AgentParts';
+import { FromBadge, RouteLink, Skills, UsedBy } from '../components/AgentParts';
 import { routeLink } from '../components/routeLink';
 import { agentsQuery, type AgentListing } from '../lib/api';
 import { KEY_LABELS, ROLE_KEYS } from '../lib/agents';
@@ -69,7 +69,7 @@ function Place({ title, agents, empty }: { title: string; agents: AgentListing[]
   );
 }
 
-/** One agent: its name, linked to its page, what it is for, the keys it sets, and the nodes that name it. */
+/** One agent: its name, linked to its page, what it is for, what it says it can do, the keys it sets, and the nodes that name it. */
 function AgentCard({ agent }: { agent: AgentListing }) {
   const set = ROLE_KEYS.filter((key) => agent.keys[key] !== undefined);
   return (
@@ -92,6 +92,9 @@ function AgentCard({ agent }: { agent: AgentListing }) {
         <FromBadge from={agent.from} />
       </header>
       {agent.description && <p className="text-sm text-neutral-700 dark:text-neutral-300">{agent.description}</p>}
+      {agent.error === null && (
+        <Skills skills={agent.skills?.list} none={<>Says nothing it can do: no {code('skills:')} file beside it.</>} />
+      )}
       {agent.error !== null ? (
         <p className="font-mono text-xs break-words text-red-700 dark:text-red-400">{agent.error}</p>
       ) : (

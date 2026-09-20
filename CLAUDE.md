@@ -84,6 +84,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   The same happened to a byte order mark: writing `\uFEFF` through the file tools put a raw BOM into `agent-judge`'s `card.ts` and
   `card.test.ts`, twice — and into this very line as it was written, caught only by looking for one — and that package's
   `test/source.test.ts` refuses one too (learned by the run that built the judge package).
+- **An e2e fixture written relative to now crosses midnight.** The quota seed resets the five-hour window 130 minutes out, and the
+  page spec assumed that time is always today: run between about 21:50 and midnight, the header rightly says `resets Sun 00:26` and the
+  e2e failed on the weekday it added. An expectation over a formatted time decides the same way the code does — `clockWord` compares the
+  calendar day — rather than hardcoding which form it will take (learned by the second round of the run that gave an agent its skills).
 - **Playwright treats a straight SVG edge path as hidden.** A zero-height `<path>` fails
   `toBeVisible()`, so an e2e that waits for an edge to be visible waits for ever; count the edge
   paths instead (learned by the run that animated the edges).
@@ -173,6 +177,12 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   a time, and `apps/api/src/workflows.ts` built its 201 the same way, so a card's ignored `repo:` was printed by `wf start` and by
   nothing else — no daemon log, no board. Grep for every place that spreads or rebuilds the type, and give the new fact one writer
   (`ignoredRepoLine`) so the paths cannot word it differently either (learned by the run that started a folder team from a card).
+- **A key added to `AGENT_KEYS` that is not a role key has three exclusion sites.** `description` and `skills` describe the agent and are no
+  step's, so each place that turns `AGENT_KEYS` into the keys a step inherits excludes them by name: `ROLE_KEYS` in `apps/api/src/builder.ts`
+  and in `apps/api/src/agents.ts`, and the hand-written mirror in `apps/web/src/lib/agents.ts`. Miss one and the board offers the key as a
+  role key on every step form. And a key that names a file beside the agent is digested twice — `agentVersion` in the package, `versionOf` in
+  `apps/api/src/workflows.ts` — or an edit of that file moves the agent's version and not the folder's (learned by the run that added
+  `skills:`).
 - **A shipped folder is not whole without `workflows/agents/`.** Every shipped step but the supervisor's names an agent there, so a
   test that copies a folder (`cpSync(SHIPPED/dev, …)`) copies `agents/` beside it, or the load refuses `agent: implementer` as not
   there. The package's `workflows/ui` copy has its two agents in the package's `workflows/agents`, held byte for byte by the ui copy

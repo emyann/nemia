@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { AgentListing, KeyForm } from '../src/lib/api.ts';
-import { choicesOf, draftOf, edited, formOf, ROLE_KEYS, schemaFileFor } from '../src/lib/agents.ts';
+import { choicesOf, draftOf, edited, formOf, ROLE_KEYS, schemaFileFor, skillsFileFor } from '../src/lib/agents.ts';
 
 const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   name: 'scribe',
@@ -12,6 +12,7 @@ const listing = (fields: Partial<AgentListing> = {}): AgentListing => ({
   keys: { model: 'sonnet', effort: 'low' },
   body: 'You write the notes.\n',
   schema: null,
+  skills: null,
   source: '',
   version: 'v1',
   usedBy: [],
@@ -29,6 +30,8 @@ test('an agent read into the form and sent back unchanged is the draft it was: i
   assert.equal(draft.keys.effort, 'low');
   assert.equal(draft.keys.tools, null, 'a key the file does not set is sent unset');
   assert.equal('schema' in draft, false, 'a schema not touched does not travel');
+  assert.equal(draft.skills, null, 'an agent that names no skills file says so');
+  assert.equal('skillsText' in draft, false, 'and sends no text to write to a file it does not name');
   assert.equal(edited(form, listing()), false);
 });
 
@@ -80,4 +83,50 @@ test("a key's choices are its harness's words, the default harness's when the ag
   assert.deepEqual(choicesOf(form, 'remote', 'codex'), ['true', 'false']);
   assert.equal(choicesOf(form, 'model', ''), null);
   assert.equal(choicesOf(undefined, 'effort', ''), null);
+});
+
+const SAID = '[{ "id": "write-a-note", "name": "Write a note", "description": "Writes the notes of a change.", "tags": ["note"] }]\n';
+const saying = () => listing({ skills: { file: 'scribe.skills.json', text: SAID, list: [{ id: 'write-a-note', name: 'Write a note', description: 'Writes the notes of a change.', tags: ['note'] }] } });
+
+test("an agent's skills read into the form are the file it names and that file's text, and sent back unchanged they do not travel", () => {
+  const form = formOf(saying());
+  assert.equal(form.skillsFile, 'scribe.skills.json');
+  assert.equal(form.skillsText, SAID);
+  const draft = draftOf(form);
+  assert.equal(draft.skills, 'scribe.skills.json', 'the line travels with every save, as the description does');
+  assert.equal('skillsText' in draft, false, 'the file does not, until it changes');
+  assert.equal(edited(form, saying()), false);
+});
+
+test('skills pasted with no file are named after the agent, and travel', () => {
+  const form = formOf(listing());
+  form.skillsText = SAID;
+  const draft = draftOf(form);
+  assert.equal(draft.skills, 'scribe.skills.json');
+  assert.equal(draft.skillsText, SAID);
+  assert.equal(skillsFileFor('  '), 'agent.skills.json');
+  assert.equal(edited(form, listing()), true);
+});
+
+test('a skills file read with the agent travels only once its text or its file changes — one shared with another agent is otherwise left alone', () => {
+  const read = saying();
+  const moved = formOf(read);
+  moved.skillsFile = 'notes.skills.json';
+  assert.equal(draftOf(moved).skillsText, SAID, 'the file named otherwise is written where it now points');
+  assert.equal(draftOf(moved).skills, 'notes.skills.json');
+  const typed = formOf(read);
+  typed.skillsText = `${SAID.trimEnd()} `;
+  assert.equal('skillsText' in draftOf(typed), false, 'spaces round it are not a change');
+  typed.skillsText = '[]';
+  assert.equal(draftOf(typed).skillsText, '[]', 'what the package then refuses, in its own words');
+});
+
+test('the skills line emptied is sent unset, and the text emptied with it', () => {
+  const form = formOf(saying());
+  form.skillsFile = '';
+  form.skillsText = '';
+  const draft = draftOf(form);
+  assert.equal(draft.skills, null);
+  assert.equal('skillsText' in draft, false, 'there is no file to write it to');
+  assert.equal(edited(form, saying()), true);
 });

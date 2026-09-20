@@ -90,6 +90,17 @@ export function presetOf(workflow: string | null, repo: string | null, here: str
 export const ignoredRepoNote = (workflow: Pick<WorkflowListing, 'folderTeam'>, repo: string | undefined | null): string | null =>
   workflow.folderTeam && repo ? `The card's repo: ${repo} is not looked at — this workflow's steps work in folders, with no git repository.` : null;
 
+/**
+ * The runs a start waits on, as it is sent: none on a team whose every step works in a folder. `wf start` refuses `--after` for such a
+ * team — a folder run has no branch, so there is nothing for another run to wait for — and the form hides the picker for one.
+ *
+ * Hiding a control does not forget what was chosen in it: the picker is on the card's form under the workflow it picks, and a person who
+ * picked runs under a git workflow and then picked a folder team would have sent them still, to be shown a refusal about a control no
+ * longer on the page. What is not offered is not sent.
+ */
+export const afterFor = (workflow: Pick<WorkflowListing, 'folderTeam'>, after: readonly string[]): string[] =>
+  workflow.folderTeam ? [] : [...after];
+
 /** A place in a queue as a person says it: `1st`, `2nd`, `3rd`, `4th`, `11th`, `21st`. */
 export function ordinal(n: number): string {
   const tens = n % 100;

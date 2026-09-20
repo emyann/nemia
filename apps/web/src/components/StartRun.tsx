@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { repositoryQuery, runsQuery, startRun, type RunSummary, type Started, type WorkflowListing } from '../lib/api';
 import { standingOf, titleOf } from '../lib/factory';
-import { ignoredRepoNote } from '../lib/inbox';
+import { afterFor, ignoredRepoNote } from '../lib/inbox';
 
 /**
  * A brief, the runs the new run waits on, and the button that starts a run of the workflow with them: then the new run, linked to
@@ -68,7 +68,8 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
       className={card ? 'space-y-2' : 'space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-800'}
       onSubmit={(event) => {
         event.preventDefault();
-        start.mutate({ brief, after });
+        // Not the picks: what the workflow now picked takes (`afterFor`). The picker is hidden for a folder team, and what it holds is not sent.
+        start.mutate({ brief, after: afterFor(workflow, after) });
       }}
     >
       <label htmlFor={field} className="block text-sm font-medium">

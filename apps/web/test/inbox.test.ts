@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dropCard, fileCard, queueCard, startRun, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
-import { capLine, cardLines, hasPage, ignoredRepoNote, namedElsewhere, newestCardsFirst, ordinal, presetOf, queueable, queuedWord, queueOf, triedLine, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
+import { afterFor, capLine, cardLines, hasPage, ignoredRepoNote, namedElsewhere, newestCardsFirst, ordinal, presetOf, queueable, queuedWord, queueOf, triedLine, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
 
 const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}): InboxEntry => ({
   name, file: `${name}.md`, title: name, workflow: null, repo: null, startedAs: [], error: null, body: name, filedAt, ...extra,
@@ -149,6 +149,18 @@ test('REFUSED: nothing is said of a repository a run does look at, nor of a card
   const inFolders = { ...onRepo, folderTeam: true };
   assert.equal(ignoredRepoNote(onRepo, '/code/app'), null, 'a team that works on a repository looks at the one the card names');
   for (const none of [undefined, null, '']) assert.equal(ignoredRepoNote(inFolders, none), null, `a card that names none: ${JSON.stringify(none)}`);
+});
+
+test('a start sends the runs it waits on, as they were picked', () => {
+  const onRepo = listing('dev', 'repo', '/code/app/workflows/dev');
+  assert.deepEqual(afterFor(onRepo, ['a-run-k2q9', 'another-c3d4']), ['a-run-k2q9', 'another-c3d4']);
+});
+
+test('REFUSED: a start of a team that works in folders sends none, whatever the picker was left holding', () => {
+  // The picker is hidden for a folder team, not emptied, and it is the same form on a card: pick runs under a git workflow, then pick
+  // the folder team, and what is no longer on the page would have been sent — for `wf start`'s refusal of `--after` on such a run.
+  const inFolders = { ...listing('note', 'yours', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
+  assert.deepEqual(afterFor(inFolders, ['a-run-k2q9', 'another-c3d4']), []);
 });
 
 /** The api answering each request with `answer()`, for the length of the test: the requests the board sent. */

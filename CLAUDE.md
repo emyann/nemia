@@ -231,6 +231,10 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   to a person as having made nothing, on the one surface a person who never opens a terminal has. Either the list carries what it
   cannot serve, by path (what was done), or the sentence says only what the list knows. Anywhere a page words an empty list, read
   what the list leaves out (learned by the run that started a folder team from a card, round 3).
+- **A control hidden by a condition still holds what was put in it.** `StartRun` hides the After picker for a team that works in
+  folders and kept its state, so picking runs under a git workflow and then picking a folder team sent them anyway — and the api's
+  refusal named a control no longer on the page. Send what the current choice takes, not what the state holds (`afterFor`, same
+  round). The same for a field a form stops showing.
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

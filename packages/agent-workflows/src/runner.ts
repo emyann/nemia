@@ -1236,7 +1236,8 @@ const inUse = (name: string, users: readonly string[], does: string): string =>
  *
  * `schema` is the result schema the agent's `output:` names and `skills` the skills its `skills:` names, each written beside it with it: a
  * `.json` file's name with no folder, the one that key names, and not a file another agent names — that one is its agent's to change.
- * Without one, the file that key names is read from the folder as it is.
+ * Without one, the file that key names is read from the folder as it is. A key whose line is taken off, or pointed at another file, takes
+ * the file it named with it, unless another agent names that one — as `removeAgent` does, so nothing in `agents/` is named by nothing.
  */
 export function writeAgent(dir: string, draft: AgentDraft, { version, from, schema, skills, anywhere = false }: { version: string | null; from?: string; schema?: AgentSidecar | null; skills?: AgentSidecar | null; anywhere?: boolean }): AgentWritten {
   const at = path.resolve(dir);
@@ -1292,6 +1293,8 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
   const removed: string[] = [];
   const held = (f: string): string | undefined => { try { return fs.readFileSync(path.join(at, f), 'utf8'); } catch { return undefined; } };
   const before = sending.map((sidecar) => ({ sidecar, was: held(sidecar.file) }));
+  // What the agent named beside it before this write, read while its file still says so: a key whose line is taken off leaves no file behind.
+  const named = SIDECARS.map(({ key }) => ({ key, was: frontmatterKey(held(`${old}.md`) ?? '', key), now: frontmatterKey(text, key) }));
   for (const { sidecar, was } of before) {
     if (was === sidecar.text) continue;
     fs.writeFileSync(path.join(at, sidecar.file), sidecar.text);
@@ -1311,6 +1314,14 @@ export function writeAgent(dir: string, draft: AgentDraft, { version, from, sche
     throw err;
   }
   if (renamed && !removed.length) { fs.rmSync(file(old)); removed.push(`${old}.md`); }
+  // A key's line taken off, or pointed at another file: the file it named goes too, unless another agent names it — that one is not this
+  // agent's to remove. As `removeAgent` does, and for the same reason: nothing in `agents/` should name a file that nothing names.
+  for (const { key, was, now } of named) {
+    if (was === undefined || was === now || !/^[^\\/]+\.json$/.test(was) || was.startsWith('.')) continue;
+    const shared = fs.readdirSync(at).some((f) => f.endsWith('.md') && frontmatterKey(held(f) ?? '', key) === was);
+    const sidecarAt = path.join(at, was);
+    if (!shared && fs.lstatSync(sidecarAt, { throwIfNoEntry: false })?.isFile()) { fs.rmSync(sidecarAt); removed.push(was); }
+  }
   return { dir: at, agent, version: agentVersion(at, name)!, written, removed };
 }
 

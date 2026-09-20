@@ -2303,12 +2303,16 @@ export function roundAsk(
   }
   const looping = named ?? loops[0]!;
   const now = roundOf(run, looping.name);
-  // A loop a person ended themselves (`wf accept`) reads `verified` again, so without this the refusal below would tell them the step
-  // "signed off without asking for another round", which is the one thing it did not do.
   const accepted = acceptanceOf(run, looping.name);
-  if (accepted) {
-    return no(`${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (wf accept): its loop is over on their word, and what waits on it is filed. `
-      + `To go round once more after all, take that acceptance back first — accept-${looping.name}-${tryOf(run, looping.name)}, in the run's .asks directory — then ask again: wf round ${run.id} ${looping.name}.`);
+  // What waits on the loop and has a task of its own. Nothing does while the loop asks for another round — `assess` holds them — so this
+  // is work a tick filed on the strength of an acceptance, and it is there whether the acceptance still is or not.
+  const filed = steps.filter((s) => s.after.includes(looping.name)).find((s) => run.steps[s.name]?.taskId);
+  // A loop a person ended themselves (`wf accept`) reads `verified` again, so without this the refusals below would tell them the step
+  // "signed off without asking for another round", which is the one thing it did not do. While no tick has acted on their word there is
+  // nothing to undo, so the way back into the loop is to take the word back; once one has, it is not, and the answers are the ones below.
+  if (accepted && !filed) {
+    return no(`${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (wf accept): its loop is over on their word. `
+      + `Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-${looping.name}-${tryOf(run, looping.name)}, in the run's .asks directory — then ask again: wf round ${run.id} ${looping.name}.`);
   }
   const over = loopOver(steps, looping, run, spendOf);
   const above = Math.max(0, ...over.map((o) => o.spent.usd));
@@ -2333,6 +2337,13 @@ export function roundAsk(
   }
   const { status, own } = at(looping.name);
   if (status === 'exhausted' || (status === 'over budget' && satisfiesAfter(own))) {
+    // The loop asks for another round and something after it is already filed: the one way to that is a person's acceptance, honoured by a
+    // tick, and then taken back by hand — an acceptance is level-triggered, unlike a retry ask, which is unconsumed by definition. A round
+    // would file the loop's work again under a step that has run on it, and take none of that back, so the acceptance is not undone here.
+    if (filed) {
+      return no(`${filed.name} waits on ${looping.name} and has already been filed (${ownStatus(filed, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}), so a round would file ${looping.loop} again under a step that ran on its work, and take none of that back. `
+        + `What ended this loop was a person accepting the work as it stands (wf accept); deleting that acceptance does not delete ${filed.name}. See where the run stands, and what there is to do: wf decide ${run.id}.`);
+    }
     if (over.length && budget === undefined) {
       return no(`${looping.name} asked for round ${now + 1}, and ${overWords(over)}: the run files nothing more for ${over.length > 1 ? 'them' : 'it'} until a person raises the cap. Raise it with the round, above ${dollars(above)}: wf round ${run.id} ${looping.name} --budget <amount>.`);
     }
@@ -2351,24 +2362,30 @@ export function roundAsk(
     return no(`the run goes round again itself: ${looping.name} asked for another round, and \`rounds: ${capOf(looping)}\` has ${capOf(looping) - now} left, so the next tick files round ${now + 1}. Wait for it: wf ls ${run.id}.`);
   }
   if (satisfiesAfter(status)) {
+    // Two ways a loop is over with its `again` still true or not asked: the step said so itself, or a person did (`wf accept`) and a tick
+    // filed what waited. Every answer below is the same for both, so which it was is written once.
+    const ended = accepted
+      ? `${looping.name} asked for round ${now + 1}, and a person accepted its work as it stands at ${accepted.at}, with its findings open (wf accept)`
+      : `${looping.name} signed off without asking for another round (\`again: false\`)`;
+    const overNow = `${ended}, so its loop is over${accepted ? ' on their word' : ''}`;
     // What waits on it may be an ending held at its gate before it is filed (`waitsAtGate`): nothing has been filed, and saying so would
     // send a person to `wf ls` to read a run that is waiting for them. The two things there are to say to it are the approval that files
     // it and an objection to the work it would act on (`sendBackTo`), which is this loop.
     const ending = steps.find((s) => s.after.includes(looping.name) && waitsAtGate(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, () => undefined));
     if (ending) {
       const back = sendBackTo(ending, run).map((n) => `wf retry ${run.id} ${n} --message "<objection>"`).join(' or ');
-      return no(`${looping.name} signed off without asking for another round (\`again: false\`), so its loop is over — and nothing waiting on it has been filed: the run is at ${ending.name}'s gate, `
+      return no(`${overNow}${filed ? '' : ' — and nothing waiting on it has been filed'}: the run is at ${ending.name}'s gate, `
         + `where nothing of ${ending.name} has run and your approval is what files it. Approve it: wf approve ${run.id} ${ending.name}${back ? ` — or send the work back: ${back}` : ''}.`);
     }
     // An ending that waits on it was approved and stopped on the base branch (`endingStopped`): what changes the work there is a person's
     // objection, which a round does not carry — the send-back files the looping step with it, and its `again: true` is the round.
     const stopped = steps.find((s) => s.after.includes(looping.name) && endingStopped(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf));
     if (stopped) {
-      return no(`${looping.name} signed off without asking for another round (\`again: false\`), and ${stopped.name} stopped on the base branch (${ownStatus(stopped, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for: `
+      return no(`${ended}, and ${stopped.name} stopped on the base branch (${ownStatus(stopped, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for: `
         + `a round would file the work again with nothing said of why. Send it back, with what to change — ${looping.name} is filed again with your objection and what ${stopped.name} said, and its \`again: true\` is the round: `
         + `wf retry ${run.id} ${looping.name} --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: wf retry ${run.id} ${stopped.name}.`);
     }
-    return no(`${looping.name} signed off without asking for another round (\`again: false\`), so its loop is over and there is nothing to go round again. What waits on it has been filed: wf ls ${run.id}.`);
+    return no(`${overNow} and there is nothing to go round again. What waits on it has been filed: wf ls ${run.id}.`);
   }
   return no(`round ${now} of ${looping.name}'s loop is still running, so there is nothing to go round again until it ends. Wait for it: wf ls ${run.id} (or stop the run: wf cancel ${run.id}).`);
 }

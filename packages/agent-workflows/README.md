@@ -1046,8 +1046,14 @@ rounds: 3
   `loop:`, a folder with no loop or several unnamed, the try already accepted, a round already asked for,
   a loop below its cap — which goes round by itself — a round held on a budget, where raising the cap is
   the way on, a loop that ended `again: false`, and a round still running. A file at the acceptance's name
-  that is not one is honoured by no pass, which says so in its notes and leaves the file alone, and
-  `wf round` refuses an accepted loop, naming the file to delete to take the acceptance back.
+  that is not one is honoured by no pass, which says so in its notes and leaves the file alone.
+- **Taking it back is only a file to delete until a tick has acted on it.** `wf round` on an accepted loop
+  refuses, and what it says depends on that: while nothing waiting on the loop has been filed, nothing has
+  been done on the person's word, and the refusal names `accept-<step>-<try>` to delete before asking again.
+  Once a tick has filed what waited, deleting that file does not take the step it filed back — it only makes
+  the loop read `rounds exhausted` again — so the refusal says where the run stands instead, and a round is
+  refused a second time, by the step after the loop that is already filed. The way on there is the run's own:
+  approve the ending, or send the work back through the loop (`wf retry <run> <step> --message`).
 - **What it leaves on the record.** `wf ls` says `round 3 of 3, and it asked again — accepted as it stands
   <time>, its findings open` beside the looping step — the time, never the person's words, which are free
   text and would break the column. `wf decide` says it in full, with the words. And the step after the loop

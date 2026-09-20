@@ -865,6 +865,12 @@ const asksDir = (id: string) => path.join(ROOT, 'runs', `${id}.asks`);
 /** The asks waiting in a run's directory, by name. */
 const asksOf = (id: string) => (fs.existsSync(asksDir(id)) ? fs.readdirSync(asksDir(id)).filter((f) => f.startsWith('retry-')) : []);
 const refusedWith = (pattern: RegExp) => (err: Error & { exitCode?: number }) => err.exitCode === 2 && pattern.test(err.message);
+/** What a verb refused with, once it has said it was a refusal — for a message to read more than one thing in, and to read something out of. */
+const refusal = async (p: Promise<unknown>): Promise<string> => {
+  const err = await p.then(() => undefined, (e: Error & { exitCode?: number }) => e);
+  assert.ok(err?.exitCode === 2, `expected a refusal, got ${err ? err.message : 'no error'}`);
+  return err!.message;
+};
 
 test('`retries: 1` re-files a step its check refused, once, continuing its session and told what the check said — and past it, files nothing', async () => {
   const { run, e, tasks, filings, settle, logs } = await throughCheck('check: npm test && npm run typecheck\nretries: 1', 'failed', 1);
@@ -1247,6 +1253,43 @@ test('an acceptance file the run cannot read is not honoured, and not touched: t
     assert.equal(fs.readFileSync(file, 'utf8'), written, 'not touched');
     assert.equal((await list(b.e, readRun(run.id))).steps[1]!.status, 'rounds exhausted');
   }
+});
+
+/** The same loop, closed by a step with no gate: what waits on the loop runs the moment the loop is over, and nobody is asked. */
+const loopedThenDocs = () => {
+  const dir = looped();
+  fs.writeFileSync(path.join(dir, 'docs.md'), '---\nafter: review\n---\nwrite it up\n');
+  return dir;
+};
+
+test('an acceptance a tick has acted on is not a file to delete: the round refuses with what there is instead — and refuses again if it is deleted anyway', async () => {
+  const run = started(loopedThenDocs());
+  const b = board();
+  await advance(b.e, readRun(run.id));
+  for (const n of [1, 2]) { await toReview(b, run.id, n, true); await advance(b.e, readRun(run.id)); }
+  await toReview(b, run.id, 3, true);
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, [], 'at the cap, nothing after the loop');
+
+  // Before a tick has acted on it, taking the acceptance back is the way back into the loop: nothing has been done on its strength.
+  const { file } = await accept(b.e, run.id, undefined, ENOUGH);
+  const early = await refusal(round(b.e, run.id));
+  assert.match(early, /^review asked for round 4, and a person accepted its work as it stands at .*Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-review-3, in the run's \.asks directory — then ask again: wf round /);
+
+  // Once one has, it is not: docs has run on the work, and taking the word back takes none of that back. So the refusal says what there is.
+  assert.deepEqual((await advance(b.e, readRun(run.id))).filed, ['docs'], 'the tick files what waited, as if review had said `again: false`');
+  const late = await refusal(round(b.e, run.id));
+  assert.match(late, /^review asked for round 4, and a person accepted its work as it stands at .* \(wf accept\), so its loop is over on their word and there is nothing to go round again\. What waits on it has been filed: wf ls /);
+  assert.doesNotMatch(late, /take that acceptance back|\.asks directory/, 'and does not send them to delete it');
+
+  // Deleted anyway — an acceptance is level-triggered, unlike a round ask, so the loop reads out of rounds again and a round would be filed.
+  fs.rmSync(file);
+  assert.equal(readRun(run.id).acceptances, undefined);
+  assert.equal((await list(b.e, readRun(run.id))).steps[1]!.status, 'rounds exhausted', 'which is the standing a round is filed from');
+  const anyway = await refusal(round(b.e, run.id));
+  assert.match(anyway, /^docs waits on review and has already been filed \(running\), so a round would file implement again under a step that ran on its work, and take none of that back\./);
+  assert.match(anyway, /deleting that acceptance does not delete docs\. See where the run stands, and what there is to do: wf decide /);
+  assert.deepEqual(roundAsksOf(run.id), [], 'and no ask is written');
+  assert.deepEqual((await advance(b.e, readRun(run.id))).looped, [], 'nor does a pass go round of its own accord');
 });
 
 test('`wf round` refuses a round still running, a round the run files itself and a cancelled run — exit 2, and no ask written', async () => {

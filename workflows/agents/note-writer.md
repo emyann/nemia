@@ -7,8 +7,8 @@ effort: medium
 context: 200k
 # Fenced by machinery: files only, and no web tool — nothing reads or sends anything outside the machine.
 tools: Read, Write, Edit, Glob, Grep
-# Nobody is there to answer a prompt, and this folder is nobody's checkout: in any mode that can ask, the first call outside the
-# folder stops the session for ever (the first live note run sat thirty-one minutes in `acceptEdits`). `dontAsk` denies such a call
+# Nobody is there to answer a prompt, and this folder is nobody's checkout: in any mode that can ask, a call outside the folder
+# can stop the session for ever (the first live note run sat thirty-one minutes in `acceptEdits`). `dontAsk` denies such a call
 # with no prompt, and the session reads the refusal and carries on — which is why a folder team may run in no other mode
 # (`validateFolderMode`). It asks nobody, so it allows nothing, not even a write here: `allow:` gives the writing back, scoped by a
 # glob to the directory the session is started in. One rule covers Write and Edit both — Claude Code matches a file write against

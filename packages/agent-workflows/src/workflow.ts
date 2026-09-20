@@ -1526,7 +1526,7 @@ function validateFolderMode(steps: readonly Workflow[]): void {
     : "it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something";
   throw new WorkflowError(
     `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, and ${mode}`
-    + ' — the first read or write outside the folder does, and an unattended session then waits for ever (measured on Claude Code 2.1.278).'
+    + ' — a read or a write outside the folder can, and an unattended session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).'
     + ' Write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on.'
     + " A step that must write its own work needs `allow: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );

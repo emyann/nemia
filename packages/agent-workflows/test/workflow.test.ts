@@ -953,7 +953,7 @@ test('REFUSED at load: a step of a folder team in a permission mode that can sto
   // Every other mode the parser takes is refused, and the step that is in one is named — the second here, so a rule that only ever looked
   // at the first would fail.
   for (const mode of ['default', 'acceptEdits', 'plan', 'manual', 'auto']) {
-    refused(team('dontAsk', mode), new RegExp(`^s1: \`workspace: folder\` works in a folder nobody has opened, and \`permissionMode: ${mode}\` can stop and ask a person to approve something — the first read or write outside the folder does`));
+    refused(team('dontAsk', mode), new RegExp(`^s1: \`workspace: folder\` works in a folder nobody has opened, and \`permissionMode: ${mode}\` can stop and ask a person to approve something — a read or a write outside the folder can`));
   }
   // The line left off is the same defect: the engine files such a task in `auto`.
   refused(team('dontAsk', undefined), /^s1: `workspace: folder` works in a folder nobody has opened, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/);

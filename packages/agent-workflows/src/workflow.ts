@@ -109,6 +109,24 @@ export type Workflow = {
    */
   disallow?: string[];
   /**
+   * What the session may do without being asked, in Claude Code's permission rules — `allow: Edit(**)`.
+   * Absent: only what `permissionMode` allows by itself. Claude Code is given the list as `--allowedTools`, and a
+   * deny beats it, so `disallow:` still holds.
+   *
+   * The key a fenced step in a fresh folder needs. `dontAsk` never asks a person who is not there — it denies, and the
+   * session reads the refusal and carries on — but it never allows a write either, in the session's own directory or
+   * anywhere (measured on Claude Code 2.1.278). `allow: Edit(**)` gives back the writes inside the directory the
+   * session was started in and no others: the glob is resolved against its `cwd`, a write outside it is still denied
+   * with no prompt, and unscoped (`Edit`) it would write anywhere on the machine.
+   *
+   * `Edit(…)` is the rule for every file-editing tool, Write and NotebookEdit with it: Claude Code matches a file
+   * permission check against `Edit` rules alone, warns on stderr that a `Write(…)` rule is not matched, and denies
+   * the write — measured on 2.1.278, where `allow: Write(**)` left the shipped note writer unable to write its own
+   * note, and said so nowhere the run could read. So a path rule on a file-editing tool that is not `Edit` is refused
+   * (`fileRuleRefusal`). Refused on codex too, which has no tool list: its fence is the sandbox.
+   */
+  allow?: string[];
+  /**
    * `remote: true`: every session of the step is bridged to claude.ai — the engine's `remoteControl`, Claude Code's `--remote-control` — and
    * listed in the web's agents view, where anyone signed in to the account can drive it from a browser or a phone: type into it, answer its
    * prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what a step without the line is. Refused at
@@ -209,7 +227,7 @@ export type OutputSchema = {
 
 /** Every key a step may set, in the order a person reads them. Anything else is refused by name. */
 export const STEP_KEYS = [
-  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
+  'after', 'resume', 'input', 'workspace', 'slot', 'agent', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'remote', 'deadlineSeconds', 'maxAttempts', 'budget', 'check', 'retries', 'gate', 'output', 'loop', 'rounds',
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
@@ -240,6 +258,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   permissionMode: "the harness's permission mode — on codex, its sandbox — checked against the harness the step runs on",
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
   disallow: "what the session may not have, in Claude Code's permission rules: a deny beats an allow the checkout's settings give",
+  allow: "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
   remote: "`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` only",
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
   maxAttempts: COUNTS.maxAttempts.counts,
@@ -418,7 +437,8 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
     context: contextOf(name, meta.context, harness),
     permissionMode: wordOf(name, 'permissionMode', meta.permissionMode, harness),
     tools: toolsOf(name, meta.tools, harness),
-    disallow: disallowOf(name, meta.disallow, harness),
+    disallow: rulesOf(name, 'disallow', meta.disallow, harness),
+    allow: rulesOf(name, 'allow', meta.allow, harness),
     remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
     maxAttempts: countOf(name, 'maxAttempts', meta.maxAttempts),
@@ -441,7 +461,7 @@ function stepFrom(name: string, meta: Partial<Record<StepKey, string>>, body: st
 export type StepDraft = Omit<Workflow, 'output' | 'agent'> & { output?: Pick<StepOutput, 'file'>; agent?: string | StepAgent | null };
 
 /** The keys whose empty list says what no line says: nothing to wait on, to read, to deny. Not `tools:`, where none reads as every tool to one person. */
-const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow'];
+const EMPTY_IS_UNSET: readonly StepKey[] = ['after', 'input', 'disallow', 'allow'];
 
 /**
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as
@@ -567,6 +587,8 @@ function readKeys<K extends string>(step: string, block: string, refusal: (key: 
           ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
           : key === 'disallow'
             ? `${step}: \`disallow\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
+          : key === 'allow'
+            ? `${step}: \`allow\` has no value, which allows nothing and reads as a permission. Name what the session may do without being asked — ${ALLOW_EXAMPLE} — or delete the line, and the step may do only what its \`permissionMode\` allows by itself.`
             : key === 'budget'
               ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
               : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`);
@@ -639,6 +661,7 @@ function toolsOf(step: string, tools: string | undefined, harness: string | unde
 }
 
 const DISALLOW_EXAMPLE = '`disallow: Bash(npm run build), SendMessage`';
+const ALLOW_EXAMPLE = '`allow: Edit(**), Bash(npm test)`';
 
 /**
  * One permission rule as Claude Code writes one: a tool's name, and what it may not run in parentheses. The engine's
@@ -646,36 +669,89 @@ const DISALLOW_EXAMPLE = '`disallow: Bash(npm run build), SendMessage`';
  */
 const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
 
+/** What each rule list is, in the words its refusals use: the two halves of Claude Code's permission rules. */
+const RULE_LIST = {
+  disallow: {
+    is: 'a deny list',
+    has: 'no tool list to deny from',
+    example: DISALLOW_EXAMPLE,
+    written: 'what the session may not have',
+    may: 'may not run',
+    sandbox: '`permissionMode: read-only` for a step that must not write',
+    absent: 'the step is denied nothing beyond the checkout\'s settings',
+    two: 'Two commands are two rules: `Bash(git push), Bash(git reset)`.',
+  },
+  allow: {
+    is: 'an allow list',
+    has: 'no tool list to allow from',
+    example: ALLOW_EXAMPLE,
+    written: 'what the session may do without being asked',
+    may: 'may do',
+    sandbox: '`permissionMode: workspace-write` for a step that writes in its workspace and asks nobody',
+    absent: 'the step may do only what its `permissionMode` allows by itself',
+    two: 'Two tools are two rules: `Edit(**), Bash(npm test)`.',
+  },
+} as const;
+
 /**
- * `disallow:` as the rules the harness is given to deny, refused unless each entry is one rule.
+ * `disallow:` and `allow:` as the rules the harness is given to deny and to permit, refused unless each entry is one rule.
+ * One function for both: the two keys are the same list in Claude Code's own grammar, and a rule the deny list refuses is
+ * not a rule the allow list should take.
  *
  * Split on commas, as `tools:` is, so a comma inside a rule's parentheses would reach the harness as two pieces of it, and is
  * refused as `tools:` refuses one. Only the parentheses are looked in: a quote is legal inside a rule — `Bash(git commit -m 'wip')`
  * — and `tools:`'s quote check fired on such a rule whenever another entry followed it. A list written in brackets or quotes
- * splits into entries that are not rules, and is refused for that. Refused on codex, which has no tool list to deny from.
+ * splits into entries that are not rules, and is refused for that. Refused on codex, which has no tool list at all.
  */
-function disallowOf(step: string, disallow: string | undefined, harness: string | undefined): string[] | undefined {
-  if (disallow === undefined) return undefined;
-  const named = `${step}: \`disallow: ${disallow}\``;
-  const written = `Each entry is one rule, a tool or a tool and what it may not run, comma-separated: ${DISALLOW_EXAMPLE}.`;
+function rulesOf(step: string, key: 'disallow' | 'allow', written: string | undefined, harness: string | undefined): string[] | undefined {
+  if (written === undefined) return undefined;
+  const w = RULE_LIST[key];
+  const named = `${step}: \`${key}: ${written}\``;
+  const shape = `Each entry is one rule, a tool or a tool and what it ${w.may}, comma-separated: ${w.example}.`;
   if (harness === 'codex') {
-    refuse(`${named} is a deny list, and codex has no tool list to deny from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: \`permissionMode: read-only\` for a step that must not write.`);
+    refuse(`${named} is ${w.is}, and codex has ${w.has}: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`read-only\` reads and runs commands and writes nothing, \`workspace-write\` writes in the workspace. Delete the line, and name the sandbox: ${w.sandbox}.`);
   }
-  if (/\([^)]*,/.test(disallow)) {
-    const pieces = disallow.split(',').map((s) => `\`${s.trim()}\``).join(', ');
-    refuse(`${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as rules. ${written} Two commands are two rules: \`Bash(git push), Bash(git reset)\`.`);
+  if (/\([^)]*,/.test(written)) {
+    const pieces = written.split(',').map((x) => `\`${x.trim()}\``).join(', ');
+    refuse(`${named} has a comma inside an entry, and the list is split on every comma, so the harness would be given ${pieces} as rules. ${shape} ${w.two}`);
   }
-  const rules = disallow.split(',').map((s) => s.trim()).filter(Boolean);
-  if (!rules.length) refuse(`${named} names no rule. ${written} Without the line, the step is denied nothing beyond the checkout's settings.`);
+  const rules = written.split(',').map((x) => x.trim()).filter(Boolean);
+  if (!rules.length) refuse(`${named} names no rule. ${shape} Without the line, ${w.absent}.`);
   const odd = rules.find((r) => !RULE.test(r));
   if (odd) {
     refuse(`${named} has \`${odd}\`, which is not one rule: ${/[()]/.test(odd)
       ? 'a rule has one pair of parentheses, right after the name, closed'
       : /\s/.test(odd) ? 'a space outside the parentheses separates two rules, to the harness'
-      : 'a rule is a bare name, without quotes or brackets'}. ${written}`);
+      : 'a rule is a bare name, without quotes or brackets'}. ${shape}`);
   }
+  const inert = rules.find((r) => FILE_TOOLS.some((tool) => r.startsWith(`${tool}(`)));
+  if (inert) refuse(fileRuleRefusal(named, inert, key));
   return rules;
 }
+
+/**
+ * The file-editing tools whose path rules Claude Code does not match: it checks a write against `Edit` rules alone, whatever
+ * tool made it. `Edit` is not in the list — it is the one that works.
+ */
+const FILE_TOOLS = ['Write', 'NotebookEdit'] as const;
+
+/**
+ * A path rule on a file-editing tool that is not `Edit`, which Claude Code accepts, warns about on stderr and never matches.
+ *
+ * Measured on Claude Code 2.1.278, on the allow list. The shipped note writer was given `allow: Write(**)` and could not write its
+ * own `note.md` — `Permission to use Write has been denied because Claude Code is running in don't ask mode` — while the harness
+ * said, on a stderr nobody reads, `Write(**) is not matched by file permission checks — only Edit(path) rules are`. With `Edit(**)`
+ * it wrote inside its folder and was denied outside it, which is the fence.
+ *
+ * Refused on the deny list too, on the harness's own sentence: what it does not match is the *file permission check*, which is the one
+ * check a deny rule on a write is read in. An inert allow denies a step its own work, which a person finds by the work not happening; an
+ * inert deny is worse, since the step is fenced by nothing while its file reads as fenced. The fix is the same rule on `Edit`, which
+ * covers the file-editing tools whichever list it is in.
+ */
+const fileRuleRefusal = (named: string, rule: string, key: 'disallow' | 'allow'): string =>
+  `${named} has \`${rule}\`, and Claude Code matches a file write against \`Edit\` rules alone: it takes this rule, warns that it is not matched, and ${key === 'allow'
+    ? 'denies the write anyway — so the step would be fenced out of its own work with nothing said where the run can read it'
+    : 'allows the write anyway — so the step would be fenced by nothing while its file reads as fenced'}. Write \`Edit${rule.slice(rule.indexOf('('))}\` instead: an \`Edit\` rule covers every file-editing tool, ${FILE_TOOLS.join(', ')} with it.`;
 
 /**
  * `remote:` as written: `true` or `false`, or refused. Anything else — `yes`, `on` — is a word the run would have to interpret, and reading it
@@ -1218,7 +1294,7 @@ export function workflowFolder(given: string, from: string, repo: string): strin
  * sets is wiring — where the step sits in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent
  * file that sets one is refused by name.
  */
-export const AGENT_KEYS = ['description', 'skills', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'remote', 'output'] as const;
+export const AGENT_KEYS = ['description', 'skills', 'harness', 'model', 'effort', 'context', 'permissionMode', 'tools', 'disallow', 'allow', 'remote', 'output'] as const;
 export type AgentKey = (typeof AGENT_KEYS)[number];
 /**
  * The keys a step takes from its agent: every agent key but the two that describe the agent itself — its `description:` and the `skills:` it
@@ -1538,6 +1614,7 @@ export function validate(steps: readonly Workflow[]): void {
   }
 
   validateFolder(steps);
+  validateFolderMode(steps);
   validateMainWorkspace(steps);
   validateSlot(steps);
 
@@ -1593,6 +1670,76 @@ function validateFolder(steps: readonly Workflow[]): void {
   throw new WorkflowError(
     `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`workspace: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'do' : 'does'} not — every step of a team says workspace: folder, or none does.`
     + ` A run works in folders it makes, with no git repository, or on branches of one: it cannot do both. Add the line to ${not.join(', ')}, or delete it from ${folder.join(', ')}.`,
+  );
+}
+
+/**
+ * The permission modes that never stop to ask a person, per harness — because a mode is the harness's word, and what it does with a
+ * call it was not given is the harness's too.
+ *
+ * On Claude Code (`claude`, `claude-detached`): `dontAsk`, which denies what it is not given and lets the session read the refusal and
+ * carry on, and `bypassPermissions`, which allows everything. Every other mode asks, `auto` — the engine's default — among them.
+ *
+ * On codex: every mode it has. `codex exec` is not interactive; it has one shell, fenced by the sandbox `permissionMode` names, and a
+ * call outside the fence is denied there and then. `read-only` reads and writes nothing, `workspace-write` writes in the workspace and
+ * asks nobody — this file's own `allow:` refusal says exactly that to anyone who writes a rule list on codex — and the two widest allow
+ * more, not less. So a codex folder team is not judged on this at all, and is not pushed off its sandbox to reach the widest mode.
+ *
+ * Every harness has a list here and a default below, held by `test/vocabulary.test.ts`: a harness added with neither would have every
+ * folder team of its own refused, in another harness's words.
+ */
+const UNASKING: Readonly<Record<string, readonly string[]>> = {
+  claude: ['dontAsk', 'bypassPermissions'],
+  'claude-detached': ['dontAsk', 'bypassPermissions'],
+  codex: PERMISSION_MODES.codex!,
+};
+
+/**
+ * The mode a step runs in when it names none, which is what the guard below judges such a step on: the engine's `auto` on Claude Code
+ * (`runner.ts`'s default), codex's `workspace-write` (`sandboxOf` in the engine's `runner-detached.ts`, which falls to it for a task
+ * that named no sandbox).
+ */
+const DEFAULT_MODE: Readonly<Record<string, string>> = { claude: 'auto', 'claude-detached': 'auto', codex: 'workspace-write' };
+
+/**
+ * The way a step of a folder team cannot be run: in a permission mode that can stop and ask.
+ *
+ * Measured, on Claude Code 2.1.278, in folders no settings file had ever named. A fenced `--bg` session whose first act is anything
+ * outside its own directory — reading the run's artifacts directory beside it, or the store, to learn what it is writing about — is
+ * asked to approve it, and nobody is there: `claude agents` reads it `blocked`, `waitingFor: 'permission prompt'`, and it waits for
+ * ever. The shipped `note` team's first live run sat that way for thirty-one minutes in `acceptEdits`, and a session in `auto` sat the
+ * same way for as long as it was watched. In `dontAsk` the same call is denied with no prompt, the session is told so, and it carries
+ * on — measured beside it, on `--bg`, in the same kind of folder.
+ *
+ * A git run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there is
+ * nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
+ * api — passes.
+ *
+ * Judged against the step's own harness (`UNASKING`), since what was measured is Claude Code's prompt. A codex step is fenced by a
+ * sandbox and asks nobody in any of its modes, so a codex folder team passes here — judged on Claude's words, the tightest sandbox it
+ * has would be refused and told to write a mode codex does not take.
+ *
+ * It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allow:` gives back, scoped to the step's own
+ * folder (`Edit(**)`).
+ */
+function validateFolderMode(steps: readonly Workflow[]): void {
+  if (!isFolderTeam(steps)) return;
+  const asks = (s: Workflow): boolean => {
+    const harness = s.harness ?? DEFAULT_HARNESS;
+    return !(UNASKING[harness] ?? []).includes(s.permissionMode ?? DEFAULT_MODE[harness] ?? '');
+  };
+  const asking = steps.find(asks);
+  if (!asking) return;
+  const on = asking.harness ?? DEFAULT_HARNESS;
+  const unasking = UNASKING[on] ?? [];
+  const mode = asking.permissionMode
+    ? `\`permissionMode: ${asking.permissionMode}\` can stop and ask a person to approve something`
+    : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${DEFAULT_MODE[on]}\`, which can stop and ask a person to approve something`;
+  throw new WorkflowError(
+    `${asking.name}: \`workspace: folder\` works in a folder nobody has opened, and ${mode}`
+    + ' — a read or a write outside the folder can, and an unattended session then waits for ever (the first live run of a folder team sat thirty-one minutes so, on Claude Code 2.1.278).'
+    + ` Write \`permissionMode: ${unasking[0]}\`, which denies such a call with no prompt and lets the session carry on.`
+    + " A step that must write its own work needs `allow: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );
 }
 

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
 import { repositoryQuery, runsQuery, startRun, type RunSummary, type Started, type WorkflowListing } from '../lib/api';
 import { standingOf, titleOf } from '../lib/factory';
+import { afterFor, ignoredRepoNote } from '../lib/inbox';
 
 /**
  * A brief, the runs the new run waits on, and the button that starts a run of the workflow with them: then the new run, linked to
@@ -29,6 +30,12 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
   const queryClient = useQueryClient();
   const [brief, setBrief] = useState(card?.body ?? '');
   const [after, setAfter] = useState<string[]>([]);
+  // A team whose every step works in a folder runs on no repository, and `wf start` refuses `--after` for one: there is no branch for
+  // a run to wait on. No picker, and nothing about a repository under the button.
+  const inFolders = workflow.folderTeam;
+  // A card filed before its team worked in folders still names a repository, and the start looks at none of it. The package starts it all
+  // the same and says so afterwards; said here, a person reads it while the choice is still theirs (`ignoredRepoNote`).
+  const ignored = ignoredRepoNote(workflow, repo);
   const start = useMutation({
     mutationFn: (asked: { brief: string; after: string[] }) =>
       startRun({
@@ -61,7 +68,8 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
       className={card ? 'space-y-2' : 'space-y-2 border-t border-neutral-200 pt-4 dark:border-neutral-800'}
       onSubmit={(event) => {
         event.preventDefault();
-        start.mutate({ brief, after });
+        // Not the picks: what the workflow now picked takes (`afterFor`). The picker is hidden for a folder team, and what it holds is not sent.
+        start.mutate({ brief, after: afterFor(workflow, after) });
       }}
     >
       <label htmlFor={field} className="block text-sm font-medium">
@@ -75,7 +83,7 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
         placeholder="What to do: the brief each step is told, under “What was asked for”."
         className="block w-full resize-y rounded border border-neutral-300 bg-white px-2 py-1.5 text-sm placeholder:text-neutral-400 focus:border-neutral-500 focus:outline-none dark:border-neutral-700 dark:bg-neutral-900 dark:placeholder:text-neutral-500 dark:focus:border-neutral-400"
       />
-      <AfterPicker selected={after} onChange={setAfter} repo={repo} />
+      {!inFolders && <AfterPicker selected={after} onChange={setAfter} repo={repo} />}
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
@@ -85,10 +93,16 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
           {start.isPending ? 'Starting…' : 'Start'}
         </button>
         <span className="min-w-0 text-xs text-neutral-500">
-          Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}, from <code className="font-mono break-all">{workflow.dir}</code>
+          {inFolders ? 'Works in folders it makes for each step' : <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>}, from{' '}
+          <code className="font-mono break-all">{workflow.dir}</code>
           {card && ', and the card leaves the inbox'}.
         </span>
       </div>
+      {ignored && (
+        <p data-ignored-repo className="text-xs text-amber-700 dark:text-amber-400">
+          {ignored}
+        </p>
+      )}
 
       {start.isSuccess && (
         <p className="text-sm" data-started={start.data.id}>

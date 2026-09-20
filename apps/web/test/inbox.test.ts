@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { dropCard, fileCard, queueCard, startRun, type InboxEntry, type WorkflowListing } from '../src/lib/api.ts';
-import { capLine, cardLines, hasPage, namedElsewhere, newestCardsFirst, ordinal, presetOf, queueable, queuedWord, queueOf, triedLine, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
+import { afterFor, capLine, cardLines, hasPage, ignoredRepoNote, namedElsewhere, newestCardsFirst, ordinal, presetOf, queueable, queuedWord, queueOf, triedLine, workflowKey, type CardRefusal } from '../src/lib/inbox.ts';
 
 const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> = {}): InboxEntry => ({
   name, file: `${name}.md`, title: name, workflow: null, repo: null, startedAs: [], error: null, body: name, filedAt, ...extra,
@@ -70,7 +70,7 @@ test("REFUSED: a refusal is on the entry it is of, not on another of the same na
 });
 
 const listing = (name: string, from: 'repo' | 'yours', dir: string, error: string | null = null): WorkflowListing => ({
-  name, from, dir, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], version: '0', error,
+  name, from, dir, description: null, steps: [], graph: { roots: [], edges: [] }, schemas: [], folderTeam: false, version: '0', error,
 });
 
 const WORKFLOWS = [
@@ -133,6 +133,34 @@ test("REFUSED: no preset for a name on a card about another repository, though t
   for (const [workflow, repo] of [['dev', null], ['dev', HERE], ['dev', `${HERE}/`], ['/code/other/workflows/dev', '/code/other'], ['../workflows/dev', '/code/other'], [null, '/code/other']] as const) {
     assert.equal(namedElsewhere(workflow, repo, HERE), false, `${workflow} on ${repo}`);
   }
+});
+
+test("a card's repository on a team that works in folders: the start form says it is not looked at, before the start, and names it", () => {
+  const inFolders = { ...listing('note', 'yours', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
+  const said = ignoredRepoNote(inFolders, '/code/app');
+  assert.equal(said, "The card's repo: /code/app is not looked at — this workflow's steps work in folders, with no git repository.");
+  // The board says it before the start because a start the api takes opens the run's page: the api answers the same fact on the start
+  // (`ignoredRepo`), which a person would never read here.
+  assert.match(said!, /\/code\/app/, 'and it names the repository the card named, not a repository in general');
+});
+
+test('REFUSED: nothing is said of a repository a run does look at, nor of a card that names none', () => {
+  const onRepo = listing('dev', 'repo', '/code/app/workflows/dev');
+  const inFolders = { ...onRepo, folderTeam: true };
+  assert.equal(ignoredRepoNote(onRepo, '/code/app'), null, 'a team that works on a repository looks at the one the card names');
+  for (const none of [undefined, null, '']) assert.equal(ignoredRepoNote(inFolders, none), null, `a card that names none: ${JSON.stringify(none)}`);
+});
+
+test('a start sends the runs it waits on, as they were picked', () => {
+  const onRepo = listing('dev', 'repo', '/code/app/workflows/dev');
+  assert.deepEqual(afterFor(onRepo, ['a-run-k2q9', 'another-c3d4']), ['a-run-k2q9', 'another-c3d4']);
+});
+
+test('REFUSED: a start of a team that works in folders sends none, whatever the picker was left holding', () => {
+  // The picker is hidden for a folder team, not emptied, and it is the same form on a card: pick runs under a git workflow, then pick
+  // the folder team, and what is no longer on the page would have been sent — for `wf start`'s refusal of `--after` on such a run.
+  const inFolders = { ...listing('note', 'yours', '/home/me/.agent-workflows/workflows/note'), folderTeam: true };
+  assert.deepEqual(afterFor(inFolders, ['a-run-k2q9', 'another-c3d4']), []);
 });
 
 /** The api answering each request with `answer()`, for the length of the test: the requests the board sent. */

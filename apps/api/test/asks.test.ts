@@ -224,6 +224,15 @@ test("a blocked session's last line follows its conversation: words written sinc
   // Replaced by a shorter conversation, which no cursor of the last read fits: read from its start.
   write(transcriptFile(held), jsonl([said(held, 'assistant', 'a-1', 3, [{ type: 'text', text: LOGIN }])]));
   assert.equal(await lastLineOf('held'), LOGIN);
+
+  // What the session said, and never what it was told: a brief, a `wf say` and every tool result are `user` events, and the
+  // board would otherwise read a person's own words back at them as the reason the harness stopped. The conversation before it
+  // ends differently, so the line can only come from the filter.
+  write(transcriptFile(held), jsonl([
+    said(held, 'assistant', 'a-1', 3, [{ type: 'text', text: 'Waiting on you.' }]),
+    said(held, 'user', 'u-1', 4, [{ type: 'text', text: 'Log in and carry on.' }]),
+  ]));
+  assert.equal(await lastLineOf('held'), 'Waiting on you.');
 });
 
 test('REFUSED at shipped defaults: an ask another site could make — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and nothing is written', async () => {

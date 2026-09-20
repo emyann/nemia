@@ -12,6 +12,8 @@ export type RunSummary = {
   /** The repository a git run is about; null for a folder run (`place`), which has none. */
   repo: string | null;
   place: PlaceKind;
+  /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run. */
+  work: string | null;
   brief: string;
   /** The workflow folder the run was started from: its last segment names the workflow (`workflowNameOf`). */
   workflowDir: string;
@@ -242,6 +244,8 @@ export type RunDetail = {
   /** A git run's repository, base commit, base branch and whether it cut worktrees; each null on a folder run (`place`), which has none. */
   repo: string | null;
   place: PlaceKind;
+  /** Where a folder run's work is: the directory its steps' folders are made under. Null on a git run, whose work is on its branch. */
+  work: string | null;
   workflowDir: string;
   baseRef: string | null;
   branch: string | null;
@@ -280,6 +284,13 @@ export type RunDetail = {
     told: string | null;
     taskId: string | null;
     workspace: string | null;
+    /**
+     * For a step of a folder run, every file its folder holds now — the whole of what it made, not only what its closeout named.
+     * Empty for a step of a git run, whose work is a branch, and for one not filed yet.
+     */
+    files: StepArtifact[];
+    /** Why that list is empty when the folder is there and could not be read; null where the list is what the folder holds. */
+    filesError: string | null;
     branch: string | null;
     status: string;
     /** As on `RunSummary`. */
@@ -405,7 +416,7 @@ export type SensitiveDiff = { branch: string; files: DiffFile[]; error: string |
 export type Lesson = { said: string; state: 'written' | 'nothing' | 'unknown' };
 
 /** Mirrors `DecideCommand` in apps/api/src/app.ts: a command `wf decide` prints and runs none of. */
-export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back'; command: string; said: string | null };
+export type DecideCommand = { label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'approve' | 'send back' | 'forget it'; command: string; said: string | null };
 
 /**
  * Mirrors `Standing` in apps/api/src/app.ts: where one result branch stands against the base branch as git says it now — on it, ahead of it
@@ -576,7 +587,7 @@ export type StepReach = {
   step: string;
   harness: string;
   claudeCode: boolean;
-  fence: { tools: string[] | null; disallow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
+  fence: { tools: string[] | null; disallow: string[]; allow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
   tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: Array<{ name: string; rule: string; source: string; of: string | null }> } | null;
   skills: { names: string[]; why: string | null } | null;
   /** Each tool of each server: the deny over it, the ask rule over it when no deny is, and whether an allow reaches it with neither. */
@@ -649,6 +660,8 @@ export type WorkflowStepSpec = {
   tools: string[] | null;
   /** What the session may not have (`disallow:`): empty where the step denies nothing. */
   disallow: string[];
+  /** What the session may do without being asked (`allow:`): empty where the step allows nothing beyond its mode. */
+  allow: string[];
   /** `remote:` as written: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
@@ -688,6 +701,11 @@ export type WorkflowListing = {
   graph: RunGraph;
   /** The `.json` files beside the steps, which an `output:` may name. */
   schemas: string[];
+  /**
+   * Whether every step says `workspace: folder`: a team that works in folders the run makes and never looks at a repository. A card
+   * for one is filed with no `repo:` (the api refuses one), and a run of one has no branch to read.
+   */
+  folderTeam: boolean;
   /** What the folder's files held when it was listed: a save carries it, and the api refuses one of a folder changed since (409). */
   version: string;
   error: string | null;
@@ -825,7 +843,7 @@ export type AgentSkill = {
 export type SkillsFile = { file: string; text: string; list: AgentSkill[] | null };
 
 /** The keys an agent sets on the steps that name it: every agent key but its description. Mirrors `RoleKey` in the package. */
-export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'tools' | 'disallow' | 'remote' | 'output';
+export type AgentRoleKey = 'harness' | 'model' | 'effort' | 'context' | 'permissionMode' | 'tools' | 'disallow' | 'allow' | 'remote' | 'output';
 
 /** Mirrors `AgentUser` in apps/api/src/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
 export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };

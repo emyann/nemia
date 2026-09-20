@@ -29,18 +29,18 @@ export default {
     await sidebar(page);
     // The runs in flight on top, then the rest, each newest first; in flight as the Factory counts them, which the api's id order is not.
     const rows = page.locator('li[data-in-flight]');
-    await expectCount(rows, 15, 'the runs list has a row for each of the fifteen runs the Factory counts');
+    await expectCount(rows, 16, 'the runs list has a row for each of the sixteen runs the Factory counts');
     // Under a heading each, which says where the runs in flight end: the first finished row is newer than the last in flight.
     const flying = page.locator('section[data-group="in-flight"]');
     const deciding = page.locator('section[data-group="to-decide"]');
     const finished = page.locator('section[data-group="finished"]');
     await expectCount(flying.locator('li[data-in-flight="true"]'), 4, 'the four runs in flight, as the Factory counts them, are under In flight');
     await expectCount(flying.locator('li[data-in-flight="false"]'), 0, 'and no finished run is');
-    await expectCount(finished.locator('li[data-in-flight="false"]'), 9, 'the nine finished runs nobody has to decide are under Finished');
+    await expectCount(finished.locator('li[data-in-flight="false"]'), 10, 'the ten finished runs nobody has to decide are under Finished');
     await expectCount(finished.locator('li[data-in-flight="true"]'), 0, 'and no run in flight is');
     await expectVisible(flying.getByRole('heading', { name: /^In flight 4 something of each still moves, newest first$/ }), 'In flight is headed with its count and its order');
     await expectVisible(
-      finished.getByRole('heading', { name: /^Finished 9 nothing of these moves any more, newest first · 5 waiting on you$/ }),
+      finished.getByRole('heading', { name: /^Finished 10 nothing of these moves any more, newest first · 5 waiting on you$/ }),
       'Finished is headed with its count, its order, and how many of them wait on you, as the Factory counts them',
     );
     await expectBeneath(finished, flying, 'the finished runs are listed beneath the runs in flight');
@@ -127,6 +127,6 @@ export default {
     await enterOnPlace(page, 'Inbox', '/inbox');
     await expectVisible(page.locator('[data-sidebar="sidebar"] a[data-active="true"]', { hasText: 'Inbox' }), 'reached with Enter, the Inbox is lit in the menu');
     await enterOnPlace(page, 'Runs', '/runs');
-    await expectCount(rows, 15, 'back on Runs with Enter, the list has its fifteen rows again');
+    await expectCount(rows, 16, 'back on Runs with Enter, the list has its sixteen rows again');
   },
 } satisfies PageSpec;

@@ -146,6 +146,15 @@ export type TaskSpec = {
    */
   disallowedTools?: string[];
   /**
+   * What the session may do without being asked, in Claude Code's permission rules — `['Edit(src/**)', 'Bash(npm test)']`,
+   * one rule per entry, a path glob resolved against the session's `cwd`. Claude Code is given the list as
+   * `--allowedTools`, and a deny beats it. Absent or empty: only what the permission mode allows by itself, which in
+   * `dontAsk` is reads inside the cwd and nothing that writes — measured on 2.1.278, and why a fenced session in a
+   * fresh directory needs this to write its own work. Codex has no tool list, and refuses a task that allows anything.
+   * Carried on the task; `decide` never reads it.
+   */
+  allowedTools?: string[];
+  /**
    * How hard the harness should think, in its own words: `--effort` for Claude Code,
    * `model_reasoning_effort` for Codex. Carried on the task; `decide` never reads it.
    */
@@ -208,7 +217,7 @@ export type Engine = {
    * names a harness this engine does not have; a `maxAttempts` or `deadlineSeconds` that is not a
    * count or a number of seconds; a `resume` that is not a policy; an empty brief, cwd, model,
    * resumeFrom or effort; a `cwd` that is not absolute; a `tools` that is not a list of names; a
-   * `disallowedTools` that is not a list of permission rules; an
+   * `disallowedTools` or `allowedTools` that is not a list of permission rules; an
    * `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; or a word its harness does not take
    * (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists); a
    * `budgetUsd` that is not dollars above 0, or one its harness would not keep (`claude`, `codex`); a `contextTokens` that
@@ -402,6 +411,9 @@ const refusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<strin
   }
   if (spec.disallowedTools !== undefined && !(Array.isArray(spec.disallowedTools) && spec.disallowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
     return `\`disallowedTools: ${JSON.stringify(spec.disallowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may not run, like ["SendMessage", "Bash(npm run build)"].`;
+  }
+  if (spec.allowedTools !== undefined && !(Array.isArray(spec.allowedTools) && spec.allowedTools.every((r) => typeof r === 'string' && RULE.test(r)))) {
+    return `\`allowedTools: ${JSON.stringify(spec.allowedTools)}\` is not a list of permission rules. Give one rule per entry, a tool or a tool and what it may do, like ["Edit(**)", "Bash(npm test)"].`;
   }
   const mcp = spec.mcp === undefined ? undefined : mcpRefuses(spec.mcp);
   if (mcp) return mcp;

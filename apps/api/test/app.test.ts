@@ -120,7 +120,7 @@ test('runs are read from the workflow store and summarized, with what each step 
 
   const res = await app.request('/api/runs');
   assert.deepEqual(await res.json(), [{
-    id: 'r-1', repo: '/code/app', place: 'git', brief: 'Do the thing', workflowDir: '/code/app/workflows', createdAt: '2026-09-12T00:00:00.000Z',
+    id: 'r-1', repo: '/code/app', place: 'git', work: null, brief: 'Do the thing', workflowDir: '/code/app/workflows', createdAt: '2026-09-12T00:00:00.000Z',
     cancelledAt: '2026-09-12T01:00:00.000Z',
     // Started without `--after`: it waits on no run.
     after: [],
@@ -175,7 +175,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
   const run = await res.json();
   const [implement, review] = run.steps;
   assert.deepEqual({ ...run, steps: undefined }, {
-    id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', place: 'git', workflowDir, baseRef: 'def456',
+    id: 'r-2', brief: 'Add a cache\n\nKeep it small.', repo: '/code/app', place: 'git', work: null, workflowDir, baseRef: 'def456',
     branch: 'main', isolate: true, createdAt: '2026-09-12T02:00:00.000Z', cancelledAt: null, after: [], waiting: null,
     // implement signed off blocked, so review can never be filed: the run is over, and failed.
     status: 'failed', moving: false, cost: null, read: null, waitingOnYou: ['implement'], onYou: ['implement'],
@@ -201,6 +201,8 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     // What the engine was filed with, not the brief recomposed from today's folder and record.
     told: filedBrief('t-2'),
     workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
+    // A git run's step works on a branch: it lists no files, whatever its worktree holds.
+    files: [], filesError: null,
     note: null,
     // Its question, off its closeout; no session the harness blocked, so no last line; nothing asked of it yet.
     needs: 'Which database?', blockedByHarness: false, approve: null, gate: null, lastLine: null, said: [], asked: null,
@@ -220,7 +222,7 @@ test('a run in full: the brief, each step\'s spec and prose, what it was told, a
     filed: null,
     body: 'Review what implement did.',
     told: undefined,
-    workspace: null, branch: null,
+    workspace: null, branch: null, files: [], filesError: null,
     note: null,
     needs: null, blockedByHarness: false, approve: null, gate: null, lastLine: null, said: [], asked: null,
     ...reviewTry,
@@ -291,7 +293,7 @@ test('a run whose workflow folder is gone still answers, from its record', async
   assert.deepEqual(run.steps, [
     {
       name: 'implement', spec: null, filed: filedBare, body: null, told: filedBrief('t-2'),
-      workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement',
+      workspace: '/code/app/.wt/r-2/implement', branch: 'wf/r-2/implement', files: [], filesError: null,
       note: null, needs: 'Which database?', blockedByHarness: false, approve: null, gate: null, lastLine: null, said: [], asked: null,
       ...implementTry,
       used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },
@@ -300,7 +302,7 @@ test('a run whose workflow folder is gone still answers, from its record', async
       timeline: settledTimeline('t-2'),
     },
     {
-      name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, note: null,
+      name: 'review', spec: null, filed: null, body: null, told: null, workspace: null, branch: null, files: [], filesError: null, note: null,
       needs: null, blockedByHarness: false, approve: null, gate: null, lastLine: null, said: [], asked: null,
       ...reviewTry, used: null, spent: null, budget: null, raise: null, tries: firstTry(reviewTry), timeline: [],
     },
@@ -347,7 +349,7 @@ test('a folder changed since the run started keeps the steps that ran, and names
   };
   assert.deepEqual(original, {
     name: 'original', spec: null, filed: filedBare, body: null, told: filedBrief('t-6'),
-    workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original',
+    workspace: '/code/app/.wt/r-6/original', branch: 'wf/r-6/original', files: [], filesError: null,
     note: null, needs: 'Which database?', blockedByHarness: false, approve: null, gate: null, lastLine: null, said: [], asked: null,
     ...originalTry,
     used: { usage: null, used: 'not measured', cost: 'not measured', costUsd: null, apiMs: null, toolMs: null, read: null, peak: null, rebuilt: 0 },

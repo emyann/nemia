@@ -31,8 +31,9 @@ export default {
     try {
       await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows the quota Claude Code answered with');
       const { rate_limits: limits } = (JSON.parse(written) as { response: { response: { rate_limits: Record<'five_hour' | 'seven_day', { resets_at: string }> } } }).response.response;
-      // The resets as the browser says a time where it is, to the minute, with the weekday when it is not today — as the week's is, three
-      // days out, and as the five-hour window's is when the e2e runs in the two hours before midnight (`clockWord`, which this reads over).
+      // The resets as the browser says a time where it is, to the minute, with the weekday when the reset falls on another day than
+      // today (`clockWord`) — which is read here rather than assumed: the week resets three days out and always reads with one, and the
+      // five-hour window's reset crosses midnight for the two hours before it, when a run in the evening read `resets 00:02` as wrong.
       const clock = (iso: string) =>
         page.evaluate((at) => {
           const d = new Date(at);

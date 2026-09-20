@@ -390,6 +390,7 @@ test('at shipped defaults Claude Code is given neither --tools nor --effort', as
   const args = await argvOf({});
   assert.equal(args.includes('--tools'), false, 'no list: every tool the harness has');
   assert.equal(args.includes('--disallowedTools'), false, 'no deny list: nothing denied beyond the settings');
+  assert.equal(args.includes('--allowedTools'), false, 'no allow list: only what the permission mode allows by itself');
   assert.equal(args.includes('--effort'), false, "no effort: the harness's own");
   assert.equal(args.includes('--max-budget-usd'), false, 'no budget: no cap');
   assert.equal(args.includes('--remote-control'), false, 'no Remote Control: never a default');
@@ -493,6 +494,20 @@ test('disallowedTools reach Claude Code as --disallowedTools, the rules in one a
   assert.equal(args[args.indexOf('--tools') + 1], 'Read,Bash', 'beside the tool list, not in its place');
   assert.equal(args.at(-1), 'the prompt');
   assert.equal((await argvOf({ disallowedTools: [] })).includes('--disallowedTools'), false, 'an empty list denies nothing, and is not passed');
+});
+
+test('allowedTools reach Claude Code as --allowedTools, the rules in one argument, and a flag ends the list before the prompt', async () => {
+  // Variadic, as the two lists beside it are, and joined the same way — measured on Claude Code 2.1.278, where
+  // `--allowedTools "Write(**),Edit(**)"` allowed both.
+  const args = await argvOf({ tools: ['Read', 'Write'], disallowedTools: ['SendMessage'], allowedTools: ['Write(**)', 'Bash(npm test)'] });
+  const i = args.indexOf('--allowedTools');
+  assert.notEqual(i, -1, args.join(' '));
+  assert.equal(args[i + 1], 'Write(**),Bash(npm test)', 'a space inside a rule stays inside it');
+  assert.equal(args[i + 2], '--permission-mode');
+  assert.equal(args[args.indexOf('--disallowedTools') + 1], 'SendMessage', 'beside the deny list, not in its place');
+  assert.equal(args[args.indexOf('--tools') + 1], 'Read,Write');
+  assert.equal(args.at(-1), 'the prompt');
+  assert.equal((await argvOf({ allowedTools: [] })).includes('--allowedTools'), false, 'an empty list allows nothing extra, and is not passed');
 });
 
 test('effort reaches Claude Code as --effort', async () => {

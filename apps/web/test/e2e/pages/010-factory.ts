@@ -3,7 +3,7 @@ import type { Page } from 'playwright';
 import { nextVisit, PLACES_SAID, sidebar, themeOf } from '../board.ts';
 import { besideCard, cardOf, cardsOf, dragBy, edgeOf, expectClearOfEachOther, expectClearOfPanels, onTheFloor, placeOf, said, samePlace, showFinished } from '../canvas.ts';
 import { expectApart, expectBetween, expectCount, expectInside, expectLeftOf, expectMovedWith, expectTexts, expectUncut, expectVisible, Refused, settled } from '../checks.ts';
-import { COSTLY, DIAMOND, DIAMOND_RUNS, ENDING, FAKE, GATED, HELD, LOOPING, NEIGHBOUR, QUEUE, QUEUED, refusedWhy, SESSION, SHIPPED, UNMERGED } from '../seed.ts';
+import { COSTLY, DIAMOND, DIAMOND_RUNS, ENDING, FAKE, FOLDER, GATED, HELD, LOOPING, NEIGHBOUR, QUEUE, QUEUED, refusedWhy, SESSION, SHIPPED, UNMERGED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -151,7 +151,7 @@ export default {
     // In flight: NEIGHBOUR, HELD, the diamond's running side and its bottom. To decide: ENDING and UNMERGED. Waiting on you: FAKE,
     // LOOPING, COSTLY, GATED, ENDING and the run waiting on one called off.
     await expectVisible(
-      page.getByText('4 in flight · 11 finished · 2 to decide · 6 waiting on you'),
+      page.getByText('4 in flight · 12 finished · 2 to decide · 6 waiting on you'),
       'the Factory counts the runs in flight, the finished, those nobody has decided, and those waiting on you',
     );
     // A run at a gate in its middle: nothing of it moves until a person approves its step, and the api reads it failed, with nothing to
@@ -189,6 +189,15 @@ export default {
     await showFinished(page);
     await expectVisible(cardOf(page, SHIPPED.id), `the shipped run's card, once finished runs are shown (${SHIPPED.id})`);
     await expectCount(cardOf(page, SHIPPED.id).locator('[data-to-decide]'), 0, 'and it says nothing to decide');
+    // A run with no repository says `folders` where a git run's card says its repository's name, and where its steps worked on hover. Not a
+    // row of its own: a card drawn taller than its cell reaches over the card beneath it on every layout (`expectClearOfEachOther`), and the
+    // path is on the run's page, copyable, for a person who wants to open it.
+    const inFolders = cardOf(page, FOLDER.id).getByText('folders', { exact: true });
+    await expectVisible(inFolders, `a folder run's card says folders, and names no repository (${FOLDER.id})`);
+    const where = await inFolders.getAttribute('title');
+    if (!new RegExp(String.raw`^Its steps work in folders under .+[\\/]runs[\\/]${FOLDER.id}[\\/]work$`).test(where ?? '')) {
+      throw new Refused(`the card says where its steps work, on hover, ending in runs/${FOLDER.id}/work — it says ${JSON.stringify(where)}`);
+    }
     // The run called off, and the one that waits on it: for ever, so on you, and its card names the run it waits on and why.
     await expectVisible(
       cardOf(page, orphan.id).locator('[data-waiting="on-you"]', { hasText: DIAMOND.words.orphan }),

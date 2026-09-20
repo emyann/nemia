@@ -3106,22 +3106,21 @@ export const inputsNote = (dir: string, names: readonly string[] | undefined): s
  * reads `git status --porcelain` as dirty and stops. Such a step has no check to be given `WF_ARTIFACTS` either,
  * since `workspace: main` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
  *
- * `inFolder` for a step of a folder run (`workspace: folder`): both ways hold, and neither rides a branch, since there is none — the
- * words are the same but for git's.
+ * `inFolder` for a step of a folder run (`workspace: folder`): there the *first* way is the one that does harm. Such a step runs in
+ * `dontAsk` (`validateFolderMode` in workflow.ts), fenced to its own folder, and that directory sits beside the folder, outside the
+ * fence: told to put a file there, the session is denied — and before that rule it was worse, since a mode that could ask sat on the
+ * prompt for ever. The second way needs nothing outside the fence and hands the file over all the same. So it too is told one way,
+ * and neither mentions a branch, since a folder run has none.
  */
 export const artifactsContract = (dir: string, inMain = false, inFolder = false): string => (inFolder ? [
   '', '## Files for the steps after you', '',
-  'A note, a log or a report reaches the steps after you and the person who decides in either of two ways.',
+  'A note, a log or a report reaches the steps after you and the person who decides one way: leave it in this',
+  'folder, and name it in `artifacts` by its path from the folder, such as `note.md`. When you finish, the run',
+  'copies each such file out and keeps it, before it checks your work.',
   '',
-  `- Put it in \`${dir}\`, and name it in \`artifacts\` by absolute path. The run made that directory for`,
-  '  this step, beside this folder, and keeps what is in it.',
-  '- Or leave it in this folder, and name it in `artifacts` by its path from the folder, such as `note.md`.',
-  '  When you finish, the run copies each such file into that directory, at the same path, before it checks',
-  '  your work.',
-  '',
-  "The run's check of this step is given the same directory as `WF_ARTIFACTS`. Refused, and not read: an absolute",
-  'path anywhere else, and a path that climbs out of this folder with `..`. A directory is not collected, nor a',
-  'file that is not there: name each file.',
+  'Write nowhere else. This folder is yours and everything outside it is denied without asking, since there is',
+  'nobody to ask. Refused, and not read: an absolute path, and a path that climbs out of this folder with `..`.',
+  'A directory is not collected, nor a file that is not there: name each file.',
 ] : inMain ? [
   '', '## Files for the person who decides', '',
   `A report, a log or a screenshot reaches them one way: put it in \`${dir}\`, and name it in \`artifacts\` by`,

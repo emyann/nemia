@@ -53,6 +53,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   own, `e2e-pages.test.ts` and `e2e-merge.test.ts`, typechecked by `test/e2e/tsconfig.json`); `test/e2e/*.test.ts` are the ones that
   launch Chromium, and only `npm run e2e` runs them. The two sat in `test/e2e/`, so the check of a run that touches nothing under
   `apps/` stayed green with CLAUDE.md's union line gone (learned by the run that put the e2e's page names in `pages/NAMES`).
+- **An e2e expectation about a time of day must read the day, not assume it.** The quota page's five-hour window resets 130
+  minutes out, and the page spelled the reset it expected with no weekday. After 21:50 that reset falls on tomorrow, `clockWord`
+  prepends `Sun`, and the page fails for the hour it was run at and nothing else. Work the expected words out by the rule the code
+  keeps — same day or not — and assert the weekday separately where it must show (learned by the run that added the folder page).
+- **A run added to the e2e's seed shifts every count asserted about the store.** The Factory's tally, and the Runs page's rows,
+  its Finished heading and the count it checks again after Enter, all name a number: one more finished run fails four assertions on
+  three pages before its own page is reached. Add the run, then run the e2e and follow it to the end (learned by the same run).
 - **A test that names the last e2e page fails on the next page added.** The merge test (`apps/web/test/e2e-merge.test.ts`) wrote
   `240-capabilities.ts` as the last page and `250` as the number two runs would both take, so the page after it failed before a browser
   opened. It reads both off `pages/` now; a test about the pages reads the pages that exist (learned by the run that added the `outcome` page).
@@ -165,6 +172,11 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   board; and `apps/web/src/lib/api.ts`'s mirror with `UNSET` beside it (`apps/web/src/lib/builder.ts`), or the board can
   read the key on a folder that has it and never set it on one that does not (learned by the run that added
   `workspace: main`).
+- **An optional field added to what a function returns is dropped by every caller that rebuilds the answer field by field.** A
+  TypeScript optional field makes no caller fail: `startQueued` built its `QueueStarted` from `startFromInbox`'s answer a field at
+  a time, and `apps/api/src/workflows.ts` built its 201 the same way, so a card's ignored `repo:` was printed by `wf start` and by
+  nothing else — no daemon log, no board. Grep for every place that spreads or rebuilds the type, and give the new fact one writer
+  (`ignoredRepoLine`) so the paths cannot word it differently either (learned by the run that started a folder team from a card).
 - **A key added to `AGENT_KEYS` that is not a role key has three exclusion sites.** `description` and `skills` describe the agent and are no
   step's, so each place that turns `AGENT_KEYS` into the keys a step inherits excludes them by name: `ROLE_KEYS` in `apps/api/src/builder.ts`
   and in `apps/api/src/agents.ts`, and the hand-written mirror in `apps/web/src/lib/agents.ts`. Miss one and the board offers the key as a
@@ -198,6 +210,41 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
 - **A fake engine's closeout is flat, as a harness writes it.** `parseCloseout` moves the fields beside `outcome` — a schema's
   `title`, `gist` — under `output`; a test that hands the fake an `output` already nested reads the step as `unsigned`, and the next
   step is never filed. Give the fake `{ ...SIGNED, title, gist }` (learned by the run that added `workspace: folder`).
+- **A session in a folder nobody has opened blocks for ever in any mode that can ask.** A `workspace: folder` step
+  works in a directory the run just made: no settings file, nothing trusted. The first call outside it — reading the
+  artifacts directory beside it, say — raises an ordinary permission prompt, `claude agents` reads the session
+  `blocked` with `waitingFor: 'permission prompt'`, and nobody is there to answer (thirty-one minutes in
+  `acceptEdits`, and `auto`, the engine's default, does the same). `dontAsk` denies the call with no prompt and the
+  session reads the refusal and carries on, so a folder team may run in no other mode (`validateFolderMode`). It is
+  not the workspace-trust dialog: a folder run does start unattended on `claude --bg` (measured on Claude Code
+  2.1.278, by the first live `note` run). What was measured is Claude Code's prompt, so the guard reads the step's
+  own harness: `codex exec` is not interactive — one shell, fenced by the sandbox its `permissionMode` names — and a
+  codex folder team passes in every mode codex has. A guard written from one harness's measurement, applied to
+  another's words, sent a codex author from the tightest sandbox to the widest mode, by way of a fix codex refuses.
+  A refusal that names a mode must name one that harness takes: the test loops over `HARNESSES`, so the next harness
+  added fails until it has a list of its unasking modes and a default.
+- **A session started anywhere under `~/.claude/` cannot write there, in any mode.** Claude Code reads that directory
+  as its own and refuses a write into it — *"sits under `~/.claude/`, which the harness treats as sensitive"* — whatever
+  `--permission-mode` and `--allowedTools` say. `$CLAUDE_JOB_DIR/tmp` is under it, so a live `wf` store put there
+  fails every write a step makes and every measurement taken in it is about that, not about the fence being measured.
+  Put a probe store somewhere else (`mktemp -d /tmp/…`). This cost a live run and a wrong conclusion about the
+  allow rule.
+- **A `Write(path)` allow rule is taken and never matched.** Claude Code matches a file write against `Edit` rules
+  alone, whatever tool made it, and an `Edit` rule covers Write and NotebookEdit with it. Given
+  `--allowedTools 'Write(**)'` it warns on a stderr nobody reads — *"is not matched by file permission checks — only
+  Edit(path) rules are"* — and denies the write: the shipped note writer, fenced by `dontAsk`, could not write its
+  own `note.md` and the run learned why from nothing. Write `allow: Edit(**)`; a bare `Write` (no path) is matched,
+  and allows a write anywhere. `allow:` refuses a path rule on a file-editing tool that is not `Edit`
+  (`fileRuleRefusal` in `workflow.ts`), since accepted-and-dropped is the failure this repository refuses elsewhere.
+- **A list a page turns into a sentence must carry everything the sentence is about.** The board says *the folder is empty* of an
+  empty `files`, and `folderFiles` listed only what its route can serve by name: a step whose work went into `notes/` was reported
+  to a person as having made nothing, on the one surface a person who never opens a terminal has. Either the list carries what it
+  cannot serve, by path (what was done), or the sentence says only what the list knows. Anywhere a page words an empty list, read
+  what the list leaves out (learned by the run that started a folder team from a card, round 3).
+- **A control hidden by a condition still holds what was put in it.** `StartRun` hides the After picker for a team that works in
+  folders and kept its state, so picking runs under a git workflow and then picking a folder team sent them anyway — and the api's
+  refusal named a control no longer on the page. Send what the current choice takes, not what the state holds (`afterFor`, same
+  round). The same for a field a form stops showing.
 - **A worktree gets a `node_modules` of its own.** Each workspace package (`packages/*`, `apps/*`)
   links to the worktree's copy, so an app change can lean on a package change from the same branch;
   third-party packages link to the main checkout's tree, and `npm install` in a worktree writes the

@@ -1,11 +1,12 @@
 import { useEffect, useId, useState, type ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check as Done, ChevronRight, Copy } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { askRound, askTry, decisionQuery, type Decidable, type DecideCommand, type DiffFile, type Group, type Lesson, type RetryMode, type RunDetail, type SensitiveDiff, type Touched } from '../lib/api';
 import { answersOf, askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
-import { Facts, readRows } from './Facts';
+import { CopyButton } from './CopyButton';
+import { Facts, pathRow, readRows } from './Facts';
 import { Markdown } from './Markdown';
 
 /**
@@ -29,7 +30,7 @@ export function Decide({ run }: { run: RunDetail }) {
       </DecideFrame>
     );
   }
-  if (decidable && isDecidable(data)) return <DecideSection runId={run.id} decision={data} offers={answers} />;
+  if (decidable && isDecidable(data)) return <DecideSection runId={run.id} decision={data} offers={answers} run={run} />;
   return answers && <DecideFrame runId={run.id}>{answers}</DecideFrame>;
 }
 
@@ -54,8 +55,10 @@ function DecideFrame({ runId, children }: { runId: string; children: ReactNode }
  * lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run from
  * here. `offers` go first.
  */
-export function DecideSection({ runId, decision, offers = null }: { runId: string; decision: Decidable; offers?: ReactNode }) {
+export function DecideSection({ runId, decision, offers = null, run = null }: { runId: string; decision: Decidable; offers?: ReactNode; run?: Pick<RunDetail, 'place' | 'work'> | null }) {
   const { touched, lesson, sensitive, total, cost, overBudget, commands } = decision;
+  // A folder run has no branch and nothing to merge, so nothing about one: where its work is instead. (`wf decide` says the same.)
+  const inFolders = run?.place === 'folder';
   return (
     <DecideFrame runId={runId}>
       {offers}
@@ -68,15 +71,20 @@ export function DecideSection({ runId, decision, offers = null }: { runId: strin
       )}
 
       <div className="space-y-4">
-        {touched.length ? (
+        {inFolders ? (
+          <div data-in-folders className="space-y-1">
+            <p className="text-sm text-neutral-500">Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.</p>
+            <Facts rows={[['work', pathRow(run!.work)]]} />
+          </div>
+        ) : touched.length ? (
           touched.map((t) => <TouchedBranch key={t.branch} touched={t} />)
         ) : (
           <p className="text-sm text-neutral-500">No branch to read: no step worked on one.</p>
         )}
-        <LessonChip lesson={lesson} />
+        {!inFolders && <LessonChip lesson={lesson} />}
       </div>
 
-      <InFull sensitive={sensitive} touched={touched} />
+      {!inFolders && <InFull sensitive={sensitive} touched={touched} />}
 
       <section aria-label="Used" className="space-y-1">
         <h3 className="text-xs font-medium text-neutral-500">Used, over every step's current try — and what every try of the run cost</h3>
@@ -685,35 +693,5 @@ export function Commands({ commands }: { commands: readonly DecideCommand[] }) {
         <p className="text-sm text-neutral-500">None yet: the run is still moving.</p>
       )}
     </section>
-  );
-}
-
-/** Copies a command to the clipboard, and says so for a moment — or that it could not, so a person selects the line instead. */
-export function CopyButton({ text }: { text: string }) {
-  const [said, setSaid] = useState<'copy' | 'copied' | 'failed'>('copy');
-  useEffect(() => {
-    if (said === 'copy') return;
-    const timer = setTimeout(() => setSaid('copy'), 1_500);
-    return () => clearTimeout(timer);
-  }, [said]);
-  const copy = () => {
-    // Undefined outside a secure context: said, rather than thrown.
-    const written = navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject(new Error('no clipboard'));
-    written.then(
-      () => setSaid('copied'),
-      () => setSaid('failed'),
-    );
-  };
-  return (
-    <button
-      type="button"
-      data-copy
-      onClick={copy}
-      aria-label={`Copy: ${text}`}
-      title={said === 'failed' ? 'Could not copy: select the line and copy it' : said === 'copied' ? 'Copied' : 'Copy the command'}
-      className="shrink-0 rounded p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 dark:hover:bg-neutral-800 dark:hover:text-neutral-100"
-    >
-      {said === 'copied' ? <Done aria-hidden className="size-3.5" /> : <Copy aria-hidden className="size-3.5" />}
-    </button>
   );
 }

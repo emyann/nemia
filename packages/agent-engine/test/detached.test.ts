@@ -671,7 +671,8 @@ test('claude-detached, filed through the engine with disallowedTools, spawns cla
   try {
     const engine = createEngine({ root: root() });
     const rules = ['Bash(npm run build)', 'Bash(npm run e2e)'];
-    const id = await engine.file({ brief: 'the prompt', cwd: root(), harness: 'claude-detached', tools: ['Read', 'Bash'], disallowedTools: rules });
+    const allow = ['Write(**)'];
+    const id = await engine.file({ brief: 'the prompt', cwd: root(), harness: 'claude-detached', tools: ['Read', 'Bash'], disallowedTools: rules, allowedTools: allow });
     const until = Date.now() + 15_000;
     while (!(await engine.view(id)).state.settled && Date.now() < until) {
       await engine.tick();
@@ -682,7 +683,12 @@ test('claude-detached, filed through the engine with disallowedTools, spawns cla
     const i = argv.indexOf('--disallowedTools');
     assert.notEqual(i, -1, argv.join(' '));
     assert.equal(argv[i + 1], 'Bash(npm run build),Bash(npm run e2e)');
-    assert.equal(argv[i + 2], '--permission-mode', 'a flag ends the variadic list');
+    assert.match(argv[i + 2]!, /^--/, 'a flag ends the variadic list');
+    assert.deepEqual((await engine.view(id)).state.allowedTools, allow, 'and the allow list beside it, on the record');
+    const a = argv.indexOf('--allowedTools');
+    assert.notEqual(a, -1, argv.join(' '));
+    assert.equal(argv[a + 1], 'Write(**)');
+    assert.equal(argv[a + 2], '--permission-mode', 'a flag ends this variadic list too');
   } finally { process.env.PATH = prev; }
 });
 
@@ -692,6 +698,14 @@ test('REFUSED: a deny list on codex, which has no tool list to take from — in 
   assert.equal(codex.refuses!({ brief: 'b', cwd: '/r', disallowedTools: [] }), undefined, 'an empty list denies nothing');
   const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', disallowedTools: ['SendMessage'] }).args;
   assert.equal(args.some((a) => a.includes('SendMessage')), false, 'a direct caller is given no flag codex does not have');
+});
+
+test('REFUSED: an allow list on codex, for the same reason and in the same shape — one shell, fenced by its sandbox', async () => {
+  const { codex } = await import('../src/runner-detached.ts');
+  assert.match(codex.refuses!({ brief: 'b', cwd: '/r', allowedTools: ['Write(**)'] }) ?? '', /is an allow list, and Codex has no tool list to allow from.*`permissionMode`/);
+  assert.equal(codex.refuses!({ brief: 'b', cwd: '/r', allowedTools: [] }), undefined, 'an empty list allows nothing extra');
+  const args = codex.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', allowedTools: ['Write(**)'] }).args;
+  assert.equal(args.some((a) => a.includes('Write(**)')), false, 'a direct caller is given no flag codex does not have');
 });
 
 // ─── codex: what it consumed, from its stream ───────────────────────────────

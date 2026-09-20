@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { AGENTS_FOLDER, agentsDir, contextText, loadAgents, loadWorkflows, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type AgentSkill, type StepKey, type Workflow } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, loadAgents, loadWorkflows, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type AgentSkill, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -50,6 +50,8 @@ export type WorkflowStepSpec = {
   tools: string[] | null;
   /** What the session may not have, in Claude Code's permission rules (`disallow:`): empty where the step denies nothing. */
   disallow: string[];
+  /** What the session may do without being asked, in the same rules (`allow:`): empty where the step allows nothing beyond its mode. */
+  allow: string[];
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
@@ -80,6 +82,12 @@ export type WorkflowListing = {
   steps: ListedStep[];
   graph: RunGraph;
   schemas: string[];
+  /**
+   * Whether every step says `workspace: folder` (`isFolderTeam`): a team that works in folders the run makes and never looks at a
+   * repository. What the board reads to file a card for it without a `repo:`, and to say where a run of it does its work. False for a
+   * folder that does not load, which has no steps to ask.
+   */
+  folderTeam: boolean;
   /**
    * What the folder's files held when it was listed (`versionOf`): a builder's save carries it, and is refused when the folder no longer
    * holds that, rather than written over what changed.
@@ -147,9 +155,9 @@ export function listed(name: string, from: WorkflowSource, dir: string): Workflo
   try {
     steps = loadWorkflows(dir);
   } catch (err) {
-    return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, version, error: messageOf(err) };
+    return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, folderTeam: false, version, error: messageOf(err) };
   }
-  return { name, from, dir, description, steps: steps.map(listedStep), graph: graphOf(steps), schemas, version, error: null };
+  return { name, from, dir, description, steps: steps.map(listedStep), graph: graphOf(steps), schemas, folderTeam: isFolderTeam(steps), version, error: null };
 }
 
 /** A step as the listing has it: resolved, and what its file sets itself where an agent gives it the rest. */
@@ -238,6 +246,7 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   permissionMode: step.permissionMode ?? null,
   tools: step.tools ?? null,
   disallow: step.disallow ?? [],
+  allow: step.allow ?? [],
   remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
   maxAttempts: step.maxAttempts ?? null,
@@ -433,7 +442,13 @@ export const workflows = new Hono()
         const started = startFromInbox({ name: asked.card, callerRepo: repo, workflow: asked.dir, ...(asked.brief !== undefined ? { brief: asked.brief } : {}), ...(asked.after ? { after: asked.after } : {}) });
         c.header('Location', `/api/runs/${encodeURIComponent(started.run.id)}`);
         // Started all the same when the card could not be removed: the run is written, and the card lists as started until it is dropped.
-        return c.json({ id: started.run.id, card: started.card.name, removed: started.removed, ...(started.removed ? {} : { why: started.why }) }, 201);
+        // And a card whose `repo:` the run looked at none of — a folder team's — carries it, as `wf start` prints it and a tick's line
+        // says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from.
+        return c.json({
+          id: started.run.id, card: started.card.name, removed: started.removed,
+          ...(started.removed ? {} : { why: started.why }),
+          ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
+        }, 201);
       } catch (err) {
         const status = (err as { exitCode?: unknown }).exitCode === 2 ? cardRefusalStatus(asked.card) : 422;
         return c.json({ error: messageOf(err) }, status);

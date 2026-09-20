@@ -24,7 +24,7 @@ export type { Approval, AskName, BranchFate, BranchStanding, ToDecide, CloseoutA
 import { agentNameRefusal, agentsDir, agentsFolderRefusal, agentUsers, agentVersion, AGENTS_FOLDER, fansOut, frontmatterKey, isFolderTeam, parseAgent, renderAgent, type Agent, type AgentDraft, isReadme, linkRefusal, loadAgents, loadWorkflows, orderSteps, parseFolder, parseWorkflow, renderStep, sessionContext, stepNameRefusal, WorkflowError, workflowFolder, workflowsIn, type StepDraft, type Workflow } from './workflow.ts';
 export { cardToStart, planLines, planStopped } from './plan.ts';
 export type { Card, Planned } from './plan.ts';
-export { INBOX_KEY_MEANINGS, INBOX_KEYS, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
+export { INBOX_KEY_MEANINGS, INBOX_KEYS, ignoredRepoLine, inboxLines, inboxNameRefusal, noCardLine, parseInboxCard, queueLine, queueOrder, workflowAt } from './inbox.ts';
 export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox.ts';
 import { ideaCard, inboxListing, inboxNameOf, inboxNameRefusal, nextQueued, noCardLine, noWorkflowRefusal, parseInboxCard, queueOrder, queuedText, queueRefusal, startedRefusal, type InboxCard, type InboxListing, type QueueStarted, type QueueTry } from './inbox.ts';
 import { parsePlan, planOrder, type Card, type Planned } from './plan.ts';
@@ -1497,12 +1497,38 @@ function queueTries(): Map<string, QueueTry> {
 export const readInbox = (): InboxListing[] => inboxListing(inboxFiles(), listRuns(), isDirectory, queueTries());
 
 /**
+ * Why a card may not name a repository, or null: `repo:` is the repository a run started from the card works on, and a team whose every step
+ * says `workspace: folder` works on none — the card would keep on disk a path no run of it will ever look at.
+ *
+ * Refused where the card is written, `wf inbox add` and the board's Inbox alike (`addToInbox` is the one writer), in the words `wf start
+ * --repo` is refused in: the same sentence about the same lie, wherever it is told. A card already on disk is another matter — there is no
+ * way to edit one from the board, and refusing its start would strand it — so its `repo:` is ignored and said (`InboxStarted.ignoredRepo`).
+ *
+ * Silent when there is no repository to judge, when the card names no workflow, and when the workflow cannot be read from here: what a card
+ * names is the start's to refuse, in the start's words, and a folder that does not load says so there.
+ */
+function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string }): string | null {
+  if (opts.repo === undefined || opts.workflow === undefined) return null;
+  let steps: readonly Workflow[];
+  try {
+    steps = loadWorkflows(workflowFolder(opts.workflow, opts.dir ?? process.cwd(), opts.repo));
+  } catch {
+    return null;
+  }
+  if (!isFolderTeam(steps)) return null;
+  return `--repo ${opts.repo}: this card's workflow has steps that say \`workspace: folder\`, so a run started from it works in folders it makes under ${workRoot(runsDir(), '<run>')}, with no git repository, and would never look at ${opts.repo}.\n`
+    + `File the card without a repository, or name a workflow whose steps work on one.`;
+}
+
+/**
  * `wf inbox add`: an idea filed as a card (`ideaCard`), under the slug `runId` makes of its body's first line, suffix and all, so two ideas
  * alike are two cards. `text` is a note, or a file's text; `from` is what a refusal calls it; `dir` is the folder a path in the text's own
  * `workflow:` is read from — the file's — and it is written absolute (`ideaCard`). `workflow` and `repo` are written as the card's keys, over
  * the text's own: `repo` an absolute path to a directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it.
  */
 export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string }): { card: InboxCard; file: string } {
+  const refusedRepo = cardRepoRefusal(opts);
+  if (refusedRepo) throw new WorkflowError(refusedRepo);
   const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, { workflow: opts.workflow, repo: opts.repo }, isDirectory, opts.dir);
   fs.mkdirSync(inboxDir(), { recursive: true });
   for (;;) {
@@ -1629,8 +1655,14 @@ export type InboxStart = {
   gates?: readonly string[];
 };
 
-/** What `startFromInbox` did: the run, the card it started, and whether the card left the inbox — and, when not, why. */
-export type InboxStarted = { run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string };
+/**
+ * What `startFromInbox` did: the run, the card it started, and whether the card left the inbox — and, when not, why.
+ *
+ * `ignoredRepo` is the card's own `repo:` when the run looks at no repository: a folder team's does not, and a card filed before
+ * `cardRepoRefusal` — or by hand — may still carry one. The run is started all the same, and the line says the path was not looked at,
+ * rather than leaving a person to wonder which repository the work went to.
+ */
+export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string }) & { ignoredRepo?: string };
 
 /**
  * `wf start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name> }` on
@@ -1694,17 +1726,21 @@ export function startFromInbox(opts: InboxStart): InboxStarted {
     from: { inbox: card.name },
     ...(gates.length ? { gates } : {}),
   });
+  // The card's `repo:` reached `start()` as the repository, and a folder run looks at none: said, not refused, since a card on disk cannot
+  // be edited from the board. A `--repo` given here was refused by `start()` before the run was written.
+  const ignoredRepo = card.repo !== undefined && !isGitRun(run) ? { ignoredRepo: card.repo } : {};
   try {
     fs.rmSync(file, { force: true });
   } catch (err) {
-    return { run, card, removed: false, why: `${file} could not be removed — ${(err as Error).message}` };
+    return { run, card, removed: false, why: `${file} could not be removed — ${(err as Error).message}`, ...ignoredRepo };
   }
-  return { run, card, removed: true };
+  return { run, card, removed: true, ...ignoredRepo };
 }
 
 /**
  * The queue's next card started (`nextQueued`), one try: through `startFromInbox`, with the card's `workflow:` and its `repo:` or else `repo`,
- * the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start.
+ * the daemon's — so its base is its base branch as it is now, and its brief is frozen now. Undefined with no card to start. A card whose
+ * `repo:` the run looks at none of — a folder team's — carries it on `ignoredRepo`, as `wf start` says it.
  *
  * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name: the
  * workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
@@ -1727,7 +1763,12 @@ export function startQueued(repo: string, runs: readonly Run[] = listRuns()): Qu
   const where = next.repo ? {} : { on };
   try {
     const started = startFromInbox({ name: next.name, callerRepo: repo });
-    return started.removed ? { card: next.name, run: started.run.id, removed: true } : { card: next.name, run: started.run.id, removed: false, why: started.why };
+    // Carried, not dropped: a card whose `repo:` the run never looked at says so wherever it was started, and a tick's line is the only
+    // place a daemon's start is read (`queueLine`).
+    const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};
+    return started.removed
+      ? { card: next.name, run: started.run.id, removed: true, ...ignored }
+      : { card: next.name, run: started.run.id, removed: false, why: started.why, ...ignored };
   } catch (err) {
     const refused = (err as { exitCode?: number }).exitCode === 2;
     // On one line: git's words come with its command and its stderr, a line each.
@@ -2043,6 +2084,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         // The fence goes with every try: a try is the step, and a nudge continues a session that had it.
         tools: step.tools,
         disallowedTools: step.disallow,
+        allowedTools: step.allow,
         // And the bridge to claude.ai, as the step asked for it: a try is a session of the step.
         remoteControl: step.remote,
         deadlineSeconds: step.deadlineSeconds,
@@ -2097,6 +2139,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
         permissionMode: target.permissionMode,
         tools: target.tools,
         disallowedTools: target.disallow,
+        allowedTools: target.allow,
         remoteControl: target.remote,
         deadlineSeconds: target.deadlineSeconds,
         maxAttempts: target.maxAttempts,
@@ -2200,6 +2243,7 @@ export async function advance(e: Engine, run: Run, slot?: RunSlot): Promise<Adva
       tools: step.tools,
       // What it may not have of them, as `--disallowedTools`: a deny beats the checkout's settings.
       disallowedTools: step.disallow,
+      allowedTools: step.allow,
       // Bridged to claude.ai, where anyone signed in can drive it, only when the step says `remote: true`: never a default.
       remoteControl: step.remote,
       deadlineSeconds: step.deadlineSeconds,

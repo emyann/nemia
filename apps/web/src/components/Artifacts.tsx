@@ -7,14 +7,17 @@ export const bytesWord = (bytes: number): string =>
 /**
  * The files a closeout named. One the api serves: an image drawn inline, opening full-size in a new tab; a text file as a link;
  * anything else as a link with its size. Any other path as the path, as the closeout gave it.
+ *
+ * `size` puts every file's size beside its name, and says so when there are none: for a list of what a folder holds rather than of
+ * what a step named, where the size is part of what a person came to see.
  */
-export function Artifacts({ artifacts }: { artifacts: readonly StepArtifact[] }) {
-  if (!artifacts.length) return <p className="text-xs text-neutral-500">none named</p>;
+export function Artifacts({ artifacts, size = false, none = 'none named' }: { artifacts: readonly StepArtifact[]; size?: boolean; none?: string }) {
+  if (!artifacts.length) return <p className="text-xs text-neutral-500">{none}</p>;
   return (
     <ul className="mt-1 space-y-2 text-xs">
       {artifacts.map((artifact, i) => (
         <li key={`${i}:${artifact.path}`} className="break-all">
-          <ArtifactView artifact={artifact} />
+          <ArtifactView artifact={artifact} size={size} />
         </li>
       ))}
     </ul>
@@ -24,7 +27,7 @@ export function Artifacts({ artifacts }: { artifacts: readonly StepArtifact[] })
 const linkClass = 'font-mono font-medium text-neutral-900 underline underline-offset-2 dark:text-neutral-100';
 
 /** One file a closeout named, drawn as `Artifacts` draws each: the Output tab draws an image a field names with it too. */
-export function ArtifactView({ artifact }: { artifact: StepArtifact }) {
+export function ArtifactView({ artifact, size = false }: { artifact: StepArtifact; size?: boolean }) {
   if (!('url' in artifact)) {
     return (
       <span data-artifact="path" className="font-mono">
@@ -53,7 +56,7 @@ export function ArtifactView({ artifact }: { artifact: StepArtifact }) {
       <a href={artifact.url} target="_blank" rel="noreferrer" className={linkClass}>
         {artifact.name}
       </a>
-      {artifact.kind === 'other' && <span className="text-neutral-500"> · {bytesWord(artifact.size)}</span>}
+      {(size || artifact.kind === 'other') && <span className="text-neutral-500"> · {bytesWord(artifact.size)}</span>}
     </span>
   );
 }

@@ -104,11 +104,13 @@ function FileCard() {
   // Null until a person types in it: the api's repository, once it has said which.
   const [repo, setRepo] = useState<string | null>(null);
   const about = repo ?? repository.data?.repo ?? '';
+  const picked = workflows.data?.find((w) => workflowKey(w) === workflow) ?? null;
+  // A team whose every step works in a folder looks at no repository, and the api refuses a card for one that names one: no box, and
+  // nothing sent, whatever a person typed before picking it.
+  const inFolders = picked?.folderTeam ?? false;
   const file = useMutation({
-    mutationFn: () => {
-      const picked = workflows.data?.find((w) => workflowKey(w) === workflow);
-      return fileCard({ body: idea, ...(picked ? { workflow: picked.name, from: picked.from } : {}), ...(about.trim() ? { repo: about.trim() } : {}) });
-    },
+    mutationFn: () =>
+      fileCard({ body: idea, ...(picked ? { workflow: picked.name, from: picked.from } : {}), ...(!inFolders && about.trim() ? { repo: about.trim() } : {}) }),
     onSuccess: () => {
       setIdea('');
       setWorkflow('');
@@ -152,15 +154,22 @@ function FileCard() {
         </div>
         <div className="space-y-1.5">
           <label htmlFor={ids.repo} className="block text-sm font-medium">
-            Repository
+            {inFolders ? 'Where its work goes' : 'Repository'}
           </label>
-          <input
-            id={ids.repo}
-            value={about}
-            onChange={(event) => setRepo(event.target.value)}
-            placeholder="None: the repository its start names"
-            className={`${FIELD} font-mono text-xs`}
-          />
+          {inFolders ? (
+            <p data-in-folders className="text-xs text-neutral-600 dark:text-neutral-400">
+              {picked!.name} works in folders the run makes for it, and looks at no repository. The card names none, and the run says
+              where the work is.
+            </p>
+          ) : (
+            <input
+              id={ids.repo}
+              value={about}
+              onChange={(event) => setRepo(event.target.value)}
+              placeholder="None: the repository its start names"
+              className={`${FIELD} font-mono text-xs`}
+            />
+          )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">

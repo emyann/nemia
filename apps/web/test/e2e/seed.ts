@@ -382,6 +382,85 @@ export const DIAMOND = {
   },
 } as const;
 
+/**
+ * A run with no repository at all (`workspace: folder`), as `workflows/note` runs: two steps, each in a folder the run made under
+ * the store, and never a branch, a base or a merge. `write` signed off naming the note it wrote; `review` continued the same folder
+ * — a chain does — and said the note holds. Both are done, so the run is finished and its card is off the Factory's default floor.
+ *
+ * The folder holds more than the closeout named: the note, and an outline `write` left behind and never named. A person who never
+ * opens a terminal finds both on the step, with their sizes.
+ */
+export const FOLDER = {
+  id: 'a-note-on-the-tides-e2e15',
+  title: 'A note on the tides',
+  /** The folder in the store it was started from, beside the runs rather than under `workflows/`, so the Workflows page is unchanged. */
+  workflow: 'notes',
+  steps: ['write', 'review'],
+  /** The file `write` wrote and named in its closeout, which the run collected into the step's files beside the record. */
+  note: 'note.md',
+  /** And one it left in the folder and never named: what the folder holds is not what a closeout said. */
+  outline: 'outline.txt',
+  /** A line of the note itself, to read back off what the api serves. */
+  line: 'Two bulges, one turn: two tides.',
+  /** What `review` gave back, which changed nothing. */
+  verdict: 'The note holds: nothing in it is claimed beyond what it says it is unsure of.',
+  /** The one command `wf decide` offers a run with no repository, which the board offers too. */
+  forget: 'wf rm a-note-on-the-tides-e2e15',
+} as const;
+
+/**
+ * Write FOLDER into the store at `root`: its workflow folder, its record with `place` and none of a git run's fields, a journal per
+ * step, and the files the steps left — in `write`'s folder, and the note collected beside the record as the run collects a named file.
+ * Times are minutes before `now`.
+ */
+export function seedFolder(root: string, now = Date.now()): void {
+  const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
+  const { id } = FOLDER;
+  const workflowDir = path.join(root, FOLDER.workflow);
+  const fence = 'permissionMode: dontAsk\nallow: Edit(**)\n';
+  write(path.join(workflowDir, 'write.md'), `---\nharness: claude\nworkspace: folder\n${fence}---\nWrite a short note on what was asked.\n`);
+  write(path.join(workflowDir, 'review.md'), `---\nharness: claude\nafter: write\nworkspace: folder\npermissionMode: dontAsk\n---\nRead the note, and say whether it holds up.\n`);
+
+  // Every step of a folder team works under the run's own directory in the store; `review` continues `write`'s folder, as a chain does.
+  const work = path.join(root, 'runs', id, 'work');
+  const wrote = path.join(work, 'write');
+  write(path.join(wrote, FOLDER.note), `# Why the tides come twice a day\n\nThe moon pulls the water nearest it, and leaves the water\nfarthest from it behind. Two bulges, one turn: two tides.\n`);
+  write(path.join(wrote, FOLDER.outline), 'moon pulls · earth turns · two bulges\n');
+  // The run collects a file its closeout named into the step's files, beside the record.
+  write(path.join(root, 'runs', id, 'artifacts', 'write', FOLDER.note), fs.readFileSync(path.join(wrote, FOLDER.note)));
+
+  write(path.join(root, 'runs', `${id}.json`), JSON.stringify({
+    id, place: { kind: 'folder' }, workspace: work,
+    // The brief says no git word of its own — the folder page sweeps everything the page draws, so a word found there can only
+    // have come from the board.
+    brief: `${FOLDER.title}\n\nA run seeded by npm run e2e: a team that works in folders it makes for its steps.`,
+    workflowDir,
+    workflow: [
+      { name: 'write', after: [], body: 'Write a short note on what was asked.', harness: 'claude', workspace: 'folder', permissionMode: 'dontAsk', allow: ['Edit(**)'] },
+      { name: 'review', after: ['write'], body: 'Read the note, and say whether it holds up.', harness: 'claude', workspace: 'folder', permissionMode: 'dontAsk' },
+    ],
+    createdAt: ago(20),
+    steps: { write: { taskId: `${id}-write`, workspace: wrote }, review: { taskId: `${id}-review`, workspace: wrote } },
+  }, null, 2));
+
+  // Filed as the run files a folder step: in `dontAsk`, the one mode a folder team is allowed, so the step's rows read the mode it
+  // ran in rather than the engine's default.
+  const signedOff = (step: string, brief: string, began: number, ended: number, closeout: object): void =>
+    write(path.join(root, 'engine', 'tasks', `${id}-${step}.jsonl`), lines([
+      { kind: 'filed', at: ago(began), brief, cwd: wrote, maxAttempts: 1, harness: 'claude', permissionMode: 'dontAsk' },
+      { kind: 'starting', at: ago(began - 1), attempt: 1 },
+      { kind: 'spawned', at: ago(began - 1), attempt: 1 },
+      { kind: 'ended', at: ago(ended), attempt: 1, sessionId: `ae/${id}-${step}/1`, observed: 'done', reason: 'harness', closeout },
+      { kind: 'settled', at: ago(ended), outcome: 'succeeded' },
+    ]));
+  signedOff('write', 'Write a short note on what was asked.', 19, 18, {
+    outcome: 'done', summary: 'Wrote the note, in the folder this step was given.', needs: null, artifacts: [path.join(wrote, FOLDER.note)],
+  });
+  signedOff('review', 'Read the note, and say whether it holds up.', 18, 17, {
+    outcome: 'done', summary: FOLDER.verdict, needs: null, artifacts: [],
+  });
+}
+
 /** The diamond's runs, oldest first. */
 export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.shipped, DIAMOND.running, DIAMOND.bottom, DIAMOND.cancelled, DIAMOND.orphan] as const;
 

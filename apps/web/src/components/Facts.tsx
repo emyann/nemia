@@ -2,13 +2,14 @@ import type { ReactNode } from 'react';
 import type { PeakMark, RunDetail, StepCheck, StepFiled, StepLog, StepSpec, StepUsed } from '../lib/api';
 import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
+import { CopyButton } from './CopyButton';
 
 /** Label and value, one per row. A value that is not set reads as a dash. */
 export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]> }) {
   return (
     <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
       {rows.map(([label, value]) => (
-        <div key={label} className="contents">
+        <div key={label} data-fact={label} className="contents">
           <dt className="text-neutral-500">{label}</dt>
           <dd className="min-w-0 break-words">{value ?? '—'}</dd>
         </div>
@@ -95,6 +96,19 @@ function Marked({ value, mark, word = false, title }: { value: string; mark: str
 }
 
 export const code = (value: string | null) => (value === null ? null : <span className="font-mono text-xs">{value}</span>);
+
+/**
+ * A path on the machine, as a `Facts` value: the path, and a button that copies it. A folder run's work is somewhere under the store
+ * that nobody typed and nobody remembers, and the board is where a person reads the run — so the path is copyable wherever it is shown,
+ * rather than selected out of a line that wraps.
+ */
+export const pathRow = (at: string | null) =>
+  at === null ? null : (
+    <span data-path className="flex items-start gap-1">
+      <span className="min-w-0 break-all font-mono text-xs">{at}</span>
+      <CopyButton text={at} what="the path" />
+    </span>
+  );
 
 type Priced = Pick<RunDetail['steps'][number], 'spent' | 'budget' | 'taskId' | 'tries'>;
 

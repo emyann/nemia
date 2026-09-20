@@ -40,7 +40,7 @@ export type TaskView = {
 export const file = Effect.fn('file')(function* (spec: {
   brief: string; cwd: string; maxAttempts?: number; model?: string; permissionMode?: string;
   harness?: string; deadlineSeconds?: number; resume?: ResumePolicy; resumeFrom?: string;
-  worktree?: string | boolean; closeoutSchema?: object; tools?: string[]; disallowedTools?: string[];
+  worktree?: string | boolean; closeoutSchema?: object; tools?: string[]; disallowedTools?: string[]; allowedTools?: string[];
   effort?: string; mcp?: Record<string, McpServer>; budgetUsd?: number; contextTokens?: number;
   remoteControl?: boolean; priority?: number; id?: string;
 }) {
@@ -52,7 +52,7 @@ export const file = Effect.fn('file')(function* (spec: {
     maxAttempts: spec.maxAttempts ?? 1, model: spec.model, permissionMode: spec.permissionMode,
     harness: spec.harness, deadlineSeconds: spec.deadlineSeconds, resume: spec.resume,
     resumeFrom: spec.resumeFrom, worktree: spec.worktree, closeoutSchema: spec.closeoutSchema,
-    tools: spec.tools, disallowedTools: spec.disallowedTools, effort: spec.effort, mcp: spec.mcp, budgetUsd: spec.budgetUsd,
+    tools: spec.tools, disallowedTools: spec.disallowedTools, allowedTools: spec.allowedTools, effort: spec.effort, mcp: spec.mcp, budgetUsd: spec.budgetUsd,
     contextTokens: spec.contextTokens, remoteControl: spec.remoteControl, priority: spec.priority,
   });
   return id;
@@ -157,7 +157,7 @@ export const step = Effect.fn('step')(function* (
         name: action.name, brief: attempt?.nudge ?? state.brief, cwd: state.cwd,
         model: state.model, permissionMode: state.permissionMode, harness: state.harness,
         worktree: state.worktree, closeoutSchema: state.closeoutSchema,
-        tools: state.tools, disallowedTools: state.disallowedTools, effort: state.effort, mcp: state.mcp,
+        tools: state.tools, disallowedTools: state.disallowedTools, allowedTools: state.allowedTools, effort: state.effort, mcp: state.mcp,
         budgetUsd: state.budgetUsd, contextTokens: state.contextTokens, remoteControl: state.remoteControl, resumeFrom: attempt?.resumeFrom,
       }).pipe(
         Effect.as(undefined),

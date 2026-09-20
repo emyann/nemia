@@ -63,7 +63,7 @@ write(path.join(root, 'workflows', '.git', 'HEAD'), 'ref: refs/heads/main\n');
 
 /** A spec with every key unset but `fields`. */
 const spec = (fields: Partial<WorkflowStepSpec>): WorkflowStepSpec => ({
-  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], remote: null,
+  harness: null, model: null, effort: null, context: null, after: [], resume: null, input: [], workspace: null, slot: null, agent: null, permissionMode: null, tools: null, disallow: [], allow: [], remote: null,
   deadlineSeconds: null, maxAttempts: null, budget: null, check: null, retries: null, gate: null, output: null, loop: null, rounds: null, ...fields,
 });
 
@@ -96,7 +96,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
   // Each at the version its files are at: what a save from the board carries.
   for (const w of listing) assert.equal(w.version, versionOf(w.dir), w.name);
   assert.deepEqual(listing, [
-    { name: 'broken', from: 'repo', dir: broken, description: 'A reviewer with a misspelt key.', steps: [], graph: { roots: [], edges: [] }, schemas: [], version: versionOf(broken), error: refused },
+    { name: 'broken', from: 'repo', dir: broken, description: 'A reviewer with a misspelt key.', steps: [], graph: { roots: [], edges: [] }, schemas: [], folderTeam: false, version: versionOf(broken), error: refused },
     {
       name: 'good', from: 'repo', dir: good, description: 'Implement it, then review it, two rounds at most.',
       // The README is not among the steps.
@@ -107,6 +107,8 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       // `graphOf` the steps, as a run of it is drawn.
       graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'review', kind: 'after' }, { from: 'review', to: 'implement', kind: 'loop', rounds: 2 }] },
       schemas: ['review.json'],
+      // Neither works in folders: a folder team is every step saying `workspace: folder` (folder-run.test.ts lists one).
+      folderTeam: false,
       version: versionOf(good),
       error: null,
     },
@@ -115,6 +117,7 @@ test("GET /api/workflows lists each folder, the repository's then yours: its des
       steps: [{ name: 'plan', spec: spec({ harness: 'codex', check: 'test -f PLAN.md', retries: 1 }), body: 'Write PLAN.md.', own: null }],
       graph: { roots: ['plan'], edges: [] },
       schemas: [],
+      folderTeam: false,
       version: versionOf(mine),
       error: null,
     },

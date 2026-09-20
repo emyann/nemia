@@ -232,6 +232,7 @@ function StepRow({ step, measured, readOnly }: { step: StepReach; measured: Meas
         {([
           ['tools', fence.tools ? fence.tools.join(', ') || 'none' : `${OWN} set`],
           ['disallow', fence.disallow.join(', ') || 'nothing'],
+          ['allow', fence.allow.join(', ') || 'nothing'],
           ['permission mode', fence.permissionMode ?? OWN],
           ['effort', fence.effort ?? OWN],
           ['mcp', 'none named: a step has no mcp: key'],

@@ -123,12 +123,15 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
     const closeout = looping.closeout;
     const output = closeout?.output ?? {};
     const findings = Array.isArray(output.findings) ? output.findings.length : null;
+    // Ended by a person out of rounds (`wf accept`): the closeout still says `again: true`, and the loop is over on their word. Say that,
+    // with their words, where "asks another round" would send whoever approves the ending looking for a round nobody will file.
+    const accepted = looping.accepted ? `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open: ${looping.accepted.message}` : null;
     const said = !closeout
       ? `${looping.name} has not signed off`
       : output.again === false
         ? `${looping.name} asks no further round${findings ? `, and left ${findings} finding${findings === 1 ? '' : 's'}` : ''}`
         : findings !== null
-          ? `${looping.name} left ${findings} finding${findings === 1 ? '' : 's'}${output.again === true ? ' and asks another round' : ''}`
+          ? `${looping.name} left ${findings} finding${findings === 1 ? '' : 's'}${accepted ?? (output.again === true ? ' and asks another round' : '')}`
           : `${looping.name} signed off ${closeout.outcome}`;
     facts.push({ label: 'last review', said, state: output.again === false && !findings ? 'good' : undefined, step: looping.name });
   }

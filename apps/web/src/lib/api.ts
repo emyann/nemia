@@ -113,6 +113,9 @@ export type StepApproval = { try: number; at: string; message: string | null };
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
+/** As the api's: a person's acceptance of a loop out of rounds (`wf accept`), on the try its looping step is on. */
+export type StepAcceptance = { try: number; at: string; message: string };
+
 /**
  * Mirrors `StepAsked` in apps/api/src/app.ts: a try a person asked for, which the next tick files — once it has stopped the step's session
  * where `stopFirst`, because the harness blocked it.
@@ -304,6 +307,8 @@ export type RunDetail = {
     approve: string | null;
     /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
     gate: StepGate | null;
+    /** For a looping step a person ended out of rounds (`wf accept`), their acceptance of the try it is on; null for any other step. */
+    accepted: StepAcceptance | null;
     /** For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read. */
     lastLine: string | null;
     /** What a person said to its current try's session while it ran (`wf say`, or the session page's prompt box), in the order said. */

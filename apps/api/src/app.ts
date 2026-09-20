@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { Hono } from 'hono';
 import { streamSSE, type SSEStreamingApi } from 'hono/streaming';
 import { answerIn, approve, type BranchStanding, branchStandings, branchWord, branchesToRead, budgetRefusal, budgetWord, CHECK_AFFECTING, checkStderr, closeoutAsked, closeoutOf, closeoutReader, consumption, dollars, diffStat, engine, exitVerdicts, fromNote, harnessBlocked, HARNESSES, isShipped, lastCeilings, lessonLine, listRuns, merges, messageRefusal, nameFor, parentOf, type ParentRun, peakMark, phaseOfView, readAnswers, readAsks, readFilings, readWords, type Retry, retry, type RetryAsk, type RetryHow, type RetryMode, resultSteps, round, runCostLines, runSpend, type Said, saidCount, say, sendBackTo, sensitiveDiff, slotWord, type Spend, type SpendOf, spendReader, spentWord, stepsOf, stepSpend, sumUsage, type Timeline, timeline, type TimelineTotal, type TimelineTry, toDecideWords, touchedBy, usedLines, verdictWord, type Wait, waitAdvice, waitingWords, waitWord } from 'agent-workflows';
-import { addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type GitRun, isGitRun, placeOf, type PlaceKind, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
+import { acceptanceOf, addSpend, admissionOrder, answerOf, approvalOf, approvalWordsRefusal, assess, type Assessment, budgetOf, composeBrief, type Decision, decision, declaredOutput, type EarlierTry, gated, gatesOf, hasGate, heldRuns, inFlight, listing, loopOver, onYouWords, overBudget, overBudgetLine, ownStatus, parseCloseout, retryable, retryLines, roundIn, roundLines, type GitRun, isGitRun, placeOf, type PlaceKind, type Run, runCapOf, slotNeed, type StepRecord, type StepStatus, type ToDecide, tryNote, waitsOf } from 'agent-workflows/run';
 import { LOOP_REPLIES, loadWorkflows, loopSpan, outputFields, type Workflow } from 'agent-workflows/workflow';
 import { artifactOf, folderFiles, readArtifactFile, readFolderFile, refusedName, type StepArtifact } from './artifacts.ts';
 import { repoOf } from './capabilities.ts';
@@ -188,6 +188,13 @@ export type StepApproval = { try: number; at: string; message: string | null };
  * `approval`, once a person approved that try. Neither, for a gated step not signed off yet.
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
+
+/**
+ * A person's acceptance of a loop out of rounds, on the try its looping step is on (`acceptanceOf`), off their file (`wf accept`): the
+ * try, when, and the words given. The step's closeout still says `again: true` — the acceptance does not rewrite what the reviewer said —
+ * so whoever reads the step's last word needs this beside it, or a gate after the loop reads as if another round were still asked for.
+ */
+export type StepAcceptance = { try: number; at: string; message: string };
 
 /**
  * A try a person asked for — with `wf retry`, or the board's answer box or Continue — that the next tick files: `assess`'s, off their
@@ -425,6 +432,8 @@ export type RunDetail = {
     approve: StepNeeds['approve'];
     /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
     gate: StepGate | null;
+    /** For a looping step a person ended out of rounds (`wf accept`), their acceptance of the try it is on; null for any other step. */
+    accepted: StepAcceptance | null;
     /**
      * For a step the harness blocked, what its session said last, as the engine's `transcript` reads it: its last `text` or `system`
      * event, trimmed. Null for any other step, and for one whose session said none or whose conversation cannot be read.
@@ -1099,6 +1108,12 @@ function gateOf(run: Run, step: Workflow, status: string): StepGate | null {
   };
 }
 
+/** A looping step's acceptance (`StepAcceptance`), off the record as `listRuns` composes it, as `gateOf` reads an approval: no read of its own. */
+function acceptedOf(run: Run, step: string): StepAcceptance | null {
+  const given = acceptanceOf(run, step);
+  return given ? { try: given.try, at: given.at, message: given.message } : null;
+}
+
 /**
  * When each task was filed, off the engine's feed (`readFilings`), and where the last read of it stopped: a task's view carries no filing
  * time, and the wait for a slot is filing → first attempt. Read on from the cursor on each detail — a filing is written once and never
@@ -1265,6 +1280,7 @@ async function detail(run: Run): Promise<RunDetail> {
         lastLine: needs.blockedByHarness ? await lastLineOf(views.get(taskId!)!) : null,
         // Judged by the workflow the run is: a step it does not have is gated only where the run was started with its gate.
         gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
+        accepted: acceptedOf(run, name),
         said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
         asked: askedOf(judged.asked.get(name)),
         ...current,

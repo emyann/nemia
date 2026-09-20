@@ -115,6 +115,14 @@ test("the facts under a gate: the round of its loop's cap and the cost, the revi
     { label: 'round', said: 'round 1 · cost not measured' },
     { label: 'last review', said: 'review left 2 findings and asks another round', state: undefined, step: 'review' },
   ]);
+  // Ended by a person out of rounds (`wf accept`): the closeout still says `again: true`, and the fact says whose word ended the loop, with
+  // their words — not "asks another round", which would send whoever approves the ending looking for a round nobody will file.
+  const accepted = [{ ...findings[0]!, accepted: { try: 1, at: '2026-09-20T00:00:00Z', message: 'fan-in teams are follow-up work' } }];
+  assert.deepEqual(gateFacts(detail(accepted, { cost: null }), null)[1], {
+    label: 'last review', said: 'review left 2 findings; a person accepted the work as it stands, with them open: fan-in teams are follow-up work', state: undefined, step: 'review',
+  });
+  const one = [{ ...accepted[0]!, closeout: { outcome: 'succeeded', output: { again: true, findings: [{}] } } as unknown as Step['closeout'] }];
+  assert.match(gateFacts(detail(one, { cost: null }), null)[1]!.said, /^review left 1 finding; a person accepted the work as it stands, with it open: /);
   const failed = [step('implement', { check: { verdict: 'failed' } as Step['check'] })];
   assert.equal(gateFacts(detail(failed), null)[1]?.state, 'bad');
 });

@@ -248,6 +248,21 @@ test('a loop out of rounds offers both answers as commands, each the bare `wf` l
   ]);
   const accept = body.commands.find((c: { label: string }) => c.label === 'accept');
   assert.match(accept.said, /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  wf accept r-d9 review --message "<why>"$/);
+
+  // Before a person accepts, no step of the run says an acceptance; after, the looping step does — the try, when, and their words — and no
+  // other step. The board's gate reads it: the closeout still says `again: true`, and without this it would say the loop asks another round.
+  const stepsOf = async () => ((await (await app.request('/api/runs/r-d9')).json()) as { steps: { name: string; accepted: unknown }[] }).steps;
+  assert.deepEqual((await stepsOf()).map((s) => [s.name, s.accepted]), [['implement', null], ['review', null]]);
+  const asks = path.join(root, 'runs', 'r-d9.asks');
+  fs.mkdirSync(asks, { recursive: true });
+  // The looping step is on its second try (one round behind it), so the acceptance is of try 2: one of try 1 would be spent, and said of nothing.
+  fs.writeFileSync(path.join(asks, 'accept-review-1'), JSON.stringify({ at: '2026-09-20T01:00:00.000Z', message: 'spent: of the try before' }));
+  assert.deepEqual((await stepsOf()).map((s) => [s.name, s.accepted]), [['implement', null], ['review', null]], 'an acceptance of an earlier try is spent');
+  fs.writeFileSync(path.join(asks, 'accept-review-2'), JSON.stringify({ at: '2026-09-20T02:00:00.000Z', message: 'the findings are follow-up work' }));
+  assert.deepEqual((await stepsOf()).map((s) => [s.name, s.accepted]), [
+    ['implement', null],
+    ['review', { try: 2, at: '2026-09-20T02:00:00.000Z', message: 'the findings are follow-up work' }],
+  ]);
 });
 
 test("a branch git cannot read is an `error` on its entry — the lesson not known, its diff not read — and the request still answers", async () => {

@@ -48,12 +48,13 @@ export const defaultRecord = (env: Readonly<Record<string, string | undefined>>)
  * share a key, the first asking writes it and the second reads it back off the record, so a key counted once here is
  * asked once there however many runs carry it. `sending` holds only the briefs with a question left: a brief every one
  * of whose questions is answered — on record, or by an earlier brief in this same pass — is never sent again, and must
- * not be counted in what a person is asked to consent to.
+ * not be counted in what a person is asked to consent to. `repeated` counts the questions an earlier brief of this pass
+ * already stands for: they are not asked, and they are not on record either, so the consent line says them apart.
  */
-export type Asking = { readonly questions: number; readonly sending: readonly string[] };
+export type Asking = { readonly questions: number; readonly repeated: number; readonly sending: readonly string[] };
 
 export const wouldAsk = (record: string, briefs: readonly string[], reask: boolean, now = Date.now()): Asking => {
-  let questions = 0;
+  let questions = 0, repeated = 0;
   const sending: string[] = [];
   const counted = new Set<string>();
   for (const brief of briefs) {
@@ -62,7 +63,7 @@ export const wouldAsk = (record: string, briefs: readonly string[], reask: boole
     for (const question of Object.values(QUESTIONS)) {
       const key = keyOf(MODEL, question, state);
       // Counted already, by an earlier brief in this pass: that asking writes the record this one would read.
-      if (counted.has(key)) continue;
+      if (counted.has(key)) { repeated++; continue; }
       const r = reading(key, readFacts(record, key), question, MODEL, now);
       if (r.status === 'none' || (reask && r.status === 'failed')) {
         counted.add(key);
@@ -73,7 +74,7 @@ export const wouldAsk = (record: string, briefs: readonly string[], reask: boole
     // What travels is the stripped card, not the brief: that is what `cardState` puts in the request.
     if (n > 0) sending.push(state.card as string);
   }
-  return { questions, sending };
+  return { questions, repeated, sending };
 };
 
 /**
@@ -142,11 +143,14 @@ export async function main(argv: readonly string[], io: Io = {}): Promise<number
       const off = available(env) ? undefined : 'the judge is off: no TYPESAFE_API_KEY in the environment';
 
       // What it costs and what it sends, before anything is sent. `--yes` is needed only when a request would be made.
-      const asking = off ? { questions: 0, sending: [] } : wouldAsk(dir, runs.map((r) => r.brief), reask);
+      const asking = off ? { questions: 0, repeated: 0, sending: [] } : wouldAsk(dir, runs.map((r) => r.brief), reask);
       const characters = asking.sending.reduce((n, card) => n + card.length, 0);
       out(`judge runs: ${runs.length} runs in scope, ${skipped.length} skipped, of ${read} records in ${root}`);
       if (off) out(`  ${off}; nothing would be sent, and only the rival is scored.`);
-      else out(`  ${asking.questions} of ${runs.length * 4} questions would be asked; the rest are on record in ${dir}`);
+      else if (asking.repeated === 0) out(`  ${asking.questions} of ${runs.length * 4} questions would be asked; the rest are on record in ${dir}`);
+      // A brief dispatched twice is asked once: its second four questions are neither asked nor on record yet.
+      else out(`  ${asking.questions} of ${runs.length * 4} questions would be asked; ${asking.repeated} more are the same questions of a brief already counted, ` +
+        `and ${runs.length * 4 - asking.questions - asking.repeated} are on record in ${dir}`);
       if (asking.questions > 0) {
         out(`  about ${characters} characters would go to TypeSafe — ${asking.sending.length} of the ${runs.length} briefs, ` +
           'stripped of their frontmatter, with the fixed description of the repository and nothing else');

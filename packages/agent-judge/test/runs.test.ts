@@ -244,11 +244,13 @@ test('a brief two runs were dispatched with is one question, counted once, sent 
     { id: 'again', folder: 'dev', brief, createdAt: '2026-09-11T00:00:00Z' },
   ]);
   const record = tmp('runs');
-  assert.deepEqual(wouldAsk(record, [brief, brief], false), { questions: 4, sending: [brief] });
+  assert.deepEqual(wouldAsk(record, [brief, brief], false), { questions: 4, repeated: 4, sending: [brief] });
 
   const { calls, text } = await run(['runs', '--store', store, '--record', record, '--yes']);
   assert.equal(calls.length, 1, 'one request for the two runs');
-  assert.match(text, /^ {2}4 of 8 questions would be asked; the rest are on record in /m);
+  // Nothing is on record yet: the other four are the same four questions, and the line says so rather than "the rest are on record".
+  assert.match(text, /^ {2}4 of 8 questions would be asked; 4 more are the same questions of a brief already counted, and 0 are on record in /m);
+  assert.doesNotMatch(text, /the rest are on record/);
   assert.match(text, new RegExp(`^ {2}about ${brief.length} characters would go to TypeSafe — 1 of the 2 briefs, `, 'm'));
   // Both dispatches are scored all the same — each is a choice a person made — and the count says how many briefs.
   assert.match(text, /^judge runs: 2 of 2 records were dispatched to /m);
@@ -296,6 +298,9 @@ test('what it would ask is counted without asking, and a failure on record is as
   assert.equal(wouldAsk(record, briefs, false).questions, 24);
   const failed = await run(['runs', '--store', store, '--record', record, '--yes'], [{ status: 500 }]);
   assert.match(failed.text, /^ {2}rival {3}5 of 6 agree/m, 'a pass that answered nothing still scores the rival');
+  // Every answer failed, and the report says so: `unsure 6` alone would read as a judge that could not decide.
+  assert.match(failed.text, /^ {2}FAILED {2}24 of 24 answers did not come — unreachable 24 — and read `unsure` below\.$/m);
+  assert.match(failed.text, /run again with --reask/);
   assert.equal(wouldAsk(record, briefs, false).questions, 0, 'a failure is a fact: nothing is asked again by itself');
   assert.equal(wouldAsk(record, briefs, true).questions, 24, 'and --reask would ask each of them again');
   const kept = await run(['runs', '--store', store, '--record', record]);
@@ -303,6 +308,7 @@ test('what it would ask is counted without asking, and a failure on record is as
   const again = await run(['runs', '--store', store, '--record', record, '--reask', '--yes']);
   assert.equal(again.calls.length, 6);
   assert.match(again.text, /^ {2}judge {3}4 of 6 agree/m);
+  assert.doesNotMatch(again.text, /FAILED/, 'a pass whose answers all came says nothing of failures');
 });
 
 // ─── what it refuses ────────────────────────────────────────────────────────────────────────────

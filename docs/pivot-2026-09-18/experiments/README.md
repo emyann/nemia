@@ -24,3 +24,19 @@ re-run from this folder alone; their scored tables are here.
 scripts carry the absolute paths of the machine they ran on. The model was pinned to `jev-1.13.0`.
 Everything sent to TypeSafe was this project's own briefs, findings, closeouts and step markdown;
 its retention terms had not been read (§8 of the pivot document).
+
+## `jev/judge-runs-2026-09-19.*` — the judge scored against 75 dispatches already made
+
+`judge runs` (packages/agent-judge), live on the owner's store on 19 September: 74 requests, 296 questions, 136,503 input
+tokens, 17 s, no failed answer, well under a cent. The label is the folder a person chose; it is agreement, not accuracy.
+
+- **web** — judge P 0.83 R 1.00 with 4 unsure; the rival (`apps/web` or `apps/api` named) P 0.71 R 1.00. All six of the
+  judge's "false positives" were the PERSON's: the inbox menu, the runs page sort, the floor fix, the quota's backoff, P2's
+  first slice and the Output tab each changed `apps/web` or the api and were filed on a folder without `-build` (since P0.6
+  `dev` builds when the work touches an app, so the label stopped meaning "web"). Read that way the judge was right 35 of 35.
+- **plan** — weak. Runs the person planned: median P 0.95. Runs they did not: median 0.64, and 15 of 58 at 0.8 or above. At
+  0.8 / 0.2 the judge is unsure on 44 of 75. No single cut separates them (0.8: P 0.50 R 0.88). The question leans yes on
+  almost any long brief — and the owner's own reading of that week is that most of those runs should have had a plan: the
+  quota-by-statusline run, the one they named, reads P 0.88.
+- **the whole folder** — judge 13 of 75 agree, 46 kept in the inbox; rival 35 of 75. As a dispatcher at these thresholds it
+  would have parked most cards, nearly all on the plan question.

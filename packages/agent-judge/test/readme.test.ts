@@ -89,3 +89,13 @@ test('the README uses no verb the command does not have, and keeps no count by h
 test('the README says the judge is optional, never in a tick, what is sent, and that retention terms are unread', () => {
   assert.deepEqual(absent(read('README.md')), []);
 });
+
+test("the README lists the rival's planning words as the code has them, and claims no form the list does not hold", async () => {
+  const { PLANNING_WORDS } = await import('../src/rival.ts');
+  const readme = read('README.md');
+  // First, a README that says what the code does not: the sentence this test was written against.
+  assert.match('plan, design, decide, and their forms', /and their forms/);
+  assert.doesNotMatch(readme, /and their forms/, 'the list is fixed: `deciding` and `option` are not in it, and the README must not say they are');
+  const missing = PLANNING_WORDS.filter((w) => !readme.includes(`\`${w}\``));
+  assert.deepEqual(missing, [], 'each word of PLANNING_WORDS is named in the README, in backticks');
+});

@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { recordedUsage, themeOf } from '../board.ts';
 import { expectClearOfEachOther } from '../canvas.ts';
-import { expectCount, expectTexts, expectVisible, settled } from '../checks.ts';
+import { expectCount, expectTexts, expectVisible, Refused, settled } from '../checks.ts';
 import { QUOTA } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
@@ -31,15 +31,19 @@ export default {
     try {
       await expectCount(page.locator('[data-quota="fresh"]'), 1, 'the header shows the quota Claude Code answered with');
       const { rate_limits: limits } = (JSON.parse(written) as { response: { response: { rate_limits: Record<'five_hour' | 'seven_day', { resets_at: string }> } } }).response.response;
-      // The resets as the browser says a time where it is, to the minute — and the weekday for the week, three days out.
-      const clock = (iso: string, weekday: boolean) =>
-        page.evaluate(([at, day]) => {
+      // The resets as the browser says a time where it is, to the minute, with the weekday when the reset falls on another day than
+      // today (`clockWord`) — which is read here rather than assumed: the week resets three days out and always reads with one, and the
+      // five-hour window's reset crosses midnight for the two hours before it, when a run in the evening read `resets 00:02` as wrong.
+      const clock = (iso: string) =>
+        page.evaluate((at) => {
           const d = new Date(at);
           const time = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
-          return day ? `${new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(d)} ${time}` : time;
-        }, [iso, weekday] as const);
-      const fiveResets = await clock(limits.five_hour.resets_at, false);
-      const weekResets = await clock(limits.seven_day.resets_at, true);
+          const day = (on: Date) => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(on);
+          return day(d) === day(new Date()) ? time : `${new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(d)} ${time}`;
+        }, iso);
+      const fiveResets = await clock(limits.five_hour.resets_at);
+      const weekResets = await clock(limits.seven_day.resets_at);
+      if (!/^\D+ \d{2}:\d{2}$/.test(weekResets)) throw new Refused(`the week resets three days out, on another day, so it reads with its weekday — it read ${weekResets}`);
       await expectTexts(line.locator('[data-quota-window="five_hour"]'), [`5-hour ${Math.round(QUOTA.fiveHour.used)}% · resets ${fiveResets}`], 'the five-hour window, used and when it resets, in the browser’s time');
       await expectTexts(line.locator('[data-quota-window="seven_day"]'), [`week ${QUOTA.week.used}% · resets ${weekResets}`], 'the week, with the weekday it resets on');
       await expectCount(line.locator('[data-quota-window="seven_day"][data-marked]'), 1, `the week, ${QUOTA.week.used}% used, is marked`);

@@ -53,6 +53,13 @@ and nothing in a tick, `assess`, `wf decide` or a gate calls it (its README's *N
   own, `e2e-pages.test.ts` and `e2e-merge.test.ts`, typechecked by `test/e2e/tsconfig.json`); `test/e2e/*.test.ts` are the ones that
   launch Chromium, and only `npm run e2e` runs them. The two sat in `test/e2e/`, so the check of a run that touches nothing under
   `apps/` stayed green with CLAUDE.md's union line gone (learned by the run that put the e2e's page names in `pages/NAMES`).
+- **An e2e expectation about a time of day must read the day, not assume it.** The quota page's five-hour window resets 130
+  minutes out, and the page spelled the reset it expected with no weekday. After 21:50 that reset falls on tomorrow, `clockWord`
+  prepends `Sun`, and the page fails for the hour it was run at and nothing else. Work the expected words out by the rule the code
+  keeps — same day or not — and assert the weekday separately where it must show (learned by the run that added the folder page).
+- **A run added to the e2e's seed shifts every count asserted about the store.** The Factory's tally, and the Runs page's rows,
+  its Finished heading and the count it checks again after Enter, all name a number: one more finished run fails four assertions on
+  three pages before its own page is reached. Add the run, then run the e2e and follow it to the end (learned by the same run).
 - **A test that names the last e2e page fails on the next page added.** The merge test (`apps/web/test/e2e-merge.test.ts`) wrote
   `240-capabilities.ts` as the last page and `250` as the number two runs would both take, so the page after it failed before a browser
   opened. It reads both off `pages/` now; a test about the pages reads the pages that exist (learned by the run that added the `outcome` page).

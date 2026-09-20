@@ -289,6 +289,8 @@ export type RunDetail = {
      * Empty for a step of a git run, whose work is a branch, and for one not filed yet.
      */
     files: StepArtifact[];
+    /** Why that list is empty when the folder is there and could not be read; null where the list is what the folder holds. */
+    filesError: string | null;
     branch: string | null;
     status: string;
     /** As on `RunSummary`. */
@@ -585,7 +587,7 @@ export type StepReach = {
   step: string;
   harness: string;
   claudeCode: boolean;
-  fence: { tools: string[] | null; disallow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
+  fence: { tools: string[] | null; disallow: string[]; allow: string[]; permissionMode: string | null; effort: string | null; mcp: null };
   tools: { from: 'declared' | 'measured'; names: string[]; inferred: string[]; removed: Array<{ name: string; rule: string; source: string; of: string | null }> } | null;
   skills: { names: string[]; why: string | null } | null;
   /** Each tool of each server: the deny over it, the ask rule over it when no deny is, and whether an allow reaches it with neither. */

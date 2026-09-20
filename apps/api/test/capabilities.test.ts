@@ -366,7 +366,7 @@ const stepsRepo = () => repoWith({
   '.mcp.json': { mcpServers: { fixture: fixture() } },
   '.claude/skills/review/SKILL.md': '---\nname: code-review\ndescription: Review a diff.\n---\n',
   'workflows/dev/implement.md': '---\nharness: claude\ndisallow: SendMessage, CronCreate, mcp__fixture__echo, Bash(npm run build)\n---\nImplement it.\n',
-  'workflows/dev/review.md': '---\nharness: claude\nafter: implement\ntools: Read, Grep, Glob, Bash\npermissionMode: dontAsk\neffort: high\n---\nReview it.\n',
+  'workflows/dev/review.md': '---\nharness: claude\nafter: implement\ntools: Read, Grep, Glob, Bash\npermissionMode: dontAsk\nallow: Edit(**)\neffort: high\n---\nReview it.\n',
   'workflows/codexed/plan.md': '---\nharness: codex\n---\nPlan it.\n',
 });
 
@@ -387,7 +387,8 @@ const nothingElse = { takenBack: [], asked: [], unused: [], exceptions: [], why:
 
 test('a step with `tools:` gets exactly those — no skill without Skill, the tools of each server the checkout enables, and the settings\' deny', async () => {
   const { 'dev/review': review } = await stepsOf(stepsRepo());
-  assert.deepEqual(review.fence, { tools: ['Read', 'Grep', 'Glob', 'Bash'], disallow: [], permissionMode: 'dontAsk', effort: 'high', mcp: null });
+  assert.deepEqual(review.fence, { tools: ['Read', 'Grep', 'Glob', 'Bash'], disallow: [], allow: ['Edit(**)'], permissionMode: 'dontAsk', effort: 'high', mcp: null },
+    "its `allow:` among them: in dontAsk what a rule allows is the difference between a step that can do its work and one that cannot");
   assert.deepEqual(review.tools, { from: 'declared', names: ['Read', 'Grep', 'Glob', 'Bash'], inferred: [], removed: [] });
   assert.equal(review.claudeCode, true);
   assert.deepEqual(review.skills.names, []);
@@ -408,7 +409,7 @@ test('a step without `tools:` gets the harness\'s own set — what was measured,
   assert.deepEqual(implement.tools.names, [...MEASURED_TOOLS.tools, ...inferred].filter((name: string) => name !== 'SendMessage'));
   assert.deepEqual(implement.tools.inferred, inferred);
   assert.deepEqual(implement.skills, { names: ['code-review'], why: null });
-  assert.deepEqual(implement.fence, { tools: null, disallow: ['SendMessage', 'CronCreate', 'mcp__fixture__echo', 'Bash(npm run build)'], permissionMode: null, effort: null, mcp: null });
+  assert.deepEqual(implement.fence, { tools: null, disallow: ['SendMessage', 'CronCreate', 'mcp__fixture__echo', 'Bash(npm run build)'], allow: [], permissionMode: null, effort: null, mcp: null });
 });
 
 test('REFUSED: the measured set holds only what the ledger\'s measurement names, as a tool of its own — a tool it does not name is inferred, with why, or not there', () => {
@@ -549,7 +550,7 @@ test('REFUSED: a `dontAsk` step without Bash runs no command, whatever the setti
 test('a Codex step shows its fence, and nothing it was not measured to get or does not read: no tools, skills, servers, or rules of the settings', async () => {
   const { 'codexed/plan': plan } = await stepsOf(stepsRepo());
   assert.deepEqual([plan.harness, plan.claudeCode, plan.tools, plan.skills, plan.mcp, plan.denied, plan.asked], ['codex', false, null, null, null, [], []]);
-  assert.deepEqual(plan.fence, { tools: null, disallow: [], permissionMode: null, effort: null, mcp: null });
+  assert.deepEqual(plan.fence, { tools: null, disallow: [], allow: [], permissionMode: null, effort: null, mcp: null });
   assert.deepEqual(plan.allowed, { rules: [], takenBack: [], asked: [], unused: [], bash: [], exceptions: [], dontAsk: false, why: 'codex reads no .claude/settings.json, so none of its rules is claimed for this step.' });
 });
 

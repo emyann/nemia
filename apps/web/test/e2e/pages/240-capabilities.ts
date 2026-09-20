@@ -55,6 +55,9 @@ export default {
     for (const tool of declared) await expectVisible(review.locator(`[data-tool="${tool}"]`), `review has ${tool}, which its tools: names`);
     await expectCount(review.locator('[data-tool]'), declared.length, `review has exactly the tools it declares (${good.tools})`);
     await expectCount(review.locator('[data-measured]'), 0, 'and no measured set: it declares its own');
+    // The fence as the file declares it, allow list and all: in dontAsk what a rule allows is what the step may do, and the page said only what it denies.
+    await expectVisible(review.locator('dt', { hasText: /^allow$/ }), "review's fence says what it allows, beside what it denies");
+    await expectVisible(review.locator('dt', { hasText: /^allow$/ }).locator('xpath=following-sibling::dd[1]').getByText('nothing', { exact: true }), 'nothing, where the step names no rule');
     for (const command of CHECKOUT.allowed.map((rule) => rule.slice('Bash('.length, -1))) {
       await expectVisible(review.locator(`[data-bash="${command}"]`), `review, in dontAsk, shows the Bash command the settings allow (${command})`);
     }

@@ -71,26 +71,30 @@ export function artifactOf(run: Pick<Run, 'id'>, step: string, file: string): St
  * What the route cannot serve is listed all the same, by its path alone, drawn as any path a closeout named that the api does not
  * serve: a directory, a link (`fileIn` follows none), a name with a separator or `..` in it. The route serves a name and never a
  * path, and none of those becomes reachable by being listed — but a folder holding only `notes/` is not an empty folder, and the
- * board, which turns an empty list into *the folder is empty*, would tell a person their step made nothing. An unreadable folder
- * is an empty list — a step not filed yet has no folder at all, and that is not an error.
+ * board, which turns an empty list into *the folder is empty*, would tell a person their step made nothing. A folder that is not
+ * there is an empty list and no error — a step not filed yet has no folder. A folder that is there and cannot be read is neither:
+ * the page is given the reason instead of the list, since *the folder is empty* would again say the step made nothing when the truth
+ * is that nobody could look.
  *
  * Beside the closeout's `artifacts`, which are the files a step *named* and the run collected: these are what is in the folder,
  * named or not, which is the only way to see what a step left behind that it forgot to name.
  */
-export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): StepArtifact[] {
+export function folderFiles(run: Pick<Run, 'id'>, step: string, dir: string): { files: StepArtifact[]; error: string | null } {
   let names: string[];
   try {
     names = fs.readdirSync(dir).sort();
-  } catch {
-    return [];
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException).code;
+    return { files: [], error: code === 'ENOENT' ? null : `Its folder could not be read (${code ?? (e as Error).message}).` };
   }
-  return names.map((name) => {
+  const files = names.map((name) => {
     const here = path.join(dir, name);
     const stat = refusedName(name) === null ? fileIn(dir, name) : undefined;
     if (!stat) return { path: here };
     const url = `/api/runs/${encodeURIComponent(run.id)}/steps/${encodeURIComponent(step)}/files/${encodeURIComponent(name)}`;
     return { path: here, name, url, kind: typeOf(name).kind, size: stat.size };
   });
+  return { files, error: null };
 }
 
 /**

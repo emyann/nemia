@@ -405,6 +405,8 @@ export type RunDetail = {
      * only what its closeout named. Empty for a step of a git run, whose work is a branch to read, and for one not filed yet.
      */
     files: StepArtifact[];
+    /** Why that list is empty when the folder is there and could not be read (`folderFiles`); null where the list is what the folder holds. */
+    filesError: string | null;
     branch: string | null;
     status: string;
     /** As on `RunSummary`. */
@@ -1139,10 +1141,15 @@ async function lastLineOf(view: TaskView): Promise<string | null> {
  */
 const workFolderOf = (run: Run, step: string): string | null => (isGitRun(run) ? null : (run.steps[step]?.workspace ?? null));
 
-/** Every file that folder holds (`folderFiles`), for a person who never opens a terminal; empty where there is no folder. */
-function filesOf(run: Run, step: string): StepArtifact[] {
+/**
+ * Every file that folder holds (`folderFiles`), for a person who never opens a terminal; empty where there is no folder. A folder the
+ * api cannot read answers with why instead of a list, since the board words an empty list as the step having made nothing.
+ */
+function filesOf(run: Run, step: string): { files: StepArtifact[]; filesError: string | null } {
   const dir = workFolderOf(run, step);
-  return dir ? folderFiles(run, step, dir) : [];
+  if (!dir) return { files: [], filesError: null };
+  const { files, error } = folderFiles(run, step, dir);
+  return { files, filesError: error };
 }
 
 /** A try asked for, as the page says it (`StepAsked`). */
@@ -1237,7 +1244,7 @@ async function detail(run: Run): Promise<RunDetail> {
         told: toldOf(run, name, source, views),
         taskId,
         workspace: run.steps[name]?.workspace ?? null,
-        files: filesOf(run, name),
+        ...filesOf(run, name),
         branch: run.steps[name]?.branch ?? null,
         note: judged.notes.get(name) ?? null,
         ...needs,

@@ -155,6 +155,31 @@ test("a folder step carries everything its folder holds: what a name reaches wit
   ]);
 });
 
+test('a folder the api cannot read says why, where one not there is an empty list', async () => {
+  // Two folders neither of which lists: one that is a regular file where a folder should be, which `readdirSync` refuses with ENOTDIR
+  // as a folder removed under the run or one nobody may read refuses with ENOENT or EACCES; and one the run has not made yet.
+  const notAFolder = path.join(root, 'runs', 'f-gone', 'not-a-folder');
+  fs.mkdirSync(path.dirname(notAFolder), { recursive: true });
+  fs.writeFileSync(notAFolder, 'a file where a folder should be');
+  fs.writeFileSync(path.join(root, 'runs', 'f-gone.json'), JSON.stringify({
+    id: 'f-gone', place: { kind: 'folder' }, workspace: path.join(root, 'runs', 'f-gone'), brief: 'Write a note.', createdAt: at,
+    workflowDir: path.join(root, 'no-such-workflow'),
+    workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'claude', workspace: 'folder' }, { name: 'review', after: ['write'], body: 'Read it.', harness: 'claude', workspace: 'folder' }],
+    steps: {
+      write: { taskId: 't-gone-write', workspace: notAFolder, branch: null },
+      review: { taskId: 't-gone-review', workspace: path.join(root, 'runs', 'f-gone', 'review'), branch: null },
+    },
+  }));
+
+  const run = (await (await app.request('/api/runs/f-gone')).json()) as { steps: { name: string; files: unknown[]; filesError: string | null }[] };
+  const write = run.steps.find((s) => s.name === 'write')!;
+  assert.deepEqual(write.files, [], 'nothing to list');
+  assert.equal(write.filesError, 'Its folder could not be read (ENOTDIR).',
+    'and why — an empty list here is the board saying the step made nothing when nobody could look');
+  const review = run.steps.find((s) => s.name === 'review')!;
+  assert.deepEqual([review.files, review.filesError], [[], null], 'a folder the run has not made yet is empty, and no error');
+});
+
 test("a folder step's file is served by name, and a name that is a path, or not in the folder, is refused", async () => {
   const base = '/api/runs/f-notes/steps/write/files';
 

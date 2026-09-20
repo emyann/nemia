@@ -187,12 +187,19 @@ function StepSection({ run, step, runCancelled }: { run: RunDetail; step: Step; 
 
       {/* What a folder step left in its folder, which is the whole of what it made: the files its closeout named and the ones it
           forgot to, each with its size, and a text file readable in a tab — and what the api serves by no name, a directory or a
-          link, by its path, so *the folder is empty* is said of an empty folder and of nothing else. A git step's work is its
+          link, by its path, so *the folder is empty* is said of an empty folder and of nothing else. A folder the api could not read
+          says so instead: an empty list there would say the step made nothing when nobody could look. A git step's work is its
           branch, and has no such list. */}
       {run.place === 'folder' && step.taskId !== null && (
         <div aria-label="Files" data-files className="text-xs text-neutral-500">
-          Files in its folder:
-          <Artifacts artifacts={step.files} size none="the folder is empty" />
+          {step.filesError === null ? (
+            <>
+              Files in its folder:
+              <Artifacts artifacts={step.files} size none="the folder is empty" />
+            </>
+          ) : (
+            <span data-files-error>{step.filesError}</span>
+          )}
         </div>
       )}
 

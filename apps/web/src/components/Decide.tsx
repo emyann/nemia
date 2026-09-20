@@ -73,7 +73,7 @@ export function DecideSection({ runId, decision, offers = null, run = null }: { 
       <div className="space-y-4">
         {inFolders ? (
           <div data-in-folders className="space-y-1">
-            <p className="text-sm text-neutral-500">Worked in folders, with no git repository: nothing to merge.</p>
+            <p className="text-sm text-neutral-500">Worked in folders of its own, and changed nothing anywhere else: what it made is there, to keep or to forget.</p>
             <Facts rows={[['work', pathRow(run!.work)]]} />
           </div>
         ) : touched.length ? (

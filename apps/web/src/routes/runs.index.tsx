@@ -86,7 +86,8 @@ function RunRow({ run }: { run: RunSummary }) {
         <p className="truncate font-medium">{title}</p>
         <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-neutral-500">
           <span className="font-mono">{run.id}</span>
-          <span>{run.repo ?? 'folders, no repository'}</span>
+          {/* A folder run has no repository to name: where a git run's row says one, it says what it works in. */}
+          <span title={run.repo ?? 'Its steps work in folders the run made'}>{run.repo ?? 'folders'}</span>
           {run.cancelledAt && <span className="text-amber-600">cancelled</span>}
           {/* As `wf ls` prints `→ waiting on you:` — the steps, `approve plan` for one at its gate, or for a run waiting on a run that never ships, what is yours to resolve. */}
           {waitsOnYou(run) && (onYouOf(run).length > 0 || run.waiting?.advice) && (

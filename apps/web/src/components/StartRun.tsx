@@ -88,7 +88,7 @@ export function StartRun({ workflow, card, repo, onStarted, onRefused }: {
           {start.isPending ? 'Starting…' : 'Start'}
         </button>
         <span className="min-w-0 text-xs text-neutral-500">
-          {inFolders ? 'Works in folders it makes for each step, with no git repository' : <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>}, from{' '}
+          {inFolders ? 'Works in folders it makes for each step' : <>Runs in {repo ? <code className="font-mono break-all">{repo}</code> : 'this repository'}</>}, from{' '}
           <code className="font-mono break-all">{workflow.dir}</code>
           {card && ', and the card leaves the inbox'}.
         </span>

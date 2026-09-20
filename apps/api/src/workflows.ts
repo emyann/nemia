@@ -19,7 +19,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { HOME, inboxDir, inboxNameRefusal, listRuns, start, startFromInbox } from 'agent-workflows';
-import { AGENTS_FOLDER, agentsDir, contextText, loadWorkflows, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
+import { AGENTS_FOLDER, agentsDir, contextText, isFolderTeam, loadWorkflows, splitFrontmatter, STEP_KEY_MEANINGS, STEP_KEYS, workflowDescription, type StepKey, type Workflow } from 'agent-workflows/workflow';
 import { repoOf } from './capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from './guard.ts';
 import { graphOf, type RunGraph } from './graph.ts';
@@ -82,6 +82,12 @@ export type WorkflowListing = {
   steps: ListedStep[];
   graph: RunGraph;
   schemas: string[];
+  /**
+   * Whether every step says `workspace: folder` (`isFolderTeam`): a team that works in folders the run makes and never looks at a
+   * repository. What the board reads to file a card for it without a `repo:`, and to say where a run of it does its work. False for a
+   * folder that does not load, which has no steps to ask.
+   */
+  folderTeam: boolean;
   /**
    * What the folder's files held when it was listed (`versionOf`): a builder's save carries it, and is refused when the folder no longer
    * holds that, rather than written over what changed.
@@ -148,9 +154,9 @@ export function listed(name: string, from: WorkflowSource, dir: string): Workflo
   try {
     steps = loadWorkflows(dir);
   } catch (err) {
-    return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, version, error: messageOf(err) };
+    return { name, from, dir, description, steps: [], graph: graphOf([]), schemas, folderTeam: false, version, error: messageOf(err) };
   }
-  return { name, from, dir, description, steps: steps.map(listedStep), graph: graphOf(steps), schemas, version, error: null };
+  return { name, from, dir, description, steps: steps.map(listedStep), graph: graphOf(steps), schemas, folderTeam: isFolderTeam(steps), version, error: null };
 }
 
 /** A step as the listing has it: resolved, and what its file sets itself where an agent gives it the rest. */

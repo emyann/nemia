@@ -690,6 +690,11 @@ export type WorkflowListing = {
   graph: RunGraph;
   /** The `.json` files beside the steps, which an `output:` may name. */
   schemas: string[];
+  /**
+   * Whether every step says `workspace: folder`: a team that works in folders the run makes and never looks at a repository. A card
+   * for one is filed with no `repo:` (the api refuses one), and a run of one has no branch to read.
+   */
+  folderTeam: boolean;
   /** What the folder's files held when it was listed: a save carries it, and the api refuses one of a folder changed since (409). */
   version: string;
   error: string | null;
